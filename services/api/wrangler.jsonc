@@ -3,12 +3,13 @@
   "main": "src/index.ts",
   "compatibility_date": "2025-11-25",
   "compatibility_flags": ["nodejs_compat"],
-
   "d1_databases": [
     {
       "binding": "DB",
       "database_name": "wonder",
-      "database_id": "preview_only"
+      "database_id": "6da9d996-e498-4f1f-8437-667705030a54",
+      "migrations_dir": "src/infrastructure/db/migrations",
+      "remote": true
     }
   ]
 }
