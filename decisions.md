@@ -1,7 +1,5 @@
 # Key Design Decisions
 
-Insights from workflow editor walkthrough (Nov 2024).
-
 ---
 
 ## 1. Unified Node Model Works in UI
@@ -172,13 +170,80 @@ Node (call API)
 
 ---
 
+## 9. Project Chat for Workflow Editing
+
+Users interact with an agent to build and manage workflows.
+
+### Scope Hierarchy
+
+| Chat Context     | Purpose                        | Can Access                              |
+| ---------------- | ------------------------------ | --------------------------------------- |
+| **Workflow Run** | Interact with running workflow | Run state, artifacts, human inputs      |
+| **Project**      | Build and manage workflows     | All workflows, actions, runs in project |
+| **Workspace**    | Cross-project queries          | All projects, library                   |
+
+**Primary editing happens in Project Chat.** Scoped context = better agent performance.
+
+### Agent Tools via MCP
+
+The project agent uses Wonder's MCP server:
+
+**Query**: `search_workflows`, `get_workflow`, `list_runs`, `search_artifacts`  
+**Mutate**: `create_workflow`, `update_workflow`, `create_action`, `trigger_run`  
+**Introspect**: `get_project_context`, `validate_workflow`
+
+### Semantic Search Over Metadata
+
+Vectorize indexes:
+
+- Workflow descriptions
+- Action descriptions
+- Prompt templates
+- Library contents
+
+Enables: "Find workflows similar to X", "Which workflow handles Y?"
+
+---
+
+## 10. Platform Operations as Workflows
+
+Complex MCP tool calls are implemented as workflows, not code.
+
+### Why
+
+- **Consistency**: Same infrastructure for platform and user workflows
+- **Observability**: Debug platform operations with same tooling
+- **Improvability**: Platform workflows are versioned, testable, upgradable
+- **Dogfooding**: Wonder uses Wonder
+
+### Platform Project
+
+A special hidden project (`platform_operations`) contains platform workflows:
+
+```
+Workspace: Wonder Platform (internal)
+└── Project: platform_operations
+    ├── workflow_editor_v1      — handles update_workflow tool
+    ├── workflow_creator_v1     — handles create_workflow tool
+    ├── run_explainer_v1        — handles explain_run tool
+    └── improvement_suggester_v1— analyzes runs, suggests optimizations
+```
+
+### Mechanics
+
+1. MCP tool handler (Worker) receives call
+2. Worker starts a workflow run in platform project
+3. Workflow executes on normal infrastructure (DO, Workers, Queues)
+4. Worker waits for completion, returns result
+
+Platform workflows can use reasoning strategies (consensus, tree-of-thought) just like user workflows.
+
+### Visibility
+
+- Hidden from regular users
+- Visible to admins for debugging
+- All operations logged as runs
+
+---
+
 ## Summary
-
-The model is sound:
-
-- Unified nodes with fan_out/fan_in
-- Isolated sub-workflows with explicit I/O mapping
-- Local state + global artifacts
-- Full observability via events and run tree
-
-Implementation will find edge cases. Build, measure, iterate.
