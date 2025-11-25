@@ -10,14 +10,20 @@
     "db:generate": "drizzle-kit generate",
     "db:migrate:local": "wrangler d1 migrations apply wonder --local",
     "db:migrate:remote": "wrangler d1 migrations apply wonder --remote",
-    "db:studio": "drizzle-kit studio"
+    "db:studio": "drizzle-kit studio",
+    "test": "vitest --run",
+    "test:watch": "vitest",
+    "test:ui": "vitest --ui"
   },
   "dependencies": {
     "drizzle-orm": "^0.44.7"
   },
   "devDependencies": {
+    "@types/node": "^24.10.1",
+    "@vitest/ui": "^4.0.14",
     "drizzle-kit": "^0.31.7",
     "typescript": "^5.9.3",
+    "vitest": "^4.0.14",
     "wrangler": "^4.50.0"
   }
 }
