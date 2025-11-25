@@ -87,7 +87,7 @@ services/api/src/
 │   ├── queues/           # Cloudflare Queues (future)
 │   └── clients/          # External APIs (MCP, GitHub, Anthropic)
 └── adapters/             # Protocol adapters (thin wrappers)
-    ├── http/             # REST API (Hono routes)
+    ├── http/             # REST API
     └── rpc/              # Workers RPC endpoints
 ```
 
