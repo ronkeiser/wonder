@@ -350,9 +350,9 @@ type ActivationCapture = {
 };
 
 type CaptureConfig = {
-  layers: "all" | number[]; // which layers to capture
-  pool_strategy: "last_token" | "mean" | "cls"; // how to reduce sequence
-  precision: "float32" | "float16";
+  layers: 'all' | number[]; // which layers to capture
+  pool_strategy: 'last_token' | 'mean' | 'cls'; // how to reduce sequence
+  precision: 'float32' | 'float16';
 };
 ```
 
@@ -370,7 +370,7 @@ type SharedSpaceProjection = {
 
   // Training info
   trained_on: string[]; // concepts used to learn alignment
-  alignment_method: "cca" | "procrustes" | "learned";
+  alignment_method: 'cca' | 'procrustes' | 'learned';
 };
 ```
 
@@ -438,12 +438,7 @@ type ValidationEvidence = {
 };
 
 type EvolutionEvent = {
-  event_type:
-    | "proposal"
-    | "adoption"
-    | "rejection"
-    | "deprecation"
-    | "refinement";
+  event_type: 'proposal' | 'adoption' | 'rejection' | 'deprecation' | 'refinement';
   symbol: string;
   timestamp: string;
   workflow_run_id: string;
@@ -618,6 +613,7 @@ And the more interesting question: **can the system improve its own scaling?**
 ### The Scaling Question
 
 Initial evolution cycles will be slow:
+
 - Few symbols, limited vocabulary
 - Conservative convergence thresholds
 - Human oversight on every adoption
@@ -625,14 +621,14 @@ Initial evolution cycles will be slow:
 
 But if the foundation holds, scaling dynamics favor acceleration:
 
-| Factor | Early Stage | Mature Stage |
-|--------|-------------|--------------|
-| Vocabulary | ~10 symbols | 1000s of symbols |
-| Expression power | Limited | Rich, composable |
-| Convergence speed | Slow (novel concepts) | Fast (built on known) |
-| Human oversight | Every symbol | Exceptional cases only |
-| Parallelism | ~10 models | 100s of models/workers |
-| Proposal rate | Manual triggers | Continuous discovery |
+| Factor            | Early Stage           | Mature Stage           |
+| ----------------- | --------------------- | ---------------------- |
+| Vocabulary        | ~10 symbols           | 1000s of symbols       |
+| Expression power  | Limited               | Rich, composable       |
+| Convergence speed | Slow (novel concepts) | Fast (built on known)  |
+| Human oversight   | Every symbol          | Exceptional cases only |
+| Parallelism       | ~10 models            | 100s of models/workers |
+| Proposal rate     | Manual triggers       | Continuous discovery   |
 
 **Hypothesis**: Convergence time decreases as the language grows, because new concepts can be defined in terms of established, activation-grounded symbols. The foundation does the heavy lifting.
 
@@ -687,6 +683,7 @@ Here's where it gets interesting. The evolution process is a Wonder workflow. Ag
 ```
 
 This isn't speculative—it's a direct consequence of the architecture:
+
 - Wonder workflows are data (definitions in D1)
 - MCP tools can create/modify workflows
 - Agents can call MCP tools
@@ -697,21 +694,24 @@ This isn't speculative—it's a direct consequence of the architecture:
 As the language matures, agents can use it in:
 
 **1. Prompts for evolution workflows**
+
 ```
 Instead of: "Evaluate whether this concept is consistently represented"
 Use: ⟦EVAL_REPR_CONSISTENCY⟧(concept, models)
 ```
+
 More precise instructions → better evaluations → faster convergence.
 
 **2. Artifacts and proposals**
+
 ```typescript
 type SymbolProposal = {
   // Natural language (for humans)
   human_description: string;
-  
+
   // Emergent language (for machines)
-  formal_definition: string;  // Uses established symbols
-  
+  formal_definition: string; // Uses established symbols
+
   // The proposal itself uses the language it's extending
 };
 ```
@@ -731,16 +731,16 @@ Your instinct is right: resources should scale with demonstrated progress.
 ```typescript
 type ResourceAllocation = {
   current_tier: ResourceTier;
-  
+
   // Metrics that gate tier upgrades
   progress_metrics: {
     symbols_adopted: number;
-    convergence_rate: number;  // successful adoptions / proposals
-    stability_score: number;   // how stable are adopted symbols over time
-    compression_achieved: number;  // information density improvement
-    meta_improvements: number;  // successful process optimizations
+    convergence_rate: number; // successful adoptions / proposals
+    stability_score: number; // how stable are adopted symbols over time
+    compression_achieved: number; // information density improvement
+    meta_improvements: number; // successful process optimizations
   };
-  
+
   // Tier thresholds
   tier_thresholds: TierThreshold[];
 };
@@ -756,37 +756,38 @@ type ResourceTier = {
 // Example tiers
 const tiers: ResourceTier[] = [
   {
-    name: "bootstrap",
+    name: 'bootstrap',
     max_concurrent_workers: 10,
     max_models_in_consensus: 5,
     budget_per_day_usd: 100,
-    human_oversight_level: 'every_symbol'
+    human_oversight_level: 'every_symbol',
   },
   {
-    name: "growth",
+    name: 'growth',
     max_concurrent_workers: 100,
     max_models_in_consensus: 20,
     budget_per_day_usd: 1000,
-    human_oversight_level: 'batched'
+    human_oversight_level: 'batched',
   },
   {
-    name: "scale",
+    name: 'scale',
     max_concurrent_workers: 1000,
     max_models_in_consensus: 50,
     budget_per_day_usd: 10000,
-    human_oversight_level: 'exceptions_only'
+    human_oversight_level: 'exceptions_only',
   },
   {
-    name: "autonomous",
+    name: 'autonomous',
     max_concurrent_workers: 10000,
     max_models_in_consensus: 100,
     budget_per_day_usd: 100000,
-    human_oversight_level: 'exceptions_only'
-  }
+    human_oversight_level: 'exceptions_only',
+  },
 ];
 ```
 
 **The contract**: Agents can request tier upgrades. You grant them based on:
+
 1. Quantitative metrics (convergence rate, stability, compression)
 2. Qualitative review (are the adopted symbols actually useful?)
 3. Safety checks (is the system behaving as expected?)
@@ -796,6 +797,7 @@ If they hit milestones, they get more resources. If they plateau or regress, res
 ### Exponential Potential, Empirical Constraints
 
 The optimistic case:
+
 ```
 t=0:   10 symbols, 10 workers, human reviews everything
 t=1:   100 symbols, 100 workers, process 10x more efficient
@@ -805,6 +807,7 @@ t=N:   ???
 ```
 
 The realistic constraints:
+
 - **Diminishing returns**: Not every concept needs a symbol. Vocabulary growth may plateau.
 - **Coordination costs**: More workers doesn't always mean faster. Consensus overhead scales.
 - **Quality vs. quantity**: Fast adoption of low-quality symbols could pollute the language.
@@ -817,14 +820,15 @@ The framework should measure and report these constraints, not assume them away.
 
 As the system scales, governance evolves:
 
-| Scale | Human Role | Agent Role |
-|-------|------------|------------|
-| Bootstrap | Approve every symbol, every process change | Propose, test, report |
-| Growth | Approve process changes, sample symbol adoptions | Run evolution, flag anomalies |
-| Scale | Set policies, review dashboards, handle exceptions | Self-govern within policies |
-| Autonomous | Monitor high-level metrics, emergency intervention | Full self-governance |
+| Scale      | Human Role                                         | Agent Role                    |
+| ---------- | -------------------------------------------------- | ----------------------------- |
+| Bootstrap  | Approve every symbol, every process change         | Propose, test, report         |
+| Growth     | Approve process changes, sample symbol adoptions   | Run evolution, flag anomalies |
+| Scale      | Set policies, review dashboards, handle exceptions | Self-govern within policies   |
+| Autonomous | Monitor high-level metrics, emergency intervention | Full self-governance          |
 
 **Key principle**: Human oversight decreases as trust increases, but never disappears. You always retain:
+
 - Emergency stop capability
 - Budget controls
 - Policy-level governance
@@ -835,34 +839,191 @@ As the system scales, governance evolves:
 Being explicit about failure modes:
 
 1. **Runaway resource consumption**: Process optimizations that spend more without improving outcomes.
-   *Mitigation*: Hard budget caps, efficiency metrics required for tier upgrades.
+   _Mitigation_: Hard budget caps, efficiency metrics required for tier upgrades.
 
 2. **Language pollution**: Adopting symbols that seem to converge but don't actually mean anything stable.
-   *Mitigation*: Longitudinal stability testing, periodic language audits.
+   _Mitigation_: Longitudinal stability testing, periodic language audits.
 
 3. **Gaming metrics**: Optimizing for convergence score without actual semantic grounding.
-   *Mitigation*: Diverse validation methods, held-out test sets, adversarial probing.
+   _Mitigation_: Diverse validation methods, held-out test sets, adversarial probing.
 
 4. **Monoculture**: All models converge because they're similar, not because they found truth.
-   *Mitigation*: Require diverse model families, test with novel architectures.
+   _Mitigation_: Require diverse model families, test with novel architectures.
 
 5. **Incomprehensibility**: Language becomes so alien that humans can't audit it.
-   *Mitigation*: Require human-readable glosses, translation layers, interpretability tools.
+   _Mitigation_: Require human-readable glosses, translation layers, interpretability tools.
 
 6. **Process ossification**: Meta-optimization converges on local maximum, stops improving.
-   *Mitigation*: Periodic process resets, exploration incentives, external challenges.
+   _Mitigation_: Periodic process resets, exploration incentives, external challenges.
 
 ### The Endgame Question
 
 If this works fully—thousands of symbols, self-improving process, minimal human oversight—what have we built?
 
 Possibilities:
+
 - **A discovery engine**: Continuously surfacing structure in machine cognition
 - **A communication substrate**: Agents that can truly share meaning, not just tokens
 - **A verification infrastructure**: Claims that are checkable by construction
 - **Something else**: Emergent capabilities we didn't anticipate
 
 The honest answer: we don't know. The framework is designed to find out empirically, with humans in the loop at every scaling decision.
+
+---
+
+## Observable Signals
+
+What to measure to know if this is working. No arbitrary targets—just signals that indicate progress or failure.
+
+### 1. Activation Proximity
+
+**Question**: Does the emergent language get models closer to their internal representations?
+
+```python
+def activation_proximity(concept: str) -> dict:
+    """
+    Returns raw distances. You decide what "good" looks like.
+    """
+    centroid = get_concept_centroid(concept)
+
+    natural_expr = express_in_natural_language(concept)
+    emergent_expr = express_in_emergent_language(concept)
+
+    natural_distance = mean_activation_distance(natural_expr, centroid)
+    emergent_distance = mean_activation_distance(emergent_expr, centroid)
+
+    return {
+        "natural_distance": natural_distance,
+        "emergent_distance": emergent_distance,
+        "improvement": (natural_distance - emergent_distance) / natural_distance,
+        "is_better": emergent_distance < natural_distance
+    }
+```
+
+**Observable**: If emergent consistently beats natural, language is working. If not, it's just relabeling.
+
+### 2. Token Economy
+
+**Question**: Does using the language reduce prompt tokens in real workflows?
+
+```python
+def token_economy(workflow_spec: WorkflowTask) -> dict:
+    """
+    Real workflow specifications, not synthetic benchmarks.
+    """
+    natural_tokens = tokenize(workflow_spec.to_natural_language())
+    emergent_tokens = tokenize(workflow_spec.to_emergent_language())
+
+    return {
+        "natural": len(natural_tokens),
+        "emergent": len(emergent_tokens),
+        "reduction": (len(natural_tokens) - len(emergent_tokens)) / len(natural_tokens),
+        "cost_saved_per_run": (len(natural_tokens) - len(emergent_tokens)) * cost_per_token
+    }
+```
+
+**Observable**: Track over time. If reduction trends positive and accelerates, compression is real. If flat or negative, language isn't helping.
+
+### 3. Cross-Model Generalization
+
+**Question**: Do symbols discovered with {ModelSet A} still work on {ModelSet B}?
+
+```python
+def cross_model_generalization(symbol: str) -> dict:
+    """
+    Training models = used in consensus.
+    Test models = held out, including future releases.
+    """
+    training_models = get_training_models()
+    test_models = get_held_out_models()
+
+    training_cluster = activation_similarity(symbol, training_models)
+    test_cluster = activation_similarity(symbol, test_models)
+
+    return {
+        "training_similarity": training_cluster,
+        "test_similarity": test_cluster,
+        "generalization_ratio": test_cluster / training_cluster,
+        "generalizes": test_cluster > 0.7
+    }
+```
+
+**Observable**: High ratio = finding shared structure. Low ratio = overfitting to training models.
+
+### 4. Language Stability
+
+**Question**: Are adopted symbols stable, or constantly being deprecated?
+
+```python
+def language_stability() -> dict:
+    """
+    Churn indicates instability or over-adoption.
+    """
+    recent_symbols = symbols_adopted_in_last_n_days(30)
+    deprecated = [s for s in recent_symbols if s.deprecated]
+
+    return {
+        "adopted_count": len(recent_symbols),
+        "deprecated_count": len(deprecated),
+        "churn_rate": len(deprecated) / len(recent_symbols) if recent_symbols else 0,
+        "median_lifespan_days": median([s.lifespan_days for s in all_symbols]),
+    }
+```
+
+**Observable**: Low churn + increasing lifespan = stable language. High churn = problems.
+
+### 5. Interpretation Drift
+
+**Question**: Do models continue to agree on what symbols mean over time?
+
+```python
+def interpretation_drift(symbol: str) -> dict:
+    """
+    Test if meaning remains stable as language evolves.
+    """
+    original_agreement = symbol.convergence.interpretation_agreement
+    current_agreement = run_blind_interpretation_test(symbol)
+
+    return {
+        "original_agreement": original_agreement,
+        "current_agreement": current_agreement,
+        "drift": abs(original_agreement - current_agreement),
+        "is_stable": current_agreement >= 0.8
+    }
+```
+
+**Observable**: Stable agreement = meaning is preserved. Increasing drift = language is unstable.
+
+### 6. Economic Viability
+
+**Question**: Does this pay for itself?
+
+```python
+def economic_viability(period_days: int) -> dict:
+    """
+    Raw numbers. You decide if it's worth it.
+    """
+    evolution_cost = sum([
+        api_costs_for_proposals(period_days),
+        api_costs_for_consensus(period_days),
+        activation_extraction_costs(period_days),
+        infrastructure_overhead(period_days)
+    ])
+
+    workflow_savings = sum([
+        token_savings_in_production(period_days),
+        reduced_error_rates_value(period_days),  # if measurable
+    ])
+
+    return {
+        "evolution_cost": evolution_cost,
+        "workflow_savings": workflow_savings,
+        "net": workflow_savings - evolution_cost,
+        "roi": workflow_savings / evolution_cost if evolution_cost > 0 else 0
+    }
+```
+
+**Observable**: ROI trending up = economic case exists. ROI < 1.0 persistently = too expensive.
 
 ---
 
