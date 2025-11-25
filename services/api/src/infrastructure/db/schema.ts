@@ -39,9 +39,7 @@ export const projects = sqliteTable(
     created_at: text('created_at').notNull(),
     updated_at: text('updated_at').notNull(),
   },
-  (table) => ({
-    workspaceIdx: index('idx_projects_workspace').on(table.workspace_id),
-  }),
+  (table) => [index('idx_projects_workspace').on(table.workspace_id)],
 );
 
 // =============================================================================
@@ -58,9 +56,10 @@ export const libraries = sqliteTable(
     created_at: text('created_at').notNull(),
     updated_at: text('updated_at').notNull(),
   },
-  (table) => ({
-    workspaceIdx: index('idx_libraries_workspace').on(table.workspace_id),
-  }),
+  (table) => [
+    index('idx_libraries_workspace').on(table.workspace_id),
+    unique('unique_libraries_workspace_name').on(table.workspace_id, table.name),
+  ],
 );
 
 // =============================================================================
@@ -89,16 +88,16 @@ export const workflow_defs = sqliteTable(
     created_at: text('created_at').notNull(),
     updated_at: text('updated_at').notNull(),
   },
-  (table) => ({
-    pk: primaryKey({ columns: [table.id, table.version] }),
-    ownerIdx: index('idx_workflow_defs_owner').on(table.owner_type, table.owner_id),
-    nameVersionIdx: index('idx_workflow_defs_name_version').on(
+  (table) => [
+    primaryKey({ columns: [table.id, table.version] }),
+    index('idx_workflow_defs_owner').on(table.owner_type, table.owner_id),
+    index('idx_workflow_defs_name_version').on(
       table.name,
       table.owner_type,
       table.owner_id,
       table.version,
     ),
-  }),
+  ],
 );
 
 export const workflows = sqliteTable(
@@ -116,10 +115,10 @@ export const workflows = sqliteTable(
     created_at: text('created_at').notNull(),
     updated_at: text('updated_at').notNull(),
   },
-  (table) => ({
-    projectIdx: index('idx_workflows_project').on(table.project_id),
-    defIdx: index('idx_workflows_def').on(table.workflow_def_id, table.pinned_version),
-  }),
+  (table) => [
+    index('idx_workflows_project').on(table.project_id),
+    index('idx_workflows_def').on(table.workflow_def_id, table.pinned_version),
+  ],
 );
 
 // =============================================================================
@@ -130,7 +129,9 @@ export const nodes = sqliteTable(
   'nodes',
   {
     id: text('id').primaryKey(),
-    workflow_def_id: text('workflow_def_id').notNull(),
+    workflow_def_id: text('workflow_def_id')
+      .notNull()
+      .references(() => workflow_defs.id),
     name: text('name').notNull(),
     action_id: text('action_id')
       .notNull()
@@ -142,23 +143,25 @@ export const nodes = sqliteTable(
     fan_out: text('fan_out', { enum: ['first_match', 'all'] }).notNull(),
     fan_in: text('fan_in', { mode: 'json' }).notNull(), // 'any' | 'all' | { m_of_n: number }
 
-    joins_node: text('joins_node'), // references nodes.id (circular - validated at runtime)
+    joins_node: text('joins_node'), // self-reference to nodes.id (enforced at application level)
     merge: text('merge', { mode: 'json' }), // merge strategy config
     on_early_complete: text('on_early_complete', {
       enum: ['cancel', 'abandon', 'allow_late_merge'],
     }),
   },
-  (table) => ({
-    workflowDefIdx: index('idx_nodes_workflow_def').on(table.workflow_def_id),
-    actionIdx: index('idx_nodes_action').on(table.action_id),
-  }),
+  (table) => [
+    index('idx_nodes_workflow_def').on(table.workflow_def_id),
+    index('idx_nodes_action').on(table.action_id),
+  ],
 );
 
 export const transitions = sqliteTable(
   'transitions',
   {
     id: text('id').primaryKey(),
-    workflow_def_id: text('workflow_def_id').notNull(),
+    workflow_def_id: text('workflow_def_id')
+      .notNull()
+      .references(() => workflow_defs.id),
     from_node_id: text('from_node_id')
       .notNull()
       .references(() => nodes.id, { onDelete: 'cascade' }),
@@ -171,11 +174,11 @@ export const transitions = sqliteTable(
     foreach: text('foreach', { mode: 'json' }), // foreach config
     loop_config: text('loop_config', { mode: 'json' }),
   },
-  (table) => ({
-    workflowDefIdx: index('idx_transitions_workflow_def').on(table.workflow_def_id),
-    fromNodeIdx: index('idx_transitions_from_node').on(table.from_node_id),
-    toNodeIdx: index('idx_transitions_to_node').on(table.to_node_id),
-  }),
+  (table) => [
+    index('idx_transitions_workflow_def').on(table.workflow_def_id),
+    index('idx_transitions_from_node').on(table.from_node_id),
+    index('idx_transitions_to_node').on(table.to_node_id),
+  ],
 );
 
 // =============================================================================
@@ -280,19 +283,20 @@ export const workflow_runs = sqliteTable(
     durable_object_id: text('durable_object_id').notNull(),
     latest_snapshot: text('latest_snapshot', { mode: 'json' }), // Snapshot
 
-    parent_run_id: text('parent_run_id'), // self-reference (circular - validated at runtime)
+    parent_run_id: text('parent_run_id'), // self-reference to workflow_runs.id (enforced at application level)
     parent_node_id: text('parent_node_id').references(() => nodes.id),
 
     created_at: text('created_at').notNull(),
     updated_at: text('updated_at').notNull(),
     completed_at: text('completed_at'),
   },
-  (table) => ({
-    projectIdx: index('idx_workflow_runs_project').on(table.project_id),
-    workflowIdx: index('idx_workflow_runs_workflow').on(table.workflow_id),
-    statusIdx: index('idx_workflow_runs_status').on(table.status),
-    parentIdx: index('idx_workflow_runs_parent').on(table.parent_run_id),
-  }),
+  (table) => [
+    index('idx_workflow_runs_project').on(table.project_id),
+    index('idx_workflow_runs_workflow').on(table.workflow_id),
+    index('idx_workflow_runs_status').on(table.status),
+    index('idx_workflow_runs_parent').on(table.parent_run_id),
+    index('idx_workflow_runs_created_at').on(table.created_at),
+  ],
 );
 
 export const events = sqliteTable(
@@ -329,13 +333,12 @@ export const events = sqliteTable(
     timestamp: text('timestamp').notNull(),
     archived_at: text('archived_at'), // when moved to R2 (30-day retention policy)
   },
-  (table) => ({
-    runSequenceIdx: index('idx_events_run_sequence').on(
-      table.workflow_run_id,
-      table.sequence_number,
-    ),
-    timestampIdx: index('idx_events_timestamp').on(table.timestamp),
-  }),
+  (table) => [
+    index('idx_events_run_sequence').on(table.workflow_run_id, table.sequence_number),
+    index('idx_events_timestamp').on(table.timestamp),
+    index('idx_events_kind').on(table.kind),
+    index('idx_events_archived_at').on(table.archived_at),
+  ],
 );
 
 // =============================================================================
@@ -351,9 +354,7 @@ export const artifact_types = sqliteTable(
     schema: text('schema', { mode: 'json' }).notNull(),
     version: integer('version').notNull(),
   },
-  (table) => ({
-    pk: primaryKey({ columns: [table.id, table.version] }),
-  }),
+  (table) => [primaryKey({ columns: [table.id, table.version] })],
 );
 
 export const artifacts = sqliteTable(
@@ -375,10 +376,11 @@ export const artifacts = sqliteTable(
 
     created_at: text('created_at').notNull(),
   },
-  (table) => ({
-    projectTypeIdx: index('idx_artifacts_project_type').on(table.project_id, table.type_id),
-    workflowRunIdx: index('idx_artifacts_workflow_run').on(table.created_by_workflow_run_id),
-  }),
+  (table) => [
+    index('idx_artifacts_project_type').on(table.project_id, table.type_id),
+    index('idx_artifacts_workflow_run').on(table.created_by_workflow_run_id),
+    index('idx_artifacts_created_at').on(table.created_at),
+  ],
 );
 
 // =============================================================================
@@ -407,9 +409,10 @@ export const mcp_servers = sqliteTable(
     created_at: text('created_at').notNull(),
     updated_at: text('updated_at').notNull(),
   },
-  (table) => ({
-    workspaceIdx: index('idx_mcp_servers_workspace').on(table.workspace_id),
-  }),
+  (table) => [
+    index('idx_mcp_servers_workspace').on(table.workspace_id),
+    unique('unique_mcp_servers_workspace_name').on(table.workspace_id, table.name),
+  ],
 );
 
 // =============================================================================
@@ -433,9 +436,10 @@ export const event_sources = sqliteTable(
     created_at: text('created_at').notNull(),
     updated_at: text('updated_at').notNull(),
   },
-  (table) => ({
-    workspaceIdx: index('idx_event_sources_workspace').on(table.workspace_id),
-  }),
+  (table) => [
+    index('idx_event_sources_workspace').on(table.workspace_id),
+    unique('unique_event_sources_workspace_name').on(table.workspace_id, table.name),
+  ],
 );
 
 // =============================================================================
@@ -445,7 +449,7 @@ export const event_sources = sqliteTable(
 export const vector_indexes = sqliteTable('vector_indexes', {
   id: text('id').primaryKey(),
   name: text('name').notNull(),
-  vectorize_index_id: text('vectorize_index_id').notNull(),
+  vectorize_index_id: text('vectorize_index_id').notNull().unique('unique_vectorize_index_id'),
 
   artifact_type_ids: text('artifact_type_ids', { mode: 'json' }).notNull(),
   embedding_provider: text('embedding_provider', {
@@ -478,10 +482,10 @@ export const triggers = sqliteTable(
     enabled: integer('enabled', { mode: 'boolean' }).notNull().default(true),
     created_at: text('created_at').notNull(),
   },
-  (table) => ({
-    workflowIdx: index('idx_triggers_workflow').on(table.workflow_id),
-    kindIdx: index('idx_triggers_kind').on(table.kind, table.enabled),
-  }),
+  (table) => [
+    index('idx_triggers_workflow').on(table.workflow_id),
+    index('idx_triggers_kind').on(table.kind, table.enabled),
+  ],
 );
 
 // =============================================================================
@@ -498,9 +502,7 @@ export const actors = sqliteTable(
     permissions: text('permissions', { mode: 'json' }).notNull(), // Permission[]
     created_at: text('created_at').notNull(),
   },
-  (table) => ({
-    emailUnique: unique('unique_actors_email').on(table.email),
-  }),
+  (table) => [unique('unique_actors_email').on(table.email)],
 );
 
 // =============================================================================
@@ -519,7 +521,5 @@ export const secrets = sqliteTable(
     created_at: text('created_at').notNull(),
     updated_at: text('updated_at').notNull(),
   },
-  (table) => ({
-    workspaceKeyUnique: unique('unique_secrets_workspace_key').on(table.workspace_id, table.key),
-  }),
+  (table) => [unique('unique_secrets_workspace_key').on(table.workspace_id, table.key)],
 );
