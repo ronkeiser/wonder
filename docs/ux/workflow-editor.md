@@ -293,3 +293,94 @@ Human input nodes waiting too long:
 - Visual indicator: "Waiting for input (2 days)"
 - Timeout warnings
 - Manual intervention options: skip, cancel, reassign
+
+---
+
+## Implementation Notes
+
+### Technology Choice: Svelte Flow
+
+**Recommendation:** Use `@xyflow/svelte` (Svelte Flow) for the graph canvas.
+
+**Why:**
+
+- Native Svelte (not a React wrapper)
+- Purpose-built for node-based editors
+- Handles directed graphs, custom nodes/edges, zoom/pan, selection
+- React Flow is battle-tested; Svelte port is maturing well
+- Extensible—custom node components can contain complex UIs
+
+**What Svelte Flow handles:**
+
+- Node placement and connection
+- Custom node appearance (badges, icons, action-specific styling)
+- Custom edge appearance (condition labels, foreach indicators)
+- Selection events → trigger side panel updates
+- Minimap, controls, background grid
+
+**What lives outside Svelte Flow (standard Svelte components):**
+
+- Side panels (node config, state schema, prompt editor)
+- Node palette (drag source)
+- Structured condition builder
+- Run tree view (hierarchical, not graph-based)
+
+### Component Architecture
+
+```
+WorkflowEditor
+├── LeftSidebar
+│   ├── NodePalette (drag to add nodes)
+│   └── StateSchemaPanel (auto-inferred, editable)
+├── Canvas (Svelte Flow)
+│   ├── Custom node types per action (LLMCallNode, HumanInputNode, etc.)
+│   └── Custom edge type for transitions (condition labels)
+└── RightSidebar
+    └── ConfigPanel (contextual: node | edge | workflow settings)
+```
+
+### Custom Node Design
+
+Each action type gets a node component. Common structure:
+
+- Header: icon + label
+- Badges: `×N` for fan-out, `⊕` for fan-in
+- Preview slot: action-specific summary (model name, gate indicator, etc.)
+- Handles: top (target) and bottom (source)
+
+Sub-workflow nodes include a "drill in" button to navigate to the nested graph.
+
+### Custom Edge Design
+
+Transition edges show:
+
+- Condition expression (abbreviated) as a label on the edge
+- `∀` symbol for foreach transitions
+- Priority number if multiple edges from same source
+
+### Prompt Editor
+
+For LLM Call nodes, use **CodeMirror 6** or **Monaco** with:
+
+- Handlebars syntax highlighting
+- Autocomplete for `{{input.*}}`, `{{state.*}}`, `{{_branch.*}}`
+- Schema-aware: autocomplete paths come from inferred state schema
+
+### Run Visualization
+
+The live tree view is a **separate component** (not graph-based):
+
+- Recursive Svelte component for hierarchical display
+- Status icons: ✓ completed, ● running, ○ pending, ✗ failed, ⏸ waiting
+- Progress indicators for fan-out nodes (3/10 completed)
+- Click to inspect node input/output in side panel
+
+### State Schema Inference
+
+Schema inference runs reactively as the graph changes:
+
+1. Walk graph to find all merge configurations
+2. Trace upstream to find source node output schemas
+3. Combine to infer `context.state` shape
+4. Surface orphaned fields when nodes are deleted
+5. Allow user locks/overrides that persist through inference updates
