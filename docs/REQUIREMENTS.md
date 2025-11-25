@@ -80,7 +80,8 @@
 
 ## Organization
 
-- Hierarchy: Workspace → Project → Workflow
+- Hierarchy: Account → Workspace → Project → Workflow → Sub-workflow
+- Auth: magic link or Google SSO (email-based); single-user ownership, no authorization
 - Libraries hold reusable workflow definitions (routines)
 - Workflows reference library definitions by ID, optionally pinned to version
 
@@ -91,6 +92,13 @@
 - Prompt template editor with Handlebars + autocomplete from schema
 - Run view: live tree, node inspector, metrics bar
 
-## Infrastructure Details
+## Secrets
 
 - User secrets (provider keys, MCP tokens) in D1 encrypted; managed via UI
+
+## Scaling Validation
+
+- DO coordination: single DO handling 1k+ concurrent tokens
+- Event throughput: 50k+ events per run with compaction/batching
+- Error propagation: failures bubbling through 5-6 nested layers
+- Stuck workflow detection: human input timeouts surfaced and recoverable
