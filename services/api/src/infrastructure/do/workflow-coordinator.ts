@@ -126,10 +126,12 @@ export class WorkflowCoordinator implements DurableObject {
 
       // Generate and create context storage table
       const contextDDL = this.ddlGenerator.generateDDL('context');
-      await this.sql.exec(contextDDL);
+      this.sql.exec(contextDDL).toArray();
 
       // Create tokens table
-      await this.sql.exec(`
+      this.sql
+        .exec(
+          `
         CREATE TABLE IF NOT EXISTS tokens (
           id TEXT PRIMARY KEY,
           node_id TEXT NOT NULL,
@@ -142,22 +144,28 @@ export class WorkflowCoordinator implements DurableObject {
           created_at TEXT NOT NULL,
           updated_at TEXT NOT NULL
         )
-      `);
+      `,
+        )
+        .toArray();
 
       // Create events table (buffered until batch flush to D1)
-      await this.sql.exec(`
+      this.sql
+        .exec(
+          `
         CREATE TABLE IF NOT EXISTS events (
           sequence_number INTEGER PRIMARY KEY,
           kind TEXT NOT NULL,
           payload TEXT NOT NULL,
           timestamp TEXT NOT NULL
         )
-      `);
+      `,
+        )
+        .toArray();
 
       // Store initial context using DML generator
       const { statements, values } = this.dmlGenerator.generateInsert('context', context);
       for (let i = 0; i < statements.length; i++) {
-        await this.sql.exec(statements[i], ...values[i]);
+        this.sql.exec(statements[i], ...values[i]).toArray();
       }
 
       // Create initial token
@@ -175,20 +183,22 @@ export class WorkflowCoordinator implements DurableObject {
         updated_at: new Date().toISOString(),
       };
 
-      await this.sql.exec(
-        `INSERT INTO tokens (id, node_id, status, path_id, parent_token_id, fan_out_node_id, branch_index, branch_total, created_at, updated_at)
+      this.sql
+        .exec(
+          `INSERT INTO tokens (id, node_id, status, path_id, parent_token_id, fan_out_node_id, branch_index, branch_total, created_at, updated_at)
          VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
-        initialToken.id,
-        initialToken.node_id,
-        initialToken.status,
-        initialToken.path_id,
-        initialToken.parent_token_id,
-        initialToken.fan_out_node_id,
-        initialToken.branch_index,
-        initialToken.branch_total,
-        initialToken.created_at,
-        initialToken.updated_at,
-      );
+          initialToken.id,
+          initialToken.node_id,
+          initialToken.status,
+          initialToken.path_id,
+          initialToken.parent_token_id,
+          initialToken.fan_out_node_id,
+          initialToken.branch_index,
+          initialToken.branch_total,
+          initialToken.created_at,
+          initialToken.updated_at,
+        )
+        .toArray();
 
       // Emit workflow_started event
       await this.emitEvent('workflow_started', {
@@ -304,7 +314,7 @@ export class WorkflowCoordinator implements DurableObject {
       // Success: update context with output data
       if (result.output_data && this.dmlGenerator) {
         // Read current context
-        const contextRow = await this.sql.exec('SELECT * FROM context LIMIT 1').toArray();
+        const contextRow = this.sql.exec('SELECT * FROM context LIMIT 1').toArray();
         const currentContext = this.parseContextFromRow(contextRow[0]);
 
         // Merge output into state (Stage 0: simple merge)
@@ -320,17 +330,19 @@ export class WorkflowCoordinator implements DurableObject {
           '1=1', // Stage 0: single row table
         );
         for (let i = 0; i < statements.length; i++) {
-          await this.sql.exec(statements[i], ...values[i]);
+          this.sql.exec(statements[i], ...values[i]).toArray();
         }
       }
 
       // Update token status to completed
-      await this.sql.exec(
-        'UPDATE tokens SET status = ?, updated_at = ? WHERE id = ?',
-        'completed',
-        new Date().toISOString(),
-        result.token_id,
-      );
+      this.sql
+        .exec(
+          'UPDATE tokens SET status = ?, updated_at = ? WHERE id = ?',
+          'completed',
+          new Date().toISOString(),
+          result.token_id,
+        )
+        .toArray();
 
       // Emit node_completed event
       await this.emitEvent('node_completed', {
@@ -362,7 +374,7 @@ export class WorkflowCoordinator implements DurableObject {
     }
 
     // Read final context
-    const contextRow = await this.sql.exec('SELECT * FROM context LIMIT 1').toArray();
+    const contextRow = this.sql.exec('SELECT * FROM context LIMIT 1').toArray();
     const finalContext = this.parseContextFromRow(contextRow[0]);
 
     // For Stage 0: output = state
@@ -375,7 +387,7 @@ export class WorkflowCoordinator implements DurableObject {
       '1=1', // Stage 0: single row table
     );
     for (let i = 0; i < statements.length; i++) {
-      await this.sql.exec(statements[i], ...values[i]);
+      this.sql.exec(statements[i], ...values[i]).toArray();
     }
 
     // Emit workflow_completed event
@@ -402,13 +414,15 @@ export class WorkflowCoordinator implements DurableObject {
   private async emitEvent(kind: EventKind, payload: Record<string, unknown>): Promise<void> {
     this.sequenceNumber++;
 
-    await this.sql.exec(
-      'INSERT INTO events (sequence_number, kind, payload, timestamp) VALUES (?, ?, ?, ?)',
-      this.sequenceNumber,
-      kind,
-      JSON.stringify(payload),
-      new Date().toISOString(),
-    );
+    this.sql
+      .exec(
+        'INSERT INTO events (sequence_number, kind, payload, timestamp) VALUES (?, ?, ?, ?)',
+        this.sequenceNumber,
+        kind,
+        JSON.stringify(payload),
+        new Date().toISOString(),
+      )
+      .toArray();
   }
 
   /**
@@ -416,9 +430,7 @@ export class WorkflowCoordinator implements DurableObject {
    */
   private async flushEvents(): Promise<void> {
     const workflowRunId = await this.state.storage.get<string>('workflow_run_id');
-    const eventsRows = await this.sql
-      .exec('SELECT * FROM events ORDER BY sequence_number')
-      .toArray();
+    const eventsRows = this.sql.exec('SELECT * FROM events ORDER BY sequence_number').toArray();
 
     const events = eventsRows.map((row) => ({
       workflow_run_id: workflowRunId!,

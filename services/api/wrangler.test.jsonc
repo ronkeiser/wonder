@@ -13,5 +13,27 @@
       "database_name": "wonder-test",
       "database_id": "test"
     }
-  ]
+  ],
+  "durable_objects": {
+    "bindings": [
+      {
+        "name": "WORKFLOW_COORDINATOR",
+        "class_name": "WorkflowCoordinator"
+      }
+    ]
+  },
+  "migrations": [
+    {
+      "tag": "v1",
+      "new_classes": ["WorkflowCoordinator"]
+    }
+  ],
+  "queues": {
+    "producers": [
+      {
+        "binding": "WORKFLOW_QUEUE",
+        "queue": "workflow-tasks"
+      }
+    ]
+  }
 }
