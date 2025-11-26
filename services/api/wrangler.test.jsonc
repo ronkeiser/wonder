@@ -7,6 +7,9 @@
     "enable_nodejs_fs_module",
     "enable_nodejs_http_modules"
   ],
+  "ai": {
+    "binding": "AI"
+  },
   "d1_databases": [
     {
       "binding": "DB",

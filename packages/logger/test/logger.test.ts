@@ -1,4 +1,3 @@
-// @ts-expect-error - cloudflare:test is provided by vitest pool at runtime
 import { env } from 'cloudflare:test';
 import { afterEach, beforeAll, describe, expect, it } from 'vitest';
 import { createLogger } from '../src/index.js';

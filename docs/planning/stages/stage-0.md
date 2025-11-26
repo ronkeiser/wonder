@@ -78,17 +78,19 @@ Single node is both start and terminal (no transitions needed).
 **Test:** Unit tests with mock schemas (valid/invalid inputs, nested objects, arrays, required fields)  
 **Status:** Complete - 15 tests passing. Root-level fields required by convention, nested objects use `required` array.
 
-### Step 2: Repository Layer (Data Access)
+### Step 2: Repository Layer (Data Access) ✅
 
 **Files:** `domains/graph/repository.ts`, `domains/ai/repository.ts`, `domains/effects/repository.ts`, `domains/execution/repository.ts`, `domains/events/repository.ts`  
 **What:** D1 insert/select operations for each entity type  
-**Test:** Simple CRUD test per repository (create entity, get by id, assert fields match)
+**Test:** Simple CRUD test per repository (create entity, get by id, assert fields match)  
+**Status:** Complete - 24 tests passing across 5 repository test files.
 
-### Step 3: Seed Data
+### Step 3: Seed Data ✅
 
-**Files:** `infrastructure/db/seed.ts`  
-**What:** Bootstrap workspace + project + model_profile  
-**Test:** Run seed script, query D1 to verify entities exist with correct relationships
+**Files:** `src/infrastructure/db/migrations/0002_initial_seed.sql`, `test/helpers/migrate.ts`  
+**What:** Bootstrap workspace + project + model_profile via SQL migration  
+**Test:** Migration applied successfully, seed data verified in local D1  
+**Status:** Complete
 
 ### Step 4: Workers AI Client
 

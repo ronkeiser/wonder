@@ -10,8 +10,9 @@
     "strict": true,
     "esModuleInterop": true,
     "skipLibCheck": true,
-    "moduleResolution": "bundler"
+    "moduleResolution": "bundler",
+    "types": ["./worker-configuration.d.ts", "@cloudflare/vitest-pool-workers"]
   },
-  "include": ["src/**/*", "worker-configuration.d.ts"],
-  "exclude": ["test/**/*", "**/*.test.ts"]
+  "include": ["src/**/*", "test/**/*"],
+  "exclude": ["dist"]
 }
