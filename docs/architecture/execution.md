@@ -64,19 +64,22 @@ Applied when fan-in completes, writes to `context.state[target]`:
 
 ## Context Storage
 
-- Context stored as JSON in DO SQLite `workflow_context` table (one row per run)
-- Workers send path-based update commands; DO applies via `json_set()`, `json_extract()`
-- Granular mutations without loading entire blob; validated against `context_schema` before write
-- Sub-workflows isolated by `workflow_run_id`; transitions query via `json_extract()`
-- Snapshots to D1 serialize full context JSON from DO row
+- Every workflow run has its own DO with SQLite Transactional Storage
+- Context schema mapped to relational tables: scalars as columns, arrays as tables, objects flattened/normalized
+- Workers send field updates; DO applies via `UPDATE` or `INSERT`/`DELETE` for arrays
+- SQLite validates types, constraints, and foreign keys natively on every write
+- Transition conditions query directly against columns/tables
+- Sub-workflows get separate DO with isolated SQLite storage
+- Snapshots to D1 serialize context by joining all tables
 
 ## Sub-workflows
 
-- `workflow_call` action spawns new WorkflowRun with fresh context
-- `input_mapping` on node maps parent context → sub-workflow input (schema-validated)
-- Sub-workflow executes independently (may spawn own DO if needed)
+- `workflow_call` invokes a WorkflowDef as part of parent run
+- Each sub-workflow gets separate DO with isolated SQLite storage
+- Cannot execute independently; always part of parent workflow run
+- `input_mapping` maps parent context → sub-workflow input (schema-validated)
 - `output_mapping` maps sub-workflow output → parent context state
-- `inherit_artifacts: false` by default (sub-workflow sees own project artifacts only)
+- `inherit_artifacts: false` by default
 - `on_failure: 'propagate'` default (sub-workflow error fails parent node)
 
 ## Error Handling

@@ -50,9 +50,16 @@ secrets
 - Full artifact content (reference by ID only, fetch in Worker)
 - Historical events (written only, read for replay/debug via API)
 
+## DO SQLite Storage
+
+- Context mapped to relational schema: scalars as columns, arrays as tables
+- SQLite validates types, constraints, foreign keys natively
+- Single row per run, updated in place
+- Ephemeral (run lifetime); snapshots to D1
+
 ## Event Storage
 
-- Events written to D1 `events` table in batches (per snapshot interval)
+- Events buffered in DO SQLite, flushed to D1 in batches (per snapshot interval)
 - Retention: 30 days in D1, then moved to R2 by scheduled Worker
 - Query patterns: by `workflow_run_id` + `sequence_number` range for replay
 

@@ -32,29 +32,27 @@
 - Merge strategies: append, merge, keyed, last_wins
 - Deep nesting supported (5-6+ layers of fan-out/sub-workflows)
 
-## Context & State
+## Execution & State
 
-- Each run has Context: input (immutable), state (mutable), output, artifacts
-- Context stored as JSON in DO SQLite; path-based updates via `json_set()`
-- Local state is ephemeral working data; artifacts are persisted outputs
-- Sub-workflows get fresh isolated context; explicit input/output mapping only
-- Sub-workflows are pure functions: no parent state access, no side effects
+- Every workflow run gets its own DO; sub-workflows get separate DO instances
+- Context (input, state, output, artifacts) mapped to relational schema in DO's SQLite
+- Scalars become columns, arrays become tables, objects flatten or normalize
+- SQLite validates types, constraints, and referential integrity natively
+- Single row per run, updated in place; history via event log
+- Sub-workflows isolated: separate DO, explicit input/output mapping only
+- DO coordinates tokens and fan-in; Workers execute tasks via Queues
+- Event sourcing: state changes emit events for replay/debug
+- Events: 30 days in D1, then archived to R2
+- Volume: 50k+ events per run with compaction/batching
 
 ## Data
 
 - LLM nodes define output schema; enables structured output + autocomplete
 - State schema auto-inferred from graph; user can override/lock fields
+- Local state is ephemeral working data; artifacts are persisted outputs
 - Artifacts are typed, versioned, project-scoped, searchable via Vectorize
 - Artifacts persist until explicit user delete
 - All entity IDs use ULID format (sortable, timestamp-prefixed, 26 chars)
-
-## Execution
-
-- One DO per run coordinates token state and fan-in synchronization
-- Workers execute tasks (LLM calls, HTTP, etc.) via Queues
-- Event sourcing: every state change emits event for replay/debug
-- Events in D1 30 days, then moved to R2 by scheduled worker
-- Event volume can reach 50k+ per run; requires compaction/batching
 
 ## Error Handling
 

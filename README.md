@@ -133,7 +133,7 @@ Token {
 
 ### Context Carries State
 
-Every workflow run has a Context:
+Every workflow run has a Context stored relationally in DO's SQLite:
 
 ```typescript
 Context {
@@ -144,6 +144,8 @@ Context {
   _branch?: { ... }   // Present during fan-out execution
 }
 ```
+
+Scalar fields become columns, arrays become tables—SQLite validates types and constraints natively.
 
 ### Parallel Execution: Branch Isolation
 
@@ -175,9 +177,9 @@ Result:
 
 ```typescript
 context.state.votes = [
-  { _branch_id: "tok_1", choice: "A", rationale: "..." },
-  { _branch_id: "tok_2", choice: "B", rationale: "..." },
-  { _branch_id: "tok_3", choice: "A", rationale: "..." },
+  { _branch_id: 'tok_1', choice: 'A', rationale: '...' },
+  { _branch_id: 'tok_2', choice: 'B', rationale: '...' },
+  { _branch_id: 'tok_3', choice: 'A', rationale: '...' },
   // ...
 ];
 ```
@@ -227,7 +229,7 @@ The `workflow_call` action enables composition. A research pipeline invokes a re
 
 ### Context Isolation
 
-Sub-workflows get fresh context:
+Sub-workflows execute in separate DO with isolated SQLite and fresh context:
 
 - `input`: Built from parent's `input_mapping`
 - `state`: Empty
@@ -265,12 +267,14 @@ condition: {
 
 ### Durable Object Coordination
 
-Each workflow run is managed by a Cloudflare Durable Object that:
+Every workflow run gets its own Cloudflare Durable Object:
 
+- Context mapped to relational schema in SQLite (scalars as columns, arrays as tables)
+- SQLite validates types, constraints, and referential integrity natively
 - Maintains authoritative state (context, tokens)
 - Tracks fan-in synchronization (waiting for all branches)
 - Emits events for observability
-- Persists to SQLite for durability
+- Sub-workflows: separate DO instances with isolated storage, part of parent run
 
 ### Worker Execution
 
