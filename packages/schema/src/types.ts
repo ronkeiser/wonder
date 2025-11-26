@@ -43,9 +43,21 @@ export type CustomTypeDefinition = {
   // Validation function - returns true if valid
   validate: (value: unknown, schema: SchemaType, path: string) => boolean;
 
+  // SQL mapping (for DDL generation - Phase 2)
+  toSQL?: () => SQLTypeMapping;
+
   // Optional metadata
   description?: string;
   examples?: unknown[];
+};
+
+// SQL type mapping for DDL generation
+export type SQLTypeMapping = {
+  // Base SQLite type
+  type: 'TEXT' | 'INTEGER' | 'REAL' | 'BLOB';
+
+  // Optional SQL constraints
+  constraints?: string[];
 };
 
 // Validation result - collects all errors
