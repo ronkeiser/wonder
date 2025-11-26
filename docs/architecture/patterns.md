@@ -1,33 +1,12 @@
 # Implementation Patterns
 
-<!-- TODO: Cross-cutting patterns needed before Stage 0 implementation:
-
-Already documented:
-✅ Repository layer - pure functions with D1Database first param
-✅ IDs - ULID, generated in repository
-✅ Timestamps - ISO 8601, set in repository
-✅ Error handling - null for not found, throw custom errors, propagate DB errors
-✅ Type imports - Drizzle inference from schema
-✅ Discriminated unions - flatten to columns or JSON
-✅ Drizzle query patterns - inline transformations
-✅ Test isolation - fresh schema + transaction rollback
-✅ Test data creation - inline in tests
-✅ Service layer pattern - pure functions
-
-Defer until implementation:
-⏸️ Mapping between DB rows and types - start inline, extract if repetitive
-⏸️ Validation placement - principle clear, specifics need domain logic
-⏸️ Client wrapper pattern - needs actual external API to evaluate
-⏸️ Integration test structure - needs actual flow to test
--->
-
-## Repository Layer
-
-Pure functions with D1Database as first parameter:
+Pure functions with DrizzleD1Database as first parameter:
 
 ```typescript
+import type { DrizzleD1Database } from 'drizzle-orm/d1';
+
 export async function createWorkflowDef(
-  db: D1Database,
+  db: DrizzleD1Database,
   def: Omit<WorkflowDef, 'id' | 'created_at' | 'updated_at'>,
 ): Promise<WorkflowDef> {
   /* ... */
@@ -105,7 +84,10 @@ export const workflowDefs = sqliteTable('workflow_defs', {
 });
 
 // Repository transforms on read
-export async function getWorkflowDef(db: D1Database, id: string): Promise<WorkflowDef | null> {
+export async function getWorkflowDef(
+  db: DrizzleD1Database,
+  id: string,
+): Promise<WorkflowDef | null> {
   const row = await db.select().from(workflowDefs).where(eq(workflowDefs.id, id)).get();
   if (!row) return null;
 
@@ -119,7 +101,10 @@ export async function getWorkflowDef(db: D1Database, id: string): Promise<Workfl
 }
 
 // Repository transforms on write
-export async function createWorkflowDef(db: D1Database, def: NewWorkflowDef): Promise<WorkflowDef> {
+export async function createWorkflowDef(
+  db: DrizzleD1Database,
+  def: NewWorkflowDef,
+): Promise<WorkflowDef> {
   const row = {
     id: ulid(),
     owner_type: def.owner.type,
@@ -187,7 +172,10 @@ export function fromWorkflowDefOwner(owner: WorkflowDefOwner): {
 }
 
 // domains/graph/repository.ts
-export async function getWorkflowDef(db: D1Database, id: string): Promise<WorkflowDef | null> {
+export async function getWorkflowDef(
+  db: DrizzleD1Database,
+  id: string,
+): Promise<WorkflowDef | null> {
   const row = await db.select().from(workflowDefs).where(eq(workflowDefs.id, id)).get();
   if (!row) return null;
 
@@ -259,7 +247,7 @@ Benefits:
 ```typescript
 // domains/graph/fixtures.ts
 export async function buildWorkspace(
-  db: D1Database,
+  db: DrizzleD1Database,
   overrides?: Partial<NewWorkspace>,
 ): Promise<Workspace> {
   return await createWorkspace(db, {
@@ -270,7 +258,7 @@ export async function buildWorkspace(
 }
 
 export async function buildProject(
-  db: D1Database,
+  db: DrizzleD1Database,
   overrides?: Partial<NewProject>,
 ): Promise<Project> {
   const workspace = overrides?.workspace_id ? null : await buildWorkspace(db);
@@ -283,7 +271,7 @@ export async function buildProject(
 }
 
 export async function buildWorkflowDef(
-  db: D1Database,
+  db: DrizzleD1Database,
   overrides?: Partial<NewWorkflowDef>,
 ): Promise<WorkflowDef> {
   const project = overrides?.project_id ? null : await buildProject(db);
@@ -333,8 +321,10 @@ Benefits:
 
 ```typescript
 // infrastructure/context.ts
+import type { DrizzleD1Database } from 'drizzle-orm/d1';
+
 export interface ServiceContext {
-  db: D1Database;
+  db: DrizzleD1Database;
   workersAI: WorkersAI;
   vectorize: Vectorize;
   logger: Logger;

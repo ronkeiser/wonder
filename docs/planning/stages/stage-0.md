@@ -92,17 +92,24 @@ Single node is both start and terminal (no transitions needed).
 **Test:** Migration applied successfully, seed data verified in local D1  
 **Status:** Complete
 
-### Step 4: Workers AI Client
+### Step 4: Workers AI Client ✅
 
 **Files:** `infrastructure/clients/workers-ai.ts`  
 **What:** Thin wrapper around Workers AI binding  
-**Test:** Integration test with real AI binding (or mock in test env), assert response structure
+**Test:** Integration test with real AI binding (or mock in test env), assert response structure  
+**Status:** Complete - 6 tests passing (5 mocked, 1 ReadableStream, 1 error handling)
 
-### Step 5: Execution Service (Mock LLM)
+### Step 5: Execution Service ✅
 
-**Files:** `domains/execution/service.ts` + `test/unit/execution/service.test.ts`  
-**What:** Token lifecycle, event emission, context initialization (stub LLM call for now)  
-**Test:** Unit test with mocked repositories + LLM client, assert token/event sequences
+**Files:** `domains/execution/service.ts` (~417 LOC) + `test/unit/execution/service.test.ts` (~309 LOC)  
+**What:** Token lifecycle, event emission, context initialization, LLM execution orchestration  
+**Test:** Unit test with mocked repositories + LLM client, assert token/event sequences  
+**Status:** Complete - 4 tests passing:
+
+- ✅ Successful single-node workflow execution
+- ✅ Event sequencing (4 events with monotonic sequence numbers)
+- ✅ Input validation (rejects invalid input)
+- ✅ Error handling (workflow/definition not found)
 
 ### Step 6: End-to-End Integration
 
