@@ -79,26 +79,65 @@ Simple log viewer in SvelteKit:
 
 ## Logger Package
 
-Generic logger package. App-specific context passed as metadata via `child()`.
+Unified logger with optional D1 persistence:
 
-### API
+### With D1 (Workers, API Handlers)
+
+Persists logs to D1 for queryable operational diagnostics:
 
 ```typescript
-// Create logger with D1 binding
+import { createLogger } from '@wonder/logger';
+
+// Create D1-backed logger
 const logger = createLogger({ db: env.DB });
 
 // Add any metadata via child()
-const requestLogger = logger.child({ requestId: "req_123" });
-const childLogger = requestLogger.child({ userId: "user_456" });
+const requestLogger = logger.child({ requestId: 'req_123' });
+const childLogger = requestLogger.child({ userId: 'user_456' });
 
 // Log events (sync, buffers internally)
-childLogger.info("request_started", { path: "/api/users" });
-childLogger.warn("slow_query", { duration_ms: 500 });
-childLogger.error("validation_failed", { field: "email" });
+childLogger.info('request_started', { path: '/api/users' });
+childLogger.warn('slow_query', { duration_ms: 500 });
+childLogger.error('validation_failed', { field: 'email' });
 
 // Flush at request/alarm boundary
 await logger.flush();
 ```
+
+### Console-Only (Durable Objects)
+
+Console-only output for environments without D1 access:
+
+```typescript
+import { createLogger } from '@wonder/logger';
+
+// Create console-only logger
+const logger = createLogger({ consoleOnly: true });
+
+// Same Logger interface
+const coordinatorLogger = logger.child({
+  do_id: doId.toString(),
+  workflow_run_id: runId,
+});
+
+coordinatorLogger.info('workflow_initialized');
+coordinatorLogger.error('task_queue_failed', { error: err.message });
+
+// No-op when consoleOnly is true
+await logger.flush();
+```
+
+**Configuration:**
+
+- **With D1**: `createLogger({ db: env.DB })` - buffers and persists to D1
+- **Console-only**: `createLogger({ consoleOnly: true })` - console output only
+
+**Use Cases:**
+
+- **D1 mode**: Workers, API handlers, anywhere with D1 binding
+- **Console-only mode**: Durable Objects (no D1 access), testing, local development
+
+All modes write to console for `wrangler tail`. D1 mode additionally persists to D1 `logs` table.
 
 ### Levels
 
@@ -121,8 +160,8 @@ await logger.flush();
 Logger handles logs only. Analytics Engine metrics use a separate metrics package:
 
 ```typescript
-metrics.increment("api_calls", { endpoint: "/users" });
-metrics.timing("request_latency_ms", duration, { method: "POST" });
+metrics.increment('api_calls', { endpoint: '/users' });
+metrics.timing('request_latency_ms', duration, { method: 'POST' });
 ```
 
 ## No External Dependencies

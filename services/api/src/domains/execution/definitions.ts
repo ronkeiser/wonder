@@ -73,3 +73,47 @@ export type Snapshot = {
   tokens: Token[];
   created_at: string;
 };
+
+/** Schema types for @wonder/schema DDL/DML generation */
+import type { SchemaType } from '@wonder/schema';
+
+/** Token table schema for SQLite storage in DO */
+export const tokenSchemaType: SchemaType = {
+  type: 'object',
+  properties: {
+    id: { type: 'string' },
+    workflow_run_id: { type: 'string' },
+    node_id: { type: 'string' },
+    status: { type: 'string' },
+    path_id: { type: 'string' },
+    parent_token_id: { type: 'string', nullable: true },
+    fan_out_node_id: { type: 'string', nullable: true },
+    branch_index: { type: 'number' },
+    branch_total: { type: 'number' },
+    created_at: { type: 'string' },
+    updated_at: { type: 'string' },
+  },
+  required: [
+    'id',
+    'workflow_run_id',
+    'node_id',
+    'status',
+    'path_id',
+    'branch_index',
+    'branch_total',
+    'created_at',
+    'updated_at',
+  ],
+};
+
+/** Event table schema for SQLite storage in DO */
+export const eventSchemaType: SchemaType = {
+  type: 'object',
+  properties: {
+    sequence_number: { type: 'number' },
+    kind: { type: 'string' },
+    payload: { type: 'string' }, // JSON string
+    timestamp: { type: 'string' },
+  },
+  required: ['sequence_number', 'kind', 'payload', 'timestamp'],
+};

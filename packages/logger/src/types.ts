@@ -48,7 +48,8 @@ export interface Logger {
 }
 
 export interface LoggerConfig {
-  db: D1Database;
+  db?: D1Database;
   bufferSize?: number;
   tableName?: string;
+  consoleOnly?: boolean;
 }

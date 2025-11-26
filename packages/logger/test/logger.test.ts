@@ -302,4 +302,43 @@ describe('logger', () => {
       expect(log?.timestamp).toBeLessThanOrEqual(after);
     });
   });
+
+  describe('console-only mode', () => {
+    it('does not persist logs when consoleOnly is true', async () => {
+      const logger = createLogger({ consoleOnly: true });
+
+      logger.info('console_event', { foo: 'bar' });
+      logger.warn('console_warn');
+      logger.error('console_error');
+      await logger.flush();
+
+      // Nothing should be written to D1
+      const count = await getLogCount(db);
+      expect(count).toBe(0);
+    });
+
+    it('child loggers inherit consoleOnly setting', async () => {
+      const logger = createLogger({ consoleOnly: true });
+      const child = logger.child({ requestId: 'req_123' });
+
+      child.info('child_event');
+      await child.flush();
+
+      const count = await getLogCount(db);
+      expect(count).toBe(0);
+    });
+
+    it('throws error if db is missing when consoleOnly is false', () => {
+      expect(() => {
+        createLogger({ consoleOnly: false });
+      }).toThrow('LoggerConfig.db is required when consoleOnly is false');
+    });
+
+    it('does not require db when consoleOnly is true', () => {
+      expect(() => {
+        const logger = createLogger({ consoleOnly: true });
+        logger.info('test');
+      }).not.toThrow();
+    });
+  });
 });
