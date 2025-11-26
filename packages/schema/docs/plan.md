@@ -803,66 +803,66 @@ if (!result.valid) {
 
 ## Feature Implementation Status
 
-| Feature | Phase 1-3 (Immediate) | Future Enhancement |
-|---------|:---------------------:|:------------------:|
-| **Basic Types** |
-| string, number, integer, boolean, object, array, null | ✅ | |
-| **String Constraints** |
-| minLength, maxLength | ✅ | |
-| pattern (regex) | ✅ | |
-| format (email, url, uuid, date-time, etc.) | | ⏭️ Phase 1.5 |
-| **Number Constraints** |
-| minimum, maximum | ✅ | |
-| exclusiveMinimum, exclusiveMaximum | ✅ | |
-| multipleOf | ✅ | |
-| **Array Constraints** |
-| items (type validation) | ✅ | |
-| minItems, maxItems | ✅ | |
-| uniqueItems | ✅ | |
-| **Object Constraints** |
-| properties, required | ✅ | |
-| additionalProperties (strict mode) | | ⏭️ Phase 1.5 |
-| minProperties, maxProperties | | ⏭️ Phase 1.5 |
-| **General Constraints** |
-| enum | ✅ | |
-| const | ✅ | |
-| **Type Modifiers** |
-| nullable | ✅ | |
-| default (value application) | | ⏭️ Phase 1.5 |
-| **Composition** |
-| oneOf, anyOf, allOf, not | | ⏭️ Phase 1.5 |
-| **References** |
-| $ref, $defs | | ⏭️ Phase 1.5 |
-| **Custom Types** |
-| Custom type registry | ✅ | |
-| Custom type validation | ✅ | |
-| Custom type SQL mapping | ✅ | |
-| **Error Handling** |
-| JSON Pointer paths | ✅ | |
-| Collect all errors | ✅ | |
-| Rich error codes | ✅ | |
-| Custom error messages (errorMessage) | | ⏭️ Phase 1.5 |
-| **Options** |
-| collectAllErrors | ✅ | |
-| strictNullChecks | ✅ | |
-| applyDefaults | | ⏭️ Phase 1.5 |
-| **DDL Generation** |
-| Schema → CREATE TABLE | ✅ | |
-| Scalar fields → columns | ✅ | |
-| Arrays → separate tables | ✅ | |
-| Custom types → SQL types | ✅ | |
-| NOT NULL constraints | ✅ | |
-| CHECK constraints | ✅ | |
-| Indexes | | ⏭️ Phase 2.5 |
-| Foreign keys | | ⏭️ Phase 2.5 |
-| **Query Helpers** |
-| INSERT/UPDATE/SELECT | | ⏭️ Phase 4 |
-| WHERE clause builder | | ⏭️ Phase 3.5 |
-| JOINs | | ⏭️ Phase 3.5 |
-| **Other** |
-| Partial validation | | ⏭️ Phase 1.5 |
-| Schema versioning | | 🔮 Long-term |
-| Migration generation | | 🔮 Long-term |
+| Feature                                               | Phase 1-3 (Immediate) | Future Enhancement |
+| ----------------------------------------------------- | :-------------------: | :----------------: |
+| **Basic Types**                                       |
+| string, number, integer, boolean, object, array, null |          ✅           |                    |
+| **String Constraints**                                |
+| minLength, maxLength                                  |          ✅           |                    |
+| pattern (regex)                                       |          ✅           |                    |
+| format (email, url, uuid, date-time, etc.)            |                       |    ⏭️ Phase 1.5    |
+| **Number Constraints**                                |
+| minimum, maximum                                      |          ✅           |                    |
+| exclusiveMinimum, exclusiveMaximum                    |          ✅           |                    |
+| multipleOf                                            |          ✅           |                    |
+| **Array Constraints**                                 |
+| items (type validation)                               |          ✅           |                    |
+| minItems, maxItems                                    |          ✅           |                    |
+| uniqueItems                                           |          ✅           |                    |
+| **Object Constraints**                                |
+| properties, required                                  |          ✅           |                    |
+| additionalProperties (strict mode)                    |                       |    ⏭️ Phase 1.5    |
+| minProperties, maxProperties                          |                       |    ⏭️ Phase 1.5    |
+| **General Constraints**                               |
+| enum                                                  |          ✅           |                    |
+| const                                                 |          ✅           |                    |
+| **Type Modifiers**                                    |
+| nullable                                              |          ✅           |                    |
+| default (value application)                           |                       |    ⏭️ Phase 1.5    |
+| **Composition**                                       |
+| oneOf, anyOf, allOf, not                              |                       |    ⏭️ Phase 1.5    |
+| **References**                                        |
+| $ref, $defs                                           |                       |    ⏭️ Phase 1.5    |
+| **Custom Types**                                      |
+| Custom type registry                                  |          ✅           |                    |
+| Custom type validation                                |          ✅           |                    |
+| Custom type SQL mapping                               |          ✅           |                    |
+| **Error Handling**                                    |
+| JSON Pointer paths                                    |          ✅           |                    |
+| Collect all errors                                    |          ✅           |                    |
+| Rich error codes                                      |          ✅           |                    |
+| Custom error messages (errorMessage)                  |                       |    ⏭️ Phase 1.5    |
+| **Options**                                           |
+| collectAllErrors                                      |          ✅           |                    |
+| strictNullChecks                                      |          ✅           |                    |
+| applyDefaults                                         |                       |    ⏭️ Phase 1.5    |
+| **DDL Generation**                                    |
+| Schema → CREATE TABLE                                 |          ✅           |                    |
+| Scalar fields → columns                               |          ✅           |                    |
+| Arrays → separate tables                              |          ✅           |                    |
+| Custom types → SQL types                              |          ✅           |                    |
+| NOT NULL constraints                                  |          ✅           |                    |
+| CHECK constraints                                     |          ✅           |                    |
+| Indexes                                               |                       |    ⏭️ Phase 2.5    |
+| Foreign keys                                          |                       |    ⏭️ Phase 2.5    |
+| **Query Helpers**                                     |
+| INSERT/UPDATE/SELECT                                  |                       |     ⏭️ Phase 4     |
+| WHERE clause builder                                  |                       |    ⏭️ Phase 3.5    |
+| JOINs                                                 |                       |    ⏭️ Phase 3.5    |
+| **Other**                                             |
+| Partial validation                                    |                       |    ⏭️ Phase 1.5    |
+| Schema versioning                                     |                       |    🔮 Long-term    |
+| Migration generation                                  |                       |    🔮 Long-term    |
 
 ## Success Criteria
 
