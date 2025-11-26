@@ -193,7 +193,8 @@ console.log(insertResult.values);
 // ]
 
 // Execute with D1
-const result = await db.prepare(insertResult.statements[0])
+const result = await db
+  .prepare(insertResult.statements[0])
   .bind(...insertResult.values[0])
   .run();
 const userId = result.meta.last_row_id;
@@ -201,7 +202,10 @@ const userId = result.meta.last_row_id;
 // Execute array inserts with actual parent ID
 for (let i = 1; i < insertResult.statements.length; i++) {
   const stmt = insertResult.statements[i].replace('{{PARENT_ID}}', userId);
-  await db.prepare(stmt).bind(...insertResult.values[i]).run();
+  await db
+    .prepare(stmt)
+    .bind(...insertResult.values[i])
+    .run();
 }
 
 // UPDATE - deletes and re-inserts array items
@@ -218,8 +222,8 @@ const deleteStatements = dmlGen.generateDelete('users', 'id = ?');
 ```typescript
 // Strategy 1: Normalized (default) - arrays in separate tables
 const ddlGen = new DDLGenerator(schema, registry, {
-  nestedObjectStrategy: 'flatten',  // user_name, user_email columns
-  arrayStrategy: 'table',           // Separate users_tags table with FK
+  nestedObjectStrategy: 'flatten', // user_name, user_email columns
+  arrayStrategy: 'table', // Separate users_tags table with FK
 });
 
 const dmlGen = new DMLGenerator(schema, registry, {
@@ -229,8 +233,8 @@ const dmlGen = new DMLGenerator(schema, registry, {
 
 // Strategy 2: Denormalized - everything as JSON
 const ddlGen = new DDLGenerator(schema, registry, {
-  nestedObjectStrategy: 'json',     // Single TEXT column with JSON object
-  arrayStrategy: 'json',            // Single TEXT column with JSON array
+  nestedObjectStrategy: 'json', // Single TEXT column with JSON object
+  arrayStrategy: 'json', // Single TEXT column with JSON array
 });
 
 const dmlGen = new DMLGenerator(schema, registry, {
@@ -313,7 +317,7 @@ const result = validator.validate({
   id: 1,
   title: 'Getting Started',
   content: 'This is a short post', // Invalid: too short
-  status: 'pending',                // Invalid: not in enum
+  status: 'pending', // Invalid: not in enum
   author: { name: 'Alice' },
   tags: ['tutorial'],
   comments: [
@@ -322,7 +326,7 @@ const result = validator.validate({
 });
 
 if (!result.valid) {
-  result.errors.forEach(err => {
+  result.errors.forEach((err) => {
     console.log(`${err.path}: ${err.message}`);
   });
 }
@@ -340,36 +344,43 @@ const { statements, values } = dmlGen.generateInsert('posts', {
   status: 'published',
   author: { name: 'Alice', email: 'alice@example.com' },
   tags: ['tutorial', 'workflow'],
-  comments: [
-    { author: 'Bob', text: 'Great article!', upvotes: 5 },
-  ],
+  comments: [{ author: 'Bob', text: 'Great article!', upvotes: 5 }],
 });
 
 // Execute with D1
-const postResult = await db.prepare(statements[0]).bind(...values[0]).run();
+const postResult = await db
+  .prepare(statements[0])
+  .bind(...values[0])
+  .run();
 const postId = postResult.meta.last_row_id;
 
 // Execute remaining statements (tags and comments)
 for (let i = 1; i < statements.length; i++) {
   const stmt = statements[i].replace('{{PARENT_ID}}', postId);
-  await db.prepare(stmt).bind(...values[i]).run();
+  await db
+    .prepare(stmt)
+    .bind(...values[i])
+    .run();
 }
 ```
 
 ### Performance & Design
 
 **Validation Performance:**
+
 - ~0.25ms per validation (similar to Cabidela)
 - Zero compilation overhead (runtime interpretation)
 - No eval/Function() calls (Cloudflare Workers compatible)
 
 **Architecture:**
+
 - Single schema definition drives validation, DDL, and DML
 - Custom types register once, work everywhere (validation + SQL mapping)
 - Error collection: get all errors at once or fail fast
 - JSON Pointer paths for precise error location
 
 **Comparison with Cabidela:**
+
 - Core validation logic ~95% identical
 - Error collection vs exception-driven
 - Adds DDL/DML generation capabilities

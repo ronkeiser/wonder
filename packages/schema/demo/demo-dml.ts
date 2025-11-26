@@ -1,7 +1,7 @@
 // Demo: INSERT/UPDATE operations with @wonder/schema
 
-import { CustomTypeRegistry, DDLGenerator, DMLGenerator } from './src/index.js';
-import type { SchemaType } from './src/types.js';
+import { CustomTypeRegistry, DDLGenerator, DMLGenerator } from '../src/index.js';
+import type { SchemaType } from '../src/types.js';
 
 console.log('='.repeat(60));
 console.log('💾 @wonder/schema DML Demo (INSERT/UPDATE/DELETE)');

@@ -1,7 +1,7 @@
 // Demo script for @wonder/schema
 
-import { CustomTypeRegistry, DDLGenerator, Validator } from './src/index.js';
-import type { SchemaType } from './src/types.js';
+import { CustomTypeRegistry, DDLGenerator, Validator } from '../src/index.js';
+import type { SchemaType } from '../src/types.js';
 
 console.log('='.repeat(60));
 console.log('🎯 @wonder/schema Demo');
