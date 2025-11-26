@@ -15,6 +15,13 @@
       "when": 1764122394946,
       "tag": "0001_simple_jetstream",
       "breakpoints": true
+    },
+    {
+      "idx": 2,
+      "version": "6",
+      "when": 1764134400000,
+      "tag": "0002_initial_seed",
+      "breakpoints": true
     }
   ]
 }
