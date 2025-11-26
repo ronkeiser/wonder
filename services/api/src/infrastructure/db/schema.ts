@@ -1,10 +1,7 @@
-// =============================================================================
-// WONDER D1 SCHEMA
-// Derived from docs/architecture/primitives.ts
-// =============================================================================
+/** WONDER D1 SCHEMA */
+/** Derived from docs/architecture/primitives.ts */
 
 import {
-  blob,
   index,
   integer,
   primaryKey,
@@ -14,15 +11,11 @@ import {
   unique,
 } from 'drizzle-orm/sqlite-core';
 
-// =============================================================================
-// INFRASTRUCTURE
-// =============================================================================
+/** Infrastructure */
 
 export { logs } from '@wonder/logger/schema';
 
-// =============================================================================
-// WORKSPACE & PROJECT
-// =============================================================================
+/** Workspace & Project */
 
 export const workspaces = sqliteTable('workspaces', {
   id: text('id').primaryKey(),
@@ -48,9 +41,7 @@ export const projects = sqliteTable(
   (table) => [index('idx_projects_workspace').on(table.workspace_id)],
 );
 
-// =============================================================================
-// LIBRARY
-// =============================================================================
+/** Library */
 
 export const libraries = sqliteTable(
   'libraries',
@@ -68,9 +59,7 @@ export const libraries = sqliteTable(
   ],
 );
 
-// =============================================================================
-// WORKFLOW DEFINITIONS
-// =============================================================================
+/** Workflow Definitions */
 
 export const workflow_defs = sqliteTable(
   'workflow_defs',
@@ -127,9 +116,7 @@ export const workflows = sqliteTable(
   ],
 );
 
-// =============================================================================
-// GRAPH STRUCTURE
-// =============================================================================
+/** Graph Structure */
 
 export const nodes = sqliteTable(
   'nodes',
@@ -187,9 +174,7 @@ export const transitions = sqliteTable(
   ],
 );
 
-// =============================================================================
-// ACTIONS
-// =============================================================================
+/** Actions */
 
 export const actions = sqliteTable('actions', {
   id: text('id').primaryKey(),
@@ -222,9 +207,7 @@ export const actions = sqliteTable('actions', {
   updated_at: text('updated_at').notNull(),
 });
 
-// =============================================================================
-// AI PRIMITIVES
-// =============================================================================
+/** AI Primitives */
 
 export const prompt_specs = sqliteTable('prompt_specs', {
   id: text('id').primaryKey(),
@@ -262,9 +245,7 @@ export const model_profiles = sqliteTable('model_profiles', {
   cost_per_1k_output_tokens: real('cost_per_1k_output_tokens').notNull(),
 });
 
-// =============================================================================
-// WORKFLOW RUNS & EXECUTION
-// =============================================================================
+/** Workflow Runs & Execution */
 
 export const workflow_runs = sqliteTable(
   'workflow_runs',
@@ -347,9 +328,7 @@ export const events = sqliteTable(
   ],
 );
 
-// =============================================================================
-// ARTIFACTS
-// =============================================================================
+/** Artifacts */
 
 export const artifact_types = sqliteTable(
   'artifact_types',
@@ -389,9 +368,7 @@ export const artifacts = sqliteTable(
   ],
 );
 
-// =============================================================================
-// MCP SERVERS
-// =============================================================================
+/** MCP Servers */
 
 export const mcp_servers = sqliteTable(
   'mcp_servers',
@@ -421,9 +398,7 @@ export const mcp_servers = sqliteTable(
   ],
 );
 
-// =============================================================================
-// EVENT SOURCES
-// =============================================================================
+/** Event Sources */
 
 export const event_sources = sqliteTable(
   'event_sources',
@@ -448,9 +423,7 @@ export const event_sources = sqliteTable(
   ],
 );
 
-// =============================================================================
-// VECTOR SEARCH
-// =============================================================================
+/** Vector Search */
 
 export const vector_indexes = sqliteTable('vector_indexes', {
   id: text('id').primaryKey(),
@@ -470,9 +443,7 @@ export const vector_indexes = sqliteTable('vector_indexes', {
   created_at: text('created_at').notNull(),
 });
 
-// =============================================================================
-// TRIGGERS
-// =============================================================================
+/** Triggers */
 
 export const triggers = sqliteTable(
   'triggers',
@@ -494,9 +465,7 @@ export const triggers = sqliteTable(
   ],
 );
 
-// =============================================================================
-// AUTH & PERMISSIONS
-// =============================================================================
+/** Auth & Permissions */
 
 export const actors = sqliteTable(
   'actors',
@@ -511,9 +480,7 @@ export const actors = sqliteTable(
   (table) => [unique('unique_actors_email').on(table.email)],
 );
 
-// =============================================================================
-// SECRETS
-// =============================================================================
+/** Secrets */
 
 export const secrets = sqliteTable(
   'secrets',
