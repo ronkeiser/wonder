@@ -56,7 +56,7 @@ describe('Execution Service', () => {
     };
   });
 
-  describe('triggerWorkflow', () => {
+  describe('startWorkflow', () => {
     it('should trigger a workflow and return run with status=running', async () => {
       const input = { text: 'Long article about climate change...' };
 
@@ -134,9 +134,9 @@ describe('Execution Service', () => {
       (execRepo.createWorkflowRun as Mock).mockResolvedValue(workflowRun);
 
       // Execute
-      const result = await executionService.triggerWorkflow(mockCtx, workflowId, input);
+      const result = await executionService.startWorkflow(mockCtx, workflowId, input);
 
-      // Assertions: triggerWorkflow returns immediately with status='running'
+      // Assertions: startWorkflow returns immediately with status='running'
       expect(result.status).toBe('running');
       expect(result.durable_object_id).toBe('do_test_id_123');
       expect(result.completed_at).toBeNull();
@@ -215,14 +215,14 @@ describe('Execution Service', () => {
       (graphRepo.getWorkflowDef as Mock).mockResolvedValue(workflowDef);
 
       await expect(
-        executionService.triggerWorkflow(mockCtx, workflowId, invalidInput),
+        executionService.startWorkflow(mockCtx, workflowId, invalidInput),
       ).rejects.toThrow(ValidationError);
     });
 
     it('should throw error if workflow not found', async () => {
       (graphRepo.getWorkflow as Mock).mockResolvedValue(null);
 
-      await expect(executionService.triggerWorkflow(mockCtx, workflowId, {})).rejects.toThrow(
+      await expect(executionService.startWorkflow(mockCtx, workflowId, {})).rejects.toThrow(
         NotFoundError,
       );
     });
@@ -243,7 +243,7 @@ describe('Execution Service', () => {
       (graphRepo.getWorkflow as Mock).mockResolvedValue(workflow);
       (graphRepo.getWorkflowDef as Mock).mockResolvedValue(null);
 
-      await expect(executionService.triggerWorkflow(mockCtx, workflowId, {})).rejects.toThrow(
+      await expect(executionService.startWorkflow(mockCtx, workflowId, {})).rejects.toThrow(
         NotFoundError,
       );
     });

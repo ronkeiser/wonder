@@ -5,7 +5,7 @@
  */
 
 // Export Durable Objects (required for Workers runtime)
-export { WorkflowCoordinator } from './infrastructure/do/workflow-coordinator';
+export { WorkflowCoordinator } from './domains/execution/coordinator';
 
 // Main worker fetch handler (placeholder for Stage 0)
 export default {

@@ -12,7 +12,7 @@ import { env } from 'cloudflare:test';
 import { ulid } from 'ulid';
 import { beforeEach, describe, expect, it } from 'vitest';
 import type { ExecutionServiceContext } from '~/domains/execution/service';
-import { triggerWorkflow } from '~/domains/execution/service';
+import { startWorkflow } from '~/domains/execution/service';
 import { createTestDb } from '../helpers/db';
 import { migrate, seed } from '../helpers/migrate';
 
@@ -45,7 +45,7 @@ describe('Workflow Coordination Architecture', () => {
     const input = { text: 'Test input' };
 
     // This should fail with not found error since workflow doesn't exist
-    await expect(triggerWorkflow(ctx, nonExistentWorkflowId, input)).rejects.toThrow();
+    await expect(startWorkflow(ctx, nonExistentWorkflowId, input)).rejects.toThrow();
   });
 
   it('should validate DO and Queue bindings are available', () => {
