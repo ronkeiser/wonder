@@ -34,16 +34,12 @@
 
 ## Execution & State
 
-- Every workflow run gets its own DO; sub-workflows get separate DO instances
-- Context (input, state, output, artifacts) mapped to relational schema in DO's SQLite
-- Scalars become columns, arrays become tables, objects flatten or normalize
-- SQLite validates types, constraints, and referential integrity natively
-- Single row per run, updated in place; history via event log
-- Sub-workflows isolated: separate DO, explicit input/output mapping only
-- DO coordinates tokens and fan-in; Workers execute tasks via Queues
-- Event sourcing: state changes emit events for replay/debug
-- Events: 30 days in D1, then archived to R2
-- Volume: 50k+ events per run with compaction/batching
+- Each workflow run maintains isolated context: input, state, output, artifacts
+- Sub-workflows execute with isolated context; explicit input/output mapping only
+- Context schema enforced: scalars, arrays, objects all validated
+- State updates atomic and transactional
+- Full event log for replay and time-travel debugging
+- Events retained 30 days, then archived
 
 ## Data
 

@@ -1,10 +1,16 @@
 # Execution
 
-## Graph Loading
+## Loading
 
-- Nodes and transitions stored in D1, keyed by `workflow_def_id`
-- Loaded once at workflow run start, cached in DO memory
-- Actions loaded on-demand when nodes execute
+**At run start:**
+
+- Load `WorkflowDef`, `NodeDef`, `TransitionDef` (by `workflow_def_id`)
+- Cache in DO memory for run lifetime
+
+**On-demand:**
+
+- `ActionDef`, `PromptSpec`, `ModelProfile`, `ArtifactType` loaded when needed
+- Never load full artifact content or historical events into DO
 
 ## Transition Evaluation
 
@@ -64,13 +70,17 @@ Applied when fan-in completes, writes to `context.state[target]`:
 
 ## Context Storage
 
-- Every workflow run has its own DO with SQLite Transactional Storage
-- Context schema mapped to relational tables: scalars as columns, arrays as tables, objects flattened/normalized
-- Workers send field updates; DO applies via `UPDATE` or `INSERT`/`DELETE` for arrays
-- SQLite validates types, constraints, and foreign keys natively on every write
-- Transition conditions query directly against columns/tables
-- Sub-workflows get separate DO with isolated SQLite storage
-- Snapshots to D1 serialize context by joining all tables
+- Every workflow/sub-workflow gets own DO with SQLite Transactional Storage
+- Schema mapped: scalars → columns, arrays → tables, objects → flattened/normalized
+- Workers send updates; DO applies via `UPDATE`/`INSERT`/`DELETE`
+- SQLite validates types, constraints, foreign keys natively
+- Single row per run, updated in place
+- Transition conditions query against columns/tables directly
+- Ephemeral (run lifetime); snapshots to D1 per `ProjectSettings.snapshot_policy`
+
+## Event Buffering
+
+- Events buffered in DO SQLite, flushed to D1 in batches
 
 ## Sub-workflows
 
