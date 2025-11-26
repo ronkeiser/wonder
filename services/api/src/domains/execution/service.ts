@@ -85,9 +85,12 @@ export async function executeWorkflow(
   workflowId: string,
   input: Record<string, unknown>,
 ): Promise<WorkflowRun> {
+  ctx.logger.info('workflow_execution_started', { workflow_id: workflowId });
+
   // Load workflow and definition
   const workflow = await graphRepo.getWorkflow(ctx.db, workflowId);
   if (!workflow) {
+    ctx.logger.error('workflow_not_found', { workflow_id: workflowId });
     throw new NotFoundError(`Workflow not found: ${workflowId}`, 'workflow', workflowId);
   }
 
@@ -97,6 +100,11 @@ export async function executeWorkflow(
     workflow.pinned_version ?? undefined,
   );
   if (!workflowDef) {
+    ctx.logger.error('workflow_definition_not_found', {
+      workflow_id: workflowId,
+      workflow_def_id: workflow.workflow_def_id,
+      version: workflow.pinned_version,
+    });
     throw new NotFoundError(
       `Workflow definition not found: ${workflow.workflow_def_id}${
         workflow.pinned_version ? ` v${workflow.pinned_version}` : ''
@@ -111,6 +119,11 @@ export async function executeWorkflow(
     validateSchema(input, workflowDef.input_schema as Record<string, SchemaType>);
   } catch (err) {
     const message = err instanceof Error ? err.message : String(err);
+    ctx.logger.error('workflow_validation_failed', {
+      workflow_id: workflowId,
+      workflow_def_id: workflowDef.id,
+      error: message,
+    });
     throw new ValidationError(`Invalid input: ${message}`, 'input', 'SCHEMA_VALIDATION_FAILED');
   }
 
@@ -187,6 +200,15 @@ export async function executeWorkflow(
     execContext.context.output ? new Date().toISOString() : undefined,
   );
 
+  const finalStatus = execContext.context.output ? 'completed' : 'running';
+  if (finalStatus === 'completed') {
+    ctx.logger.info('workflow_execution_completed', {
+      workflow_id: workflowId,
+      workflow_run_id: workflowRun.id,
+      workflow_def_id: workflowDef.id,
+    });
+  }
+
   // Return updated workflow run
   return (await execRepo.getWorkflowRun(ctx.db, workflowRun.id))!;
 }
@@ -205,6 +227,13 @@ async function executeToken(execCtx: ExecutionContext, token: Token): Promise<vo
     token_id: token.id,
     node_id: node.id,
     node_name: node.name,
+  });
+
+  execCtx.ctx.logger.info('node_execution_started', {
+    workflow_run_id: execCtx.workflowRun.id,
+    node_id: node.id,
+    node_name: node.name,
+    token_id: token.id,
   });
 
   // Load action
@@ -235,6 +264,13 @@ async function executeToken(execCtx: ExecutionContext, token: Token): Promise<vo
     node_id: node.id,
     node_name: node.name,
     result: actionResult,
+  });
+
+  execCtx.ctx.logger.info('node_execution_completed', {
+    workflow_run_id: execCtx.workflowRun.id,
+    node_id: node.id,
+    node_name: node.name,
+    token_id: token.id,
   });
 
   // Check if terminal node
@@ -288,11 +324,25 @@ async function executeAction(
   messages.push({ role: 'user', content: userPrompt });
 
   // Call Workers AI
+  execCtx.ctx.logger.info('llm_call_started', {
+    workflow_run_id: execCtx.workflowRun.id,
+    node_id: node.id,
+    model_id: modelProfile.model_id,
+    prompt_spec_id: promptSpec.id,
+  });
+
   const result = await runInference(
     execCtx.ctx.ai,
     modelProfile.model_id as keyof AiModels,
     messages,
   );
+
+  execCtx.ctx.logger.info('llm_call_completed', {
+    workflow_run_id: execCtx.workflowRun.id,
+    node_id: node.id,
+    model_id: modelProfile.model_id,
+    response_length: result.response.length,
+  });
 
   return { response: result.response };
 }

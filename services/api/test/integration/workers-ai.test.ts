@@ -1,5 +1,5 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
-import { runInference, type ChatMessage } from '../../src/infrastructure/clients/workers-ai';
+import { runInference, type ChatMessage } from '~/infrastructure/clients/workers-ai';
 
 /**
  * Creates a mock AI binding for testing.

@@ -1,27 +1,26 @@
 /** Unit tests for execution service */
 
-import type { DrizzleD1Database } from 'drizzle-orm/d1';
 import { ulid } from 'ulid';
 import { beforeEach, describe, expect, it, vi, type Mock } from 'vitest';
-import * as aiRepo from '../../../src/domains/ai/repository';
-import * as effectsRepo from '../../../src/domains/effects/repository';
-import * as eventsRepo from '../../../src/domains/events/repository';
-import * as execRepo from '../../../src/domains/execution/repository';
-import * as executionService from '../../../src/domains/execution/service';
-import * as graphRepo from '../../../src/domains/graph/repository';
-import type { SchemaType } from '../../../src/domains/schema/validation';
-import { NotFoundError, ValidationError } from '../../../src/errors';
-import type { ServiceContext } from '../../../src/infrastructure/context';
+import * as aiRepo from '~/domains/ai/repository';
+import * as effectsRepo from '~/domains/effects/repository';
+import * as eventsRepo from '~/domains/events/repository';
+import * as execRepo from '~/domains/execution/repository';
+import * as executionService from '~/domains/execution/service';
+import * as graphRepo from '~/domains/graph/repository';
+import type { SchemaType } from '~/domains/schema/validation';
+import { NotFoundError, ValidationError } from '~/errors';
+import { createMockServiceContext, type MockServiceContext } from '../../helpers/context';
 
 // Mock all repository modules
-vi.mock('../../../src/domains/graph/repository');
-vi.mock('../../../src/domains/ai/repository');
-vi.mock('../../../src/domains/effects/repository');
-vi.mock('../../../src/domains/execution/repository');
-vi.mock('../../../src/domains/events/repository');
+vi.mock('~/domains/graph/repository');
+vi.mock('~/domains/ai/repository');
+vi.mock('~/domains/effects/repository');
+vi.mock('~/domains/execution/repository');
+vi.mock('~/domains/events/repository');
 
 describe('Execution Service', () => {
-  let mockCtx: ServiceContext;
+  let mockCtx: MockServiceContext;
 
   // Test IDs
   const workspaceId = ulid();
@@ -37,14 +36,13 @@ describe('Execution Service', () => {
     vi.clearAllMocks();
 
     // Mock ServiceContext
-    mockCtx = {
-      db: {} as unknown as DrizzleD1Database,
+    mockCtx = createMockServiceContext({
       ai: {
         run: vi.fn().mockResolvedValue({
           response: 'This is a summary of the input text.',
         }),
       } as unknown as Ai,
-    };
+    });
   });
 
   describe('executeWorkflow', () => {

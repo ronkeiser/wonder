@@ -7,6 +7,10 @@
       "types": "./dist/src/index.d.ts",
       "default": "./dist/src/index.js"
     },
+    "./mock": {
+      "types": "./dist/src/mock.d.ts",
+      "default": "./dist/src/mock.js"
+    },
     "./schema": {
       "types": "./dist/src/schema.d.ts",
       "default": "./dist/src/schema.js"
