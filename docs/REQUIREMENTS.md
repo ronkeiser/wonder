@@ -9,6 +9,7 @@
 
 - Built on Cloudflare: Workers, Durable Objects, Queues, D1, Vectorize, R2
 - UI built with SvelteKit
+- Testing via Vitest with miniflare (local Cloudflare runtime)
 
 ## Providers & MCP
 
@@ -44,6 +45,7 @@
 - State schema auto-inferred from graph; user can override/lock fields
 - Artifacts are typed, versioned, project-scoped, searchable via Vectorize
 - Artifacts persist until explicit user delete
+- All entity IDs use ULID format (sortable, timestamp-prefixed, 26 chars)
 
 ## Execution
 

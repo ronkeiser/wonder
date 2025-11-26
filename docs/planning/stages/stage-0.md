@@ -1,5 +1,12 @@
 # Stage 0: Vertical Slice
 
+<!-- TODO: Stage 0-specific implementation details to decide:
+- Seed script: exact data values for workspace, project, model_profile
+- Workers AI: which model to use (@cf/meta/llama-3-8b-instruct?)
+- Workflow structure: exact prompt template text
+- Integration test: assertions to validate (context.output fields, event payload structure)
+-->
+
 ## Goal
 
 Create and persist a single-node LLM workflow, then execute it once.
