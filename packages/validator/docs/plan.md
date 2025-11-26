@@ -1,4 +1,4 @@
-# @wonderful/validator Implementation Plan
+# @wonder/validator Implementation Plan
 
 ## Overview
 
@@ -123,7 +123,7 @@ packages/validator/
 ### Exception-Driven (Simple Cases)
 
 ```typescript
-import { validateSchema } from '@wonderful/validator';
+import { validateSchema } from '@wonder/validator';
 
 // Throws ValidationError on failure
 validateSchema(data, schema);
@@ -132,7 +132,7 @@ validateSchema(data, schema);
 ### Result-Driven (All Errors)
 
 ```typescript
-import { Validator } from '@wonderful/validator';
+import { Validator } from '@wonder/validator';
 
 const validator = new Validator(schema, {
   collectAllErrors: true,
@@ -147,7 +147,7 @@ const result = validator.validate(data);
 ### Partial Validation
 
 ```typescript
-import { validatePartial } from '@wonderful/validator';
+import { validatePartial } from '@wonder/validator';
 
 // Validate only specific paths
 validatePartial(updates, schema, {
@@ -315,10 +315,10 @@ import { validateSchema } from '~/domains/schema/validation';
 validateSchema(input, workflowDef.input_schema);
 ```
 
-### After (@wonderful/validator):
+### After (@wonder/validator):
 
 ```typescript
-import { validateSchema } from '@wonderful/validator';
+import { validateSchema } from '@wonder/validator';
 
 validateSchema(input, workflowDef.input_schema);
 ```

@@ -1,4 +1,4 @@
-// Type definitions for @wonderful/validator
+// Type definitions for @wonder/validator
 
 export type SchemaType = {
   // Core type

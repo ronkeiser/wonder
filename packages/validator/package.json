@@ -1,5 +1,5 @@
 {
-  "name": "@wonderful/validator",
+  "name": "@wonder/validator",
   "version": "0.1.0",
   "description": "Fast, CF Workers-compatible JSON Schema validator for Wonder",
   "type": "module",

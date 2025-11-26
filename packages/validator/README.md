@@ -1,4 +1,4 @@
-# @wonderful/validator
+# @wonder/validator
 
 Fast, Cloudflare Workers-compatible JSON Schema validator for Wonder.
 
@@ -15,13 +15,13 @@ Fast, Cloudflare Workers-compatible JSON Schema validator for Wonder.
 ## Installation
 
 ```bash
-pnpm add @wonderful/validator
+pnpm add @wonder/validator
 ```
 
 ## Usage
 
 ```typescript
-import { Validator, validateSchema } from '@wonderful/validator';
+import { Validator, validateSchema } from '@wonder/validator';
 
 const schema = {
   type: 'object',
