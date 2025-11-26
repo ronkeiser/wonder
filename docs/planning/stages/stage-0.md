@@ -2,11 +2,15 @@
 
 ## Goal
 
-Create and persist a single-node LLM workflow, then execute it once.
+Create and persist a single-node LLM workflow, then execute it once using the proper DO-based coordination architecture.
 
 ## What It Proves
 
-- Graph authoring → D1 persistence → retrieval → Workers AI execution → result storage
+- Graph authoring → D1 persistence → retrieval
+- **DO-based workflow coordination with SQLite context storage**
+- **Queue-based task distribution (DO → Queue → Worker → DO)**
+- Workers AI execution → result storage
+- Proper separation: DO coordinates, Worker executes
 
 ## The Workflow
 
@@ -16,6 +20,24 @@ Create and persist a single-node LLM workflow, then execute it once.
 
 Single node is both start and terminal (no transitions needed).
 
+## Architecture Flow
+
+```
+HTTP Request
+  ↓
+triggerWorkflow() creates run in D1, gets DO stub
+  ↓
+DO.executeWorkflow() initializes context in SQLite
+  ↓
+DO enqueues WorkflowTask to Queue
+  ↓
+Worker picks up task, executes LLM call
+  ↓
+Worker returns WorkflowTaskResult to DO
+  ↓
+DO updates context, emits events, completes workflow
+```
+
 ## Data Created
 
 1. One `workspace` + `project` (seeded)
@@ -24,50 +46,58 @@ Single node is both start and terminal (no transitions needed).
 4. One `action` (llm_call referencing the prompt_spec + model_profile)
 5. One `workflow_def` with one `node`
 6. One `workflow` binding the def to the project
-7. One `workflow_run` with result in `context.output` + `latest_snapshot`
-8. One `token` (created → completed lifecycle)
+7. One `workflow_run` with `durable_object_id` + result in `context.output`
+8. **DO SQLite storage:** context (input, state, output as columns/tables), token state
 9. Four `events` (workflow_started, node_started, node_completed, workflow_completed)
 
 ## Files
 
-| File                                      | LOC est. | Purpose                                                         |
-| ----------------------------------------- | -------- | --------------------------------------------------------------- |
-| `domains/graph/repository.ts`             | ~80      | CRUD: workflow_defs, nodes, transitions                         |
-| `domains/ai/repository.ts`                | ~60      | CRUD: prompt_specs, model_profiles                              |
-| `domains/effects/repository.ts`           | ~40      | CRUD: actions                                                   |
-| `domains/execution/repository.ts`         | ~70      | CRUD: workflow_runs, tokens                                     |
-| `domains/execution/service.ts`            | ~120     | `executeWorkflow(workflowId, input)` — token lifecycle + events |
-| `domains/events/repository.ts`            | ~30      | Write events to D1 (batch insert)                               |
-| `infrastructure/clients/workers-ai.ts`    | ~30      | `runInference(model, messages)`                                 |
-| `infrastructure/validation/schema.ts`     | ~40      | Validate context.input against workflow schema                  |
-| `infrastructure/db/seed.ts`               | ~50      | Seed workspace, project, model_profile                          |
-| `test/unit/validation/schema.test.ts`     | ~60      | Unit: schema validation edge cases                              |
-| `test/unit/execution/service.test.ts`     | ~80      | Unit: token lifecycle, event sequencing (mock repositories)     |
-| `test/integration/vertical-slice.test.ts` | ~100     | End-to-end test (including event/token assertions)              |
+| File                                            | LOC est. | Purpose                                                       |
+| ----------------------------------------------- | -------- | ------------------------------------------------------------- |
+| `domains/graph/repository.ts`                   | ~80      | CRUD: workflow_defs, nodes, transitions                       |
+| `domains/ai/repository.ts`                      | ~60      | CRUD: prompt_specs, model_profiles                            |
+| `domains/effects/repository.ts`                 | ~40      | CRUD: actions                                                 |
+| `domains/execution/repository.ts`               | ~70      | CRUD: workflow_runs (in D1)                                   |
+| **`infrastructure/do/workflow-coordinator.ts`** | **~480** | **DO class using @wonder/schema DDL/DML for context storage** |
+| **`infrastructure/queue/types.ts`**             | **~70**  | **WorkflowTask, WorkflowTaskResult, task queue types**        |
+| `domains/execution/service.ts`                  | ~180     | `triggerWorkflow()` — creates run, invokes DO                 |
+| **`domains/execution/worker.ts`**               | **~200** | **Worker task handler: execute action, return result**        |
+| `domains/events/repository.ts`                  | ~30      | Write events to D1 (batch insert)                             |
+| `infrastructure/clients/workers-ai.ts`          | ~30      | `runInference(model, messages)`                               |
+| `infrastructure/validation/schema.ts`           | ~40      | Validate context.input against workflow schema                |
+| `infrastructure/db/seed.ts`                     | ~50      | Seed workspace, project, model_profile                        |
+| `test/unit/validation/schema.test.ts`           | ~60      | Unit: schema validation edge cases                            |
+| `test/unit/do/workflow-coordinator.test.ts`     | ~120     | Unit: DO coordination logic (mocked queue)                    |
+| `test/integration/vertical-slice.test.ts`       | ~120     | End-to-end test with real DO, Queue, Worker                   |
 
-**~760 LOC total**
+**~1,380 LOC total** (+620 for DO coordination)
+
+**Note:** Removed `infrastructure/do/context-storage.ts` - using `@wonder/schema` DDL/DML generators directly instead of duplicating functionality.
 
 ## Test
 
 ```typescript
 // 1. Seed base data
 // 2. Create prompt_spec, action, workflow_def, node, workflow
-// 3. Call executeWorkflow({ text: "Long article..." })
-// 4. Assert workflow_run.status === 'completed'
-// 5. Assert workflow_run.context.output.summary exists
-// 6. Assert workflow_run.latest_snapshot exists
-// 7. Assert token created and completed
+// 3. Call triggerWorkflow(workflowId, { text: "Long article..." })
+// 4. Wait for async execution (DO → Queue → Worker → DO)
+// 5. Assert workflow_run.status === 'completed'
+// 6. Assert workflow_run.context.output.summary exists
+// 7. Query DO SQLite directly to verify context storage structure
 // 8. Assert 4 events emitted in correct sequence
+// 9. Verify durable_object_id set correctly
 ```
 
 ## Scope Exclusions
 
-- No fan-out/fan-in
+- No fan-out/fan-in (but DO fan-in tracking structure exists)
 - No transitions (single node)
-- No triggers
+- No triggers (direct HTTP invocation only)
 - No artifacts
 - No human input gates
-- No sub-workflows
+- No sub-workflows (but DO isolation pattern proven)
+- No snapshots (structure exists, creation deferred)
+- Simplified context storage (all scalars only, no arrays/complex objects)
 
 ## Implementation Steps
 
@@ -99,20 +129,46 @@ Single node is both start and terminal (no transitions needed).
 **Test:** Integration test with real AI binding (or mock in test env), assert response structure  
 **Status:** Complete - 6 tests passing (5 mocked, 1 ReadableStream, 1 error handling)
 
-### Step 5: Execution Service ✅
+### Step 5: DO Coordinator Implementation
 
-**Files:** `domains/execution/service.ts` (~417 LOC) + `test/unit/execution/service.test.ts` (~309 LOC)  
-**What:** Token lifecycle, event emission, context initialization, LLM execution orchestration  
-**Test:** Unit test with mocked repositories + LLM client, assert token/event sequences  
-**Status:** Complete - 4 tests passing:
+**Files:** `infrastructure/do/workflow-coordinator.ts`, `infrastructure/do/context-storage.ts`, `infrastructure/queue/types.ts`  
+**What:** Durable Object class that owns workflow run state, manages context in SQLite, coordinates task execution  
+**Key Methods:**
 
-- ✅ Successful single-node workflow execution
-- ✅ Event sequencing (4 events with monotonic sequence numbers)
-- ✅ Input validation (rejects invalid input)
-- ✅ Error handling (workflow/definition not found)
+- `executeWorkflow(workflowId, input)` - initialize run, create context tables
+- `enqueueTask(token, node, action)` - send WorkflowTask to Queue
+- `receiveTaskResult(result)` - update context, advance token, emit events
+- Context storage: map `context.input`, `context.state`, `context.output` to SQLite columns
 
-### Step 6: End-to-End Integration
+**Test:** Unit test with mocked queue binding, assert context storage and task coordination  
+**Status:** Not started
 
-**Files:** Wire everything together  
-**What:** Create workflow, execute with real Workers AI, validate full result  
-**Test:** `test/integration/vertical-slice.test.ts` — complete vertical slice with real D1 + Workers AI
+### Step 6: Worker Task Handler
+
+**Files:** `domains/execution/worker.ts`  
+**What:** Worker handler that receives WorkflowTask from Queue, executes action, returns WorkflowTaskResult to DO  
+**Test:** Unit test with mocked AI client, assert task execution and result structure  
+**Status:** Not started
+
+### Step 7: Trigger Service (Updated)
+
+**Files:** `domains/execution/service.ts` (refactored from monolithic executor to thin trigger)  
+**What:** `triggerWorkflow(workflowId, input)` - creates run in D1, gets DO stub, invokes DO.executeWorkflow()  
+**Test:** Integration test end-to-end  
+**Status:** Needs refactor - current implementation bypasses DO
+
+### Step 8: End-to-End Integration
+
+**Files:** Wire everything together with DO, Queue, Worker coordination  
+**What:** Create workflow, trigger execution, validate async coordination through DO → Queue → Worker → DO  
+**Test:** `test/integration/vertical-slice.test.ts` — complete vertical slice with real D1 + DO + Queue + Workers AI  
+**Validation:**
+
+- Workflow run created with durable_object_id
+- DO SQLite contains context data in proper schema
+- Task enqueued and processed by worker
+- Result returned to DO and context updated
+- Events persisted to D1 in correct sequence
+- Final status 'completed' with output
+
+**Status:** Needs implementation

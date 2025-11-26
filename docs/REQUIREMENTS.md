@@ -1,5 +1,7 @@
 # Requirements
 
+<!-- Style: KEEP THIS DOC LEAN. Exhibit extreme token economy. No sub-bullets. -->
+
 ## Purpose
 
 - Wonder is personal infrastructure for AI-assisted research and software development
@@ -49,6 +51,7 @@
 - Artifacts are typed, versioned, project-scoped, searchable via Vectorize
 - Artifacts persist until explicit user delete
 - All entity IDs use ULID format (sortable, timestamp-prefixed, 26 chars)
+- `@wonder/schema` handles all validation, DDL/DML generation (no duplication)
 
 ## Error Handling
 
