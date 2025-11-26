@@ -4,14 +4,14 @@
  * This worker serves the Wonder API and exports Durable Object classes.
  */
 
+import { handleFetch } from './handlers/fetch';
+import { handleQueue } from './handlers/queue';
+
 // Export Durable Objects (required for Workers runtime)
 export { WorkflowCoordinator } from './domains/execution/coordinator';
 
-// Main worker fetch handler (placeholder for Stage 0)
+// Export handler implementations
 export default {
-  async fetch(request: Request, env: Env): Promise<Response> {
-    return new Response('Wonder API - Stage 0', {
-      headers: { 'content-type': 'text/plain' },
-    });
-  },
+  fetch: handleFetch,
+  queue: handleQueue,
 };

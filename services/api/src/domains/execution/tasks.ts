@@ -2,8 +2,7 @@
 
 import type { Logger } from '@wonder/logger';
 import { ulid } from 'ulid';
-import type { WorkflowTask } from '~/infrastructure/queue/types';
-import type { Token } from './definitions';
+import type { Token, WorkflowTask } from './definitions';
 import type { EventManager } from './events';
 
 export class TaskDispatcher {

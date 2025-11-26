@@ -2,10 +2,10 @@
 
 import type { DrizzleD1Database } from 'drizzle-orm/d1';
 import { runInference } from '~/infrastructure/clients/workers-ai';
-import type { WorkflowTask, WorkflowTaskResult } from '~/infrastructure/queue/types';
 import * as aiRepo from '../ai/repository';
 import * as effectsRepo from '../effects/repository';
 import * as graphRepo from '../graph/repository';
+import type { WorkflowTask, WorkflowTaskResult } from './definitions';
 
 /**
  * Process a workflow task from the queue.
