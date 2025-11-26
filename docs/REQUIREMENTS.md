@@ -35,6 +35,7 @@
 ## Context & State
 
 - Each run has Context: input (immutable), state (mutable), output, artifacts
+- Context stored as JSON in DO SQLite; path-based updates via `json_set()`
 - Local state is ephemeral working data; artifacts are persisted outputs
 - Sub-workflows get fresh isolated context; explicit input/output mapping only
 - Sub-workflows are pure functions: no parent state access, no side effects
@@ -49,7 +50,7 @@
 
 ## Execution
 
-- One DO per run coordinates token state and fan-in synchronization; may need sub-workflow DOs at scale
+- One DO per run coordinates token state and fan-in synchronization
 - Workers execute tasks (LLM calls, HTTP, etc.) via Queues
 - Event sourcing: every state change emits event for replay/debug
 - Events in D1 30 days, then moved to R2 by scheduled worker

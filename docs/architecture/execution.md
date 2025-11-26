@@ -62,6 +62,14 @@ Applied when fan-in completes, writes to `context.state[target]`:
 - **After fan-in**: merge strategy applies `_branch.output` from siblings → `context.state[target]`
 - `_branch` cleared after merge completes
 
+## Context Storage
+
+- Context stored as JSON in DO SQLite `workflow_context` table (one row per run)
+- Workers send path-based update commands; DO applies via `json_set()`, `json_extract()`
+- Granular mutations without loading entire blob; validated against `context_schema` before write
+- Sub-workflows isolated by `workflow_run_id`; transitions query via `json_extract()`
+- Snapshots to D1 serialize full context JSON from DO row
+
 ## Sub-workflows
 
 - `workflow_call` action spawns new WorkflowRun with fresh context

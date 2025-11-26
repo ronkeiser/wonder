@@ -116,8 +116,3 @@ Single node is both start and terminal (no transitions needed).
 **Files:** Wire everything together  
 **What:** Create workflow, execute with real Workers AI, validate full result  
 **Test:** `test/integration/vertical-slice.test.ts` — complete vertical slice with real D1 + Workers AI
-
-## Dependencies
-
-- D1 database with schema migrated
-- Workers AI binding configured in `wrangler.jsonc`
