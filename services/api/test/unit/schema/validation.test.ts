@@ -1,9 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import {
-  validateSchema,
-  ValidationError,
-  type SchemaType,
-} from '~/infrastructure/validation/schema';
+import { validateSchema, ValidationError, type SchemaType } from '~/domains/schema/validation';
 
 describe('schema validation', () => {
   describe('basic types', () => {
