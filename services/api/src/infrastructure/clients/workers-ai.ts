@@ -35,10 +35,14 @@ export async function runInference<T extends keyof AiModels>(
     const reader = result.getReader();
     const chunks: string[] = [];
 
-    while (true) {
-      const { done, value } = await reader.read();
-      if (done) break;
-      chunks.push(new TextDecoder().decode(value));
+    try {
+      while (true) {
+        const { done, value } = await reader.read();
+        if (done) break;
+        chunks.push(new TextDecoder().decode(value));
+      }
+    } finally {
+      reader.releaseLock();
     }
 
     return { response: chunks.join('') };
