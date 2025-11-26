@@ -1,6 +1,5 @@
 /** Workflow execution service */
 
-import { ulid } from 'ulid';
 import { validateSchema, type SchemaType } from '~/domains/schema/validation';
 import { NotFoundError, ValidationError } from '~/errors';
 import { runInference } from '~/infrastructure/clients/workers-ai';
@@ -9,64 +8,16 @@ import * as aiRepo from '../ai/repository';
 import * as effectsRepo from '../effects/repository';
 import * as eventsRepo from '../events/repository';
 import * as graphRepo from '../graph/repository';
+import type { Context, Event, EventKind, Token, WorkflowRun } from './definitions';
 import * as execRepo from './repository';
 
-/** Core Types */
+/** Domain types from other bounded contexts */
 
-type WorkflowRun = Awaited<ReturnType<typeof execRepo.createWorkflowRun>>;
 type WorkflowDef = Awaited<ReturnType<typeof graphRepo.getWorkflowDef>>;
 type Node = Awaited<ReturnType<typeof graphRepo.getNode>>;
 type Action = Awaited<ReturnType<typeof effectsRepo.getAction>>;
 
-type Token = {
-  id: string;
-  workflow_run_id: string;
-  node_id: string;
-  status: 'active' | 'waiting_at_fan_in' | 'completed' | 'cancelled';
-  path_id: string;
-  parent_token_id: string | null;
-  fan_out_node_id: string | null;
-  branch_index: number;
-  branch_total: number;
-  created_at: string;
-  updated_at: string;
-};
-
-type Context = {
-  input: Record<string, unknown>;
-  state: Record<string, unknown>;
-  output?: Record<string, unknown>;
-  artifacts: Record<string, string>;
-  _branch?: BranchContext;
-};
-
-type BranchContext = {
-  id: string;
-  index: number;
-  total: number;
-  fan_out_node_id: string;
-  output: Record<string, unknown>;
-  parent?: BranchContext;
-};
-
-type EventKind =
-  | 'workflow_started'
-  | 'workflow_completed'
-  | 'workflow_failed'
-  | 'node_started'
-  | 'node_completed'
-  | 'node_failed'
-  | 'transition_taken'
-  | 'token_spawned';
-
-type Event = {
-  workflow_run_id: string;
-  sequence_number: number;
-  kind: EventKind;
-  payload: Record<string, unknown>;
-};
-
-/** Execution Context */
+/** Internal execution context (not part of domain model) */
 
 type ExecutionContext = {
   ctx: ServiceContext;
@@ -134,22 +85,7 @@ export async function executeWorkflow(
     artifacts: {},
   };
 
-  // Create initial token
-  const initialToken: Token = {
-    id: ulid(),
-    workflow_run_id: '', // Will be set after creating workflow_run
-    node_id: workflowDef.initial_node_id,
-    status: 'active',
-    path_id: ulid(),
-    parent_token_id: null,
-    fan_out_node_id: null,
-    branch_index: 0,
-    branch_total: 1,
-    created_at: new Date().toISOString(),
-    updated_at: new Date().toISOString(),
-  };
-
-  // Create workflow run
+  // Create workflow run (with empty tokens initially)
   const workflowRun = await execRepo.createWorkflowRun(ctx.db, {
     project_id: workflow.project_id,
     workflow_id: workflow.id,
@@ -157,14 +93,23 @@ export async function executeWorkflow(
     workflow_version: workflowDef.version,
     status: 'running',
     context: JSON.stringify(context),
-    active_tokens: JSON.stringify([{ ...initialToken, workflow_run_id: '' }]),
-    durable_object_id: ulid(), // Placeholder for Stage 0
+    active_tokens: JSON.stringify([]),
+    durable_object_id: 'do_placeholder', // Placeholder for Stage 0
     parent_run_id: null,
     parent_node_id: null,
   });
 
-  // Update token with workflow_run_id
-  initialToken.workflow_run_id = workflowRun.id;
+  // Create initial token via repository (generates ID and timestamps)
+  const initialToken = await execRepo.createToken(ctx.db, {
+    workflow_run_id: workflowRun.id,
+    node_id: workflowDef.initial_node_id,
+    status: 'active',
+    path_id: workflowRun.id, // Use run ID as root path for Stage 0
+    parent_token_id: null,
+    fan_out_node_id: null,
+    branch_index: 0,
+    branch_total: 1,
+  });
 
   // Initialize execution context
   const execContext: ExecutionContext = {

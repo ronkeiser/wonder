@@ -172,6 +172,22 @@ describe('Execution Service', () => {
         completed_at: null,
       };
 
+      // Mock initial token
+      const tokenId = ulid();
+      const initialToken = {
+        id: tokenId,
+        workflow_run_id: workflowRunId,
+        node_id: nodeId,
+        status: 'active' as const,
+        path_id: workflowRunId,
+        parent_token_id: null,
+        fan_out_node_id: null,
+        branch_index: 0,
+        branch_total: 1,
+        created_at: new Date().toISOString(),
+        updated_at: new Date().toISOString(),
+      };
+
       // Setup mocks
       (graphRepo.getWorkflow as Mock).mockResolvedValue(workflow);
       (graphRepo.getWorkflowDef as Mock).mockResolvedValue(workflowDef);
@@ -181,6 +197,7 @@ describe('Execution Service', () => {
       (aiRepo.getPromptSpec as Mock).mockResolvedValue(promptSpec);
       (aiRepo.getModelProfile as Mock).mockResolvedValue(modelProfile);
       (execRepo.createWorkflowRun as Mock).mockResolvedValue(workflowRun);
+      (execRepo.createToken as Mock).mockResolvedValue(initialToken);
       (execRepo.getWorkflowRun as Mock).mockResolvedValue({
         ...workflowRun,
         status: 'completed',

@@ -4,25 +4,7 @@ import { eq } from 'drizzle-orm';
 import type { DrizzleD1Database } from 'drizzle-orm/d1';
 import { ulid } from 'ulid';
 import { events, workflow_runs } from '~/infrastructure/db/schema';
-
-type WorkflowRun = typeof workflow_runs.$inferSelect;
-type NewWorkflowRun = Omit<typeof workflow_runs.$inferInsert, 'id' | 'created_at' | 'updated_at'>;
-
-type Token = {
-  id: string;
-  workflow_run_id: string;
-  node_id: string;
-  status: 'active' | 'waiting_at_fan_in' | 'completed' | 'cancelled';
-  path_id: string;
-  parent_token_id: string | null;
-  fan_out_node_id: string | null;
-  branch_index: number;
-  branch_total: number;
-  created_at: string;
-  updated_at: string;
-};
-
-type NewToken = Omit<Token, 'id' | 'created_at' | 'updated_at'>;
+import type { NewToken, NewWorkflowRun, Token, WorkflowRun } from './definitions';
 
 /** WorkflowRun */
 

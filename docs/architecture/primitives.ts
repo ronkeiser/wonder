@@ -1,14 +1,9 @@
-// =============================================================================
-// WONDER WORKFLOW PRIMITIVES
-// AI Workflow Orchestration System
-// =============================================================================
+/** WONDER WORKFLOW PRIMITIVES - AI Workflow Orchestration System */
 
-// =============================================================================
-// TYPE SYSTEM
-// =============================================================================
+/** Type System */
 
 export type SchemaType = {
-  type: "string" | "number" | "boolean" | "object" | "array" | "artifact_ref";
+  type: 'string' | 'number' | 'boolean' | 'object' | 'array' | 'artifact_ref';
   properties?: Record<string, SchemaType>;
   required?: string[];
   items?: SchemaType;
@@ -23,9 +18,7 @@ export type ArtifactType = {
   version: number;
 };
 
-// =============================================================================
-// WORKSPACE & PROJECT
-// =============================================================================
+/** Workspace & Project */
 
 export type Workspace = {
   id: string;
@@ -79,9 +72,7 @@ export type ProjectSettings = {
   };
 };
 
-// =============================================================================
-// LIBRARY
-// =============================================================================
+/** Library */
 
 export type Library = {
   id: string;
@@ -92,13 +83,11 @@ export type Library = {
   updated_at: string;
 };
 
-// =============================================================================
-// WORKFLOW & WORKFLOW DEFINITION
-// =============================================================================
+/** Workflow & Workflow Definition */
 
 export type WorkflowDefOwner =
-  | { type: "project"; project_id: string }
-  | { type: "library"; library_id: string };
+  | { type: 'project'; project_id: string }
+  | { type: 'library'; library_id: string };
 
 export type WorkflowDef = {
   id: string;
@@ -169,7 +158,7 @@ export type WorkflowRun = {
   completed_at?: string;
 };
 
-export type WorkflowRunStatus = "running" | "completed" | "failed" | "waiting";
+export type WorkflowRunStatus = 'running' | 'completed' | 'failed' | 'waiting';
 
 export type Snapshot = {
   after_sequence_number: number; // replay events after this
@@ -178,9 +167,7 @@ export type Snapshot = {
   created_at: string;
 };
 
-// =============================================================================
-// GRAPH STRUCTURE: NODES
-// =============================================================================
+/** Graph Structure: Nodes */
 
 export type NodeDef = {
   id: string;
@@ -195,8 +182,8 @@ export type NodeDef = {
   output_mapping?: Record<string, string>;
 
   // Parallelism semantics
-  fan_out: "first_match" | "all";
-  fan_in: "any" | "all" | { m_of_n: number };
+  fan_out: 'first_match' | 'all';
+  fan_in: 'any' | 'all' | { m_of_n: number };
 
   // For fan_in nodes: which fan_out node spawned the tokens we're joining?
   // Required when fan_in is 'all' or 'm_of_n' to identify sibling tokens
@@ -206,16 +193,14 @@ export type NodeDef = {
   merge?: {
     source?: string; // path within _branch.output, default '*' (all)
     target: string; // path in state to write merged result
-    strategy: "append" | "merge_object" | "keyed_by_branch" | "last_wins";
+    strategy: 'append' | 'merge_object' | 'keyed_by_branch' | 'last_wins';
   };
 
   // Behavior when m_of_n satisfied early
-  on_early_complete?: "cancel" | "abandon" | "allow_late_merge";
+  on_early_complete?: 'cancel' | 'abandon' | 'allow_late_merge';
 };
 
-// =============================================================================
-// GRAPH STRUCTURE: TRANSITIONS
-// =============================================================================
+/** Graph Structure: Transitions */
 
 export type TransitionDef = {
   id: string;
@@ -225,8 +210,8 @@ export type TransitionDef = {
   priority: number;
 
   condition?:
-    | { type: "structured"; definition: StructuredCondition }
-    | { type: "expression"; expr: string; reads: string[] };
+    | { type: 'structured'; definition: StructuredCondition }
+    | { type: 'expression'; expr: string; reads: string[] };
 
   // Dynamic iteration: spawn a token for each item in collection
   foreach?: {
@@ -240,9 +225,7 @@ export type TransitionDef = {
   };
 };
 
-// =============================================================================
-// STRUCTURED CONDITIONS
-// =============================================================================
+/** Structured Conditions */
 
 export type StructuredCondition =
   | ComparisonCondition
@@ -252,61 +235,59 @@ export type StructuredCondition =
   | BooleanCondition;
 
 export type ComparisonCondition = {
-  type: "comparison";
+  type: 'comparison';
   left: FieldRef | LiteralValue;
-  operator: ">" | "<" | "==" | "!=" | ">=" | "<=";
+  operator: '>' | '<' | '==' | '!=' | '>=' | '<=';
   right: FieldRef | LiteralValue;
 };
 
 export type FieldRef = {
-  type: "field";
+  type: 'field';
   path: string;
 };
 
 export type LiteralValue = {
-  type: "literal";
+  type: 'literal';
   value: string | number | boolean;
 };
 
 export type ExistsCondition = {
-  type: "exists";
+  type: 'exists';
   field: FieldRef;
   negated?: boolean;
 };
 
 export type InSetCondition = {
-  type: "in_set";
+  type: 'in_set';
   field: FieldRef;
   values: LiteralValue[];
   negated?: boolean;
 };
 
 export type ArrayCondition = {
-  type: "array_length";
+  type: 'array_length';
   field: FieldRef;
-  operator: ">" | "<" | "==" | ">=" | "<=";
+  operator: '>' | '<' | '==' | '>=' | '<=';
   value: number | FieldRef;
 };
 
 export type BooleanCondition = {
-  type: "and" | "or";
+  type: 'and' | 'or';
   conditions: StructuredCondition[];
 };
 
-// =============================================================================
-// ACTIONS
-// =============================================================================
+/** Actions */
 
 export type ActionKind =
-  | "llm_call"
-  | "mcp_tool"
-  | "http_request"
-  | "human_input"
-  | "update_context"
-  | "write_artifact"
-  | "workflow_call"
-  | "vector_search"
-  | "emit_metric";
+  | 'llm_call'
+  | 'mcp_tool'
+  | 'http_request'
+  | 'human_input'
+  | 'update_context'
+  | 'write_artifact'
+  | 'workflow_call'
+  | 'vector_search'
+  | 'emit_metric';
 
 export type ActionDef = {
   id: string;
@@ -334,7 +315,7 @@ export type ActionDef = {
     timeout_ms?: number;
     retry_policy?: {
       max_attempts: number;
-      backoff: "none" | "linear" | "exponential";
+      backoff: 'none' | 'linear' | 'exponential';
       initial_delay_ms: number;
       max_delay_ms?: number;
       retryable_errors?: string[];
@@ -362,7 +343,7 @@ export type MCPToolImpl = {
 
 export type HTTPRequestImpl = {
   url_template: string;
-  method: "GET" | "POST" | "PUT" | "DELETE";
+  method: 'GET' | 'POST' | 'PUT' | 'DELETE';
   headers?: Record<string, string>;
   body_template?: string;
 };
@@ -399,7 +380,7 @@ export type WorkflowCallImpl = {
   inherit_artifacts?: boolean; // default false
 
   // Failure handling
-  on_failure?: "propagate" | "catch"; // default 'propagate'
+  on_failure?: 'propagate' | 'catch'; // default 'propagate'
 };
 
 export type VectorSearchImpl = {
@@ -414,9 +395,7 @@ export type EmitMetricImpl = {
   dimensions?: Record<string, string>;
 };
 
-// =============================================================================
-// AI PRIMITIVES
-// =============================================================================
+/** AI Primitives */
 
 export type PromptSpec = {
   id: string;
@@ -426,7 +405,7 @@ export type PromptSpec = {
 
   system_prompt?: string;
   template: string;
-  template_language: "handlebars" | "jinja2";
+  template_language: 'handlebars' | 'jinja2';
 
   requires: Record<string, SchemaType>;
   produces: Record<string, SchemaType>;
@@ -442,12 +421,7 @@ export type PromptSpec = {
   updated_at: string;
 };
 
-export type ModelProvider =
-  | "anthropic"
-  | "openai"
-  | "google"
-  | "cloudflare"
-  | "local";
+export type ModelProvider = 'anthropic' | 'openai' | 'google' | 'cloudflare' | 'local';
 
 export type ModelProfile = {
   id: string;
@@ -468,9 +442,7 @@ export type ModelProfile = {
   cost_per_1k_output_tokens: number;
 };
 
-// =============================================================================
-// VECTOR SEARCH
-// =============================================================================
+/** Vector Search */
 
 export type VectorIndex = {
   id: string;
@@ -479,7 +451,7 @@ export type VectorIndex = {
 
   artifact_type_ids: string[];
 
-  embedding_provider: "openai" | "cloudflare_ai";
+  embedding_provider: 'openai' | 'cloudflare_ai';
   embedding_model: string;
   dimensions: number;
 
@@ -490,11 +462,9 @@ export type VectorIndex = {
   created_at: string;
 };
 
-// =============================================================================
-// TRIGGERS
-// =============================================================================
+/** Triggers */
 
-export type TriggerKind = "webhook" | "schedule" | "event";
+export type TriggerKind = 'webhook' | 'schedule' | 'event';
 
 export type TriggerDef = {
   id: string;
@@ -526,15 +496,9 @@ export type EventTriggerConfig = {
   };
 };
 
-// =============================================================================
-// RUNTIME: TOKENS
-// =============================================================================
+/** Runtime: Tokens */
 
-export type TokenStatus =
-  | "active"
-  | "waiting_at_fan_in"
-  | "completed"
-  | "cancelled";
+export type TokenStatus = 'active' | 'waiting_at_fan_in' | 'completed' | 'cancelled';
 
 export type Token = {
   id: string;
@@ -555,9 +519,7 @@ export type Token = {
   updated_at: string;
 };
 
-// =============================================================================
-// RUNTIME: CONTEXT
-// =============================================================================
+/** Runtime: Context */
 
 export type Context = {
   // Immutable inputs (validated against workflow.input_schema)
@@ -590,9 +552,7 @@ export type BranchContext = {
   parent?: BranchContext;
 };
 
-// =============================================================================
-// RUNTIME: ARTIFACTS
-// =============================================================================
+/** Runtime: Artifacts */
 
 export type Artifact = {
   id: string;
@@ -608,27 +568,25 @@ export type Artifact = {
   created_at: string;
 };
 
-// =============================================================================
-// RUNTIME: EVENTS (for event sourcing)
-// =============================================================================
+/** Runtime: Events (for event sourcing) */
 
 export type EventKind =
-  | "workflow_started"
-  | "workflow_completed"
-  | "workflow_failed"
-  | "workflow_waiting"
-  | "workflow_resumed"
-  | "node_started"
-  | "node_completed"
-  | "node_failed"
-  | "transition_taken"
-  | "token_spawned"
-  | "token_merged"
-  | "token_cancelled"
-  | "artifact_created"
-  | "context_updated"
-  | "subworkflow_started"
-  | "subworkflow_completed";
+  | 'workflow_started'
+  | 'workflow_completed'
+  | 'workflow_failed'
+  | 'workflow_waiting'
+  | 'workflow_resumed'
+  | 'node_started'
+  | 'node_completed'
+  | 'node_failed'
+  | 'transition_taken'
+  | 'token_spawned'
+  | 'token_merged'
+  | 'token_cancelled'
+  | 'artifact_created'
+  | 'context_updated'
+  | 'subworkflow_started'
+  | 'subworkflow_completed';
 
 export type Event = {
   id: string;
@@ -641,9 +599,7 @@ export type Event = {
   timestamp: string;
 };
 
-// =============================================================================
-// EXECUTION QUEUE
-// =============================================================================
+/** Execution Queue */
 
 export type WorkflowTask = {
   workflow_run_id: string;
@@ -669,7 +625,7 @@ export type WorkflowTaskResult = {
   token_id: string;
   node_id: string;
 
-  status: "success" | "failure";
+  status: 'success' | 'failure';
 
   // Branch output—staged here, not written to context directly
   // Fan-in node collects these and applies merge strategy
@@ -685,11 +641,9 @@ export type WorkflowTaskResult = {
   timestamp: string;
 };
 
-// =============================================================================
-// AUTH & PERMISSIONS
-// =============================================================================
+/** Auth & Permissions */
 
-export type ActorType = "human" | "system";
+export type ActorType = 'human' | 'system';
 
 export type Actor = {
   id: string;
@@ -700,8 +654,8 @@ export type Actor = {
   created_at: string;
 };
 
-export type ResourceType = "workflow" | "workflow_run" | "artifact" | "project";
-export type ActionType = "read" | "write" | "execute" | "delete";
+export type ResourceType = 'workflow' | 'workflow_run' | 'artifact' | 'project';
+export type ActionType = 'read' | 'write' | 'execute' | 'delete';
 
 export type Permission = {
   resource_type: ResourceType;
