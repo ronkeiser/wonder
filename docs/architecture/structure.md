@@ -3,10 +3,10 @@
 ```
 wonder/
 ├── packages/
-│   └── types/                      # @wonder/types
+│   └── logger/                     # @wonder/logger
 │       ├── src/
-│       │   ├── primitives/         # Interfaces for ADR-002 primitives
-│       │   ├── errors.ts           # Domain error classes
+│       │   ├── logger.ts           # Logger implementation
+│       │   ├── schema.ts           # D1 schema for logs table
 │       │   └── index.ts
 │       └── package.json
 ├── services/
@@ -15,6 +15,7 @@ wonder/
 │   │   │   ├── domains/            # Business logic (10 bounded contexts)
 │   │   │   ├── infrastructure/     # External systems & platform services
 │   │   │   ├── adapters/           # Protocol adapters (HTTP, RPC)
+│   │   │   ├── errors.ts           # Custom error classes
 │   │   │   └── index.ts            # Service assembly
 │   │   ├── test/
 │   │   │   ├── unit/
@@ -86,9 +87,10 @@ services/api/src/
 │   ├── storage/          # R2 client
 │   ├── queues/           # Cloudflare Queues (future)
 │   └── clients/          # External APIs (MCP, GitHub, Anthropic)
-└── adapters/             # Protocol adapters (thin wrappers)
-    ├── http/             # REST API
-    └── rpc/              # Workers RPC endpoints
+├── adapters/             # Protocol adapters (thin wrappers)
+│   ├── http/             # REST API
+│   └── rpc/              # Workers RPC endpoints
+└── errors.ts             # Custom error classes (ValidationError, NotFoundError, etc.)
 ```
 
 **File pattern** (within each domain):
