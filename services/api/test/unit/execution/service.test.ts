@@ -3,10 +3,8 @@
 import type { SchemaType } from '@wonder/schema';
 import { ulid } from 'ulid';
 import { beforeEach, describe, expect, it, vi, type Mock } from 'vitest';
-import * as aiRepo from '~/domains/ai/repository';
-import * as effectsRepo from '~/domains/effects/repository';
-import * as eventsRepo from '~/domains/events/repository';
 import * as execRepo from '~/domains/execution/repository';
+import type { ExecutionServiceContext } from '~/domains/execution/service';
 import * as executionService from '~/domains/execution/service';
 import * as graphRepo from '~/domains/graph/repository';
 import { NotFoundError, ValidationError } from '~/errors';
@@ -14,13 +12,12 @@ import { createMockServiceContext, type MockServiceContext } from '../../helpers
 
 // Mock all repository modules
 vi.mock('~/domains/graph/repository');
-vi.mock('~/domains/ai/repository');
-vi.mock('~/domains/effects/repository');
 vi.mock('~/domains/execution/repository');
-vi.mock('~/domains/events/repository');
 
 describe('Execution Service', () => {
-  let mockCtx: MockServiceContext;
+  let mockCtx: ExecutionServiceContext;
+  let mockDOStub: { fetch: Mock };
+  let mockDOId: DurableObjectId;
 
   // Test IDs
   const workspaceId = ulid();
@@ -28,25 +25,39 @@ describe('Execution Service', () => {
   const workflowId = ulid();
   const workflowDefId = ulid();
   const nodeId = ulid();
-  const actionId = ulid();
-  const promptSpecId = ulid();
-  const modelProfileId = ulid();
 
   beforeEach(() => {
     vi.clearAllMocks();
 
-    // Mock ServiceContext
-    mockCtx = createMockServiceContext({
-      ai: {
-        run: vi.fn().mockResolvedValue({
-          response: 'This is a summary of the input text.',
+    // Mock Durable Object ID
+    mockDOId = {
+      toString: vi.fn().mockReturnValue('do_test_id_123'),
+    } as unknown as DurableObjectId;
+
+    // Mock Durable Object stub
+    mockDOStub = {
+      fetch: vi.fn().mockResolvedValue(
+        new Response(JSON.stringify({ success: true }), {
+          headers: { 'Content-Type': 'application/json' },
         }),
-      } as unknown as Ai,
-    });
+      ),
+    };
+
+    // Mock ServiceContext with DO namespace
+    const baseCtx = createMockServiceContext();
+    mockCtx = {
+      ...baseCtx,
+      WORKFLOW_COORDINATOR: {
+        newUniqueId: vi.fn().mockReturnValue(mockDOId),
+        get: vi.fn().mockReturnValue(mockDOStub),
+        idFromString: vi.fn(),
+        idFromName: vi.fn(),
+      } as unknown as DurableObjectNamespace,
+    };
   });
 
-  describe('executeWorkflow', () => {
-    it('should execute a single-node workflow successfully', async () => {
+  describe('triggerWorkflow', () => {
+    it('should trigger a workflow and return run with status=running', async () => {
       const input = { text: 'Long article about climate change...' };
 
       // Mock workflow
@@ -93,69 +104,6 @@ describe('Execution Service', () => {
         updated_at: new Date().toISOString(),
       };
 
-      // Mock node
-      const node = {
-        id: nodeId,
-        workflow_def_id: workflowDefId,
-        name: 'Summarize',
-        action_id: actionId,
-        input_mapping: { input_text: 'input.text' },
-        output_mapping: { summary: 'response' },
-        fan_out: 'first_match' as const,
-        fan_in: 'any' as const,
-        joins_node: null,
-        merge: null,
-        on_early_complete: null,
-      };
-
-      // Mock action
-      const action = {
-        id: actionId,
-        name: 'Summarize Text',
-        description: 'Summarize the input text',
-        version: 1,
-        kind: 'llm_call' as const,
-        implementation: {
-          prompt_spec_id: promptSpecId,
-          model_profile_id: modelProfileId,
-        },
-        requires: null,
-        produces: null,
-        execution: null,
-        idempotency: null,
-        created_at: new Date().toISOString(),
-        updated_at: new Date().toISOString(),
-      };
-
-      // Mock prompt spec
-      const promptSpec = {
-        id: promptSpecId,
-        name: 'Summarize Prompt',
-        description: 'Summarization prompt',
-        version: 1,
-        system_prompt: 'You are a helpful assistant.',
-        template: 'Summarize: {{input_text}}',
-        template_language: 'handlebars' as const,
-        requires: [],
-        produces: [],
-        examples: null,
-        tags: null,
-        created_at: new Date().toISOString(),
-        updated_at: new Date().toISOString(),
-      };
-
-      // Mock model profile
-      const modelProfile = {
-        id: modelProfileId,
-        name: 'Llama 3 8B',
-        provider: 'cloudflare' as const,
-        model_id: '@cf/meta/llama-3-8b-instruct',
-        parameters: {},
-        execution_config: null,
-        cost_per_1k_input_tokens: 0.0,
-        cost_per_1k_output_tokens: 0.0,
-      };
-
       // Mock workflow run
       const workflowRunId = ulid();
       const workflowRun = {
@@ -171,7 +119,7 @@ describe('Execution Service', () => {
           artifacts: {},
         }),
         active_tokens: JSON.stringify([]),
-        durable_object_id: ulid(),
+        durable_object_id: 'do_test_id_123',
         latest_snapshot: null,
         parent_run_id: null,
         parent_node_id: null,
@@ -180,83 +128,49 @@ describe('Execution Service', () => {
         completed_at: null,
       };
 
-      // Mock initial token
-      const tokenId = ulid();
-      const initialToken = {
-        id: tokenId,
-        workflow_run_id: workflowRunId,
-        node_id: nodeId,
-        status: 'active' as const,
-        path_id: workflowRunId,
-        parent_token_id: null,
-        fan_out_node_id: null,
-        branch_index: 0,
-        branch_total: 1,
-        created_at: new Date().toISOString(),
-        updated_at: new Date().toISOString(),
-      };
-
       // Setup mocks
       (graphRepo.getWorkflow as Mock).mockResolvedValue(workflow);
       (graphRepo.getWorkflowDef as Mock).mockResolvedValue(workflowDef);
-      (graphRepo.getNode as Mock).mockResolvedValue(node);
-      (graphRepo.listTransitionsByWorkflowDef as Mock).mockResolvedValue([]);
-      (effectsRepo.getAction as Mock).mockResolvedValue(action);
-      (aiRepo.getPromptSpec as Mock).mockResolvedValue(promptSpec);
-      (aiRepo.getModelProfile as Mock).mockResolvedValue(modelProfile);
       (execRepo.createWorkflowRun as Mock).mockResolvedValue(workflowRun);
-      (execRepo.createToken as Mock).mockResolvedValue(initialToken);
-      (execRepo.getWorkflowRun as Mock).mockResolvedValue({
-        ...workflowRun,
-        status: 'completed',
-        context: JSON.stringify({
-          input,
-          state: { summary: 'This is a summary of the input text.' },
-          output: { summary: 'This is a summary of the input text.' },
-          artifacts: {},
-        }),
-        completed_at: new Date().toISOString(),
-      });
-      (execRepo.updateWorkflowRunContext as Mock).mockResolvedValue(undefined);
-      (execRepo.updateWorkflowRunStatus as Mock).mockResolvedValue(undefined);
-      (eventsRepo.createEvents as Mock).mockResolvedValue(undefined);
 
       // Execute
-      const result = await executionService.executeWorkflow(mockCtx, workflowId, input);
+      const result = await executionService.triggerWorkflow(mockCtx, workflowId, input);
 
-      // Assertions
-      expect(result.status).toBe('completed');
-      expect(result.completed_at).toBeDefined();
+      // Assertions: triggerWorkflow returns immediately with status='running'
+      expect(result.status).toBe('running');
+      expect(result.durable_object_id).toBe('do_test_id_123');
+      expect(result.completed_at).toBeNull();
 
       const context = JSON.parse(result.context as string);
       expect(context.input).toEqual(input);
-      expect(context.output).toBeDefined();
-      expect(context.output.summary).toBe('This is a summary of the input text.');
+      expect(context.state).toEqual({});
+      expect(context.output).toBeUndefined();
 
-      // Verify AI was called
-      expect(mockCtx.ai.run).toHaveBeenCalledWith('@cf/meta/llama-3-8b-instruct', {
-        messages: [
-          { role: 'system', content: 'You are a helpful assistant.' },
-          { role: 'user', content: 'Summarize: Long article about climate change...' },
-        ],
+      // Verify workflow run was created in D1
+      expect(execRepo.createWorkflowRun).toHaveBeenCalledWith(mockCtx.db, {
+        project_id: projectId,
+        workflow_id: workflowId,
+        workflow_def_id: workflowDefId,
+        workflow_version: 1,
+        status: 'running',
+        context: expect.any(String),
+        active_tokens: '[]',
+        durable_object_id: 'do_test_id_123',
+        parent_run_id: null,
+        parent_node_id: null,
       });
 
-      // Verify events were created
-      expect(eventsRepo.createEvents).toHaveBeenCalled();
-      const eventsCall = (eventsRepo.createEvents as Mock).mock.calls[0];
-      const events = eventsCall[1];
-
-      expect(events).toHaveLength(4);
-      expect(events[0].kind).toBe('workflow_started');
-      expect(events[1].kind).toBe('node_started');
-      expect(events[2].kind).toBe('node_completed');
-      expect(events[3].kind).toBe('workflow_completed');
-
-      // Verify sequence numbers are monotonic
-      expect(events[0].sequence_number).toBe(1);
-      expect(events[1].sequence_number).toBe(2);
-      expect(events[2].sequence_number).toBe(3);
-      expect(events[3].sequence_number).toBe(4);
+      // Verify DO was invoked
+      expect(mockCtx.WORKFLOW_COORDINATOR.newUniqueId).toHaveBeenCalled();
+      expect(mockCtx.WORKFLOW_COORDINATOR.get).toHaveBeenCalledWith(mockDOId);
+      expect(mockDOStub.fetch).toHaveBeenCalledWith(
+        'https://do/execute',
+        expect.objectContaining({
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: expect.stringContaining('workflowRunId'),
+        }),
+      );
     });
 
     it('should validate input and reject invalid data', async () => {
@@ -274,8 +188,12 @@ describe('Execution Service', () => {
         updated_at: new Date().toISOString(),
       };
 
-      const inputSchema: Record<string, SchemaType> = {
-        text: { type: 'string' },
+      const inputSchema: SchemaType = {
+        type: 'object',
+        properties: {
+          text: { type: 'string' },
+        },
+        required: ['text'],
       };
 
       const workflowDef = {
@@ -286,7 +204,7 @@ describe('Execution Service', () => {
         owner: { type: 'project' as const, project_id: projectId },
         tags: [],
         input_schema: inputSchema,
-        output_schema: { summary: { type: 'string' } },
+        output_schema: { type: 'object', properties: { summary: { type: 'string' } } },
         context_schema: null,
         initial_node_id: nodeId,
         created_at: new Date().toISOString(),
@@ -297,14 +215,14 @@ describe('Execution Service', () => {
       (graphRepo.getWorkflowDef as Mock).mockResolvedValue(workflowDef);
 
       await expect(
-        executionService.executeWorkflow(mockCtx, workflowId, invalidInput),
+        executionService.triggerWorkflow(mockCtx, workflowId, invalidInput),
       ).rejects.toThrow(ValidationError);
     });
 
     it('should throw error if workflow not found', async () => {
       (graphRepo.getWorkflow as Mock).mockResolvedValue(null);
 
-      await expect(executionService.executeWorkflow(mockCtx, workflowId, {})).rejects.toThrow(
+      await expect(executionService.triggerWorkflow(mockCtx, workflowId, {})).rejects.toThrow(
         NotFoundError,
       );
     });
@@ -325,7 +243,7 @@ describe('Execution Service', () => {
       (graphRepo.getWorkflow as Mock).mockResolvedValue(workflow);
       (graphRepo.getWorkflowDef as Mock).mockResolvedValue(null);
 
-      await expect(executionService.executeWorkflow(mockCtx, workflowId, {})).rejects.toThrow(
+      await expect(executionService.triggerWorkflow(mockCtx, workflowId, {})).rejects.toThrow(
         NotFoundError,
       );
     });

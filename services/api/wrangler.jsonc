@@ -14,5 +14,37 @@
       "migrations_dir": "src/infrastructure/db/migrations",
       "remote": true
     }
+  ],
+  "durable_objects": {
+    "bindings": [
+      {
+        "name": "WORKFLOW_COORDINATOR",
+        "class_name": "WorkflowCoordinator",
+        "script_name": "wonder-api"
+      }
+    ]
+  },
+  "queues": {
+    "producers": [
+      {
+        "binding": "WORKFLOW_QUEUE",
+        "queue": "workflow-tasks"
+      }
+    ],
+    "consumers": [
+      {
+        "queue": "workflow-tasks",
+        "max_batch_size": 10,
+        "max_batch_timeout": 5,
+        "max_retries": 3,
+        "dead_letter_queue": "workflow-tasks-dlq"
+      }
+    ]
+  },
+  "migrations": [
+    {
+      "tag": "v1",
+      "new_classes": ["WorkflowCoordinator"]
+    }
   ]
 }

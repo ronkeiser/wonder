@@ -129,9 +129,9 @@ DO updates context, emits events, completes workflow
 **Test:** Integration test with real AI binding (or mock in test env), assert response structure  
 **Status:** Complete - 6 tests passing (5 mocked, 1 ReadableStream, 1 error handling)
 
-### Step 5: DO Coordinator Implementation
+### Step 5: DO Coordinator Implementation ✅
 
-**Files:** `infrastructure/do/workflow-coordinator.ts`, `infrastructure/do/context-storage.ts`, `infrastructure/queue/types.ts`  
+**Files:** `infrastructure/do/workflow-coordinator.ts`, `infrastructure/queue/types.ts`  
 **What:** Durable Object class that owns workflow run state, manages context in SQLite, coordinates task execution  
 **Key Methods:**
 
@@ -141,21 +141,21 @@ DO updates context, emits events, completes workflow
 - Context storage: map `context.input`, `context.state`, `context.output` to SQLite columns
 
 **Test:** Unit test with mocked queue binding, assert context storage and task coordination  
-**Status:** Not started
+**Status:** Complete - ~480 LOC implemented. Uses @wonder/schema DDL/DML generators for context storage.
 
-### Step 6: Worker Task Handler
+### Step 6: Worker Task Handler ✅
 
 **Files:** `domains/execution/worker.ts`  
 **What:** Worker handler that receives WorkflowTask from Queue, executes action, returns WorkflowTaskResult to DO  
 **Test:** Unit test with mocked AI client, assert task execution and result structure  
-**Status:** Not started
+**Status:** Complete - ~200 LOC implemented. Executes LLM calls and sends results back to DO.
 
-### Step 7: Trigger Service (Updated)
+### Step 7: Trigger Service (Updated) ✅
 
 **Files:** `domains/execution/service.ts` (refactored from monolithic executor to thin trigger)  
 **What:** `triggerWorkflow(workflowId, input)` - creates run in D1, gets DO stub, invokes DO.executeWorkflow()  
-**Test:** Integration test end-to-end  
-**Status:** Needs refactor - current implementation bypasses DO
+**Test:** Unit tests updated for new async architecture (4 tests passing)  
+**Status:** Complete - Refactored to DO-based architecture. Returns immediately with status='running'.
 
 ### Step 8: End-to-End Integration
 
