@@ -185,32 +185,43 @@ export async function executeWorkflow(
     input,
   });
 
-  // Execute initial token
-  await executeToken(execContext, initialToken);
+  try {
+    // Execute initial token
+    await executeToken(execContext, initialToken);
 
-  // Persist events
-  await persistEvents(execContext);
+    // Persist events
+    await persistEvents(execContext);
 
-  // Update workflow run with final state
-  await execRepo.updateWorkflowRunContext(ctx.db, workflowRun.id, execContext.context);
-  await execRepo.updateWorkflowRunStatus(
-    ctx.db,
-    workflowRun.id,
-    execContext.context.output ? 'completed' : 'running',
-    execContext.context.output ? new Date().toISOString() : undefined,
-  );
+    // Update workflow run with final state
+    await execRepo.updateWorkflowRunContext(ctx.db, workflowRun.id, execContext.context);
+    await execRepo.updateWorkflowRunStatus(
+      ctx.db,
+      workflowRun.id,
+      execContext.context.output ? 'completed' : 'running',
+      execContext.context.output ? new Date().toISOString() : undefined,
+    );
 
-  const finalStatus = execContext.context.output ? 'completed' : 'running';
-  if (finalStatus === 'completed') {
-    ctx.logger.info('workflow_execution_completed', {
+    const finalStatus = execContext.context.output ? 'completed' : 'running';
+    if (finalStatus === 'completed') {
+      ctx.logger.info('workflow_execution_completed', {
+        workflow_id: workflowId,
+        workflow_run_id: workflowRun.id,
+        workflow_def_id: workflowDef.id,
+      });
+    }
+
+    // Return updated workflow run
+    return (await execRepo.getWorkflowRun(ctx.db, workflowRun.id))!;
+  } catch (err) {
+    const errorMessage = err instanceof Error ? err.message : String(err);
+    ctx.logger.error('workflow_execution_failed', {
       workflow_id: workflowId,
       workflow_run_id: workflowRun.id,
       workflow_def_id: workflowDef.id,
+      error: errorMessage,
     });
+    throw err;
   }
-
-  // Return updated workflow run
-  return (await execRepo.getWorkflowRun(ctx.db, workflowRun.id))!;
 }
 
 /** Token Execution */
@@ -236,46 +247,58 @@ async function executeToken(execCtx: ExecutionContext, token: Token): Promise<vo
     token_id: token.id,
   });
 
-  // Load action
-  const action = await effectsRepo.getAction(execCtx.ctx.db, node.action_id);
-  if (!action) {
-    throw new Error(`Action not found: ${node.action_id}`);
-  }
+  try {
+    // Load action
+    const action = await effectsRepo.getAction(execCtx.ctx.db, node.action_id);
+    if (!action) {
+      throw new Error(`Action not found: ${node.action_id}`);
+    }
 
-  // Execute action
-  const actionResult = await executeAction(execCtx, action!, node!);
+    // Execute action
+    const actionResult = await executeAction(execCtx, action!, node!);
 
-  // Apply output mapping
-  if (node.output_mapping && Object.keys(node.output_mapping).length > 0) {
-    applyOutputMapping(
-      execCtx.context,
-      node.output_mapping as Record<string, string>,
-      actionResult,
-    );
-  }
+    // Apply output mapping
+    if (node.output_mapping && Object.keys(node.output_mapping).length > 0) {
+      applyOutputMapping(
+        execCtx.context,
+        node.output_mapping as Record<string, string>,
+        actionResult,
+      );
+    }
 
-  // Update token status
-  token.status = 'completed';
-  token.updated_at = new Date().toISOString();
+    // Update token status
+    token.status = 'completed';
+    token.updated_at = new Date().toISOString();
 
-  // Emit node_completed event
-  emitEvent(execCtx, 'node_completed', {
-    token_id: token.id,
-    node_id: node.id,
-    node_name: node.name,
-    result: actionResult,
-  });
+    // Emit node_completed event
+    emitEvent(execCtx, 'node_completed', {
+      token_id: token.id,
+      node_id: node.id,
+      node_name: node.name,
+      result: actionResult,
+    });
 
-  execCtx.ctx.logger.info('node_execution_completed', {
-    workflow_run_id: execCtx.workflowRun.id,
-    node_id: node.id,
-    node_name: node.name,
-    token_id: token.id,
-  });
+    execCtx.ctx.logger.info('node_execution_completed', {
+      workflow_run_id: execCtx.workflowRun.id,
+      node_id: node.id,
+      node_name: node.name,
+      token_id: token.id,
+    });
 
-  // Check if terminal node
-  if (await isTerminalNode(execCtx, node)) {
-    await completeWorkflow(execCtx);
+    // Check if terminal node
+    if (await isTerminalNode(execCtx, node)) {
+      await completeWorkflow(execCtx);
+    }
+  } catch (err) {
+    const errorMessage = err instanceof Error ? err.message : String(err);
+    execCtx.ctx.logger.error('node_execution_failed', {
+      workflow_run_id: execCtx.workflowRun.id,
+      node_id: node.id,
+      node_name: node.name,
+      token_id: token.id,
+      error: errorMessage,
+    });
+    throw err;
   }
 }
 
@@ -331,20 +354,31 @@ async function executeAction(
     prompt_spec_id: promptSpec.id,
   });
 
-  const result = await runInference(
-    execCtx.ctx.ai,
-    modelProfile.model_id as keyof AiModels,
-    messages,
-  );
+  try {
+    const result = await runInference(
+      execCtx.ctx.ai,
+      modelProfile.model_id as keyof AiModels,
+      messages,
+    );
 
-  execCtx.ctx.logger.info('llm_call_completed', {
-    workflow_run_id: execCtx.workflowRun.id,
-    node_id: node.id,
-    model_id: modelProfile.model_id,
-    response_length: result.response.length,
-  });
+    execCtx.ctx.logger.info('llm_call_completed', {
+      workflow_run_id: execCtx.workflowRun.id,
+      node_id: node.id,
+      model_id: modelProfile.model_id,
+      response_length: result.response.length,
+    });
 
-  return { response: result.response };
+    return { response: result.response };
+  } catch (err) {
+    const errorMessage = err instanceof Error ? err.message : String(err);
+    execCtx.ctx.logger.error('llm_call_failed', {
+      workflow_run_id: execCtx.workflowRun.id,
+      node_id: node.id,
+      model_id: modelProfile.model_id,
+      error: errorMessage,
+    });
+    throw err;
+  }
 }
 
 /** Input/Output Mapping */
