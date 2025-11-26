@@ -16,6 +16,7 @@
     "test:ui": "vitest --ui"
   },
   "dependencies": {
+    "@wonder/logger": "workspace:*",
     "drizzle-orm": "^0.44.7"
   },
   "devDependencies": {
