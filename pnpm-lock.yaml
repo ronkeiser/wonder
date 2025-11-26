@@ -13,6 +13,12 @@ importers:
       '@cloudflare/vitest-pool-workers':
         specifier: ^0.10.10
         version: 0.10.10(@cloudflare/workers-types@4.20251125.0)(@vitest/runner@4.0.14)(@vitest/snapshot@4.0.14)(vitest@3.2.4(@types/node@24.10.1)(jiti@2.6.1)(lightningcss@1.30.2))
+      '@types/node':
+        specifier: ^24.10.1
+        version: 24.10.1
+      drizzle-orm:
+        specifier: ^0.44.7
+        version: 0.44.7(@cloudflare/workers-types@4.20251125.0)(gel@2.2.0)
       miniflare:
         specifier: ^4.20251118.1
         version: 4.20251118.1

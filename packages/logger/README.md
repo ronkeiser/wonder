@@ -13,9 +13,27 @@ Generic logger package for Wonder services. Writes to D1 with buffering and expl
 
 ## Installation
 
-```bash
-pnpm add @wonder/logger
-```
+1. Add to your service's `package.json`:
+
+   ```json
+   {
+     "dependencies": {
+       "@wonder/logger": "workspace:*"
+     }
+   }
+   ```
+
+2. Add the logs table to your Drizzle schema (`src/infrastructure/db/schema.ts`):
+
+   ```typescript
+   export { logs } from '@wonder/logger/schema';
+   ```
+
+3. Generate and apply the migration:
+   ```bash
+   pnpm db:generate
+   pnpm db:migrate:local
+   ```
 
 ## Usage
 
