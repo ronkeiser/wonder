@@ -1,5 +1,6 @@
 /** Unit tests for execution service */
 
+import type { SchemaType } from '@wonder/schema';
 import { ulid } from 'ulid';
 import { beforeEach, describe, expect, it, vi, type Mock } from 'vitest';
 import * as aiRepo from '~/domains/ai/repository';
@@ -8,7 +9,6 @@ import * as eventsRepo from '~/domains/events/repository';
 import * as execRepo from '~/domains/execution/repository';
 import * as executionService from '~/domains/execution/service';
 import * as graphRepo from '~/domains/graph/repository';
-import type { SchemaType } from '~/domains/schema/validation';
 import { NotFoundError, ValidationError } from '~/errors';
 import { createMockServiceContext, type MockServiceContext } from '../../helpers/context';
 
@@ -63,11 +63,19 @@ describe('Execution Service', () => {
       };
 
       // Mock workflow definition
-      const inputSchema: Record<string, SchemaType> = {
-        text: { type: 'string' },
+      const inputSchema: SchemaType = {
+        type: 'object',
+        properties: {
+          text: { type: 'string' },
+        },
+        required: ['text'],
       };
-      const outputSchema: Record<string, SchemaType> = {
-        summary: { type: 'string' },
+      const outputSchema: SchemaType = {
+        type: 'object',
+        properties: {
+          summary: { type: 'string' },
+        },
+        required: ['summary'],
       };
 
       const workflowDef = {

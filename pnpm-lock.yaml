@@ -43,6 +43,9 @@ importers:
       '@wonder/logger':
         specifier: workspace:*
         version: link:../../packages/logger
+      '@wonder/schema':
+        specifier: workspace:*
+        version: link:../../packages/schema
       drizzle-orm:
         specifier: ^0.44.7
         version: 0.44.7(@cloudflare/workers-types@4.20251125.0)(gel@2.2.0)

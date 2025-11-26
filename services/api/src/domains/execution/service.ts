@@ -1,6 +1,11 @@
 /** Workflow execution service */
 
-import { validateSchema, type SchemaType } from '~/domains/schema/validation';
+import {
+  CustomTypeRegistry,
+  Validator,
+  type SchemaType,
+  type ValidationResult,
+} from '@wonder/schema';
 import { NotFoundError, ValidationError } from '~/errors';
 import { runInference } from '~/infrastructure/clients/workers-ai';
 import type { ServiceContext } from '~/infrastructure/context';
@@ -10,6 +15,18 @@ import * as eventsRepo from '../events/repository';
 import * as graphRepo from '../graph/repository';
 import type { Context, Event, EventKind, Token, WorkflowRun } from './definitions';
 import * as execRepo from './repository';
+
+/** Custom type registry for schema validation */
+
+const customTypes = new CustomTypeRegistry();
+
+// Register artifact_ref custom type (validates string format)
+customTypes.register('artifact_ref', {
+  validate: (value: unknown): boolean => {
+    return typeof value === 'string' && value.length > 0;
+  },
+  description: 'Reference to an artifact (string ID)',
+});
 
 /** Domain types from other bounded contexts */
 
@@ -66,16 +83,24 @@ export async function executeWorkflow(
   }
 
   // Validate input against schema
-  try {
-    validateSchema(input, workflowDef.input_schema as Record<string, SchemaType>);
-  } catch (err) {
-    const message = err instanceof Error ? err.message : String(err);
+  const inputSchema = workflowDef.input_schema as SchemaType;
+  const validator = new Validator(inputSchema, customTypes);
+  const validationResult: ValidationResult = validator.validate(input);
+
+  if (!validationResult.valid) {
+    const errorMessages = validationResult.errors
+      .map((e: { path: string; message: string }) => `${e.path}: ${e.message}`)
+      .join('; ');
     ctx.logger.error('workflow_validation_failed', {
       workflow_id: workflowId,
       workflow_def_id: workflowDef.id,
-      error: message,
+      errors: validationResult.errors,
     });
-    throw new ValidationError(`Invalid input: ${message}`, 'input', 'SCHEMA_VALIDATION_FAILED');
+    throw new ValidationError(
+      `Invalid input: ${errorMessages}`,
+      'input',
+      'SCHEMA_VALIDATION_FAILED',
+    );
   }
 
   // Initialize context
@@ -418,13 +443,15 @@ async function completeWorkflow(execCtx: ExecutionContext): Promise<void> {
   execCtx.context.output = { ...execCtx.context.state };
 
   // Validate output against schema
-  try {
-    validateSchema(
-      execCtx.context.output,
-      execCtx.workflowDef!.output_schema as Record<string, SchemaType>,
-    );
-  } catch (err) {
-    throw new Error(`Invalid output: ${err instanceof Error ? err.message : String(err)}`);
+  const outputSchema = execCtx.workflowDef!.output_schema as SchemaType;
+  const validator = new Validator(outputSchema, customTypes);
+  const validationResult: ValidationResult = validator.validate(execCtx.context.output);
+
+  if (!validationResult.valid) {
+    const errorMessages = validationResult.errors
+      .map((e: { path: string; message: string }) => `${e.path}: ${e.message}`)
+      .join('; ');
+    throw new Error(`Invalid output: ${errorMessages}`);
   }
 
   // Emit workflow_completed event
