@@ -32,3 +32,5 @@ Options:
 2. [Action option 2] `Score as %`
 ... (Present as few or as many as warranted)
 ```
+
+Never say YAGNI.
