@@ -1,14 +1,5 @@
 # Stage 0: Vertical Slice
 
-**Purpose**: Validate the entire architecture before horizontal scaling across 10 domains. This is not an MVP feature—it's architectural proof. One complete workflow execution (definition → execution → LLM call → completion) exercises all layers: repositories, service composition, cross-domain coordination, event sourcing, Durable Objects, and testing patterns. Any pattern that doesn't work gets fixed now, before replicating across 50+ entities.
-
-<!-- TODO: Stage 0-specific implementation details to decide:
-- Seed script: exact data values for workspace, project, model_profile
-- Workers AI: which model to use (@cf/meta/llama-3-8b-instruct?)
-- Workflow structure: exact prompt template text
-- Integration test: assertions to validate (context.output fields, event payload structure)
--->
-
 ## Goal
 
 Create and persist a single-node LLM workflow, then execute it once.

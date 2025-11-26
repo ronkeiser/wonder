@@ -17,14 +17,16 @@
   },
   "dependencies": {
     "@wonder/logger": "workspace:*",
-    "drizzle-orm": "^0.44.7"
+    "drizzle-orm": "^0.44.7",
+    "ulid": "^3.0.1"
   },
   "devDependencies": {
+    "@cloudflare/vitest-pool-workers": "^0.10.10",
     "@types/node": "^24.10.1",
-    "@vitest/ui": "^4.0.14",
+    "@vitest/ui": "^3.2.4",
     "drizzle-kit": "^0.31.7",
     "typescript": "^5.9.3",
-    "vitest": "^4.0.14",
+    "vitest": "^3.2.4",
     "wrangler": "^4.50.0"
   }
 }

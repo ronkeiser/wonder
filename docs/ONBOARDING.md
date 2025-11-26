@@ -12,4 +12,4 @@ Reference if necessary:
 - `docs/architecture/error-handling.md` — Error strategies and retry config
 - `docs/architecture/primitives.ts` — TypeScript type definitions
 
-Pick the second most interesting thing to you in the docs and write a one sentence response to it.
+Pick the most interesting things in the docs and write one sentence about it.
