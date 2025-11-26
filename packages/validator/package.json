@@ -1,0 +1,30 @@
+{
+  "name": "@wonderful/validator",
+  "version": "0.1.0",
+  "description": "Fast, CF Workers-compatible JSON Schema validator for Wonder",
+  "type": "module",
+  "main": "./dist/index.js",
+  "types": "./dist/index.d.ts",
+  "exports": {
+    ".": {
+      "import": "./dist/index.js",
+      "types": "./dist/index.d.ts"
+    }
+  },
+  "scripts": {
+    "build": "tsc",
+    "test": "vitest",
+    "test:watch": "vitest --watch"
+  },
+  "keywords": [
+    "json-schema",
+    "validation",
+    "cloudflare-workers",
+    "schema-validator"
+  ],
+  "license": "MIT",
+  "devDependencies": {
+    "typescript": "^5.6.0",
+    "vitest": "^2.1.0"
+  }
+}
