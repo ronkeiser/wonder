@@ -13,7 +13,8 @@
     "db:studio": "drizzle-kit studio",
     "test": "vitest --run",
     "test:watch": "vitest",
-    "test:ui": "vitest --ui"
+    "test:ui": "vitest --ui",
+    "workflow:run": "tsx scripts/run-workflow.ts"
   },
   "dependencies": {
     "@wonder/logger": "workspace:*",
@@ -26,6 +27,7 @@
     "@types/node": "^24.10.1",
     "@vitest/ui": "^3.2.4",
     "drizzle-kit": "^0.31.7",
+    "tsx": "^4.20.6",
     "typescript": "^5.9.3",
     "vitest": "^3.2.4",
     "wrangler": "^4.50.0"
