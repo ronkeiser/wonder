@@ -38,24 +38,6 @@ export type BranchContext = {
   parent?: BranchContext;
 };
 
-/** Event represents a state change during workflow execution */
-export type EventKind =
-  | 'workflow_started'
-  | 'workflow_completed'
-  | 'workflow_failed'
-  | 'node_started'
-  | 'node_completed'
-  | 'node_failed'
-  | 'transition_taken'
-  | 'token_spawned';
-
-export type Event = {
-  workflow_run_id: string;
-  sequence_number: number;
-  kind: EventKind;
-  payload: Record<string, unknown>;
-};
-
 /** WorkflowRun represents an instance of a workflow execution */
 export type WorkflowRun = typeof workflow_runs.$inferSelect;
 export type NewWorkflowRun = Omit<
@@ -117,6 +99,9 @@ export const eventSchemaType: SchemaType = {
   },
   required: ['sequence_number', 'kind', 'payload', 'timestamp'],
 };
+
+/** Re-export event types from events domain */
+export type { Event, EventKind } from '../events/types';
 
 /** Task sent from DO to Worker via Queue */
 export interface WorkflowTask {

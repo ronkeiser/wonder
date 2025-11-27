@@ -3,9 +3,10 @@
 import { createLogger, type Logger } from '@wonder/logger';
 import { CustomTypeRegistry, type SchemaType } from '@wonder/schema';
 import { ulid } from 'ulid';
+import { EventBuffer } from '../events/buffer';
+import { EventStreamer } from '../events/stream';
 import type { Context, Token, WorkflowTaskResult } from '../execution/definitions';
 import { ContextManager } from './context';
-import { EventManager } from './events';
 import { TaskDispatcher } from './tasks';
 import { TokenManager } from './tokens';
 
@@ -17,7 +18,8 @@ export class WorkflowCoordinator implements DurableObject {
   private logger: Logger;
   private context: ContextManager;
   private tokens: TokenManager;
-  private events: EventManager;
+  private events: EventBuffer;
+  private streamer: EventStreamer;
   private tasks: TaskDispatcher;
   private workflowRunId?: string;
   private workflowDefId?: string;
@@ -39,12 +41,13 @@ export class WorkflowCoordinator implements DurableObject {
     // Initialize managers
     this.context = new ContextManager(this.state.storage.sql, customTypes);
     this.tokens = new TokenManager(this.state.storage.sql, customTypes);
-    this.events = new EventManager(this.state.storage.sql, customTypes);
+    this.events = new EventBuffer(this.state.storage.sql, customTypes);
+    this.streamer = new EventStreamer(this.state);
     this.tasks = new TaskDispatcher(this.env.WORKFLOW_QUEUE, this.logger, this.events);
 
     // Set up event broadcasting to WebSocket clients
     this.events.setBroadcastCallback((kind, payload) => {
-      this.broadcastEvent(kind, payload);
+      this.streamer.broadcast(kind, payload);
     });
   }
 
@@ -93,43 +96,12 @@ export class WorkflowCoordinator implements DurableObject {
    * Handle WebSocket upgrade for event streaming.
    */
   private handleWebSocketUpgrade(request: Request): Response {
-    const pair = new WebSocketPair();
-    const [client, server] = [pair[0], pair[1]];
-
-    // Accept WebSocket connection
-    this.state.acceptWebSocket(server);
-
     this.logger.info('websocket_connected', {
       workflow_run_id: this.workflowRunId,
       durable_object_id: this.durableObjectId,
     });
 
-    return new Response(null, {
-      status: 101,
-      webSocket: client,
-    });
-  }
-
-  /**
-   * Broadcast event to all connected WebSocket clients.
-   */
-  private broadcastEvent(kind: string, payload: Record<string, unknown>): void {
-    const sockets = this.state.getWebSockets();
-    const message = JSON.stringify({
-      kind,
-      payload,
-      timestamp: new Date().toISOString(),
-    });
-
-    for (const ws of sockets) {
-      try {
-        ws.send(message);
-      } catch (err) {
-        this.logger.error('websocket_send_failed', {
-          error: err instanceof Error ? err.message : String(err),
-        });
-      }
-    }
+    return this.streamer.handleUpgrade(request, this.workflowRunId);
   }
 
   /**

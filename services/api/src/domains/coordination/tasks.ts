@@ -2,15 +2,15 @@
 
 import type { Logger } from '@wonder/logger';
 import { ulid } from 'ulid';
+import type { EventBuffer } from '../events/buffer';
 import type { Token, WorkflowTask } from '../execution/definitions';
-import type { EventManager } from './events';
 
 export class TaskDispatcher {
   private queue: Queue<WorkflowTask>;
   private logger: Logger;
-  private events: EventManager;
+  private events: EventBuffer;
 
-  constructor(queue: Queue<WorkflowTask>, logger: Logger, events: EventManager) {
+  constructor(queue: Queue<WorkflowTask>, logger: Logger, events: EventBuffer) {
     this.queue = queue;
     this.logger = logger;
     this.events = events;

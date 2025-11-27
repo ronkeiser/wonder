@@ -44,6 +44,9 @@ export function createMockServiceContext(
         }),
       } as unknown as Ai),
     logger: options.logger ?? createMockLogger(),
-    executionContext: {} as ExecutionContext,
+    executionContext: {
+      waitUntil: vi.fn(),
+      passThroughOnException: vi.fn(),
+    } as unknown as ExecutionContext,
   };
 }

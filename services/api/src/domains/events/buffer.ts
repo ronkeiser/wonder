@@ -1,9 +1,13 @@
-/** Event recording and retrieval */
+/** Event buffer for DO-side event storage before D1 sync */
 
 import { CustomTypeRegistry, DDLGenerator, DMLGenerator } from '@wonder/schema';
-import { eventSchemaType, type EventKind } from '../execution/definitions';
+import { eventSchemaType, type Event, type EventKind } from './types';
 
-export class EventManager {
+/**
+ * EventBuffer manages event storage in DO SQLite.
+ * Events are buffered here before being flushed to D1.
+ */
+export class EventBuffer {
   private sql: SqlStorage;
   private ddl: DDLGenerator;
   private dml: DMLGenerator;
@@ -16,12 +20,16 @@ export class EventManager {
     this.dml = new DMLGenerator(eventSchemaType, customTypes);
   }
 
+  /**
+   * Initialize the events table in DO storage
+   */
   initialize(): void {
-    this.createTable();
+    const eventDDL = this.ddl.generateDDL('events');
+    this.sql.exec(eventDDL).toArray();
   }
 
   /**
-   * Set callback for broadcasting events to WebSocket clients.
+   * Set callback for broadcasting events to WebSocket clients
    */
   setBroadcastCallback(
     callback: (kind: EventKind, payload: Record<string, unknown>) => void,
@@ -29,6 +37,9 @@ export class EventManager {
     this.broadcastCallback = callback;
   }
 
+  /**
+   * Emit an event - stores in DO SQLite and broadcasts to WebSocket clients
+   */
   emit(kind: EventKind, payload: Record<string, unknown>): void {
     this.sequenceNumber++;
 
@@ -50,6 +61,9 @@ export class EventManager {
     }
   }
 
+  /**
+   * Get all pending events (for D1 sync)
+   */
   getPending(workflowRunId: string): Array<{
     workflow_run_id: string;
     sequence_number: number;
@@ -66,10 +80,5 @@ export class EventManager {
       payload: row.payload as string,
       timestamp: row.timestamp as string,
     }));
-  }
-
-  private createTable(): void {
-    const eventDDL = this.ddl.generateDDL('events');
-    this.sql.exec(eventDDL).toArray();
   }
 }
