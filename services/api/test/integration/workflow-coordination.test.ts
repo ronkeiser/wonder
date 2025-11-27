@@ -14,22 +14,22 @@ import { beforeEach, describe, expect, it } from 'vitest';
 import type { ExecutionServiceContext } from '~/domains/execution/service';
 import { startWorkflow } from '~/domains/execution/service';
 import { createTestDb } from '../helpers/db';
-import { migrate, seed } from '../helpers/migrate';
+import { migrate } from '../helpers/migrate';
 
 describe('Workflow Coordination Architecture', () => {
   let ctx: ExecutionServiceContext;
 
   beforeEach(async () => {
-    // Setup test database with migrations and seed data
+    // Setup test database with migrations (includes seed data in migration 0002)
     const db = createTestDb();
     await migrate(db);
-    await seed(db);
 
     // Create test context with real bindings
     ctx = {
       db,
       ai: env.AI,
       logger: createMockLogger(),
+      executionContext: {} as ExecutionContext,
       WORKFLOW_COORDINATOR: env.WORKFLOW_COORDINATOR,
     };
   });
