@@ -1,63 +1,57 @@
 {
-	"name": "wonder-api",
-	"main": "src/index.ts",
-	"compatibility_date": "2025-11-25",
-	"ai": {
-		"binding": "AI"
-	},
-	"d1_databases": [
-		{
-			"binding": "DB",
-			"database_name": "wonder",
-			"database_id": "ec06d912-8013-4f30-9e94-e47a90c9ef46",
-			"migrations_dir": "src/infrastructure/db/migrations",
-			"remote": true
-		}
-	],
-	"durable_objects": {
-		"bindings": [
-			{
-				"name": "WORKFLOW_COORDINATOR",
-				"class_name": "WorkflowCoordinator",
-				"script_name": "wonder-api"
-			}
-		]
-	},
-	"migrations": [
-		{
-			"tag": "v1",
-			"new_classes": [
-				"WorkflowCoordinator"
-			]
-		},
-		{
-			"tag": "v2",
-			"deleted_classes": [
-				"WorkflowCoordinator"
-			]
-		},
-		{
-			"tag": "v3",
-			"new_sqlite_classes": [
-				"WorkflowCoordinator"
-			]
-		}
-	],
-	"queues": {
-		"producers": [
-			{
-				"binding": "WORKFLOW_QUEUE",
-				"queue": "workflow-tasks"
-			}
-		],
-		"consumers": [
-			{
-				"queue": "workflow-tasks",
-				"max_batch_size": 1,
-				"max_batch_timeout": 0,
-				"max_retries": 3,
-				"dead_letter_queue": "workflow-tasks-dlq"
-			}
-		]
-	}
+  "name": "wonder-api",
+  "main": "src/index.ts",
+  "compatibility_date": "2025-11-25",
+  "ai": {
+    "binding": "AI"
+  },
+  "d1_databases": [
+    {
+      "binding": "DB",
+      "database_name": "wonder",
+      "database_id": "ec06d912-8013-4f30-9e94-e47a90c9ef46",
+      "migrations_dir": "src/infrastructure/db/migrations",
+      "remote": true
+    }
+  ],
+  "durable_objects": {
+    "bindings": [
+      {
+        "name": "WORKFLOW_COORDINATOR",
+        "class_name": "WorkflowCoordinator",
+        "script_name": "wonder-api"
+      }
+    ]
+  },
+  "migrations": [
+    {
+      "tag": "v1",
+      "new_classes": ["WorkflowCoordinator"]
+    },
+    {
+      "tag": "v2",
+      "deleted_classes": ["WorkflowCoordinator"]
+    },
+    {
+      "tag": "v3",
+      "new_sqlite_classes": ["WorkflowCoordinator"]
+    }
+  ],
+  "queues": {
+    "producers": [
+      {
+        "binding": "WORKFLOW_QUEUE",
+        "queue": "workflow-tasks"
+      }
+    ],
+    "consumers": [
+      {
+        "queue": "workflow-tasks",
+        "max_batch_size": 1,
+        "max_batch_timeout": 0,
+        "max_retries": 3,
+        "dead_letter_queue": "workflow-tasks-dlq"
+      }
+    ]
+  }
 }
