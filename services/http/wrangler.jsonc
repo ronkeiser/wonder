@@ -1,0 +1,12 @@
+{
+  "name": "wonder-http",
+  "main": "src/index.ts",
+  "compatibility_date": "2025-11-25",
+  "compatibility_flags": ["nodejs_compat"],
+  "services": [
+    {
+      "binding": "API",
+      "service": "wonder-api"
+    }
+  ]
+}

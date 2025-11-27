@@ -75,6 +75,19 @@ importers:
         specifier: ^4.50.0
         version: 4.50.0(@cloudflare/workers-types@4.20251125.0)
 
+  services/http:
+    dependencies:
+      '@cloudflare/vitest-pool-workers':
+        specifier: ^0.10.10
+        version: 0.10.10(@cloudflare/workers-types@4.20251125.0)(@vitest/runner@4.0.14)(@vitest/snapshot@4.0.14)(vitest@3.2.4)
+    devDependencies:
+      typescript:
+        specifier: ^5.9.3
+        version: 5.9.3
+      wrangler:
+        specifier: ^4.50.0
+        version: 4.50.0(@cloudflare/workers-types@4.20251125.0)
+
   services/web:
     devDependencies:
       '@sveltejs/adapter-cloudflare':
