@@ -2,7 +2,7 @@
 
 import type { Logger } from '@wonder/logger';
 import { ulid } from 'ulid';
-import type { Token, WorkflowTask } from '../definitions';
+import type { Token, WorkflowTask } from '../execution/definitions';
 import type { EventManager } from './events';
 
 export class TaskDispatcher {
@@ -20,7 +20,7 @@ export class TaskDispatcher {
     token: Token,
     workflowRunId: string,
     durableObjectId: string,
-    context: import('./definitions').Context,
+    context: import('../execution/definitions').Context,
   ): void {
     const taskId = ulid();
 

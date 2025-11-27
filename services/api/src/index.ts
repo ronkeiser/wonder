@@ -10,7 +10,7 @@ import { handleQueue } from './handlers/queue';
 import { Workflows } from './rpc/workflows';
 
 // Export Durable Objects (required for Workers runtime)
-export { WorkflowCoordinator } from './domains/execution/coordinator';
+export { WorkflowCoordinator } from './domains/coordination';
 
 /**
  * Wonder API Entrypoint

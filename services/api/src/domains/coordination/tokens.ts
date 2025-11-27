@@ -1,7 +1,7 @@
 /** Token lifecycle management */
 
 import { CustomTypeRegistry, DDLGenerator, DMLGenerator } from '@wonder/schema';
-import { tokenSchemaType, type Token } from '../definitions';
+import { tokenSchemaType, type Token } from '../execution/definitions';
 
 export class TokenManager {
   private sql: SqlStorage;
