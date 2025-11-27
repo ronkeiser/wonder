@@ -2,7 +2,6 @@
   "name": "wonder-api",
   "main": "src/index.ts",
   "compatibility_date": "2025-11-25",
-  "compatibility_flags": ["nodejs_compat"],
   "ai": {
     "binding": "AI"
   },
@@ -46,11 +45,5 @@
         "dead_letter_queue": "workflow-tasks-dlq"
       }
     ]
-  },
-  "migrations": [
-    {
-      "tag": "v1",
-      "new_classes": ["WorkflowCoordinator"]
-    }
-  ]
+  }
 }

@@ -2,6 +2,7 @@
 /** Derived from docs/architecture/primitives.ts */
 
 import {
+  foreignKey,
   index,
   integer,
   primaryKey,
@@ -122,9 +123,8 @@ export const nodes = sqliteTable(
   'nodes',
   {
     id: text('id').primaryKey(),
-    workflow_def_id: text('workflow_def_id')
-      .notNull()
-      .references(() => workflow_defs.id),
+    workflow_def_id: text('workflow_def_id').notNull(),
+    workflow_def_version: integer('workflow_def_version').notNull(),
     name: text('name').notNull(),
     action_id: text('action_id')
       .notNull()
@@ -143,7 +143,11 @@ export const nodes = sqliteTable(
     }),
   },
   (table) => [
-    index('idx_nodes_workflow_def').on(table.workflow_def_id),
+    foreignKey({
+      columns: [table.workflow_def_id, table.workflow_def_version],
+      foreignColumns: [workflow_defs.id, workflow_defs.version],
+    }),
+    index('idx_nodes_workflow_def').on(table.workflow_def_id, table.workflow_def_version),
     index('idx_nodes_action').on(table.action_id),
   ],
 );
@@ -152,9 +156,8 @@ export const transitions = sqliteTable(
   'transitions',
   {
     id: text('id').primaryKey(),
-    workflow_def_id: text('workflow_def_id')
-      .notNull()
-      .references(() => workflow_defs.id),
+    workflow_def_id: text('workflow_def_id').notNull(),
+    workflow_def_version: integer('workflow_def_version').notNull(),
     from_node_id: text('from_node_id')
       .notNull()
       .references(() => nodes.id, { onDelete: 'cascade' }),
@@ -168,7 +171,11 @@ export const transitions = sqliteTable(
     loop_config: text('loop_config', { mode: 'json' }),
   },
   (table) => [
-    index('idx_transitions_workflow_def').on(table.workflow_def_id),
+    foreignKey({
+      columns: [table.workflow_def_id, table.workflow_def_version],
+      foreignColumns: [workflow_defs.id, workflow_defs.version],
+    }),
+    index('idx_transitions_workflow_def').on(table.workflow_def_id, table.workflow_def_version),
     index('idx_transitions_from_node').on(table.from_node_id),
     index('idx_transitions_to_node').on(table.to_node_id),
   ],
