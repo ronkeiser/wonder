@@ -44,5 +44,6 @@ export function createMockServiceContext(
         }),
       } as unknown as Ai),
     logger: options.logger ?? createMockLogger(),
+    executionContext: {} as ExecutionContext,
   };
 }

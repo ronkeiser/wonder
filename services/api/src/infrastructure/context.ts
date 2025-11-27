@@ -33,10 +33,12 @@ export function createServiceContext(
   db: DrizzleD1Database,
   ai: Ai,
   logger: Logger,
+  executionContext: ExecutionContext,
 ): ServiceContext {
   return {
     db,
     ai,
     logger,
+    executionContext,
   };
 }
