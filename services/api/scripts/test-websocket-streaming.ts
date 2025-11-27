@@ -23,7 +23,10 @@ async function main() {
     process.exit(1);
   }
 
-  const { workflow_run_id, durable_object_id } = await startResponse.json();
+  const { workflow_run_id, durable_object_id } = (await startResponse.json()) as {
+    workflow_run_id: string;
+    durable_object_id: string;
+  };
   console.log(`✅ Workflow started:`);
   console.log(`   Run ID: ${workflow_run_id}`);
   console.log(`   DO ID:  ${durable_object_id}\n`);
