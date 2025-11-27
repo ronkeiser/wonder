@@ -8,6 +8,7 @@ export class EventManager {
   private ddl: DDLGenerator;
   private dml: DMLGenerator;
   private sequenceNumber: number = 0;
+  private broadcastCallback?: (kind: EventKind, payload: Record<string, unknown>) => void;
 
   constructor(sql: SqlStorage, customTypes: CustomTypeRegistry) {
     this.sql = sql;
@@ -17,6 +18,15 @@ export class EventManager {
 
   initialize(): void {
     this.createTable();
+  }
+
+  /**
+   * Set callback for broadcasting events to WebSocket clients.
+   */
+  setBroadcastCallback(
+    callback: (kind: EventKind, payload: Record<string, unknown>) => void,
+  ): void {
+    this.broadcastCallback = callback;
   }
 
   emit(kind: EventKind, payload: Record<string, unknown>): void {
@@ -32,6 +42,11 @@ export class EventManager {
     const { statements, values } = this.dml.generateInsert('events', event);
     for (let i = 0; i < statements.length; i++) {
       this.sql.exec(statements[i], ...values[i]).toArray();
+    }
+
+    // Broadcast to WebSocket clients if callback is set
+    if (this.broadcastCallback) {
+      this.broadcastCallback(kind, payload);
     }
   }
 

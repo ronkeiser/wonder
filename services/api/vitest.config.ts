@@ -10,6 +10,7 @@ export default defineWorkersConfig({
     poolOptions: {
       workers: {
         wrangler: { configPath: './wrangler.test.jsonc' },
+        main: './src/index.ts',
       },
     },
   },

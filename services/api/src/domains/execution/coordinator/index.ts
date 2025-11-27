@@ -41,12 +41,29 @@ export class WorkflowCoordinator implements DurableObject {
     this.tokens = new TokenManager(this.state.storage.sql, customTypes);
     this.events = new EventManager(this.state.storage.sql, customTypes);
     this.tasks = new TaskDispatcher(this.env.WORKFLOW_QUEUE, this.logger, this.events);
+
+    // Set up event broadcasting to WebSocket clients
+    this.events.setBroadcastCallback((kind, payload) => {
+      this.broadcastEvent(kind, payload);
+    });
   }
 
   async fetch(request: Request): Promise<Response> {
     const url = new URL(request.url);
 
+    this.logger.info('coordinator_fetch', {
+      pathname: url.pathname,
+      upgrade: request.headers.get('Upgrade'),
+      workflow_run_id: this.workflowRunId,
+    });
+
     try {
+      // WebSocket upgrade for event streaming
+      if (url.pathname === '/stream' && request.headers.get('Upgrade') === 'websocket') {
+        this.logger.info('handling_websocket_upgrade');
+        return this.handleWebSocketUpgrade(request);
+      }
+
       if (url.pathname === '/execute' && request.method === 'POST') {
         return await this.handleExecute(request);
       }
@@ -69,6 +86,49 @@ export class WorkflowCoordinator implements DurableObject {
         JSON.stringify({ error: err instanceof Error ? err.message : String(err) }),
         { status: 500, headers: { 'Content-Type': 'application/json' } },
       );
+    }
+  }
+
+  /**
+   * Handle WebSocket upgrade for event streaming.
+   */
+  private handleWebSocketUpgrade(request: Request): Response {
+    const pair = new WebSocketPair();
+    const [client, server] = [pair[0], pair[1]];
+
+    // Accept WebSocket connection
+    this.state.acceptWebSocket(server);
+
+    this.logger.info('websocket_connected', {
+      workflow_run_id: this.workflowRunId,
+      durable_object_id: this.durableObjectId,
+    });
+
+    return new Response(null, {
+      status: 101,
+      webSocket: client,
+    });
+  }
+
+  /**
+   * Broadcast event to all connected WebSocket clients.
+   */
+  private broadcastEvent(kind: string, payload: Record<string, unknown>): void {
+    const sockets = this.state.getWebSockets();
+    const message = JSON.stringify({
+      kind,
+      payload,
+      timestamp: new Date().toISOString(),
+    });
+
+    for (const ws of sockets) {
+      try {
+        ws.send(message);
+      } catch (err) {
+        this.logger.error('websocket_send_failed', {
+          error: err instanceof Error ? err.message : String(err),
+        });
+      }
     }
   }
 
@@ -250,10 +310,15 @@ export class WorkflowCoordinator implements DurableObject {
 
     this.context.update(finalContext);
 
-    // Emit workflow_completed event
+    // Close WebSocket connections BEFORE emitting final event
+    // This ensures the close happens after all previous messages are sent
+    const sockets = this.state.getWebSockets();
+
+    // Emit workflow_completed event with a special close flag
     this.events.emit('workflow_completed', {
       workflow_run_id: this.workflowRunId,
       output: finalContext.output,
+      close: true, // Signal to clients they should close the connection
     });
 
     this.logger.info('workflow_completed', {
@@ -261,6 +326,18 @@ export class WorkflowCoordinator implements DurableObject {
       output: finalContext.output,
       full_context: finalContext,
     });
+  }
+
+  /**
+   * Handle WebSocket close events.
+   */
+  async webSocketClose(
+    ws: WebSocket,
+    code: number,
+    reason: string,
+    wasClean: boolean,
+  ): Promise<void> {
+    this.logger.info('websocket_close_handler', { code, reason, wasClean });
   }
 
   private handleTaskFailure(result: WorkflowTaskResult): void {
