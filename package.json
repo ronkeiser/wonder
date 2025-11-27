@@ -3,9 +3,21 @@
   "version": "0.0.1",
   "private": true,
   "scripts": {},
-  "devDependencies": {},
   "engines": {
     "node": ">=24.0.0",
     "pnpm": ">=10.0.0"
+  },
+  "pnpm": {
+    "overrides": {
+      "@vitest/runner": "~3.2.4",
+      "@vitest/snapshot": "~3.2.4",
+      "@vitest/utils": "~3.2.4",
+      "@vitest/pretty-format": "~3.2.4"
+    },
+    "onlyBuiltDependencies": [
+      "esbuild",
+      "sharp",
+      "workerd"
+    ]
   }
 }

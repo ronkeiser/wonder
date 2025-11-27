@@ -25,7 +25,7 @@
     "test": "vitest run"
   },
   "devDependencies": {
-    "@cloudflare/vitest-pool-workers": "^0.10.10",
+    "@cloudflare/vitest-pool-workers": "^0.10.11",
     "@types/node": "^24.10.1",
     "drizzle-orm": "^0.44.7",
     "miniflare": "^4.20251118.1",

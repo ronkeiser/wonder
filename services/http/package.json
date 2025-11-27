@@ -13,6 +13,6 @@
     "wrangler": "^4.50.0"
   },
   "dependencies": {
-    "@cloudflare/vitest-pool-workers": "^0.10.10"
+    "@cloudflare/vitest-pool-workers": "^0.10.11"
   }
 }
