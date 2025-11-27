@@ -3,8 +3,8 @@
 import { createLogger, type Logger } from '@wonder/logger';
 import { CustomTypeRegistry, type SchemaType } from '@wonder/schema';
 import { ulid } from 'ulid';
+import type { Context, Token, WorkflowTaskResult } from '../definitions';
 import { ContextManager } from './context';
-import type { Context, Token, WorkflowTaskResult } from './definitions';
 import { EventManager } from './events';
 import { TaskDispatcher } from './tasks';
 import { TokenManager } from './tokens';

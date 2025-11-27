@@ -1,7 +1,7 @@
 /** Event recording and retrieval */
 
 import { CustomTypeRegistry, DDLGenerator, DMLGenerator } from '@wonder/schema';
-import { eventSchemaType, type EventKind } from './definitions';
+import { eventSchemaType, type EventKind } from '../definitions';
 
 export class EventManager {
   private sql: SqlStorage;

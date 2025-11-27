@@ -1,7 +1,7 @@
 /** Context storage and schema management */
 
 import { CustomTypeRegistry, DDLGenerator, DMLGenerator, type SchemaType } from '@wonder/schema';
-import type { Context } from './definitions';
+import type { Context } from '../definitions';
 
 export class ContextManager {
   private sql: SqlStorage;
