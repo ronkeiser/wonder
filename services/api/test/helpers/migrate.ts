@@ -120,6 +120,7 @@ CREATE TABLE model_profiles (
 CREATE TABLE nodes (
 	id text PRIMARY KEY NOT NULL,
 	workflow_def_id text NOT NULL,
+	workflow_def_version integer NOT NULL,
 	name text NOT NULL,
 	action_id text NOT NULL,
 	input_mapping text,
@@ -129,9 +130,10 @@ CREATE TABLE nodes (
 	joins_node text,
 	merge text,
 	on_early_complete text,
-	FOREIGN KEY (action_id) REFERENCES actions(id) ON UPDATE no action ON DELETE no action
+	FOREIGN KEY (action_id) REFERENCES actions(id) ON UPDATE no action ON DELETE no action,
+	FOREIGN KEY (workflow_def_id, workflow_def_version) REFERENCES workflow_defs(id, version) ON UPDATE no action ON DELETE no action
 );
-CREATE INDEX idx_nodes_workflow_def ON nodes (workflow_def_id);
+CREATE INDEX idx_nodes_workflow_def ON nodes (workflow_def_id, workflow_def_version);
 CREATE INDEX idx_nodes_action ON nodes (action_id);
 CREATE TABLE projects (
 	id text PRIMARY KEY NOT NULL,
@@ -172,6 +174,7 @@ CREATE UNIQUE INDEX unique_secrets_workspace_key ON secrets (workspace_id,key);
 CREATE TABLE transitions (
 	id text PRIMARY KEY NOT NULL,
 	workflow_def_id text NOT NULL,
+	workflow_def_version integer NOT NULL,
 	from_node_id text NOT NULL,
 	to_node_id text NOT NULL,
 	priority integer NOT NULL,
@@ -179,9 +182,10 @@ CREATE TABLE transitions (
 	foreach text,
 	loop_config text,
 	FOREIGN KEY (from_node_id) REFERENCES nodes(id) ON UPDATE no action ON DELETE cascade,
-	FOREIGN KEY (to_node_id) REFERENCES nodes(id) ON UPDATE no action ON DELETE cascade
+	FOREIGN KEY (to_node_id) REFERENCES nodes(id) ON UPDATE no action ON DELETE cascade,
+	FOREIGN KEY (workflow_def_id, workflow_def_version) REFERENCES workflow_defs(id, version) ON UPDATE no action ON DELETE no action
 );
-CREATE INDEX idx_transitions_workflow_def ON transitions (workflow_def_id);
+CREATE INDEX idx_transitions_workflow_def ON transitions (workflow_def_id, workflow_def_version);
 CREATE INDEX idx_transitions_from_node ON transitions (from_node_id);
 CREATE INDEX idx_transitions_to_node ON transitions (to_node_id);
 CREATE TABLE triggers (
@@ -372,10 +376,11 @@ VALUES (
 );
 
 -- Node: Single greeting node
-INSERT INTO nodes (id, workflow_def_id, name, action_id, input_mapping, output_mapping, fan_out, fan_in, joins_node, merge, on_early_complete)
+INSERT INTO nodes (id, workflow_def_id, workflow_def_version, name, action_id, input_mapping, output_mapping, fan_out, fan_in, joins_node, merge, on_early_complete)
 VALUES (
   '01JDXSEED0000NODE0000001',
   '01JDXSEED0000WORKFLOWDEF1',
+  1,
   'Greet',
   '01JDXSEED0000ACTION000001',
   '{"name":"$.input.name"}',

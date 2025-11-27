@@ -210,6 +210,7 @@ describe('Node', () => {
 
     const node = await createNode(db, {
       workflow_def_id: def.id,
+      workflow_def_version: def.version,
       name: 'Test Node',
       action_id: action.id,
       input_mapping: null,
@@ -256,6 +257,7 @@ describe('Node', () => {
 
     const node = await createNode(db, {
       workflow_def_id: def.id,
+      workflow_def_version: def.version,
       name: 'Test Node',
       action_id: action.id,
       input_mapping: null,
@@ -312,6 +314,7 @@ describe('Node', () => {
 
     const node1 = await createNode(db, {
       workflow_def_id: def.id,
+      workflow_def_version: def.version,
       name: 'Node 1',
       action_id: action1.id,
       input_mapping: null,
@@ -325,6 +328,7 @@ describe('Node', () => {
 
     const node2 = await createNode(db, {
       workflow_def_id: def.id,
+      workflow_def_version: def.version,
       name: 'Node 2',
       action_id: action2.id,
       input_mapping: null,
