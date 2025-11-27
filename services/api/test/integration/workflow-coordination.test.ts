@@ -14,15 +14,13 @@ import { beforeEach, describe, expect, it } from 'vitest';
 import type { ExecutionServiceContext } from '~/domains/execution/service';
 import { startWorkflow } from '~/domains/execution/service';
 import { createTestDb } from '../helpers/db';
-import { migrate } from '../helpers/migrate';
 
 describe('Workflow Coordination Architecture', () => {
   let ctx: ExecutionServiceContext;
 
   beforeEach(async () => {
-    // Setup test database with migrations (includes seed data in migration 0002)
+    // Migrations applied automatically via setup file
     const db = createTestDb();
-    await migrate(db);
 
     // Create test context with real bindings
     ctx = {

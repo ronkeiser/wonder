@@ -1,7 +1,7 @@
 {
   "version": "6",
   "dialect": "sqlite",
-  "id": "88bd5e2a-932e-4abc-b0e2-bc886e121834",
+  "id": "0b952d02-c698-4f92-9aa7-52a0a8ca30ba",
   "prevId": "00000000-0000-0000-0000-000000000000",
   "tables": {
     "actions": {
@@ -629,6 +629,80 @@
       "uniqueConstraints": {},
       "checkConstraints": {}
     },
+    "logs": {
+      "name": "logs",
+      "columns": {
+        "id": {
+          "name": "id",
+          "type": "text",
+          "primaryKey": true,
+          "notNull": true,
+          "autoincrement": false
+        },
+        "level": {
+          "name": "level",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false
+        },
+        "event_type": {
+          "name": "event_type",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false
+        },
+        "message": {
+          "name": "message",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false,
+          "autoincrement": false
+        },
+        "metadata": {
+          "name": "metadata",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false
+        },
+        "timestamp": {
+          "name": "timestamp",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false
+        }
+      },
+      "indexes": {
+        "idx_logs_level": {
+          "name": "idx_logs_level",
+          "columns": [
+            "level"
+          ],
+          "isUnique": false
+        },
+        "idx_logs_event_type": {
+          "name": "idx_logs_event_type",
+          "columns": [
+            "event_type"
+          ],
+          "isUnique": false
+        },
+        "idx_logs_timestamp": {
+          "name": "idx_logs_timestamp",
+          "columns": [
+            "timestamp"
+          ],
+          "isUnique": false
+        }
+      },
+      "foreignKeys": {},
+      "compositePrimaryKeys": {},
+      "uniqueConstraints": {},
+      "checkConstraints": {}
+    },
     "mcp_servers": {
       "name": "mcp_servers",
       "columns": {
@@ -837,6 +911,13 @@
           "notNull": true,
           "autoincrement": false
         },
+        "workflow_def_version": {
+          "name": "workflow_def_version",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false
+        },
         "name": {
           "name": "name",
           "type": "text",
@@ -905,7 +986,8 @@
         "idx_nodes_workflow_def": {
           "name": "idx_nodes_workflow_def",
           "columns": [
-            "workflow_def_id"
+            "workflow_def_id",
+            "workflow_def_version"
           ],
           "isUnique": false
         },
@@ -918,19 +1000,6 @@
         }
       },
       "foreignKeys": {
-        "nodes_workflow_def_id_workflow_defs_id_fk": {
-          "name": "nodes_workflow_def_id_workflow_defs_id_fk",
-          "tableFrom": "nodes",
-          "tableTo": "workflow_defs",
-          "columnsFrom": [
-            "workflow_def_id"
-          ],
-          "columnsTo": [
-            "id"
-          ],
-          "onDelete": "no action",
-          "onUpdate": "no action"
-        },
         "nodes_action_id_actions_id_fk": {
           "name": "nodes_action_id_actions_id_fk",
           "tableFrom": "nodes",
@@ -940,6 +1009,21 @@
           ],
           "columnsTo": [
             "id"
+          ],
+          "onDelete": "no action",
+          "onUpdate": "no action"
+        },
+        "nodes_workflow_def_id_workflow_def_version_workflow_defs_id_version_fk": {
+          "name": "nodes_workflow_def_id_workflow_def_version_workflow_defs_id_version_fk",
+          "tableFrom": "nodes",
+          "tableTo": "workflow_defs",
+          "columnsFrom": [
+            "workflow_def_id",
+            "workflow_def_version"
+          ],
+          "columnsTo": [
+            "id",
+            "version"
           ],
           "onDelete": "no action",
           "onUpdate": "no action"
@@ -1223,6 +1307,13 @@
           "notNull": true,
           "autoincrement": false
         },
+        "workflow_def_version": {
+          "name": "workflow_def_version",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false
+        },
         "from_node_id": {
           "name": "from_node_id",
           "type": "text",
@@ -1270,7 +1361,8 @@
         "idx_transitions_workflow_def": {
           "name": "idx_transitions_workflow_def",
           "columns": [
-            "workflow_def_id"
+            "workflow_def_id",
+            "workflow_def_version"
           ],
           "isUnique": false
         },
@@ -1290,19 +1382,6 @@
         }
       },
       "foreignKeys": {
-        "transitions_workflow_def_id_workflow_defs_id_fk": {
-          "name": "transitions_workflow_def_id_workflow_defs_id_fk",
-          "tableFrom": "transitions",
-          "tableTo": "workflow_defs",
-          "columnsFrom": [
-            "workflow_def_id"
-          ],
-          "columnsTo": [
-            "id"
-          ],
-          "onDelete": "no action",
-          "onUpdate": "no action"
-        },
         "transitions_from_node_id_nodes_id_fk": {
           "name": "transitions_from_node_id_nodes_id_fk",
           "tableFrom": "transitions",
@@ -1327,6 +1406,21 @@
             "id"
           ],
           "onDelete": "cascade",
+          "onUpdate": "no action"
+        },
+        "transitions_workflow_def_id_workflow_def_version_workflow_defs_id_version_fk": {
+          "name": "transitions_workflow_def_id_workflow_def_version_workflow_defs_id_version_fk",
+          "tableFrom": "transitions",
+          "tableTo": "workflow_defs",
+          "columnsFrom": [
+            "workflow_def_id",
+            "workflow_def_version"
+          ],
+          "columnsTo": [
+            "id",
+            "version"
+          ],
+          "onDelete": "no action",
           "onUpdate": "no action"
         }
       },

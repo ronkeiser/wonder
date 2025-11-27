@@ -1,45 +1,41 @@
-DROP TABLE IF EXISTS `nodes`;--> statement-breakpoint
-CREATE TABLE `nodes` (
-	`id` text PRIMARY KEY NOT NULL,
-	`workflow_def_id` text NOT NULL,
-	`workflow_def_version` integer NOT NULL,
-	`name` text NOT NULL,
-	`action_id` text NOT NULL,
-	`input_mapping` text,
-	`output_mapping` text,
-	`fan_out` text NOT NULL,
-	`fan_in` text NOT NULL,
-	`joins_node` text,
-	`merge` text,
-	`on_early_complete` text,
-	FOREIGN KEY (`action_id`) REFERENCES `actions`(`id`) ON UPDATE no action ON DELETE no action,
-	FOREIGN KEY (`workflow_def_id`,`workflow_def_version`) REFERENCES `workflow_defs`(`id`,`version`) ON UPDATE no action ON DELETE no action
-);--> statement-breakpoint
-CREATE INDEX `idx_nodes_workflow_def` ON `nodes` (`workflow_def_id`,`workflow_def_version`);--> statement-breakpoint
-CREATE INDEX `idx_nodes_action` ON `nodes` (`action_id`);--> statement-breakpoint
-DROP TABLE IF EXISTS `transitions`;--> statement-breakpoint
-CREATE TABLE `transitions` (
-	`id` text PRIMARY KEY NOT NULL,
-	`workflow_def_id` text NOT NULL,
-	`workflow_def_version` integer NOT NULL,
-	`from_node_id` text NOT NULL,
-	`to_node_id` text NOT NULL,
-	`priority` integer NOT NULL,
-	`condition` text,
-	`foreach` text,
-	`loop_config` text,
-	FOREIGN KEY (`from_node_id`) REFERENCES `nodes`(`id`) ON UPDATE no action ON DELETE cascade,
-	FOREIGN KEY (`to_node_id`) REFERENCES `nodes`(`id`) ON UPDATE no action ON DELETE cascade,
-	FOREIGN KEY (`workflow_def_id`,`workflow_def_version`) REFERENCES `workflow_defs`(`id`,`version`) ON UPDATE no action ON DELETE no action
-);--> statement-breakpoint
-CREATE INDEX `idx_transitions_workflow_def` ON `transitions` (`workflow_def_id`,`workflow_def_version`);--> statement-breakpoint
-CREATE INDEX `idx_transitions_from_node` ON `transitions` (`from_node_id`);--> statement-breakpoint
-CREATE INDEX `idx_transitions_to_node` ON `transitions` (`to_node_id`);--> statement-breakpoint
+-- Seed data for Wonder database
 
--- Hello World workflow seed data
--- Complete minimal working example with all required entities
+-- Workspace
+INSERT INTO workspaces (id, name, settings, created_at, updated_at)
+VALUES (
+  '01JDXSEED0000WORKSPACE00001',
+  'Wonder',
+  NULL,
+  '2025-11-25T00:00:00.000Z',
+  '2025-11-25T00:00:00.000Z'
+);
 
--- 1. PromptSpec: Template for the greeting prompt
+-- Project (linked to workspace)
+INSERT INTO projects (id, workspace_id, name, description, settings, created_at, updated_at)
+VALUES (
+  '01JDXSEED0000PROJECT000001',
+  '01JDXSEED0000WORKSPACE00001',
+  'Default Project',
+  'Default project for Stage 0 vertical slice',
+  NULL,
+  '2025-11-25T00:00:00.000Z',
+  '2025-11-25T00:00:00.000Z'
+);
+
+-- Model Profile (Workers AI Llama 3 8B)
+INSERT INTO model_profiles (id, name, provider, model_id, parameters, execution_config, cost_per_1k_input_tokens, cost_per_1k_output_tokens)
+VALUES (
+  '01JDXSEED0000MODELPROF0001',
+  'Llama 3 8B',
+  'cloudflare',
+  '@cf/meta/llama-3-8b-instruct',
+  '{"temperature":0.7,"max_tokens":2048}',
+  NULL,
+  0,
+  0
+);
+
+-- PromptSpec: Template for the greeting prompt
 INSERT INTO prompt_specs (id, name, description, version, system_prompt, template, template_language, requires, produces, examples, tags, created_at, updated_at)
 VALUES (
   '01JDXSEED0000PROMPTSPEC01',
@@ -55,9 +51,9 @@ VALUES (
   NULL,
   '2025-11-25T00:00:00.000Z',
   '2025-11-25T00:00:00.000Z'
-);--> statement-breakpoint
+);
 
--- 2. Action: LLM Call using the prompt spec
+-- Action: LLM Call using the prompt spec
 INSERT INTO actions (id, name, description, version, kind, implementation, requires, produces, execution, idempotency, created_at, updated_at)
 VALUES (
   '01JDXSEED0000ACTION000001',
@@ -72,9 +68,9 @@ VALUES (
   '{"level":"call"}',
   '2025-11-25T00:00:00.000Z',
   '2025-11-25T00:00:00.000Z'
-);--> statement-breakpoint
+);
 
--- 3. Workflow Definition
+-- Workflow Definition
 INSERT INTO workflow_defs (id, name, description, version, owner_type, owner_id, tags, input_schema, output_schema, context_schema, initial_node_id, created_at, updated_at)
 VALUES (
   '01JDXSEED0000WORKFLOWDEF1',
@@ -90,9 +86,9 @@ VALUES (
   '01JDXSEED0000NODE0000001',
   '2025-11-25T00:00:00.000Z',
   '2025-11-25T00:00:00.000Z'
-);--> statement-breakpoint
+);
 
--- 4. Workflow: Binds workflow_def to project
+-- Workflow: Binds workflow_def to project
 INSERT INTO workflows (id, project_id, name, description, workflow_def_id, pinned_version, enabled, created_at, updated_at)
 VALUES (
   '01JDXSEED0000WORKFLOW0001',
@@ -104,9 +100,9 @@ VALUES (
   1,
   '2025-11-25T00:00:00.000Z',
   '2025-11-25T00:00:00.000Z'
-);--> statement-breakpoint
+);
 
--- 5. Node: References action and workflow_def (with version!)
+-- Node: References action and workflow_def (with version!)
 INSERT INTO nodes (id, workflow_def_id, workflow_def_version, name, action_id, input_mapping, output_mapping, fan_out, fan_in, joins_node, merge, on_early_complete)
 VALUES (
   '01JDXSEED0000NODE0000001',

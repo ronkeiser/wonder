@@ -5,29 +5,8 @@
     {
       "idx": 0,
       "version": "6",
-      "when": 1764107054283,
-      "tag": "0000_known_raza",
-      "breakpoints": true
-    },
-    {
-      "idx": 1,
-      "version": "6",
-      "when": 1764122394946,
-      "tag": "0001_simple_jetstream",
-      "breakpoints": true
-    },
-    {
-      "idx": 2,
-      "version": "6",
-      "when": 1764134400000,
-      "tag": "0002_initial_seed",
-      "breakpoints": true
-    },
-    {
-      "idx": 3,
-      "version": "6",
-      "when": 1764207136732,
-      "tag": "0003_lonely_lenny_balinger",
+      "when": 1764243033456,
+      "tag": "0000_parched_annihilus",
       "breakpoints": true
     }
   ]

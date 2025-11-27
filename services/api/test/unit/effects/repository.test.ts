@@ -3,12 +3,11 @@
 import { beforeAll, describe, expect, test } from 'vitest';
 import { createAction, getAction, listActionsByKind } from '~/domains/effects/repository';
 import { createTestDb } from '../../helpers/db';
-import { migrate } from '../../helpers/migrate';
 
 const db = createTestDb();
 
 beforeAll(async () => {
-  await migrate(db);
+  // Migrations applied automatically via setup file
 });
 
 describe('Action', () => {

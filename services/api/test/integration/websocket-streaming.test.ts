@@ -6,7 +6,6 @@ import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 import type { ExecutionServiceContext } from '~/domains/execution/service';
 import { startWorkflow } from '~/domains/execution/service';
 import { createTestDb } from '../helpers/db';
-import { migrate, seed } from '../helpers/migrate';
 
 // Skipping these tests due to Cloudflare Workers test framework limitation:
 // Durable Objects with SQLite storage cannot be properly cleaned up in isolated tests.
@@ -17,8 +16,7 @@ describe.skip('WebSocket Event Streaming', () => {
 
   beforeEach(async () => {
     const db = createTestDb();
-    await migrate(db);
-    await seed(db);
+    // Migrations are now applied automatically via setup file
 
     ctx = {
       db,

@@ -9,12 +9,11 @@ import {
 } from '~/domains/events/repository';
 import { buildWorkflowRun } from '~/domains/execution/fixtures';
 import { createTestDb } from '../../helpers/db';
-import { migrate } from '../../helpers/migrate';
 
 const db = createTestDb();
 
 beforeAll(async () => {
-  await migrate(db);
+  // Migrations applied automatically via setup file
 });
 
 describe('Event', () => {
