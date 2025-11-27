@@ -310,15 +310,10 @@ export class WorkflowCoordinator implements DurableObject {
 
     this.context.update(finalContext);
 
-    // Close WebSocket connections BEFORE emitting final event
-    // This ensures the close happens after all previous messages are sent
-    const sockets = this.state.getWebSockets();
-
-    // Emit workflow_completed event with a special close flag
+    // Emit workflow_completed event
     this.events.emit('workflow_completed', {
       workflow_run_id: this.workflowRunId,
       output: finalContext.output,
-      close: true, // Signal to clients they should close the connection
     });
 
     this.logger.info('workflow_completed', {

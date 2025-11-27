@@ -13,12 +13,12 @@
     "db:studio": "drizzle-kit studio",
     "test": "vitest --run",
     "test:watch": "vitest",
-    "test:ui": "vitest --ui",
-    "workflow:run": "tsx scripts/run-workflow.ts"
+    "test:ui": "vitest --ui"
   },
   "dependencies": {
     "@wonder/logger": "workspace:*",
     "@wonder/schema": "workspace:*",
+    "@wonder/sdk": "workspace:*",
     "drizzle-orm": "^0.44.7",
     "ulid": "^3.0.1"
   },

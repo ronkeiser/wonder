@@ -1,5 +1,11 @@
 /**
  * Minimal SDK for Wonderful Workflow API
+ *
+ * Note on WebSocket lifecycle:
+ * WebSockets keep the Node.js event loop alive even after close() is called.
+ * In CLI scripts, explicitly call process.exit() after consuming all events.
+ * This is expected behavior - WebSockets maintain connections for bidirectional
+ * communication and don't auto-terminate.
  */
 
 export interface WorkflowInput {
@@ -8,7 +14,20 @@ export interface WorkflowInput {
 }
 
 export interface WorkflowEvent {
-  kind: 'workflow_started' | 'node_started' | 'node_completed' | 'workflow_completed';
+  kind:
+    | 'workflow_started'
+    | 'workflow_completed'
+    | 'workflow_failed'
+    | 'node_started'
+    | 'node_completed'
+    | 'node_failed'
+    | 'token_spawned'
+    | 'token_merged'
+    | 'token_cancelled'
+    | 'subworkflow_started'
+    | 'subworkflow_completed'
+    | 'artifact_created'
+    | 'context_updated';
   payload: Record<string, unknown>;
   timestamp: string;
 }
@@ -50,41 +69,30 @@ export class WonderfulClient {
     const resolvers: Array<(value: IteratorResult<WorkflowEvent>) => void> = [];
     let closed = false;
     let error: Error | null = null;
-    let closeResolve: (() => void) | null = null;
 
     ws.addEventListener('message', (event: MessageEvent) => {
       const data = JSON.parse(event.data) as WorkflowEvent;
 
-      // Check for close signal BEFORE queuing/resolving
-      const shouldClose = data.kind === 'workflow_completed' && (data.payload as any).close;
+      // Check if workflow is complete
+      const isComplete = data.kind === 'workflow_completed';
 
       if (resolvers.length > 0) {
         const resolve = resolvers.shift()!;
         resolve({ value: data, done: false });
-
-        // If this is the close signal and there are MORE pending resolvers,
-        // resolve them all as done so the loop exits immediately
-        if (shouldClose) {
-          while (resolvers.length > 0) {
-            const pendingResolve = resolvers.shift()!;
-            pendingResolve({ value: undefined as any, done: true });
-          }
-        }
       } else {
         messageQueue.push(data);
       }
 
-      // Set closed flag immediately so loop exits after yielding this event
-      if (shouldClose) {
+      // Mark as closed after workflow completes
+      // The generator will exit after yielding this final event
+      if (isComplete) {
         closed = true;
-        ws.close();
       }
     });
 
     ws.addEventListener('error', () => {
       error = new Error('WebSocket error');
       closed = true;
-      // Resolve any pending promises with error
       while (resolvers.length > 0) {
         const resolve = resolvers.shift()!;
         resolve({ value: undefined as any, done: true });
@@ -93,15 +101,9 @@ export class WonderfulClient {
 
     ws.addEventListener('close', () => {
       closed = true;
-      // Resolve any pending promises
       while (resolvers.length > 0) {
         const resolve = resolvers.shift()!;
         resolve({ value: undefined as any, done: true });
-      }
-      // Resolve close promise if waiting
-      if (closeResolve) {
-        closeResolve();
-        closeResolve = null;
       }
     });
 
@@ -118,30 +120,23 @@ export class WonderfulClient {
         if (messageQueue.length > 0) {
           const event = messageQueue.shift()!;
           yield event;
-          // Check if we should exit immediately after yielding this event
-          if (closed) {
-            break;
-          }
+          if (closed) break;
         } else {
           // Wait for next message
           const result = await new Promise<IteratorResult<WorkflowEvent>>((resolve) => {
             resolvers.push(resolve);
           });
 
-          if (result.done) {
-            break;
-          }
+          if (result.done) break;
 
           yield result.value;
-          // Check if we should exit immediately after yielding this event
-          if (closed) {
-            break;
-          }
+          if (closed) break;
         }
       }
     } finally {
-      // Just close and don't wait - Cloudflare hibernatable WebSockets don't respond to close anyway
-      // Caller should use process.exit() if they need immediate termination
+      // Close WebSocket if still open
+      // Note: WebSocket keeps Node.js event loop alive even after close() is called
+      // In CLI scripts, use process.exit() after the async generator completes
       if (ws.readyState === WebSocket.OPEN || ws.readyState === WebSocket.CONNECTING) {
         ws.close();
       }

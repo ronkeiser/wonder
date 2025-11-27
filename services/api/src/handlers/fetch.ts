@@ -67,14 +67,6 @@ export async function handleFetch(
     const doId = coordinatorStreamMatch[1];
     const upgradeHeader = request.headers.get('Upgrade');
 
-    // Log for debugging
-    console.log('WebSocket route matched:', {
-      pathname: url.pathname,
-      doId,
-      upgradeHeader,
-      headers: Object.fromEntries(request.headers.entries()),
-    });
-
     if (upgradeHeader === 'websocket') {
       try {
         const id = env.WORKFLOW_COORDINATOR.idFromString(doId);

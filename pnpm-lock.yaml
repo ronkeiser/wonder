@@ -44,6 +44,21 @@ importers:
         specifier: ^2.1.0
         version: 2.1.9(@types/node@24.10.1)(lightningcss@1.30.2)
 
+  packages/sdk:
+    devDependencies:
+      '@types/node':
+        specifier: ^24.10.1
+        version: 24.10.1
+      tsx:
+        specifier: ^4.20.6
+        version: 4.20.6
+      typescript:
+        specifier: ^5.9.3
+        version: 5.9.3
+      vitest:
+        specifier: ^3.2.4
+        version: 3.2.4(@types/node@24.10.1)(@vitest/ui@3.2.4)(jiti@2.6.1)(lightningcss@1.30.2)(tsx@4.20.6)
+
   services/api:
     dependencies:
       '@wonder/logger':
@@ -52,6 +67,9 @@ importers:
       '@wonder/schema':
         specifier: workspace:*
         version: link:../../packages/schema
+      '@wonder/sdk':
+        specifier: workspace:*
+        version: link:../../packages/sdk
       drizzle-orm:
         specifier: ^0.44.7
         version: 0.44.7(@cloudflare/workers-types@4.20251127.0)

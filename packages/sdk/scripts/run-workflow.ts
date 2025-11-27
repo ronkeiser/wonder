@@ -7,7 +7,7 @@
  *   pnpm tsx scripts/run-workflow.ts --name "Alice" --url "http://localhost:8787"
  */
 
-import { WonderfulClient } from '../src/sdk/index.js';
+import { WonderfulClient } from '@wonder/sdk';
 
 interface Args {
   name?: string;
@@ -76,7 +76,7 @@ async function main() {
 
     console.log('\n✓ Workflow completed successfully');
 
-    // Force immediate exit - WebSocket keeps event loop alive otherwise
+    // WebSocket keeps the event loop alive, so we must explicitly exit
     process.exit(0);
   } catch (error) {
     console.error('\n✗ Error:', error);

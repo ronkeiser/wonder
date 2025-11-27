@@ -1,10 +1,12 @@
 #!/usr/bin/env tsx
 /** Test WebSocket event streaming against deployed infrastructure */
 
-const API_BASE = 'https://wonder-api.ron-keiser.workers.dev';
+// Configure API base (default to production, or pass as first arg)
+const API_BASE = process.argv[2] || 'https://wonder-api.ron-keiser.workers.dev';
 const WORKFLOW_ID = '01JDXSEED0000WORKFLOW0001'; // Hello World workflow from seed data
 
 async function main() {
+  console.log(`📡 API Base: ${API_BASE}\n`);
   console.log('🚀 Starting workflow execution...\n');
 
   // Start workflow
