@@ -23,6 +23,7 @@ export class Workflows extends RpcTarget {
       ai: this.env.AI,
       WORKFLOW_COORDINATOR: this.env.WORKFLOW_COORDINATOR,
       logger,
+      executionContext: this.ctx,
     };
     return startWorkflow(serviceCtx, workflowId, input);
   }

@@ -27,6 +27,14 @@
     {
       "tag": "v1",
       "new_classes": ["WorkflowCoordinator"]
+    },
+    {
+      "tag": "v2",
+      "deleted_classes": ["WorkflowCoordinator"]
+    },
+    {
+      "tag": "v3",
+      "new_sqlite_classes": ["WorkflowCoordinator"]
     }
   ],
   "queues": {
@@ -39,8 +47,8 @@
     "consumers": [
       {
         "queue": "workflow-tasks",
-        "max_batch_size": 10,
-        "max_batch_timeout": 5,
+        "max_batch_size": 1,
+        "max_batch_timeout": 0,
         "max_retries": 3,
         "dead_letter_queue": "workflow-tasks-dlq"
       }

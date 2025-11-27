@@ -34,6 +34,12 @@ export async function processWorkflowTask(
       throw new Error(`Node not found: ${task.node_id}`);
     }
 
+    // Apply input_mapping to extract data from context
+    let inputData: Record<string, unknown> = {};
+    if (node.input_mapping && Object.keys(node.input_mapping).length > 0) {
+      inputData = applyInputMapping(node.input_mapping as Record<string, string>, task.context);
+    }
+
     // Load action
     const action = await effectsRepo.getAction(env.db, node.action_id);
     if (!action) {
@@ -44,7 +50,7 @@ export async function processWorkflowTask(
     let outputData: Record<string, unknown>;
 
     if (action.kind === 'llm_call') {
-      outputData = await executeLLMCall(env, action, task.input_data);
+      outputData = await executeLLMCall(env, action, inputData);
     } else {
       throw new Error(`Unsupported action kind: ${action.kind}`);
     }
@@ -131,6 +137,9 @@ async function executeLLMCall(
   console.log('[Worker] Calling LLM', {
     model_id: modelProfile.model_id,
     prompt_spec_id: promptSpec.id,
+    input_data: inputData,
+    template: promptSpec.template,
+    rendered_prompt: userPrompt,
   });
 
   // Call Workers AI
@@ -139,9 +148,36 @@ async function executeLLMCall(
   console.log('[Worker] LLM call completed', {
     model_id: modelProfile.model_id,
     response_length: result.response.length,
+    response: result.response,
   });
 
   return { response: result.response };
+}
+
+/**
+ * Apply input mapping to extract data from context.
+ */
+function applyInputMapping(
+  mapping: Record<string, string>,
+  context: import('./definitions').Context,
+): Record<string, unknown> {
+  const result: Record<string, unknown> = {};
+
+  for (const [targetKey, sourcePath] of Object.entries(mapping)) {
+    // Source path like "$.input.name" or "$.state.summary"
+    const actualPath = sourcePath.startsWith('$.') ? sourcePath.slice(2) : sourcePath;
+    const pathParts = actualPath.split('.');
+
+    // Navigate context to extract value
+    let value: any = context;
+    for (const part of pathParts) {
+      value = value?.[part];
+    }
+
+    result[targetKey] = value;
+  }
+
+  return result;
 }
 
 /**
@@ -157,12 +193,14 @@ function applyOutputMapping(
     // For Stage 0: simplified - just map directly
     // Target path like "summary" or "state.summary"
     const key = targetPath.startsWith('state.') ? targetPath.slice(6) : targetPath;
-    result[key] = actionResult[sourceKey];
+
+    // Source key may have $. prefix (JSONPath notation for "from result")
+    const actualSourceKey = sourceKey.startsWith('$.') ? sourceKey.slice(2) : sourceKey;
+    result[key] = actionResult[actualSourceKey];
   }
 
   return result;
 }
-
 /**
  * Render a template string with data.
  * For Stage 0: simple {{key}} replacement.

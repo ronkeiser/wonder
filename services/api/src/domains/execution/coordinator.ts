@@ -152,7 +152,7 @@ export class WorkflowCoordinator implements DurableObject {
     if (!this.durableObjectId) {
       throw new Error('Durable object ID not set');
     }
-    this.tasks.enqueue(initialToken, workflowRunId, this.durableObjectId);
+    this.tasks.enqueue(initialToken, workflowRunId, this.durableObjectId, context);
 
     return new Response(JSON.stringify({ success: true }), {
       headers: { 'Content-Type': 'application/json' },
@@ -192,6 +192,11 @@ export class WorkflowCoordinator implements DurableObject {
         ...result.output_data,
       };
       this.context.update(currentContext);
+
+      this.logger.info('context_updated_with_output', {
+        workflow_run_id: this.workflowRunId,
+        output_data: result.output_data,
+      });
     }
 
     // Update token status
@@ -254,6 +259,7 @@ export class WorkflowCoordinator implements DurableObject {
     this.logger.info('workflow_completed', {
       workflow_run_id: this.workflowRunId,
       output: finalContext.output,
+      full_context: finalContext,
     });
   }
 

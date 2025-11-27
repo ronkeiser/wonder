@@ -124,47 +124,59 @@ export async function startWorkflow(
   // Get DO stub and invoke executeWorkflow
   const doStub = ctx.WORKFLOW_COORDINATOR.get(doId);
 
-  try {
-    // Invoke DO asynchronously (fire and forget for Stage 0)
-    // In production, we'd want to wait for acknowledgment or use waitUntil
-    doStub
-      .fetch('https://do/execute', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          workflowRunId: workflowRun.id,
-          workflowDefId: workflowDef.id,
-          workflowVersion: workflowDef.version,
-          initialNodeId: workflowDef.initial_node_id,
-          inputSchema: workflowDef.input_schema,
-          outputSchema: workflowDef.output_schema,
-          context,
-        }),
-      })
-      .catch((err) => {
-        ctx.logger.error('do_invocation_failed', {
-          workflow_run_id: workflowRun.id,
-          durable_object_id: durableObjectId,
-          error: err instanceof Error ? err.message : String(err),
+  // Use waitUntil() to properly handle fire-and-forget DO invocation
+  // This allows the DO work to continue after the response is returned
+  const doInvocation = doStub
+    .fetch('https://do/execute', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        workflowRunId: workflowRun.id,
+        workflowDefId: workflowDef.id,
+        workflowVersion: workflowDef.version,
+        initialNodeId: workflowDef.initial_node_id,
+        inputSchema: workflowDef.input_schema,
+        outputSchema: workflowDef.output_schema,
+        context,
+      }),
+    })
+    .then((response) => {
+      if (!response.ok) {
+        return response.text().then((errorText) => {
+          console.error('[DO ERROR]', response.status, errorText);
+          ctx.logger.error('do_invocation_failed', {
+            workflow_run_id: workflowRun.id,
+            durable_object_id: durableObjectId,
+            status: response.status,
+            error: errorText,
+          });
         });
+      }
+      console.log('[DO SUCCESS]', workflowRun.id);
+      ctx.logger.info('do_invocation_succeeded', {
+        workflow_run_id: workflowRun.id,
+        durable_object_id: durableObjectId,
       });
-
-    ctx.logger.info('workflow_trigger_completed', {
-      workflow_id: workflowId,
-      workflow_run_id: workflowRun.id,
-      durable_object_id: durableObjectId,
+    })
+    .catch((err) => {
+      console.error('[DO EXCEPTION]', err);
+      ctx.logger.error('do_invocation_exception', {
+        workflow_run_id: workflowRun.id,
+        durable_object_id: durableObjectId,
+        error: err instanceof Error ? err.message : String(err),
+      });
     });
 
-    // Return the workflow run immediately
-    // Execution continues asynchronously in DO
-    return workflowRun;
-  } catch (err) {
-    const errorMessage = err instanceof Error ? err.message : String(err);
-    ctx.logger.error('workflow_trigger_failed', {
-      workflow_id: workflowId,
-      workflow_run_id: workflowRun.id,
-      error: errorMessage,
-    });
-    throw err;
-  }
+  // Extend Worker lifetime to allow DO invocation to complete
+  ctx.executionContext.waitUntil(doInvocation);
+
+  ctx.logger.info('workflow_trigger_completed', {
+    workflow_id: workflowId,
+    workflow_run_id: workflowRun.id,
+    durable_object_id: durableObjectId,
+  });
+
+  // Return the workflow run immediately
+  // Execution continues asynchronously in DO
+  return workflowRun;
 }

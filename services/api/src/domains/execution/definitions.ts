@@ -153,6 +153,9 @@ export interface WorkflowTask {
   /** Input data for this task (after input_mapping applied) */
   input_data: Record<string, unknown>;
 
+  /** Full workflow context at time of task creation (for input_mapping) */
+  context: Context;
+
   /** Durable Object ID for sending result back */
   durable_object_id: string;
 

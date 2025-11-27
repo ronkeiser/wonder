@@ -16,7 +16,12 @@ export class TaskDispatcher {
     this.events = events;
   }
 
-  enqueue(token: Token, workflowRunId: string, durableObjectId: string): void {
+  enqueue(
+    token: Token,
+    workflowRunId: string,
+    durableObjectId: string,
+    context: import('./definitions').Context,
+  ): void {
     const taskId = ulid();
 
     // Emit node_started event
@@ -33,7 +38,8 @@ export class TaskDispatcher {
       action_id: '', // Will be filled by worker from node lookup
       action_kind: 'llm_call', // Simplified for Stage 0
       action_implementation: {}, // Will be filled by worker
-      input_data: {}, // For Stage 0, worker will read from context
+      input_data: {}, // Will be populated by worker via input_mapping
+      context: context,
       durable_object_id: durableObjectId,
       enqueued_at: new Date().toISOString(),
     };
@@ -46,6 +52,18 @@ export class TaskDispatcher {
     });
 
     // Send to queue
-    this.queue.send(task);
+    try {
+      this.queue.send(task);
+      this.logger.info('task_sent_to_queue', {
+        task_id: taskId,
+        queue_available: !!this.queue,
+      });
+    } catch (err) {
+      this.logger.error('queue_send_failed', {
+        task_id: taskId,
+        error: err instanceof Error ? err.message : String(err),
+      });
+      throw err;
+    }
   }
 }

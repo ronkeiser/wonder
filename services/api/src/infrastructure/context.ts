@@ -17,6 +17,9 @@ export interface ServiceContext {
   /** Structured logger for application events */
   logger: Logger;
 
+  /** Execution context for async operations */
+  executionContext: ExecutionContext;
+
   // Future dependencies to be added:
   // vectorize: Vectorize;
   // r2: R2Bucket;
