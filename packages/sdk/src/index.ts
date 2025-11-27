@@ -44,17 +44,17 @@ export class WonderfulClient {
    * Start a workflow and return the run ID and DO ID
    */
   async startWorkflow(input: WorkflowInput): Promise<WorkflowStartResponse> {
-    const response = await fetch(`${this.baseUrl}/workflows/start`, {
+    const response = await fetch(`${this.baseUrl}/api/workflows/${input.workflow_id}/start`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify(input),
+      body: JSON.stringify(input.input),
     });
 
     if (!response.ok) {
       throw new Error(`Failed to start workflow: ${response.statusText}`);
     }
 
-    return response.json();
+    return (await response.json()) as WorkflowStartResponse;
   }
 
   /**
@@ -63,7 +63,7 @@ export class WonderfulClient {
    */
   async *streamEvents(durableObjectId: string): AsyncGenerator<WorkflowEvent> {
     const wsUrl = this.baseUrl.replace('https://', 'wss://').replace('http://', 'ws://');
-    const ws = new WebSocket(`${wsUrl}/coordinator/${durableObjectId}/stream`);
+    const ws = new WebSocket(`${wsUrl}/api/coordinator/${durableObjectId}/stream`);
 
     const messageQueue: WorkflowEvent[] = [];
     const resolvers: Array<(value: IteratorResult<WorkflowEvent>) => void> = [];

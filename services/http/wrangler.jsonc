@@ -7,5 +7,14 @@
       "binding": "API",
       "service": "wonder-api"
     }
-  ]
+  ],
+  "durable_objects": {
+    "bindings": [
+      {
+        "name": "WORKFLOW_COORDINATOR",
+        "class_name": "WorkflowCoordinator",
+        "script_name": "wonder-api"
+      }
+    ]
+  }
 }

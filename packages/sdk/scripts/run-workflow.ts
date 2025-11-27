@@ -39,7 +39,7 @@ Usage: pnpm tsx scripts/run-workflow.ts [options]
 
 Options:
   --name, -n <name>    Name to pass to the workflow (default: "CLI User")
-  --url, -u <url>      API base URL (default: "https://wonder-api.ron-keiser.workers.dev")
+  --url, -u <url>      API base URL (default: "https://wonder-http.ron-keiser.workers.dev")
   --help, -h           Show this help message
 
 Examples:
@@ -57,7 +57,7 @@ async function main() {
   }
 
   const name = args.name || 'CLI User';
-  const baseUrl = args.url || 'https://wonder-api.ron-keiser.workers.dev';
+  const baseUrl = args.url || 'https://wonder-http.ron-keiser.workers.dev';
 
   console.log(`Starting workflow...`);
   console.log(`  Name: ${name}`);

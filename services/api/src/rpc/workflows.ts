@@ -25,6 +25,26 @@ export class Workflows extends RpcTarget {
       logger,
       executionContext: this.ctx,
     };
-    return startWorkflow(serviceCtx, workflowId, input);
+    const workflowRun = await startWorkflow(serviceCtx, workflowId, input);
+    return {
+      workflow_run_id: workflowRun.id,
+      durable_object_id: workflowRun.durable_object_id,
+    };
+  }
+
+  /**
+   * Stream coordinator events via WebSocket
+   * Forwards WebSocket upgrade request to the Durable Object
+   */
+  async streamCoordinator(doId: string, request: Request): Promise<Response> {
+    const id = this.env.WORKFLOW_COORDINATOR.idFromString(doId);
+    const stub = this.env.WORKFLOW_COORDINATOR.get(id);
+
+    // Create new request with /stream path for DO
+    const doUrl = new URL(request.url);
+    doUrl.pathname = '/stream';
+    const doRequest = new Request(doUrl, request);
+
+    return await stub.fetch(doRequest);
   }
 }

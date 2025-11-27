@@ -13,14 +13,28 @@ import { Workflows } from './rpc/workflows';
 export { WorkflowCoordinator } from './domains/execution/coordinator';
 
 /**
- * HTTP fetch handler (service worker format for WebSocket support)
+ * Wonder API Entrypoint
+ * Handles HTTP requests, queue messages, and provides RPC methods
  */
-export default {
-  async fetch(request: Request, env: Env, ctx: ExecutionContext): Promise<Response> {
-    return handleFetch(request, env, ctx);
-  },
+export default class extends WorkerEntrypoint<Env> {
+  /**
+   * RPC: Workflows adapter
+   */
+  workflows() {
+    return new Workflows(this.env, this.ctx);
+  }
 
-  async queue(batch: MessageBatch<WorkflowTask>, env: Env): Promise<void> {
-    return handleQueue(batch, env);
-  },
-};
+  /**
+   * HTTP fetch handler
+   */
+  async fetch(request: Request): Promise<Response> {
+    return handleFetch(request, this.env, this.ctx);
+  }
+
+  /**
+   * Queue consumer handler
+   */
+  async queue(batch: MessageBatch<WorkflowTask>): Promise<void> {
+    return handleQueue(batch, this.env);
+  }
+}

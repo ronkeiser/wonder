@@ -2,7 +2,7 @@
 /** Test WebSocket event streaming against deployed infrastructure */
 
 // Configure API base (default to production, or pass as first arg)
-const API_BASE = process.argv[2] || 'https://wonder-api.ron-keiser.workers.dev';
+const API_BASE = process.argv[2] || 'https://wonder-http.ron-keiser.workers.dev';
 const WORKFLOW_ID = '01JDXSEED0000WORKFLOW0001'; // Hello World workflow from seed data
 
 async function main() {
@@ -10,12 +10,11 @@ async function main() {
   console.log('🚀 Starting workflow execution...\n');
 
   // Start workflow
-  const startResponse = await fetch(`${API_BASE}/workflows/start`, {
+  const startResponse = await fetch(`${API_BASE}/api/workflows/${WORKFLOW_ID}/start`, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify({
-      workflow_id: WORKFLOW_ID,
-      input: { name: 'World' },
+      name: 'World',
     }),
   });
 
@@ -34,7 +33,10 @@ async function main() {
   console.log(`   DO ID:  ${durable_object_id}\n`);
 
   // Connect WebSocket to stream events
-  const wsUrl = `${API_BASE.replace('https://', 'wss://')}/coordinator/${durable_object_id}/stream`;
+  const wsUrl = `${API_BASE.replace(
+    'https://',
+    'wss://',
+  )}/api/coordinator/${durable_object_id}/stream`;
   console.log(`📡 Connecting to WebSocket: ${wsUrl}\n`);
 
   const ws = new WebSocket(wsUrl);
