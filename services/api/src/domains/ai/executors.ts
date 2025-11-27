@@ -38,22 +38,8 @@ export async function executeLLMCall(
   }
   messages.push({ role: 'user', content: userPrompt });
 
-  console.log('[AI] Calling LLM', {
-    model_id: modelProfile.model_id,
-    prompt_spec_id: promptSpec.id,
-    input_data: inputData,
-    template: promptSpec.template,
-    rendered_prompt: userPrompt,
-  });
-
   // Call Workers AI
   const result = await runInference(env.ai, modelProfile.model_id as keyof AiModels, messages);
-
-  console.log('[AI] LLM call completed', {
-    model_id: modelProfile.model_id,
-    response_length: result.response.length,
-    response: result.response,
-  });
 
   return { response: result.response };
 }

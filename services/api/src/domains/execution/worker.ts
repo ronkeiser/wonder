@@ -19,12 +19,6 @@ export async function processWorkflowTask(
   },
 ): Promise<void> {
   const startTime = Date.now();
-  console.log('[Worker] Processing task', {
-    task_id: task.task_id,
-    workflow_run_id: task.workflow_run_id,
-    token_id: task.token_id,
-    node_id: task.node_id,
-  });
 
   try {
     // Load node to get action_id and mappings
@@ -68,19 +62,10 @@ export async function processWorkflowTask(
       completed_at: new Date().toISOString(),
     };
 
-    console.log('[Worker] Task completed successfully', {
-      task_id: task.task_id,
-      duration_ms: Date.now() - startTime,
-    });
-
     // Send result to DO
     await sendResultToDO(task.durable_object_id, result, env.WORKFLOW_COORDINATOR);
   } catch (err) {
     const errorMessage = err instanceof Error ? err.message : String(err);
-    console.error('[Worker] Task execution failed', {
-      task_id: task.task_id,
-      error: errorMessage,
-    });
 
     // Create failure result
     const result: WorkflowTaskResult = {
@@ -170,17 +155,7 @@ async function sendResultToDO(
     if (!response.ok) {
       throw new Error(`DO returned ${response.status}: ${await response.text()}`);
     }
-
-    console.log('[Worker] Result sent to DO', {
-      task_id: result.task_id,
-      durable_object_id: durableObjectId,
-    });
   } catch (err) {
-    console.error('[Worker] Failed to send result to DO', {
-      task_id: result.task_id,
-      durable_object_id: durableObjectId,
-      error: err instanceof Error ? err.message : String(err),
-    });
     throw err;
   }
 }

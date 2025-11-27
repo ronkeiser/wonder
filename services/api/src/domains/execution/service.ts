@@ -143,7 +143,6 @@ export async function startWorkflow(
     .then((response) => {
       if (!response.ok) {
         return response.text().then((errorText) => {
-          console.error('[DO ERROR]', response.status, errorText);
           ctx.logger.error('do_invocation_failed', {
             workflow_run_id: workflowRun.id,
             durable_object_id: durableObjectId,
@@ -152,14 +151,12 @@ export async function startWorkflow(
           });
         });
       }
-      console.log('[DO SUCCESS]', workflowRun.id);
       ctx.logger.info('do_invocation_succeeded', {
         workflow_run_id: workflowRun.id,
         durable_object_id: durableObjectId,
       });
     })
     .catch((err) => {
-      console.error('[DO EXCEPTION]', err);
       ctx.logger.error('do_invocation_exception', {
         workflow_run_id: workflowRun.id,
         durable_object_id: durableObjectId,

@@ -15,7 +15,7 @@ export async function handleFetch(
     return new Response('OK', { status: 200 });
   }
 
-  // Workflow start endpoint for testing
+  // Workflow start endpoint
   if (url.pathname === '/workflows/start' && request.method === 'POST') {
     try {
       const body = (await request.json()) as {
