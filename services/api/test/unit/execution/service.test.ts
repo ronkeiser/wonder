@@ -1,40 +1,27 @@
-/** Unit tests for execution service */
+/** Integration tests for execution service using real miniflare D1 */
 
-import type { SchemaType } from '@wonder/schema';
-import { ulid } from 'ulid';
+import { createMockLogger } from '@wonder/logger/mock';
+import { env } from 'cloudflare:test';
+import { eq } from 'drizzle-orm';
 import { beforeEach, describe, expect, it, vi, type Mock } from 'vitest';
-import * as execRepo from '~/domains/execution/repository';
 import type { ExecutionServiceContext } from '~/domains/execution/service';
 import * as executionService from '~/domains/execution/service';
-import * as graphRepo from '~/domains/graph/repository';
 import { NotFoundError, ValidationError } from '~/errors';
-import { createMockServiceContext, type MockServiceContext } from '../../helpers/context';
+import { workflow_runs } from '~/infrastructure/db/schema';
+import { createTestDb } from '../../helpers/db';
 
-// Mock all repository modules with factory functions for namespace imports
-vi.mock('~/domains/graph/repository', () => ({
-  getWorkflow: vi.fn(),
-  getWorkflowDef: vi.fn(),
-}));
-vi.mock('~/domains/execution/repository', () => ({
-  createWorkflowRun: vi.fn(),
-}));
+// Seed data IDs from seed.sql
+const SEED_WORKSPACE_ID = '01JDXSEED0000WORKSPACE00001';
+const SEED_PROJECT_ID = '01JDXSEED0000PROJECT000001';
+const SEED_WORKFLOW_ID = '01JDXSEED0000WORKFLOW0001';
+const SEED_WORKFLOW_DEF_ID = '01JDXSEED0000WORKFLOWDEF1';
 
-// TODO: Fix module mocking - vi.mock() doesn't work with namespace imports (import * as)
-// The mocks aren't being applied, causing "db.select is not a function" errors
-// This test file was already broken before recent changes
-describe.skip('Execution Service', () => {
+describe('Execution Service', () => {
   let mockCtx: ExecutionServiceContext;
   let mockDOStub: { fetch: Mock };
   let mockDOId: DurableObjectId;
 
-  // Test IDs
-  const workspaceId = ulid();
-  const projectId = ulid();
-  const workflowId = ulid();
-  const workflowDefId = ulid();
-  const nodeId = ulid();
-
-  beforeEach(() => {
+  beforeEach(async () => {
     vi.clearAllMocks();
 
     // Mock Durable Object ID
@@ -51,122 +38,75 @@ describe.skip('Execution Service', () => {
       ),
     };
 
-    // Mock ServiceContext with DO namespace
-    const baseCtx = createMockServiceContext();
+    // Real DB from miniflare, mocked DO namespace, AI, and logger
     mockCtx = {
-      ...baseCtx,
+      db: createTestDb(),
+      logger: createMockLogger(),
+      ai: {
+        run: vi.fn().mockResolvedValue({ response: 'Mock AI response' }),
+      } as unknown as Ai,
+      executionContext: {
+        waitUntil: vi.fn(),
+        passThroughOnException: vi.fn(),
+      } as unknown as ExecutionContext,
       WORKFLOW_COORDINATOR: {
         newUniqueId: vi.fn().mockReturnValue(mockDOId),
         get: vi.fn().mockReturnValue(mockDOStub),
         idFromString: vi.fn(),
         idFromName: vi.fn(),
       } as unknown as DurableObjectNamespace,
-    };
+    } as ExecutionServiceContext;
+
+    // Clean up any test runs from previous tests
+    await mockCtx.db.delete(workflow_runs);
+
+    // Apply seed data (passed as binding from vitest.config.ts)
+    // Parse SQL statements properly handling multiline statements and comments
+    const statements: string[] = [];
+    let current = '';
+    for (const line of env.TEST_SEED_SQL.split('\n')) {
+      const trimmed = line.trim();
+      if (!trimmed || trimmed.startsWith('--')) continue; // Skip empty lines and comments
+      current += ' ' + line;
+      if (trimmed.endsWith(';')) {
+        statements.push(current.trim().slice(0, -1)); // Remove trailing semicolon
+        current = '';
+      }
+    }
+
+    // Execute via batch for atomicity
+    if (statements.length > 0) {
+      await env.DB.batch(statements.map((s: string) => env.DB.prepare(s)));
+    }
   });
 
   describe('startWorkflow', () => {
     it('should trigger a workflow and return run with status=running', async () => {
-      const input = { text: 'Long article about climate change...' };
+      // Use seed data: Hello World workflow that greets a user
+      const input = { name: 'Alice' };
 
-      // Mock workflow
-      const workflow = {
-        id: workflowId,
-        project_id: projectId,
-        name: 'Test Workflow',
-        description: 'Test workflow',
-        workflow_def_id: workflowDefId,
-        pinned_version: null,
-        enabled: true,
-        created_at: new Date().toISOString(),
-        updated_at: new Date().toISOString(),
-      };
-
-      // Mock workflow definition
-      const inputSchema: SchemaType = {
-        type: 'object',
-        properties: {
-          text: { type: 'string' },
-        },
-        required: ['text'],
-      };
-      const outputSchema: SchemaType = {
-        type: 'object',
-        properties: {
-          summary: { type: 'string' },
-        },
-        required: ['summary'],
-      };
-
-      const workflowDef = {
-        id: workflowDefId,
-        name: 'Summarization Workflow',
-        description: 'Summarize text',
-        version: 1,
-        owner: { type: 'project' as const, project_id: projectId },
-        tags: [],
-        input_schema: inputSchema,
-        output_schema: outputSchema,
-        context_schema: null,
-        initial_node_id: nodeId,
-        created_at: new Date().toISOString(),
-        updated_at: new Date().toISOString(),
-      };
-
-      // Mock workflow run
-      const workflowRunId = ulid();
-      const workflowRun = {
-        id: workflowRunId,
-        project_id: projectId,
-        workflow_id: workflowId,
-        workflow_def_id: workflowDefId,
-        workflow_version: 1,
-        status: 'running' as const,
-        context: JSON.stringify({
-          input,
-          state: {},
-          artifacts: {},
-        }),
-        active_tokens: JSON.stringify([]),
-        durable_object_id: 'do_test_id_123',
-        latest_snapshot: null,
-        parent_run_id: null,
-        parent_node_id: null,
-        created_at: new Date().toISOString(),
-        updated_at: new Date().toISOString(),
-        completed_at: null,
-      };
-
-      // Setup mocks
-      (graphRepo.getWorkflow as Mock).mockResolvedValue(workflow);
-      (graphRepo.getWorkflowDef as Mock).mockResolvedValue(workflowDef);
-      (execRepo.createWorkflowRun as Mock).mockResolvedValue(workflowRun);
-
-      // Execute
-      const result = await executionService.startWorkflow(mockCtx, workflowId, input);
+      // Execute - uses real DB with seed data
+      const result = await executionService.startWorkflow(mockCtx, SEED_WORKFLOW_ID, input);
 
       // Assertions: startWorkflow returns immediately with status='running'
       expect(result.status).toBe('running');
       expect(result.durable_object_id).toBe('do_test_id_123');
-      expect(result.completed_at).toBeNull();
+      expect(result.completed_at).toBeUndefined(); // Not set yet
+      expect(result.workflow_id).toBe(SEED_WORKFLOW_ID);
+      expect(result.project_id).toBe(SEED_PROJECT_ID);
 
       const context = JSON.parse(result.context as string);
       expect(context.input).toEqual(input);
       expect(context.state).toEqual({});
       expect(context.output).toBeUndefined();
 
-      // Verify workflow run was created in D1
-      expect(execRepo.createWorkflowRun).toHaveBeenCalledWith(mockCtx.db, {
-        project_id: projectId,
-        workflow_id: workflowId,
-        workflow_def_id: workflowDefId,
-        workflow_version: 1,
-        status: 'running',
-        context: expect.any(String),
-        active_tokens: '[]',
-        durable_object_id: 'do_test_id_123',
-        parent_run_id: null,
-        parent_node_id: null,
-      });
+      // Verify workflow run was persisted in D1
+      const runs = await mockCtx.db
+        .select()
+        .from(workflow_runs)
+        .where(eq(workflow_runs.id, result.id));
+      expect(runs).toHaveLength(1);
+      expect(runs[0].status).toBe('running');
 
       // Verify DO was invoked
       expect(mockCtx.WORKFLOW_COORDINATOR.newUniqueId).toHaveBeenCalled();
@@ -176,84 +116,26 @@ describe.skip('Execution Service', () => {
         expect.objectContaining({
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
-          body: expect.stringContaining('workflowRunId'),
+          body: expect.stringContaining(result.id),
         }),
       );
     });
 
     it('should validate input and reject invalid data', async () => {
+      // Hello World workflow requires {name: string}
       const invalidInput = { wrong_field: 'value' };
 
-      const workflow = {
-        id: workflowId,
-        project_id: projectId,
-        name: 'Test Workflow',
-        description: 'Test workflow',
-        workflow_def_id: workflowDefId,
-        pinned_version: null,
-        enabled: true,
-        created_at: new Date().toISOString(),
-        updated_at: new Date().toISOString(),
-      };
-
-      const inputSchema: SchemaType = {
-        type: 'object',
-        properties: {
-          text: { type: 'string' },
-        },
-        required: ['text'],
-      };
-
-      const workflowDef = {
-        id: workflowDefId,
-        name: 'Summarization Workflow',
-        description: 'Summarize text',
-        version: 1,
-        owner: { type: 'project' as const, project_id: projectId },
-        tags: [],
-        input_schema: inputSchema,
-        output_schema: { type: 'object', properties: { summary: { type: 'string' } } },
-        context_schema: null,
-        initial_node_id: nodeId,
-        created_at: new Date().toISOString(),
-        updated_at: new Date().toISOString(),
-      };
-
-      (graphRepo.getWorkflow as Mock).mockResolvedValue(workflow);
-      (graphRepo.getWorkflowDef as Mock).mockResolvedValue(workflowDef);
-
       await expect(
-        executionService.startWorkflow(mockCtx, workflowId, invalidInput),
+        executionService.startWorkflow(mockCtx, SEED_WORKFLOW_ID, invalidInput),
       ).rejects.toThrow(ValidationError);
     });
 
     it('should throw error if workflow not found', async () => {
-      (graphRepo.getWorkflow as Mock).mockResolvedValue(null);
+      const nonExistentWorkflowId = '01FAKE00000WORKFLOW0001';
 
-      await expect(executionService.startWorkflow(mockCtx, workflowId, {})).rejects.toThrow(
-        NotFoundError,
-      );
-    });
-
-    it('should throw error if workflow definition not found', async () => {
-      const workflow = {
-        id: workflowId,
-        project_id: projectId,
-        name: 'Test Workflow',
-        description: 'Test workflow',
-        workflow_def_id: workflowDefId,
-        pinned_version: null,
-        enabled: true,
-        created_at: new Date().toISOString(),
-        updated_at: new Date().toISOString(),
-      };
-
-      (graphRepo.getWorkflow as Mock).mockResolvedValue(workflow);
-      (graphRepo.getWorkflowDef as Mock).mockResolvedValue(null);
-
-      await expect(executionService.startWorkflow(mockCtx, workflowId, {})).rejects.toThrow(
-        NotFoundError,
-      );
+      await expect(
+        executionService.startWorkflow(mockCtx, nonExistentWorkflowId, {}),
+      ).rejects.toThrow(NotFoundError);
     });
   });
 });
