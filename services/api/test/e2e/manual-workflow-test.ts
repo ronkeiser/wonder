@@ -1,6 +1,9 @@
 #!/usr/bin/env node
 /**
- * Manual E2E test: Run a workflow and stream events
+ * E2E test: Create a project, workflow, run it, and clean up
+ *
+ * This test creates all its own data and cleans up afterward,
+ * ensuring isolated test execution without seed data dependencies.
  *
  * Usage:
  *   pnpm --filter api e2e:workflow --name "Your Name"
@@ -59,28 +62,116 @@ async function main() {
   const name = args.name || 'CLI User';
   const baseUrl = args.url || 'https://wonder-http.ron-keiser.workers.dev';
 
-  console.log(`Starting workflow...`);
+  console.log(`E2E Test: Create → Run → Clean up`);
   console.log(`  Name: ${name}`);
   console.log(`  API: ${baseUrl}`);
   console.log('');
 
   const client = new WonderfulClient(baseUrl);
+  let projectId: string | undefined;
 
   try {
-    for await (const event of client.executeWorkflow({
-      workflow_id: '01JDXSEED0000WORKFLOW0001',
+    // Step 1: Get seed model profile (we still use seed data for model profiles)
+    console.log('📋 Fetching model profiles...');
+    const { profiles } = await client.modelProfiles.list({ provider: 'cloudflare' });
+    const modelProfile = profiles.find((p) => p.model_id === '@cf/meta/llama-3.1-8b-instruct');
+    if (!modelProfile) {
+      throw new Error('Seed model profile not found');
+    }
+    console.log(`  ✓ Using model profile: ${modelProfile.name}`);
+
+    // Step 2: Create test project
+    console.log('\n🏗️  Creating test project...');
+    const { project_id } = await client.projects.create({
+      workspace_id: '01JDXSEED0000WORKSPACE01',
+      name: `E2E Test ${Date.now()}`,
+      description: 'Temporary project for E2E testing',
+    });
+    projectId = project_id;
+    console.log(`  ✓ Created project: ${project_id}`);
+
+    // Step 3: Create prompt spec
+    console.log('\n📝 Creating prompt spec...');
+    const { prompt_spec_id } = await client.promptSpecs.create({
+      name: 'Hello Greeting',
+      template_language: 'handlebars',
+      user_template: 'Say hello to {{name}}',
+    });
+    console.log(`  ✓ Created prompt spec: ${prompt_spec_id}`);
+
+    // Step 4: Create LLM action
+    console.log('\n⚡ Creating action...');
+    const { action_id } = await client.actions.create({
+      name: 'Generate Greeting',
+      action_kind: 'llm_call',
+      config: {
+        prompt_spec_id,
+        model_profile_id: modelProfile.id,
+        response_schema: {
+          type: 'object',
+          properties: {
+            greeting: { type: 'string' },
+          },
+          required: ['greeting'],
+        },
+      },
+    });
+    console.log(`  ✓ Created action: ${action_id}`);
+
+    // Step 5: Create workflow definition
+    console.log('\n🔀 Creating workflow definition...');
+    const { workflow_def_id } = await client.workflowDefs.create({
+      owner: 'e2e_test',
+      name: 'E2E Test Workflow',
+      description: 'Temporary workflow for E2E testing',
+      nodes: [
+        {
+          local_id: 'greet',
+          action_id,
+          produces: { greeting: 'string' },
+        },
+      ],
+      transitions: [],
+    });
+    console.log(`  ✓ Created workflow def: ${workflow_def_id}`);
+
+    // Step 6: Create workflow binding
+    console.log('\n🔗 Creating workflow binding...');
+    const { workflow_id } = await client.workflows.create({
+      project_id,
+      workflow_def_id,
+      name: 'E2E Test Workflow Instance',
+      description: 'Temporary workflow instance for testing',
+    });
+    console.log(`  ✓ Created workflow: ${workflow_id}`);
+
+    // Step 7: Run workflow and stream events
+    console.log('\n▶️  Starting workflow execution...\n');
+    for await (const event of client.workflows.execute({
+      workflow_id,
       input: { name },
     })) {
       console.log(`[${event.kind}]`, JSON.stringify(event.payload, null, 2));
     }
 
     console.log('\n✓ Workflow completed successfully');
-
-    // WebSocket keeps the event loop alive, so we must explicitly exit
-    process.exit(0);
   } catch (error) {
     console.error('\n✗ Error:', error);
     process.exit(1);
+  } finally {
+    // Step 8: Clean up - delete project (cascades to all related data)
+    if (projectId) {
+      console.log('\n🧹 Cleaning up...');
+      try {
+        await client.projects.delete(projectId);
+        console.log(`  ✓ Deleted project: ${projectId}`);
+      } catch (error) {
+        console.error('  ✗ Failed to clean up:', error);
+      }
+    }
+
+    // WebSocket keeps the event loop alive, so we must explicitly exit
+    process.exit(0);
   }
 }
 
