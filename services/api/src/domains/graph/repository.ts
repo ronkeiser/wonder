@@ -48,7 +48,7 @@ type NewNodeRow = typeof nodes.$inferInsert;
 type Node = Omit<NodeRow, 'fan_in'> & {
   fan_in: FanIn;
 };
-type NewNode = Omit<NewNodeRow, 'id' | 'fan_in'> & {
+type NewNode = Omit<NewNodeRow, 'fan_in'> & {
   fan_in: FanIn;
 };
 
@@ -193,7 +193,6 @@ export async function getWorkflow(db: DrizzleD1Database, id: string): Promise<Wo
 export async function createNode(db: DrizzleD1Database, data: NewNode): Promise<Node> {
   const { fan_in, ...rest } = data;
   const row: NewNodeRow = {
-    id: ulid(),
     ...rest,
     fan_in: fromFanIn(fan_in),
   };
@@ -206,8 +205,23 @@ export async function createNode(db: DrizzleD1Database, data: NewNode): Promise<
   } as Node;
 }
 
-export async function getNode(db: DrizzleD1Database, id: string): Promise<Node | null> {
-  const row = await db.select().from(nodes).where(eq(nodes.id, id)).get();
+export async function getNode(
+  db: DrizzleD1Database,
+  workflow_def_id: string,
+  workflow_def_version: number,
+  id: string,
+): Promise<Node | null> {
+  const row = await db
+    .select()
+    .from(nodes)
+    .where(
+      and(
+        eq(nodes.workflow_def_id, workflow_def_id),
+        eq(nodes.workflow_def_version, workflow_def_version),
+        eq(nodes.id, id),
+      ),
+    )
+    .get();
   if (!row) return null;
 
   return {
@@ -219,12 +233,21 @@ export async function getNode(db: DrizzleD1Database, id: string): Promise<Node |
 export async function listNodesByWorkflowDef(
   db: DrizzleD1Database,
   workflow_def_id: string,
+  workflow_def_version?: number,
 ): Promise<Node[]> {
-  const rows = await db
-    .select()
-    .from(nodes)
-    .where(eq(nodes.workflow_def_id, workflow_def_id))
-    .all();
+  const query = workflow_def_version
+    ? db
+        .select()
+        .from(nodes)
+        .where(
+          and(
+            eq(nodes.workflow_def_id, workflow_def_id),
+            eq(nodes.workflow_def_version, workflow_def_version),
+          ),
+        )
+    : db.select().from(nodes).where(eq(nodes.workflow_def_id, workflow_def_id));
+
+  const rows = await query.all();
 
   return rows.map((row) => ({
     ...row,

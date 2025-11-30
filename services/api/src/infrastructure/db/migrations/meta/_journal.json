@@ -8,6 +8,13 @@
       "when": 1764243033456,
       "tag": "0000_parched_annihilus",
       "breakpoints": true
+    },
+    {
+      "idx": 1,
+      "version": "6",
+      "when": 1764500726767,
+      "tag": "0001_graceful_thunderbolt_ross",
+      "breakpoints": true
     }
   ]
 }

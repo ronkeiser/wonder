@@ -122,7 +122,7 @@ export const workflows = sqliteTable(
 export const nodes = sqliteTable(
   'nodes',
   {
-    id: text('id').primaryKey(),
+    id: text('id').notNull(),
     workflow_def_id: text('workflow_def_id').notNull(),
     workflow_def_version: integer('workflow_def_version').notNull(),
     name: text('name').notNull(),
@@ -143,6 +143,7 @@ export const nodes = sqliteTable(
     }),
   },
   (table) => [
+    primaryKey({ columns: [table.workflow_def_id, table.workflow_def_version, table.id] }),
     foreignKey({
       columns: [table.workflow_def_id, table.workflow_def_version],
       foreignColumns: [workflow_defs.id, workflow_defs.version],
@@ -158,12 +159,8 @@ export const transitions = sqliteTable(
     id: text('id').primaryKey(),
     workflow_def_id: text('workflow_def_id').notNull(),
     workflow_def_version: integer('workflow_def_version').notNull(),
-    from_node_id: text('from_node_id')
-      .notNull()
-      .references(() => nodes.id, { onDelete: 'cascade' }),
-    to_node_id: text('to_node_id')
-      .notNull()
-      .references(() => nodes.id, { onDelete: 'cascade' }),
+    from_node_id: text('from_node_id').notNull(),
+    to_node_id: text('to_node_id').notNull(),
     priority: integer('priority').notNull(),
 
     condition: text('condition', { mode: 'json' }), // structured or expression
@@ -175,6 +172,14 @@ export const transitions = sqliteTable(
       columns: [table.workflow_def_id, table.workflow_def_version],
       foreignColumns: [workflow_defs.id, workflow_defs.version],
     }),
+    foreignKey({
+      columns: [table.workflow_def_id, table.workflow_def_version, table.from_node_id],
+      foreignColumns: [nodes.workflow_def_id, nodes.workflow_def_version, nodes.id],
+    }).onDelete('cascade'),
+    foreignKey({
+      columns: [table.workflow_def_id, table.workflow_def_version, table.to_node_id],
+      foreignColumns: [nodes.workflow_def_id, nodes.workflow_def_version, nodes.id],
+    }).onDelete('cascade'),
     index('idx_transitions_workflow_def').on(table.workflow_def_id, table.workflow_def_version),
     index('idx_transitions_from_node').on(table.from_node_id),
     index('idx_transitions_to_node').on(table.to_node_id),
@@ -278,13 +283,17 @@ export const workflow_runs = sqliteTable(
     latest_snapshot: text('latest_snapshot', { mode: 'json' }), // Snapshot
 
     parent_run_id: text('parent_run_id'), // self-reference to workflow_runs.id (enforced at application level)
-    parent_node_id: text('parent_node_id').references(() => nodes.id),
+    parent_node_id: text('parent_node_id'),
 
     created_at: text('created_at').notNull(),
     updated_at: text('updated_at').notNull(),
     completed_at: text('completed_at'),
   },
   (table) => [
+    foreignKey({
+      columns: [table.workflow_def_id, table.workflow_version, table.parent_node_id],
+      foreignColumns: [nodes.workflow_def_id, nodes.workflow_def_version, nodes.id],
+    }),
     index('idx_workflow_runs_project').on(table.project_id),
     index('idx_workflow_runs_workflow').on(table.workflow_id),
     index('idx_workflow_runs_status').on(table.status),
@@ -364,11 +373,21 @@ export const artifacts = sqliteTable(
     created_by_workflow_run_id: text('created_by_workflow_run_id').references(
       () => workflow_runs.id,
     ),
-    created_by_node_id: text('created_by_node_id').references(() => nodes.id),
+    created_by_workflow_def_id: text('created_by_workflow_def_id'),
+    created_by_workflow_def_version: integer('created_by_workflow_def_version'),
+    created_by_node_id: text('created_by_node_id'),
 
     created_at: text('created_at').notNull(),
   },
   (table) => [
+    foreignKey({
+      columns: [
+        table.created_by_workflow_def_id,
+        table.created_by_workflow_def_version,
+        table.created_by_node_id,
+      ],
+      foreignColumns: [nodes.workflow_def_id, nodes.workflow_def_version, nodes.id],
+    }),
     index('idx_artifacts_project_type').on(table.project_id, table.type_id),
     index('idx_artifacts_workflow_run').on(table.created_by_workflow_run_id),
     index('idx_artifacts_created_at').on(table.created_at),
