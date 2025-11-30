@@ -5,7 +5,8 @@
   "services": [
     {
       "binding": "API",
-      "service": "wonder-api"
+      "service": "wonder-api",
+      "entrypoint": "WonderAPI"
     }
   ],
   "durable_objects": {
