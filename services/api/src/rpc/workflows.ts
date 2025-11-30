@@ -1,4 +1,5 @@
 import { startWorkflow } from '~/domains/execution/service';
+import * as graphRepo from '~/domains/graph/repository';
 import { Resource } from './resource';
 
 /**
@@ -6,6 +7,43 @@ import { Resource } from './resource';
  * Exposes workflow operations for RPC calls from web service
  */
 export class Workflows extends Resource {
+  /**
+   * Create a new workflow (binds a workflow_def to a project)
+   */
+  async create(data: {
+    project_id: string;
+    name: string;
+    description?: string;
+    workflow_def_id: string;
+    pinned_version?: number;
+    enabled?: boolean;
+  }) {
+    const workflow = await graphRepo.createWorkflow(this.serviceCtx.db, {
+      project_id: data.project_id,
+      name: data.name,
+      description: data.description || data.name,
+      workflow_def_id: data.workflow_def_id,
+      pinned_version: data.pinned_version ?? null,
+      enabled: data.enabled ?? true,
+    });
+
+    return {
+      workflow_id: workflow.id,
+      workflow,
+    };
+  }
+
+  /**
+   * Get a workflow by ID
+   */
+  async get(workflowId: string) {
+    const workflow = await graphRepo.getWorkflow(this.serviceCtx.db, workflowId);
+    if (!workflow) {
+      throw new Error(`Workflow not found: ${workflowId}`);
+    }
+    return { workflow };
+  }
+
   /**
    * Start a workflow execution
    */

@@ -7,6 +7,11 @@ import { WorkerEntrypoint } from 'cloudflare:workers';
 import type { WorkflowTask } from './domains/execution/definitions';
 import { handleFetch } from './handlers/fetch';
 import { handleQueue } from './handlers/queue';
+import { Actions } from './rpc/actions';
+import { ModelProfiles } from './rpc/model-profiles';
+import { Projects } from './rpc/projects';
+import { PromptSpecs } from './rpc/prompt-specs';
+import { WorkflowDefs } from './rpc/workflow-defs';
 import { Workflows } from './rpc/workflows';
 
 // Export Durable Objects (required for Workers runtime)
@@ -18,10 +23,45 @@ export { WorkflowCoordinator } from './domains/coordination';
  */
 export default class extends WorkerEntrypoint<Env> {
   /**
+   * RPC: Projects adapter
+   */
+  projects() {
+    return new Projects(this.env, this.ctx);
+  }
+
+  /**
+   * RPC: WorkflowDefs adapter
+   */
+  workflowDefs() {
+    return new WorkflowDefs(this.env, this.ctx);
+  }
+
+  /**
    * RPC: Workflows adapter
    */
   workflows() {
     return new Workflows(this.env, this.ctx);
+  }
+
+  /**
+   * RPC: Actions adapter
+   */
+  actions() {
+    return new Actions(this.env, this.ctx);
+  }
+
+  /**
+   * RPC: PromptSpecs adapter
+   */
+  promptSpecs() {
+    return new PromptSpecs(this.env, this.ctx);
+  }
+
+  /**
+   * RPC: ModelProfiles adapter
+   */
+  modelProfiles() {
+    return new ModelProfiles(this.env, this.ctx);
   }
 
   /**

@@ -1,0 +1,58 @@
+import * as effectsRepo from '~/domains/effects/repository';
+import { Resource } from './resource';
+
+/**
+ * Actions RPC resource
+ * Exposes action CRUD operations
+ */
+export class Actions extends Resource {
+  /**
+   * Create a new action
+   */
+  async create(data: {
+    name: string;
+    description: string;
+    kind:
+      | 'llm_call'
+      | 'mcp_tool'
+      | 'http_request'
+      | 'human_input'
+      | 'update_context'
+      | 'write_artifact'
+      | 'workflow_call'
+      | 'vector_search'
+      | 'emit_metric';
+    implementation: unknown;
+    requires?: unknown;
+    produces?: unknown;
+    execution?: unknown;
+    idempotency?: unknown;
+  }) {
+    const action = await effectsRepo.createAction(this.serviceCtx.db, {
+      name: data.name,
+      description: data.description,
+      kind: data.kind,
+      implementation: JSON.stringify(data.implementation),
+      requires: data.requires ? JSON.stringify(data.requires) : null,
+      produces: data.produces ? JSON.stringify(data.produces) : null,
+      execution: data.execution ? JSON.stringify(data.execution) : null,
+      idempotency: data.idempotency ? JSON.stringify(data.idempotency) : null,
+    });
+
+    return {
+      action_id: action.id,
+      action,
+    };
+  }
+
+  /**
+   * Get an action by ID
+   */
+  async get(actionId: string) {
+    const action = await effectsRepo.getAction(this.serviceCtx.db, actionId);
+    if (!action) {
+      throw new Error(`Action not found: ${actionId}`);
+    }
+    return { action };
+  }
+}
