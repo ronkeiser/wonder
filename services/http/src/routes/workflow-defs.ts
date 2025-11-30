@@ -54,7 +54,7 @@ const getWorkflowDefRoute = createRoute({
       id: ulid().openapi({ param: { name: 'id', in: 'path' } }),
     }),
     query: z.object({
-      version: z.string().optional().openapi({ param: { name: 'version', in: 'query' } }),
+      version: z.coerce.number().int().positive().optional().openapi({ param: { name: 'version', in: 'query' } }),
     }),
   },
   responses: {
@@ -73,7 +73,7 @@ workflowDefs.openapi(getWorkflowDefRoute, async (c) => {
   const { id } = c.req.valid('param');
   const { version } = c.req.valid('query');
   using workflowDefs = c.env.API.workflowDefs();
-  const result = await workflowDefs.get(id, version ? parseInt(version) : undefined);
+  const result = await workflowDefs.get(id, version);
   return c.json(result);
 });
 
