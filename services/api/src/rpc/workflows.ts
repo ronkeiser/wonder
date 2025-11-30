@@ -1,7 +1,5 @@
-import { eq } from 'drizzle-orm';
-import { startWorkflow } from '~/domains/execution/service';
+import * as executionService from '~/domains/execution/service';
 import * as graphService from '~/domains/graph/service';
-import { workflow_runs } from '~/infrastructure/db/schema';
 import { Resource } from './resource';
 
 /**
@@ -39,7 +37,7 @@ export class Workflows extends Resource {
    * Start a workflow execution
    */
   async start(workflowId: string, input: Record<string, unknown>) {
-    const workflowRun = await startWorkflow(this.serviceCtx, workflowId, input);
+    const workflowRun = await executionService.startWorkflow(this.serviceCtx, workflowId, input);
     return {
       workflow_run_id: workflowRun.id,
       durable_object_id: workflowRun.durable_object_id,
@@ -50,25 +48,8 @@ export class Workflows extends Resource {
    * Get workflow run status and output
    */
   async getWorkflowRun(workflowRunId: string) {
-    const result = await this.serviceCtx.db
-      .select({
-        id: workflow_runs.id,
-        workflow_id: workflow_runs.workflow_id,
-        status: workflow_runs.status,
-        context: workflow_runs.context,
-        created_at: workflow_runs.created_at,
-        updated_at: workflow_runs.updated_at,
-        completed_at: workflow_runs.completed_at,
-      })
-      .from(workflow_runs)
-      .where(eq(workflow_runs.id, workflowRunId))
-      .get();
-
-    if (!result) {
-      throw new Error(`Workflow run not found: ${workflowRunId}`);
-    }
-
-    return { workflow_run: result };
+    const workflowRun = await executionService.getWorkflowRun(this.serviceCtx, workflowRunId);
+    return { workflow_run: workflowRun };
   }
 
   /**

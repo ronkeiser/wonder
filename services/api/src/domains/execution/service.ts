@@ -177,3 +177,25 @@ export async function startWorkflow(
   // Execution continues asynchronously in DO
   return workflowRun;
 }
+
+/**
+ * Get a workflow run by ID
+ */
+export async function getWorkflowRun(
+  ctx: ServiceContext,
+  workflowRunId: string,
+): Promise<WorkflowRun> {
+  ctx.logger.info('workflow_run_get', { workflow_run_id: workflowRunId });
+
+  const workflowRun = await execRepo.getWorkflowRun(ctx.db, workflowRunId);
+  if (!workflowRun) {
+    ctx.logger.warn('workflow_run_not_found', { workflow_run_id: workflowRunId });
+    throw new NotFoundError(
+      `Workflow run not found: ${workflowRunId}`,
+      'workflow_run',
+      workflowRunId,
+    );
+  }
+
+  return workflowRun;
+}

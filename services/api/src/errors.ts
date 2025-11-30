@@ -14,6 +14,13 @@ export class NotFoundError extends Error {
   }
 }
 
+export class ConflictError extends Error {
+  constructor(message: string, public field?: string, public constraint?: string) {
+    super(message);
+    this.name = 'ConflictError';
+  }
+}
+
 /**
  * Extract meaningful error message from Drizzle/D1 errors
  */
@@ -74,26 +81,4 @@ export function extractDbError(error: unknown): {
   }
 
   return { message };
-}
-
-/**
- * Wrap an async operation with better error handling
- */
-export async function withDbErrorHandling<T>(
-  operation: () => Promise<T>,
-  context: string,
-): Promise<T> {
-  try {
-    return await operation();
-  } catch (error) {
-    const dbError = extractDbError(error);
-    const enhancedMessage = `${context}: ${dbError.message}`;
-
-    const enhancedError = new Error(enhancedMessage);
-    (enhancedError as any).constraint = dbError.constraint;
-    (enhancedError as any).field = dbError.field;
-    (enhancedError as any).originalError = error;
-
-    throw enhancedError;
-  }
 }

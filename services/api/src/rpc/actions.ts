@@ -1,5 +1,4 @@
-import * as effectsRepo from '~/domains/effects/repository';
-import { withDbErrorHandling } from '~/errors';
+import * as effectsService from '~/domains/effects/service';
 import { Resource } from './resource';
 
 /**
@@ -30,22 +29,7 @@ export class Actions extends Resource {
     execution?: unknown;
     idempotency?: unknown;
   }) {
-    const action = await withDbErrorHandling(
-      () =>
-        effectsRepo.createAction(this.serviceCtx.db, {
-          version: data.version,
-          name: data.name,
-          description: data.description ?? '',
-          kind: data.kind,
-          implementation: data.implementation,
-          requires: data.requires ?? null,
-          produces: data.produces ?? null,
-          execution: data.execution ?? null,
-          idempotency: data.idempotency ?? null,
-        }),
-      'Failed to create action',
-    );
-
+    const action = await effectsService.createAction(this.serviceCtx, data);
     return {
       action_id: action.id,
       action,
@@ -56,10 +40,7 @@ export class Actions extends Resource {
    * Get an action by ID
    */
   async get(actionId: string) {
-    const action = await effectsRepo.getAction(this.serviceCtx.db, actionId);
-    if (!action) {
-      throw new Error(`Action not found: ${actionId}`);
-    }
+    const action = await effectsService.getAction(this.serviceCtx, actionId);
     return { action };
   }
 
@@ -67,11 +48,7 @@ export class Actions extends Resource {
    * Delete an action
    */
   async delete(actionId: string) {
-    const action = await effectsRepo.getAction(this.serviceCtx.db, actionId);
-    if (!action) {
-      throw new Error(`Action not found: ${actionId}`);
-    }
-    await effectsRepo.deleteAction(this.serviceCtx.db, actionId);
+    await effectsService.deleteAction(this.serviceCtx, actionId);
     return { success: true };
   }
 }
