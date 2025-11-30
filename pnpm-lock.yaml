@@ -107,6 +107,9 @@ importers:
       '@cloudflare/vitest-pool-workers':
         specifier: ^0.10.11
         version: 0.10.11(@cloudflare/workers-types@4.20251127.0)(@vitest/runner@3.2.4)(@vitest/snapshot@3.2.4)(vitest@3.2.4)
+      hono:
+        specifier: ^4.10.7
+        version: 4.10.7
     devDependencies:
       typescript:
         specifier: ^5.9.3
@@ -1525,6 +1528,10 @@ packages:
 
   graceful-fs@4.2.11:
     resolution: {integrity: sha512-RbJ5/jmFcNNCcDV5o9eTnBLJ/HszWV0P73bc+Ff4nS/rJj+YaS6IGyiOL0VoBYX+l1Wrl3k63h/KrH+nhJ0XvQ==}
+
+  hono@4.10.7:
+    resolution: {integrity: sha512-icXIITfw/07Q88nLSkB9aiUrd8rYzSweK681Kjo/TSggaGbOX4RRyxxm71v+3PC8C/j+4rlxGeoTRxQDkaJkUw==}
+    engines: {node: '>=16.9.0'}
 
   is-arrayish@0.3.4:
     resolution: {integrity: sha512-m6UrgzFVUYawGBh1dUsWR5M2Clqic9RVXC/9f8ceNlv2IcO9j9J/z8UoCLPqtsPBFNzEpfR3xftohbfqDx8EQA==}
@@ -3000,6 +3007,8 @@ snapshots:
   glob-to-regexp@0.4.1: {}
 
   graceful-fs@4.2.11: {}
+
+  hono@4.10.7: {}
 
   is-arrayish@0.3.4: {}
 
