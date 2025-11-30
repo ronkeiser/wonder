@@ -51,8 +51,8 @@ export class ModelProfiles extends Resource {
       name: data.name,
       provider: data.provider,
       model_id: data.model_id,
-      parameters: data.parameters ? JSON.stringify(data.parameters) : null,
-      execution_config: data.execution_config ? JSON.stringify(data.execution_config) : null,
+      parameters: data.parameters ?? null,
+      execution_config: data.execution_config ?? null,
       cost_per_1k_input_tokens: data.cost_per_1k_input_tokens ?? 0,
       cost_per_1k_output_tokens: data.cost_per_1k_output_tokens ?? 0,
     });

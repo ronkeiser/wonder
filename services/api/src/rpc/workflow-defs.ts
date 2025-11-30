@@ -94,12 +94,12 @@ export class WorkflowDefs extends Resource {
         name: nodeData.name,
         action_id: nodeData.action_id,
         action_version: nodeData.action_version,
-        input_mapping: nodeData.input_mapping ? JSON.stringify(nodeData.input_mapping) : null,
-        output_mapping: nodeData.output_mapping ? JSON.stringify(nodeData.output_mapping) : null,
+        input_mapping: nodeData.input_mapping ?? null,
+        output_mapping: nodeData.output_mapping ?? null,
         fan_out: nodeData.fan_out ?? 'first_match',
         fan_in: nodeData.fan_in ?? 'any',
         joins_node: nodeData.joins_node_ref ? null : null, // Will be resolved in second pass
-        merge: nodeData.merge ? JSON.stringify(nodeData.merge) : null,
+        merge: nodeData.merge ?? null,
         on_early_complete: nodeData.on_early_complete ?? null,
       });
       refToIdMap.set(nodeData.ref, node.id);
@@ -133,11 +133,9 @@ export class WorkflowDefs extends Resource {
           from_node_id: refToIdMap.get(transitionData.from_node_ref)!,
           to_node_id: refToIdMap.get(transitionData.to_node_ref)!,
           priority: transitionData.priority,
-          condition: transitionData.condition ? JSON.stringify(transitionData.condition) : null,
-          foreach: transitionData.foreach ? JSON.stringify(transitionData.foreach) : null,
-          loop_config: transitionData.loop_config
-            ? JSON.stringify(transitionData.loop_config)
-            : null,
+          condition: transitionData.condition ?? null,
+          foreach: transitionData.foreach ?? null,
+          loop_config: transitionData.loop_config ?? null,
         });
       }
     }

@@ -28,10 +28,10 @@ export class PromptSpecs extends Resource {
       system_prompt: data.system_prompt ?? null,
       template: data.template,
       template_language: data.template_language ?? 'handlebars',
-      requires: JSON.stringify(data.requires ?? {}),
-      produces: JSON.stringify(data.produces ?? {}),
-      examples: data.examples ? JSON.stringify(data.examples) : null,
-      tags: data.tags ? JSON.stringify(data.tags) : null,
+      requires: data.requires ?? {},
+      produces: data.produces ?? {},
+      examples: data.examples ?? null,
+      tags: data.tags ?? null,
     });
 
     return {
