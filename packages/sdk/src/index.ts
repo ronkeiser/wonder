@@ -15,6 +15,7 @@ export type * from './types/projects';
 export type * from './types/prompt-specs';
 export type * from './types/workflow-defs';
 export type * from './types/workflows';
+export type * from './types/workspaces';
 
 // Resource imports
 import { ActionsResource } from './resources/actions';
@@ -23,8 +24,10 @@ import { ProjectsResource } from './resources/projects';
 import { PromptSpecsResource } from './resources/prompt-specs';
 import { WorkflowDefsResource } from './resources/workflow-defs';
 import { WorkflowsResource } from './resources/workflows';
+import { WorkspacesResource } from './resources/workspaces';
 
 export class WonderfulClient {
+  public readonly workspaces: WorkspacesResource;
   public readonly projects: ProjectsResource;
   public readonly actions: ActionsResource;
   public readonly promptSpecs: PromptSpecsResource;
@@ -33,6 +36,7 @@ export class WonderfulClient {
   public readonly workflows: WorkflowsResource;
 
   constructor(baseUrl: string) {
+    this.workspaces = new WorkspacesResource(baseUrl);
     this.projects = new ProjectsResource(baseUrl);
     this.actions = new ActionsResource(baseUrl);
     this.promptSpecs = new PromptSpecsResource(baseUrl);

@@ -68,38 +68,48 @@ async function main() {
   console.log('');
 
   const client = new WonderfulClient(baseUrl);
+  let workspaceId: string | undefined;
   let projectId: string | undefined;
 
   try {
-    // Step 1: Get seed model profile (we still use seed data for model profiles)
-    console.log('📋 Fetching model profiles...');
+    // Step 1: Create test workspace
+    console.log('🌍 Creating test workspace...');
+    const { workspace_id } = await client.workspaces.create({
+      name: `E2E Test Workspace ${Date.now()}`,
+    });
+    workspaceId = workspace_id;
+    console.log(`  ✓ Created workspace: ${workspace_id}`);
+
+    // Step 2: Get seed model profile (we still use seed data for model profiles)
+    console.log('\n📋 Fetching model profiles...');
     const { profiles } = await client.modelProfiles.list({ provider: 'cloudflare' });
-    const modelProfile = profiles.find((p) => p.model_id === '@cf/meta/llama-3.1-8b-instruct');
+    const modelProfile = profiles.find((p) => p.model_id === '@cf/meta/llama-3-8b-instruct');
     if (!modelProfile) {
       throw new Error('Seed model profile not found');
     }
     console.log(`  ✓ Using model profile: ${modelProfile.name}`);
 
-    // Step 2: Create test project
+    // Step 3: Create test project
     console.log('\n🏗️  Creating test project...');
     const { project_id } = await client.projects.create({
-      workspace_id: '01JDXSEED0000WORKSPACE01',
+      workspace_id,
       name: `E2E Test ${Date.now()}`,
       description: 'Temporary project for E2E testing',
     });
     projectId = project_id;
     console.log(`  ✓ Created project: ${project_id}`);
 
-    // Step 3: Create prompt spec
+    // Step 4: Create prompt spec
     console.log('\n📝 Creating prompt spec...');
     const { prompt_spec_id } = await client.promptSpecs.create({
       name: 'Hello Greeting',
+      description: 'A friendly greeting prompt',
       template_language: 'handlebars',
-      user_template: 'Say hello to {{name}}',
+      template: 'Say hello to {{name}}',
     });
     console.log(`  ✓ Created prompt spec: ${prompt_spec_id}`);
 
-    // Step 4: Create LLM action
+    // Step 5: Create LLM action
     console.log('\n⚡ Creating action...');
     const { action_id } = await client.actions.create({
       name: 'Generate Greeting',
@@ -118,7 +128,7 @@ async function main() {
     });
     console.log(`  ✓ Created action: ${action_id}`);
 
-    // Step 5: Create workflow definition
+    // Step 6: Create workflow definition
     console.log('\n🔀 Creating workflow definition...');
     const { workflow_def_id } = await client.workflowDefs.create({
       owner: 'e2e_test',
@@ -135,7 +145,7 @@ async function main() {
     });
     console.log(`  ✓ Created workflow def: ${workflow_def_id}`);
 
-    // Step 6: Create workflow binding
+    // Step 7: Create workflow binding
     console.log('\n🔗 Creating workflow binding...');
     const { workflow_id } = await client.workflows.create({
       project_id,
@@ -145,7 +155,7 @@ async function main() {
     });
     console.log(`  ✓ Created workflow: ${workflow_id}`);
 
-    // Step 7: Run workflow and stream events
+    // Step 8: Run workflow and stream events
     console.log('\n▶️  Starting workflow execution...\n');
     for await (const event of client.workflows.execute({
       workflow_id,
@@ -159,12 +169,12 @@ async function main() {
     console.error('\n✗ Error:', error);
     process.exit(1);
   } finally {
-    // Step 8: Clean up - delete project (cascades to all related data)
-    if (projectId) {
+    // Step 9: Clean up - delete workspace (cascades to projects and all related data)
+    if (workspaceId) {
       console.log('\n🧹 Cleaning up...');
       try {
-        await client.projects.delete(projectId);
-        console.log(`  ✓ Deleted project: ${projectId}`);
+        await client.workspaces.delete(workspaceId);
+        console.log(`  ✓ Deleted workspace: ${workspaceId}`);
       } catch (error) {
         console.error('  ✗ Failed to clean up:', error);
       }

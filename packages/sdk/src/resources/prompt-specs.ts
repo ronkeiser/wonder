@@ -13,7 +13,8 @@ export class PromptSpecsResource {
     });
 
     if (!response.ok) {
-      throw new Error(`Failed to create prompt spec: ${response.statusText}`);
+      const errorText = await response.text();
+      throw new Error(`Failed to create prompt spec: ${response.statusText} - ${errorText}`);
     }
 
     return (await response.json()) as { prompt_spec_id: string; prompt_spec: PromptSpec };

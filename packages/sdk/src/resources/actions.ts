@@ -11,7 +11,8 @@ export class ActionsResource {
     });
 
     if (!response.ok) {
-      throw new Error(`Failed to create action: ${response.statusText}`);
+      const errorText = await response.text();
+      throw new Error(`Failed to create action: ${response.statusText} - ${errorText}`);
     }
 
     return (await response.json()) as { action_id: string; action: Action };

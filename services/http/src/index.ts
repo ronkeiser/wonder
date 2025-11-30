@@ -12,6 +12,7 @@ import { projects } from './routes/projects';
 import { promptSpecs } from './routes/prompt-specs';
 import { workflowDefs } from './routes/workflow-defs';
 import { workflows } from './routes/workflows';
+import { workspaces } from './routes/workspaces';
 
 interface Env {
   API: any; // RPC binding to wonder-api
@@ -27,6 +28,7 @@ app.use('/*', cors());
 app.get('/health', (c) => c.text('OK'));
 
 // Mount resource routes
+app.route('/api/workspaces', workspaces);
 app.route('/api/projects', projects);
 app.route('/api/actions', actions);
 app.route('/api/prompt-specs', promptSpecs);

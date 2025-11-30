@@ -22,12 +22,12 @@ export class PromptSpecs extends Resource {
   }) {
     const promptSpec = await aiRepo.createPromptSpec(this.serviceCtx.db, {
       name: data.name,
-      description: data.description,
+      description: data.description ?? '',
       system_prompt: data.system_prompt ?? null,
       template: data.template,
       template_language: data.template_language ?? 'handlebars',
-      requires: data.requires ? JSON.stringify(data.requires) : null,
-      produces: data.produces ? JSON.stringify(data.produces) : null,
+      requires: JSON.stringify(data.requires ?? {}),
+      produces: JSON.stringify(data.produces ?? {}),
       examples: data.examples ? JSON.stringify(data.examples) : null,
       tags: data.tags ? JSON.stringify(data.tags) : null,
     });

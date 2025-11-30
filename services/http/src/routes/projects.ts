@@ -7,10 +7,22 @@ interface Env {
 export const projects = new Hono<{ Bindings: Env }>();
 
 projects.post('/', async (c) => {
-  using projects = c.env.API.projects();
-  const data = await c.req.json();
-  const result = await projects.create(data);
-  return c.json(result, 201);
+  try {
+    using projects = c.env.API.projects();
+    const data = await c.req.json();
+    const result = await projects.create(data);
+    return c.json(result, 201);
+  } catch (err) {
+    console.error('Failed to create project:', err);
+    return c.json(
+      {
+        error: 'Failed to create project',
+        message: err instanceof Error ? err.message : String(err),
+        stack: err instanceof Error ? err.stack : undefined,
+      },
+      500,
+    );
+  }
 });
 
 projects.get('/:id', async (c) => {

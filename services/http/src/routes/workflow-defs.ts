@@ -7,10 +7,22 @@ interface Env {
 export const workflowDefs = new Hono<{ Bindings: Env }>();
 
 workflowDefs.post('/', async (c) => {
-  using workflowDefs = c.env.API.workflowDefs();
-  const data = await c.req.json();
-  const result = await workflowDefs.create(data);
-  return c.json(result, 201);
+  try {
+    using workflowDefs = c.env.API.workflowDefs();
+    const data = await c.req.json();
+    const result = await workflowDefs.create(data);
+    return c.json(result, 201);
+  } catch (err) {
+    console.error('Failed to create workflow def:', err);
+    return c.json(
+      {
+        error: 'Failed to create workflow def',
+        message: err instanceof Error ? err.message : String(err),
+        stack: err instanceof Error ? err.stack : undefined,
+      },
+      500,
+    );
+  }
 });
 
 workflowDefs.get('/:id', async (c) => {

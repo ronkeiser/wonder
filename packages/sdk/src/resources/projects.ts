@@ -11,7 +11,8 @@ export class ProjectsResource {
     });
 
     if (!response.ok) {
-      throw new Error(`Failed to create project: ${response.statusText}`);
+      const errorText = await response.text();
+      throw new Error(`Failed to create project: ${response.statusText} - ${errorText}`);
     }
 
     return (await response.json()) as { project_id: string; project: Project };

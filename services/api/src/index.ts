@@ -13,6 +13,7 @@ import { Projects } from './rpc/projects';
 import { PromptSpecs } from './rpc/prompt-specs';
 import { WorkflowDefs } from './rpc/workflow-defs';
 import { Workflows } from './rpc/workflows';
+import { Workspaces } from './rpc/workspaces';
 
 // Export Durable Objects (required for Workers runtime)
 export { WorkflowCoordinator } from './domains/coordination';
@@ -22,6 +23,13 @@ export { WorkflowCoordinator } from './domains/coordination';
  * Handles HTTP requests, queue messages, and provides RPC methods
  */
 export default class extends WorkerEntrypoint<Env> {
+  /**
+   * RPC: Workspaces adapter
+   */
+  workspaces() {
+    return new Workspaces(this.env, this.ctx);
+  }
+
   /**
    * RPC: Projects adapter
    */
