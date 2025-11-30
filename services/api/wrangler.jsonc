@@ -1,10 +1,12 @@
 {
+  "$schema": "./node_modules/wrangler/config-schema.json",
   "name": "wonder-api",
   "main": "src/index.ts",
   "compatibility_date": "2025-11-25",
   "ai": {
     "binding": "AI"
   },
+
   "d1_databases": [
     {
       "binding": "DB",
@@ -53,5 +55,13 @@
         "dead_letter_queue": "workflow-tasks-dlq"
       }
     ]
+  },
+  "observability": {
+    "logs": {
+      "enabled": true,
+      "head_sampling_rate": 1,
+      "invocation_logs": false,
+      "persist": true
+    }
   }
 }

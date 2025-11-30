@@ -22,7 +22,7 @@ export { WorkflowCoordinator } from './domains/coordination';
  * Wonder API Entrypoint
  * Handles HTTP requests, queue messages, and provides RPC methods
  */
-export default class WonderAPI extends WorkerEntrypoint<Env> {
+class WonderAPI extends WorkerEntrypoint<Env> {
   /**
    * RPC: Workspaces adapter
    */
@@ -86,3 +86,7 @@ export default class WonderAPI extends WorkerEntrypoint<Env> {
     return handleQueue(batch, this.env);
   }
 }
+
+// Export as both named and default for service binding compatibility
+export { WonderAPI };
+export default WonderAPI;
