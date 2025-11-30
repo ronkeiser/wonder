@@ -1,5 +1,5 @@
 import { createRoute, OpenAPIHono, z } from '@hono/zod-openapi';
-import { ActionSchema, CreateActionSchema } from '../schemas.js';
+import { ActionSchema, CreateActionSchema, ulid } from '../schemas.js';
 
 interface Env {
   API: any;
@@ -43,7 +43,7 @@ const getActionRoute = createRoute({
   path: '/{id}',
   request: {
     params: z.object({
-      id: z.string().uuid().openapi({ param: { name: 'id', in: 'path' } }),
+      id: ulid().openapi({ param: { name: 'id', in: 'path' } }),
     }),
   },
   responses: {

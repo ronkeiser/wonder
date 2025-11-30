@@ -1,5 +1,5 @@
 import { createRoute, OpenAPIHono, z } from '@hono/zod-openapi';
-import { CreatePromptSpecSchema, PromptSpecSchema } from '../schemas.js';
+import { CreatePromptSpecSchema, PromptSpecSchema, ulid } from '../schemas.js';
 
 interface Env {
   API: any;
@@ -43,7 +43,7 @@ const getPromptSpecRoute = createRoute({
   path: '/{id}',
   request: {
     params: z.object({
-      id: z.string().uuid().openapi({ param: { name: 'id', in: 'path' } }),
+      id: ulid().openapi({ param: { name: 'id', in: 'path' } }),
     }),
   },
   responses: {

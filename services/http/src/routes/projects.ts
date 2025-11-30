@@ -1,5 +1,5 @@
 import { createRoute, OpenAPIHono, z } from '@hono/zod-openapi';
-import { CreateProjectSchema, ProjectSchema } from '../schemas.js';
+import { CreateProjectSchema, ProjectSchema, ulid } from '../schemas.js';
 
 interface Env {
   API: any;
@@ -43,7 +43,7 @@ const getProjectRoute = createRoute({
   path: '/{id}',
   request: {
     params: z.object({
-      id: z.string().uuid().openapi({ param: { name: 'id', in: 'path' } }),
+      id: ulid().openapi({ param: { name: 'id', in: 'path' } }),
     }),
   },
   responses: {
@@ -70,7 +70,7 @@ const deleteProjectRoute = createRoute({
   path: '/{id}',
   request: {
     params: z.object({
-      id: z.string().uuid().openapi({ param: { name: 'id', in: 'path' } }),
+      id: ulid().openapi({ param: { name: 'id', in: 'path' } }),
     }),
   },
   responses: {

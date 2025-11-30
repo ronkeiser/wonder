@@ -5,6 +5,13 @@
 
 import { z } from '@hono/zod-openapi';
 
+// ULID regex pattern: 26 characters, uppercase letters and digits (excludes I, L, O, U)
+const ulidRegex = /^[0-7][0-9A-HJKMNP-TV-Z]{25}$/;
+const ulid = () => z.string().regex(ulidRegex, 'Invalid ULID format');
+
+/** Export ULID validator for use in routes */
+export { ulid };
+
 /** Workspace Schemas */
 export const CreateWorkspaceSchema = z
   .object({
@@ -15,7 +22,7 @@ export const CreateWorkspaceSchema = z
 
 export const WorkspaceSchema = z
   .object({
-    id: z.string().uuid().openapi({ example: '550e8400-e29b-41d4-a716-446655440000' }),
+    id: ulid().openapi({ example: '01ARZ3NDEKTSV4RRFFQ69G5FAV' }),
     name: z.string().openapi({ example: 'My Workspace' }),
     settings: z.record(z.string(), z.unknown()).nullable(),
     created_at: z.string().openapi({ example: '2024-01-01T00:00:00Z' }),
@@ -26,7 +33,7 @@ export const WorkspaceSchema = z
 /** Project Schemas */
 export const CreateProjectSchema = z
   .object({
-    workspace_id: z.string().uuid().openapi({ example: '550e8400-e29b-41d4-a716-446655440000' }),
+    workspace_id: ulid().openapi({ example: '01ARZ3NDEKTSV4RRFFQ69G5FAV' }),
     name: z.string().min(1).max(255).openapi({ example: 'My Project' }),
     description: z.string().optional().openapi({ example: 'Project description' }),
     settings: z.record(z.string(), z.unknown()).optional().openapi({ example: {} }),
@@ -35,8 +42,8 @@ export const CreateProjectSchema = z
 
 export const ProjectSchema = z
   .object({
-    id: z.string().uuid(),
-    workspace_id: z.string().uuid(),
+    id: ulid(),
+    workspace_id: ulid(),
     name: z.string(),
     description: z.string().nullable(),
     settings: z.record(z.string(), z.unknown()).nullable(),
@@ -74,7 +81,7 @@ export const CreateActionSchema = z
 
 export const ActionSchema = z
   .object({
-    id: z.string().uuid(),
+    id: ulid(),
     name: z.string(),
     description: z.string(),
     version: z.number().int(),
@@ -117,7 +124,7 @@ export const CreatePromptSpecSchema = z
 
 export const PromptSpecSchema = z
   .object({
-    id: z.string().uuid(),
+    id: ulid(),
     name: z.string(),
     description: z.string(),
     version: z.number().int(),
@@ -150,7 +157,7 @@ export const CreateModelProfileSchema = z
 
 export const ModelProfileSchema = z
   .object({
-    id: z.string().uuid(),
+    id: ulid(),
     name: z.string(),
     provider: z.enum(['anthropic', 'openai', 'google', 'cloudflare', 'local']),
     model_id: z.string(),
@@ -169,11 +176,11 @@ export const CreateWorkflowDefSchema = z
     version: z.number().int().positive().default(1).openapi({ example: 1 }),
     owner: z
       .discriminatedUnion('type', [
-        z.object({ type: z.literal('project'), project_id: z.string().uuid() }),
-        z.object({ type: z.literal('library'), library_id: z.string().uuid() }),
+        z.object({ type: z.literal('project'), project_id: ulid() }),
+        z.object({ type: z.literal('library'), library_id: ulid() }),
       ])
       .openapi({
-        example: { type: 'project', project_id: '550e8400-e29b-41d4-a716-446655440000' },
+        example: { type: 'project', project_id: '01ARZ3NDEKTSV4RRFFQ69G5FAV' },
       }),
     tags: z.array(z.string()).optional(),
     input_schema: z.record(z.string(), z.unknown()).openapi({ example: { topic: 'string' } }),
@@ -185,12 +192,12 @@ export const CreateWorkflowDefSchema = z
 
 export const WorkflowDefSchema = z
   .object({
-    id: z.string().uuid(),
+    id: ulid(),
     name: z.string(),
     description: z.string(),
     version: z.number().int(),
     owner_type: z.enum(['project', 'library']),
-    owner_id: z.string().uuid(),
+    owner_id: ulid(),
     tags: z.record(z.string(), z.unknown()).nullable(),
     input_schema: z.record(z.string(), z.unknown()),
     output_schema: z.record(z.string(), z.unknown()),
@@ -200,3 +207,25 @@ export const WorkflowDefSchema = z
     updated_at: z.string(),
   })
   .openapi('WorkflowDef');
+
+/** Workflow (Binding) Schemas */
+export const CreateWorkflowSchema = z
+  .object({
+    project_id: ulid().openapi({ example: '01ARZ3NDEKTSV4RRFFQ69G5FAV' }),
+    workflow_def_id: ulid().openapi({ example: '01ARZ3NDEKTSV4RRFFQ69G5FAV' }),
+    name: z.string().min(1).max(255).openapi({ example: 'My Workflow Instance' }),
+    description: z.string().optional().openapi({ example: 'Production workflow instance' }),
+  })
+  .openapi('CreateWorkflow');
+
+export const WorkflowSchema = z
+  .object({
+    id: ulid(),
+    project_id: ulid(),
+    workflow_def_id: ulid(),
+    name: z.string(),
+    description: z.string().nullable(),
+    created_at: z.string(),
+    updated_at: z.string(),
+  })
+  .openapi('Workflow');

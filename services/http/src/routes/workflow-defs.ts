@@ -1,5 +1,5 @@
 import { createRoute, OpenAPIHono, z } from '@hono/zod-openapi';
-import { CreateWorkflowDefSchema, WorkflowDefSchema } from '../schemas.js';
+import { CreateWorkflowDefSchema, ulid, WorkflowDefSchema } from '../schemas.js';
 
 interface Env {
   API: any;
@@ -43,7 +43,7 @@ const getWorkflowDefRoute = createRoute({
   path: '/{id}',
   request: {
     params: z.object({
-      id: z.string().uuid().openapi({ param: { name: 'id', in: 'path' } }),
+      id: ulid().openapi({ param: { name: 'id', in: 'path' } }),
     }),
     query: z.object({
       version: z.string().optional().openapi({ param: { name: 'version', in: 'query' } }),

@@ -1,5 +1,5 @@
 import { createRoute, OpenAPIHono, z } from '@hono/zod-openapi';
-import { CreateWorkspaceSchema, WorkspaceSchema } from '../schemas.js';
+import { CreateWorkspaceSchema, ulid, WorkspaceSchema } from '../schemas.js';
 
 interface Env {
   API: any;
@@ -43,7 +43,7 @@ const getWorkspaceRoute = createRoute({
   path: '/{id}',
   request: {
     params: z.object({
-      id: z.string().uuid().openapi({ param: { name: 'id', in: 'path' }, example: '550e8400-e29b-41d4-a716-446655440000' }),
+      id: ulid().openapi({ param: { name: 'id', in: 'path' }, example: '01ARZ3NDEKTSV4RRFFQ69G5FAV' }),
     }),
   },
   responses: {
@@ -70,7 +70,7 @@ const deleteWorkspaceRoute = createRoute({
   path: '/{id}',
   request: {
     params: z.object({
-      id: z.string().uuid().openapi({ param: { name: 'id', in: 'path' } }),
+      id: ulid().openapi({ param: { name: 'id', in: 'path' } }),
     }),
   },
   responses: {

@@ -4,14 +4,17 @@
   "type": "module",
   "private": true,
   "scripts": {
-    "test": "tsx src/workflow-test.ts"
+    "test": "vitest run",
+    "test:watch": "vitest"
   },
   "dependencies": {
-    "@wonder/sdk": "workspace:*"
+    "@wonder/http": "workspace:*",
+    "hono": "^4.10.7"
   },
   "devDependencies": {
     "@types/node": "^24.10.1",
     "tsx": "^4.20.6",
-    "typescript": "^5.9.3"
+    "typescript": "^5.9.3",
+    "vitest": "^3.2.4"
   }
 }
