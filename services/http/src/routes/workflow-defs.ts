@@ -1,41 +1,97 @@
-import { Hono } from 'hono';
+import { createRoute, OpenAPIHono, z } from '@hono/zod-openapi';
+import { CreateWorkflowDefSchema, WorkflowDefSchema } from '../schemas.js';
 
 interface Env {
   API: any;
 }
 
-export const workflowDefs = new Hono<{ Bindings: Env }>();
+export const workflowDefs = new OpenAPIHono<{ Bindings: Env }>();
 
-workflowDefs.post('/', async (c) => {
-  try {
-    using workflowDefs = c.env.API.workflowDefs();
-    const data = await c.req.json();
-    const result = await workflowDefs.create(data);
-    return c.json(result, 201);
-  } catch (err) {
-    console.error('Failed to create workflow def:', err);
-    return c.json(
-      {
-        error: 'Failed to create workflow def',
-        message: err instanceof Error ? err.message : String(err),
-        stack: err instanceof Error ? err.stack : undefined,
+const createWorkflowDefRoute = createRoute({
+  method: 'post',
+  path: '/',
+  request: {
+    body: {
+      content: {
+        'application/json': {
+          schema: CreateWorkflowDefSchema,
+        },
       },
-      500,
-    );
-  }
+    },
+  },
+  responses: {
+    201: {
+      content: {
+        'application/json': {
+          schema: WorkflowDefSchema,
+        },
+      },
+      description: 'Workflow definition created successfully',
+    },
+  },
 });
 
-workflowDefs.get('/:id', async (c) => {
+workflowDefs.openapi(createWorkflowDefRoute, async (c) => {
+  const validated = c.req.valid('json');
   using workflowDefs = c.env.API.workflowDefs();
-  const id = c.req.param('id');
-  const version = c.req.query('version');
+  const result = await workflowDefs.create(validated);
+  return c.json(result, 201);
+});
+
+const getWorkflowDefRoute = createRoute({
+  method: 'get',
+  path: '/{id}',
+  request: {
+    params: z.object({
+      id: z.string().uuid().openapi({ param: { name: 'id', in: 'path' } }),
+    }),
+    query: z.object({
+      version: z.string().optional().openapi({ param: { name: 'version', in: 'query' } }),
+    }),
+  },
+  responses: {
+    200: {
+      content: {
+        'application/json': {
+          schema: WorkflowDefSchema,
+        },
+      },
+      description: 'Workflow definition retrieved successfully',
+    },
+  },
+});
+
+workflowDefs.openapi(getWorkflowDefRoute, async (c) => {
+  const { id } = c.req.valid('param');
+  const { version } = c.req.valid('query');
+  using workflowDefs = c.env.API.workflowDefs();
   const result = await workflowDefs.get(id, version ? parseInt(version) : undefined);
   return c.json(result);
 });
 
-workflowDefs.get('/owner/:owner', async (c) => {
+const listWorkflowDefsByOwnerRoute = createRoute({
+  method: 'get',
+  path: '/owner/{owner}',
+  request: {
+    params: z.object({
+      owner: z.string().openapi({ param: { name: 'owner', in: 'path' } }),
+    }),
+  },
+  responses: {
+    200: {
+      content: {
+        'application/json': {
+          schema: z.array(WorkflowDefSchema),
+        },
+      },
+      description: 'Workflow definitions retrieved successfully',
+    },
+  },
+});
+
+workflowDefs.openapi(listWorkflowDefsByOwnerRoute, async (c) => {
+  const { owner } = c.req.valid('param');
   using workflowDefs = c.env.API.workflowDefs();
-  const owner = c.req.param('owner');
   const result = await workflowDefs.listByOwner(owner);
   return c.json(result);
 });

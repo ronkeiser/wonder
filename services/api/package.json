@@ -1,8 +1,11 @@
 {
-  "name": "api",
+  "name": "@wonder/api",
   "private": true,
   "version": "0.0.1",
   "type": "module",
+  "exports": {
+    "./types": "./src/types.ts"
+  },
   "scripts": {
     "dev": "wrangler dev",
     "deploy": "wrangler deploy",
@@ -18,7 +21,6 @@
   "dependencies": {
     "@wonder/logger": "workspace:*",
     "@wonder/schema": "workspace:*",
-    "@wonder/sdk": "workspace:*",
     "drizzle-orm": "^0.44.7",
     "ulid": "^3.0.1"
   },

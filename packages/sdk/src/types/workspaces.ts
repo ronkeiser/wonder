@@ -1,11 +1,9 @@
-export interface Workspace {
-  id: string;
-  name: string;
-  settings?: unknown;
-  created_at: string;
-  updated_at: string;
-}
+import type { Workspace as DbWorkspace, NewWorkspace } from '@wonder/api/types';
 
+// Re-export canonical types from API
+export type Workspace = DbWorkspace;
+
+// Request type for creating workspaces (subset of NewWorkspace)
 export interface CreateWorkspaceRequest {
   name: string;
   settings?: unknown;

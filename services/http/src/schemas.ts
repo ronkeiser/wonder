@@ -1,0 +1,202 @@
+/**
+ * HTTP request validation schemas
+ * Derived from API base schemas but customized for HTTP layer needs
+ */
+
+import { z } from '@hono/zod-openapi';
+
+/** Workspace Schemas */
+export const CreateWorkspaceSchema = z
+  .object({
+    name: z.string().min(1).max(255).openapi({ example: 'My Workspace' }),
+    settings: z.record(z.string(), z.unknown()).optional().openapi({ example: {} }),
+  })
+  .openapi('CreateWorkspace');
+
+export const WorkspaceSchema = z
+  .object({
+    id: z.string().uuid().openapi({ example: '550e8400-e29b-41d4-a716-446655440000' }),
+    name: z.string().openapi({ example: 'My Workspace' }),
+    settings: z.record(z.string(), z.unknown()).nullable(),
+    created_at: z.string().openapi({ example: '2024-01-01T00:00:00Z' }),
+    updated_at: z.string().openapi({ example: '2024-01-01T00:00:00Z' }),
+  })
+  .openapi('Workspace');
+
+/** Project Schemas */
+export const CreateProjectSchema = z
+  .object({
+    workspace_id: z.string().uuid().openapi({ example: '550e8400-e29b-41d4-a716-446655440000' }),
+    name: z.string().min(1).max(255).openapi({ example: 'My Project' }),
+    description: z.string().optional().openapi({ example: 'Project description' }),
+    settings: z.record(z.string(), z.unknown()).optional().openapi({ example: {} }),
+  })
+  .openapi('CreateProject');
+
+export const ProjectSchema = z
+  .object({
+    id: z.string().uuid(),
+    workspace_id: z.string().uuid(),
+    name: z.string(),
+    description: z.string().nullable(),
+    settings: z.record(z.string(), z.unknown()).nullable(),
+    created_at: z.string(),
+    updated_at: z.string(),
+  })
+  .openapi('Project');
+
+/** Action Schemas */
+export const CreateActionSchema = z
+  .object({
+    name: z.string().min(1).max(255).openapi({ example: 'Generate Summary' }),
+    description: z.string().min(1).openapi({ example: 'Generates a summary using LLM' }),
+    version: z.number().int().positive().default(1).openapi({ example: 1 }),
+    kind: z
+      .enum([
+        'llm_call',
+        'mcp_tool',
+        'http_request',
+        'human_input',
+        'update_context',
+        'write_artifact',
+        'workflow_call',
+        'vector_search',
+        'emit_metric',
+      ])
+      .openapi({ example: 'llm_call' }),
+    implementation: z.record(z.string(), z.unknown()).openapi({ example: { model: 'gpt-4' } }),
+    requires: z.record(z.string(), z.unknown()).optional(),
+    produces: z.record(z.string(), z.unknown()).optional(),
+    execution: z.record(z.string(), z.unknown()).optional(),
+    idempotency: z.record(z.string(), z.unknown()).optional(),
+  })
+  .openapi('CreateAction');
+
+export const ActionSchema = z
+  .object({
+    id: z.string().uuid(),
+    name: z.string(),
+    description: z.string(),
+    version: z.number().int(),
+    kind: z.enum([
+      'llm_call',
+      'mcp_tool',
+      'http_request',
+      'human_input',
+      'update_context',
+      'write_artifact',
+      'workflow_call',
+      'vector_search',
+      'emit_metric',
+    ]),
+    implementation: z.record(z.string(), z.unknown()),
+    requires: z.record(z.string(), z.unknown()).nullable(),
+    produces: z.record(z.string(), z.unknown()).nullable(),
+    execution: z.record(z.string(), z.unknown()).nullable(),
+    idempotency: z.record(z.string(), z.unknown()).nullable(),
+    created_at: z.string(),
+    updated_at: z.string(),
+  })
+  .openapi('Action');
+
+/** Prompt Spec Schemas */
+export const CreatePromptSpecSchema = z
+  .object({
+    name: z.string().min(1).max(255).openapi({ example: 'Summarization Prompt' }),
+    description: z.string().min(1).openapi({ example: 'Prompt for summarizing text' }),
+    version: z.number().int().positive().default(1).openapi({ example: 1 }),
+    system_prompt: z.string().optional().openapi({ example: 'You are a helpful assistant.' }),
+    template: z.string().min(1).openapi({ example: 'Summarize: {{text}}' }),
+    template_language: z.enum(['handlebars', 'jinja2']).openapi({ example: 'handlebars' }),
+    requires: z.record(z.string(), z.unknown()).openapi({ example: { text: 'string' } }),
+    produces: z.record(z.string(), z.unknown()).openapi({ example: { summary: 'string' } }),
+    examples: z.array(z.unknown()).optional(),
+    tags: z.array(z.string()).optional(),
+  })
+  .openapi('CreatePromptSpec');
+
+export const PromptSpecSchema = z
+  .object({
+    id: z.string().uuid(),
+    name: z.string(),
+    description: z.string(),
+    version: z.number().int(),
+    system_prompt: z.string().nullable(),
+    template: z.string(),
+    template_language: z.enum(['handlebars', 'jinja2']),
+    requires: z.record(z.string(), z.unknown()),
+    produces: z.record(z.string(), z.unknown()),
+    examples: z.record(z.string(), z.unknown()).nullable(),
+    tags: z.record(z.string(), z.unknown()).nullable(),
+    created_at: z.string(),
+    updated_at: z.string(),
+  })
+  .openapi('PromptSpec');
+
+/** Model Profile Schemas */
+export const CreateModelProfileSchema = z
+  .object({
+    name: z.string().min(1).max(255).openapi({ example: 'GPT-4 Default' }),
+    provider: z
+      .enum(['anthropic', 'openai', 'google', 'cloudflare', 'local'])
+      .openapi({ example: 'openai' }),
+    model_id: z.string().min(1).openapi({ example: 'gpt-4' }),
+    parameters: z.record(z.string(), z.unknown()).openapi({ example: { temperature: 0.7 } }),
+    execution_config: z.record(z.string(), z.unknown()).optional(),
+    cost_per_1k_input_tokens: z.number().nonnegative().openapi({ example: 0.03 }),
+    cost_per_1k_output_tokens: z.number().nonnegative().openapi({ example: 0.06 }),
+  })
+  .openapi('CreateModelProfile');
+
+export const ModelProfileSchema = z
+  .object({
+    id: z.string().uuid(),
+    name: z.string(),
+    provider: z.enum(['anthropic', 'openai', 'google', 'cloudflare', 'local']),
+    model_id: z.string(),
+    parameters: z.record(z.string(), z.unknown()),
+    execution_config: z.record(z.string(), z.unknown()).nullable(),
+    cost_per_1k_input_tokens: z.number(),
+    cost_per_1k_output_tokens: z.number(),
+  })
+  .openapi('ModelProfile');
+
+/** Workflow Definition Schemas */
+export const CreateWorkflowDefSchema = z
+  .object({
+    name: z.string().min(1).max(255).openapi({ example: 'Content Generation Pipeline' }),
+    description: z.string().min(1).openapi({ example: 'Generates and reviews content' }),
+    version: z.number().int().positive().default(1).openapi({ example: 1 }),
+    owner: z
+      .discriminatedUnion('type', [
+        z.object({ type: z.literal('project'), project_id: z.string().uuid() }),
+        z.object({ type: z.literal('library'), library_id: z.string().uuid() }),
+      ])
+      .openapi({
+        example: { type: 'project', project_id: '550e8400-e29b-41d4-a716-446655440000' },
+      }),
+    tags: z.array(z.string()).optional(),
+    input_schema: z.record(z.string(), z.unknown()).openapi({ example: { topic: 'string' } }),
+    output_schema: z.record(z.string(), z.unknown()).openapi({ example: { content: 'string' } }),
+    context_schema: z.record(z.string(), z.unknown()).optional(),
+    initial_node_id: z.string().min(1).openapi({ example: 'node-1' }),
+  })
+  .openapi('CreateWorkflowDef');
+
+export const WorkflowDefSchema = z
+  .object({
+    id: z.string().uuid(),
+    name: z.string(),
+    description: z.string(),
+    version: z.number().int(),
+    owner_type: z.enum(['project', 'library']),
+    owner_id: z.string().uuid(),
+    tags: z.record(z.string(), z.unknown()).nullable(),
+    input_schema: z.record(z.string(), z.unknown()),
+    output_schema: z.record(z.string(), z.unknown()),
+    context_schema: z.record(z.string(), z.unknown()).nullable(),
+    initial_node_id: z.string(),
+    created_at: z.string(),
+    updated_at: z.string(),
+  })
+  .openapi('WorkflowDef');

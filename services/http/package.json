@@ -14,6 +14,8 @@
   },
   "dependencies": {
     "@cloudflare/vitest-pool-workers": "^0.10.11",
-    "hono": "^4.10.7"
+    "@hono/zod-openapi": "^1.1.5",
+    "hono": "^4.10.7",
+    "zod": "^4.1.13"
   }
 }

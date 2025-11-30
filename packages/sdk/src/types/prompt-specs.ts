@@ -1,27 +1,17 @@
-export interface PromptSpec {
-  id: string;
-  name: string;
-  description: string;
-  version: number;
-  template_language: 'handlebars' | 'jinja2';
-  system_prompt: string | null;
-  template: string;
-  requires: unknown | null;
-  produces: unknown | null;
-  examples: unknown | null;
-  tags: string[] | null;
-  created_at: string;
-  updated_at: string;
-}
+import type { PromptSpec as DbPromptSpec, NewPromptSpec } from '@wonder/api/types';
 
+// Re-export canonical types from API
+export type PromptSpec = DbPromptSpec;
+
+// Request type for creating prompt specs (subset of NewPromptSpec)
 export interface CreatePromptSpecRequest {
   name: string;
   description?: string;
-  template_language: 'handlebars' | 'jinja2';
+  template_language?: NewPromptSpec['template_language'];
   system_prompt?: string;
   template: string;
   requires?: unknown;
   produces?: unknown;
   examples?: unknown;
-  tags?: string[];
+  tags?: unknown;
 }

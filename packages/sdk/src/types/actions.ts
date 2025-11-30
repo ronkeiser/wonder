@@ -1,14 +1,16 @@
-export interface Action {
-  id: string;
-  name: string;
-  action_kind: 'llm_call' | 'mcp_tool' | 'http_request' | 'js_function' | 'subworkflow';
-  config: unknown;
-  created_at: string;
-  updated_at: string;
-}
+import type { Action as DbAction, NewAction } from '@wonder/api/types';
 
+// Re-export canonical types from API
+export type Action = DbAction;
+
+// Request type for creating actions (subset of NewAction)
 export interface CreateActionRequest {
   name: string;
-  action_kind: 'llm_call' | 'mcp_tool' | 'http_request' | 'js_function' | 'subworkflow';
-  config: unknown;
+  description?: string;
+  kind: NewAction['kind'];
+  implementation: unknown;
+  requires?: unknown;
+  produces?: unknown;
+  execution?: unknown;
+  idempotency?: unknown;
 }

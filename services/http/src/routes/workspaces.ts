@@ -1,62 +1,93 @@
-import { Hono } from 'hono';
+import { createRoute, OpenAPIHono, z } from '@hono/zod-openapi';
+import { CreateWorkspaceSchema, WorkspaceSchema } from '../schemas.js';
 
 interface Env {
   API: any;
 }
 
-export const workspaces = new Hono<{ Bindings: Env }>();
+export const workspaces = new OpenAPIHono<{ Bindings: Env }>();
 
-workspaces.post('/', async (c) => {
-  try {
-    using workspaces = c.env.API.workspaces();
-    const data = await c.req.json();
-    const result = await workspaces.create(data);
-    return c.json(result, 201);
-  } catch (err) {
-    console.error('Failed to create workspace:', err);
-    return c.json(
-      {
-        error: 'Failed to create workspace',
-        message: err instanceof Error ? err.message : String(err),
-        stack: err instanceof Error ? err.stack : undefined,
+const createWorkspaceRoute = createRoute({
+  method: 'post',
+  path: '/',
+  request: {
+    body: {
+      content: {
+        'application/json': {
+          schema: CreateWorkspaceSchema,
+        },
       },
-      500,
-    );
-  }
+    },
+  },
+  responses: {
+    201: {
+      content: {
+        'application/json': {
+          schema: WorkspaceSchema,
+        },
+      },
+      description: 'Workspace created successfully',
+    },
+  },
 });
 
-workspaces.get('/:id', async (c) => {
-  try {
-    using workspaces = c.env.API.workspaces();
-    const id = c.req.param('id');
-    const result = await workspaces.get(id);
-    return c.json(result);
-  } catch (err) {
-    console.error('Failed to get workspace:', err);
-    return c.json(
-      {
-        error: 'Failed to get workspace',
-        message: err instanceof Error ? err.message : String(err),
-      },
-      500,
-    );
-  }
+workspaces.openapi(createWorkspaceRoute, async (c) => {
+  const validated = c.req.valid('json');
+  using workspaces = c.env.API.workspaces();
+  const result = await workspaces.create(validated);
+  return c.json(result, 201);
 });
 
-workspaces.delete('/:id', async (c) => {
-  try {
-    using workspaces = c.env.API.workspaces();
-    const id = c.req.param('id');
-    await workspaces.delete(id);
-    return c.json({ success: true });
-  } catch (err) {
-    console.error('Failed to delete workspace:', err);
-    return c.json(
-      {
-        error: 'Failed to delete workspace',
-        message: err instanceof Error ? err.message : String(err),
+const getWorkspaceRoute = createRoute({
+  method: 'get',
+  path: '/{id}',
+  request: {
+    params: z.object({
+      id: z.string().uuid().openapi({ param: { name: 'id', in: 'path' }, example: '550e8400-e29b-41d4-a716-446655440000' }),
+    }),
+  },
+  responses: {
+    200: {
+      content: {
+        'application/json': {
+          schema: WorkspaceSchema,
+        },
       },
-      500,
-    );
-  }
+      description: 'Workspace retrieved successfully',
+    },
+  },
+});
+
+workspaces.openapi(getWorkspaceRoute, async (c) => {
+  const { id } = c.req.valid('param');
+  using workspaces = c.env.API.workspaces();
+  const result = await workspaces.get(id);
+  return c.json(result);
+});
+
+const deleteWorkspaceRoute = createRoute({
+  method: 'delete',
+  path: '/{id}',
+  request: {
+    params: z.object({
+      id: z.string().uuid().openapi({ param: { name: 'id', in: 'path' } }),
+    }),
+  },
+  responses: {
+    200: {
+      content: {
+        'application/json': {
+          schema: z.object({ success: z.boolean() }),
+        },
+      },
+      description: 'Workspace deleted successfully',
+    },
+  },
+});
+
+workspaces.openapi(deleteWorkspaceRoute, async (c) => {
+  const { id } = c.req.valid('param');
+  using workspaces = c.env.API.workspaces();
+  await workspaces.delete(id);
+  return c.json({ success: true });
 });

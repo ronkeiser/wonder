@@ -1,4 +1,5 @@
 import * as effectsRepo from '~/domains/effects/repository';
+import { withDbErrorHandling } from '~/errors';
 import { Resource } from './resource';
 
 /**
@@ -11,7 +12,7 @@ export class Actions extends Resource {
    */
   async create(data: {
     name: string;
-    description: string;
+    description?: string;
     kind:
       | 'llm_call'
       | 'mcp_tool'
@@ -28,16 +29,20 @@ export class Actions extends Resource {
     execution?: unknown;
     idempotency?: unknown;
   }) {
-    const action = await effectsRepo.createAction(this.serviceCtx.db, {
-      name: data.name,
-      description: data.description,
-      kind: data.kind,
-      implementation: JSON.stringify(data.implementation),
-      requires: data.requires ? JSON.stringify(data.requires) : null,
-      produces: data.produces ? JSON.stringify(data.produces) : null,
-      execution: data.execution ? JSON.stringify(data.execution) : null,
-      idempotency: data.idempotency ? JSON.stringify(data.idempotency) : null,
-    });
+    const action = await withDbErrorHandling(
+      () =>
+        effectsRepo.createAction(this.serviceCtx.db, {
+          name: data.name,
+          description: data.description ?? '',
+          kind: data.kind,
+          implementation: JSON.stringify(data.implementation),
+          requires: data.requires ? JSON.stringify(data.requires) : null,
+          produces: data.produces ? JSON.stringify(data.produces) : null,
+          execution: data.execution ? JSON.stringify(data.execution) : null,
+          idempotency: data.idempotency ? JSON.stringify(data.idempotency) : null,
+        }),
+      'Failed to create action',
+    );
 
     return {
       action_id: action.id,

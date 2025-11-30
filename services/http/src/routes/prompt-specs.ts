@@ -1,33 +1,66 @@
-import { Hono } from 'hono';
+import { createRoute, OpenAPIHono, z } from '@hono/zod-openapi';
+import { CreatePromptSpecSchema, PromptSpecSchema } from '../schemas.js';
 
 interface Env {
   API: any;
 }
 
-export const promptSpecs = new Hono<{ Bindings: Env }>();
+export const promptSpecs = new OpenAPIHono<{ Bindings: Env }>();
 
-promptSpecs.post('/', async (c) => {
-  try {
-    using promptSpecs = c.env.API.promptSpecs();
-    const data = await c.req.json();
-    const result = await promptSpecs.create(data);
-    return c.json(result, 201);
-  } catch (err) {
-    console.error('Failed to create prompt spec:', err);
-    return c.json(
-      {
-        error: 'Failed to create prompt spec',
-        message: err instanceof Error ? err.message : String(err),
-        stack: err instanceof Error ? err.stack : undefined,
+const createPromptSpecRoute = createRoute({
+  method: 'post',
+  path: '/',
+  request: {
+    body: {
+      content: {
+        'application/json': {
+          schema: CreatePromptSpecSchema,
+        },
       },
-      500,
-    );
-  }
+    },
+  },
+  responses: {
+    201: {
+      content: {
+        'application/json': {
+          schema: PromptSpecSchema,
+        },
+      },
+      description: 'Prompt spec created successfully',
+    },
+  },
 });
 
-promptSpecs.get('/:id', async (c) => {
+promptSpecs.openapi(createPromptSpecRoute, async (c) => {
+  const validated = c.req.valid('json');
   using promptSpecs = c.env.API.promptSpecs();
-  const id = c.req.param('id');
+  const result = await promptSpecs.create(validated);
+  return c.json(result, 201);
+});
+
+const getPromptSpecRoute = createRoute({
+  method: 'get',
+  path: '/{id}',
+  request: {
+    params: z.object({
+      id: z.string().uuid().openapi({ param: { name: 'id', in: 'path' } }),
+    }),
+  },
+  responses: {
+    200: {
+      content: {
+        'application/json': {
+          schema: PromptSpecSchema,
+        },
+      },
+      description: 'Prompt spec retrieved successfully',
+    },
+  },
+});
+
+promptSpecs.openapi(getPromptSpecRoute, async (c) => {
+  const { id } = c.req.valid('param');
+  using promptSpecs = c.env.API.promptSpecs();
   const result = await promptSpecs.get(id);
   return c.json(result);
 });

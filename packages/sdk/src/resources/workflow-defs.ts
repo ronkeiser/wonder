@@ -13,7 +13,8 @@ export class WorkflowDefsResource {
     });
 
     if (!response.ok) {
-      throw new Error(`Failed to create workflow def: ${response.statusText}`);
+      const errorText = await response.text();
+      throw new Error(`Failed to create workflow def: ${response.statusText} - ${errorText}`);
     }
 
     return (await response.json()) as { workflow_def_id: string; workflow_def: WorkflowDef };
