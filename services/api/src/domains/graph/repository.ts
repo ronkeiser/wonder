@@ -53,7 +53,7 @@ type NewNode = Omit<NewNodeRow, 'fan_in'> & {
 };
 
 type Transition = typeof transitions.$inferSelect;
-type NewTransition = Omit<typeof transitions.$inferInsert, 'id'>;
+type NewTransition = typeof transitions.$inferInsert;
 
 /** Workspace */
 
@@ -261,13 +261,8 @@ export async function createTransition(
   db: DrizzleD1Database,
   data: NewTransition,
 ): Promise<Transition> {
-  const transition = {
-    id: ulid(),
-    ...data,
-  };
-
-  await db.insert(transitions).values(transition).run();
-  return transition as Transition;
+  await db.insert(transitions).values(data).run();
+  return data as Transition;
 }
 
 export async function listTransitionsByWorkflowDef(

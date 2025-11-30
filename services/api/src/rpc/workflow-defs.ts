@@ -31,6 +31,7 @@ export class WorkflowDefs extends Resource {
       on_early_complete?: 'cancel' | 'abandon' | 'allow_late_merge';
     }>;
     transitions?: Array<{
+      id: string;
       from_node_id: string;
       to_node_id: string;
       priority: number;
@@ -77,6 +78,7 @@ export class WorkflowDefs extends Resource {
     if (data.transitions) {
       for (const transitionData of data.transitions) {
         await graphRepo.createTransition(this.serviceCtx.db, {
+          id: transitionData.id,
           workflow_def_id: workflowDef.id,
           workflow_def_version: workflowDef.version,
           from_node_id: transitionData.from_node_id,

@@ -156,7 +156,7 @@ export const nodes = sqliteTable(
 export const transitions = sqliteTable(
   'transitions',
   {
-    id: text('id').primaryKey(),
+    id: text('id').notNull(),
     workflow_def_id: text('workflow_def_id').notNull(),
     workflow_def_version: integer('workflow_def_version').notNull(),
     from_node_id: text('from_node_id').notNull(),
@@ -168,6 +168,7 @@ export const transitions = sqliteTable(
     loop_config: text('loop_config', { mode: 'json' }),
   },
   (table) => [
+    primaryKey({ columns: [table.workflow_def_id, table.workflow_def_version, table.id] }),
     foreignKey({
       columns: [table.workflow_def_id, table.workflow_def_version],
       foreignColumns: [workflow_defs.id, workflow_defs.version],
