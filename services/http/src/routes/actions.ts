@@ -36,7 +36,7 @@ actions.openapi(createActionRoute, async (c) => {
   const validated = c.req.valid('json');
   using actions = c.env.API.actions();
   const result = await actions.create(validated);
-  return c.json(result, 201);
+  return c.json(result.action, 201);
 });
 
 const getActionRoute = createRoute({
@@ -64,5 +64,5 @@ actions.openapi(getActionRoute, async (c) => {
   const { id } = c.req.valid('param');
   using actions = c.env.API.actions();
   const result = await actions.get(id);
-  return c.json(result);
+  return c.json(result.action);
 });
