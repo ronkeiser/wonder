@@ -1,5 +1,9 @@
 import { createRoute, OpenAPIHono, z } from '@hono/zod-openapi';
-import { ActionSchema, CreateActionSchema, ulid } from '../schemas.js';
+import {
+    ActionCreateResponseSchema,
+    ActionGetResponseSchema,
+    CreateActionSchema,
+} from '../schemas.js';
 
 interface Env {
   API: any;
@@ -24,7 +28,7 @@ const createActionRoute = createRoute({
     201: {
       content: {
         'application/json': {
-          schema: ActionSchema,
+          schema: ActionCreateResponseSchema,
         },
       },
       description: 'Action created successfully',
@@ -36,7 +40,7 @@ actions.openapi(createActionRoute, async (c) => {
   const validated = c.req.valid('json');
   using actions = c.env.API.actions();
   const result = await actions.create(validated);
-  return c.json(result.action, 201);
+  return c.json(result, 201);
 });
 
 const getActionRoute = createRoute({
@@ -52,7 +56,7 @@ const getActionRoute = createRoute({
     200: {
       content: {
         'application/json': {
-          schema: ActionSchema,
+          schema: ActionGetResponseSchema,
         },
       },
       description: 'Action retrieved successfully',
@@ -64,7 +68,7 @@ actions.openapi(getActionRoute, async (c) => {
   const { id } = c.req.valid('param');
   using actions = c.env.API.actions();
   const result = await actions.get(id);
-  return c.json(result.action);
+  return c.json(result);
 });
 
 const deleteActionRoute = createRoute({

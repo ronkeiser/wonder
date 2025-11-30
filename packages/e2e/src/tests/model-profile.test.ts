@@ -4,7 +4,7 @@ import { client } from '../client';
 describe('ModelProfile API', () => {
   it('should create and retrieve a model profile', async () => {
     // Create model profile
-    const { data: profile, error: createError } = await client.POST('/api/model-profiles', {
+    const { data: createResponse, error: createError } = await client.POST('/api/model-profiles', {
       body: {
         name: `Test Model ${Date.now()}`,
         provider: 'anthropic',
@@ -19,26 +19,29 @@ describe('ModelProfile API', () => {
     });
 
     expect(createError).toBeUndefined();
-    expect(profile).toBeDefined();
-    expect(profile!.id).toBeDefined();
-    expect(profile!.name).toContain('Test Model');
-    expect(profile!.provider).toBe('anthropic');
-    expect(profile!.model_id).toBe('claude-3-5-sonnet-20241022');
+    expect(createResponse).toBeDefined();
+    expect(createResponse!.model_profile_id).toBeDefined();
+    expect(createResponse!.model_profile).toBeDefined();
+    expect(createResponse!.model_profile.id).toBeDefined();
+    expect(createResponse!.model_profile.name).toContain('Test Model');
+    expect(createResponse!.model_profile.provider).toBe('anthropic');
+    expect(createResponse!.model_profile.model_id).toBe('claude-3-5-sonnet-20241022');
 
     // Get model profile
-    const { data: retrieved, error: getError } = await client.GET('/api/model-profiles/{id}', {
-      params: { path: { id: profile!.id } },
+    const { data: getResponse, error: getError } = await client.GET('/api/model-profiles/{id}', {
+      params: { path: { id: createResponse!.model_profile.id } },
     });
     expect(getError).toBeUndefined();
-    expect(retrieved).toBeDefined();
-    expect(retrieved!.id).toBe(profile!.id);
-    expect(retrieved!.provider).toBe('anthropic');
+    expect(getResponse).toBeDefined();
+    expect(getResponse!.model_profile).toBeDefined();
+    expect(getResponse!.model_profile.id).toBe(createResponse!.model_profile.id);
+    expect(getResponse!.model_profile.provider).toBe('anthropic');
 
     // Delete model profile
     const { data: deleteResult, error: deleteError } = await client.DELETE(
       '/api/model-profiles/{id}',
       {
-        params: { path: { id: profile!.id } },
+        params: { path: { id: createResponse!.model_profile.id } },
       },
     );
     expect(deleteError).toBeUndefined();

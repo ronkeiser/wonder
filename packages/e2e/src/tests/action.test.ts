@@ -5,7 +5,7 @@ describe('Action API', () => {
   it('should create and retrieve an action', async () => {
     // Create action
     const actionId = `test-action-${Date.now()}`;
-    const { data: action, error: createError } = await client.POST('/api/actions', {
+    const { data: createResponse, error: createError } = await client.POST('/api/actions', {
       body: {
         id: actionId,
         name: `Test Action ${Date.now()}`,
@@ -25,26 +25,29 @@ describe('Action API', () => {
       },
     });
     expect(createError).toBeUndefined();
-    expect(action).toBeDefined();
-    expect(action!.id).toBeDefined();
-    expect(action!.name).toContain('Test Action');
-    expect(action!.kind).toBe('llm_call');
-    expect(action!.version).toBe(1);
+    expect(createResponse).toBeDefined();
+    expect(createResponse!.action_id).toBeDefined();
+    expect(createResponse!.action).toBeDefined();
+    expect(createResponse!.action.id).toBeDefined();
+    expect(createResponse!.action.name).toContain('Test Action');
+    expect(createResponse!.action.kind).toBe('llm_call');
+    expect(createResponse!.action.version).toBe(1);
 
     // Get action
-    const { data: retrieved, error: getError } = await client.GET('/api/actions/{id}', {
-      params: { path: { id: action!.id } },
+    const { data: getResponse, error: getError } = await client.GET('/api/actions/{id}', {
+      params: { path: { id: createResponse!.action.id } },
     });
 
     expect(getError).toBeUndefined();
-    expect(retrieved).toBeDefined();
-    expect(retrieved!.id).toBe(action!.id);
-    expect(retrieved!.name).toBe(action!.name);
-    expect(retrieved!.kind).toBe('llm_call');
+    expect(getResponse).toBeDefined();
+    expect(getResponse!.action).toBeDefined();
+    expect(getResponse!.action.id).toBe(createResponse!.action.id);
+    expect(getResponse!.action.name).toBe(createResponse!.action.name);
+    expect(getResponse!.action.kind).toBe('llm_call');
 
     // Delete action
     const { data: deleteResult, error: deleteError } = await client.DELETE('/api/actions/{id}', {
-      params: { path: { id: action!.id } },
+      params: { path: { id: createResponse!.action.id } },
     });
     expect(deleteError).toBeUndefined();
     expect(deleteResult?.success).toBe(true);

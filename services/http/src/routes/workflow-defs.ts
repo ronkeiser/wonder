@@ -1,5 +1,11 @@
 import { createRoute, OpenAPIHono, z } from '@hono/zod-openapi';
-import { CreateWorkflowDefSchema, ulid, WorkflowDefSchema } from '../schemas.js';
+import {
+    CreateWorkflowDefSchema,
+    ulid,
+    WorkflowDefCreateResponseSchema,
+    WorkflowDefGetResponseSchema,
+    WorkflowDefSchema,
+} from '../schemas.js';
 
 interface Env {
   API: any;
@@ -24,7 +30,7 @@ const createWorkflowDefRoute = createRoute({
     201: {
       content: {
         'application/json': {
-          schema: WorkflowDefSchema,
+          schema: WorkflowDefCreateResponseSchema,
         },
       },
       description: 'Workflow definition created successfully',
@@ -36,7 +42,7 @@ workflowDefs.openapi(createWorkflowDefRoute, async (c) => {
   const validated = c.req.valid('json');
   using workflowDefs = c.env.API.workflowDefs();
   const result = await workflowDefs.create(validated);
-  return c.json(result.workflow_def, 201);
+  return c.json(result, 201);
 });
 
 const getWorkflowDefRoute = createRoute({
@@ -55,7 +61,7 @@ const getWorkflowDefRoute = createRoute({
     200: {
       content: {
         'application/json': {
-          schema: WorkflowDefSchema,
+          schema: WorkflowDefGetResponseSchema,
         },
       },
       description: 'Workflow definition retrieved successfully',
@@ -68,7 +74,7 @@ workflowDefs.openapi(getWorkflowDefRoute, async (c) => {
   const { version } = c.req.valid('query');
   using workflowDefs = c.env.API.workflowDefs();
   const result = await workflowDefs.get(id, version ? parseInt(version) : undefined);
-  return c.json(result.workflow_def);
+  return c.json(result);
 });
 
 const listWorkflowDefsByOwnerRoute = createRoute({

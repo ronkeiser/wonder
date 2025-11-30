@@ -4,34 +4,39 @@ import { client } from '../client';
 describe('Project API', () => {
   it('should create and delete a project', async () => {
     // Create workspace first
-    const { data: workspace, error: workspaceError } = await client.POST('/api/workspaces', {
-      body: {
-        name: `Test Workspace ${Date.now()}`,
+    const { data: workspaceResponse, error: workspaceError } = await client.POST(
+      '/api/workspaces',
+      {
+        body: {
+          name: `Test Workspace ${Date.now()}`,
+        },
       },
-    });
+    );
 
     expect(workspaceError).toBeUndefined();
-    expect(workspace).toBeDefined();
-    expect(workspace!.id).toBeDefined();
+    expect(workspaceResponse).toBeDefined();
+    expect(workspaceResponse!.workspace.id).toBeDefined();
 
     // Create project
-    const { data: project, error: createError } = await client.POST('/api/projects', {
+    const { data: projectResponse, error: createError } = await client.POST('/api/projects', {
       body: {
-        workspace_id: workspace!.id,
+        workspace_id: workspaceResponse!.workspace.id,
         name: `Test Project ${Date.now()}`,
         description: 'E2E test project',
       },
     });
 
     expect(createError).toBeUndefined();
-    expect(project).toBeDefined();
-    expect(project!.id).toBeDefined();
-    expect(project!.name).toContain('Test Project');
-    expect(project!.workspace_id).toBe(workspace!.id);
+    expect(projectResponse).toBeDefined();
+    expect(projectResponse!.project_id).toBeDefined();
+    expect(projectResponse!.project).toBeDefined();
+    expect(projectResponse!.project.id).toBeDefined();
+    expect(projectResponse!.project.name).toContain('Test Project');
+    expect(projectResponse!.project.workspace_id).toBe(workspaceResponse!.workspace.id);
 
     // Delete project
     const { data: deleteResult, error: deleteError } = await client.DELETE('/api/projects/{id}', {
-      params: { path: { id: project!.id } },
+      params: { path: { id: projectResponse!.project.id } },
     });
 
     expect(deleteError).toBeUndefined();
@@ -39,7 +44,7 @@ describe('Project API', () => {
 
     // Clean up workspace
     await client.DELETE('/api/workspaces/{id}', {
-      params: { path: { id: workspace!.id } },
+      params: { path: { id: workspaceResponse!.workspace.id } },
     });
   });
 });

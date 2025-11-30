@@ -1,5 +1,9 @@
 import { createRoute, OpenAPIHono, z } from '@hono/zod-openapi';
-import { CreatePromptSpecSchema, PromptSpecSchema, ulid } from '../schemas.js';
+import {
+    CreatePromptSpecSchema,
+    PromptSpecCreateResponseSchema,
+    PromptSpecGetResponseSchema,
+} from '../schemas.js';
 
 interface Env {
   API: any;
@@ -24,7 +28,7 @@ const createPromptSpecRoute = createRoute({
     201: {
       content: {
         'application/json': {
-          schema: PromptSpecSchema,
+          schema: PromptSpecCreateResponseSchema,
         },
       },
       description: 'Prompt spec created successfully',
@@ -36,7 +40,7 @@ promptSpecs.openapi(createPromptSpecRoute, async (c) => {
   const validated = c.req.valid('json');
   using promptSpecs = c.env.API.promptSpecs();
   const result = await promptSpecs.create(validated);
-  return c.json(result.prompt_spec, 201);
+  return c.json(result, 201);
 });
 
 const getPromptSpecRoute = createRoute({
@@ -52,7 +56,7 @@ const getPromptSpecRoute = createRoute({
     200: {
       content: {
         'application/json': {
-          schema: PromptSpecSchema,
+          schema: PromptSpecGetResponseSchema,
         },
       },
       description: 'Prompt spec retrieved successfully',
@@ -64,7 +68,7 @@ promptSpecs.openapi(getPromptSpecRoute, async (c) => {
   const { id } = c.req.valid('param');
   using promptSpecs = c.env.API.promptSpecs();
   const result = await promptSpecs.get(id);
-  return c.json(result.prompt_spec);
+  return c.json(result);
 });
 
 const deletePromptSpecRoute = createRoute({

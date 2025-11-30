@@ -1,5 +1,10 @@
 import { createRoute, OpenAPIHono, z } from '@hono/zod-openapi';
-import { CreateProjectSchema, ProjectSchema, ulid } from '../schemas.js';
+import {
+    CreateProjectSchema,
+    ProjectCreateResponseSchema,
+    ProjectGetResponseSchema,
+    ulid,
+} from '../schemas.js';
 
 interface Env {
   API: any;
@@ -24,7 +29,7 @@ const createProjectRoute = createRoute({
     201: {
       content: {
         'application/json': {
-          schema: ProjectSchema,
+          schema: ProjectCreateResponseSchema,
         },
       },
       description: 'Project created successfully',
@@ -36,7 +41,7 @@ projects.openapi(createProjectRoute, async (c) => {
   const validated = c.req.valid('json');
   using projects = c.env.API.projects();
   const result = await projects.create(validated);
-  return c.json(result.project, 201);
+  return c.json(result, 201);
 });
 
 const getProjectRoute = createRoute({
@@ -52,7 +57,7 @@ const getProjectRoute = createRoute({
     200: {
       content: {
         'application/json': {
-          schema: ProjectSchema,
+          schema: ProjectGetResponseSchema,
         },
       },
       description: 'Project retrieved successfully',
@@ -64,7 +69,7 @@ projects.openapi(getProjectRoute, async (c) => {
   const { id } = c.req.valid('param');
   using projects = c.env.API.projects();
   const result = await projects.get(id);
-  return c.json(result.project);
+  return c.json(result);
 });
 
 const deleteProjectRoute = createRoute({

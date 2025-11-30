@@ -30,6 +30,19 @@ export const WorkspaceSchema = z
   })
   .openapi('Workspace');
 
+export const WorkspaceCreateResponseSchema = z
+  .object({
+    workspace_id: ulid(),
+    workspace: WorkspaceSchema,
+  })
+  .openapi('WorkspaceCreateResponse');
+
+export const WorkspaceGetResponseSchema = z
+  .object({
+    workspace: WorkspaceSchema,
+  })
+  .openapi('WorkspaceGetResponse');
+
 /** Project Schemas */
 export const CreateProjectSchema = z
   .object({
@@ -51,6 +64,19 @@ export const ProjectSchema = z
     updated_at: z.string(),
   })
   .openapi('Project');
+
+export const ProjectCreateResponseSchema = z
+  .object({
+    project_id: ulid(),
+    project: ProjectSchema,
+  })
+  .openapi('ProjectCreateResponse');
+
+export const ProjectGetResponseSchema = z
+  .object({
+    project: ProjectSchema,
+  })
+  .openapi('ProjectGetResponse');
 
 /** Action Schemas */
 export const CreateActionSchema = z
@@ -107,6 +133,19 @@ export const ActionSchema = z
   })
   .openapi('Action');
 
+export const ActionCreateResponseSchema = z
+  .object({
+    action_id: z.string(),
+    action: ActionSchema,
+  })
+  .openapi('ActionCreateResponse');
+
+export const ActionGetResponseSchema = z
+  .object({
+    action: ActionSchema,
+  })
+  .openapi('ActionGetResponse');
+
 /** Prompt Spec Schemas */
 export const CreatePromptSpecSchema = z
   .object({
@@ -142,6 +181,19 @@ export const PromptSpecSchema = z
   })
   .openapi('PromptSpec');
 
+export const PromptSpecCreateResponseSchema = z
+  .object({
+    prompt_spec_id: z.string(),
+    prompt_spec: PromptSpecSchema,
+  })
+  .openapi('PromptSpecCreateResponse');
+
+export const PromptSpecGetResponseSchema = z
+  .object({
+    prompt_spec: PromptSpecSchema,
+  })
+  .openapi('PromptSpecGetResponse');
+
 /** Model Profile Schemas */
 export const CreateModelProfileSchema = z
   .object({
@@ -169,6 +221,19 @@ export const ModelProfileSchema = z
     cost_per_1k_output_tokens: z.number(),
   })
   .openapi('ModelProfile');
+
+export const ModelProfileCreateResponseSchema = z
+  .object({
+    model_profile_id: ulid(),
+    model_profile: ModelProfileSchema,
+  })
+  .openapi('ModelProfileCreateResponse');
+
+export const ModelProfileGetResponseSchema = z
+  .object({
+    model_profile: ModelProfileSchema,
+  })
+  .openapi('ModelProfileGetResponse');
 
 /** Workflow Definition Schemas */
 export const CreateWorkflowDefSchema = z
@@ -237,6 +302,21 @@ export const WorkflowDefSchema = z
   })
   .openapi('WorkflowDef');
 
+export const WorkflowDefCreateResponseSchema = z
+  .object({
+    workflow_def_id: ulid(),
+    workflow_def: WorkflowDefSchema,
+  })
+  .openapi('WorkflowDefCreateResponse');
+
+export const WorkflowDefGetResponseSchema = z
+  .object({
+    workflow_def: WorkflowDefSchema,
+    nodes: z.array(z.unknown()),
+    transitions: z.array(z.unknown()),
+  })
+  .openapi('WorkflowDefGetResponse');
+
 /** Workflow (Binding) Schemas */
 export const CreateWorkflowSchema = z
   .object({
@@ -258,3 +338,16 @@ export const WorkflowSchema = z
     updated_at: z.string(),
   })
   .openapi('Workflow');
+
+export const WorkflowCreateResponseSchema = z
+  .object({
+    workflow_id: ulid(),
+    workflow: WorkflowSchema,
+  })
+  .openapi('WorkflowCreateResponse');
+
+export const WorkflowGetResponseSchema = z
+  .object({
+    workflow: WorkflowSchema,
+  })
+  .openapi('WorkflowGetResponse');

@@ -21,7 +21,7 @@ export class ModelProfiles extends Resource {
       profiles = await this.serviceCtx.db.select().from(model_profiles).all();
     }
 
-    return { profiles };
+    return { model_profiles: profiles };
   }
 
   /**
@@ -32,7 +32,7 @@ export class ModelProfiles extends Resource {
     if (!profile) {
       throw new Error(`ModelProfile not found: ${modelProfileId}`);
     }
-    return { profile };
+    return { model_profile: profile };
   }
 
   /**
@@ -59,7 +59,7 @@ export class ModelProfiles extends Resource {
 
     return {
       model_profile_id: profile.id,
-      profile,
+      model_profile: profile,
     };
   }
 

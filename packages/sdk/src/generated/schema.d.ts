@@ -32,7 +32,7 @@ export interface paths {
                         [name: string]: unknown;
                     };
                     content: {
-                        "application/json": components["schemas"]["Workspace"];
+                        "application/json": components["schemas"]["WorkspaceCreateResponse"];
                     };
                 };
             };
@@ -67,7 +67,7 @@ export interface paths {
                         [name: string]: unknown;
                     };
                     content: {
-                        "application/json": components["schemas"]["Workspace"];
+                        "application/json": components["schemas"]["WorkspaceGetResponse"];
                     };
                 };
             };
@@ -131,7 +131,7 @@ export interface paths {
                         [name: string]: unknown;
                     };
                     content: {
-                        "application/json": components["schemas"]["Project"];
+                        "application/json": components["schemas"]["ProjectCreateResponse"];
                     };
                 };
             };
@@ -166,7 +166,7 @@ export interface paths {
                         [name: string]: unknown;
                     };
                     content: {
-                        "application/json": components["schemas"]["Project"];
+                        "application/json": components["schemas"]["ProjectGetResponse"];
                     };
                 };
             };
@@ -230,7 +230,7 @@ export interface paths {
                         [name: string]: unknown;
                     };
                     content: {
-                        "application/json": components["schemas"]["Action"];
+                        "application/json": components["schemas"]["ActionCreateResponse"];
                     };
                 };
             };
@@ -265,7 +265,7 @@ export interface paths {
                         [name: string]: unknown;
                     };
                     content: {
-                        "application/json": components["schemas"]["Action"];
+                        "application/json": components["schemas"]["ActionGetResponse"];
                     };
                 };
             };
@@ -329,7 +329,7 @@ export interface paths {
                         [name: string]: unknown;
                     };
                     content: {
-                        "application/json": components["schemas"]["PromptSpec"];
+                        "application/json": components["schemas"]["PromptSpecCreateResponse"];
                     };
                 };
             };
@@ -364,7 +364,7 @@ export interface paths {
                         [name: string]: unknown;
                     };
                     content: {
-                        "application/json": components["schemas"]["PromptSpec"];
+                        "application/json": components["schemas"]["PromptSpecGetResponse"];
                     };
                 };
             };
@@ -425,7 +425,7 @@ export interface paths {
                     };
                     content: {
                         "application/json": {
-                            profiles: components["schemas"]["ModelProfile"][];
+                            model_profiles: components["schemas"]["ModelProfile"][];
                         };
                     };
                 };
@@ -451,7 +451,7 @@ export interface paths {
                         [name: string]: unknown;
                     };
                     content: {
-                        "application/json": components["schemas"]["ModelProfile"];
+                        "application/json": components["schemas"]["ModelProfileCreateResponse"];
                     };
                 };
             };
@@ -486,7 +486,7 @@ export interface paths {
                         [name: string]: unknown;
                     };
                     content: {
-                        "application/json": components["schemas"]["ModelProfile"];
+                        "application/json": components["schemas"]["ModelProfileGetResponse"];
                     };
                 };
             };
@@ -550,7 +550,7 @@ export interface paths {
                         [name: string]: unknown;
                     };
                     content: {
-                        "application/json": components["schemas"]["WorkflowDef"];
+                        "application/json": components["schemas"]["WorkflowDefCreateResponse"];
                     };
                 };
             };
@@ -587,7 +587,7 @@ export interface paths {
                         [name: string]: unknown;
                     };
                     content: {
-                        "application/json": components["schemas"]["WorkflowDef"];
+                        "application/json": components["schemas"]["WorkflowDefGetResponse"];
                     };
                 };
             };
@@ -665,7 +665,7 @@ export interface paths {
                         [name: string]: unknown;
                     };
                     content: {
-                        "application/json": components["schemas"]["Workflow"];
+                        "application/json": components["schemas"]["WorkflowCreateResponse"];
                     };
                 };
             };
@@ -700,7 +700,7 @@ export interface paths {
                         [name: string]: unknown;
                     };
                     content: {
-                        "application/json": components["schemas"]["Workflow"];
+                        "application/json": components["schemas"]["WorkflowGetResponse"];
                     };
                 };
             };
@@ -775,6 +775,10 @@ export interface components {
             /** @example 2024-01-01T00:00:00Z */
             updated_at: string;
         };
+        WorkspaceCreateResponse: {
+            workspace_id: string;
+            workspace: components["schemas"]["Workspace"];
+        };
         CreateWorkspace: {
             /** @example My Workspace */
             name: string;
@@ -782,6 +786,9 @@ export interface components {
             settings?: {
                 [key: string]: unknown;
             };
+        };
+        WorkspaceGetResponse: {
+            workspace: components["schemas"]["Workspace"];
         };
         Project: {
             id: string;
@@ -794,6 +801,10 @@ export interface components {
             created_at: string;
             updated_at: string;
         };
+        ProjectCreateResponse: {
+            project_id: string;
+            project: components["schemas"]["Project"];
+        };
         CreateProject: {
             /** @example 01ARZ3NDEKTSV4RRFFQ69G5FAV */
             workspace_id: string;
@@ -805,6 +816,9 @@ export interface components {
             settings?: {
                 [key: string]: unknown;
             };
+        };
+        ProjectGetResponse: {
+            project: components["schemas"]["Project"];
         };
         Action: {
             /** @example send-email */
@@ -831,6 +845,10 @@ export interface components {
             } | null;
             created_at: string;
             updated_at: string;
+        };
+        ActionCreateResponse: {
+            action_id: string;
+            action: components["schemas"]["Action"];
         };
         CreateAction: {
             /** @example send-email */
@@ -870,6 +888,9 @@ export interface components {
                 [key: string]: unknown;
             };
         };
+        ActionGetResponse: {
+            action: components["schemas"]["Action"];
+        };
         PromptSpec: {
             /** @example summarize-text */
             id: string;
@@ -894,6 +915,10 @@ export interface components {
             } | null;
             created_at: string;
             updated_at: string;
+        };
+        PromptSpecCreateResponse: {
+            prompt_spec_id: string;
+            prompt_spec: components["schemas"]["PromptSpec"];
         };
         CreatePromptSpec: {
             /** @example summarize-text */
@@ -935,6 +960,9 @@ export interface components {
             examples?: unknown[];
             tags?: string[];
         };
+        PromptSpecGetResponse: {
+            prompt_spec: components["schemas"]["PromptSpec"];
+        };
         ModelProfile: {
             id: string;
             name: string;
@@ -949,6 +977,13 @@ export interface components {
             } | null;
             cost_per_1k_input_tokens: number;
             cost_per_1k_output_tokens: number;
+        };
+        ModelProfileGetResponse: {
+            model_profile: components["schemas"]["ModelProfile"];
+        };
+        ModelProfileCreateResponse: {
+            model_profile_id: string;
+            model_profile: components["schemas"]["ModelProfile"];
         };
         CreateModelProfile: {
             /** @example GPT-4 Default */
@@ -999,6 +1034,10 @@ export interface components {
             initial_node_id: string;
             created_at: string;
             updated_at: string;
+        };
+        WorkflowDefCreateResponse: {
+            workflow_def_id: string;
+            workflow_def: components["schemas"]["WorkflowDef"];
         };
         CreateWorkflowDef: {
             /** @example Content Generation Pipeline */
@@ -1079,6 +1118,11 @@ export interface components {
                 loop_config?: unknown;
             }[];
         };
+        WorkflowDefGetResponse: {
+            workflow_def: components["schemas"]["WorkflowDef"];
+            nodes: unknown[];
+            transitions: unknown[];
+        };
         Workflow: {
             id: string;
             project_id: string;
@@ -1087,6 +1131,10 @@ export interface components {
             description: string | null;
             created_at: string;
             updated_at: string;
+        };
+        WorkflowCreateResponse: {
+            workflow_id: string;
+            workflow: components["schemas"]["Workflow"];
         };
         CreateWorkflow: {
             /** @example 01ARZ3NDEKTSV4RRFFQ69G5FAV */
@@ -1097,6 +1145,9 @@ export interface components {
             name: string;
             /** @example Production workflow instance */
             description?: string;
+        };
+        WorkflowGetResponse: {
+            workflow: components["schemas"]["Workflow"];
         };
     };
     responses: never;

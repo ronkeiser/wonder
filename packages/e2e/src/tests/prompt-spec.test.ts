@@ -5,7 +5,7 @@ describe('PromptSpec API', () => {
   it('should create and retrieve a prompt spec', async () => {
     // Create prompt spec
     const promptSpecId = `test-prompt-${Date.now()}`;
-    const { data: promptSpec, error: createError } = await client.POST('/api/prompt-specs', {
+    const { data: createResponse, error: createError } = await client.POST('/api/prompt-specs', {
       body: {
         id: promptSpecId,
         name: `Test Prompt Spec ${Date.now()}`,
@@ -25,29 +25,32 @@ describe('PromptSpec API', () => {
     });
 
     expect(createError).toBeUndefined();
-    expect(promptSpec).toBeDefined();
-    expect(promptSpec!.id).toBeDefined();
-    expect(promptSpec!.name).toContain('Test Prompt Spec');
-    expect(promptSpec!.template_language).toBe('handlebars');
-    expect(promptSpec!.version).toBe(1);
+    expect(createResponse).toBeDefined();
+    expect(createResponse!.prompt_spec_id).toBeDefined();
+    expect(createResponse!.prompt_spec).toBeDefined();
+    expect(createResponse!.prompt_spec.id).toBeDefined();
+    expect(createResponse!.prompt_spec.name).toContain('Test Prompt Spec');
+    expect(createResponse!.prompt_spec.template_language).toBe('handlebars');
+    expect(createResponse!.prompt_spec.version).toBe(1);
 
     // Get prompt spec
-    const { data: retrieved, error: getError } = await client.GET('/api/prompt-specs/{id}', {
-      params: { path: { id: promptSpec!.id } },
+    const { data: getResponse, error: getError } = await client.GET('/api/prompt-specs/{id}', {
+      params: { path: { id: createResponse!.prompt_spec.id } },
     });
 
     expect(getError).toBeUndefined();
-    expect(retrieved).toBeDefined();
-    expect(retrieved!.id).toBe(promptSpec!.id);
-    expect(retrieved!.name).toBe(promptSpec!.name);
-    expect(retrieved!.template_language).toBe('handlebars');
-    expect(retrieved!.template).toContain('Summarize');
+    expect(getResponse).toBeDefined();
+    expect(getResponse!.prompt_spec).toBeDefined();
+    expect(getResponse!.prompt_spec.id).toBe(createResponse!.prompt_spec.id);
+    expect(getResponse!.prompt_spec.name).toBe(createResponse!.prompt_spec.name);
+    expect(getResponse!.prompt_spec.template_language).toBe('handlebars');
+    expect(getResponse!.prompt_spec.template).toContain('Summarize');
 
     // Delete prompt spec
     const { data: deleteResult, error: deleteError } = await client.DELETE(
       '/api/prompt-specs/{id}',
       {
-        params: { path: { id: promptSpec!.id } },
+        params: { path: { id: createResponse!.prompt_spec.id } },
       },
     );
     expect(deleteError).toBeUndefined();

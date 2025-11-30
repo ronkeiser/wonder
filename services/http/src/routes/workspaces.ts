@@ -1,5 +1,10 @@
 import { createRoute, OpenAPIHono, z } from '@hono/zod-openapi';
-import { CreateWorkspaceSchema, ulid, WorkspaceSchema } from '../schemas.js';
+import {
+    CreateWorkspaceSchema,
+    ulid,
+    WorkspaceCreateResponseSchema,
+    WorkspaceGetResponseSchema,
+} from '../schemas.js';
 
 interface Env {
   API: any;
@@ -24,7 +29,7 @@ const createWorkspaceRoute = createRoute({
     201: {
       content: {
         'application/json': {
-          schema: WorkspaceSchema,
+          schema: WorkspaceCreateResponseSchema,
         },
       },
       description: 'Workspace created successfully',
@@ -36,7 +41,7 @@ workspaces.openapi(createWorkspaceRoute, async (c) => {
   const validated = c.req.valid('json');
   using workspaces = c.env.API.workspaces();
   const result = await workspaces.create(validated);
-  return c.json(result.workspace, 201);
+  return c.json(result, 201);
 });
 
 const getWorkspaceRoute = createRoute({
@@ -52,7 +57,7 @@ const getWorkspaceRoute = createRoute({
     200: {
       content: {
         'application/json': {
-          schema: WorkspaceSchema,
+          schema: WorkspaceGetResponseSchema,
         },
       },
       description: 'Workspace retrieved successfully',

@@ -1,5 +1,11 @@
 import { createRoute, OpenAPIHono, z } from '@hono/zod-openapi';
-import { CreateModelProfileSchema, ModelProfileSchema, ulid } from '../schemas.js';
+import {
+    CreateModelProfileSchema,
+    ModelProfileCreateResponseSchema,
+    ModelProfileGetResponseSchema,
+    ModelProfileSchema,
+    ulid,
+} from '../schemas.js';
 
 interface Env {
   API: any;
@@ -21,7 +27,7 @@ const listModelProfilesRoute = createRoute({
       content: {
         'application/json': {
           schema: z.object({
-            profiles: z.array(ModelProfileSchema),
+            model_profiles: z.array(ModelProfileSchema),
           }),
         },
       },
@@ -51,7 +57,7 @@ const getModelProfileRoute = createRoute({
     200: {
       content: {
         'application/json': {
-          schema: ModelProfileSchema,
+          schema: ModelProfileGetResponseSchema,
         },
       },
       description: 'Model profile retrieved successfully',
@@ -63,7 +69,7 @@ modelProfiles.openapi(getModelProfileRoute, async (c) => {
   const { id } = c.req.valid('param');
   using modelProfiles = c.env.API.modelProfiles();
   const result = await modelProfiles.get(id);
-  return c.json(result.profile);
+  return c.json(result);
 });
 
 const createModelProfileRoute = createRoute({
@@ -83,7 +89,7 @@ const createModelProfileRoute = createRoute({
     201: {
       content: {
         'application/json': {
-          schema: ModelProfileSchema,
+          schema: ModelProfileCreateResponseSchema,
         },
       },
       description: 'Model profile created successfully',
@@ -95,7 +101,7 @@ modelProfiles.openapi(createModelProfileRoute, async (c) => {
   const validated = c.req.valid('json');
   using modelProfiles = c.env.API.modelProfiles();
   const result = await modelProfiles.create(validated);
-  return c.json(result.profile, 201);
+  return c.json(result, 201);
 });
 
 const deleteModelProfileRoute = createRoute({
