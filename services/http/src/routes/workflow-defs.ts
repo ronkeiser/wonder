@@ -36,7 +36,7 @@ workflowDefs.openapi(createWorkflowDefRoute, async (c) => {
   const validated = c.req.valid('json');
   using workflowDefs = c.env.API.workflowDefs();
   const result = await workflowDefs.create(validated);
-  return c.json(result, 201);
+  return c.json(result.workflow_def, 201);
 });
 
 const getWorkflowDefRoute = createRoute({
@@ -68,7 +68,7 @@ workflowDefs.openapi(getWorkflowDefRoute, async (c) => {
   const { version } = c.req.valid('query');
   using workflowDefs = c.env.API.workflowDefs();
   const result = await workflowDefs.get(id, version ? parseInt(version) : undefined);
-  return c.json(result);
+  return c.json(result.workflow_def);
 });
 
 const listWorkflowDefsByOwnerRoute = createRoute({

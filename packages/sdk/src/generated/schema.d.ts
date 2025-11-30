@@ -1041,6 +1041,34 @@ export interface components {
             };
             /** @example node-1 */
             initial_node_id: string;
+            nodes: {
+                id: string;
+                name: string;
+                action_id: string;
+                input_mapping?: {
+                    [key: string]: unknown;
+                };
+                output_mapping?: {
+                    [key: string]: unknown;
+                };
+                /** @enum {string} */
+                fan_out?: "first_match" | "all";
+                fan_in?: ("any" | "all") | {
+                    m_of_n: number;
+                };
+                joins_node?: string;
+                merge?: unknown;
+                /** @enum {string} */
+                on_early_complete?: "cancel" | "abandon" | "allow_late_merge";
+            }[];
+            transitions?: {
+                from_node_id: string;
+                to_node_id: string;
+                priority: number;
+                condition?: unknown;
+                foreach?: unknown;
+                loop_config?: unknown;
+            }[];
         };
         Workflow: {
             id: string;

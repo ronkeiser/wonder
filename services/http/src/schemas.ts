@@ -187,6 +187,32 @@ export const CreateWorkflowDefSchema = z
     output_schema: z.record(z.string(), z.unknown()).openapi({ example: { content: 'string' } }),
     context_schema: z.record(z.string(), z.unknown()).optional(),
     initial_node_id: z.string().min(1).openapi({ example: 'node-1' }),
+    nodes: z.array(
+      z.object({
+        id: z.string().min(1),
+        name: z.string().min(1),
+        action_id: ulid(),
+        input_mapping: z.record(z.string(), z.unknown()).optional(),
+        output_mapping: z.record(z.string(), z.unknown()).optional(),
+        fan_out: z.enum(['first_match', 'all']).optional(),
+        fan_in: z.union([z.enum(['any', 'all']), z.object({ m_of_n: z.number() })]).optional(),
+        joins_node: z.string().optional(),
+        merge: z.unknown().optional(),
+        on_early_complete: z.enum(['cancel', 'abandon', 'allow_late_merge']).optional(),
+      }),
+    ),
+    transitions: z
+      .array(
+        z.object({
+          from_node_id: z.string().min(1),
+          to_node_id: z.string().min(1),
+          priority: z.number().int(),
+          condition: z.unknown().optional(),
+          foreach: z.unknown().optional(),
+          loop_config: z.unknown().optional(),
+        }),
+      )
+      .optional(),
   })
   .openapi('CreateWorkflowDef');
 
