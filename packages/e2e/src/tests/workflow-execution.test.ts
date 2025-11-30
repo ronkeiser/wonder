@@ -3,6 +3,7 @@ import { client } from '../client';
 
 describe('Workflow Execution API', () => {
   it('should start a workflow execution and return workflow_run_id', async () => {
+    const testName = 'Bungholio';
     // Create workspace
     const { data: workspaceResponse } = await client.POST('/api/workspaces', {
       body: {
@@ -47,10 +48,10 @@ describe('Workflow Execution API', () => {
         version: 1,
         name: 'Test Prompt',
         description: 'Prompt for workflow execution test',
-        template: 'You are a helpful assistant. User prompt: {{prompt}}',
+        template: 'You are a helpful assistant. Please greet {{name}} warmly.',
         template_language: 'handlebars',
         requires: {
-          prompt: 'string',
+          name: 'string',
         },
         produces: {
           response: 'string',
@@ -89,9 +90,9 @@ describe('Workflow Execution API', () => {
           input_schema: {
             type: 'object',
             properties: {
-              prompt: { type: 'string' },
+              name: { type: 'string' },
             },
-            required: ['prompt'],
+            required: ['name'],
           },
           output_schema: {
             type: 'object',
@@ -107,7 +108,7 @@ describe('Workflow Execution API', () => {
               action_id: actionResponse!.action.id,
               action_version: 1,
               input_mapping: {
-                prompt: '$.input.prompt',
+                name: '$.input.name',
               },
               output_mapping: {
                 response: '$.response',
@@ -136,7 +137,7 @@ describe('Workflow Execution API', () => {
       {
         params: { path: { id: workflowResponse!.workflow.id } },
         body: {
-          prompt: 'Hello, world!',
+          name: testName,
         },
       },
     );
