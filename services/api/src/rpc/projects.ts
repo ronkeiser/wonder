@@ -1,6 +1,4 @@
-import { eq } from 'drizzle-orm';
-import * as graphRepo from '~/domains/graph/repository';
-import { projects } from '~/infrastructure/db/schema';
+import * as graphService from '~/domains/graph/service';
 import { Resource } from './resource';
 
 /**
@@ -17,24 +15,7 @@ export class Projects extends Resource {
     description?: string;
     settings?: unknown;
   }) {
-    this.serviceCtx.logger.info('project_create_started', {
-      workspace_id: data.workspace_id,
-      name: data.name,
-    });
-
-    const project = await graphRepo.createProject(this.serviceCtx.db, {
-      workspace_id: data.workspace_id,
-      name: data.name,
-      description: data.description ?? null,
-      settings: data.settings ?? null,
-    });
-
-    this.serviceCtx.logger.info('project_created', {
-      project_id: project.id,
-      workspace_id: project.workspace_id,
-      name: project.name,
-    });
-
+    const project = await graphService.createProject(this.serviceCtx, data);
     return {
       project_id: project.id,
       project,
@@ -45,13 +26,7 @@ export class Projects extends Resource {
    * Get a project by ID
    */
   async get(projectId: string) {
-    this.serviceCtx.logger.info('project_get', { project_id: projectId });
-
-    const project = await graphRepo.getProject(this.serviceCtx.db, projectId);
-    if (!project) {
-      this.serviceCtx.logger.error('project_not_found', { project_id: projectId });
-      throw new Error(`Project not found: ${projectId}`);
-    }
+    const project = await graphService.getProject(this.serviceCtx, projectId);
     return { project };
   }
 
@@ -60,20 +35,7 @@ export class Projects extends Resource {
    * Note: Cascading deletes handled by DB foreign key constraints
    */
   async delete(projectId: string) {
-    this.serviceCtx.logger.info('project_delete_started', { project_id: projectId });
-
-    // Verify project exists
-    const project = await graphRepo.getProject(this.serviceCtx.db, projectId);
-    if (!project) {
-      this.serviceCtx.logger.error('project_not_found', { project_id: projectId });
-      throw new Error(`Project not found: ${projectId}`);
-    }
-
-    // Delete project (cascades to workflows, workflow_defs, etc.)
-    await this.serviceCtx.db.delete(projects).where(eq(projects.id, projectId));
-
-    this.serviceCtx.logger.info('project_deleted', { project_id: projectId });
-
+    await graphService.deleteProject(this.serviceCtx, projectId);
     return { success: true };
   }
 }

@@ -1,6 +1,6 @@
 import { eq } from 'drizzle-orm';
 import { startWorkflow } from '~/domains/execution/service';
-import * as graphRepo from '~/domains/graph/repository';
+import * as graphService from '~/domains/graph/service';
 import { workflow_runs } from '~/infrastructure/db/schema';
 import { Resource } from './resource';
 
@@ -20,15 +20,7 @@ export class Workflows extends Resource {
     pinned_version?: number;
     enabled?: boolean;
   }) {
-    const workflow = await graphRepo.createWorkflow(this.serviceCtx.db, {
-      project_id: data.project_id,
-      name: data.name,
-      description: data.description || data.name,
-      workflow_def_id: data.workflow_def_id,
-      pinned_version: data.pinned_version ?? null,
-      enabled: data.enabled ?? true,
-    });
-
+    const workflow = await graphService.createWorkflow(this.serviceCtx, data);
     return {
       workflow_id: workflow.id,
       workflow,
@@ -39,10 +31,7 @@ export class Workflows extends Resource {
    * Get a workflow by ID
    */
   async get(workflowId: string) {
-    const workflow = await graphRepo.getWorkflow(this.serviceCtx.db, workflowId);
-    if (!workflow) {
-      throw new Error(`Workflow not found: ${workflowId}`);
-    }
+    const workflow = await graphService.getWorkflow(this.serviceCtx, workflowId);
     return { workflow };
   }
 

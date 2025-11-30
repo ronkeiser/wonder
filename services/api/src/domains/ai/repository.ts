@@ -98,9 +98,17 @@ export async function getModelProfile(
   return result ?? null;
 }
 
+export async function listModelProfiles(db: DrizzleD1Database): Promise<ModelProfile[]> {
+  return await db.select().from(model_profiles).all();
+}
+
 export async function listModelProfilesByProvider(
   db: DrizzleD1Database,
   provider: 'anthropic' | 'openai' | 'google' | 'cloudflare' | 'local',
 ): Promise<ModelProfile[]> {
   return await db.select().from(model_profiles).where(eq(model_profiles.provider, provider)).all();
+}
+
+export async function deleteModelProfile(db: DrizzleD1Database, id: string): Promise<void> {
+  await db.delete(model_profiles).where(eq(model_profiles.id, id)).run();
 }

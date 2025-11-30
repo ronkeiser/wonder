@@ -117,6 +117,10 @@ export async function updateWorkspace(
   return updated;
 }
 
+export async function deleteWorkspace(db: DrizzleD1Database, id: string): Promise<void> {
+  await db.delete(workspaces).where(eq(workspaces.id, id)).run();
+}
+
 /** Project */
 
 export async function createProject(db: DrizzleD1Database, data: NewProject): Promise<Project> {
@@ -135,6 +139,10 @@ export async function createProject(db: DrizzleD1Database, data: NewProject): Pr
 export async function getProject(db: DrizzleD1Database, id: string): Promise<Project | null> {
   const result = await db.select().from(projects).where(eq(projects.id, id)).get();
   return result ?? null;
+}
+
+export async function deleteProject(db: DrizzleD1Database, id: string): Promise<void> {
+  await db.delete(projects).where(eq(projects.id, id)).run();
 }
 
 /** WorkflowDef */

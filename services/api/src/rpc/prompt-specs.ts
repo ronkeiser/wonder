@@ -1,4 +1,4 @@
-import * as aiRepo from '~/domains/ai/repository';
+import * as aiService from '~/domains/ai/service';
 import { Resource } from './resource';
 
 /**
@@ -21,19 +21,7 @@ export class PromptSpecs extends Resource {
     examples?: unknown;
     tags?: string[];
   }) {
-    const promptSpec = await aiRepo.createPromptSpec(this.serviceCtx.db, {
-      version: data.version,
-      name: data.name,
-      description: data.description ?? '',
-      system_prompt: data.system_prompt ?? null,
-      template: data.template,
-      template_language: data.template_language ?? 'handlebars',
-      requires: data.requires ?? {},
-      produces: data.produces ?? {},
-      examples: data.examples ?? null,
-      tags: data.tags ?? null,
-    });
-
+    const promptSpec = await aiService.createPromptSpec(this.serviceCtx, data);
     return {
       prompt_spec_id: promptSpec.id,
       prompt_spec: promptSpec,
@@ -44,10 +32,7 @@ export class PromptSpecs extends Resource {
    * Get a prompt spec by ID
    */
   async get(promptSpecId: string) {
-    const promptSpec = await aiRepo.getPromptSpec(this.serviceCtx.db, promptSpecId);
-    if (!promptSpec) {
-      throw new Error(`PromptSpec not found: ${promptSpecId}`);
-    }
+    const promptSpec = await aiService.getPromptSpec(this.serviceCtx, promptSpecId);
     return { prompt_spec: promptSpec };
   }
 
@@ -55,11 +40,7 @@ export class PromptSpecs extends Resource {
    * Delete a prompt spec
    */
   async delete(promptSpecId: string) {
-    const promptSpec = await aiRepo.getPromptSpec(this.serviceCtx.db, promptSpecId);
-    if (!promptSpec) {
-      throw new Error(`PromptSpec not found: ${promptSpecId}`);
-    }
-    await aiRepo.deletePromptSpec(this.serviceCtx.db, promptSpecId);
+    await aiService.deletePromptSpec(this.serviceCtx, promptSpecId);
     return { success: true };
   }
 }
