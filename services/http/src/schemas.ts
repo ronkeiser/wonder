@@ -317,6 +317,12 @@ export const WorkflowDefGetResponseSchema = z
   })
   .openapi('WorkflowDefGetResponse');
 
+export const WorkflowDefListResponseSchema = z
+  .object({
+    workflow_defs: z.array(WorkflowDefSchema),
+  })
+  .openapi('WorkflowDefListResponse');
+
 /** Workflow (Binding) Schemas */
 export const CreateWorkflowSchema = z
   .object({

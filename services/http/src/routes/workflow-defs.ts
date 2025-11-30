@@ -1,13 +1,12 @@
 import { createRoute, OpenAPIHono, z } from '@hono/zod-openapi';
 import {
-    CreateWorkflowDefSchema,
-    ulid,
-    WorkflowDefCreateResponseSchema,
-    WorkflowDefGetResponseSchema,
-    WorkflowDefSchema,
-} from '../schemas.js';
-
-interface Env {
+  CreateWorkflowDefSchema,
+  ulid,
+  WorkflowDefCreateResponseSchema,
+  WorkflowDefGetResponseSchema,
+  WorkflowDefListResponseSchema,
+  WorkflowDefSchema,
+} from '../schemas.js';interface Env {
   API: any;
 }
 
@@ -90,7 +89,7 @@ const listWorkflowDefsByOwnerRoute = createRoute({
     200: {
       content: {
         'application/json': {
-          schema: z.array(WorkflowDefSchema),
+          schema: WorkflowDefListResponseSchema,
         },
       },
       description: 'Workflow definitions retrieved successfully',

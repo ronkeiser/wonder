@@ -624,7 +624,7 @@ export interface paths {
                         [name: string]: unknown;
                     };
                     content: {
-                        "application/json": components["schemas"]["WorkflowDef"][];
+                        "application/json": components["schemas"]["WorkflowDefListResponse"];
                     };
                 };
             };
@@ -1122,6 +1122,9 @@ export interface components {
             workflow_def: components["schemas"]["WorkflowDef"];
             nodes: unknown[];
             transitions: unknown[];
+        };
+        WorkflowDefListResponse: {
+            workflow_defs: components["schemas"]["WorkflowDef"][];
         };
         Workflow: {
             id: string;
