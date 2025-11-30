@@ -6,8 +6,8 @@
  * ensuring isolated test execution without seed data dependencies.
  *
  * Usage:
- *   pnpm --filter api e2e:workflow --name "Your Name"
- *   pnpm --filter api e2e:workflow --name "Alice" --url "http://localhost:8787"
+ *   pnpm --filter @wonder/e2e test --name "Your Name"
+ *   pnpm --filter @wonder/e2e test --name "Alice" --url "http://localhost:8787"
  */
 
 import { WonderfulClient } from '@wonder/sdk';
@@ -38,7 +38,7 @@ function parseArgs(): Args {
 
 function printHelp() {
   console.log(`
-Usage: pnpm --filter api e2e:workflow [options]
+Usage: pnpm --filter @wonder/e2e test [options]
 
 Options:
   --name, -n <name>    Name to pass to the workflow (default: "CLI User")
@@ -46,8 +46,8 @@ Options:
   --help, -h           Show this help message
 
 Examples:
-  pnpm --filter api e2e:workflow --name "Alice"
-  pnpm --filter api e2e:workflow --name "Bob" --url "http://localhost:8787"
+  pnpm --filter @wonder/e2e test --name "Alice"
+  pnpm --filter @wonder/e2e test --name "Bob" --url "http://localhost:8787"
 `);
 }
 

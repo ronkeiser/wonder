@@ -13,9 +13,7 @@
     "db:studio": "drizzle-kit studio",
     "test": "vitest --run",
     "test:watch": "vitest",
-    "test:ui": "vitest --ui",
-    "e2e:workflow": "tsx test/e2e/manual-workflow-test.ts",
-    "e2e:websocket": "tsx test/e2e/manual-websocket-test.ts"
+    "test:ui": "vitest --ui"
   },
   "dependencies": {
     "@wonder/logger": "workspace:*",

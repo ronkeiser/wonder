@@ -1,0 +1,17 @@
+{
+  "name": "@wonder/e2e",
+  "version": "0.0.1",
+  "type": "module",
+  "private": true,
+  "scripts": {
+    "test": "tsx src/workflow-test.ts"
+  },
+  "dependencies": {
+    "@wonder/sdk": "workspace:*"
+  },
+  "devDependencies": {
+    "@types/node": "^24.10.1",
+    "tsx": "^4.20.6",
+    "typescript": "^5.9.3"
+  }
+}
