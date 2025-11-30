@@ -1,10 +1,10 @@
 #!/usr/bin/env node
 /**
- * CLI script to run a workflow and stream events
+ * Manual E2E test: Run a workflow and stream events
  *
  * Usage:
- *   pnpm tsx scripts/run-workflow.ts --name "Your Name"
- *   pnpm tsx scripts/run-workflow.ts --name "Alice" --url "http://localhost:8787"
+ *   pnpm --filter api e2e:workflow --name "Your Name"
+ *   pnpm --filter api e2e:workflow --name "Alice" --url "http://localhost:8787"
  */
 
 import { WonderfulClient } from '@wonder/sdk';
@@ -35,7 +35,7 @@ function parseArgs(): Args {
 
 function printHelp() {
   console.log(`
-Usage: pnpm tsx scripts/run-workflow.ts [options]
+Usage: pnpm --filter api e2e:workflow [options]
 
 Options:
   --name, -n <name>    Name to pass to the workflow (default: "CLI User")
@@ -43,8 +43,8 @@ Options:
   --help, -h           Show this help message
 
 Examples:
-  pnpm tsx scripts/run-workflow.ts --name "Alice"
-  pnpm tsx scripts/run-workflow.ts --name "Bob" --url "http://localhost:8787"
+  pnpm --filter api e2e:workflow --name "Alice"
+  pnpm --filter api e2e:workflow --name "Bob" --url "http://localhost:8787"
 `);
 }
 

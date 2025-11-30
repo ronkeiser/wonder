@@ -1,5 +1,11 @@
 #!/usr/bin/env tsx
-/** Test WebSocket event streaming against deployed infrastructure */
+/**
+ * Manual E2E test: WebSocket event streaming against deployed infrastructure
+ *
+ * Usage:
+ *   pnpm --filter api e2e:websocket
+ *   pnpm --filter api e2e:websocket http://localhost:8787
+ */
 
 // Configure API base (default to production, or pass as first arg)
 const API_BASE = process.argv[2] || 'https://wonder-http.ron-keiser.workers.dev';

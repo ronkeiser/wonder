@@ -7,9 +7,7 @@
   },
   "scripts": {
     "test": "vitest --run",
-    "test:watch": "vitest",
-    "workflow:run": "tsx scripts/run-workflow.ts",
-    "workflow:test": "tsx scripts/test-websocket-streaming.ts"
+    "test:watch": "vitest"
   },
   "devDependencies": {
     "@types/node": "^24.10.1",
