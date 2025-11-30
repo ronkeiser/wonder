@@ -4,8 +4,10 @@ import { client } from '../client';
 describe('Action API', () => {
   it('should create and retrieve an action', async () => {
     // Create action
+    const actionId = `test-action-${Date.now()}`;
     const { data: action, error: createError } = await client.POST('/api/actions', {
       body: {
+        id: actionId,
         name: `Test Action ${Date.now()}`,
         description: 'E2E test action for LLM call',
         version: 1,

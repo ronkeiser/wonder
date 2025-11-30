@@ -807,6 +807,7 @@ export interface components {
             };
         };
         Action: {
+            /** @example send-email */
             id: string;
             name: string;
             description: string;
@@ -832,6 +833,8 @@ export interface components {
             updated_at: string;
         };
         CreateAction: {
+            /** @example send-email */
+            id: string;
             /** @example Generate Summary */
             name: string;
             /** @example Generates a summary using LLM */
@@ -868,6 +871,7 @@ export interface components {
             };
         };
         PromptSpec: {
+            /** @example summarize-text */
             id: string;
             name: string;
             description: string;
@@ -892,6 +896,8 @@ export interface components {
             updated_at: string;
         };
         CreatePromptSpec: {
+            /** @example summarize-text */
+            id: string;
             /** @example Summarization Prompt */
             name: string;
             /** @example Prompt for summarizing text */
@@ -1044,7 +1050,10 @@ export interface components {
             nodes: {
                 id: string;
                 name: string;
+                /** @example send-email */
                 action_id: string;
+                /** @example 1 */
+                action_version: number;
                 input_mapping?: {
                     [key: string]: unknown;
                 };

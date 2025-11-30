@@ -45,7 +45,7 @@ const getPromptSpecRoute = createRoute({
   tags: ['prompt-specs'],
   request: {
     params: z.object({
-      id: ulid().openapi({ param: { name: 'id', in: 'path' } }),
+      id: z.string().min(1).openapi({ param: { name: 'id', in: 'path' }, example: 'summarize-text' }),
     }),
   },
   responses: {
@@ -73,7 +73,7 @@ const deletePromptSpecRoute = createRoute({
   tags: ['prompt-specs'],
   request: {
     params: z.object({
-      id: ulid().openapi({ param: { name: 'id', in: 'path' } }),
+      id: z.string().min(1).openapi({ param: { name: 'id', in: 'path' }, example: 'summarize-text' }),
     }),
   },
   responses: {

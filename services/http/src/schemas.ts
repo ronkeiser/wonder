@@ -55,6 +55,7 @@ export const ProjectSchema = z
 /** Action Schemas */
 export const CreateActionSchema = z
   .object({
+    id: z.string().min(1).openapi({ example: 'send-email' }),
     name: z.string().min(1).max(255).openapi({ example: 'Generate Summary' }),
     description: z.string().min(1).openapi({ example: 'Generates a summary using LLM' }),
     version: z.number().int().positive().default(1).openapi({ example: 1 }),
@@ -81,7 +82,7 @@ export const CreateActionSchema = z
 
 export const ActionSchema = z
   .object({
-    id: ulid(),
+    id: z.string().openapi({ example: 'send-email' }),
     name: z.string(),
     description: z.string(),
     version: z.number().int(),
@@ -109,6 +110,7 @@ export const ActionSchema = z
 /** Prompt Spec Schemas */
 export const CreatePromptSpecSchema = z
   .object({
+    id: z.string().min(1).openapi({ example: 'summarize-text' }),
     name: z.string().min(1).max(255).openapi({ example: 'Summarization Prompt' }),
     description: z.string().min(1).openapi({ example: 'Prompt for summarizing text' }),
     version: z.number().int().positive().default(1).openapi({ example: 1 }),
@@ -124,7 +126,7 @@ export const CreatePromptSpecSchema = z
 
 export const PromptSpecSchema = z
   .object({
-    id: ulid(),
+    id: z.string().openapi({ example: 'summarize-text' }),
     name: z.string(),
     description: z.string(),
     version: z.number().int(),
@@ -191,7 +193,8 @@ export const CreateWorkflowDefSchema = z
       z.object({
         id: z.string().min(1),
         name: z.string().min(1),
-        action_id: ulid(),
+        action_id: z.string().min(1).openapi({ example: 'send-email' }),
+        action_version: z.number().int().positive().openapi({ example: 1 }),
         input_mapping: z.record(z.string(), z.unknown()).optional(),
         output_mapping: z.record(z.string(), z.unknown()).optional(),
         fan_out: z.enum(['first_match', 'all']).optional(),

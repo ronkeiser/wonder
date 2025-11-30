@@ -22,6 +22,7 @@ export class WorkflowDefs extends Resource {
       id: string;
       name: string;
       action_id: string;
+      action_version: number;
       input_mapping?: unknown;
       output_mapping?: unknown;
       fan_out?: 'first_match' | 'all';
@@ -60,6 +61,7 @@ export class WorkflowDefs extends Resource {
         workflow_def_version: workflowDef.version,
         name: nodeData.name,
         action_id: nodeData.action_id,
+        action_version: nodeData.action_version,
         input_mapping: nodeData.input_mapping ? JSON.stringify(nodeData.input_mapping) : null,
         output_mapping: nodeData.output_mapping ? JSON.stringify(nodeData.output_mapping) : null,
         fan_out: nodeData.fan_out ?? 'first_match',

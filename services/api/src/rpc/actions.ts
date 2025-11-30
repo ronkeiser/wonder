@@ -11,6 +11,8 @@ export class Actions extends Resource {
    * Create a new action
    */
   async create(data: {
+    id: string;
+    version: number;
     name: string;
     description?: string;
     kind:
@@ -32,6 +34,8 @@ export class Actions extends Resource {
     const action = await withDbErrorHandling(
       () =>
         effectsRepo.createAction(this.serviceCtx.db, {
+          id: data.id,
+          version: data.version,
           name: data.name,
           description: data.description ?? '',
           kind: data.kind,

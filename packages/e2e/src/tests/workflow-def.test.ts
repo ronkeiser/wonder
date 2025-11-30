@@ -18,8 +18,10 @@ describe('WorkflowDef API', () => {
     });
 
     // Create action for the LLM node
+    const actionId = `llm-action-${Date.now()}`;
     const { data: action } = await client.POST('/api/actions', {
       body: {
+        id: actionId,
         name: `LLM Action ${Date.now()}`,
         description: 'LLM call action for workflow',
         version: 1,
@@ -59,6 +61,7 @@ describe('WorkflowDef API', () => {
             id: 'llm-node-1',
             name: 'LLM Call',
             action_id: action!.id,
+            action_version: 1,
             input_mapping: {
               input: '$.prompt',
             },

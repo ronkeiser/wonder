@@ -4,8 +4,10 @@ import { client } from '../client';
 describe('PromptSpec API', () => {
   it('should create and retrieve a prompt spec', async () => {
     // Create prompt spec
+    const promptSpecId = `test-prompt-${Date.now()}`;
     const { data: promptSpec, error: createError } = await client.POST('/api/prompt-specs', {
       body: {
+        id: promptSpecId,
         name: `Test Prompt Spec ${Date.now()}`,
         description: 'E2E test prompt spec for text summarization',
         version: 1,

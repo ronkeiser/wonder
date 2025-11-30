@@ -126,9 +126,8 @@ export const nodes = sqliteTable(
     workflow_def_id: text('workflow_def_id').notNull(),
     workflow_def_version: integer('workflow_def_version').notNull(),
     name: text('name').notNull(),
-    action_id: text('action_id')
-      .notNull()
-      .references(() => actions.id),
+    action_id: text('action_id').notNull(),
+    action_version: integer('action_version').notNull(),
 
     input_mapping: text('input_mapping', { mode: 'json' }),
     output_mapping: text('output_mapping', { mode: 'json' }),
@@ -148,8 +147,12 @@ export const nodes = sqliteTable(
       columns: [table.workflow_def_id, table.workflow_def_version],
       foreignColumns: [workflow_defs.id, workflow_defs.version],
     }),
+    foreignKey({
+      columns: [table.action_id, table.action_version],
+      foreignColumns: [actions.id, actions.version],
+    }),
     index('idx_nodes_workflow_def').on(table.workflow_def_id, table.workflow_def_version),
-    index('idx_nodes_action').on(table.action_id),
+    index('idx_nodes_action').on(table.action_id, table.action_version),
   ],
 );
 
@@ -189,59 +192,67 @@ export const transitions = sqliteTable(
 
 /** Actions */
 
-export const actions = sqliteTable('actions', {
-  id: text('id').primaryKey(),
-  name: text('name').notNull(),
-  description: text('description').notNull(),
-  version: integer('version').notNull(),
+export const actions = sqliteTable(
+  'actions',
+  {
+    id: text('id').notNull(),
+    name: text('name').notNull(),
+    description: text('description').notNull(),
+    version: integer('version').notNull(),
 
-  kind: text('kind', {
-    enum: [
-      'llm_call',
-      'mcp_tool',
-      'http_request',
-      'human_input',
-      'update_context',
-      'write_artifact',
-      'workflow_call',
-      'vector_search',
-      'emit_metric',
-    ],
-  }).notNull(),
+    kind: text('kind', {
+      enum: [
+        'llm_call',
+        'mcp_tool',
+        'http_request',
+        'human_input',
+        'update_context',
+        'write_artifact',
+        'workflow_call',
+        'vector_search',
+        'emit_metric',
+      ],
+    }).notNull(),
 
-  implementation: text('implementation', { mode: 'json' }).notNull(), // discriminated by kind
+    implementation: text('implementation', { mode: 'json' }).notNull(), // discriminated by kind
 
-  requires: text('requires', { mode: 'json' }),
-  produces: text('produces', { mode: 'json' }),
-  execution: text('execution', { mode: 'json' }), // timeout, retry_policy
-  idempotency: text('idempotency', { mode: 'json' }),
+    requires: text('requires', { mode: 'json' }),
+    produces: text('produces', { mode: 'json' }),
+    execution: text('execution', { mode: 'json' }), // timeout, retry_policy
+    idempotency: text('idempotency', { mode: 'json' }),
 
-  created_at: text('created_at').notNull(),
-  updated_at: text('updated_at').notNull(),
-});
+    created_at: text('created_at').notNull(),
+    updated_at: text('updated_at').notNull(),
+  },
+  (table) => [primaryKey({ columns: [table.id, table.version] })],
+);
 
 /** AI Primitives */
 
-export const prompt_specs = sqliteTable('prompt_specs', {
-  id: text('id').primaryKey(),
-  name: text('name').notNull(),
-  description: text('description').notNull(),
-  version: integer('version').notNull(),
+export const prompt_specs = sqliteTable(
+  'prompt_specs',
+  {
+    id: text('id').notNull(),
+    name: text('name').notNull(),
+    description: text('description').notNull(),
+    version: integer('version').notNull(),
 
-  system_prompt: text('system_prompt'),
-  template: text('template').notNull(),
-  template_language: text('template_language', {
-    enum: ['handlebars', 'jinja2'],
-  }).notNull(),
+    system_prompt: text('system_prompt'),
+    template: text('template').notNull(),
+    template_language: text('template_language', {
+      enum: ['handlebars', 'jinja2'],
+    }).notNull(),
 
-  requires: text('requires', { mode: 'json' }).notNull(),
-  produces: text('produces', { mode: 'json' }).notNull(),
-  examples: text('examples', { mode: 'json' }),
-  tags: text('tags', { mode: 'json' }),
+    requires: text('requires', { mode: 'json' }).notNull(),
+    produces: text('produces', { mode: 'json' }).notNull(),
+    examples: text('examples', { mode: 'json' }),
+    tags: text('tags', { mode: 'json' }),
 
-  created_at: text('created_at').notNull(),
-  updated_at: text('updated_at').notNull(),
-});
+    created_at: text('created_at').notNull(),
+    updated_at: text('updated_at').notNull(),
+  },
+  (table) => [primaryKey({ columns: [table.id, table.version] })],
+);
 
 export const model_profiles = sqliteTable('model_profiles', {
   id: text('id').primaryKey(),

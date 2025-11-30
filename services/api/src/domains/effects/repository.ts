@@ -2,19 +2,16 @@
 
 import { and, eq } from 'drizzle-orm';
 import type { DrizzleD1Database } from 'drizzle-orm/d1';
-import { ulid } from 'ulid';
 import { actions } from '~/infrastructure/db/schema';
 
 type Action = typeof actions.$inferSelect;
-type NewAction = Omit<typeof actions.$inferInsert, 'id' | 'version' | 'created_at' | 'updated_at'>;
+type NewAction = Omit<typeof actions.$inferInsert, 'created_at' | 'updated_at'>;
 
 /** Action */
 
 export async function createAction(db: DrizzleD1Database, data: NewAction): Promise<Action> {
   const now = new Date().toISOString();
   const action = {
-    id: ulid(),
-    version: 1,
     ...data,
     created_at: now,
     updated_at: now,
@@ -60,6 +57,17 @@ export async function listActionsByKind(
   return await db.select().from(actions).where(eq(actions.kind, kind)).all();
 }
 
-export async function deleteAction(db: DrizzleD1Database, id: string): Promise<void> {
-  await db.delete(actions).where(eq(actions.id, id)).run();
+export async function deleteAction(
+  db: DrizzleD1Database,
+  id: string,
+  version?: number,
+): Promise<void> {
+  if (version) {
+    await db
+      .delete(actions)
+      .where(and(eq(actions.id, id), eq(actions.version, version)))
+      .run();
+  } else {
+    await db.delete(actions).where(eq(actions.id, id)).run();
+  }
 }

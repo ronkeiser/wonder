@@ -10,6 +10,8 @@ export class PromptSpecs extends Resource {
    * Create a new prompt spec
    */
   async create(data: {
+    id: string;
+    version: number;
     name: string;
     description: string;
     system_prompt?: string;
@@ -21,6 +23,8 @@ export class PromptSpecs extends Resource {
     tags?: string[];
   }) {
     const promptSpec = await aiRepo.createPromptSpec(this.serviceCtx.db, {
+      id: data.id,
+      version: data.version,
       name: data.name,
       description: data.description ?? '',
       system_prompt: data.system_prompt ?? null,
