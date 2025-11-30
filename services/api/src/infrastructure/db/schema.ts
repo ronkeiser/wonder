@@ -79,7 +79,7 @@ export const workflow_defs = sqliteTable(
     output_schema: text('output_schema', { mode: 'json' }).notNull(),
     context_schema: text('context_schema', { mode: 'json' }),
 
-    initial_node_id: text('initial_node_id').notNull(),
+    initial_node_id: text('initial_node_id'),
 
     created_at: text('created_at').notNull(),
     updated_at: text('updated_at').notNull(),
@@ -123,6 +123,7 @@ export const nodes = sqliteTable(
   'nodes',
   {
     id: text('id').notNull(),
+    ref: text('ref').notNull(),
     workflow_def_id: text('workflow_def_id').notNull(),
     workflow_def_version: integer('workflow_def_version').notNull(),
     name: text('name').notNull(),
@@ -153,6 +154,7 @@ export const nodes = sqliteTable(
     }),
     index('idx_nodes_workflow_def').on(table.workflow_def_id, table.workflow_def_version),
     index('idx_nodes_action').on(table.action_id, table.action_version),
+    index('idx_nodes_ref').on(table.workflow_def_id, table.workflow_def_version, table.ref),
   ],
 );
 
@@ -160,6 +162,7 @@ export const transitions = sqliteTable(
   'transitions',
   {
     id: text('id').notNull(),
+    ref: text('ref'),
     workflow_def_id: text('workflow_def_id').notNull(),
     workflow_def_version: integer('workflow_def_version').notNull(),
     from_node_id: text('from_node_id').notNull(),
@@ -187,6 +190,7 @@ export const transitions = sqliteTable(
     index('idx_transitions_workflow_def').on(table.workflow_def_id, table.workflow_def_version),
     index('idx_transitions_from_node').on(table.from_node_id),
     index('idx_transitions_to_node').on(table.to_node_id),
+    index('idx_transitions_ref').on(table.workflow_def_id, table.workflow_def_version, table.ref),
   ],
 );
 

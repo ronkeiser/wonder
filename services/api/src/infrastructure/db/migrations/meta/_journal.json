@@ -8,6 +8,20 @@
       "when": 1764534116686,
       "tag": "0000_right_madrox",
       "breakpoints": true
+    },
+    {
+      "idx": 1,
+      "version": "6",
+      "when": 1764535723335,
+      "tag": "0001_glossy_valeria_richards",
+      "breakpoints": true
+    },
+    {
+      "idx": 2,
+      "version": "6",
+      "when": 1764538036480,
+      "tag": "0002_quiet_landau",
+      "breakpoints": true
     }
   ]
 }

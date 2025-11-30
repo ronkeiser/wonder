@@ -18,10 +18,8 @@ describe('WorkflowDef API', () => {
     });
 
     // Create action for the LLM node
-    const actionId = `llm-action-${Date.now()}`;
     const { data: actionResponse } = await client.POST('/api/actions', {
       body: {
-        id: actionId,
         name: `LLM Action ${Date.now()}`,
         description: 'LLM call action for workflow',
         version: 1,
@@ -55,10 +53,10 @@ describe('WorkflowDef API', () => {
         output_schema: {
           response: 'string',
         },
-        initial_node_id: 'llm-node-1',
+        initial_node_ref: 'llm_node_1',
         nodes: [
           {
-            id: 'llm-node-1',
+            ref: 'llm_node_1',
             name: 'LLM Call',
             action_id: actionResponse!.action.id,
             action_version: 1,
@@ -79,7 +77,7 @@ describe('WorkflowDef API', () => {
     expect(createResponse!.workflow_def).toBeDefined();
     expect(createResponse!.workflow_def.id).toBeDefined();
     expect(createResponse!.workflow_def.name).toContain('Simple Workflow');
-    expect(createResponse!.workflow_def.initial_node_id).toBe('llm-node-1');
+    expect(createResponse!.workflow_def.initial_node_id).toBeDefined();
 
     // Get workflow definition
     const { data: getResponse, error: getError } = await client.GET('/api/workflow-defs/{id}', {
@@ -91,7 +89,7 @@ describe('WorkflowDef API', () => {
     expect(getResponse!.workflow_def).toBeDefined();
     expect(getResponse!.workflow_def.id).toBe(createResponse!.workflow_def.id);
     expect(getResponse!.workflow_def.name).toBe(createResponse!.workflow_def.name);
-    expect(getResponse!.workflow_def.initial_node_id).toBe('llm-node-1');
+    expect(getResponse!.workflow_def.initial_node_id).toBeDefined();
 
     // Cleanup
     await client.DELETE('/api/actions/{id}', {

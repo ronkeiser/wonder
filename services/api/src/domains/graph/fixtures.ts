@@ -97,6 +97,7 @@ export async function buildNode(
   }
 
   return await createNode(db, {
+    ref: 'test_node',
     workflow_def_id: workflow_def_id!,
     workflow_def_version: overrides?.workflow_def_version ?? 1,
     action_version: overrides?.action_version ?? 1,

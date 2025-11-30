@@ -100,7 +100,6 @@ export const ProjectGetResponseSchema = z
 /** Action Schemas */
 export const CreateActionSchema = z
   .object({
-    id: z.string().min(1).openapi({ example: 'send-email' }),
     name: z.string().min(1).max(255).openapi({ example: 'Generate Summary' }),
     description: z.string().min(1).openapi({ example: 'Generates a summary using LLM' }),
     version: z.number().int().positive().default(1).openapi({ example: 1 }),
@@ -168,7 +167,6 @@ export const ActionGetResponseSchema = z
 /** Prompt Spec Schemas */
 export const CreatePromptSpecSchema = z
   .object({
-    id: z.string().min(1).openapi({ example: 'summarize-text' }),
     name: z.string().min(1).max(255).openapi({ example: 'Summarization Prompt' }),
     description: z.string().min(1).openapi({ example: 'Prompt for summarizing text' }),
     version: z.number().int().positive().default(1).openapi({ example: 1 }),
@@ -272,10 +270,18 @@ export const CreateWorkflowDefSchema = z
     input_schema: z.record(z.string(), z.unknown()).openapi({ example: { topic: 'string' } }),
     output_schema: z.record(z.string(), z.unknown()).openapi({ example: { content: 'string' } }),
     context_schema: z.record(z.string(), z.unknown()).optional(),
-    initial_node_id: z.string().min(1).openapi({ example: 'node-1' }),
+    initial_node_ref: z
+      .string()
+      .min(1)
+      .regex(/^[a-z_][a-z0-9_]*$/)
+      .openapi({ example: 'start_node' }),
     nodes: z.array(
       z.object({
-        id: z.string().min(1),
+        ref: z
+          .string()
+          .min(1)
+          .regex(/^[a-z_][a-z0-9_]*$/)
+          .openapi({ example: 'llm_call_node' }),
         name: z.string().min(1),
         action_id: z.string().min(1).openapi({ example: 'send-email' }),
         action_version: z.number().int().positive().openapi({ example: 1 }),
@@ -283,7 +289,7 @@ export const CreateWorkflowDefSchema = z
         output_mapping: z.record(z.string(), z.unknown()).optional(),
         fan_out: z.enum(['first_match', 'all']).optional(),
         fan_in: z.union([z.enum(['any', 'all']), z.object({ m_of_n: z.number() })]).optional(),
-        joins_node: z.string().optional(),
+        joins_node_ref: z.string().optional(),
         merge: z.unknown().optional(),
         on_early_complete: z.enum(['cancel', 'abandon', 'allow_late_merge']).optional(),
       }),
@@ -291,8 +297,12 @@ export const CreateWorkflowDefSchema = z
     transitions: z
       .array(
         z.object({
-          from_node_id: z.string().min(1),
-          to_node_id: z.string().min(1),
+          ref: z
+            .string()
+            .regex(/^[a-z_][a-z0-9_]*$/)
+            .optional(),
+          from_node_ref: z.string().min(1),
+          to_node_ref: z.string().min(1),
           priority: z.number().int(),
           condition: z.unknown().optional(),
           foreach: z.unknown().optional(),

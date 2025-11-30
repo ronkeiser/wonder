@@ -6,12 +6,11 @@
   "ai": {
     "binding": "AI"
   },
-
   "d1_databases": [
     {
       "binding": "DB",
       "database_name": "wonder",
-      "database_id": "ec06d912-8013-4f30-9e94-e47a90c9ef46",
+      "database_id": "d03f7db5-ff4a-4dd8-9153-589cec06dc60",
       "migrations_dir": "src/infrastructure/db/migrations",
       "remote": true
     }

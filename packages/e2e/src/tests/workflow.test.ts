@@ -20,10 +20,8 @@ describe('Workflow (Binding) API', () => {
     });
 
     // Create action
-    const actionId = `test-action-${Date.now()}`;
     const { data: actionResponse } = await client.POST('/api/actions', {
       body: {
-        id: actionId,
         version: 1,
         name: 'Test LLM Action',
         description: 'LLM action for workflow binding test',
@@ -50,10 +48,10 @@ describe('Workflow (Binding) API', () => {
         output_schema: {
           response: 'string',
         },
-        initial_node_id: 'node-1',
+        initial_node_ref: 'node_1',
         nodes: [
           {
-            id: 'node-1',
+            ref: 'node_1',
             name: 'LLM Node',
             action_id: actionResponse!.action.id,
             action_version: 1,

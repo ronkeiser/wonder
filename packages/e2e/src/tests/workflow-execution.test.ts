@@ -41,10 +41,8 @@ describe('Workflow Execution API', () => {
     expect(modelProfileError).toBeUndefined();
 
     // Create prompt spec (before action since action references it)
-    const promptSpecId = `test-prompt-${Date.now()}`;
     const { data: promptSpecResponse } = await client.POST('/api/prompt-specs', {
       body: {
-        id: promptSpecId,
         version: 1,
         name: 'Test Prompt',
         description: 'Prompt for workflow execution test',
@@ -60,10 +58,8 @@ describe('Workflow Execution API', () => {
     });
 
     // Create action (after prompt spec since action references it)
-    const actionId = `test-action-${Date.now()}`;
     const { data: actionResponse } = await client.POST('/api/actions', {
       body: {
-        id: actionId,
         version: 1,
         name: 'Test LLM Action',
         description: 'LLM action for workflow execution test',
@@ -100,10 +96,10 @@ describe('Workflow Execution API', () => {
               response: { type: 'string' },
             },
           },
-          initial_node_id: 'node-1',
+          initial_node_ref: 'llm_greet',
           nodes: [
             {
-              id: 'node-1',
+              ref: 'llm_greet',
               name: 'LLM Node',
               action_id: actionResponse!.action.id,
               action_version: 1,
@@ -115,10 +111,14 @@ describe('Workflow Execution API', () => {
               },
             },
           ],
+          transitions: [],
         },
       },
     );
 
+    if (wfDefError) {
+      console.error('Workflow def creation error:', JSON.stringify(wfDefError, null, 2));
+    }
     expect(wfDefError).toBeUndefined();
 
     // Create workflow binding

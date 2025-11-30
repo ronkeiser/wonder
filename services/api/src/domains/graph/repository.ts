@@ -53,7 +53,7 @@ type NewNode = Omit<NewNodeRow, 'id' | 'fan_in'> & {
 };
 
 type Transition = typeof transitions.$inferSelect;
-type NewTransition = typeof transitions.$inferInsert;
+type NewTransition = Omit<typeof transitions.$inferInsert, 'id'>;
 
 /** Workspace */
 
@@ -190,6 +190,23 @@ export async function getWorkflowDef(
   };
 }
 
+export async function updateWorkflowDef(
+  db: DrizzleD1Database,
+  id: string,
+  version: number,
+  data: { initial_node_id?: string | null },
+): Promise<void> {
+  const now = new Date().toISOString();
+  await db
+    .update(workflow_defs)
+    .set({
+      ...data,
+      updated_at: now,
+    })
+    .where(and(eq(workflow_defs.id, id), eq(workflow_defs.version, version)))
+    .run();
+}
+
 export async function listWorkflowDefsByOwner(
   db: DrizzleD1Database,
   owner_type: 'project' | 'library',
@@ -270,6 +287,31 @@ export async function getNode(
   };
 }
 
+export async function getNodeByRef(
+  db: DrizzleD1Database,
+  workflow_def_id: string,
+  workflow_def_version: number,
+  ref: string,
+): Promise<Node | null> {
+  const row = await db
+    .select()
+    .from(nodes)
+    .where(
+      and(
+        eq(nodes.workflow_def_id, workflow_def_id),
+        eq(nodes.workflow_def_version, workflow_def_version),
+        eq(nodes.ref, ref),
+      ),
+    )
+    .get();
+  if (!row) return null;
+
+  return {
+    ...row,
+    fan_in: toFanIn(row.fan_in as string),
+  };
+}
+
 export async function listNodesByWorkflowDef(
   db: DrizzleD1Database,
   workflow_def_id: string,
@@ -301,8 +343,32 @@ export async function createTransition(
   db: DrizzleD1Database,
   data: NewTransition,
 ): Promise<Transition> {
-  await db.insert(transitions).values(data).run();
-  return data as Transition;
+  const transition = {
+    id: ulid(),
+    ...data,
+  };
+  await db.insert(transitions).values(transition).run();
+  return transition as Transition;
+}
+
+export async function getTransitionByRef(
+  db: DrizzleD1Database,
+  workflow_def_id: string,
+  workflow_def_version: number,
+  ref: string,
+): Promise<Transition | null> {
+  const result = await db
+    .select()
+    .from(transitions)
+    .where(
+      and(
+        eq(transitions.workflow_def_id, workflow_def_id),
+        eq(transitions.workflow_def_version, workflow_def_version),
+        eq(transitions.ref, ref),
+      ),
+    )
+    .get();
+  return result ?? null;
 }
 
 export async function listTransitionsByWorkflowDef(

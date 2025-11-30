@@ -209,6 +209,7 @@ describe('Node', () => {
     });
 
     const node = await createNode(db, {
+      ref: 'test_node',
       workflow_def_id: def.id,
       workflow_def_version: def.version,
       action_version: action.version,
@@ -258,6 +259,7 @@ describe('Node', () => {
     });
 
     const node = await createNode(db, {
+      ref: 'test_node_m_of_n',
       workflow_def_id: def.id,
       workflow_def_version: def.version,
       action_version: action.version,
@@ -266,14 +268,14 @@ describe('Node', () => {
       input_mapping: null,
       output_mapping: null,
       fan_out: 'all',
-      fan_in: { m_of_n: 3 },
+      fan_in: { m_of_n: 2 },
       joins_node: null,
       merge: null,
       on_early_complete: null,
     });
 
     const retrieved = await getNode(db, def.id, def.version, node.id);
-    expect(retrieved?.fan_in).toEqual({ m_of_n: 3 });
+    expect(retrieved?.fan_in).toEqual({ m_of_n: 2 });
   });
 
   test('lists nodes by workflow def', async () => {
@@ -318,6 +320,7 @@ describe('Node', () => {
     });
 
     const node1 = await createNode(db, {
+      ref: 'node_1',
       workflow_def_id: def.id,
       workflow_def_version: def.version,
       action_version: action1.version,
@@ -333,6 +336,7 @@ describe('Node', () => {
     });
 
     const node2 = await createNode(db, {
+      ref: 'node_2',
       workflow_def_id: def.id,
       workflow_def_version: def.version,
       action_version: action2.version,

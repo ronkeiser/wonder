@@ -951,8 +951,6 @@ export interface components {
             action: components["schemas"]["Action"];
         };
         CreateAction: {
-            /** @example send-email */
-            id: string;
             /** @example Generate Summary */
             name: string;
             /** @example Generates a summary using LLM */
@@ -1021,8 +1019,6 @@ export interface components {
             prompt_spec: components["schemas"]["PromptSpec"];
         };
         CreatePromptSpec: {
-            /** @example summarize-text */
-            id: string;
             /** @example Summarization Prompt */
             name: string;
             /** @example Prompt for summarizing text */
@@ -1184,10 +1180,11 @@ export interface components {
             context_schema?: {
                 [key: string]: unknown;
             };
-            /** @example node-1 */
-            initial_node_id: string;
+            /** @example start_node */
+            initial_node_ref: string;
             nodes: {
-                id: string;
+                /** @example llm_call_node */
+                ref: string;
                 name: string;
                 /** @example send-email */
                 action_id: string;
@@ -1204,14 +1201,15 @@ export interface components {
                 fan_in?: ("any" | "all") | {
                     m_of_n: number;
                 };
-                joins_node?: string;
+                joins_node_ref?: string;
                 merge?: unknown;
                 /** @enum {string} */
                 on_early_complete?: "cancel" | "abandon" | "allow_late_merge";
             }[];
             transitions?: {
-                from_node_id: string;
-                to_node_id: string;
+                ref?: string;
+                from_node_ref: string;
+                to_node_ref: string;
                 priority: number;
                 condition?: unknown;
                 foreach?: unknown;

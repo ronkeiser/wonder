@@ -34,3 +34,4 @@ Options:
 ```
 
 Never say YAGNI.
+Always check for type errors after doing work.
