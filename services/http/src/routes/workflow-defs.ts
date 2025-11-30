@@ -6,7 +6,8 @@ import {
   WorkflowDefGetResponseSchema,
   WorkflowDefListResponseSchema,
   WorkflowDefSchema,
-} from '../schemas.js';interface Env {
+} from '../schemas.js';
+interface Env {
   API: any;
 }
 
