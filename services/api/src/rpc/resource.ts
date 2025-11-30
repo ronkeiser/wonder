@@ -15,7 +15,7 @@ export abstract class Resource extends RpcTarget {
     super();
     this.env = env;
     const db = drizzle(env.DB);
-    const logger = createLogger({ consoleOnly: true });
+    const logger = createLogger({ db: env.DB });
     this.serviceCtx = {
       db,
       ai: env.AI,
