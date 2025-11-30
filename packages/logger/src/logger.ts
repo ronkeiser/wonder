@@ -1,9 +1,42 @@
 /** Unified logger with optional D1 persistence */
 
-import type { LogEntry, Logger, LoggerConfig, LogLevel } from './types.js';
+import type {
+  Environment,
+  EnvironmentConfig,
+  LogEntry,
+  Logger,
+  LoggerConfig,
+  LogLevel,
+} from './types.js';
 
-const DEFAULT_BUFFER_SIZE = 50;
 const DEFAULT_TABLE_NAME = 'logs';
+
+/** Environment-specific configurations */
+const ENVIRONMENT_CONFIGS: Record<Environment, EnvironmentConfig> = {
+  test: {
+    minLevel: 'debug', // Log everything in tests
+    includeStackTraces: true,
+    bufferSize: 1000, // Large buffer, flush less often
+  },
+  development: {
+    minLevel: 'info', // Skip debug logs
+    includeStackTraces: true,
+    bufferSize: 50,
+  },
+  production: {
+    minLevel: 'warn', // Only warnings and errors
+    includeStackTraces: false,
+    bufferSize: 50,
+  },
+};
+
+const LOG_LEVEL_PRIORITY: Record<LogLevel, number> = {
+  debug: 0,
+  info: 1,
+  warn: 2,
+  error: 3,
+  fatal: 4,
+};
 
 class LoggerImpl implements Logger {
   protected metadata: Record<string, unknown>;
@@ -12,13 +45,17 @@ class LoggerImpl implements Logger {
   private bufferSize: number;
   private tableName: string;
   private consoleOnly: boolean;
+  private environment: Environment;
+  private envConfig: EnvironmentConfig;
 
   constructor(config: LoggerConfig, parentMetadata: Record<string, unknown> = {}) {
     this.metadata = parentMetadata;
     this.db = config.db;
-    this.bufferSize = config.bufferSize ?? DEFAULT_BUFFER_SIZE;
     this.tableName = config.tableName ?? DEFAULT_TABLE_NAME;
     this.consoleOnly = config.consoleOnly ?? false;
+    this.environment = config.environment ?? 'development';
+    this.envConfig = ENVIRONMENT_CONFIGS[this.environment];
+    this.bufferSize = config.bufferSize ?? this.envConfig.bufferSize;
 
     // Validate: if not console-only, db is required
     if (!this.consoleOnly && !this.db) {
@@ -33,14 +70,14 @@ class LoggerImpl implements Logger {
         bufferSize: this.bufferSize,
         tableName: this.tableName,
         consoleOnly: this.consoleOnly,
+        environment: this.environment,
       },
       { ...this.metadata, ...metadata },
     );
   }
 
   debug(event_type: string, metadata?: Record<string, unknown>): void {
-    // Debug logs only go to console, never persisted
-    this.logToConsole('debug', event_type, metadata);
+    this.log('debug', event_type, metadata);
   }
 
   info(event_type: string, metadata?: Record<string, unknown>): void {
@@ -64,6 +101,11 @@ class LoggerImpl implements Logger {
   }
 
   private log(level: LogLevel, event_type: string, metadata?: Record<string, unknown>): void {
+    // Check if this log level should be emitted based on environment config
+    if (LOG_LEVEL_PRIORITY[level] < LOG_LEVEL_PRIORITY[this.envConfig.minLevel]) {
+      return; // Skip logs below minimum level
+    }
+
     const entry: LogEntry = {
       id: this.generateId(),
       level,
