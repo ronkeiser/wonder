@@ -48,4 +48,16 @@ export class PromptSpecs extends Resource {
     }
     return { prompt_spec: promptSpec };
   }
+
+  /**
+   * Delete a prompt spec
+   */
+  async delete(promptSpecId: string) {
+    const promptSpec = await aiRepo.getPromptSpec(this.serviceCtx.db, promptSpecId);
+    if (!promptSpec) {
+      throw new Error(`PromptSpec not found: ${promptSpecId}`);
+    }
+    await aiRepo.deletePromptSpec(this.serviceCtx.db, promptSpecId);
+    return { success: true };
+  }
 }

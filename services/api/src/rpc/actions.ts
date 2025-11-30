@@ -60,4 +60,16 @@ export class Actions extends Resource {
     }
     return { action };
   }
+
+  /**
+   * Delete an action
+   */
+  async delete(actionId: string) {
+    const action = await effectsRepo.getAction(this.serviceCtx.db, actionId);
+    if (!action) {
+      throw new Error(`Action not found: ${actionId}`);
+    }
+    await effectsRepo.deleteAction(this.serviceCtx.db, actionId);
+    return { success: true };
+  }
 }

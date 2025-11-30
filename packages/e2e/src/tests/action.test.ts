@@ -39,5 +39,12 @@ describe('Action API', () => {
     expect(retrieved!.id).toBe(action!.id);
     expect(retrieved!.name).toBe(action!.name);
     expect(retrieved!.kind).toBe('llm_call');
+
+    // Delete action
+    const { data: deleteResult, error: deleteError } = await client.DELETE('/api/actions/{id}', {
+      params: { path: { id: action!.id } },
+    });
+    expect(deleteError).toBeUndefined();
+    expect(deleteResult?.success).toBe(true);
   });
 });

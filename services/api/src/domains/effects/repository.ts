@@ -59,3 +59,7 @@ export async function listActionsByKind(
 ): Promise<Action[]> {
   return await db.select().from(actions).where(eq(actions.kind, kind)).all();
 }
+
+export async function deleteAction(db: DrizzleD1Database, id: string): Promise<void> {
+  await db.delete(actions).where(eq(actions.id, id)).run();
+}

@@ -66,3 +66,31 @@ actions.openapi(getActionRoute, async (c) => {
   const result = await actions.get(id);
   return c.json(result.action);
 });
+
+const deleteActionRoute = createRoute({
+  method: 'delete',
+  path: '/{id}',
+  tags: ['actions'],
+  request: {
+    params: z.object({
+      id: ulid().openapi({ param: { name: 'id', in: 'path' } }),
+    }),
+  },
+  responses: {
+    200: {
+      content: {
+        'application/json': {
+          schema: z.object({ success: z.boolean() }),
+        },
+      },
+      description: 'Action deleted successfully',
+    },
+  },
+});
+
+actions.openapi(deleteActionRoute, async (c) => {
+  const { id } = c.req.valid('param');
+  using actions = c.env.API.actions();
+  await actions.delete(id);
+  return c.json({ success: true });
+});

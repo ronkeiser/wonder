@@ -64,6 +64,10 @@ export async function getLatestPromptSpec(
   return result ?? null;
 }
 
+export async function deletePromptSpec(db: DrizzleD1Database, id: string): Promise<void> {
+  await db.delete(prompt_specs).where(eq(prompt_specs.id, id)).run();
+}
+
 /** ModelProfile */
 
 export async function createModelProfile(
