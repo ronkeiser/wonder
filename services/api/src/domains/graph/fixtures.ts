@@ -97,7 +97,10 @@ export async function buildNode(
   }
 
   return await createNode(db, {
+    id: overrides?.id ?? 'node_test',
     workflow_def_id: workflow_def_id!,
+    workflow_def_version: overrides?.workflow_def_version ?? 1,
+    action_version: overrides?.action_version ?? 1,
     name: 'Test Node',
     action_id: 'action_test',
     input_mapping: null,

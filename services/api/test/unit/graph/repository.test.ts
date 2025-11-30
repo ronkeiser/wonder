@@ -197,6 +197,8 @@ describe('Node', () => {
       initial_node_id: 'start',
     });
     const action = await createAction(db, {
+      id: 'action_node_test',
+      version: 1,
       name: 'Test Action',
       description: 'Test',
       kind: 'llm_call',
@@ -208,8 +210,10 @@ describe('Node', () => {
     });
 
     const node = await createNode(db, {
+      id: 'node_test',
       workflow_def_id: def.id,
       workflow_def_version: def.version,
+      action_version: action.version,
       name: 'Test Node',
       action_id: action.id,
       input_mapping: null,
@@ -244,6 +248,8 @@ describe('Node', () => {
       initial_node_id: 'start',
     });
     const action = await createAction(db, {
+      id: 'action_m_of_n',
+      version: 1,
       name: 'Test Action',
       description: 'Test',
       kind: 'llm_call',
@@ -255,8 +261,10 @@ describe('Node', () => {
     });
 
     const node = await createNode(db, {
+      id: 'node_m_of_n',
       workflow_def_id: def.id,
       workflow_def_version: def.version,
+      action_version: action.version,
       name: 'Test Node',
       action_id: action.id,
       input_mapping: null,
@@ -268,7 +276,7 @@ describe('Node', () => {
       on_early_complete: null,
     });
 
-    const retrieved = await getNode(db, node.id);
+    const retrieved = await getNode(db, def.id, def.version, node.id);
     expect(retrieved?.fan_in).toEqual({ m_of_n: 3 });
   });
 
@@ -291,6 +299,8 @@ describe('Node', () => {
       initial_node_id: 'start',
     });
     const action1 = await createAction(db, {
+      id: 'action_1',
+      version: 1,
       name: 'Action 1',
       description: 'Test',
       kind: 'llm_call',
@@ -301,6 +311,8 @@ describe('Node', () => {
       idempotency: null,
     });
     const action2 = await createAction(db, {
+      id: 'action_2',
+      version: 1,
       name: 'Action 2',
       description: 'Test',
       kind: 'llm_call',
@@ -312,8 +324,10 @@ describe('Node', () => {
     });
 
     const node1 = await createNode(db, {
+      id: 'node_1',
       workflow_def_id: def.id,
       workflow_def_version: def.version,
+      action_version: action1.version,
       name: 'Node 1',
       action_id: action1.id,
       input_mapping: null,
@@ -326,8 +340,10 @@ describe('Node', () => {
     });
 
     const node2 = await createNode(db, {
+      id: 'node_2',
       workflow_def_id: def.id,
       workflow_def_version: def.version,
+      action_version: action2.version,
       name: 'Node 2',
       action_id: action2.id,
       input_mapping: null,

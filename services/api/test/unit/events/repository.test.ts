@@ -28,11 +28,12 @@ describe('Event', () => {
       archived_at: null,
     });
 
-    expect(event.id).toMatch(/^[0-9A-Z]{26}$/);
+    expect(event.workflow_run_id).toBe(run.id);
+    expect(event.sequence_number).toBe(1);
     expect(event.kind).toBe('workflow_started');
     expect(event.timestamp).toBeDefined();
 
-    const retrieved = await getEvent(db, event.id);
+    const retrieved = await getEvent(db, run.id, 1);
     expect(retrieved).toEqual(event);
   });
 

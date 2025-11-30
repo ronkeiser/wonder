@@ -20,6 +20,8 @@ beforeAll(async () => {
 describe('PromptSpec', () => {
   test('creates and retrieves prompt spec', async () => {
     const spec = await createPromptSpec(db, {
+      id: 'prompt_test',
+      version: 1,
       name: 'Test Prompt',
       description: 'Test description',
       system_prompt: 'You are a helpful assistant',
@@ -41,6 +43,8 @@ describe('PromptSpec', () => {
 
   test('gets latest version when multiple exist', async () => {
     const spec1 = await createPromptSpec(db, {
+      id: 'prompt_versioned',
+      version: 1,
       name: 'Test',
       description: 'Test',
       system_prompt: null,

@@ -13,6 +13,8 @@ beforeAll(async () => {
 describe('Action', () => {
   test('creates and retrieves action', async () => {
     const action = await createAction(db, {
+      id: 'action_test',
+      version: 1,
       name: 'LLM Call',
       description: 'Execute LLM call',
       kind: 'llm_call',
@@ -36,6 +38,8 @@ describe('Action', () => {
 
   test('lists actions by kind', async () => {
     await createAction(db, {
+      id: 'action_llm_1',
+      version: 1,
       name: 'LLM Call 1',
       description: 'Test',
       kind: 'llm_call',
@@ -47,6 +51,8 @@ describe('Action', () => {
     });
 
     await createAction(db, {
+      id: 'action_mcp',
+      version: 1,
       name: 'MCP Tool',
       description: 'Test',
       kind: 'mcp_tool',
@@ -58,6 +64,8 @@ describe('Action', () => {
     });
 
     await createAction(db, {
+      id: 'action_llm_2',
+      version: 1,
       name: 'LLM Call 2',
       description: 'Test',
       kind: 'llm_call',
