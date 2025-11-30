@@ -1,4 +1,4 @@
-import * as graphService from '~/domains/graph/service';
+import * as workspaceService from '~/domains/workspace/service';
 import { Resource } from './resource';
 
 /**
@@ -15,7 +15,7 @@ export class Projects extends Resource {
     description?: string;
     settings?: unknown;
   }) {
-    const project = await graphService.createProject(this.serviceCtx, data);
+    const project = await workspaceService.createProject(this.serviceCtx, data);
     return {
       project_id: project.id,
       project,
@@ -26,7 +26,7 @@ export class Projects extends Resource {
    * Get a project by ID
    */
   async get(projectId: string) {
-    const project = await graphService.getProject(this.serviceCtx, projectId);
+    const project = await workspaceService.getProject(this.serviceCtx, projectId);
     return { project };
   }
 
@@ -35,7 +35,7 @@ export class Projects extends Resource {
    * Note: Cascading deletes handled by DB foreign key constraints
    */
   async delete(projectId: string) {
-    await graphService.deleteProject(this.serviceCtx, projectId);
+    await workspaceService.deleteProject(this.serviceCtx, projectId);
     return { success: true };
   }
 }

@@ -4,16 +4,18 @@ import { beforeAll, describe, expect, test } from 'vitest';
 import { createAction } from '~/domains/effects/repository';
 import {
   createNode,
-  createProject,
   createWorkflowDef,
-  createWorkspace,
   getNode,
-  getProject,
   getWorkflowDef,
-  getWorkspace,
   listNodesByWorkflowDef,
   listWorkflowDefsByOwner,
 } from '~/domains/graph/repository';
+import {
+  createProject,
+  createWorkspace,
+  getProject,
+  getWorkspace,
+} from '~/domains/workspace/repository';
 import { createTestDb } from '../../helpers/db';
 
 const db = createTestDb();

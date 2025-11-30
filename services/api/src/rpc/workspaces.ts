@@ -1,4 +1,4 @@
-import * as graphService from '~/domains/graph/service';
+import * as workspaceService from '~/domains/workspace/service';
 import { Resource } from './resource';
 
 /**
@@ -10,7 +10,7 @@ export class Workspaces extends Resource {
    * Create a new workspace
    */
   async create(data: { name: string; settings?: unknown }) {
-    const workspace = await graphService.createWorkspace(this.serviceCtx, data);
+    const workspace = await workspaceService.createWorkspace(this.serviceCtx, data);
     return {
       workspace_id: workspace.id,
       workspace,
@@ -21,7 +21,7 @@ export class Workspaces extends Resource {
    * Get a workspace by ID
    */
   async get(workspaceId: string) {
-    const workspace = await graphService.getWorkspace(this.serviceCtx, workspaceId);
+    const workspace = await workspaceService.getWorkspace(this.serviceCtx, workspaceId);
     return { workspace };
   }
 
@@ -29,7 +29,7 @@ export class Workspaces extends Resource {
    * List workspaces with optional pagination
    */
   async list(options?: { limit?: number; offset?: number }) {
-    const workspaces = await graphService.listWorkspaces(this.serviceCtx, options);
+    const workspaces = await workspaceService.listWorkspaces(this.serviceCtx, options);
     return { workspaces };
   }
 
@@ -37,7 +37,7 @@ export class Workspaces extends Resource {
    * Update a workspace
    */
   async update(workspaceId: string, data: { name?: string; settings?: unknown }) {
-    const workspace = await graphService.updateWorkspace(this.serviceCtx, workspaceId, data);
+    const workspace = await workspaceService.updateWorkspace(this.serviceCtx, workspaceId, data);
     return { workspace };
   }
 
@@ -46,7 +46,7 @@ export class Workspaces extends Resource {
    * Note: Cascading deletes handled by DB foreign key constraints
    */
   async delete(workspaceId: string) {
-    await graphService.deleteWorkspace(this.serviceCtx, workspaceId);
+    await workspaceService.deleteWorkspace(this.serviceCtx, workspaceId);
     return { success: true };
   }
 }
