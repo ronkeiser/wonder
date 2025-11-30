@@ -337,6 +337,14 @@ export async function listNodesByWorkflowDef(
   }));
 }
 
+export async function updateNode(
+  db: DrizzleD1Database,
+  id: string,
+  data: Partial<Pick<NewNodeRow, 'joins_node'>>,
+): Promise<void> {
+  await db.update(nodes).set(data).where(eq(nodes.id, id)).run();
+}
+
 /** Transition */
 
 export async function createTransition(
