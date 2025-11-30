@@ -11,7 +11,29 @@ export interface paths {
             path?: never;
             cookie?: never;
         };
-        get?: never;
+        get: {
+            parameters: {
+                query?: {
+                    limit?: number;
+                    offset?: number | null;
+                };
+                header?: never;
+                path?: never;
+                cookie?: never;
+            };
+            requestBody?: never;
+            responses: {
+                /** @description Workspaces retrieved successfully */
+                200: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["WorkspaceListResponse"];
+                    };
+                };
+            };
+        };
         put?: never;
         post: {
             parameters: {
@@ -100,7 +122,32 @@ export interface paths {
         };
         options?: never;
         head?: never;
-        patch?: never;
+        patch: {
+            parameters: {
+                query?: never;
+                header?: never;
+                path: {
+                    id: string;
+                };
+                cookie?: never;
+            };
+            requestBody?: {
+                content: {
+                    "application/json": components["schemas"]["UpdateWorkspace"];
+                };
+            };
+            responses: {
+                /** @description Workspace updated successfully */
+                200: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["WorkspaceUpdateResponse"];
+                    };
+                };
+            };
+        };
         trace?: never;
     };
     "/api/projects": {
@@ -758,6 +805,45 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/workflows/runs/{id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: {
+            parameters: {
+                query?: never;
+                header?: never;
+                path: {
+                    id: string;
+                };
+                cookie?: never;
+            };
+            requestBody?: never;
+            responses: {
+                /** @description Workflow run retrieved successfully */
+                200: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": {
+                            [key: string]: unknown;
+                        };
+                    };
+                };
+            };
+        };
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
 }
 export type webhooks = Record<string, never>;
 export interface components {
@@ -775,6 +861,9 @@ export interface components {
             /** @example 2024-01-01T00:00:00Z */
             updated_at: string;
         };
+        WorkspaceListResponse: {
+            workspaces: components["schemas"]["Workspace"][];
+        };
         WorkspaceCreateResponse: {
             workspace_id: string;
             workspace: components["schemas"]["Workspace"];
@@ -789,6 +878,17 @@ export interface components {
         };
         WorkspaceGetResponse: {
             workspace: components["schemas"]["Workspace"];
+        };
+        WorkspaceUpdateResponse: {
+            workspace: components["schemas"]["Workspace"];
+        };
+        UpdateWorkspace: {
+            /** @example My Workspace */
+            name?: string;
+            /** @example {} */
+            settings?: {
+                [key: string]: unknown;
+            };
         };
         Project: {
             id: string;

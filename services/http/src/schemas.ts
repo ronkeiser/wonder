@@ -43,6 +43,25 @@ export const WorkspaceGetResponseSchema = z
   })
   .openapi('WorkspaceGetResponse');
 
+export const WorkspaceListResponseSchema = z
+  .object({
+    workspaces: z.array(WorkspaceSchema),
+  })
+  .openapi('WorkspaceListResponse');
+
+export const UpdateWorkspaceSchema = z
+  .object({
+    name: z.string().min(1).max(255).optional().openapi({ example: 'My Workspace' }),
+    settings: z.record(z.string(), z.unknown()).optional().openapi({ example: {} }),
+  })
+  .openapi('UpdateWorkspace');
+
+export const WorkspaceUpdateResponseSchema = z
+  .object({
+    workspace: WorkspaceSchema,
+  })
+  .openapi('WorkspaceUpdateResponse');
+
 /** Project Schemas */
 export const CreateProjectSchema = z
   .object({

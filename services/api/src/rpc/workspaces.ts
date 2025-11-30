@@ -45,6 +45,36 @@ export class Workspaces extends Resource {
   }
 
   /**
+   * List workspaces with optional pagination
+   */
+  async list(options?: { limit?: number; offset?: number }) {
+    this.serviceCtx.logger.info('workspace_list', options);
+
+    const workspaces = await graphRepo.listWorkspaces(this.serviceCtx.db, options);
+
+    return { workspaces };
+  }
+
+  /**
+   * Update a workspace
+   */
+  async update(workspaceId: string, data: { name?: string; settings?: unknown }) {
+    this.serviceCtx.logger.info('workspace_update_started', { workspace_id: workspaceId });
+
+    const workspace = await graphRepo.updateWorkspace(this.serviceCtx.db, workspaceId, {
+      name: data.name,
+      settings: data.settings ?? undefined,
+    });
+
+    this.serviceCtx.logger.info('workspace_updated', {
+      workspace_id: workspace.id,
+      name: workspace.name,
+    });
+
+    return { workspace };
+  }
+
+  /**
    * Delete a workspace
    * Note: Cascading deletes handled by DB foreign key constraints
    */

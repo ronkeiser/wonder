@@ -78,6 +78,45 @@ export async function getWorkspace(db: DrizzleD1Database, id: string): Promise<W
   return result ?? null;
 }
 
+export async function listWorkspaces(
+  db: DrizzleD1Database,
+  options?: { limit?: number; offset?: number },
+): Promise<Workspace[]> {
+  let query = db.select().from(workspaces);
+
+  if (options?.limit) {
+    query = query.limit(options.limit) as any;
+  }
+  if (options?.offset) {
+    query = query.offset(options.offset) as any;
+  }
+
+  return await query.all();
+}
+
+export async function updateWorkspace(
+  db: DrizzleD1Database,
+  id: string,
+  data: Partial<Pick<NewWorkspace, 'name' | 'settings'>>,
+): Promise<Workspace> {
+  const now = new Date().toISOString();
+
+  await db
+    .update(workspaces)
+    .set({
+      ...data,
+      updated_at: now,
+    })
+    .where(eq(workspaces.id, id))
+    .run();
+
+  const updated = await getWorkspace(db, id);
+  if (!updated) {
+    throw new Error(`Workspace not found after update: ${id}`);
+  }
+  return updated;
+}
+
 /** Project */
 
 export async function createProject(db: DrizzleD1Database, data: NewProject): Promise<Project> {
