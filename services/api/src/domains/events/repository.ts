@@ -2,17 +2,15 @@
 
 import { and, eq, gt } from 'drizzle-orm';
 import type { DrizzleD1Database } from 'drizzle-orm/d1';
-import { ulid } from 'ulid';
 import { events } from '~/infrastructure/db/schema';
 
 type Event = typeof events.$inferSelect;
-type NewEvent = Omit<typeof events.$inferInsert, 'id' | 'timestamp'>;
+type NewEvent = Omit<typeof events.$inferInsert, 'timestamp'>;
 
 /** Event */
 
 export async function createEvent(db: DrizzleD1Database, data: NewEvent): Promise<Event> {
   const event = {
-    id: ulid(),
     ...data,
     timestamp: new Date().toISOString(),
   };
@@ -24,7 +22,6 @@ export async function createEvent(db: DrizzleD1Database, data: NewEvent): Promis
 export async function createEvents(db: DrizzleD1Database, data: NewEvent[]): Promise<void> {
   const timestamp = new Date().toISOString();
   const eventRecords = data.map((event) => ({
-    id: ulid(),
     ...event,
     timestamp,
   }));
@@ -32,8 +29,18 @@ export async function createEvents(db: DrizzleD1Database, data: NewEvent[]): Pro
   await db.insert(events).values(eventRecords).run();
 }
 
-export async function getEvent(db: DrizzleD1Database, id: string): Promise<Event | null> {
-  const result = await db.select().from(events).where(eq(events.id, id)).get();
+export async function getEvent(
+  db: DrizzleD1Database,
+  workflow_run_id: string,
+  sequence_number: number,
+): Promise<Event | null> {
+  const result = await db
+    .select()
+    .from(events)
+    .where(
+      and(eq(events.workflow_run_id, workflow_run_id), eq(events.sequence_number, sequence_number)),
+    )
+    .get();
   return result ?? null;
 }
 

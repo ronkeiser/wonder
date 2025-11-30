@@ -306,7 +306,6 @@ export const workflow_runs = sqliteTable(
 export const events = sqliteTable(
   'events',
   {
-    id: text('id').primaryKey(),
     workflow_run_id: text('workflow_run_id')
       .notNull()
       .references(() => workflow_runs.id, { onDelete: 'cascade' }),
@@ -338,7 +337,7 @@ export const events = sqliteTable(
     archived_at: text('archived_at'), // when moved to R2 (30-day retention policy)
   },
   (table) => [
-    index('idx_events_run_sequence').on(table.workflow_run_id, table.sequence_number),
+    primaryKey({ columns: [table.workflow_run_id, table.sequence_number] }),
     index('idx_events_timestamp').on(table.timestamp),
     index('idx_events_kind').on(table.kind),
     index('idx_events_archived_at').on(table.archived_at),
