@@ -21,109 +21,122 @@ app.get('/health', (c) => c.text('OK'));
 
 // Projects
 app.post('/api/projects', async (c) => {
+  using projects = c.env.API.projects();
   const data = await c.req.json();
-  const result = await c.env.API.projects().create(data);
+  const result = await projects.create(data);
   return c.json(result, 201);
 });
 
 app.get('/api/projects/:id', async (c) => {
+  using projects = c.env.API.projects();
   const id = c.req.param('id');
-  const result = await c.env.API.projects().get(id);
+  const result = await projects.get(id);
   return c.json(result);
 });
 
 app.delete('/api/projects/:id', async (c) => {
+  using projects = c.env.API.projects();
   const id = c.req.param('id');
-  await c.env.API.projects().delete(id);
+  await projects.delete(id);
   return c.json({ success: true });
 });
 
 // Actions
 app.post('/api/actions', async (c) => {
+  using actions = c.env.API.actions();
   const data = await c.req.json();
-  const result = await c.env.API.actions().create(data);
+  const result = await actions.create(data);
   return c.json(result, 201);
 });
 
 app.get('/api/actions/:id', async (c) => {
+  using actions = c.env.API.actions();
   const id = c.req.param('id');
-  const result = await c.env.API.actions().get(id);
+  const result = await actions.get(id);
   return c.json(result);
 });
 
 // Prompt Specs
 app.post('/api/prompt-specs', async (c) => {
+  using promptSpecs = c.env.API.promptSpecs();
   const data = await c.req.json();
-  const result = await c.env.API.promptSpecs().create(data);
+  const result = await promptSpecs.create(data);
   return c.json(result, 201);
 });
 
 app.get('/api/prompt-specs/:id', async (c) => {
+  using promptSpecs = c.env.API.promptSpecs();
   const id = c.req.param('id');
-  const result = await c.env.API.promptSpecs().get(id);
+  const result = await promptSpecs.get(id);
   return c.json(result);
 });
 
 // Model Profiles
 app.get('/api/model-profiles', async (c) => {
+  using modelProfiles = c.env.API.modelProfiles();
   const provider = c.req.query('provider');
   const filters = provider ? { provider } : undefined;
-  const result = await c.env.API.modelProfiles().list(filters);
+  const result = await modelProfiles.list(filters);
   return c.json(result);
 });
 
 app.get('/api/model-profiles/:id', async (c) => {
+  using modelProfiles = c.env.API.modelProfiles();
   const id = c.req.param('id');
-  const result = await c.env.API.modelProfiles().get(id);
+  const result = await modelProfiles.get(id);
   return c.json(result);
 });
 
 app.post('/api/model-profiles', async (c) => {
+  using modelProfiles = c.env.API.modelProfiles();
   const data = await c.req.json();
-  const result = await c.env.API.modelProfiles().create(data);
+  const result = await modelProfiles.create(data);
   return c.json(result, 201);
 });
 
 // Workflow Definitions
 app.post('/api/workflow-defs', async (c) => {
+  using workflowDefs = c.env.API.workflowDefs();
   const data = await c.req.json();
-  const result = await c.env.API.workflowDefs().create(data);
+  const result = await workflowDefs.create(data);
   return c.json(result, 201);
 });
 
 app.get('/api/workflow-defs/:id', async (c) => {
+  using workflowDefs = c.env.API.workflowDefs();
   const id = c.req.param('id');
   const version = c.req.query('version');
-  const result = await c.env.API.workflowDefs().get(
-    id,
-    version ? parseInt(version) : undefined,
-  );
+  const result = await workflowDefs.get(id, version ? parseInt(version) : undefined);
   return c.json(result);
 });
 
 app.get('/api/workflow-defs/owner/:owner', async (c) => {
+  using workflowDefs = c.env.API.workflowDefs();
   const owner = c.req.param('owner');
-  const result = await c.env.API.workflowDefs().listByOwner(owner);
+  const result = await workflowDefs.listByOwner(owner);
   return c.json(result);
 });
 
 // Workflows (bindings)
 app.post('/api/workflows', async (c) => {
+  using workflows = c.env.API.workflows();
   const data = await c.req.json();
-  const result = await c.env.API.workflows().create(data);
+  const result = await workflows.create(data);
   return c.json(result, 201);
 });
 
 app.get('/api/workflows/:id', async (c) => {
+  using workflows = c.env.API.workflows();
   const id = c.req.param('id');
-  const result = await c.env.API.workflows().get(id);
+  const result = await workflows.get(id);
   return c.json(result);
 });
 
 app.post('/api/workflows/:id/start', async (c) => {
+  using workflows = c.env.API.workflows();
   const id = c.req.param('id');
   const input = await c.req.json();
-  const result = await c.env.API.workflows().start(id, input);
+  const result = await workflows.start(id, input);
   return c.json(result);
 });
 
