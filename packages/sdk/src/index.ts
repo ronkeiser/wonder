@@ -1,47 +1,27 @@
 /**
- * Minimal SDK for Wonderful Workflow API
- *
- * Note on WebSocket lifecycle:
- * WebSockets keep the Node.js event loop alive even after close() is called.
- * In CLI scripts, explicitly call process.exit() after consuming all events.
- * This is expected behavior - WebSockets maintain connections for bidirectional
- * communication and don't auto-terminate.
+ * Wonder SDK - Type-safe client for the Wonder API
  */
 
-// Type exports
-export type * from './types/actions';
-export type * from './types/model-profiles';
-export type * from './types/projects';
-export type * from './types/prompt-specs';
-export type * from './types/workflow-defs';
-export type * from './types/workflows';
-export type * from './types/workspaces';
-
-// Resource imports
-import { ActionsResource } from './resources/actions';
+import { APIClient } from './client';
 import { ModelProfilesResource } from './resources/model-profiles';
 import { ProjectsResource } from './resources/projects';
-import { PromptSpecsResource } from './resources/prompt-specs';
-import { WorkflowDefsResource } from './resources/workflow-defs';
-import { WorkflowsResource } from './resources/workflows';
 import { WorkspacesResource } from './resources/workspaces';
 
-export class WonderfulClient {
+export type * from './generated/schema';
+
+export class WonderClient {
   public readonly workspaces: WorkspacesResource;
   public readonly projects: ProjectsResource;
-  public readonly actions: ActionsResource;
-  public readonly promptSpecs: PromptSpecsResource;
   public readonly modelProfiles: ModelProfilesResource;
-  public readonly workflowDefs: WorkflowDefsResource;
-  public readonly workflows: WorkflowsResource;
 
-  constructor(baseUrl: string) {
-    this.workspaces = new WorkspacesResource(baseUrl);
-    this.projects = new ProjectsResource(baseUrl);
-    this.actions = new ActionsResource(baseUrl);
-    this.promptSpecs = new PromptSpecsResource(baseUrl);
-    this.modelProfiles = new ModelProfilesResource(baseUrl);
-    this.workflowDefs = new WorkflowDefsResource(baseUrl);
-    this.workflows = new WorkflowsResource(baseUrl);
+  constructor(
+    baseUrl: string = process.env.API_URL || 'https://wonder-http.ron-keiser.workers.dev',
+  ) {
+    const apiClient = new APIClient(baseUrl);
+    this.workspaces = new WorkspacesResource(apiClient);
+    this.projects = new ProjectsResource(apiClient);
+    this.modelProfiles = new ModelProfilesResource(apiClient);
   }
 }
+
+export const client = new WonderClient();

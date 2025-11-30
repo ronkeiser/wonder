@@ -1,44 +1,25 @@
-import type { CreateWorkspaceRequest, Workspace } from '../types/workspaces';
+import type { APIClient } from '../client';
+import type { components } from '../generated/schema';
+
+type Workspace = components['schemas']['Workspace'];
+type CreateWorkspace = components['schemas']['CreateWorkspace'];
 
 export class WorkspacesResource {
-  constructor(private baseUrl: string) {}
+  constructor(private client: APIClient) {}
 
-  async create(
-    request: CreateWorkspaceRequest,
-  ): Promise<{ workspace_id: string; workspace: Workspace }> {
-    const response = await fetch(`${this.baseUrl}/api/workspaces`, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify(request),
-    });
-
-    if (!response.ok) {
-      const errorText = await response.text();
-      throw new Error(`Failed to create workspace: ${response.statusText} - ${errorText}`);
-    }
-
-    return (await response.json()) as { workspace_id: string; workspace: Workspace };
+  async create(data: CreateWorkspace) {
+    return this.client.post<Workspace>('/api/workspaces', { body: data });
   }
 
-  async get(workspaceId: string): Promise<{ workspace: Workspace }> {
-    const response = await fetch(`${this.baseUrl}/api/workspaces/${workspaceId}`);
-
-    if (!response.ok) {
-      throw new Error(`Failed to get workspace: ${response.statusText}`);
-    }
-
-    return (await response.json()) as { workspace: Workspace };
+  async get(id: string) {
+    return this.client.get<Workspace>('/api/workspaces/{id}', {
+      params: { id },
+    });
   }
 
-  async delete(workspaceId: string): Promise<{ success: boolean }> {
-    const response = await fetch(`${this.baseUrl}/api/workspaces/${workspaceId}`, {
-      method: 'DELETE',
+  async delete(id: string) {
+    return this.client.delete<{ success: boolean }>('/api/workspaces/{id}', {
+      params: { id },
     });
-
-    if (!response.ok) {
-      throw new Error(`Failed to delete workspace: ${response.statusText}`);
-    }
-
-    return (await response.json()) as { success: boolean };
   }
 }

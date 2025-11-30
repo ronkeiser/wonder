@@ -1,42 +1,21 @@
-import type { CreateProjectRequest, Project } from '../types/projects';
+import type { APIClient } from '../client';
+import type { components } from '../generated/schema';
+
+type Project = components['schemas']['Project'];
+type CreateProject = components['schemas']['CreateProject'];
 
 export class ProjectsResource {
-  constructor(private baseUrl: string) {}
+  constructor(private client: APIClient) {}
 
-  async create(request: CreateProjectRequest): Promise<{ project_id: string; project: Project }> {
-    const response = await fetch(`${this.baseUrl}/api/projects`, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify(request),
-    });
-
-    if (!response.ok) {
-      const errorText = await response.text();
-      throw new Error(`Failed to create project: ${response.statusText} - ${errorText}`);
-    }
-
-    return (await response.json()) as { project_id: string; project: Project };
+  async create(data: CreateProject) {
+    return this.client.post<Project>('/api/projects', { body: data });
   }
 
-  async get(projectId: string): Promise<{ project: Project }> {
-    const response = await fetch(`${this.baseUrl}/api/projects/${projectId}`);
-
-    if (!response.ok) {
-      throw new Error(`Failed to get project: ${response.statusText}`);
-    }
-
-    return (await response.json()) as { project: Project };
+  async get(id: string) {
+    return this.client.get<Project>(`/api/projects/${id}`);
   }
 
-  async delete(projectId: string): Promise<{ success: boolean }> {
-    const response = await fetch(`${this.baseUrl}/api/projects/${projectId}`, {
-      method: 'DELETE',
-    });
-
-    if (!response.ok) {
-      throw new Error(`Failed to delete project: ${response.statusText}`);
-    }
-
-    return (await response.json()) as { success: boolean };
+  async delete(id: string) {
+    return this.client.delete<{ success: boolean }>(`/api/projects/${id}`);
   }
 }

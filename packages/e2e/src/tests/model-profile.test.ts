@@ -1,11 +1,10 @@
 import { describe, expect, it } from 'vitest';
-
-const baseUrl = process.env.API_URL || 'https://wonder-http.ron-keiser.workers.dev';
+import { client } from '../client';
 
 describe('ModelProfile API', () => {
   it('should create and retrieve a model profile', async () => {
     // Create model profile
-    const profileBody = {
+    const { data: profile, error: createError } = await client.modelProfiles.create({
       name: `Test Model ${Date.now()}`,
       provider: 'anthropic',
       model_id: 'claude-3-5-sonnet-20241022',
@@ -15,36 +14,27 @@ describe('ModelProfile API', () => {
       },
       cost_per_1k_input_tokens: 0.003,
       cost_per_1k_output_tokens: 0.015,
-    };
-
-    const createRes = await fetch(`${baseUrl}/api/model-profiles`, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify(profileBody),
     });
 
-    expect(createRes.status).toBe(201);
-    const result = (await createRes.json()) as any;
-    expect(result.model_profile_id).toBeDefined();
-    expect(result.profile).toBeDefined();
-    expect(result.profile.name).toContain('Test Model');
-    expect(result.profile.provider).toBe('anthropic');
-    expect(result.profile.model_id).toBe('claude-3-5-sonnet-20241022');
+    expect(createError).toBeUndefined();
+    expect(profile).toBeDefined();
+    expect(profile!.id).toBeDefined();
+    expect(profile!.name).toContain('Test Model');
+    expect(profile!.provider).toBe('anthropic');
+    expect(profile!.model_id).toBe('claude-3-5-sonnet-20241022');
 
     // Get model profile
-    const getRes = await fetch(`${baseUrl}/api/model-profiles/${result.model_profile_id}`);
-    expect(getRes.status).toBe(200);
-    const retrieved = (await getRes.json()) as any;
-    expect(retrieved.profile).toBeDefined();
-    expect(retrieved.profile.id).toBe(result.model_profile_id);
-    expect(retrieved.profile.provider).toBe('anthropic');
+    const { data: retrieved, error: getError } = await client.modelProfiles.get(profile!.id);
+    expect(getError).toBeUndefined();
+    expect(retrieved).toBeDefined();
+    expect(retrieved!.id).toBe(profile!.id);
+    expect(retrieved!.provider).toBe('anthropic');
 
     // Delete model profile
-    const deleteRes = await fetch(`${baseUrl}/api/model-profiles/${result.model_profile_id}`, {
-      method: 'DELETE',
-    });
-    expect(deleteRes.status).toBe(200);
-    const deleteResult = (await deleteRes.json()) as any;
-    expect(deleteResult.success).toBe(true);
+    const { data: deleteResult, error: deleteError } = await client.modelProfiles.delete(
+      profile!.id,
+    );
+    expect(deleteError).toBeUndefined();
+    expect(deleteResult?.success).toBe(true);
   });
 });

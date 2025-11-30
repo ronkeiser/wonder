@@ -19,7 +19,13 @@ interface Env {
   WORKFLOW_COORDINATOR: DurableObjectNamespace; // Direct DO binding for WebSocket upgrades
 }
 
-const app = new OpenAPIHono<{ Bindings: Env }>();
+const app = new OpenAPIHono<{ Bindings: Env }>({
+  defaultHook: (result, c) => {
+    if (!result.success) {
+      return c.json({ error: result.error }, 400);
+    }
+  },
+});
 
 // CORS middleware
 app.use('/*', cors());
@@ -28,17 +34,18 @@ app.use('/*', cors());
 app.get('/health', (c) => c.text('OK'));
 
 // Mount resource routes
-app.route('/api/workspaces', workspaces);
-app.route('/api/projects', projects);
-app.route('/api/actions', actions);
-app.route('/api/prompt-specs', promptSpecs);
-app.route('/api/model-profiles', modelProfiles);
-app.route('/api/workflow-defs', workflowDefs);
-app.route('/api/workflows', workflows);
-app.route('/api/coordinator', coordinator);
+const routes = app
+  .route('/api/workspaces', workspaces)
+  .route('/api/projects', projects)
+  .route('/api/actions', actions)
+  .route('/api/prompt-specs', promptSpecs)
+  .route('/api/model-profiles', modelProfiles)
+  .route('/api/workflow-defs', workflowDefs)
+  .route('/api/workflows', workflows)
+  .route('/api/coordinator', coordinator);
 
 // OpenAPI documentation
-app.doc('/doc', {
+routes.doc('/doc', {
   openapi: '3.0.0',
   info: {
     version: '1.0.0',
@@ -47,5 +54,7 @@ app.doc('/doc', {
   },
 });
 
-export type AppType = typeof app;
-export default app;
+export default routes;
+
+// OpenAPIHono extends Hono, so we can safely cast for RPC client type inference
+export type AppType = typeof routes;

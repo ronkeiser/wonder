@@ -35,7 +35,7 @@ projects.openapi(createProjectRoute, async (c) => {
   const validated = c.req.valid('json');
   using projects = c.env.API.projects();
   const result = await projects.create(validated);
-  return c.json(result, 201);
+  return c.json(result.project, 201);
 });
 
 const getProjectRoute = createRoute({
@@ -62,7 +62,7 @@ projects.openapi(getProjectRoute, async (c) => {
   const { id } = c.req.valid('param');
   using projects = c.env.API.projects();
   const result = await projects.get(id);
-  return c.json(result);
+  return c.json(result.project);
 });
 
 const deleteProjectRoute = createRoute({

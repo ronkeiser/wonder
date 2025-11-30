@@ -8,11 +8,12 @@
     "test:watch": "vitest"
   },
   "dependencies": {
-    "@wonder/http": "workspace:*",
-    "hono": "^4.10.7"
+    "@wonder/sdk": "workspace:*"
   },
   "devDependencies": {
     "@types/node": "^24.10.1",
+    "openapi-fetch": "^0.15.0",
+    "openapi-typescript": "^7.10.1",
     "tsx": "^4.20.6",
     "typescript": "^5.9.3",
     "vitest": "^3.2.4"

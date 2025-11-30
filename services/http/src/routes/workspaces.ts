@@ -35,7 +35,7 @@ workspaces.openapi(createWorkspaceRoute, async (c) => {
   const validated = c.req.valid('json');
   using workspaces = c.env.API.workspaces();
   const result = await workspaces.create(validated);
-  return c.json(result, 201);
+  return c.json(result.workspace, 201);
 });
 
 const getWorkspaceRoute = createRoute({

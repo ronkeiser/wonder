@@ -61,7 +61,7 @@ modelProfiles.openapi(getModelProfileRoute, async (c) => {
   const { id } = c.req.valid('param');
   using modelProfiles = c.env.API.modelProfiles();
   const result = await modelProfiles.get(id);
-  return c.json(result);
+  return c.json(result.profile);
 });
 
 const createModelProfileRoute = createRoute({
@@ -92,7 +92,7 @@ modelProfiles.openapi(createModelProfileRoute, async (c) => {
   const validated = c.req.valid('json');
   using modelProfiles = c.env.API.modelProfiles();
   const result = await modelProfiles.create(validated);
-  return c.json(result, 201);
+  return c.json(result.profile, 201);
 });
 
 const deleteModelProfileRoute = createRoute({
