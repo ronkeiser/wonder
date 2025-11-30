@@ -10,7 +10,6 @@ export async function buildAction(
   overrides?: Partial<Parameters<typeof createAction>[1]>,
 ): Promise<Action> {
   return await createAction(db, {
-    id: overrides?.id ?? 'action_test',
     version: overrides?.version ?? 1,
     name: 'Test Action',
     description: 'Test action description',
@@ -30,12 +29,10 @@ export async function buildAction(
 export function buildLLMCallAction(params: {
   prompt_spec_id: string;
   model_profile_id: string;
-  id?: string;
   name?: string;
   description?: string;
 }): Omit<Parameters<typeof createAction>[1], 'version' | 'created_at' | 'updated_at'> {
   return {
-    id: params.id ?? 'action_llm_call',
     name: params.name ?? 'LLM Call',
     description: params.description ?? 'Execute LLM call',
     kind: 'llm_call',

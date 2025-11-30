@@ -103,13 +103,14 @@ VALUES (
 );
 
 -- Node: References action and workflow_def (with version!)
-INSERT INTO nodes (id, workflow_def_id, workflow_def_version, name, action_id, input_mapping, output_mapping, fan_out, fan_in, joins_node, merge, on_early_complete)
+INSERT INTO nodes (id, workflow_def_id, workflow_def_version, name, action_id, action_version, input_mapping, output_mapping, fan_out, fan_in, joins_node, merge, on_early_complete)
 VALUES (
   '01JDXSEED0000NODE0000001',
   '01JDXSEED0000WORKFLOWDEF1',
   1,
   'Greet',
   '01JDXSEED0000ACTION000001',
+  1,
   '{"name":"$.input.name"}',
   '{"greeting":"$.greeting"}',
   'first_match',

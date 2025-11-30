@@ -6,7 +6,7 @@ import { ulid } from 'ulid';
 import { model_profiles, prompt_specs } from '~/infrastructure/db/schema';
 
 type PromptSpec = typeof prompt_specs.$inferSelect;
-type NewPromptSpec = Omit<typeof prompt_specs.$inferInsert, 'created_at' | 'updated_at'>;
+type NewPromptSpec = Omit<typeof prompt_specs.$inferInsert, 'id' | 'created_at' | 'updated_at'>;
 
 type ModelProfile = typeof model_profiles.$inferSelect;
 type NewModelProfile = Omit<typeof model_profiles.$inferInsert, 'id'>;
@@ -19,6 +19,7 @@ export async function createPromptSpec(
 ): Promise<PromptSpec> {
   const now = new Date().toISOString();
   const spec = {
+    id: ulid(),
     ...data,
     created_at: now,
     updated_at: now,

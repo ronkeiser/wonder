@@ -2,16 +2,18 @@
 
 import { and, eq } from 'drizzle-orm';
 import type { DrizzleD1Database } from 'drizzle-orm/d1';
+import { ulid } from 'ulid';
 import { actions } from '~/infrastructure/db/schema';
 
 type Action = typeof actions.$inferSelect;
-type NewAction = Omit<typeof actions.$inferInsert, 'created_at' | 'updated_at'>;
+type NewAction = Omit<typeof actions.$inferInsert, 'id' | 'created_at' | 'updated_at'>;
 
 /** Action */
 
 export async function createAction(db: DrizzleD1Database, data: NewAction): Promise<Action> {
   const now = new Date().toISOString();
   const action = {
+    id: ulid(),
     ...data,
     created_at: now,
     updated_at: now,

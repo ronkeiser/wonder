@@ -56,7 +56,6 @@ export class WorkflowDefs extends Resource {
     // Create nodes
     for (const nodeData of data.nodes) {
       await graphRepo.createNode(this.serviceCtx.db, {
-        id: nodeData.id,
         workflow_def_id: workflowDef.id,
         workflow_def_version: workflowDef.version,
         name: nodeData.name,

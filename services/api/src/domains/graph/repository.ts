@@ -48,7 +48,7 @@ type NewNodeRow = typeof nodes.$inferInsert;
 type Node = Omit<NodeRow, 'fan_in'> & {
   fan_in: FanIn;
 };
-type NewNode = Omit<NewNodeRow, 'fan_in'> & {
+type NewNode = Omit<NewNodeRow, 'id' | 'fan_in'> & {
   fan_in: FanIn;
 };
 
@@ -232,6 +232,7 @@ export async function getWorkflow(db: DrizzleD1Database, id: string): Promise<Wo
 export async function createNode(db: DrizzleD1Database, data: NewNode): Promise<Node> {
   const { fan_in, ...rest } = data;
   const row: NewNodeRow = {
+    id: ulid(),
     ...rest,
     fan_in: fromFanIn(fan_in),
   };
