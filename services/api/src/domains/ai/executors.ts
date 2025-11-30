@@ -9,7 +9,7 @@ import * as aiRepo from './repository';
  */
 export async function executeLLMCall(
   env: { db: DrizzleD1Database; ai: Ai },
-  action: { implementation: unknown },
+  action: { implementation: unknown; produces: unknown },
   inputData: Record<string, unknown>,
 ): Promise<Record<string, unknown>> {
   const impl = action.implementation as {
@@ -41,6 +41,17 @@ export async function executeLLMCall(
   // Call Workers AI
   const result = await runInference(env.ai, modelProfile.model_id as keyof AiModels, messages);
 
+  // Map response to the field name specified in produces schema
+  // For Stage 0: assumes produces is a simple object with one string property
+  const produces = action.produces as { [key: string]: string } | null;
+  if (produces && typeof produces === 'object') {
+    const outputKey = Object.keys(produces)[0];
+    if (outputKey) {
+      return { [outputKey]: result.response };
+    }
+  }
+
+  // Fallback to 'response' if no produces schema
   return { response: result.response };
 }
 
