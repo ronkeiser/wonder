@@ -94,3 +94,30 @@ modelProfiles.openapi(createModelProfileRoute, async (c) => {
   const result = await modelProfiles.create(validated);
   return c.json(result, 201);
 });
+
+const deleteModelProfileRoute = createRoute({
+  method: 'delete',
+  path: '/{id}',
+  request: {
+    params: z.object({
+      id: ulid().openapi({ param: { name: 'id', in: 'path' } }),
+    }),
+  },
+  responses: {
+    200: {
+      content: {
+        'application/json': {
+          schema: z.object({ success: z.boolean() }),
+        },
+      },
+      description: 'Model profile deleted successfully',
+    },
+  },
+});
+
+modelProfiles.openapi(deleteModelProfileRoute, async (c) => {
+  const { id } = c.req.valid('param');
+  using modelProfiles = c.env.API.modelProfiles();
+  await modelProfiles.delete(id);
+  return c.json({ success: true });
+});

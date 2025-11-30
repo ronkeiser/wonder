@@ -1,3 +1,4 @@
+import { eq } from 'drizzle-orm';
 import * as aiRepo from '~/domains/ai/repository';
 import { model_profiles } from '~/infrastructure/db/schema';
 import { Resource } from './resource';
@@ -60,5 +61,19 @@ export class ModelProfiles extends Resource {
       model_profile_id: profile.id,
       profile,
     };
+  }
+
+  /**
+   * Delete a model profile
+   */
+  async delete(modelProfileId: string) {
+    const profile = await aiRepo.getModelProfile(this.serviceCtx.db, modelProfileId);
+    if (!profile) {
+      throw new Error(`ModelProfile not found: ${modelProfileId}`);
+    }
+
+    await this.serviceCtx.db.delete(model_profiles).where(eq(model_profiles.id, modelProfileId));
+
+    return { success: true };
   }
 }
