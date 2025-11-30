@@ -10,6 +10,7 @@ export const modelProfiles = new OpenAPIHono<{ Bindings: Env }>();
 const listModelProfilesRoute = createRoute({
   method: 'get',
   path: '/',
+  tags: ['model-profiles'],
   request: {
     query: z.object({
       provider: z.enum(['anthropic', 'openai', 'google', 'cloudflare', 'local']).optional(),
@@ -40,6 +41,7 @@ modelProfiles.openapi(listModelProfilesRoute, async (c) => {
 const getModelProfileRoute = createRoute({
   method: 'get',
   path: '/{id}',
+  tags: ['model-profiles'],
   request: {
     params: z.object({
       id: ulid().openapi({ param: { name: 'id', in: 'path' } }),
@@ -67,6 +69,7 @@ modelProfiles.openapi(getModelProfileRoute, async (c) => {
 const createModelProfileRoute = createRoute({
   method: 'post',
   path: '/',
+  tags: ['model-profiles'],
   request: {
     body: {
       content: {
@@ -98,6 +101,7 @@ modelProfiles.openapi(createModelProfileRoute, async (c) => {
 const deleteModelProfileRoute = createRoute({
   method: 'delete',
   path: '/{id}',
+  tags: ['model-profiles'],
   request: {
     params: z.object({
       id: ulid().openapi({ param: { name: 'id', in: 'path' } }),

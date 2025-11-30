@@ -10,6 +10,7 @@ export const projects = new OpenAPIHono<{ Bindings: Env }>();
 const createProjectRoute = createRoute({
   method: 'post',
   path: '/',
+  tags: ['projects'],
   request: {
     body: {
       content: {
@@ -41,6 +42,7 @@ projects.openapi(createProjectRoute, async (c) => {
 const getProjectRoute = createRoute({
   method: 'get',
   path: '/{id}',
+  tags: ['projects'],
   request: {
     params: z.object({
       id: ulid().openapi({ param: { name: 'id', in: 'path' } }),
@@ -68,6 +70,7 @@ projects.openapi(getProjectRoute, async (c) => {
 const deleteProjectRoute = createRoute({
   method: 'delete',
   path: '/{id}',
+  tags: ['projects'],
   request: {
     params: z.object({
       id: ulid().openapi({ param: { name: 'id', in: 'path' } }),

@@ -10,6 +10,7 @@ export const workflows = new OpenAPIHono<{ Bindings: Env }>();
 const createWorkflowRoute = createRoute({
   method: 'post',
   path: '/',
+  tags: ['workflows'],
   request: {
     body: {
       content: {
@@ -41,6 +42,7 @@ workflows.openapi(createWorkflowRoute, async (c) => {
 const getWorkflowRoute = createRoute({
   method: 'get',
   path: '/{id}',
+  tags: ['workflows'],
   request: {
     params: z.object({
       id: ulid().openapi({ param: { name: 'id', in: 'path' } }),
@@ -68,6 +70,7 @@ workflows.openapi(getWorkflowRoute, async (c) => {
 const startWorkflowRoute = createRoute({
   method: 'post',
   path: '/{id}/start',
+  tags: ['workflows'],
   request: {
     params: z.object({
       id: ulid().openapi({ param: { name: 'id', in: 'path' } }),

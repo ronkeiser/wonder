@@ -10,6 +10,7 @@ export const actions = new OpenAPIHono<{ Bindings: Env }>();
 const createActionRoute = createRoute({
   method: 'post',
   path: '/',
+  tags: ['actions'],
   request: {
     body: {
       content: {
@@ -41,6 +42,7 @@ actions.openapi(createActionRoute, async (c) => {
 const getActionRoute = createRoute({
   method: 'get',
   path: '/{id}',
+  tags: ['actions'],
   request: {
     params: z.object({
       id: ulid().openapi({ param: { name: 'id', in: 'path' } }),

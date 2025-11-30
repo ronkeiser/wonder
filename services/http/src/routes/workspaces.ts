@@ -10,6 +10,7 @@ export const workspaces = new OpenAPIHono<{ Bindings: Env }>();
 const createWorkspaceRoute = createRoute({
   method: 'post',
   path: '/',
+  tags: ['workspaces'],
   request: {
     body: {
       content: {
@@ -41,6 +42,7 @@ workspaces.openapi(createWorkspaceRoute, async (c) => {
 const getWorkspaceRoute = createRoute({
   method: 'get',
   path: '/{id}',
+  tags: ['workspaces'],
   request: {
     params: z.object({
       id: ulid().openapi({ param: { name: 'id', in: 'path' }, example: '01ARZ3NDEKTSV4RRFFQ69G5FAV' }),
@@ -68,6 +70,7 @@ workspaces.openapi(getWorkspaceRoute, async (c) => {
 const deleteWorkspaceRoute = createRoute({
   method: 'delete',
   path: '/{id}',
+  tags: ['workspaces'],
   request: {
     params: z.object({
       id: ulid().openapi({ param: { name: 'id', in: 'path' } }),

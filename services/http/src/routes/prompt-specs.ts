@@ -10,6 +10,7 @@ export const promptSpecs = new OpenAPIHono<{ Bindings: Env }>();
 const createPromptSpecRoute = createRoute({
   method: 'post',
   path: '/',
+  tags: ['prompt-specs'],
   request: {
     body: {
       content: {
@@ -41,6 +42,7 @@ promptSpecs.openapi(createPromptSpecRoute, async (c) => {
 const getPromptSpecRoute = createRoute({
   method: 'get',
   path: '/{id}',
+  tags: ['prompt-specs'],
   request: {
     params: z.object({
       id: ulid().openapi({ param: { name: 'id', in: 'path' } }),

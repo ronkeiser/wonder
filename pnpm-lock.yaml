@@ -74,6 +74,9 @@ importers:
       '@wonder/api':
         specifier: workspace:*
         version: link:../../services/api
+      openapi-fetch:
+        specifier: ^0.15.0
+        version: 0.15.0
     devDependencies:
       '@types/node':
         specifier: ^24.10.1
