@@ -29,7 +29,10 @@ export async function executeLLMCall(
   }
 
   // Render prompt template
+  console.log('Input data for template:', JSON.stringify(inputData));
+  console.log('Template:', promptSpec.template);
   const userPrompt = renderTemplate(promptSpec.template, inputData);
+  console.log('Rendered prompt:', userPrompt);
 
   // Build messages
   const messages: { role: 'system' | 'user' | 'assistant'; content: string }[] = [];
@@ -41,18 +44,24 @@ export async function executeLLMCall(
   // Call Workers AI
   const result = await runInference(env.ai, modelProfile.model_id as keyof AiModels, messages);
 
+  console.log('LLM result:', JSON.stringify(result));
+
   // Map response to the field name specified in produces schema
   // For Stage 0: assumes produces is a simple object with one string property
   const produces = action.produces as { [key: string]: string } | null;
   if (produces && typeof produces === 'object') {
     const outputKey = Object.keys(produces)[0];
     if (outputKey) {
-      return { [outputKey]: result.response };
+      const output = { [outputKey]: result.response };
+      console.log('Mapped output:', JSON.stringify(output));
+      return output;
     }
   }
 
   // Fallback to 'response' if no produces schema
-  return { response: result.response };
+  const fallback = { response: result.response };
+  console.log('Fallback output:', JSON.stringify(fallback));
+  return fallback;
 }
 
 /**

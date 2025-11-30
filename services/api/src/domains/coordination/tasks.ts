@@ -19,6 +19,8 @@ export class TaskDispatcher {
   enqueue(
     token: Token,
     workflowRunId: string,
+    workflowDefId: string,
+    workflowDefVersion: number,
     durableObjectId: string,
     context: import('../execution/definitions').Context,
   ): void {
@@ -35,6 +37,8 @@ export class TaskDispatcher {
       workflow_run_id: workflowRunId,
       token_id: token.id,
       node_id: token.node_id,
+      workflow_def_id: workflowDefId,
+      workflow_def_version: workflowDefVersion,
       action_id: '', // Will be filled by worker from node lookup
       action_kind: 'llm_call', // Simplified for Stage 0
       action_implementation: {}, // Will be filled by worker

@@ -25,36 +25,21 @@ describe('Workflow Execution API', () => {
       {
         body: {
           name: `Test Model Profile ${Date.now()}`,
-          provider: 'anthropic',
-          model_id: 'claude-3-5-sonnet-20241022',
+          provider: 'cloudflare',
+          model_id: '@cf/meta/llama-3.1-8b-instruct',
           parameters: {
-            max_tokens: 4096,
+            max_tokens: 512,
             temperature: 0.7,
           },
-          cost_per_1k_input_tokens: 0.003,
-          cost_per_1k_output_tokens: 0.015,
+          cost_per_1k_input_tokens: 0.0,
+          cost_per_1k_output_tokens: 0.0,
         },
       },
     );
 
     expect(modelProfileError).toBeUndefined();
 
-    // Create action
-    const actionId = `test-action-${Date.now()}`;
-    const { data: actionResponse } = await client.POST('/api/actions', {
-      body: {
-        id: actionId,
-        version: 1,
-        name: 'Test LLM Action',
-        description: 'LLM action for workflow execution test',
-        kind: 'llm_call',
-        implementation: {
-          model_profile_id: modelProfileResponse!.model_profile.id,
-        },
-      },
-    });
-
-    // Create prompt spec
+    // Create prompt spec (before action since action references it)
     const promptSpecId = `test-prompt-${Date.now()}`;
     const { data: promptSpecResponse } = await client.POST('/api/prompt-specs', {
       body: {
@@ -73,39 +58,67 @@ describe('Workflow Execution API', () => {
       },
     });
 
-    // Create workflow definition with single LLM node
-    const { data: workflowDefResponse } = await client.POST('/api/workflow-defs', {
+    // Create action (after prompt spec since action references it)
+    const actionId = `test-action-${Date.now()}`;
+    const { data: actionResponse } = await client.POST('/api/actions', {
       body: {
-        name: `Test Workflow Def ${Date.now()}`,
-        description: 'Workflow definition for execution test',
+        id: actionId,
         version: 1,
-        owner: {
-          type: 'project' as const,
-          project_id: projectResponse!.project.id,
+        name: 'Test LLM Action',
+        description: 'LLM action for workflow execution test',
+        kind: 'llm_call',
+        implementation: {
+          prompt_spec_id: promptSpecResponse!.prompt_spec.id,
+          model_profile_id: modelProfileResponse!.model_profile.id,
         },
-        input_schema: {
-          prompt: 'string',
-        },
-        output_schema: {
-          response: 'string',
-        },
-        initial_node_id: 'node-1',
-        nodes: [
-          {
-            id: 'node-1',
-            name: 'LLM Node',
-            action_id: actionResponse!.action.id,
-            action_version: 1,
-            input_mapping: {
-              prompt: '$.prompt',
-            },
-            output_mapping: {
-              response: '$.output',
-            },
-          },
-        ],
       },
     });
+
+    // Create workflow definition with single LLM node
+    const { data: workflowDefResponse, error: wfDefError } = await client.POST(
+      '/api/workflow-defs',
+      {
+        body: {
+          name: `Test Workflow Def ${Date.now()}`,
+          description: 'Workflow definition for execution test',
+          version: 1,
+          owner: {
+            type: 'project' as const,
+            project_id: projectResponse!.project.id,
+          },
+          input_schema: {
+            type: 'object',
+            properties: {
+              prompt: { type: 'string' },
+            },
+            required: ['prompt'],
+          },
+          output_schema: {
+            type: 'object',
+            properties: {
+              response: { type: 'string' },
+            },
+          },
+          initial_node_id: 'node-1',
+          nodes: [
+            {
+              id: 'node-1',
+              name: 'LLM Node',
+              action_id: actionResponse!.action.id,
+              action_version: 1,
+              input_mapping: {
+                prompt: '$.input.prompt',
+              },
+              output_mapping: {
+                response: '$.response',
+              },
+            },
+          ],
+        },
+      },
+    );
+
+    expect(wfDefError).toBeUndefined();
 
     // Create workflow binding
     const { data: workflowResponse } = await client.POST('/api/workflows', {
@@ -138,6 +151,50 @@ describe('Workflow Execution API', () => {
 
     // Verify workflow_run_id is a valid ULID format
     expect(startResponse!.workflow_run_id).toMatch(/^[0-7][0-9A-HJKMNP-TV-Z]{25}$/);
+
+    // Connect to WebSocket to listen for workflow completion
+    const wsUrl = `wss://wonder-http.ron-keiser.workers.dev/api/coordinator/${
+      startResponse!.durable_object_id
+    }/stream`;
+    const ws = new WebSocket(wsUrl);
+
+    const workflowOutput = await new Promise<string>((resolve, reject) => {
+      const timeout = setTimeout(() => {
+        ws.close();
+        reject(new Error('Workflow did not complete within 10 seconds'));
+      }, 10000);
+
+      ws.onmessage = (event) => {
+        const message = JSON.parse(event.data);
+        console.log('WebSocket event:', JSON.stringify(message, null, 2));
+
+        if (message.kind === 'workflow_completed') {
+          clearTimeout(timeout);
+          ws.close();
+          const output =
+            message.payload?.full_context?.output?.response ||
+            message.metadata?.output?.response ||
+            message.payload?.output?.response;
+          if (output) {
+            resolve(output);
+          } else {
+            reject(
+              new Error(`No response in workflow_completed event: ${JSON.stringify(message)}`),
+            );
+          }
+        }
+      };
+
+      ws.onerror = (error) => {
+        clearTimeout(timeout);
+        console.error('WebSocket error:', error);
+        reject(error);
+      };
+    });
+
+    // Verify we got output
+    expect(workflowOutput).toBeDefined();
+    console.log('\n🤖 Model output:', workflowOutput);
 
     // Cleanup
     await client.DELETE('/api/projects/{id}', {

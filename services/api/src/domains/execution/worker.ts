@@ -22,16 +22,34 @@ export async function processWorkflowTask(
 
   try {
     // Load node to get action_id and mappings
-    const node = await graphRepo.getNode(env.db, task.node_id);
+    const node = await graphRepo.getNode(
+      env.db,
+      task.workflow_def_id,
+      task.workflow_def_version,
+      task.node_id,
+    );
     if (!node) {
-      throw new Error(`Node not found: ${task.node_id}`);
+      throw new Error(
+        `Node not found: ${task.node_id} in workflow_def ${task.workflow_def_id} v${task.workflow_def_version}`,
+      );
     }
 
     // Apply input_mapping to extract data from context
+    console.log('Task context:', JSON.stringify(task.context));
+    console.log('Node input_mapping:', JSON.stringify(node.input_mapping));
+
     let inputData: Record<string, unknown> = {};
     if (node.input_mapping && Object.keys(node.input_mapping).length > 0) {
-      inputData = applyInputMapping(node.input_mapping as Record<string, string>, task.context);
+      // Parse input_mapping if it's a string (Drizzle JSON mode not working in queue consumer)
+      const mapping =
+        typeof node.input_mapping === 'string'
+          ? JSON.parse(node.input_mapping)
+          : node.input_mapping;
+
+      inputData = applyInputMapping(mapping as Record<string, string>, task.context);
     }
+
+    console.log('Extracted inputData:', JSON.stringify(inputData));
 
     // Load action
     const action = await effectsRepo.getAction(env.db, node.action_id);
@@ -44,13 +62,24 @@ export async function processWorkflowTask(
 
     if (action.kind === 'llm_call') {
       outputData = await aiExecutors.executeLLMCall(env, action, inputData);
+      console.log('Action result:', JSON.stringify(outputData));
     } else {
       throw new Error(`Unsupported action kind: ${action.kind}`);
     }
 
     // Apply output mapping if present
     if (node.output_mapping && Object.keys(node.output_mapping).length > 0) {
-      outputData = applyOutputMapping(node.output_mapping as Record<string, string>, outputData);
+      console.log('Before output mapping:', JSON.stringify(outputData));
+      console.log('Output mapping:', JSON.stringify(node.output_mapping));
+
+      // Parse output_mapping if it's a string (Drizzle JSON mode not working in queue consumer)
+      const mapping =
+        typeof node.output_mapping === 'string'
+          ? JSON.parse(node.output_mapping)
+          : node.output_mapping;
+
+      outputData = applyOutputMapping(mapping as Record<string, string>, outputData);
+      console.log('After output mapping:', JSON.stringify(outputData));
     }
 
     // Create success result
@@ -119,6 +148,11 @@ function applyOutputMapping(
 ): Record<string, unknown> {
   const result: Record<string, unknown> = {};
 
+  console.log('applyOutputMapping - actionResult type:', typeof actionResult);
+  console.log('applyOutputMapping - actionResult keys:', Object.keys(actionResult));
+  console.log('applyOutputMapping - actionResult:', JSON.stringify(actionResult));
+  console.log('applyOutputMapping - mapping:', JSON.stringify(mapping));
+
   for (const [targetPath, sourceKey] of Object.entries(mapping)) {
     // For Stage 0: simplified - just map directly
     // Target path like "summary" or "state.summary"
@@ -126,9 +160,16 @@ function applyOutputMapping(
 
     // Source key may have $. prefix (JSONPath notation for "from result")
     const actualSourceKey = sourceKey.startsWith('$.') ? sourceKey.slice(2) : sourceKey;
+
+    console.log(
+      `Mapping: target="${targetPath}" -> key="${key}", source="${sourceKey}" -> actualSourceKey="${actualSourceKey}"`,
+    );
+    console.log(`Value at actionResult["${actualSourceKey}"]:`, actionResult[actualSourceKey]);
+
     result[key] = actionResult[actualSourceKey];
   }
 
+  console.log('applyOutputMapping result:', JSON.stringify(result));
   return result;
 }
 

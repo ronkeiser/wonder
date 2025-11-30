@@ -46,10 +46,10 @@ export class WorkflowDefs extends Resource {
       name: data.name,
       description: data.description,
       owner: data.owner,
-      tags: data.tags ? JSON.stringify(data.tags) : null,
-      input_schema: JSON.stringify(data.input_schema),
-      output_schema: JSON.stringify(data.output_schema),
-      context_schema: data.context_schema ? JSON.stringify(data.context_schema) : null,
+      tags: data.tags,
+      input_schema: data.input_schema,
+      output_schema: data.output_schema,
+      context_schema: data.context_schema,
       initial_node_id: data.initial_node_id,
     });
 
