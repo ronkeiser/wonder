@@ -7,14 +7,14 @@ import { WorkerEntrypoint } from 'cloudflare:workers';
 import type { WorkflowTask } from './domains/execution/definitions';
 import { handleFetch } from './handlers/fetch';
 import { handleQueue } from './handlers/queue';
+import { Actions } from './resources/actions';
+import { ModelProfiles } from './resources/model-profiles';
 import { Projects } from './resources/projects';
+import { PromptSpecs } from './resources/prompt-specs';
 import { WorkflowDefs } from './resources/workflow-defs';
+import { Workflows } from './resources/workflows';
 import { Workspaces } from './resources/workspaces';
-import { Actions } from './rpc/actions';
 import { Coordination } from './rpc/coordination';
-import { ModelProfiles } from './rpc/model-profiles';
-import { PromptSpecs } from './rpc/prompt-specs';
-import { Workflows } from './rpc/workflows';
 
 // Export Durable Objects (required for Workers runtime)
 export { WorkflowCoordinator } from './domains/coordination';
