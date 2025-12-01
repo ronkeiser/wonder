@@ -65,40 +65,109 @@ wonder/
 
 ### 3. API Internal Structure
 
-**Three-way separation**:
+**Resources + Execution Infrastructure**:
 
 ```
 services/api/src/
-├── domains/              # Business logic (ADR-002 bounded contexts)
-│   ├── graph/            # WorkflowDef, NodeDef, TransitionDef
-│   ├── execution/        # WorkflowInstance, WorkItem, Token, Engine
-│   ├── schema/           # Schema, ArtifactType, FieldDefinition
-│   ├── ai/               # PromptSpec, ModelProfile, ResearchQuery
-│   ├── actors/           # Actor, AgentRole, Session
-│   ├── effects/          # ActionDef, Tool, ToolInvocation
-│   ├── events/           # Event, ExecutionLog, Trigger
-│   ├── observability/    # Observation, Dashboard, Widget
-│   ├── conversation/     # Turn, ChatMessage
-│   └── composition/      # Template, SubworkflowInvocation, Schedule
-├── infrastructure/       # External systems & platform services
-│   ├── db/               # D1 (Drizzle schema, migrations, client)
-│   ├── vectorize/        # Vectorize client
-│   ├── kv/               # Workers KV client
-│   ├── storage/          # R2 client
-│   ├── queues/           # Cloudflare Queues (future)
-│   └── clients/          # External APIs (MCP, GitHub, Anthropic)
-├── adapters/             # Protocol adapters (thin wrappers)
-│   ├── http/             # REST API
-│   └── rpc/              # Workers RPC endpoints
-└── errors.ts             # Custom error classes (ValidationError, NotFoundError, etc.)
+├── resources/            # RPC resources + data access (REST entities)
+│   ├── workspaces/
+│   │   ├── resource.ts       # RPC class: CRUD operations
+│   │   └── repository.ts     # D1 access for workspaces
+│   ├── projects/
+│   │   ├── resource.ts
+│   │   └── repository.ts
+│   ├── workflow-defs/
+│   │   ├── resource.ts       # RPC class: create/version workflow definitions
+│   │   ├── repository.ts     # WorkflowDef, Node, Transition data access
+│   │   └── transforms.ts     # Data transformations (owner, fan_in, etc.)
+│   ├── workflows/
+│   │   ├── resource.ts       # RPC class: bind workflows, start runs
+│   │   └── repository.ts
+│   ├── actions/
+│   │   ├── resource.ts
+│   │   └── repository.ts
+│   ├── prompt-specs/
+│   │   ├── resource.ts
+│   │   └── repository.ts
+│   ├── model-profiles/
+│   │   ├── resource.ts
+│   │   └── repository.ts
+│   └── workflow-runs/
+│       ├── resource.ts       # RPC class: query runs, get status
+│       └── repository.ts     # D1 persistence for completed runs
+├── coordinator/          # Durable Object (workflow orchestration)
+│   ├── index.ts              # WorkflowCoordinator DO class
+│   ├── lifecycle.ts          # Workflow lifecycle management
+│   ├── context.ts            # Context manager (DO SQLite)
+│   ├── tokens.ts             # Token manager (DO SQLite)
+│   ├── tasks.ts              # Task dispatcher (enqueues to worker)
+│   └── results.ts            # Task result processor
+├── events/               # Event sourcing (cross-cutting)
+│   ├── buffer.ts             # Event buffer (DO SQLite)
+│   └── stream.ts             # WebSocket event streaming
+├── execution/            # Task execution (queue consumer)
+│   ├── worker.ts             # Queue consumer entrypoint
+│   ├── executor.ts           # Action execution logic
+│   └── definitions.ts        # Shared types (Context, Token, WorkflowTask, etc.)
+└── infrastructure/       # External systems & platform services
+    ├── db/
+    │   └── schema.ts         # Drizzle schema (D1)
+    ├── context.ts            # ServiceContext type
+    └── clients/              # External APIs (Anthropic, OpenAI, etc.)
 ```
 
-**File pattern** (within each domain):
+**Architecture principles:**
+
+1. **Resources = Application services + Data access**
+
+   - RPC resources handle orchestration across repositories
+   - Repositories provide clean data access layer
+   - Co-located for cohesion (resource owns its data access)
+   - Testable: unit test repositories, integration test resources
+
+2. **Coordinator = Workflow state management**
+
+   - Durable Object with SQLite storage
+   - Manages workflow lifecycle, tokens, context
+   - Calls resource repositories for workflow definitions and metadata
+   - Not a resource (doesn't map to REST entity)
+
+3. **Execution = Task processing**
+
+   - Queue consumer for workflow tasks
+   - Calls LLM providers, executes actions
+   - Reports results back to coordinator
+   - Calls resource repositories for action/prompt specs
+
+4. **Events = Observability**
+   - Event sourcing for workflow execution
+   - WebSocket streaming for live updates
+   - Cross-cutting concern used by coordinator
+
+**Data flow:**
 
 ```
-domains/graph/
-├── definitions.ts      # Entities & value objects
-├── configs.ts          # Configuration objects
-├── repository.ts       # Data access layer
-└── service.ts          # Business operations (protocol-agnostic)
+HTTP → resources/workflows (RPC) → D1
+
+coordinator → resources/workflow-defs/repository → D1
+           → resources/actions/repository → D1
+           → events/buffer → DO SQLite
+
+execution/worker → resources/model-profiles/repository → D1
+                → coordinator (via DO stub) → DO SQLite
+```
+
+**File pattern** (within each resource):
+
+```
+resources/workflows/
+├── resource.ts         # RPC class (application service)
+│   - create(data)      # Orchestrates validation + repo calls
+│   - start(id, input)  # Coordinates with coordinator
+│   - get(id)           # Simple repo delegation
+│   - list(filters)     # Query orchestration
+└── repository.ts       # Data access layer
+    - createWorkflow()  # Pure D1 operations
+    - getWorkflow()     # No business logic
+    - listWorkflows()   # SQL queries only
 ```

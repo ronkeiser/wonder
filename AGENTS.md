@@ -14,10 +14,10 @@ Two common misinterpretations to avoid:
 ## Response Format
 
 **_ONLY_** perform work if the user has clearly given short, clear consent ("Proceed", "Yes", "Do it", "Approved").
-Always summarize the users concerns unless you've just recieved a short consent message.
-If you need clarification from the user to proceed, briefly summarize the issue and present any key questions. This should be your default mode of operation.
-If the path forward is clear, explain what you intend to do and seek confirmation.
-If there are multiple viable options, present them using the format below:
+**_ALWAYS_** summarize the users concerns unless you've just recieved a short consent message.
+**_IF_** you need clarification from the user to proceed, briefly summarize the issue and present any key questions. This should be your default mode of operation.
+**_IF_** the path forward is clear, explain what you intend to do and seek confirmation.
+**_ONLY IF_** there are multiple viable options, present them using the format below:
 
 ### When Presenting Options
 
