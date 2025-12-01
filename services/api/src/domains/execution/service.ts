@@ -8,7 +8,7 @@ import {
 } from '@wonder/schema';
 import { NotFoundError, ValidationError } from '~/errors';
 import type { ServiceContext } from '~/infrastructure/context';
-import * as graphRepo from '../graph/repository';
+import * as graphService from '../graph/service';
 import { type Context, type WorkflowRun } from './definitions';
 import * as execRepo from './repository';
 
@@ -44,31 +44,7 @@ export async function startWorkflow(
   ctx.logger.info('workflow_trigger_started', { workflow_id: workflowId });
 
   // Load workflow and definition
-  const workflow = await graphRepo.getWorkflow(ctx.db, workflowId);
-  if (!workflow) {
-    ctx.logger.warn('workflow_not_found', { workflow_id: workflowId });
-    throw new NotFoundError(`Workflow not found: ${workflowId}`, 'workflow', workflowId);
-  }
-
-  const workflowDef = await graphRepo.getWorkflowDef(
-    ctx.db,
-    workflow.workflow_def_id,
-    workflow.pinned_version ?? undefined,
-  );
-  if (!workflowDef) {
-    ctx.logger.warn('workflow_definition_not_found', {
-      workflow_id: workflowId,
-      workflow_def_id: workflow.workflow_def_id,
-      version: workflow.pinned_version,
-    });
-    throw new NotFoundError(
-      `Workflow definition not found: ${workflow.workflow_def_id}${
-        workflow.pinned_version ? ` v${workflow.pinned_version}` : ''
-      }`,
-      'workflow_definition',
-      workflow.workflow_def_id,
-    );
-  }
+  const { workflow, workflowDef } = await graphService.getWorkflowForExecution(ctx, workflowId);
 
   // Validate input against schema
   const inputSchema = workflowDef.input_schema as SchemaType;

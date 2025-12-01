@@ -1,9 +1,9 @@
 /** Worker task handler - executes WorkflowTask from queue and returns results to DO */
 
-import type { DrizzleD1Database } from 'drizzle-orm/d1';
+import type { ServiceContext } from '~/infrastructure/context';
 import * as aiExecutors from '../ai/executors';
-import * as effectsRepo from '../effects/repository';
-import * as graphRepo from '../graph/repository';
+import * as effectsService from '../effects/service';
+import * as graphService from '../graph/service';
 import type { WorkflowTask, WorkflowTaskResult } from './definitions';
 
 /**
@@ -12,27 +12,19 @@ import type { WorkflowTask, WorkflowTaskResult } from './definitions';
  */
 export async function processWorkflowTask(
   task: WorkflowTask,
-  env: {
-    db: DrizzleD1Database;
-    ai: Ai;
-    WORKFLOW_COORDINATOR: DurableObjectNamespace;
-  },
+  ctx: ServiceContext,
+  coordinatorNamespace: DurableObjectNamespace,
 ): Promise<void> {
   const startTime = Date.now();
 
   try {
     // Load node to get action_id and mappings
-    const node = await graphRepo.getNode(
-      env.db,
+    const node = await graphService.getNodeForExecution(
+      ctx,
       task.workflow_def_id,
       task.workflow_def_version,
       task.node_id,
     );
-    if (!node) {
-      throw new Error(
-        `Node not found: ${task.node_id} in workflow_def ${task.workflow_def_id} v${task.workflow_def_version}`,
-      );
-    }
 
     // Apply input_mapping to extract data from context
     console.log('Task context:', JSON.stringify(task.context));
@@ -52,16 +44,13 @@ export async function processWorkflowTask(
     console.log('Extracted inputData:', JSON.stringify(inputData));
 
     // Load action
-    const action = await effectsRepo.getAction(env.db, node.action_id);
-    if (!action) {
-      throw new Error(`Action not found: ${node.action_id}`);
-    }
+    const action = await effectsService.getActionForExecution(ctx, node.action_id);
 
     // Execute action based on kind
     let outputData: Record<string, unknown>;
 
     if (action.kind === 'llm_call') {
-      outputData = await aiExecutors.executeLLMCall(env, action, inputData);
+      outputData = await aiExecutors.executeLLMCall(ctx, action, inputData);
       console.log('Action result:', JSON.stringify(outputData));
     } else {
       throw new Error(`Unsupported action kind: ${action.kind}`);
@@ -92,7 +81,7 @@ export async function processWorkflowTask(
     };
 
     // Send result to DO
-    await sendResultToDO(task.durable_object_id, result, env.WORKFLOW_COORDINATOR);
+    await sendResultToDO(task.durable_object_id, result, coordinatorNamespace);
   } catch (err) {
     const errorMessage = err instanceof Error ? err.message : String(err);
 
@@ -109,7 +98,7 @@ export async function processWorkflowTask(
     };
 
     // Send failure result to DO
-    await sendResultToDO(task.durable_object_id, result, env.WORKFLOW_COORDINATOR);
+    await sendResultToDO(task.durable_object_id, result, coordinatorNamespace);
   }
 }
 

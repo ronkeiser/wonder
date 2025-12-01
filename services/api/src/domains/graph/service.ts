@@ -247,6 +247,26 @@ export async function getWorkflowDefinition(
 }
 
 /**
+ * Get a workflow definition (without nodes/transitions)
+ * Used by other domains that need workflow def metadata
+ */
+export async function getWorkflowDef(ctx: ServiceContext, workflowDefId: string, version?: number) {
+  ctx.logger.info('workflow_def_get_metadata', { workflow_def_id: workflowDefId, version });
+
+  const workflowDef = await graphRepo.getWorkflowDef(ctx.db, workflowDefId, version);
+  if (!workflowDef) {
+    ctx.logger.warn('workflow_def_not_found', { workflow_def_id: workflowDefId, version });
+    throw new NotFoundError(
+      `WorkflowDef not found: ${workflowDefId}`,
+      'workflow_def',
+      workflowDefId,
+    );
+  }
+
+  return workflowDef;
+}
+
+/**
  * List workflow definitions by owner
  */
 export async function listWorkflowDefinitionsByOwner(
@@ -335,4 +355,93 @@ export async function getWorkflow(ctx: ServiceContext, workflowId: string) {
     throw new NotFoundError(`Workflow not found: ${workflowId}`, 'workflow', workflowId);
   }
   return workflow;
+}
+
+/**
+ * Get a workflow and its definition for execution
+ * Returns both the workflow binding and the workflow definition
+ */
+export async function getWorkflowForExecution(ctx: ServiceContext, workflowId: string) {
+  ctx.logger.info('workflow_get_for_execution', { workflow_id: workflowId });
+
+  const workflow = await graphRepo.getWorkflow(ctx.db, workflowId);
+  if (!workflow) {
+    ctx.logger.warn('workflow_not_found', { workflow_id: workflowId });
+    throw new NotFoundError(`Workflow not found: ${workflowId}`, 'workflow', workflowId);
+  }
+
+  const workflowDef = await graphRepo.getWorkflowDef(
+    ctx.db,
+    workflow.workflow_def_id,
+    workflow.pinned_version ?? undefined,
+  );
+  if (!workflowDef) {
+    ctx.logger.warn('workflow_definition_not_found', {
+      workflow_id: workflowId,
+      workflow_def_id: workflow.workflow_def_id,
+      version: workflow.pinned_version,
+    });
+    throw new NotFoundError(
+      `Workflow definition not found: ${workflow.workflow_def_id}${
+        workflow.pinned_version ? ` v${workflow.pinned_version}` : ''
+      }`,
+      'workflow_definition',
+      workflow.workflow_def_id,
+    );
+  }
+
+  return { workflow, workflowDef };
+}
+
+/**
+ * Get a node by workflow def and node ID
+ * Used by execution workers to retrieve node configuration
+ */
+export async function getNode(
+  ctx: ServiceContext,
+  workflowDefId: string,
+  workflowDefVersion: number,
+  nodeId: string,
+) {
+  ctx.logger.info('node_get', {
+    workflow_def_id: workflowDefId,
+    workflow_def_version: workflowDefVersion,
+    node_id: nodeId,
+  });
+
+  const node = await graphRepo.getNode(ctx.db, workflowDefId, workflowDefVersion, nodeId);
+  if (!node) {
+    ctx.logger.warn('node_not_found', {
+      workflow_def_id: workflowDefId,
+      workflow_def_version: workflowDefVersion,
+      node_id: nodeId,
+    });
+    throw new NotFoundError(
+      `Node not found: ${nodeId} in workflow_def ${workflowDefId} v${workflowDefVersion}`,
+      'node',
+      nodeId,
+    );
+  }
+  return node;
+}
+
+/**
+ * Get a node for execution
+ * Used by workers during workflow execution
+ */
+export async function getNodeForExecution(
+  ctx: ServiceContext,
+  workflowDefId: string,
+  workflowDefVersion: number,
+  nodeId: string,
+) {
+  const node = await graphRepo.getNode(ctx.db, workflowDefId, workflowDefVersion, nodeId);
+  if (!node) {
+    throw new NotFoundError(
+      `Node not found: ${nodeId} in workflow_def ${workflowDefId} v${workflowDefVersion}`,
+      'node',
+      nodeId,
+    );
+  }
+  return node;
 }
