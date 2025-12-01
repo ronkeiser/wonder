@@ -1,11 +1,11 @@
 import { createRoute, OpenAPIHono, z } from '@hono/zod-openapi';
 import {
-  CreateWorkflowDefSchema,
-  ulid,
-  WorkflowDefCreateResponseSchema,
-  WorkflowDefGetResponseSchema,
-  WorkflowDefListResponseSchema,
-  WorkflowDefSchema,
+    CreateWorkflowDefSchema,
+    ulid,
+    WorkflowDefCreateResponseSchema,
+    WorkflowDefGetResponseSchema,
+    WorkflowDefListResponseSchema,
+    WorkflowDefSchema,
 } from '../schemas.js';
 
 export const workflowDefs = new OpenAPIHono<{ Bindings: Env }>();
@@ -37,7 +37,7 @@ const createWorkflowDefRoute = createRoute({
 
 workflowDefs.openapi(createWorkflowDefRoute, async (c) => {
   const validated = c.req.valid('json');
-  using workflowDefs = c.env.API.workflowDefs();
+  using workflowDefs = c.env.RESOURCES.workflowDefs();
   const result = await workflowDefs.create(validated);
   return c.json(result, 201);
 });
@@ -69,7 +69,7 @@ const getWorkflowDefRoute = createRoute({
 workflowDefs.openapi(getWorkflowDefRoute, async (c) => {
   const { id } = c.req.valid('param');
   const { version } = c.req.valid('query');
-  using workflowDefs = c.env.API.workflowDefs();
+  using workflowDefs = c.env.RESOURCES.workflowDefs();
   const result = await workflowDefs.get(id, version);
   return c.json(result);
 });
@@ -98,7 +98,7 @@ const listWorkflowDefsByOwnerRoute = createRoute({
 
 workflowDefs.openapi(listWorkflowDefsByOwnerRoute, async (c) => {
   const { type, id } = c.req.valid('param');
-  using workflowDefs = c.env.API.workflowDefs();
+  using workflowDefs = c.env.RESOURCES.workflowDefs();
   const result = await workflowDefs.listByOwner({ type, id });
   return c.json(result);
 });

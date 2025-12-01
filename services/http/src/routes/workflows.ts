@@ -35,7 +35,7 @@ const createWorkflowRoute = createRoute({
 
 workflows.openapi(createWorkflowRoute, async (c) => {
   const validated = c.req.valid('json');
-  using workflows = c.env.API.workflows();
+  using workflows = c.env.RESOURCES.workflows();
   const result = await workflows.create(validated);
   return c.json(result, 201);
 });
@@ -63,7 +63,7 @@ const getWorkflowRoute = createRoute({
 
 workflows.openapi(getWorkflowRoute, async (c) => {
   const { id } = c.req.valid('param');
-  using workflows = c.env.API.workflows();
+  using workflows = c.env.RESOURCES.workflows();
   const result = await workflows.get(id);
   return c.json(result);
 });
@@ -94,40 +94,4 @@ const startWorkflowRoute = createRoute({
       description: 'Workflow execution started successfully',
     },
   },
-});
-
-workflows.openapi(startWorkflowRoute, async (c) => {
-  const { id } = c.req.valid('param');
-  const input = c.req.valid('json');
-  using workflows = c.env.API.workflows();
-  const result = await workflows.start(id, input);
-  return c.json(result);
-});
-
-const getWorkflowRunRoute = createRoute({
-  method: 'get',
-  path: '/runs/{id}',
-  tags: ['workflows'],
-  request: {
-    params: z.object({
-      id: ulid().openapi({ param: { name: 'id', in: 'path' } }),
-    }),
-  },
-  responses: {
-    200: {
-      content: {
-        'application/json': {
-          schema: z.record(z.string(), z.unknown()),
-        },
-      },
-      description: 'Workflow run retrieved successfully',
-    },
-  },
-});
-
-workflows.openapi(getWorkflowRunRoute, async (c) => {
-  const { id } = c.req.valid('param');
-  using workflows = c.env.API.workflows();
-  const result = await workflows.getWorkflowRun(id);
-  return c.json(result);
 });

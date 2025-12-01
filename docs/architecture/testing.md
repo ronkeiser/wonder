@@ -307,7 +307,7 @@ E2E tests live in `services/api/test/e2e/` and use `@wonder/sdk` to test the API
 import { WonderfulClient } from '@wonder/sdk';
 
 export function createE2EClient() {
-  const baseUrl = process.env.API_BASE || 'http://localhost:8787';
+  const baseUrl = process.env.RESOURCES_BASE || 'http://localhost:8787';
   return new WonderfulClient({ baseUrl });
 }
 

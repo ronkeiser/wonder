@@ -17,17 +17,5 @@ coordinator.get('/:doId/stream', async (c) => {
     );
   }
 
-  try {
-    // Forward WebSocket upgrade through RPC to API service
-    using coordination = c.env.API.coordination();
-    return await coordination.streamEvents(doId, c.req.raw);
-  } catch (err) {
-    return c.json(
-      {
-        error: 'WebSocket connection failed',
-        message: err instanceof Error ? err.message : String(err),
-      },
-      500,
-    );
-  }
+  // TODO: Implement stream start connection to coordinator
 });

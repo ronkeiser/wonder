@@ -34,7 +34,7 @@ const createPromptSpecRoute = createRoute({
 
 promptSpecs.openapi(createPromptSpecRoute, async (c) => {
   const validated = c.req.valid('json');
-  using promptSpecs = c.env.API.promptSpecs();
+  using promptSpecs = c.env.RESOURCES.promptSpecs();
   const result = await promptSpecs.create(validated);
   return c.json(result, 201);
 });
@@ -62,7 +62,7 @@ const getPromptSpecRoute = createRoute({
 
 promptSpecs.openapi(getPromptSpecRoute, async (c) => {
   const { id } = c.req.valid('param');
-  using promptSpecs = c.env.API.promptSpecs();
+  using promptSpecs = c.env.RESOURCES.promptSpecs();
   const result = await promptSpecs.get(id);
   return c.json(result);
 });
@@ -90,7 +90,7 @@ const deletePromptSpecRoute = createRoute({
 
 promptSpecs.openapi(deletePromptSpecRoute, async (c) => {
   const { id } = c.req.valid('param');
-  using promptSpecs = c.env.API.promptSpecs();
+  using promptSpecs = c.env.RESOURCES.promptSpecs();
   await promptSpecs.delete(id);
   return c.json({ success: true });
 });

@@ -5,17 +5,17 @@
   "compatibility_date": "2025-11-18",
   "services": [
     {
-      "binding": "API",
-      "service": "wonder-api",
-      "entrypoint": "WonderAPI"
+      "binding": "RESOURCES",
+      "service": "wonder-resources",
+      "entrypoint": "WonderResources"
     }
   ],
   "durable_objects": {
     "bindings": [
       {
-        "name": "WORKFLOW_COORDINATOR",
+        "name": "COORDINATOR",
         "class_name": "WorkflowCoordinator",
-        "script_name": "wonder-api"
+        "script_name": "coordinator"
       }
     ]
   },

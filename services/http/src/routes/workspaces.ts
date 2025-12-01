@@ -35,7 +35,7 @@ const listWorkspacesRoute = createRoute({
 
 workspaces.openapi(listWorkspacesRoute, async (c) => {
   const query = c.req.valid('query');
-  using workspaces = c.env.API.workspaces();
+  using workspaces = c.env.RESOURCES.workspaces();
   const result = await workspaces.list(query);
   return c.json(result);
 });
@@ -67,7 +67,7 @@ const createWorkspaceRoute = createRoute({
 
 workspaces.openapi(createWorkspaceRoute, async (c) => {
   const validated = c.req.valid('json');
-  using workspaces = c.env.API.workspaces();
+  using workspaces = c.env.RESOURCES.workspaces();
   const result = await workspaces.create(validated);
   return c.json(result, 201);
 });
@@ -95,7 +95,7 @@ const getWorkspaceRoute = createRoute({
 
 workspaces.openapi(getWorkspaceRoute, async (c) => {
   const { id } = c.req.valid('param');
-  using workspaces = c.env.API.workspaces();
+  using workspaces = c.env.RESOURCES.workspaces();
   const result = await workspaces.get(id);
   return c.json(result);
 });
@@ -123,7 +123,7 @@ const deleteWorkspaceRoute = createRoute({
 
 workspaces.openapi(deleteWorkspaceRoute, async (c) => {
   const { id } = c.req.valid('param');
-  using workspaces = c.env.API.workspaces();
+  using workspaces = c.env.RESOURCES.workspaces();
   await workspaces.delete(id);
   return c.json({ success: true });
 });
@@ -159,7 +159,7 @@ const updateWorkspaceRoute = createRoute({
 workspaces.openapi(updateWorkspaceRoute, async (c) => {
   const { id } = c.req.valid('param');
   const validated = c.req.valid('json');
-  using workspaces = c.env.API.workspaces();
+  using workspaces = c.env.RESOURCES.workspaces();
   const result = await workspaces.update(id, validated);
   return c.json(result);
 });

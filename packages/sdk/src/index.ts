@@ -8,7 +8,7 @@ export type { APIClient } from './client';
 export type * from './generated/schema';
 
 export function createClient(
-  baseUrl: string = process.env.API_URL || 'https://wonder-http.ron-keiser.workers.dev',
+  baseUrl: string = process.env.RESOURCES_URL || 'https://wonder-http.ron-keiser.workers.dev',
 ) {
   return createAPIClient(baseUrl);
 }
