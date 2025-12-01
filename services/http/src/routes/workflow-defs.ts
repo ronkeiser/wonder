@@ -7,9 +7,6 @@ import {
   WorkflowDefListResponseSchema,
   WorkflowDefSchema,
 } from '../schemas.js';
-interface Env {
-  API: any;
-}
 
 export const workflowDefs = new OpenAPIHono<{ Bindings: Env }>();
 
@@ -79,11 +76,12 @@ workflowDefs.openapi(getWorkflowDefRoute, async (c) => {
 
 const listWorkflowDefsByOwnerRoute = createRoute({
   method: 'get',
-  path: '/owner/{owner}',
+  path: '/owner/{type}/{id}',
   tags: ['workflow-defs'],
   request: {
     params: z.object({
-      owner: z.string().openapi({ param: { name: 'owner', in: 'path' } }),
+      type: z.enum(['project', 'library']).openapi({ param: { name: 'type', in: 'path' } }),
+      id: z.string().openapi({ param: { name: 'id', in: 'path' } }),
     }),
   },
   responses: {
@@ -99,8 +97,8 @@ const listWorkflowDefsByOwnerRoute = createRoute({
 });
 
 workflowDefs.openapi(listWorkflowDefsByOwnerRoute, async (c) => {
-  const { owner } = c.req.valid('param');
+  const { type, id } = c.req.valid('param');
   using workflowDefs = c.env.API.workflowDefs();
-  const result = await workflowDefs.listByOwner(owner);
+  const result = await workflowDefs.listByOwner({ type, id });
   return c.json(result);
 });

@@ -1,9 +1,5 @@
 import { Hono } from 'hono';
 
-interface Env {
-  API: any; // RPC binding to wonder-api
-}
-
 export const coordinator = new Hono<{ Bindings: Env }>();
 
 // WebSocket event streaming: /api/coordinator/:doId/stream

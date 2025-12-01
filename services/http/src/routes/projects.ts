@@ -1,14 +1,10 @@
 import { createRoute, OpenAPIHono, z } from '@hono/zod-openapi';
 import {
-    CreateProjectSchema,
-    ProjectCreateResponseSchema,
-    ProjectGetResponseSchema,
-    ulid,
+  CreateProjectSchema,
+  ProjectCreateResponseSchema,
+  ProjectGetResponseSchema,
+  ulid,
 } from '../schemas.js';
-
-interface Env {
-  API: any;
-}
 
 export const projects = new OpenAPIHono<{ Bindings: Env }>();
 

@@ -1,15 +1,11 @@
 import { createRoute, OpenAPIHono, z } from '@hono/zod-openapi';
 import {
-    CreateModelProfileSchema,
-    ModelProfileCreateResponseSchema,
-    ModelProfileGetResponseSchema,
-    ModelProfileSchema,
-    ulid,
+  CreateModelProfileSchema,
+  ModelProfileCreateResponseSchema,
+  ModelProfileGetResponseSchema,
+  ModelProfileSchema,
+  ulid,
 } from '../schemas.js';
-
-interface Env {
-  API: any;
-}
 
 export const modelProfiles = new OpenAPIHono<{ Bindings: Env }>();
 

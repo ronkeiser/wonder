@@ -8,6 +8,7 @@ import type { WorkflowTask } from './domains/execution/definitions';
 import { handleFetch } from './handlers/fetch';
 import { handleQueue } from './handlers/queue';
 import { Actions } from './rpc/actions';
+import { Coordination } from './rpc/coordination';
 import { ModelProfiles } from './rpc/model-profiles';
 import { Projects } from './rpc/projects';
 import { PromptSpecs } from './rpc/prompt-specs';
@@ -56,6 +57,11 @@ class WonderAPI extends WorkerEntrypoint<Env> {
   /** RPC: ModelProfiles adapter */
   modelProfiles() {
     return new ModelProfiles(this.env, this.ctx);
+  }
+
+  /** RPC: Coordination adapter */
+  coordination() {
+    return new Coordination(this.env, this.ctx);
   }
 
   /** HTTP fetch handler */

@@ -9,10 +9,6 @@ import {
     WorkspaceUpdateResponseSchema,
 } from '../schemas.js';
 
-interface Env {
-  API: any;
-}
-
 export const workspaces = new OpenAPIHono<{ Bindings: Env }>();
 
 const listWorkspacesRoute = createRoute({

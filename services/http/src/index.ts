@@ -14,10 +14,6 @@ import { workflowDefs } from './routes/workflow-defs';
 import { workflows } from './routes/workflows';
 import { workspaces } from './routes/workspaces';
 
-interface Env {
-  API: any; // RPC binding to wonder-api
-}
-
 const app = new OpenAPIHono<{ Bindings: Env }>({
   defaultHook: (result, c) => {
     if (!result.success) {

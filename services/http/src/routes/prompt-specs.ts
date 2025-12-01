@@ -5,10 +5,6 @@ import {
     PromptSpecGetResponseSchema,
 } from '../schemas.js';
 
-interface Env {
-  API: any;
-}
-
 export const promptSpecs = new OpenAPIHono<{ Bindings: Env }>();
 
 const createPromptSpecRoute = createRoute({

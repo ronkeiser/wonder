@@ -6,10 +6,6 @@ import {
   WorkflowGetResponseSchema,
 } from '../schemas.js';
 
-interface Env {
-  API: any;
-}
-
 export const workflows = new OpenAPIHono<{ Bindings: Env }>();
 
 const createWorkflowRoute = createRoute({
