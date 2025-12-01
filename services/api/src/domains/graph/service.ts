@@ -1,4 +1,4 @@
-/** Graph domain service - orchestrates workflow definition operations */
+/** Graph domain service - orchestrates workflow def operations */
 
 import { ConflictError, NotFoundError, ValidationError, extractDbError } from '~/errors';
 import type { ServiceContext } from '~/infrastructure/context';
@@ -43,8 +43,8 @@ export interface CreateWorkflowDefInput {
   }>;
 }
 
-/** Create a workflow definition with nodes and transitions - validates refs, assigns ULIDs atomically */
-export async function createWorkflowDefinition(ctx: ServiceContext, data: CreateWorkflowDefInput) {
+/** Create a workflow def with nodes and transitions - validates refs, assigns ULIDs atomically */
+export async function createWorkflowDef(ctx: ServiceContext, data: CreateWorkflowDefInput) {
   ctx.logger.info('workflow_def_create_started', { name: data.name });
 
   // 1. Validate all node refs are unique
@@ -118,7 +118,7 @@ export async function createWorkflowDefinition(ctx: ServiceContext, data: Create
     }
   }
 
-  // 5. Create workflow definition (initial_node_id will be set after nodes created)
+  // 5. Create workflow def (initial_node_id will be set after nodes created)
   let workflowDef;
   try {
     workflowDef = await graphRepo.createWorkflowDef(ctx.db, {
@@ -213,12 +213,8 @@ export async function createWorkflowDefinition(ctx: ServiceContext, data: Create
   };
 }
 
-/** Get a workflow definition with its nodes and transitions */
-export async function getWorkflowDefinition(
-  ctx: ServiceContext,
-  workflowDefId: string,
-  version?: number,
-) {
+/** Get a workflow def with its nodes and transitions */
+export async function getWorkflowDef(ctx: ServiceContext, workflowDefId: string, version?: number) {
   ctx.logger.info('workflow_def_get', { workflow_def_id: workflowDefId, version });
 
   const workflowDef = await graphRepo.getWorkflowDef(ctx.db, workflowDefId, version);
@@ -241,8 +237,12 @@ export async function getWorkflowDefinition(
   };
 }
 
-/** Get a workflow definition metadata only (without nodes/transitions) */
-export async function getWorkflowDef(ctx: ServiceContext, workflowDefId: string, version?: number) {
+/** Get workflow def metadata only (without nodes/transitions) */
+export async function getWorkflowDefMetadata(
+  ctx: ServiceContext,
+  workflowDefId: string,
+  version?: number,
+) {
   ctx.logger.info('workflow_def_get_metadata', { workflow_def_id: workflowDefId, version });
 
   const workflowDef = await graphRepo.getWorkflowDef(ctx.db, workflowDefId, version);
@@ -258,8 +258,8 @@ export async function getWorkflowDef(ctx: ServiceContext, workflowDefId: string,
   return workflowDef;
 }
 
-/** List workflow definitions by owner */
-export async function listWorkflowDefinitionsByOwner(
+/** List workflow defs by owner */
+export async function listWorkflowDefsByOwner(
   ctx: ServiceContext,
   ownerType: 'project' | 'library',
   ownerId: string,
@@ -341,39 +341,6 @@ export async function getWorkflow(ctx: ServiceContext, workflowId: string) {
     throw new NotFoundError(`Workflow not found: ${workflowId}`, 'workflow', workflowId);
   }
   return workflow;
-}
-
-/** Get a workflow and its definition for execution */
-export async function getWorkflowForExecution(ctx: ServiceContext, workflowId: string) {
-  ctx.logger.info('workflow_get_for_execution', { workflow_id: workflowId });
-
-  const workflow = await graphRepo.getWorkflow(ctx.db, workflowId);
-  if (!workflow) {
-    ctx.logger.warn('workflow_not_found', { workflow_id: workflowId });
-    throw new NotFoundError(`Workflow not found: ${workflowId}`, 'workflow', workflowId);
-  }
-
-  const workflowDef = await graphRepo.getWorkflowDef(
-    ctx.db,
-    workflow.workflow_def_id,
-    workflow.pinned_version ?? undefined,
-  );
-  if (!workflowDef) {
-    ctx.logger.warn('workflow_definition_not_found', {
-      workflow_id: workflowId,
-      workflow_def_id: workflow.workflow_def_id,
-      version: workflow.pinned_version,
-    });
-    throw new NotFoundError(
-      `Workflow definition not found: ${workflow.workflow_def_id}${
-        workflow.pinned_version ? ` v${workflow.pinned_version}` : ''
-      }`,
-      'workflow_definition',
-      workflow.workflow_def_id,
-    );
-  }
-
-  return { workflow, workflowDef };
 }
 
 /** Get a node by workflow def and node ID */

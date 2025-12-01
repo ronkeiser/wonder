@@ -41,20 +41,20 @@ export class WorkflowDefs extends Resource {
       loop_config?: unknown;
     }>;
   }) {
-    return await graphService.createWorkflowDefinition(this.serviceCtx, data);
+    return await graphService.createWorkflowDef(this.serviceCtx, data);
   }
 
   /**
    * Get a workflow definition by ID and version
    */
   async get(workflowDefId: string, version?: number) {
-    return await graphService.getWorkflowDefinition(this.serviceCtx, workflowDefId, version);
+    return await graphService.getWorkflowDef(this.serviceCtx, workflowDefId, version);
   }
 
   /**
    * List workflow definitions by owner
    */
   async listByOwner(owner: { type: 'project' | 'library'; id: string }) {
-    return await graphService.listWorkflowDefinitionsByOwner(this.serviceCtx, owner.type, owner.id);
+    return await graphService.listWorkflowDefsByOwner(this.serviceCtx, owner.type, owner.id);
   }
 }

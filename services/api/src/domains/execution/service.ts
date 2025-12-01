@@ -34,8 +34,13 @@ export async function startWorkflow(
 ): Promise<WorkflowRun> {
   ctx.logger.info('workflow_trigger_started', { workflow_id: workflowId });
 
-  // Load workflow and definition
-  const { workflow, workflowDef } = await graphService.getWorkflowForExecution(ctx, workflowId);
+  // Load workflow and def
+  const workflow = await graphService.getWorkflow(ctx, workflowId);
+  const workflowDef = await graphService.getWorkflowDefMetadata(
+    ctx,
+    workflow.workflow_def_id,
+    workflow.pinned_version ?? undefined,
+  );
 
   // Validate input against schema
   const inputSchema = workflowDef.input_schema as SchemaType;
