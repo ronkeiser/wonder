@@ -4,9 +4,7 @@ import { ConflictError, NotFoundError, extractDbError } from '~/errors';
 import type { ServiceContext } from '~/infrastructure/context';
 import * as workspaceRepo from './repository';
 
-/**
- * Create a new workspace
- */
+/** Create a new workspace */
 export async function createWorkspace(
   ctx: ServiceContext,
   data: { name: string; settings?: unknown },
@@ -45,9 +43,7 @@ export async function createWorkspace(
   }
 }
 
-/**
- * Get a workspace by ID
- */
+/** Get a workspace by ID */
 export async function getWorkspace(ctx: ServiceContext, workspaceId: string) {
   ctx.logger.info('workspace_get', { workspace_id: workspaceId });
 
@@ -59,9 +55,7 @@ export async function getWorkspace(ctx: ServiceContext, workspaceId: string) {
   return workspace;
 }
 
-/**
- * List workspaces with optional pagination
- */
+/** List workspaces with optional pagination */
 export async function listWorkspaces(
   ctx: ServiceContext,
   options?: { limit?: number; offset?: number },
@@ -70,9 +64,7 @@ export async function listWorkspaces(
   return await workspaceRepo.listWorkspaces(ctx.db, options);
 }
 
-/**
- * Update a workspace
- */
+/** Update a workspace */
 export async function updateWorkspace(
   ctx: ServiceContext,
   workspaceId: string,
@@ -93,9 +85,7 @@ export async function updateWorkspace(
   return workspace;
 }
 
-/**
- * Delete a workspace
- */
+/** Delete a workspace */
 export async function deleteWorkspace(ctx: ServiceContext, workspaceId: string) {
   ctx.logger.info('workspace_delete_started', { workspace_id: workspaceId });
 
@@ -110,9 +100,7 @@ export async function deleteWorkspace(ctx: ServiceContext, workspaceId: string) 
   ctx.logger.info('workspace_deleted', { workspace_id: workspaceId });
 }
 
-/**
- * Create a new project
- */
+/** Create a new project */
 export async function createProject(
   ctx: ServiceContext,
   data: {
@@ -178,9 +166,7 @@ export async function createProject(
   }
 }
 
-/**
- * Get a project by ID
- */
+/** Get a project by ID */
 export async function getProject(ctx: ServiceContext, projectId: string) {
   ctx.logger.info('project_get', { project_id: projectId });
 
@@ -192,9 +178,7 @@ export async function getProject(ctx: ServiceContext, projectId: string) {
   return project;
 }
 
-/**
- * Delete a project
- */
+/** Delete a project */
 export async function deleteProject(ctx: ServiceContext, projectId: string) {
   ctx.logger.info('project_delete_started', { project_id: projectId });
 

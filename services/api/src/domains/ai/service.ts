@@ -4,9 +4,7 @@ import { ConflictError, NotFoundError, extractDbError } from '~/errors';
 import type { ServiceContext } from '~/infrastructure/context';
 import * as aiRepo from './repository';
 
-/**
- * Create a new prompt specification
- */
+/** Create a new prompt specification */
 export async function createPromptSpec(
   ctx: ServiceContext,
   data: {
@@ -57,9 +55,7 @@ export async function createPromptSpec(
   }
 }
 
-/**
- * Get a prompt specification by ID
- */
+/** Get a prompt specification by ID */
 export async function getPromptSpec(ctx: ServiceContext, promptSpecId: string) {
   ctx.logger.info('prompt_spec_get', { prompt_spec_id: promptSpecId });
 
@@ -71,9 +67,7 @@ export async function getPromptSpec(ctx: ServiceContext, promptSpecId: string) {
   return promptSpec;
 }
 
-/**
- * Delete a prompt specification
- */
+/** Delete a prompt specification */
 export async function deletePromptSpec(ctx: ServiceContext, promptSpecId: string) {
   ctx.logger.info('prompt_spec_delete_started', { prompt_spec_id: promptSpecId });
 
@@ -87,9 +81,7 @@ export async function deletePromptSpec(ctx: ServiceContext, promptSpecId: string
   ctx.logger.info('prompt_spec_deleted', { prompt_spec_id: promptSpecId });
 }
 
-/**
- * Create a new model profile
- */
+/** Create a new model profile */
 export async function createModelProfile(
   ctx: ServiceContext,
   data: {
@@ -134,9 +126,7 @@ export async function createModelProfile(
   }
 }
 
-/**
- * Get a model profile by ID
- */
+/** Get a model profile by ID */
 export async function getModelProfile(ctx: ServiceContext, modelProfileId: string) {
   ctx.logger.info('model_profile_get', { model_profile_id: modelProfileId });
 
@@ -152,9 +142,7 @@ export async function getModelProfile(ctx: ServiceContext, modelProfileId: strin
   return profile;
 }
 
-/**
- * List model profiles, optionally filtered by provider
- */
+/** List model profiles, optionally filtered by provider */
 export async function listModelProfiles(
   ctx: ServiceContext,
   filters?: { provider?: 'anthropic' | 'openai' | 'google' | 'cloudflare' | 'local' },
@@ -165,9 +153,7 @@ export async function listModelProfiles(
   return await aiRepo.listModelProfiles(ctx.db);
 }
 
-/**
- * Delete a model profile
- */
+/** Delete a model profile */
 export async function deleteModelProfile(ctx: ServiceContext, modelProfileId: string) {
   ctx.logger.info('model_profile_delete_started', { model_profile_id: modelProfileId });
 

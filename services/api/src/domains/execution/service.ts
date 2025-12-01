@@ -13,10 +13,7 @@ import { type Context, type WorkflowRun } from './definitions';
 import * as execRepo from './repository';
 
 /** Custom type registry for schema validation */
-
 const customTypes = new CustomTypeRegistry();
-
-// Register artifact_ref custom type (validates string format)
 customTypes.register('artifact_ref', {
   validate: (value: unknown): boolean => {
     return typeof value === 'string' && value.length > 0;
@@ -24,18 +21,12 @@ customTypes.register('artifact_ref', {
   description: 'Reference to an artifact (string ID)',
 });
 
-/**
- * Service context extended with DO namespace binding.
- */
+/** Service context extended with DO namespace binding */
 export interface ExecutionServiceContext extends ServiceContext {
   WORKFLOW_COORDINATOR: DurableObjectNamespace;
 }
 
-/**
- * Start a workflow execution.
- * Creates a run in D1, gets a DO instance, and invokes DO.executeWorkflow().
- * Returns immediately - execution continues asynchronously in DO → Queue → Worker → DO.
- */
+/** Start a workflow execution - creates run in D1 and invokes DO asynchronously */
 export async function startWorkflow(
   ctx: ExecutionServiceContext,
   workflowId: string,
@@ -154,9 +145,7 @@ export async function startWorkflow(
   return workflowRun;
 }
 
-/**
- * Get a workflow run by ID
- */
+/** Get a workflow run by ID */
 export async function getWorkflowRun(
   ctx: ServiceContext,
   workflowRunId: string,

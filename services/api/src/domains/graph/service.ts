@@ -43,10 +43,7 @@ export interface CreateWorkflowDefInput {
   }>;
 }
 
-/**
- * Create a workflow definition with nodes and transitions.
- * Validates refs, assigns ULIDs, and creates all entities atomically.
- */
+/** Create a workflow definition with nodes and transitions - validates refs, assigns ULIDs atomically */
 export async function createWorkflowDefinition(ctx: ServiceContext, data: CreateWorkflowDefInput) {
   ctx.logger.info('workflow_def_create_started', { name: data.name });
 
@@ -216,9 +213,7 @@ export async function createWorkflowDefinition(ctx: ServiceContext, data: Create
   };
 }
 
-/**
- * Get a workflow definition with its nodes and transitions
- */
+/** Get a workflow definition with its nodes and transitions */
 export async function getWorkflowDefinition(
   ctx: ServiceContext,
   workflowDefId: string,
@@ -246,10 +241,7 @@ export async function getWorkflowDefinition(
   };
 }
 
-/**
- * Get a workflow definition (without nodes/transitions)
- * Used by other domains that need workflow def metadata
- */
+/** Get a workflow definition metadata only (without nodes/transitions) */
 export async function getWorkflowDef(ctx: ServiceContext, workflowDefId: string, version?: number) {
   ctx.logger.info('workflow_def_get_metadata', { workflow_def_id: workflowDefId, version });
 
@@ -266,9 +258,7 @@ export async function getWorkflowDef(ctx: ServiceContext, workflowDefId: string,
   return workflowDef;
 }
 
-/**
- * List workflow definitions by owner
- */
+/** List workflow definitions by owner */
 export async function listWorkflowDefinitionsByOwner(
   ctx: ServiceContext,
   ownerType: 'project' | 'library',
@@ -278,9 +268,7 @@ export async function listWorkflowDefinitionsByOwner(
   return { workflow_defs: workflowDefs };
 }
 
-/**
- * Create a new workflow (binds a workflow_def to a project)
- */
+/** Create a new workflow (binds a workflow_def to a project) */
 export async function createWorkflow(
   ctx: ServiceContext,
   data: {
@@ -343,9 +331,7 @@ export async function createWorkflow(
   }
 }
 
-/**
- * Get a workflow by ID
- */
+/** Get a workflow by ID */
 export async function getWorkflow(ctx: ServiceContext, workflowId: string) {
   ctx.logger.info('workflow_get', { workflow_id: workflowId });
 
@@ -357,10 +343,7 @@ export async function getWorkflow(ctx: ServiceContext, workflowId: string) {
   return workflow;
 }
 
-/**
- * Get a workflow and its definition for execution
- * Returns both the workflow binding and the workflow definition
- */
+/** Get a workflow and its definition for execution */
 export async function getWorkflowForExecution(ctx: ServiceContext, workflowId: string) {
   ctx.logger.info('workflow_get_for_execution', { workflow_id: workflowId });
 
@@ -393,10 +376,7 @@ export async function getWorkflowForExecution(ctx: ServiceContext, workflowId: s
   return { workflow, workflowDef };
 }
 
-/**
- * Get a node by workflow def and node ID
- * Used by execution workers to retrieve node configuration
- */
+/** Get a node by workflow def and node ID */
 export async function getNode(
   ctx: ServiceContext,
   workflowDefId: string,

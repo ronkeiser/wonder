@@ -4,9 +4,7 @@ import { ConflictError, NotFoundError, extractDbError } from '~/errors';
 import type { ServiceContext } from '~/infrastructure/context';
 import * as effectsRepo from './repository';
 
-/**
- * Create a new action
- */
+/** Create a new action */
 export async function createAction(
   ctx: ServiceContext,
   data: {
@@ -78,9 +76,7 @@ export async function createAction(
   }
 }
 
-/**
- * Get an action by ID
- */
+/** Get an action by ID */
 export async function getAction(ctx: ServiceContext, actionId: string) {
   ctx.logger.info('action_get', { action_id: actionId });
 
@@ -93,9 +89,7 @@ export async function getAction(ctx: ServiceContext, actionId: string) {
   return action;
 }
 
-/**
- * Get an action by ID and version
- */
+/** Get an action by ID and version */
 export async function getActionVersion(ctx: ServiceContext, actionId: string, version: number) {
   ctx.logger.info('action_get_version', { action_id: actionId, version });
 
@@ -108,9 +102,7 @@ export async function getActionVersion(ctx: ServiceContext, actionId: string, ve
   return action;
 }
 
-/**
- * List actions by kind
- */
+/** List actions by kind */
 export async function listActionsByKind(
   ctx: ServiceContext,
   kind:
@@ -128,9 +120,7 @@ export async function listActionsByKind(
   return await effectsRepo.listActionsByKind(ctx.db, kind);
 }
 
-/**
- * Delete an action
- */
+/** Delete an action */
 export async function deleteAction(ctx: ServiceContext, actionId: string, version?: number) {
   ctx.logger.info('action_delete_started', { action_id: actionId, version });
 
