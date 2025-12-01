@@ -15,7 +15,7 @@ export class Coordination extends Resource {
    */
   async streamEvents(durableObjectId: string, request: Request): Promise<Response> {
     return await coordinationService.streamWorkflowEvents(
-      this.toCoordinationContext(),
+      this.serviceCtx,
       durableObjectId,
       request,
     );
@@ -28,13 +28,6 @@ export class Coordination extends Resource {
   async getPendingData(
     durableObjectId: string,
   ): Promise<{ events: unknown[]; context: Context | null }> {
-    return await coordinationService.getPendingData(this.toCoordinationContext(), durableObjectId);
-  }
-
-  private toCoordinationContext() {
-    return {
-      ...this.serviceCtx,
-      WORKFLOW_COORDINATOR: this.env.WORKFLOW_COORDINATOR,
-    };
+    return await coordinationService.getPendingData(this.serviceCtx, durableObjectId);
   }
 }
