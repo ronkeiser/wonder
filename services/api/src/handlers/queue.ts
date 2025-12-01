@@ -16,11 +16,11 @@ export async function handleQueue(
 ): Promise<void> {
   const db = drizzle(env.DB);
   const logger = createLogger({});
-  const serviceCtx = createServiceContext(db, env.AI, logger, ctx);
+  const serviceCtx = createServiceContext(db, env.AI, env.WORKFLOW_COORDINATOR, logger, ctx);
 
   for (const message of batch.messages) {
     try {
-      await processWorkflowTask(message.body, serviceCtx, env.WORKFLOW_COORDINATOR);
+      await processWorkflowTask(message.body, serviceCtx);
       message.ack();
     } catch (error) {
       message.retry();

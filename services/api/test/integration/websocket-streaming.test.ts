@@ -3,8 +3,8 @@
 import { createMockLogger } from '@wonder/logger/mock';
 import { env } from 'cloudflare:test';
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
-import type { ExecutionServiceContext } from '~/domains/execution/service';
 import { startWorkflow } from '~/domains/execution/service';
+import type { ServiceContext } from '~/infrastructure/context';
 import { createTestDb } from '../helpers/db';
 
 // Skipping these tests due to Cloudflare Workers test framework limitation:
@@ -12,7 +12,7 @@ import { createTestDb } from '../helpers/db';
 // The WebSocket streaming functionality is verified via manual testing with test-websocket.html
 // See: https://developers.cloudflare.com/workers/testing/vitest-integration/known-issues/#isolated-storage
 describe.skip('WebSocket Event Streaming', () => {
-  let ctx: ExecutionServiceContext;
+  let ctx: ServiceContext;
 
   beforeEach(async () => {
     const db = createTestDb();
@@ -22,7 +22,7 @@ describe.skip('WebSocket Event Streaming', () => {
       db,
       ai: env.AI,
       logger: createMockLogger(),
-      WORKFLOW_COORDINATOR: env.WORKFLOW_COORDINATOR,
+      do: env.WORKFLOW_COORDINATOR,
       executionContext: {
         waitUntil: () => {},
         passThroughOnException: () => {},

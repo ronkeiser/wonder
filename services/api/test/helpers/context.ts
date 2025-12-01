@@ -43,6 +43,12 @@ export function createMockServiceContext(
           response: 'Mock AI response',
         }),
       } as unknown as Ai),
+    do: {
+      newUniqueId: vi.fn(),
+      idFromString: vi.fn(),
+      idFromName: vi.fn(),
+      get: vi.fn(),
+    } as unknown as Env['WORKFLOW_COORDINATOR'],
     logger: options.logger ?? createMockLogger(),
     executionContext: {
       waitUntil: vi.fn(),

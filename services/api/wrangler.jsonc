@@ -19,8 +19,7 @@
     "bindings": [
       {
         "name": "WORKFLOW_COORDINATOR",
-        "class_name": "WorkflowCoordinator",
-        "script_name": "wonder-api"
+        "class_name": "WorkflowCoordinator"
       }
     ]
   },

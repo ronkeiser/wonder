@@ -10,11 +10,7 @@ import type { WorkflowTask, WorkflowTaskResult } from './definitions';
  * Process a workflow task from the queue.
  * Executes the action and returns the result to the DO.
  */
-export async function processWorkflowTask(
-  task: WorkflowTask,
-  ctx: ServiceContext,
-  coordinatorNamespace: DurableObjectNamespace,
-): Promise<void> {
+export async function processWorkflowTask(task: WorkflowTask, ctx: ServiceContext): Promise<void> {
   const startTime = Date.now();
 
   try {
@@ -81,7 +77,7 @@ export async function processWorkflowTask(
     };
 
     // Send result to DO
-    await sendResultToDO(task.durable_object_id, result, coordinatorNamespace);
+    await sendResultToDO(task.durable_object_id, result, ctx.do);
   } catch (err) {
     const errorMessage = err instanceof Error ? err.message : String(err);
 
@@ -98,7 +94,7 @@ export async function processWorkflowTask(
     };
 
     // Send failure result to DO
-    await sendResultToDO(task.durable_object_id, result, coordinatorNamespace);
+    await sendResultToDO(task.durable_object_id, result, ctx.do);
   }
 }
 
@@ -163,28 +159,20 @@ function applyOutputMapping(
 }
 
 /**
- * Send task result back to the DO via fetch.
+ * Send task result back to the DO via RPC.
  */
 async function sendResultToDO(
   durableObjectId: string,
   result: WorkflowTaskResult,
-  namespace: DurableObjectNamespace,
+  namespace: Env['WORKFLOW_COORDINATOR'],
 ): Promise<void> {
   try {
     // Get DO stub from ID
     const id = namespace.idFromString(durableObjectId);
     const stub = namespace.get(id);
 
-    // Send result
-    const response = await stub.fetch('https://do/task-result', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify(result),
-    });
-
-    if (!response.ok) {
-      throw new Error(`DO returned ${response.status}: ${await response.text()}`);
-    }
+    // Call RPC method directly
+    await stub.processTaskResult(result);
   } catch (err) {
     throw err;
   }

@@ -16,7 +16,6 @@ import { workspaces } from './routes/workspaces';
 
 interface Env {
   API: any; // RPC binding to wonder-api
-  WORKFLOW_COORDINATOR: DurableObjectNamespace; // Direct DO binding for WebSocket upgrades
 }
 
 const app = new OpenAPIHono<{ Bindings: Env }>({

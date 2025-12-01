@@ -4,6 +4,7 @@
  */
 
 export { Actions } from './actions';
+export { Coordination } from './coordination';
 export { ModelProfiles } from './model-profiles';
 export { Projects } from './projects';
 export { PromptSpecs } from './prompt-specs';

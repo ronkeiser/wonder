@@ -4,9 +4,9 @@ import { createMockLogger } from '@wonder/logger/mock';
 import { env } from 'cloudflare:test';
 import { eq } from 'drizzle-orm';
 import { beforeEach, describe, expect, it, vi, type Mock } from 'vitest';
-import type { ExecutionServiceContext } from '~/domains/execution/service';
 import * as executionService from '~/domains/execution/service';
 import { NotFoundError, ValidationError } from '~/errors';
+import type { ServiceContext } from '~/infrastructure/context';
 import { workflow_runs } from '~/infrastructure/db/schema';
 import { createTestDb } from '../../helpers/db';
 
@@ -17,7 +17,7 @@ const SEED_WORKFLOW_ID = '01JDXSEED0000WORKFLOW0001';
 const SEED_WORKFLOW_DEF_ID = '01JDXSEED0000WORKFLOWDEF1';
 
 describe('Execution Service', () => {
-  let mockCtx: ExecutionServiceContext;
+  let mockCtx: ServiceContext;
   let mockDOStub: { fetch: Mock };
   let mockDOId: DurableObjectId;
 
@@ -49,13 +49,13 @@ describe('Execution Service', () => {
         waitUntil: vi.fn(),
         passThroughOnException: vi.fn(),
       } as unknown as ExecutionContext,
-      WORKFLOW_COORDINATOR: {
+      do: {
         newUniqueId: vi.fn().mockReturnValue(mockDOId),
         get: vi.fn().mockReturnValue(mockDOStub),
         idFromString: vi.fn(),
         idFromName: vi.fn(),
-      } as unknown as DurableObjectNamespace,
-    } as ExecutionServiceContext;
+      } as unknown as Env['WORKFLOW_COORDINATOR'],
+    } as ServiceContext;
 
     // Clean up any test runs from previous tests
     await mockCtx.db.delete(workflow_runs);
@@ -109,8 +109,8 @@ describe('Execution Service', () => {
       expect(runs[0].status).toBe('running');
 
       // Verify DO was invoked
-      expect(mockCtx.WORKFLOW_COORDINATOR.newUniqueId).toHaveBeenCalled();
-      expect(mockCtx.WORKFLOW_COORDINATOR.get).toHaveBeenCalledWith(mockDOId);
+      expect(mockCtx.do.newUniqueId).toHaveBeenCalled();
+      expect(mockCtx.do.get).toHaveBeenCalledWith(mockDOId);
       expect(mockDOStub.fetch).toHaveBeenCalledWith(
         'https://do/execute',
         expect.objectContaining({

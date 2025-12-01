@@ -48,9 +48,7 @@ export class WorkflowLifecycle {
    * Initialize workflow run in DO storage.
    * Creates tables, stores initial context, creates initial token, enqueues first task.
    */
-  async initialize(request: Request): Promise<Response> {
-    const params = (await request.json()) as InitializeParams;
-
+  async initialize(params: InitializeParams): Promise<void> {
     const {
       workflowRunId,
       workflowDefId,
@@ -123,10 +121,6 @@ export class WorkflowLifecycle {
       this.durableObjectId,
       context,
     );
-
-    return new Response(JSON.stringify({ success: true }), {
-      headers: { 'Content-Type': 'application/json' },
-    });
   }
 
   /**
@@ -189,18 +183,14 @@ export class WorkflowLifecycle {
   /**
    * Get pending events and final context for D1 persistence.
    */
-  async getPendingData(request: Request): Promise<Response> {
+  async getPendingData(): Promise<{ events: unknown[]; context: Context | null }> {
     if (!this.workflowRunId) {
-      return new Response(JSON.stringify({ events: [], context: null }), {
-        headers: { 'Content-Type': 'application/json' },
-      });
+      return { events: [], context: null };
     }
 
     const events = this.events.getPending(this.workflowRunId);
     const finalContext = this.context.get();
 
-    return new Response(JSON.stringify({ events, context: finalContext }), {
-      headers: { 'Content-Type': 'application/json' },
-    });
+    return { events, context: finalContext };
   }
 }

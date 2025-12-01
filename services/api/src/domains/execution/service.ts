@@ -8,6 +8,7 @@ import {
 } from '@wonder/schema';
 import { NotFoundError, ValidationError } from '~/errors';
 import type { ServiceContext } from '~/infrastructure/context';
+import * as coordinationService from '../coordination/service';
 import * as graphService from '../graph/service';
 import { type Context, type WorkflowRun } from './definitions';
 import * as execRepo from './repository';
@@ -21,14 +22,9 @@ customTypes.register('artifact_ref', {
   description: 'Reference to an artifact (string ID)',
 });
 
-/** Service context extended with DO namespace binding */
-export interface ExecutionServiceContext extends ServiceContext {
-  WORKFLOW_COORDINATOR: DurableObjectNamespace;
-}
-
 /** Start a workflow execution - creates run in D1 and invokes DO asynchronously */
 export async function startWorkflow(
-  ctx: ExecutionServiceContext,
+  ctx: ServiceContext,
   workflowId: string,
   input: Record<string, unknown>,
 ): Promise<WorkflowRun> {
@@ -71,7 +67,7 @@ export async function startWorkflow(
   };
 
   // Create a unique DO ID for this workflow run
-  const doId = ctx.WORKFLOW_COORDINATOR.newUniqueId();
+  const doId = ctx.do.newUniqueId();
   const durableObjectId = doId.toString();
 
   // Create workflow run in D1
@@ -93,48 +89,25 @@ export async function startWorkflow(
     durable_object_id: durableObjectId,
   });
 
-  // Get DO stub and invoke executeWorkflow
-  const doStub = ctx.WORKFLOW_COORDINATOR.get(doId);
-
-  // Use waitUntil() to properly handle fire-and-forget DO invocation
-  // This allows the DO work to continue after the response is returned
-  const doInvocation = doStub
-    .fetch('https://do/execute', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({
-        workflowRunId: workflowRun.id,
-        workflowDefId: workflowDef.id,
-        workflowVersion: workflowDef.version,
-        initialNodeId: workflowDef.initial_node_id,
-        inputSchema: workflowDef.input_schema,
-        outputSchema: workflowDef.output_schema,
-        context,
-      }),
-    })
-    .then((response) => {
-      if (!response.ok) {
-        return response.text().then((errorText) => {
-          ctx.logger.error('do_invocation_failed', {
-            workflow_run_id: workflowRun.id,
-            durable_object_id: durableObjectId,
-            status: response.status,
-            error: errorText,
-          });
-        });
-      }
-      ctx.logger.info('do_invocation_succeeded', {
-        workflow_run_id: workflowRun.id,
-        durable_object_id: durableObjectId,
-      });
-    })
-    .catch((err) => {
-      ctx.logger.error('do_invocation_exception', {
-        workflow_run_id: workflowRun.id,
-        durable_object_id: durableObjectId,
-        error: err instanceof Error ? err.message : String(err),
-      });
+  // Initialize coordinator via RPC (fire-and-forget)
+  const doInvocation = (async () => {
+    const stub = ctx.do.get(doId);
+    await stub.initialize({
+      workflowRunId: workflowRun.id!,
+      workflowDefId: workflowDef.id,
+      workflowVersion: workflowDef.version,
+      initialNodeId: workflowDef.initial_node_id!,
+      inputSchema: workflowDef.input_schema as Record<string, unknown>,
+      outputSchema: workflowDef.output_schema as Record<string, unknown>,
+      context,
     });
+  })().catch((err) => {
+    ctx.logger.error('do_invocation_exception', {
+      workflow_run_id: workflowRun.id,
+      durable_object_id: durableObjectId,
+      error: err instanceof Error ? err.message : String(err),
+    });
+  });
 
   // Extend Worker lifetime to allow DO invocation to complete
   ctx.executionContext.waitUntil(doInvocation);

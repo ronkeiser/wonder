@@ -1,7 +1,7 @@
 import { Hono } from 'hono';
 
 interface Env {
-  WORKFLOW_COORDINATOR: DurableObjectNamespace;
+  API: any; // RPC binding to wonder-api
 }
 
 export const coordinator = new Hono<{ Bindings: Env }>();
@@ -22,23 +22,16 @@ coordinator.get('/:doId/stream', async (c) => {
   }
 
   try {
-    // Get DO stub directly and forward WebSocket upgrade
-    const id = c.env.WORKFLOW_COORDINATOR.idFromString(doId);
-    const stub = c.env.WORKFLOW_COORDINATOR.get(id);
-
-    // Create new request with /stream path for DO
-    const url = new URL(c.req.url);
-    url.pathname = '/stream';
-    const doRequest = new Request(url, c.req.raw);
-
-    return await stub.fetch(doRequest);
+    // Forward WebSocket upgrade through RPC to API service
+    using coordination = c.env.API.coordination();
+    return await coordination.streamEvents(doId, c.req.raw);
   } catch (err) {
     return c.json(
       {
-        error: 'Invalid durable object ID',
+        error: 'WebSocket connection failed',
         message: err instanceof Error ? err.message : String(err),
       },
-      400,
+      500,
     );
   }
 });

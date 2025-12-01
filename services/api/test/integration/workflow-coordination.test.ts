@@ -11,12 +11,12 @@ import { createMockLogger } from '@wonder/logger/mock';
 import { env } from 'cloudflare:test';
 import { ulid } from 'ulid';
 import { beforeEach, describe, expect, it } from 'vitest';
-import type { ExecutionServiceContext } from '~/domains/execution/service';
 import { startWorkflow } from '~/domains/execution/service';
+import type { ServiceContext } from '~/infrastructure/context';
 import { createTestDb } from '../helpers/db';
 
 describe('Workflow Coordination Architecture', () => {
-  let ctx: ExecutionServiceContext;
+  let ctx: ServiceContext;
 
   beforeEach(async () => {
     // Migrations applied automatically via setup file
@@ -28,7 +28,7 @@ describe('Workflow Coordination Architecture', () => {
       ai: env.AI,
       logger: createMockLogger(),
       executionContext: {} as ExecutionContext,
-      WORKFLOW_COORDINATOR: env.WORKFLOW_COORDINATOR,
+      do: env.WORKFLOW_COORDINATOR,
     };
   });
 

@@ -24,13 +24,11 @@ export class TaskResultProcessor {
    * Process task result from worker.
    * Updates context, updates token, emits events, checks for completion.
    */
-  async process(request: Request): Promise<Response> {
+  async process(result: WorkflowTaskResult): Promise<void> {
     const workflowRunId = this.lifecycle.getWorkflowRunId();
     if (!workflowRunId) {
       throw new Error('Workflow not initialized');
     }
-
-    const result = (await request.json()) as WorkflowTaskResult;
 
     this.logger.info('processing_task_result', {
       workflow_run_id: workflowRunId,
@@ -43,9 +41,7 @@ export class TaskResultProcessor {
       const errorMessage =
         typeof result.error === 'string' ? result.error : result.error?.message || 'Unknown error';
       this.lifecycle.fail(result.token_id, result.task_id, errorMessage);
-      return new Response(JSON.stringify({ success: true }), {
-        headers: { 'Content-Type': 'application/json' },
-      });
+      return;
     }
 
     // Update context with output data
@@ -74,9 +70,5 @@ export class TaskResultProcessor {
 
     // Check for workflow completion (Stage 0: single node, so always complete after first task)
     this.lifecycle.complete();
-
-    return new Response(JSON.stringify({ success: true }), {
-      headers: { 'Content-Type': 'application/json' },
-    });
   }
 }

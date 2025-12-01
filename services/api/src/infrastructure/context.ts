@@ -14,6 +14,9 @@ export interface ServiceContext {
   /** Workers AI binding for LLM inference */
   ai: Ai;
 
+  /** Durable Object namespace for workflow coordination */
+  do: Env['WORKFLOW_COORDINATOR'];
+
   /** Structured logger for application events */
   logger: Logger;
 
@@ -32,12 +35,14 @@ export interface ServiceContext {
 export function createServiceContext(
   db: DrizzleD1Database,
   ai: Ai,
+  durableObject: Env['WORKFLOW_COORDINATOR'],
   logger: Logger,
   executionContext: ExecutionContext,
 ): ServiceContext {
   return {
     db,
     ai,
+    do: durableObject,
     logger,
     executionContext,
   };
