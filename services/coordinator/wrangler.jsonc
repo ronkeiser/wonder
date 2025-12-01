@@ -14,6 +14,22 @@
     ]
   },
 
+  "queues": {
+    "producers": [
+      {
+        "binding": "WORKFLOW_TASKS",
+        "queue": "workflow-tasks"
+      }
+    ],
+    "consumers": [
+      {
+        "queue": "workflow-results",
+        "max_batch_size": 10,
+        "max_batch_timeout": 5
+      }
+    ]
+  },
+
   "observability": {
     "enabled": true
   }

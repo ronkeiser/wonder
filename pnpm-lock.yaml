@@ -136,6 +136,12 @@ importers:
       '@wonder/logger':
         specifier: workspace:*
         version: link:../../packages/logger
+      '@wonder/schema':
+        specifier: workspace:*
+        version: link:../../packages/schema
+      ulid:
+        specifier: ^3.0.2
+        version: 3.0.2
     devDependencies:
       '@cloudflare/vitest-pool-workers':
         specifier: ^0.10.11

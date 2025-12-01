@@ -6,6 +6,14 @@
  */
 
 import { DurableObject } from 'cloudflare:workers';
+import { ContextManager } from './context.js';
+import { handleTaskResults } from './results.js';
+import { TokenManager } from './tokens.js';
+import type { TaskResult } from './types.js';
+
+interface Env {
+  WORKFLOW_COORDINATOR: DurableObjectNamespace<WorkflowCoordinator>;
+}
 
 /**
  * WorkflowCoordinator Durable Object
@@ -22,20 +30,6 @@ export class WorkflowCoordinator extends DurableObject {
   async fetch(request: Request): Promise<Response> {
     const url = new URL(request.url);
 
-    // Hello world endpoint
-    if (url.pathname === '/hello') {
-      return new Response(
-        JSON.stringify({
-          message: 'Hello from WorkflowCoordinator!',
-          id: this.ctx.id.toString(),
-          timestamp: new Date().toISOString(),
-        }),
-        {
-          headers: { 'Content-Type': 'application/json' },
-        },
-      );
-    }
-
     // Health check
     if (url.pathname === '/health') {
       return new Response(
@@ -49,7 +43,25 @@ export class WorkflowCoordinator extends DurableObject {
       );
     }
 
+    // Handle task results
+    if (url.pathname === '/results' && request.method === 'POST') {
+      const results = (await request.json()) as TaskResult[];
+      // await this.processResults(results);
+      return new Response(JSON.stringify({ processed: results.length }), {
+        headers: { 'Content-Type': 'application/json' },
+      });
+    }
+
     return new Response('Not Found', { status: 404 });
+  }
+
+  /**
+   * Process task results
+   */
+  async processResults(results: TaskResult[]): Promise<void> {
+    const context = new ContextManager(this.ctx.storage.sql);
+    const tokens = new TokenManager(this.ctx.storage.sql);
+    await handleTaskResults(results, context, tokens);
   }
 
   /**
@@ -89,5 +101,27 @@ export default {
         headers: { 'Content-Type': 'application/json' },
       },
     );
+  },
+
+  /**
+   * Queue consumer handler for task results
+   */
+  async queue(batch: MessageBatch<TaskResult>, env: Env): Promise<void> {
+    // Group results by workflow_run_id
+    const resultsByWorkflow = new Map<string, TaskResult[]>();
+
+    for (const message of batch.messages) {
+      const result = message.body;
+      const existing = resultsByWorkflow.get(result.workflow_run_id) || [];
+      existing.push(result);
+      resultsByWorkflow.set(result.workflow_run_id, existing);
+    }
+
+    // Process each workflow's results in its DO
+    for (const [workflowRunId, results] of resultsByWorkflow) {
+      const id = env.WORKFLOW_COORDINATOR.idFromName(workflowRunId);
+      const stub = env.WORKFLOW_COORDINATOR.get(id);
+      await stub.processResults(results);
+    }
   },
 };
