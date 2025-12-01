@@ -1,11 +1,11 @@
 import { createRoute, OpenAPIHono, z } from '@hono/zod-openapi';
 import {
-    CreateWorkflowDefSchema,
-    ulid,
-    WorkflowDefCreateResponseSchema,
-    WorkflowDefGetResponseSchema,
-    WorkflowDefListResponseSchema,
-    WorkflowDefSchema,
+  CreateWorkflowDefSchema,
+  ulid,
+  WorkflowDefCreateResponseSchema,
+  WorkflowDefGetResponseSchema,
+  WorkflowDefListResponseSchema,
+  WorkflowDefSchema,
 } from '../schemas.js';
 
 export const workflowDefs = new OpenAPIHono<{ Bindings: Env }>();
@@ -39,6 +39,7 @@ workflowDefs.openapi(createWorkflowDefRoute, async (c) => {
   const validated = c.req.valid('json');
   using workflowDefs = c.env.RESOURCES.workflowDefs();
   const result = await workflowDefs.create(validated);
+  // @ts-ignore
   return c.json(result, 201);
 });
 

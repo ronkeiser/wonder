@@ -26,7 +26,12 @@
       }
     ]
   },
-
+  "migrations": [
+    {
+      "tag": "v1",
+      "new_classes": ["WorkflowCoordinator"]
+    }
+  ],
   "observability": {
     "enabled": true
   }

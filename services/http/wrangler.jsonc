@@ -15,7 +15,7 @@
       {
         "name": "COORDINATOR",
         "class_name": "WorkflowCoordinator",
-        "script_name": "coordinator"
+        "script_name": "wonder-coordinator"
       }
     ]
   },
