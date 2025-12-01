@@ -8,15 +8,12 @@ import {
 } from '@wonder/schema';
 import { NotFoundError, ValidationError } from '~/errors';
 import type { ServiceContext } from '~/infrastructure/context';
-import * as graphRepo from '../graph/repository';
+import * as graphService from '../graph/service';
 import { type Context, type WorkflowRun } from './definitions';
 import * as execRepo from './repository';
 
 /** Custom type registry for schema validation */
-
 const customTypes = new CustomTypeRegistry();
-
-// Register artifact_ref custom type (validates string format)
 customTypes.register('artifact_ref', {
   validate: (value: unknown): boolean => {
     return typeof value === 'string' && value.length > 0;
@@ -24,18 +21,12 @@ customTypes.register('artifact_ref', {
   description: 'Reference to an artifact (string ID)',
 });
 
-/**
- * Service context extended with DO namespace binding.
- */
+/** Service context extended with DO namespace binding */
 export interface ExecutionServiceContext extends ServiceContext {
   WORKFLOW_COORDINATOR: DurableObjectNamespace;
 }
 
-/**
- * Start a workflow execution.
- * Creates a run in D1, gets a DO instance, and invokes DO.executeWorkflow().
- * Returns immediately - execution continues asynchronously in DO → Queue → Worker → DO.
- */
+/** Start a workflow execution - creates run in D1 and invokes DO asynchronously */
 export async function startWorkflow(
   ctx: ExecutionServiceContext,
   workflowId: string,
@@ -43,32 +34,13 @@ export async function startWorkflow(
 ): Promise<WorkflowRun> {
   ctx.logger.info('workflow_trigger_started', { workflow_id: workflowId });
 
-  // Load workflow and definition
-  const workflow = await graphRepo.getWorkflow(ctx.db, workflowId);
-  if (!workflow) {
-    ctx.logger.error('workflow_not_found', { workflow_id: workflowId });
-    throw new NotFoundError(`Workflow not found: ${workflowId}`, 'workflow', workflowId);
-  }
-
-  const workflowDef = await graphRepo.getWorkflowDef(
-    ctx.db,
+  // Load workflow and def
+  const workflow = await graphService.getWorkflow(ctx, workflowId);
+  const workflowDef = await graphService.getWorkflowDefMetadata(
+    ctx,
     workflow.workflow_def_id,
     workflow.pinned_version ?? undefined,
   );
-  if (!workflowDef) {
-    ctx.logger.error('workflow_definition_not_found', {
-      workflow_id: workflowId,
-      workflow_def_id: workflow.workflow_def_id,
-      version: workflow.pinned_version,
-    });
-    throw new NotFoundError(
-      `Workflow definition not found: ${workflow.workflow_def_id}${
-        workflow.pinned_version ? ` v${workflow.pinned_version}` : ''
-      }`,
-      'workflow_definition',
-      workflow.workflow_def_id,
-    );
-  }
 
   // Validate input against schema
   const inputSchema = workflowDef.input_schema as SchemaType;
@@ -175,5 +147,25 @@ export async function startWorkflow(
 
   // Return the workflow run immediately
   // Execution continues asynchronously in DO
+  return workflowRun;
+}
+
+/** Get a workflow run by ID */
+export async function getWorkflowRun(
+  ctx: ServiceContext,
+  workflowRunId: string,
+): Promise<WorkflowRun> {
+  ctx.logger.info('workflow_run_get', { workflow_run_id: workflowRunId });
+
+  const workflowRun = await execRepo.getWorkflowRun(ctx.db, workflowRunId);
+  if (!workflowRun) {
+    ctx.logger.warn('workflow_run_not_found', { workflow_run_id: workflowRunId });
+    throw new NotFoundError(
+      `Workflow run not found: ${workflowRunId}`,
+      'workflow_run',
+      workflowRunId,
+    );
+  }
+
   return workflowRun;
 }

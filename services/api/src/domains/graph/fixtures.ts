@@ -1,13 +1,8 @@
 /** Test fixtures for graph domain */
 
 import type { DrizzleD1Database } from 'drizzle-orm/d1';
-import {
-  createNode,
-  createProject,
-  createWorkflow,
-  createWorkflowDef,
-  createWorkspace,
-} from './repository';
+import { createProject, createWorkspace } from '~/domains/workspace/repository';
+import { createNode, createWorkflow, createWorkflowDef } from './repository';
 import type { FanIn, WorkflowDefOwner } from './transforms';
 
 type Workspace = Awaited<ReturnType<typeof createWorkspace>>;
@@ -97,7 +92,10 @@ export async function buildNode(
   }
 
   return await createNode(db, {
+    ref: 'test_node',
     workflow_def_id: workflow_def_id!,
+    workflow_def_version: overrides?.workflow_def_version ?? 1,
+    action_version: overrides?.action_version ?? 1,
     name: 'Test Node',
     action_id: 'action_test',
     input_mapping: null,

@@ -1,4 +1,5 @@
 {
+  "$schema": "./node_modules/wrangler/config-schema.json",
   "name": "wonder-api",
   "main": "src/index.ts",
   "compatibility_date": "2025-11-25",
@@ -9,7 +10,7 @@
     {
       "binding": "DB",
       "database_name": "wonder",
-      "database_id": "ec06d912-8013-4f30-9e94-e47a90c9ef46",
+      "database_id": "d03f7db5-ff4a-4dd8-9153-589cec06dc60",
       "migrations_dir": "src/infrastructure/db/migrations",
       "remote": true
     }
@@ -53,5 +54,13 @@
         "dead_letter_queue": "workflow-tasks-dlq"
       }
     ]
+  },
+  "observability": {
+    "logs": {
+      "enabled": true,
+      "head_sampling_rate": 1,
+      "invocation_logs": false,
+      "persist": true
+    }
   }
 }

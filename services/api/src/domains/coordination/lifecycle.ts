@@ -115,7 +115,14 @@ export class WorkflowLifecycle {
     if (!this.durableObjectId) {
       throw new Error('Durable object ID not set');
     }
-    this.tasks.enqueue(initialToken, workflowRunId, this.durableObjectId, context);
+    this.tasks.enqueue(
+      initialToken,
+      workflowRunId,
+      workflowDefId,
+      workflowVersion,
+      this.durableObjectId,
+      context,
+    );
 
     return new Response(JSON.stringify({ success: true }), {
       headers: { 'Content-Type': 'application/json' },

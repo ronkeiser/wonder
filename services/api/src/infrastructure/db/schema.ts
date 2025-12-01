@@ -79,7 +79,7 @@ export const workflow_defs = sqliteTable(
     output_schema: text('output_schema', { mode: 'json' }).notNull(),
     context_schema: text('context_schema', { mode: 'json' }),
 
-    initial_node_id: text('initial_node_id').notNull(),
+    initial_node_id: text('initial_node_id'),
 
     created_at: text('created_at').notNull(),
     updated_at: text('updated_at').notNull(),
@@ -122,13 +122,13 @@ export const workflows = sqliteTable(
 export const nodes = sqliteTable(
   'nodes',
   {
-    id: text('id').primaryKey(),
+    id: text('id').notNull(),
+    ref: text('ref').notNull(),
     workflow_def_id: text('workflow_def_id').notNull(),
     workflow_def_version: integer('workflow_def_version').notNull(),
     name: text('name').notNull(),
-    action_id: text('action_id')
-      .notNull()
-      .references(() => actions.id),
+    action_id: text('action_id').notNull(),
+    action_version: integer('action_version').notNull(),
 
     input_mapping: text('input_mapping', { mode: 'json' }),
     output_mapping: text('output_mapping', { mode: 'json' }),
@@ -143,27 +143,30 @@ export const nodes = sqliteTable(
     }),
   },
   (table) => [
+    primaryKey({ columns: [table.workflow_def_id, table.workflow_def_version, table.id] }),
     foreignKey({
       columns: [table.workflow_def_id, table.workflow_def_version],
       foreignColumns: [workflow_defs.id, workflow_defs.version],
     }),
+    foreignKey({
+      columns: [table.action_id, table.action_version],
+      foreignColumns: [actions.id, actions.version],
+    }),
     index('idx_nodes_workflow_def').on(table.workflow_def_id, table.workflow_def_version),
-    index('idx_nodes_action').on(table.action_id),
+    index('idx_nodes_action').on(table.action_id, table.action_version),
+    index('idx_nodes_ref').on(table.workflow_def_id, table.workflow_def_version, table.ref),
   ],
 );
 
 export const transitions = sqliteTable(
   'transitions',
   {
-    id: text('id').primaryKey(),
+    id: text('id').notNull(),
+    ref: text('ref'),
     workflow_def_id: text('workflow_def_id').notNull(),
     workflow_def_version: integer('workflow_def_version').notNull(),
-    from_node_id: text('from_node_id')
-      .notNull()
-      .references(() => nodes.id, { onDelete: 'cascade' }),
-    to_node_id: text('to_node_id')
-      .notNull()
-      .references(() => nodes.id, { onDelete: 'cascade' }),
+    from_node_id: text('from_node_id').notNull(),
+    to_node_id: text('to_node_id').notNull(),
     priority: integer('priority').notNull(),
 
     condition: text('condition', { mode: 'json' }), // structured or expression
@@ -171,71 +174,89 @@ export const transitions = sqliteTable(
     loop_config: text('loop_config', { mode: 'json' }),
   },
   (table) => [
+    primaryKey({ columns: [table.workflow_def_id, table.workflow_def_version, table.id] }),
     foreignKey({
       columns: [table.workflow_def_id, table.workflow_def_version],
       foreignColumns: [workflow_defs.id, workflow_defs.version],
     }),
+    foreignKey({
+      columns: [table.workflow_def_id, table.workflow_def_version, table.from_node_id],
+      foreignColumns: [nodes.workflow_def_id, nodes.workflow_def_version, nodes.id],
+    }).onDelete('cascade'),
+    foreignKey({
+      columns: [table.workflow_def_id, table.workflow_def_version, table.to_node_id],
+      foreignColumns: [nodes.workflow_def_id, nodes.workflow_def_version, nodes.id],
+    }).onDelete('cascade'),
     index('idx_transitions_workflow_def').on(table.workflow_def_id, table.workflow_def_version),
     index('idx_transitions_from_node').on(table.from_node_id),
     index('idx_transitions_to_node').on(table.to_node_id),
+    index('idx_transitions_ref').on(table.workflow_def_id, table.workflow_def_version, table.ref),
   ],
 );
 
 /** Actions */
 
-export const actions = sqliteTable('actions', {
-  id: text('id').primaryKey(),
-  name: text('name').notNull(),
-  description: text('description').notNull(),
-  version: integer('version').notNull(),
+export const actions = sqliteTable(
+  'actions',
+  {
+    id: text('id').notNull(),
+    name: text('name').notNull(),
+    description: text('description').notNull(),
+    version: integer('version').notNull(),
 
-  kind: text('kind', {
-    enum: [
-      'llm_call',
-      'mcp_tool',
-      'http_request',
-      'human_input',
-      'update_context',
-      'write_artifact',
-      'workflow_call',
-      'vector_search',
-      'emit_metric',
-    ],
-  }).notNull(),
+    kind: text('kind', {
+      enum: [
+        'llm_call',
+        'mcp_tool',
+        'http_request',
+        'human_input',
+        'update_context',
+        'write_artifact',
+        'workflow_call',
+        'vector_search',
+        'emit_metric',
+      ],
+    }).notNull(),
 
-  implementation: text('implementation', { mode: 'json' }).notNull(), // discriminated by kind
+    implementation: text('implementation', { mode: 'json' }).notNull(), // discriminated by kind
 
-  requires: text('requires', { mode: 'json' }),
-  produces: text('produces', { mode: 'json' }),
-  execution: text('execution', { mode: 'json' }), // timeout, retry_policy
-  idempotency: text('idempotency', { mode: 'json' }),
+    requires: text('requires', { mode: 'json' }),
+    produces: text('produces', { mode: 'json' }),
+    execution: text('execution', { mode: 'json' }), // timeout, retry_policy
+    idempotency: text('idempotency', { mode: 'json' }),
 
-  created_at: text('created_at').notNull(),
-  updated_at: text('updated_at').notNull(),
-});
+    created_at: text('created_at').notNull(),
+    updated_at: text('updated_at').notNull(),
+  },
+  (table) => [primaryKey({ columns: [table.id, table.version] })],
+);
 
 /** AI Primitives */
 
-export const prompt_specs = sqliteTable('prompt_specs', {
-  id: text('id').primaryKey(),
-  name: text('name').notNull(),
-  description: text('description').notNull(),
-  version: integer('version').notNull(),
+export const prompt_specs = sqliteTable(
+  'prompt_specs',
+  {
+    id: text('id').notNull(),
+    name: text('name').notNull(),
+    description: text('description').notNull(),
+    version: integer('version').notNull(),
 
-  system_prompt: text('system_prompt'),
-  template: text('template').notNull(),
-  template_language: text('template_language', {
-    enum: ['handlebars', 'jinja2'],
-  }).notNull(),
+    system_prompt: text('system_prompt'),
+    template: text('template').notNull(),
+    template_language: text('template_language', {
+      enum: ['handlebars', 'jinja2'],
+    }).notNull(),
 
-  requires: text('requires', { mode: 'json' }).notNull(),
-  produces: text('produces', { mode: 'json' }).notNull(),
-  examples: text('examples', { mode: 'json' }),
-  tags: text('tags', { mode: 'json' }),
+    requires: text('requires', { mode: 'json' }).notNull(),
+    produces: text('produces', { mode: 'json' }).notNull(),
+    examples: text('examples', { mode: 'json' }),
+    tags: text('tags', { mode: 'json' }),
 
-  created_at: text('created_at').notNull(),
-  updated_at: text('updated_at').notNull(),
-});
+    created_at: text('created_at').notNull(),
+    updated_at: text('updated_at').notNull(),
+  },
+  (table) => [primaryKey({ columns: [table.id, table.version] })],
+);
 
 export const model_profiles = sqliteTable('model_profiles', {
   id: text('id').primaryKey(),
@@ -278,13 +299,17 @@ export const workflow_runs = sqliteTable(
     latest_snapshot: text('latest_snapshot', { mode: 'json' }), // Snapshot
 
     parent_run_id: text('parent_run_id'), // self-reference to workflow_runs.id (enforced at application level)
-    parent_node_id: text('parent_node_id').references(() => nodes.id),
+    parent_node_id: text('parent_node_id'),
 
     created_at: text('created_at').notNull(),
     updated_at: text('updated_at').notNull(),
     completed_at: text('completed_at'),
   },
   (table) => [
+    foreignKey({
+      columns: [table.workflow_def_id, table.workflow_version, table.parent_node_id],
+      foreignColumns: [nodes.workflow_def_id, nodes.workflow_def_version, nodes.id],
+    }),
     index('idx_workflow_runs_project').on(table.project_id),
     index('idx_workflow_runs_workflow').on(table.workflow_id),
     index('idx_workflow_runs_status').on(table.status),
@@ -296,7 +321,6 @@ export const workflow_runs = sqliteTable(
 export const events = sqliteTable(
   'events',
   {
-    id: text('id').primaryKey(),
     workflow_run_id: text('workflow_run_id')
       .notNull()
       .references(() => workflow_runs.id, { onDelete: 'cascade' }),
@@ -328,7 +352,7 @@ export const events = sqliteTable(
     archived_at: text('archived_at'), // when moved to R2 (30-day retention policy)
   },
   (table) => [
-    index('idx_events_run_sequence').on(table.workflow_run_id, table.sequence_number),
+    primaryKey({ columns: [table.workflow_run_id, table.sequence_number] }),
     index('idx_events_timestamp').on(table.timestamp),
     index('idx_events_kind').on(table.kind),
     index('idx_events_archived_at').on(table.archived_at),
@@ -364,11 +388,21 @@ export const artifacts = sqliteTable(
     created_by_workflow_run_id: text('created_by_workflow_run_id').references(
       () => workflow_runs.id,
     ),
-    created_by_node_id: text('created_by_node_id').references(() => nodes.id),
+    created_by_workflow_def_id: text('created_by_workflow_def_id'),
+    created_by_workflow_def_version: integer('created_by_workflow_def_version'),
+    created_by_node_id: text('created_by_node_id'),
 
     created_at: text('created_at').notNull(),
   },
   (table) => [
+    foreignKey({
+      columns: [
+        table.created_by_workflow_def_id,
+        table.created_by_workflow_def_version,
+        table.created_by_node_id,
+      ],
+      foreignColumns: [nodes.workflow_def_id, nodes.workflow_def_version, nodes.id],
+    }),
     index('idx_artifacts_project_type').on(table.project_id, table.type_id),
     index('idx_artifacts_workflow_run').on(table.created_by_workflow_run_id),
     index('idx_artifacts_created_at').on(table.created_at),

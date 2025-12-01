@@ -117,6 +117,10 @@ export interface WorkflowTask {
   /** Node to execute */
   node_id: string;
 
+  /** Workflow definition (for node lookup) */
+  workflow_def_id: string;
+  workflow_def_version: number;
+
   /** Action to perform */
   action_id: string;
 

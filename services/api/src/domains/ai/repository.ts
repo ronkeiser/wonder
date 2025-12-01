@@ -6,10 +6,7 @@ import { ulid } from 'ulid';
 import { model_profiles, prompt_specs } from '~/infrastructure/db/schema';
 
 type PromptSpec = typeof prompt_specs.$inferSelect;
-type NewPromptSpec = Omit<
-  typeof prompt_specs.$inferInsert,
-  'id' | 'version' | 'created_at' | 'updated_at'
->;
+type NewPromptSpec = Omit<typeof prompt_specs.$inferInsert, 'id' | 'created_at' | 'updated_at'>;
 
 type ModelProfile = typeof model_profiles.$inferSelect;
 type NewModelProfile = Omit<typeof model_profiles.$inferInsert, 'id'>;
@@ -23,7 +20,6 @@ export async function createPromptSpec(
   const now = new Date().toISOString();
   const spec = {
     id: ulid(),
-    version: 1,
     ...data,
     created_at: now,
     updated_at: now,
@@ -64,6 +60,21 @@ export async function getLatestPromptSpec(
   return result ?? null;
 }
 
+export async function deletePromptSpec(
+  db: DrizzleD1Database,
+  id: string,
+  version?: number,
+): Promise<void> {
+  if (version) {
+    await db
+      .delete(prompt_specs)
+      .where(and(eq(prompt_specs.id, id), eq(prompt_specs.version, version)))
+      .run();
+  } else {
+    await db.delete(prompt_specs).where(eq(prompt_specs.id, id)).run();
+  }
+}
+
 /** ModelProfile */
 
 export async function createModelProfile(
@@ -87,9 +98,17 @@ export async function getModelProfile(
   return result ?? null;
 }
 
+export async function listModelProfiles(db: DrizzleD1Database): Promise<ModelProfile[]> {
+  return await db.select().from(model_profiles).all();
+}
+
 export async function listModelProfilesByProvider(
   db: DrizzleD1Database,
   provider: 'anthropic' | 'openai' | 'google' | 'cloudflare' | 'local',
 ): Promise<ModelProfile[]> {
   return await db.select().from(model_profiles).where(eq(model_profiles.provider, provider)).all();
+}
+
+export async function deleteModelProfile(db: DrizzleD1Database, id: string): Promise<void> {
+  await db.delete(model_profiles).where(eq(model_profiles.id, id)).run();
 }

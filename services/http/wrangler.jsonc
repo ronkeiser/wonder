@@ -1,11 +1,13 @@
 {
+  "$schema": "./node_modules/wrangler/config-schema.json",
   "name": "wonder-http",
   "main": "src/index.ts",
   "compatibility_date": "2025-11-18",
   "services": [
     {
       "binding": "API",
-      "service": "wonder-api"
+      "service": "wonder-api",
+      "entrypoint": "WonderAPI"
     }
   ],
   "durable_objects": {
@@ -16,5 +18,13 @@
         "script_name": "wonder-api"
       }
     ]
+  },
+  "observability": {
+    "logs": {
+      "enabled": true,
+      "head_sampling_rate": 1,
+      "invocation_logs": false,
+      "persist": true
+    }
   }
 }

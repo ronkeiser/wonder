@@ -1,0 +1,137 @@
+import { createRoute, OpenAPIHono, z } from '@hono/zod-openapi';
+import {
+  CreateWorkflowSchema,
+  ulid,
+  WorkflowCreateResponseSchema,
+  WorkflowGetResponseSchema,
+} from '../schemas.js';
+
+interface Env {
+  API: any;
+}
+
+export const workflows = new OpenAPIHono<{ Bindings: Env }>();
+
+const createWorkflowRoute = createRoute({
+  method: 'post',
+  path: '/',
+  tags: ['workflows'],
+  request: {
+    body: {
+      content: {
+        'application/json': {
+          schema: CreateWorkflowSchema,
+        },
+      },
+    },
+  },
+  responses: {
+    201: {
+      content: {
+        'application/json': {
+          schema: WorkflowCreateResponseSchema,
+        },
+      },
+      description: 'Workflow created successfully',
+    },
+  },
+});
+
+workflows.openapi(createWorkflowRoute, async (c) => {
+  const validated = c.req.valid('json');
+  using workflows = c.env.API.workflows();
+  const result = await workflows.create(validated);
+  return c.json(result, 201);
+});
+
+const getWorkflowRoute = createRoute({
+  method: 'get',
+  path: '/{id}',
+  tags: ['workflows'],
+  request: {
+    params: z.object({
+      id: ulid().openapi({ param: { name: 'id', in: 'path' } }),
+    }),
+  },
+  responses: {
+    200: {
+      content: {
+        'application/json': {
+          schema: WorkflowGetResponseSchema,
+        },
+      },
+      description: 'Workflow retrieved successfully',
+    },
+  },
+});
+
+workflows.openapi(getWorkflowRoute, async (c) => {
+  const { id } = c.req.valid('param');
+  using workflows = c.env.API.workflows();
+  const result = await workflows.get(id);
+  return c.json(result);
+});
+
+const startWorkflowRoute = createRoute({
+  method: 'post',
+  path: '/{id}/start',
+  tags: ['workflows'],
+  request: {
+    params: z.object({
+      id: ulid().openapi({ param: { name: 'id', in: 'path' } }),
+    }),
+    body: {
+      content: {
+        'application/json': {
+          schema: z.record(z.string(), z.unknown()).openapi({ example: { input: 'value' } }),
+        },
+      },
+    },
+  },
+  responses: {
+    200: {
+      content: {
+        'application/json': {
+          schema: z.record(z.string(), z.unknown()),
+        },
+      },
+      description: 'Workflow execution started successfully',
+    },
+  },
+});
+
+workflows.openapi(startWorkflowRoute, async (c) => {
+  const { id } = c.req.valid('param');
+  const input = c.req.valid('json');
+  using workflows = c.env.API.workflows();
+  const result = await workflows.start(id, input);
+  return c.json(result);
+});
+
+const getWorkflowRunRoute = createRoute({
+  method: 'get',
+  path: '/runs/{id}',
+  tags: ['workflows'],
+  request: {
+    params: z.object({
+      id: ulid().openapi({ param: { name: 'id', in: 'path' } }),
+    }),
+  },
+  responses: {
+    200: {
+      content: {
+        'application/json': {
+          schema: z.record(z.string(), z.unknown()),
+        },
+      },
+      description: 'Workflow run retrieved successfully',
+    },
+  },
+});
+
+workflows.openapi(getWorkflowRunRoute, async (c) => {
+  const { id } = c.req.valid('param');
+  using workflows = c.env.API.workflows();
+  const result = await workflows.getWorkflowRun(id);
+  return c.json(result);
+});

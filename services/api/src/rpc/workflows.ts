@@ -1,4 +1,5 @@
-import { startWorkflow } from '~/domains/execution/service';
+import * as executionService from '~/domains/execution/service';
+import * as graphService from '~/domains/graph/service';
 import { Resource } from './resource';
 
 /**
@@ -7,14 +8,48 @@ import { Resource } from './resource';
  */
 export class Workflows extends Resource {
   /**
+   * Create a new workflow (binds a workflow_def to a project)
+   */
+  async create(data: {
+    project_id: string;
+    name: string;
+    description?: string;
+    workflow_def_id: string;
+    pinned_version?: number;
+    enabled?: boolean;
+  }) {
+    const workflow = await graphService.createWorkflow(this.serviceCtx, data);
+    return {
+      workflow_id: workflow.id,
+      workflow,
+    };
+  }
+
+  /**
+   * Get a workflow by ID
+   */
+  async get(workflowId: string) {
+    const workflow = await graphService.getWorkflow(this.serviceCtx, workflowId);
+    return { workflow };
+  }
+
+  /**
    * Start a workflow execution
    */
   async start(workflowId: string, input: Record<string, unknown>) {
-    const workflowRun = await startWorkflow(this.serviceCtx, workflowId, input);
+    const workflowRun = await executionService.startWorkflow(this.serviceCtx, workflowId, input);
     return {
       workflow_run_id: workflowRun.id,
       durable_object_id: workflowRun.durable_object_id,
     };
+  }
+
+  /**
+   * Get workflow run status and output
+   */
+  async getWorkflowRun(workflowRunId: string) {
+    const workflowRun = await executionService.getWorkflowRun(this.serviceCtx, workflowRunId);
+    return { workflow_run: workflowRun };
   }
 
   /**

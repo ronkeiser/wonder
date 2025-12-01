@@ -4,16 +4,18 @@ import { beforeAll, describe, expect, test } from 'vitest';
 import { createAction } from '~/domains/effects/repository';
 import {
   createNode,
-  createProject,
   createWorkflowDef,
-  createWorkspace,
   getNode,
-  getProject,
   getWorkflowDef,
-  getWorkspace,
   listNodesByWorkflowDef,
   listWorkflowDefsByOwner,
 } from '~/domains/graph/repository';
+import {
+  createProject,
+  createWorkspace,
+  getProject,
+  getWorkspace,
+} from '~/domains/workspace/repository';
 import { createTestDb } from '../../helpers/db';
 
 const db = createTestDb();
@@ -197,6 +199,7 @@ describe('Node', () => {
       initial_node_id: 'start',
     });
     const action = await createAction(db, {
+      version: 1,
       name: 'Test Action',
       description: 'Test',
       kind: 'llm_call',
@@ -208,8 +211,10 @@ describe('Node', () => {
     });
 
     const node = await createNode(db, {
+      ref: 'test_node',
       workflow_def_id: def.id,
       workflow_def_version: def.version,
+      action_version: action.version,
       name: 'Test Node',
       action_id: action.id,
       input_mapping: null,
@@ -244,6 +249,7 @@ describe('Node', () => {
       initial_node_id: 'start',
     });
     const action = await createAction(db, {
+      version: 1,
       name: 'Test Action',
       description: 'Test',
       kind: 'llm_call',
@@ -255,21 +261,23 @@ describe('Node', () => {
     });
 
     const node = await createNode(db, {
+      ref: 'test_node_m_of_n',
       workflow_def_id: def.id,
       workflow_def_version: def.version,
+      action_version: action.version,
       name: 'Test Node',
       action_id: action.id,
       input_mapping: null,
       output_mapping: null,
       fan_out: 'all',
-      fan_in: { m_of_n: 3 },
+      fan_in: { m_of_n: 2 },
       joins_node: null,
       merge: null,
       on_early_complete: null,
     });
 
-    const retrieved = await getNode(db, node.id);
-    expect(retrieved?.fan_in).toEqual({ m_of_n: 3 });
+    const retrieved = await getNode(db, def.id, def.version, node.id);
+    expect(retrieved?.fan_in).toEqual({ m_of_n: 2 });
   });
 
   test('lists nodes by workflow def', async () => {
@@ -291,6 +299,7 @@ describe('Node', () => {
       initial_node_id: 'start',
     });
     const action1 = await createAction(db, {
+      version: 1,
       name: 'Action 1',
       description: 'Test',
       kind: 'llm_call',
@@ -301,6 +310,7 @@ describe('Node', () => {
       idempotency: null,
     });
     const action2 = await createAction(db, {
+      version: 1,
       name: 'Action 2',
       description: 'Test',
       kind: 'llm_call',
@@ -312,8 +322,10 @@ describe('Node', () => {
     });
 
     const node1 = await createNode(db, {
+      ref: 'node_1',
       workflow_def_id: def.id,
       workflow_def_version: def.version,
+      action_version: action1.version,
       name: 'Node 1',
       action_id: action1.id,
       input_mapping: null,
@@ -326,8 +338,10 @@ describe('Node', () => {
     });
 
     const node2 = await createNode(db, {
+      ref: 'node_2',
       workflow_def_id: def.id,
       workflow_def_version: def.version,
+      action_version: action2.version,
       name: 'Node 2',
       action_id: action2.id,
       input_mapping: null,

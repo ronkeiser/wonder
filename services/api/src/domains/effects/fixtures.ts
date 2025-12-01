@@ -10,6 +10,7 @@ export async function buildAction(
   overrides?: Partial<Parameters<typeof createAction>[1]>,
 ): Promise<Action> {
   return await createAction(db, {
+    version: overrides?.version ?? 1,
     name: 'Test Action',
     description: 'Test action description',
     kind: 'llm_call',

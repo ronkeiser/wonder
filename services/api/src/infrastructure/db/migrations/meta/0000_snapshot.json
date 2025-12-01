@@ -1,7 +1,7 @@
 {
   "version": "6",
   "dialect": "sqlite",
-  "id": "0b952d02-c698-4f92-9aa7-52a0a8ca30ba",
+  "id": "5e6a85f7-fd21-475f-ba1f-9e499c4b581e",
   "prevId": "00000000-0000-0000-0000-000000000000",
   "tables": {
     "actions": {
@@ -10,7 +10,7 @@
         "id": {
           "name": "id",
           "type": "text",
-          "primaryKey": true,
+          "primaryKey": false,
           "notNull": true,
           "autoincrement": false
         },
@@ -94,7 +94,15 @@
       },
       "indexes": {},
       "foreignKeys": {},
-      "compositePrimaryKeys": {},
+      "compositePrimaryKeys": {
+        "actions_id_version_pk": {
+          "columns": [
+            "id",
+            "version"
+          ],
+          "name": "actions_id_version_pk"
+        }
+      },
       "uniqueConstraints": {},
       "checkConstraints": {}
     },
@@ -256,6 +264,20 @@
           "notNull": false,
           "autoincrement": false
         },
+        "created_by_workflow_def_id": {
+          "name": "created_by_workflow_def_id",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false,
+          "autoincrement": false
+        },
+        "created_by_workflow_def_version": {
+          "name": "created_by_workflow_def_version",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": false,
+          "autoincrement": false
+        },
         "created_by_node_id": {
           "name": "created_by_node_id",
           "type": "text",
@@ -322,14 +344,18 @@
           "onDelete": "no action",
           "onUpdate": "no action"
         },
-        "artifacts_created_by_node_id_nodes_id_fk": {
-          "name": "artifacts_created_by_node_id_nodes_id_fk",
+        "artifacts_created_by_workflow_def_id_created_by_workflow_def_version_created_by_node_id_nodes_workflow_def_id_workflow_def_version_id_fk": {
+          "name": "artifacts_created_by_workflow_def_id_created_by_workflow_def_version_created_by_node_id_nodes_workflow_def_id_workflow_def_version_id_fk",
           "tableFrom": "artifacts",
           "tableTo": "nodes",
           "columnsFrom": [
+            "created_by_workflow_def_id",
+            "created_by_workflow_def_version",
             "created_by_node_id"
           ],
           "columnsTo": [
+            "workflow_def_id",
+            "workflow_def_version",
             "id"
           ],
           "onDelete": "no action",
@@ -447,13 +473,6 @@
     "events": {
       "name": "events",
       "columns": {
-        "id": {
-          "name": "id",
-          "type": "text",
-          "primaryKey": true,
-          "notNull": true,
-          "autoincrement": false
-        },
         "workflow_run_id": {
           "name": "workflow_run_id",
           "type": "text",
@@ -498,14 +517,6 @@
         }
       },
       "indexes": {
-        "idx_events_run_sequence": {
-          "name": "idx_events_run_sequence",
-          "columns": [
-            "workflow_run_id",
-            "sequence_number"
-          ],
-          "isUnique": false
-        },
         "idx_events_timestamp": {
           "name": "idx_events_timestamp",
           "columns": [
@@ -543,7 +554,15 @@
           "onUpdate": "no action"
         }
       },
-      "compositePrimaryKeys": {},
+      "compositePrimaryKeys": {
+        "events_workflow_run_id_sequence_number_pk": {
+          "columns": [
+            "workflow_run_id",
+            "sequence_number"
+          ],
+          "name": "events_workflow_run_id_sequence_number_pk"
+        }
+      },
       "uniqueConstraints": {},
       "checkConstraints": {}
     },
@@ -900,7 +919,7 @@
         "id": {
           "name": "id",
           "type": "text",
-          "primaryKey": true,
+          "primaryKey": false,
           "notNull": true,
           "autoincrement": false
         },
@@ -928,6 +947,13 @@
         "action_id": {
           "name": "action_id",
           "type": "text",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false
+        },
+        "action_version": {
+          "name": "action_version",
+          "type": "integer",
           "primaryKey": false,
           "notNull": true,
           "autoincrement": false
@@ -994,25 +1020,13 @@
         "idx_nodes_action": {
           "name": "idx_nodes_action",
           "columns": [
-            "action_id"
+            "action_id",
+            "action_version"
           ],
           "isUnique": false
         }
       },
       "foreignKeys": {
-        "nodes_action_id_actions_id_fk": {
-          "name": "nodes_action_id_actions_id_fk",
-          "tableFrom": "nodes",
-          "tableTo": "actions",
-          "columnsFrom": [
-            "action_id"
-          ],
-          "columnsTo": [
-            "id"
-          ],
-          "onDelete": "no action",
-          "onUpdate": "no action"
-        },
         "nodes_workflow_def_id_workflow_def_version_workflow_defs_id_version_fk": {
           "name": "nodes_workflow_def_id_workflow_def_version_workflow_defs_id_version_fk",
           "tableFrom": "nodes",
@@ -1027,9 +1041,33 @@
           ],
           "onDelete": "no action",
           "onUpdate": "no action"
+        },
+        "nodes_action_id_action_version_actions_id_version_fk": {
+          "name": "nodes_action_id_action_version_actions_id_version_fk",
+          "tableFrom": "nodes",
+          "tableTo": "actions",
+          "columnsFrom": [
+            "action_id",
+            "action_version"
+          ],
+          "columnsTo": [
+            "id",
+            "version"
+          ],
+          "onDelete": "no action",
+          "onUpdate": "no action"
         }
       },
-      "compositePrimaryKeys": {},
+      "compositePrimaryKeys": {
+        "nodes_workflow_def_id_workflow_def_version_id_pk": {
+          "columns": [
+            "workflow_def_id",
+            "workflow_def_version",
+            "id"
+          ],
+          "name": "nodes_workflow_def_id_workflow_def_version_id_pk"
+        }
+      },
       "uniqueConstraints": {},
       "checkConstraints": {}
     },
@@ -1120,7 +1158,7 @@
         "id": {
           "name": "id",
           "type": "text",
-          "primaryKey": true,
+          "primaryKey": false,
           "notNull": true,
           "autoincrement": false
         },
@@ -1211,7 +1249,15 @@
       },
       "indexes": {},
       "foreignKeys": {},
-      "compositePrimaryKeys": {},
+      "compositePrimaryKeys": {
+        "prompt_specs_id_version_pk": {
+          "columns": [
+            "id",
+            "version"
+          ],
+          "name": "prompt_specs_id_version_pk"
+        }
+      },
       "uniqueConstraints": {},
       "checkConstraints": {}
     },
@@ -1296,7 +1342,7 @@
         "id": {
           "name": "id",
           "type": "text",
-          "primaryKey": true,
+          "primaryKey": false,
           "notNull": true,
           "autoincrement": false
         },
@@ -1382,32 +1428,6 @@
         }
       },
       "foreignKeys": {
-        "transitions_from_node_id_nodes_id_fk": {
-          "name": "transitions_from_node_id_nodes_id_fk",
-          "tableFrom": "transitions",
-          "tableTo": "nodes",
-          "columnsFrom": [
-            "from_node_id"
-          ],
-          "columnsTo": [
-            "id"
-          ],
-          "onDelete": "cascade",
-          "onUpdate": "no action"
-        },
-        "transitions_to_node_id_nodes_id_fk": {
-          "name": "transitions_to_node_id_nodes_id_fk",
-          "tableFrom": "transitions",
-          "tableTo": "nodes",
-          "columnsFrom": [
-            "to_node_id"
-          ],
-          "columnsTo": [
-            "id"
-          ],
-          "onDelete": "cascade",
-          "onUpdate": "no action"
-        },
         "transitions_workflow_def_id_workflow_def_version_workflow_defs_id_version_fk": {
           "name": "transitions_workflow_def_id_workflow_def_version_workflow_defs_id_version_fk",
           "tableFrom": "transitions",
@@ -1422,9 +1442,52 @@
           ],
           "onDelete": "no action",
           "onUpdate": "no action"
+        },
+        "transitions_workflow_def_id_workflow_def_version_from_node_id_nodes_workflow_def_id_workflow_def_version_id_fk": {
+          "name": "transitions_workflow_def_id_workflow_def_version_from_node_id_nodes_workflow_def_id_workflow_def_version_id_fk",
+          "tableFrom": "transitions",
+          "tableTo": "nodes",
+          "columnsFrom": [
+            "workflow_def_id",
+            "workflow_def_version",
+            "from_node_id"
+          ],
+          "columnsTo": [
+            "workflow_def_id",
+            "workflow_def_version",
+            "id"
+          ],
+          "onDelete": "cascade",
+          "onUpdate": "no action"
+        },
+        "transitions_workflow_def_id_workflow_def_version_to_node_id_nodes_workflow_def_id_workflow_def_version_id_fk": {
+          "name": "transitions_workflow_def_id_workflow_def_version_to_node_id_nodes_workflow_def_id_workflow_def_version_id_fk",
+          "tableFrom": "transitions",
+          "tableTo": "nodes",
+          "columnsFrom": [
+            "workflow_def_id",
+            "workflow_def_version",
+            "to_node_id"
+          ],
+          "columnsTo": [
+            "workflow_def_id",
+            "workflow_def_version",
+            "id"
+          ],
+          "onDelete": "cascade",
+          "onUpdate": "no action"
         }
       },
-      "compositePrimaryKeys": {},
+      "compositePrimaryKeys": {
+        "transitions_workflow_def_id_workflow_def_version_id_pk": {
+          "columns": [
+            "workflow_def_id",
+            "workflow_def_version",
+            "id"
+          ],
+          "name": "transitions_workflow_def_id_workflow_def_version_id_pk"
+        }
+      },
       "uniqueConstraints": {},
       "checkConstraints": {}
     },
@@ -1901,14 +1964,18 @@
           "onDelete": "no action",
           "onUpdate": "no action"
         },
-        "workflow_runs_parent_node_id_nodes_id_fk": {
-          "name": "workflow_runs_parent_node_id_nodes_id_fk",
+        "workflow_runs_workflow_def_id_workflow_version_parent_node_id_nodes_workflow_def_id_workflow_def_version_id_fk": {
+          "name": "workflow_runs_workflow_def_id_workflow_version_parent_node_id_nodes_workflow_def_id_workflow_def_version_id_fk",
           "tableFrom": "workflow_runs",
           "tableTo": "nodes",
           "columnsFrom": [
+            "workflow_def_id",
+            "workflow_version",
             "parent_node_id"
           ],
           "columnsTo": [
+            "workflow_def_id",
+            "workflow_def_version",
             "id"
           ],
           "onDelete": "no action",

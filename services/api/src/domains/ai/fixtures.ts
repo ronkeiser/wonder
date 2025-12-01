@@ -11,6 +11,7 @@ export async function buildPromptSpec(
   overrides?: Partial<Parameters<typeof createPromptSpec>[1]>,
 ): Promise<PromptSpec> {
   return await createPromptSpec(db, {
+    version: overrides?.version ?? 1,
     name: 'Test Prompt',
     description: 'Test prompt description',
     system_prompt: null,

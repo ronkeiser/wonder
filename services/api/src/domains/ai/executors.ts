@@ -1,14 +1,14 @@
 /** AI action executors */
 
-import type { DrizzleD1Database } from 'drizzle-orm/d1';
 import { runInference } from '~/infrastructure/clients/workers-ai';
-import * as aiRepo from './repository';
+import type { ServiceContext } from '~/infrastructure/context';
+import * as aiService from './service';
 
 /**
  * Execute an LLM call action.
  */
 export async function executeLLMCall(
-  env: { db: DrizzleD1Database; ai: Ai },
+  ctx: ServiceContext,
   action: { implementation: unknown; produces: unknown },
   inputData: Record<string, unknown>,
 ): Promise<Record<string, unknown>> {
@@ -18,18 +18,14 @@ export async function executeLLMCall(
   };
 
   // Load prompt spec and model profile
-  const promptSpec = await aiRepo.getPromptSpec(env.db, impl.prompt_spec_id);
-  if (!promptSpec) {
-    throw new Error(`PromptSpec not found: ${impl.prompt_spec_id}`);
-  }
-
-  const modelProfile = await aiRepo.getModelProfile(env.db, impl.model_profile_id);
-  if (!modelProfile) {
-    throw new Error(`ModelProfile not found: ${impl.model_profile_id}`);
-  }
+  const promptSpec = await aiService.getPromptSpec(ctx, impl.prompt_spec_id);
+  const modelProfile = await aiService.getModelProfile(ctx, impl.model_profile_id);
 
   // Render prompt template
+  console.log('Input data for template:', JSON.stringify(inputData));
+  console.log('Template:', promptSpec.template);
   const userPrompt = renderTemplate(promptSpec.template, inputData);
+  console.log('Rendered prompt:', userPrompt);
 
   // Build messages
   const messages: { role: 'system' | 'user' | 'assistant'; content: string }[] = [];
@@ -39,7 +35,9 @@ export async function executeLLMCall(
   messages.push({ role: 'user', content: userPrompt });
 
   // Call Workers AI
-  const result = await runInference(env.ai, modelProfile.model_id as keyof AiModels, messages);
+  const result = await runInference(ctx.ai, modelProfile.model_id as keyof AiModels, messages);
+
+  console.log('LLM result:', JSON.stringify(result));
 
   // Map response to the field name specified in produces schema
   // For Stage 0: assumes produces is a simple object with one string property
@@ -47,12 +45,16 @@ export async function executeLLMCall(
   if (produces && typeof produces === 'object') {
     const outputKey = Object.keys(produces)[0];
     if (outputKey) {
-      return { [outputKey]: result.response };
+      const output = { [outputKey]: result.response };
+      console.log('Mapped output:', JSON.stringify(output));
+      return output;
     }
   }
 
   // Fallback to 'response' if no produces schema
-  return { response: result.response };
+  const fallback = { response: result.response };
+  console.log('Fallback output:', JSON.stringify(fallback));
+  return fallback;
 }
 
 /**

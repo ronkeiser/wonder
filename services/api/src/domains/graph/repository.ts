@@ -3,14 +3,7 @@
 import { and, eq } from 'drizzle-orm';
 import type { DrizzleD1Database } from 'drizzle-orm/d1';
 import { ulid } from 'ulid';
-import {
-  nodes,
-  projects,
-  transitions,
-  workflow_defs,
-  workflows,
-  workspaces,
-} from '~/infrastructure/db/schema';
+import { nodes, transitions, workflow_defs, workflows } from '~/infrastructure/db/schema';
 import {
   fromFanIn,
   fromWorkflowDefOwner,
@@ -19,12 +12,6 @@ import {
   type FanIn,
   type WorkflowDefOwner,
 } from './transforms';
-
-type Workspace = typeof workspaces.$inferSelect;
-type NewWorkspace = Omit<typeof workspaces.$inferInsert, 'id' | 'created_at' | 'updated_at'>;
-
-type Project = typeof projects.$inferSelect;
-type NewProject = Omit<typeof projects.$inferInsert, 'id' | 'created_at' | 'updated_at'>;
 
 type WorkflowDefRow = typeof workflow_defs.$inferSelect;
 type NewWorkflowDefRow = typeof workflow_defs.$inferInsert;
@@ -54,49 +41,6 @@ type NewNode = Omit<NewNodeRow, 'id' | 'fan_in'> & {
 
 type Transition = typeof transitions.$inferSelect;
 type NewTransition = Omit<typeof transitions.$inferInsert, 'id'>;
-
-/** Workspace */
-
-export async function createWorkspace(
-  db: DrizzleD1Database,
-  data: NewWorkspace,
-): Promise<Workspace> {
-  const now = new Date().toISOString();
-  const workspace = {
-    id: ulid(),
-    ...data,
-    created_at: now,
-    updated_at: now,
-  };
-
-  await db.insert(workspaces).values(workspace).run();
-  return workspace as Workspace;
-}
-
-export async function getWorkspace(db: DrizzleD1Database, id: string): Promise<Workspace | null> {
-  const result = await db.select().from(workspaces).where(eq(workspaces.id, id)).get();
-  return result ?? null;
-}
-
-/** Project */
-
-export async function createProject(db: DrizzleD1Database, data: NewProject): Promise<Project> {
-  const now = new Date().toISOString();
-  const project = {
-    id: ulid(),
-    ...data,
-    created_at: now,
-    updated_at: now,
-  };
-
-  await db.insert(projects).values(project).run();
-  return project as Project;
-}
-
-export async function getProject(db: DrizzleD1Database, id: string): Promise<Project | null> {
-  const result = await db.select().from(projects).where(eq(projects.id, id)).get();
-  return result ?? null;
-}
 
 /** WorkflowDef */
 
@@ -149,6 +93,23 @@ export async function getWorkflowDef(
     ...row,
     owner: toWorkflowDefOwner(row.owner_type, row.owner_id),
   };
+}
+
+export async function updateWorkflowDef(
+  db: DrizzleD1Database,
+  id: string,
+  version: number,
+  data: { initial_node_id?: string | null },
+): Promise<void> {
+  const now = new Date().toISOString();
+  await db
+    .update(workflow_defs)
+    .set({
+      ...data,
+      updated_at: now,
+    })
+    .where(and(eq(workflow_defs.id, id), eq(workflow_defs.version, version)))
+    .run();
 }
 
 export async function listWorkflowDefsByOwner(
@@ -206,8 +167,48 @@ export async function createNode(db: DrizzleD1Database, data: NewNode): Promise<
   } as Node;
 }
 
-export async function getNode(db: DrizzleD1Database, id: string): Promise<Node | null> {
-  const row = await db.select().from(nodes).where(eq(nodes.id, id)).get();
+export async function getNode(
+  db: DrizzleD1Database,
+  workflow_def_id: string,
+  workflow_def_version: number,
+  id: string,
+): Promise<Node | null> {
+  const row = await db
+    .select()
+    .from(nodes)
+    .where(
+      and(
+        eq(nodes.workflow_def_id, workflow_def_id),
+        eq(nodes.workflow_def_version, workflow_def_version),
+        eq(nodes.id, id),
+      ),
+    )
+    .get();
+  if (!row) return null;
+
+  return {
+    ...row,
+    fan_in: toFanIn(row.fan_in as string),
+  };
+}
+
+export async function getNodeByRef(
+  db: DrizzleD1Database,
+  workflow_def_id: string,
+  workflow_def_version: number,
+  ref: string,
+): Promise<Node | null> {
+  const row = await db
+    .select()
+    .from(nodes)
+    .where(
+      and(
+        eq(nodes.workflow_def_id, workflow_def_id),
+        eq(nodes.workflow_def_version, workflow_def_version),
+        eq(nodes.ref, ref),
+      ),
+    )
+    .get();
   if (!row) return null;
 
   return {
@@ -219,17 +220,34 @@ export async function getNode(db: DrizzleD1Database, id: string): Promise<Node |
 export async function listNodesByWorkflowDef(
   db: DrizzleD1Database,
   workflow_def_id: string,
+  workflow_def_version?: number,
 ): Promise<Node[]> {
-  const rows = await db
-    .select()
-    .from(nodes)
-    .where(eq(nodes.workflow_def_id, workflow_def_id))
-    .all();
+  const query = workflow_def_version
+    ? db
+        .select()
+        .from(nodes)
+        .where(
+          and(
+            eq(nodes.workflow_def_id, workflow_def_id),
+            eq(nodes.workflow_def_version, workflow_def_version),
+          ),
+        )
+    : db.select().from(nodes).where(eq(nodes.workflow_def_id, workflow_def_id));
+
+  const rows = await query.all();
 
   return rows.map((row) => ({
     ...row,
     fan_in: toFanIn(row.fan_in as string),
   }));
+}
+
+export async function updateNode(
+  db: DrizzleD1Database,
+  id: string,
+  data: Partial<Pick<NewNodeRow, 'joins_node'>>,
+): Promise<void> {
+  await db.update(nodes).set(data).where(eq(nodes.id, id)).run();
 }
 
 /** Transition */
@@ -242,9 +260,28 @@ export async function createTransition(
     id: ulid(),
     ...data,
   };
-
   await db.insert(transitions).values(transition).run();
   return transition as Transition;
+}
+
+export async function getTransitionByRef(
+  db: DrizzleD1Database,
+  workflow_def_id: string,
+  workflow_def_version: number,
+  ref: string,
+): Promise<Transition | null> {
+  const result = await db
+    .select()
+    .from(transitions)
+    .where(
+      and(
+        eq(transitions.workflow_def_id, workflow_def_id),
+        eq(transitions.workflow_def_version, workflow_def_version),
+        eq(transitions.ref, ref),
+      ),
+    )
+    .get();
+  return result ?? null;
 }
 
 export async function listTransitionsByWorkflowDef(

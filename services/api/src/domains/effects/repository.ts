@@ -6,7 +6,7 @@ import { ulid } from 'ulid';
 import { actions } from '~/infrastructure/db/schema';
 
 type Action = typeof actions.$inferSelect;
-type NewAction = Omit<typeof actions.$inferInsert, 'id' | 'version' | 'created_at' | 'updated_at'>;
+type NewAction = Omit<typeof actions.$inferInsert, 'id' | 'created_at' | 'updated_at'>;
 
 /** Action */
 
@@ -14,7 +14,6 @@ export async function createAction(db: DrizzleD1Database, data: NewAction): Prom
   const now = new Date().toISOString();
   const action = {
     id: ulid(),
-    version: 1,
     ...data,
     created_at: now,
     updated_at: now,
@@ -58,4 +57,19 @@ export async function listActionsByKind(
   kind: ActionKind,
 ): Promise<Action[]> {
   return await db.select().from(actions).where(eq(actions.kind, kind)).all();
+}
+
+export async function deleteAction(
+  db: DrizzleD1Database,
+  id: string,
+  version?: number,
+): Promise<void> {
+  if (version) {
+    await db
+      .delete(actions)
+      .where(and(eq(actions.id, id), eq(actions.version, version)))
+      .run();
+  } else {
+    await db.delete(actions).where(eq(actions.id, id)).run();
+  }
 }

@@ -1,26 +1,27 @@
 {
-  "name": "api",
+  "name": "@wonder/api",
   "private": true,
   "version": "0.0.1",
   "type": "module",
+  "exports": {
+    "./types": "./src/types.ts"
+  },
   "scripts": {
     "dev": "wrangler dev",
     "deploy": "wrangler deploy",
     "types": "wrangler types",
+    "typecheck": "tsc --noEmit",
     "db:generate": "drizzle-kit generate",
     "db:migrate:local": "wrangler d1 migrations apply wonder --local",
     "db:migrate:remote": "wrangler d1 migrations apply wonder --remote",
     "db:studio": "drizzle-kit studio",
     "test": "vitest --run",
     "test:watch": "vitest",
-    "test:ui": "vitest --ui",
-    "e2e:workflow": "tsx test/e2e/manual-workflow-test.ts",
-    "e2e:websocket": "tsx test/e2e/manual-websocket-test.ts"
+    "test:ui": "vitest --ui"
   },
   "dependencies": {
     "@wonder/logger": "workspace:*",
     "@wonder/schema": "workspace:*",
-    "@wonder/sdk": "workspace:*",
     "drizzle-orm": "^0.44.7",
     "ulid": "^3.0.1"
   },

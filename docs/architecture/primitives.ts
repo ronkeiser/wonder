@@ -170,12 +170,13 @@ export type Snapshot = {
 /** Graph Structure: Nodes */
 
 export type NodeDef = {
-  id: string;
+  id: string; // ULID (server-assigned)
+  ref: string; // human-readable reference (client-provided, unique per workflow)
   workflow_def_id: string;
   name: string;
 
   // The action this node executes
-  action_id: string;
+  action_id: string; // ULID reference to action
 
   // Data flow mappings
   input_mapping?: Record<string, string>;
@@ -187,7 +188,7 @@ export type NodeDef = {
 
   // For fan_in nodes: which fan_out node spawned the tokens we're joining?
   // Required when fan_in is 'all' or 'm_of_n' to identify sibling tokens
-  joins_node?: string;
+  joins_node?: string; // ULID reference to node (resolved from joins_node_ref at creation)
 
   // Merge strategy when fan_in collects multiple branch outputs
   merge?: {
@@ -203,10 +204,11 @@ export type NodeDef = {
 /** Graph Structure: Transitions */
 
 export type TransitionDef = {
-  id: string;
+  id: string; // ULID (server-assigned)
+  ref?: string; // optional human-readable reference
   workflow_def_id: string;
-  from_node_id: string;
-  to_node_id: string;
+  from_node_id: string; // ULID reference (resolved from from_node_ref at creation)
+  to_node_id: string; // ULID reference (resolved from to_node_ref at creation)
   priority: number;
 
   condition?:

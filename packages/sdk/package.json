@@ -6,12 +6,17 @@
     ".": "./src/index.ts"
   },
   "scripts": {
+    "generate": "openapi-typescript ${API_URL:-https://wonder-http.ron-keiser.workers.dev}/doc -o src/generated/schema.d.ts",
     "test": "vitest --run",
     "test:watch": "vitest"
   },
+  "dependencies": {
+    "@wonder/api": "workspace:*",
+    "openapi-fetch": "^0.15.0"
+  },
   "devDependencies": {
     "@types/node": "^24.10.1",
-    "tsx": "^4.20.6",
+    "openapi-typescript": "^7.10.1",
     "typescript": "^5.9.3",
     "vitest": "^3.2.4"
   }

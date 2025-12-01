@@ -341,4 +341,71 @@ describe('logger', () => {
       }).not.toThrow();
     });
   });
+
+  describe('environment-aware logging', () => {
+    it('test environment logs debug messages', async () => {
+      const logger = createLogger({ db, environment: 'test' });
+      logger.debug('debug_message', { data: 'test' });
+      logger.info('info_message');
+      await logger.flush();
+
+      const count = await getLogCount(db);
+      expect(count).toBe(1); // info persisted, debug only to console
+    });
+
+    it('development environment skips debug messages', async () => {
+      const logger = createLogger({ db, environment: 'development' });
+      logger.debug('debug_message');
+      logger.info('info_message');
+      logger.warn('warn_message');
+      await logger.flush();
+
+      const logs = await getAllLogs(db);
+      expect(logs.length).toBe(2); // info and warn only
+      expect(logs.some((l) => l.level === 'debug')).toBe(false);
+    });
+
+    it('production environment only logs warnings and errors', async () => {
+      const logger = createLogger({ db, environment: 'production' });
+      logger.debug('debug_message');
+      logger.info('info_message');
+      logger.warn('warn_message');
+      logger.error('error_message');
+      await logger.flush();
+
+      const logs = await getAllLogs(db);
+      expect(logs.length).toBe(2); // warn and error only
+      expect(logs.map((l) => l.level)).toEqual(['warn', 'error']);
+    });
+
+    it('defaults to development environment', async () => {
+      const logger = createLogger({ db }); // no environment specified
+      logger.debug('debug_message');
+      logger.info('info_message');
+      await logger.flush();
+
+      const logs = await getAllLogs(db);
+      expect(logs.length).toBe(1); // info only (debug filtered out)
+      expect(logs[0].level).toBe('info');
+    });
+
+    it('uses environment-specific buffer sizes', async () => {
+      const testLogger = createLogger({ db, environment: 'test' });
+      const prodLogger = createLogger({ db, environment: 'production' });
+
+      // Test environment has larger buffer (1000)
+      for (let i = 0; i < 60; i++) {
+        testLogger.info(`test_${i}`);
+      }
+      let count = await getLogCount(db);
+      expect(count).toBe(0); // Not flushed yet (buffer size 1000)
+
+      // Production has smaller buffer (50)
+      for (let i = 0; i < 60; i++) {
+        prodLogger.warn(`prod_${i}`);
+      }
+      count = await getLogCount(db);
+      expect(count).toBeGreaterThan(0); // Auto-flushed at 50
+    });
+  });
 });

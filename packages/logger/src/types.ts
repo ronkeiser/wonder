@@ -1,5 +1,13 @@
 export type LogLevel = 'debug' | 'info' | 'warn' | 'error' | 'fatal';
 
+export type Environment = 'test' | 'development' | 'production';
+
+export interface EnvironmentConfig {
+  minLevel: LogLevel;
+  includeStackTraces: boolean;
+  bufferSize: number;
+}
+
 export interface LogEntry {
   id: string;
   level: LogLevel;
@@ -52,4 +60,5 @@ export interface LoggerConfig {
   bufferSize?: number;
   tableName?: string;
   consoleOnly?: boolean;
+  environment?: Environment;
 }

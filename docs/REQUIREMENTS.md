@@ -102,3 +102,13 @@
 - Event throughput: 50k+ events per run with compaction/batching
 - Error propagation: failures bubbling through 5-6 nested layers
 - Stuck workflow detection: human input timeouts surfaced and recoverable
+
+## Architecture Layers
+
+- Stack: RPC → Domain Services → Repositories (strict one-way deps)
+- RPC: thin adapters, transport only, no business logic
+- Domain services: pure functions with `ctx` param, composable primitives
+- Repositories: data access only, no validation
+- Cross-domain calls allowed at service layer; services compose their needs
+- Error handling: create ops wrap try/catch + extractDbError; get/delete/list propagate
+- No convenience methods tailored to specific callers; callers compose primitives

@@ -1,53 +1,109 @@
 # @wonder/sdk
 
-Client SDK for interacting with the Wonder workflow orchestration platform.
+Type-safe client SDK for the Wonder workflow orchestration platform using `openapi-fetch`.
+
+## Installation
+
+```bash
+pnpm add @wonder/sdk
+```
 
 ## Usage
 
 ```typescript
-import { WonderfulClient } from '@wonder/sdk';
+import { createClient } from '@wonder/sdk';
 
-const client = new WonderfulClient('https://your-api.workers.dev');
+const client = createClient('https://wonder-http.ron-keiser.workers.dev');
 
-// Start a workflow and stream events
-for await (const event of client.executeWorkflow({
-  workflow_id: 'my-workflow-id',
-  input: { name: 'World' },
-})) {
-  console.log(event.kind, event.payload);
-}
+// Create a workspace
+const { data, error } = await client.POST('/api/workspaces', {
+  body: {
+    name: 'My Workspace',
+    description: 'A workspace for AI workflows',
+  },
+});
 
-// Note: In Node.js CLI scripts, call process.exit(0) after the loop
-// WebSockets keep the event loop alive even after completion
-process.exit(0);
+// Get a project
+const { data: project } = await client.GET('/api/projects/{id}', {
+  params: { path: { id: 'project-id' } },
+});
+
+// Start a workflow
+const { data: result } = await client.POST('/api/workflows/{id}/start', {
+  params: { path: { id: 'workflow-id' } },
+  body: { input: 'Hello, world!' },
+});
+
+// List model profiles with filters
+const { data: profiles } = await client.GET('/api/model-profiles', {
+  params: { query: { provider: 'anthropic' } },
+});
 ```
 
-## API
+## Type Safety
 
-### `WonderfulClient`
+The SDK uses `openapi-fetch` which provides:
 
-#### `startWorkflow(input: WorkflowInput): Promise<WorkflowStartResponse>`
+- Full TypeScript autocomplete for all API paths
+- Type-safe request bodies and parameters
+- Type-safe response types
+- Automatic type inference from OpenAPI spec
 
-Start a workflow execution and get the run ID and Durable Object ID.
+No generated code needed - just types!
 
-#### `streamEvents(durableObjectId: string): AsyncGenerator<WorkflowEvent>`
+## Code Generation
 
-Connect to a workflow's event stream via WebSocket. Yields events as they occur.
+Generate TypeScript types from the OpenAPI specification:
 
-#### `executeWorkflow(input: WorkflowInput): AsyncGenerator<WorkflowEvent>`
+```bash
+pnpm generate
+```
 
-Convenience method that combines `startWorkflow` and `streamEvents`.
+This fetches the OpenAPI spec and generates types to `src/generated/schema.d.ts`.
 
-## Event Types
+### Environment Variables
 
-Events include:
+- `API_URL` - Base URL for the Wonder API (default: `https://wonder-http.ron-keiser.workers.dev`)
 
-- `workflow_started`, `workflow_completed`, `workflow_failed`
-- `node_started`, `node_completed`, `node_failed`
-- `token_spawned`, `token_merged`, `token_cancelled`
-- `subworkflow_started`, `subworkflow_completed`
-- `artifact_created`, `context_updated`
+## API Response Format
 
-## WebSocket Lifecycle
+All methods return:
 
-WebSockets maintain persistent connections and keep the Node.js event loop alive even after `close()` is called. In CLI scripts, explicitly call `process.exit()` after consuming all events to terminate the process.
+```typescript
+{
+  data: T | undefined,
+  error: Error | undefined,
+  response: Response
+}
+```
+
+Example error handling:
+
+```typescript
+const { data, error } = await client.POST('/api/workspaces', {
+  body: { name: 'Test' },
+});
+
+if (error) {
+  console.error('Failed:', error);
+  return;
+}
+
+console.log('Created:', data);
+```
+
+## Development
+
+### Regenerate Types
+
+After HTTP service OpenAPI spec changes:
+
+```bash
+pnpm generate
+```
+
+TypeScript will automatically catch any breaking changes.
+
+## License
+
+MIT
