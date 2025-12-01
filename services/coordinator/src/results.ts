@@ -29,7 +29,7 @@ export async function handleTaskResults(
     if (result.success && result.output_data) {
       // Update context with task output
       for (const [path, value] of Object.entries(result.output_data)) {
-        await context.update(path, value);
+        context.updateContext(path, value);
       }
 
       // Mark token as completed

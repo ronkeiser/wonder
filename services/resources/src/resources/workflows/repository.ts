@@ -1,9 +1,9 @@
 /** Repository for workflow data access */
 
-import { and, eq } from 'drizzle-orm';
+import { and, desc, eq } from 'drizzle-orm';
 import type { DrizzleD1Database } from 'drizzle-orm/d1';
 import { ulid } from 'ulid';
-import { workflows } from '~/infrastructure/db/schema';
+import { workflow_defs, workflow_runs, workflows } from '~/infrastructure/db/schema';
 
 type Workflow = typeof workflows.$inferSelect;
 type NewWorkflow = Omit<typeof workflows.$inferInsert, 'id' | 'created_at' | 'updated_at'>;
@@ -67,4 +67,72 @@ export async function updateWorkflow(
 
 export async function deleteWorkflow(db: DrizzleD1Database, id: string): Promise<void> {
   await db.delete(workflows).where(eq(workflows.id, id)).run();
+}
+
+export async function getWorkflowWithDef(
+  db: DrizzleD1Database,
+  workflowId: string,
+): Promise<{
+  workflow: Workflow;
+  workflow_def: typeof workflow_defs.$inferSelect;
+} | null> {
+  const workflow = await getWorkflow(db, workflowId);
+  if (!workflow) return null;
+
+  // Get the workflow def - use pinned_version if set, otherwise get latest
+  const workflowDefQuery = workflow.pinned_version
+    ? db
+        .select()
+        .from(workflow_defs)
+        .where(
+          and(
+            eq(workflow_defs.id, workflow.workflow_def_id),
+            eq(workflow_defs.version, workflow.pinned_version),
+          ),
+        )
+    : db
+        .select()
+        .from(workflow_defs)
+        .where(eq(workflow_defs.id, workflow.workflow_def_id))
+        .orderBy(desc(workflow_defs.version))
+        .limit(1);
+
+  const workflowDef = await workflowDefQuery.get();
+  if (!workflowDef) return null;
+
+  return {
+    workflow,
+    workflow_def: workflowDef,
+  };
+}
+
+type WorkflowRun = typeof workflow_runs.$inferSelect;
+
+export async function createWorkflowRun(
+  db: DrizzleD1Database,
+  data: {
+    id: string;
+    project_id: string;
+    workflow_id: string;
+    workflow_def_id: string;
+    workflow_version: number;
+    status: 'running' | 'completed' | 'failed' | 'waiting';
+    context: unknown;
+    active_tokens: unknown;
+    durable_object_id: string;
+    parent_run_id?: string | null;
+    parent_node_id?: string | null;
+  },
+): Promise<WorkflowRun> {
+  const now = new Date().toISOString();
+  const run = {
+    ...data,
+    latest_snapshot: null,
+    created_at: now,
+    updated_at: now,
+    completed_at: null,
+  };
+
+  await db.insert(workflow_runs).values(run).run();
+  return run as WorkflowRun;
 }

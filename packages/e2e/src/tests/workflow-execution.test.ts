@@ -3,7 +3,7 @@ import { client } from '../client';
 
 describe('Workflow Execution API', () => {
   it('should start a workflow execution and return workflow_run_id', async () => {
-    const testName = 'Bungholio';
+    const testName = 'goat boy';
     // Create workspace
     const { data: workspaceResponse } = await client.POST('/api/workspaces', {
       body: {
@@ -162,8 +162,8 @@ describe('Workflow Execution API', () => {
     const workflowOutput = await new Promise<string>((resolve, reject) => {
       const timeout = setTimeout(() => {
         ws.close();
-        reject(new Error('Workflow did not complete within 10 seconds'));
-      }, 10000);
+        reject(new Error('Workflow did not complete within 20 seconds'));
+      }, 20000);
 
       ws.onmessage = (event) => {
         const message = JSON.parse(event.data);

@@ -71,9 +71,6 @@ importers:
 
   packages/sdk:
     dependencies:
-      '@wonder/api':
-        specifier: workspace:*
-        version: link:../../services/api
       openapi-fetch:
         specifier: ^0.15.0
         version: 0.15.0
@@ -90,46 +87,6 @@ importers:
       vitest:
         specifier: ^3.2.4
         version: 3.2.4(@types/node@24.10.1)(@vitest/ui@3.2.4)(jiti@2.6.1)(lightningcss@1.30.2)(tsx@4.21.0)(yaml@2.8.1)
-
-  services/api:
-    dependencies:
-      '@wonder/logger':
-        specifier: workspace:*
-        version: link:../../packages/logger
-      '@wonder/schema':
-        specifier: workspace:*
-        version: link:../../packages/schema
-      drizzle-orm:
-        specifier: ^0.44.7
-        version: 0.44.7(@cloudflare/workers-types@4.20251127.0)
-      ulid:
-        specifier: ^3.0.1
-        version: 3.0.2
-    devDependencies:
-      '@cloudflare/vitest-pool-workers':
-        specifier: ^0.10.11
-        version: 0.10.11(@cloudflare/workers-types@4.20251127.0)(@vitest/runner@3.2.4)(@vitest/snapshot@3.2.4)(vitest@3.2.4)
-      '@types/node':
-        specifier: ^24.10.1
-        version: 24.10.1
-      '@vitest/ui':
-        specifier: ^3.2.4
-        version: 3.2.4(vitest@3.2.4)
-      drizzle-kit:
-        specifier: ^0.31.7
-        version: 0.31.7
-      tsx:
-        specifier: ^4.20.6
-        version: 4.21.0
-      typescript:
-        specifier: ^5.9.3
-        version: 5.9.3
-      vitest:
-        specifier: ^3.2.4
-        version: 3.2.4(@types/node@24.10.1)(@vitest/ui@3.2.4)(jiti@2.6.1)(lightningcss@1.30.2)(tsx@4.21.0)(yaml@2.8.1)
-      wrangler:
-        specifier: ^4.50.0
-        version: 4.51.0(@cloudflare/workers-types@4.20251127.0)
 
   services/coordinator:
     dependencies:
@@ -174,10 +131,53 @@ importers:
       hono:
         specifier: ^4.10.7
         version: 4.10.7
+      ulid:
+        specifier: ^2.3.0
+        version: 2.4.0
       zod:
         specifier: ^4.1.13
         version: 4.1.13
     devDependencies:
+      typescript:
+        specifier: ^5.9.3
+        version: 5.9.3
+      vitest:
+        specifier: ^3.2.4
+        version: 3.2.4(@types/node@24.10.1)(@vitest/ui@3.2.4)(jiti@2.6.1)(lightningcss@1.30.2)(tsx@4.21.0)(yaml@2.8.1)
+      wrangler:
+        specifier: ^4.50.0
+        version: 4.51.0(@cloudflare/workers-types@4.20251127.0)
+
+  services/resources:
+    dependencies:
+      '@wonder/logger':
+        specifier: workspace:*
+        version: link:../../packages/logger
+      '@wonder/schema':
+        specifier: workspace:*
+        version: link:../../packages/schema
+      drizzle-orm:
+        specifier: ^0.44.7
+        version: 0.44.7(@cloudflare/workers-types@4.20251127.0)
+      ulid:
+        specifier: ^3.0.1
+        version: 3.0.2
+    devDependencies:
+      '@cloudflare/vitest-pool-workers':
+        specifier: ^0.10.11
+        version: 0.10.11(@cloudflare/workers-types@4.20251127.0)(@vitest/runner@3.2.4)(@vitest/snapshot@3.2.4)(vitest@3.2.4)
+      '@types/node':
+        specifier: ^24.10.1
+        version: 24.10.1
+      '@vitest/ui':
+        specifier: ^3.2.4
+        version: 3.2.4(vitest@3.2.4)
+      drizzle-kit:
+        specifier: ^0.31.7
+        version: 0.31.7
+      tsx:
+        specifier: ^4.20.6
+        version: 4.21.0
       typescript:
         specifier: ^5.9.3
         version: 5.9.3
@@ -2168,6 +2168,10 @@ packages:
     engines: {node: '>=14.17'}
     hasBin: true
 
+  ulid@2.4.0:
+    resolution: {integrity: sha512-fIRiVTJNcSRmXKPZtGzFQv9WRrZ3M9eoptl/teFJvjOzmpU+/K/JH6HZ8deBfb5vMEpicJcLn7JmvdknlMq7Zg==}
+    hasBin: true
+
   ulid@3.0.2:
     resolution: {integrity: sha512-yu26mwteFYzBAot7KVMqFGCVpsF6g8wXfJzQUHvu1no3+rRRSFcSV2nKeYvNPLD2J4b08jYBDhHUjeH0ygIl9w==}
     hasBin: true
@@ -3933,6 +3937,8 @@ snapshots:
   type-fest@4.41.0: {}
 
   typescript@5.9.3: {}
+
+  ulid@2.4.0: {}
 
   ulid@3.0.2: {}
 

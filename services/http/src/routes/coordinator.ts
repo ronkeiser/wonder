@@ -17,5 +17,8 @@ coordinator.get('/:doId/stream', async (c) => {
     );
   }
 
-  // TODO: Implement stream start connection to coordinator
+  // Get the Durable Object stub and forward the WebSocket upgrade request
+  const id = c.env.COORDINATOR.idFromName(doId);
+  const stub = c.env.COORDINATOR.get(id);
+  return stub.fetch(c.req.raw);
 });

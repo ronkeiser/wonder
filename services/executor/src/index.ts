@@ -21,38 +21,55 @@ interface WorkflowTask {
  * Queue consumer - processes workflow tasks
  */
 export default {
-  async queue(batch: MessageBatch<WorkflowTask>, env: Env): Promise<void> {
-    console.log(`Processing batch of ${batch.messages.length} tasks`);
+  async queue(batch: MessageBatch<WorkflowTask>, env: Env, ctx: ExecutionContext): Promise<void> {
+    const executorStartTime = Date.now();
+    console.log(`[Executor t+0ms] Queue handler called!`);
+    console.log(`[Executor t+0ms] Processing batch of ${batch.messages.length} tasks`);
 
     for (const message of batch.messages) {
       const task = message.body;
 
       try {
-        console.log(`Executing task: ${task.node_id} (${task.action_kind})`);
-        console.log(`Workflow run: ${task.workflow_run_id}, Token: ${task.token_id}`);
-        console.log(`Input data:`, task.input_data);
+        console.log(
+          `[Executor t+${Date.now() - executorStartTime}ms] Executing task:`,
+          JSON.stringify(task),
+        );
 
         // Execute the action based on kind
-        const result = await executeAction(task);
+        const result = await executeAction(task, env);
 
-        console.log(`Task completed successfully:`, result);
+        console.log(
+          `[Executor t+${Date.now() - executorStartTime}ms] Task completed successfully:`,
+          JSON.stringify(result),
+        );
 
-        // In production: send result back to coordinator
-        // await sendResultToCoordinator(task, result);
+        // Send result back to coordinator via results queue
+        const taskResult = {
+          task_id: `task-${task.token_id}-${Date.now()}`,
+          workflow_run_id: task.workflow_run_id,
+          token_id: task.token_id,
+          node_id: task.node_id,
+          success: true,
+          output_data: result,
+          completed_at: new Date().toISOString(),
+        };
 
-        // Acknowledge the message
+        console.log(
+          `[Executor t+${Date.now() - executorStartTime}ms] Sending result to RESULTS queue:`,
+          JSON.stringify(taskResult),
+        );
+        await env.RESULTS.send(taskResult);
+        console.log(`[Executor t+${Date.now() - executorStartTime}ms] Result sent successfully`);
+
+        // Acknowledge the message only after result is queued
         message.ack();
+        console.log(`[Executor t+${Date.now() - executorStartTime}ms] Message acknowledged`);
       } catch (error) {
-        console.error(`Task execution failed:`, error);
+        console.error(`[Executor] Task execution failed:`, error);
 
-        // Retry or send to DLQ based on retry count
-        if (task.retry_count < 3) {
-          console.log(`Retrying task (attempt ${task.retry_count + 1})`);
-          message.retry();
-        } else {
-          console.log(`Max retries reached, moving to DLQ`);
-          message.ack(); // Let it go to DLQ
-        }
+        // Retry the message (don't ack on failure)
+        message.retry();
+        console.log(`[Executor] Message will be retried`);
       }
     }
   },
@@ -91,13 +108,31 @@ export default {
 /**
  * Execute an action based on its kind
  */
-async function executeAction(task: WorkflowTask): Promise<Record<string, unknown>> {
-  // Hello world implementation - just echo the input
+async function executeAction(task: WorkflowTask, env: Env): Promise<Record<string, unknown>> {
   switch (task.action_kind) {
     case 'llm_call':
+      // TEMPORARILY MOCKED - Workers AI call suspended for timing test
+      const aiStartTime = Date.now();
+      const prompt = `You are a friendly assistant. User said: "${
+        task.input_data.name || 'Hello'
+      }". Respond in a warm, welcoming way.`;
+
+      console.log(`[Executor AI t+0ms] MOCK: Skipping Workers AI call`);
+      
+      // Mock response instead of actual AI call
+      // const response = (await env.AI.run('@cf/meta/llama-3.1-8b-instruct' as any, {
+      //   messages: [
+      //     {
+      //       role: 'user',
+      //       content: prompt,
+      //     },
+      //   ],
+      // })) as any;
+      
+      console.log(`[Executor AI t+${Date.now() - aiStartTime}ms] MOCK: Returning mock response`);
+
       return {
-        response: `LLM response for: ${JSON.stringify(task.input_data)}`,
-        tokens_used: 42,
+        response: `MOCK: Hello! This is a mock response for testing timing. Input was: ${task.input_data.name || 'Hello'}`,
       };
 
     case 'http_request':
