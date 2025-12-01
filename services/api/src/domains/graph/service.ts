@@ -1,5 +1,6 @@
 /** Graph domain service - orchestrates workflow definition operations */
 
+import { ConflictError, NotFoundError, ValidationError, extractDbError } from '~/errors';
 import type { ServiceContext } from '~/infrastructure/context';
 import * as graphRepo from './repository';
 
@@ -47,11 +48,21 @@ export interface CreateWorkflowDefInput {
  * Validates refs, assigns ULIDs, and creates all entities atomically.
  */
 export async function createWorkflowDefinition(ctx: ServiceContext, data: CreateWorkflowDefInput) {
+  ctx.logger.info('workflow_def_create_started', { name: data.name });
+
   // 1. Validate all node refs are unique
   const nodeRefs = new Set<string>();
   for (const nodeData of data.nodes) {
     if (nodeRefs.has(nodeData.ref)) {
-      throw new Error(`Duplicate node ref: ${nodeData.ref}`);
+      ctx.logger.warn('workflow_def_validation_failed', {
+        error: 'duplicate_node_ref',
+        ref: nodeData.ref,
+      });
+      throw new ValidationError(
+        `Duplicate node ref: ${nodeData.ref}`,
+        `nodes[${nodeData.ref}]`,
+        'DUPLICATE_NODE_REF',
+      );
     }
     nodeRefs.add(nodeData.ref);
   }
@@ -59,36 +70,85 @@ export async function createWorkflowDefinition(ctx: ServiceContext, data: Create
   // 2. Validate all transition refs point to valid nodes
   for (const transition of data.transitions ?? []) {
     if (!nodeRefs.has(transition.from_node_ref)) {
-      throw new Error(`Invalid from_node_ref: ${transition.from_node_ref}`);
+      ctx.logger.warn('workflow_def_validation_failed', {
+        error: 'invalid_from_node_ref',
+        ref: transition.from_node_ref,
+      });
+      throw new ValidationError(
+        `Invalid from_node_ref: ${transition.from_node_ref}`,
+        'transitions.from_node_ref',
+        'INVALID_NODE_REF',
+      );
     }
     if (!nodeRefs.has(transition.to_node_ref)) {
-      throw new Error(`Invalid to_node_ref: ${transition.to_node_ref}`);
+      ctx.logger.warn('workflow_def_validation_failed', {
+        error: 'invalid_to_node_ref',
+        ref: transition.to_node_ref,
+      });
+      throw new ValidationError(
+        `Invalid to_node_ref: ${transition.to_node_ref}`,
+        'transitions.to_node_ref',
+        'INVALID_NODE_REF',
+      );
     }
   }
 
   // 3. Validate initial_node_ref exists
   if (!nodeRefs.has(data.initial_node_ref)) {
-    throw new Error(`Invalid initial_node_ref: ${data.initial_node_ref}`);
+    ctx.logger.warn('workflow_def_validation_failed', {
+      error: 'invalid_initial_node_ref',
+      ref: data.initial_node_ref,
+    });
+    throw new ValidationError(
+      `Invalid initial_node_ref: ${data.initial_node_ref}`,
+      'initial_node_ref',
+      'INVALID_NODE_REF',
+    );
   }
 
   // 4. Validate joins_node_ref if provided
   for (const nodeData of data.nodes) {
     if (nodeData.joins_node_ref && !nodeRefs.has(nodeData.joins_node_ref)) {
-      throw new Error(`Invalid joins_node_ref: ${nodeData.joins_node_ref}`);
+      ctx.logger.warn('workflow_def_validation_failed', {
+        error: 'invalid_joins_node_ref',
+        ref: nodeData.joins_node_ref,
+      });
+      throw new ValidationError(
+        `Invalid joins_node_ref: ${nodeData.joins_node_ref}`,
+        `nodes[${nodeData.ref}].joins_node_ref`,
+        'INVALID_NODE_REF',
+      );
     }
   }
 
   // 5. Create workflow definition (initial_node_id will be set after nodes created)
-  const workflowDef = await graphRepo.createWorkflowDef(ctx.db, {
-    name: data.name,
-    description: data.description,
-    owner: data.owner,
-    tags: data.tags ?? null,
-    input_schema: data.input_schema,
-    output_schema: data.output_schema,
-    context_schema: data.context_schema ?? null,
-    initial_node_id: null,
-  });
+  let workflowDef;
+  try {
+    workflowDef = await graphRepo.createWorkflowDef(ctx.db, {
+      name: data.name,
+      description: data.description,
+      owner: data.owner,
+      tags: data.tags ?? null,
+      input_schema: data.input_schema,
+      output_schema: data.output_schema,
+      context_schema: data.context_schema ?? null,
+      initial_node_id: null,
+    });
+  } catch (error) {
+    const dbError = extractDbError(error);
+
+    if (dbError.constraint === 'unique') {
+      ctx.logger.warn('workflow_def_create_conflict', { name: data.name, field: dbError.field });
+      throw new ConflictError(
+        `WorkflowDef with ${dbError.field} already exists`,
+        dbError.field,
+        'unique',
+      );
+    }
+
+    ctx.logger.error('workflow_def_create_failed', { name: data.name, error: dbError.message });
+    throw error;
+  }
 
   // 6. Create nodes and build ref→ULID map
   const refToIdMap = new Map<string, string>();
@@ -144,6 +204,12 @@ export async function createWorkflowDefinition(ctx: ServiceContext, data: Create
     }
   }
 
+  ctx.logger.info('workflow_def_created', {
+    workflow_def_id: workflowDef.id,
+    version: workflowDef.version,
+    name: workflowDef.name,
+  });
+
   return {
     workflow_def_id: workflowDef.id,
     workflow_def: workflowDef,
@@ -158,9 +224,16 @@ export async function getWorkflowDefinition(
   workflowDefId: string,
   version?: number,
 ) {
+  ctx.logger.info('workflow_def_get', { workflow_def_id: workflowDefId, version });
+
   const workflowDef = await graphRepo.getWorkflowDef(ctx.db, workflowDefId, version);
   if (!workflowDef) {
-    throw new Error(`WorkflowDef not found: ${workflowDefId}`);
+    ctx.logger.warn('workflow_def_not_found', { workflow_def_id: workflowDefId, version });
+    throw new NotFoundError(
+      `WorkflowDef not found: ${workflowDefId}`,
+      'workflow_def',
+      workflowDefId,
+    );
   }
 
   const nodes = await graphRepo.listNodesByWorkflowDef(ctx.db, workflowDefId);
@@ -199,25 +272,67 @@ export async function createWorkflow(
     enabled?: boolean;
   },
 ) {
-  const workflow = await graphRepo.createWorkflow(ctx.db, {
-    project_id: data.project_id,
-    name: data.name,
-    description: data.description || data.name,
-    workflow_def_id: data.workflow_def_id,
-    pinned_version: data.pinned_version ?? null,
-    enabled: data.enabled ?? true,
-  });
+  ctx.logger.info('workflow_create_started', { project_id: data.project_id, name: data.name });
 
-  return workflow;
+  try {
+    const workflow = await graphRepo.createWorkflow(ctx.db, {
+      project_id: data.project_id,
+      name: data.name,
+      description: data.description || data.name,
+      workflow_def_id: data.workflow_def_id,
+      pinned_version: data.pinned_version ?? null,
+      enabled: data.enabled ?? true,
+    });
+
+    ctx.logger.info('workflow_created', { workflow_id: workflow.id, name: workflow.name });
+    return workflow;
+  } catch (error) {
+    const dbError = extractDbError(error);
+
+    if (dbError.constraint === 'unique') {
+      ctx.logger.warn('workflow_create_conflict', {
+        project_id: data.project_id,
+        name: data.name,
+        field: dbError.field,
+      });
+      throw new ConflictError(
+        `Workflow with ${dbError.field} already exists`,
+        dbError.field,
+        'unique',
+      );
+    }
+
+    if (dbError.constraint === 'foreign_key') {
+      ctx.logger.warn('workflow_create_invalid_reference', {
+        project_id: data.project_id,
+        workflow_def_id: data.workflow_def_id,
+      });
+      throw new NotFoundError(
+        'Referenced project or workflow_def does not exist',
+        'reference',
+        data.workflow_def_id,
+      );
+    }
+
+    ctx.logger.error('workflow_create_failed', {
+      project_id: data.project_id,
+      name: data.name,
+      error: dbError.message,
+    });
+    throw error;
+  }
 }
 
 /**
  * Get a workflow by ID
  */
 export async function getWorkflow(ctx: ServiceContext, workflowId: string) {
+  ctx.logger.info('workflow_get', { workflow_id: workflowId });
+
   const workflow = await graphRepo.getWorkflow(ctx.db, workflowId);
   if (!workflow) {
-    throw new Error(`Workflow not found: ${workflowId}`);
+    ctx.logger.warn('workflow_not_found', { workflow_id: workflowId });
+    throw new NotFoundError(`Workflow not found: ${workflowId}`, 'workflow', workflowId);
   }
   return workflow;
 }

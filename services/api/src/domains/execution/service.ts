@@ -46,7 +46,7 @@ export async function startWorkflow(
   // Load workflow and definition
   const workflow = await graphRepo.getWorkflow(ctx.db, workflowId);
   if (!workflow) {
-    ctx.logger.error('workflow_not_found', { workflow_id: workflowId });
+    ctx.logger.warn('workflow_not_found', { workflow_id: workflowId });
     throw new NotFoundError(`Workflow not found: ${workflowId}`, 'workflow', workflowId);
   }
 
@@ -56,7 +56,7 @@ export async function startWorkflow(
     workflow.pinned_version ?? undefined,
   );
   if (!workflowDef) {
-    ctx.logger.error('workflow_definition_not_found', {
+    ctx.logger.warn('workflow_definition_not_found', {
       workflow_id: workflowId,
       workflow_def_id: workflow.workflow_def_id,
       version: workflow.pinned_version,
