@@ -1,23 +1,20 @@
 {
   "name": "wonder-coordinator",
   "main": "src/index.ts",
-  "compatibility_date": "2024-11-01",
-  "compatibility_flags": ["nodejs_compat"],
+  "compatibility_date": "2025-12-01",
 
   "durable_objects": {
     "bindings": [
       {
-        "name": "WORKFLOW_COORDINATOR",
-        "class_name": "WorkflowCoordinator",
-        "script_name": "wonder-coordinator"
+        "name": "COORDINATOR",
+        "class_name": "WorkflowCoordinator"
       }
     ]
   },
-
   "queues": {
     "producers": [
       {
-        "binding": "WORKFLOW_TASKS",
+        "binding": "TASKS",
         "queue": "workflow-tasks"
       }
     ],
