@@ -23,67 +23,49 @@ export { WorkflowCoordinator } from './domains/coordination';
  * Handles HTTP requests, queue messages, and provides RPC methods
  */
 class WonderAPI extends WorkerEntrypoint<Env> {
-  /**
-   * RPC: Workspaces adapter
-   */
+  /** RPC: Workspaces adapter */
   workspaces() {
     return new Workspaces(this.env, this.ctx);
   }
 
-  /**
-   * RPC: Projects adapter
-   */
+  /** RPC: Projects adapter */
   projects() {
     return new Projects(this.env, this.ctx);
   }
 
-  /**
-   * RPC: WorkflowDefs adapter
-   */
+  /** RPC: WorkflowDefs adapter */
   workflowDefs() {
     return new WorkflowDefs(this.env, this.ctx);
   }
 
-  /**
-   * RPC: Workflows adapter
-   */
+  /** RPC: Workflows adapter */
   workflows() {
     return new Workflows(this.env, this.ctx);
   }
 
-  /**
-   * RPC: Actions adapter
-   */
+  /** RPC: Actions adapter */
   actions() {
     return new Actions(this.env, this.ctx);
   }
 
-  /**
-   * RPC: PromptSpecs adapter
-   */
+  /** RPC: PromptSpecs adapter */
   promptSpecs() {
     return new PromptSpecs(this.env, this.ctx);
   }
 
-  /**
-   * RPC: ModelProfiles adapter
-   */
+  /** RPC: ModelProfiles adapter */
   modelProfiles() {
     return new ModelProfiles(this.env, this.ctx);
   }
 
-  /**
-   * HTTP fetch handler
-   */
+  /** HTTP fetch handler */
   async fetch(request: Request): Promise<Response> {
     return handleFetch(request, this.env, this.ctx);
   }
 
-  /**
-   * Queue consumer handler
-   */
+  /** Queue consumer handler */
   async queue(batch: MessageBatch<WorkflowTask>): Promise<void> {
-    return handleQueue(batch, this.env);
+    return handleQueue(batch, this.env, this.ctx);
   }
 }
 
