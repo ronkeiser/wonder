@@ -1,0 +1,22 @@
+{
+  "name": "wonder-executor",
+  "main": "src/index.ts",
+  "compatibility_date": "2024-11-01",
+  "compatibility_flags": ["nodejs_compat"],
+
+  "queues": {
+    "consumers": [
+      {
+        "queue": "workflow-tasks",
+        "max_batch_size": 10,
+        "max_batch_timeout": 5,
+        "max_retries": 3,
+        "dead_letter_queue": "workflow-tasks-dlq"
+      }
+    ]
+  },
+
+  "observability": {
+    "enabled": true
+  }
+}
