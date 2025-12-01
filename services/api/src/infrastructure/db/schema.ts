@@ -134,7 +134,7 @@ export const nodes = sqliteTable(
     output_mapping: text('output_mapping', { mode: 'json' }),
 
     fan_out: text('fan_out', { enum: ['first_match', 'all'] }).notNull(),
-    fan_in: text('fan_in', { mode: 'json' }).notNull(), // 'any' | 'all' | { m_of_n: number }
+    fan_in: text('fan_in').$type<'any' | 'all' | string>().notNull(), // 'any' | 'all' | 'm_of_n:N'
 
     joins_node: text('joins_node'), // self-reference to nodes.id (enforced at application level)
     merge: text('merge', { mode: 'json' }), // merge strategy config
