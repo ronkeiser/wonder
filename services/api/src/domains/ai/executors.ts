@@ -18,8 +18,8 @@ export async function executeLLMCall(
   };
 
   // Load prompt spec and model profile
-  const promptSpec = await aiService.getPromptSpecForExecution(ctx, impl.prompt_spec_id);
-  const modelProfile = await aiService.getModelProfileForExecution(ctx, impl.model_profile_id);
+  const promptSpec = await aiService.getPromptSpec(ctx, impl.prompt_spec_id);
+  const modelProfile = await aiService.getModelProfile(ctx, impl.model_profile_id);
 
   // Render prompt template
   console.log('Input data for template:', JSON.stringify(inputData));

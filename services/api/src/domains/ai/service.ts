@@ -72,18 +72,6 @@ export async function getPromptSpec(ctx: ServiceContext, promptSpecId: string) {
 }
 
 /**
- * Get a prompt spec for execution
- * Used by workers during workflow execution
- */
-export async function getPromptSpecForExecution(ctx: ServiceContext, promptSpecId: string) {
-  const promptSpec = await aiRepo.getPromptSpec(ctx.db, promptSpecId);
-  if (!promptSpec) {
-    throw new NotFoundError(`PromptSpec not found: ${promptSpecId}`, 'prompt_spec', promptSpecId);
-  }
-  return promptSpec;
-}
-
-/**
  * Delete a prompt specification
  */
 export async function deletePromptSpec(ctx: ServiceContext, promptSpecId: string) {
@@ -155,22 +143,6 @@ export async function getModelProfile(ctx: ServiceContext, modelProfileId: strin
   const profile = await aiRepo.getModelProfile(ctx.db, modelProfileId);
   if (!profile) {
     ctx.logger.warn('model_profile_not_found', { model_profile_id: modelProfileId });
-    throw new NotFoundError(
-      `ModelProfile not found: ${modelProfileId}`,
-      'model_profile',
-      modelProfileId,
-    );
-  }
-  return profile;
-}
-
-/**
- * Get a model profile for execution
- * Used by workers during workflow execution
- */
-export async function getModelProfileForExecution(ctx: ServiceContext, modelProfileId: string) {
-  const profile = await aiRepo.getModelProfile(ctx.db, modelProfileId);
-  if (!profile) {
     throw new NotFoundError(
       `ModelProfile not found: ${modelProfileId}`,
       'model_profile',

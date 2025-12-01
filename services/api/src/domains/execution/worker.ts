@@ -19,7 +19,7 @@ export async function processWorkflowTask(
 
   try {
     // Load node to get action_id and mappings
-    const node = await graphService.getNodeForExecution(
+    const node = await graphService.getNode(
       ctx,
       task.workflow_def_id,
       task.workflow_def_version,
@@ -44,7 +44,7 @@ export async function processWorkflowTask(
     console.log('Extracted inputData:', JSON.stringify(inputData));
 
     // Load action
-    const action = await effectsService.getActionForExecution(ctx, node.action_id);
+    const action = await effectsService.getAction(ctx, node.action_id);
 
     // Execute action based on kind
     let outputData: Record<string, unknown>;

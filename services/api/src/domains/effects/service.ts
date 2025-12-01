@@ -94,18 +94,6 @@ export async function getAction(ctx: ServiceContext, actionId: string) {
 }
 
 /**
- * Get an action for execution
- * Used by workers during workflow execution
- */
-export async function getActionForExecution(ctx: ServiceContext, actionId: string) {
-  const action = await effectsRepo.getAction(ctx.db, actionId);
-  if (!action) {
-    throw new NotFoundError(`Action not found: ${actionId}`, 'action', actionId);
-  }
-  return action;
-}
-
-/**
  * Get an action by ID and version
  */
 export async function getActionVersion(ctx: ServiceContext, actionId: string, version: number) {

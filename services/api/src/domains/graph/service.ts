@@ -424,24 +424,3 @@ export async function getNode(
   }
   return node;
 }
-
-/**
- * Get a node for execution
- * Used by workers during workflow execution
- */
-export async function getNodeForExecution(
-  ctx: ServiceContext,
-  workflowDefId: string,
-  workflowDefVersion: number,
-  nodeId: string,
-) {
-  const node = await graphRepo.getNode(ctx.db, workflowDefId, workflowDefVersion, nodeId);
-  if (!node) {
-    throw new NotFoundError(
-      `Node not found: ${nodeId} in workflow_def ${workflowDefId} v${workflowDefVersion}`,
-      'node',
-      nodeId,
-    );
-  }
-  return node;
-}
