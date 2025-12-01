@@ -1,0 +1,20 @@
+{
+  "name": "wonder-coordinator",
+  "main": "src/index.ts",
+  "compatibility_date": "2024-11-01",
+  "compatibility_flags": ["nodejs_compat"],
+
+  "durable_objects": {
+    "bindings": [
+      {
+        "name": "WORKFLOW_COORDINATOR",
+        "class_name": "WorkflowCoordinator",
+        "script_name": "wonder-coordinator"
+      }
+    ]
+  },
+
+  "observability": {
+    "enabled": true
+  }
+}
