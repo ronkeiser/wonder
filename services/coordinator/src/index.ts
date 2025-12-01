@@ -12,16 +12,11 @@ import { TokenManager } from './tokens.js';
 import type { TaskResult } from './types.js';
 
 interface Env {
-  WORKFLOW_COORDINATOR: DurableObjectNamespace<WorkflowCoordinator>;
+  COORDINATOR: DurableObjectNamespace<WorkflowCoordinator>;
 }
 
 /**
  * WorkflowCoordinator Durable Object
- *
- * Each workflow run gets its own instance with:
- * - Isolated SQLite storage for context and tokens
- * - State machine for workflow lifecycle
- * - Task queue coordination
  */
 export class WorkflowCoordinator extends DurableObject {
   /**
@@ -41,15 +36,6 @@ export class WorkflowCoordinator extends DurableObject {
           headers: { 'Content-Type': 'application/json' },
         },
       );
-    }
-
-    // Handle task results
-    if (url.pathname === '/results' && request.method === 'POST') {
-      const results = (await request.json()) as TaskResult[];
-      // await this.processResults(results);
-      return new Response(JSON.stringify({ processed: results.length }), {
-        headers: { 'Content-Type': 'application/json' },
-      });
     }
 
     return new Response('Not Found', { status: 404 });
@@ -77,30 +63,9 @@ export class WorkflowCoordinator extends DurableObject {
  */
 export default {
   async fetch(request: Request, env: Env): Promise<Response> {
-    const url = new URL(request.url);
-
-    // Create or get a DO instance
-    if (url.pathname === '/coordinator') {
-      // Use a test ID or parse from query params
-      const doId = url.searchParams.get('id') || 'test-workflow-001';
-      const id = env.WORKFLOW_COORDINATOR.idFromName(doId);
-      const stub = env.WORKFLOW_COORDINATOR.get(id);
-
-      // Forward request to DO
-      return await stub.fetch(new Request(`${url.origin}/hello`, request));
-    }
-
-    return new Response(
-      JSON.stringify({
-        message: 'Wonder Coordinator Service',
-        endpoints: {
-          '/coordinator?id=<workflow_id>': 'Access a workflow coordinator instance',
-        },
-      }),
-      {
-        headers: { 'Content-Type': 'application/json' },
-      },
-    );
+    return new Response('OK', {
+      headers: { 'Content-Type': 'application/json' },
+    });
   },
 
   /**
@@ -119,8 +84,8 @@ export default {
 
     // Process each workflow's results in its DO
     for (const [workflowRunId, results] of resultsByWorkflow) {
-      const id = env.WORKFLOW_COORDINATOR.idFromName(workflowRunId);
-      const stub = env.WORKFLOW_COORDINATOR.get(id);
+      const id = env.COORDINATOR.idFromName(workflowRunId);
+      const stub = env.COORDINATOR.get(id);
       await stub.processResults(results);
     }
   },
