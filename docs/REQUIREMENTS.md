@@ -9,7 +9,8 @@
 
 ## Platform
 
-- Built on Cloudflare: Workers, Durable Objects, Queues, D1, Vectorize, R2
+- Built on Cloudflare: Workers, Durable Objects, D1, Vectorize, R2, Analytics Engine
+- Service communication via RPC (service bindings)
 - UI built with SvelteKit
 - Testing via Vitest with miniflare (local Cloudflare runtime)
 
@@ -40,8 +41,9 @@
 - Sub-workflows execute with isolated context; explicit input/output mapping only
 - Context schema enforced: scalars, arrays, objects all validated
 - State updates atomic and transactional
-- Full event log for replay and time-travel debugging
-- Events retained 30 days, then archived
+- Full event log for replay and time-travel debugging via dedicated event service (DO + RPC)
+- Events persisted to D1 for querying; metrics to Analytics Engine
+- Events retained 30 days, then archived to R2
 
 ## Data
 

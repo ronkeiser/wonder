@@ -3,27 +3,48 @@
 ```
 wonder/
 ├── packages/
-│   └── logger/                     # @wonder/logger
-│       ├── src/
-│       │   ├── logger.ts           # Logger implementation
-│       │   ├── schema.ts           # D1 schema for logs table
-│       │   └── index.ts
-│       └── package.json
-├── services/
-│   ├── api/                        # Business logic service
+│   ├── logger/                     # @wonder/logger
 │   │   ├── src/
-│   │   │   ├── domains/            # Business logic (10 bounded contexts)
-│   │   │   ├── infrastructure/     # External systems & platform services
-│   │   │   ├── adapters/           # Protocol adapters (HTTP, RPC)
-│   │   │   ├── errors.ts           # Custom error classes
-│   │   │   └── index.ts            # Service assembly
-│   │   ├── test/
-│   │   │   ├── unit/
-│   │   │   ├── integration/
-│   │   │   └── e2e/
+│   │   │   ├── logger.ts           # Logger implementation
+│   │   │   ├── schema.ts           # D1 schema for logs table
+│   │   │   └── index.ts
+│   │   └── package.json
+│   └── schema/                     # @wonder/schema
+│       └── src/                    # Shared types, validation, DDL/DML
+├── services/
+│   ├── http/                       # HTTP routing service
+│   │   ├── src/
+│   │   │   ├── routes/             # OpenAPI routes
+│   │   │   └── index.ts            # Hono app assembly
 │   │   ├── package.json
 │   │   ├── tsconfig.json
-│   │   └── wrangler.toml
+│   │   └── wrangler.jsonc
+│   ├── resources/                  # CRUD + data access service
+│   │   ├── src/
+│   │   │   ├── resources/          # RPC classes (workspaces, projects, etc.)
+│   │   │   ├── infrastructure/     # DB schema, repositories
+│   │   │   ├── handlers/           # HTTP handler (minimal)
+│   │   │   └── index.ts            # WorkerEntrypoint with RPC methods
+│   │   ├── package.json
+│   │   ├── tsconfig.json
+│   │   └── wrangler.jsonc
+│   ├── coordinator/                # Workflow orchestration DO
+│   │   ├── src/
+│   │   │   ├── coordinator.ts      # Durable Object class
+│   │   │   └── index.ts
+│   │   ├── package.json
+│   │   ├── tsconfig.json
+│   │   └── wrangler.jsonc
+│   ├── executor/                   # Task execution service
+│   │   ├── src/
+│   │   │   └── index.ts            # WorkerEntrypoint with executeTask RPC
+│   │   ├── package.json
+│   │   ├── tsconfig.json
+│   │   └── wrangler.jsonc
+│   ├── events/                     # Event sourcing DO service
+│   │   ├── src/
+│   │   │   └── index.ts            # Event persistence + streaming
+│   │   └── wrangler.jsonc
 │   └── web/                        # UI service
 │       ├── src/
 │       │   ├── routes/             # SvelteKit routes
@@ -31,7 +52,7 @@ wonder/
 │       │   └── app.html
 │       ├── package.json
 │       ├── tsconfig.json
-│       └── wrangler.toml
+│       └── wrangler.jsonc
 ├── pnpm-workspace.yaml
 ├── package.json
 └── tsconfig.json
@@ -39,14 +60,41 @@ wonder/
 
 ### 2. Service Boundaries
 
-**API (`services/api`) responsibilities**:
+**HTTP (`services/http`) responsibilities**:
 
-- Database access (D1 via Drizzle ORM)
-- Workflow engine execution
-- Business logic (domain classes, validation)
-- MCP server implementation
-- Authentication verification
-- External integrations (webhooks)
+- HTTP routing and request validation (OpenAPI)
+- Route requests to appropriate services via RPC
+- WebSocket proxying to coordinator
+- No business logic
+
+**Resources (`services/resources`) responsibilities**:
+
+- CRUD operations on entities (workspaces, projects, workflow definitions, etc.)
+- Database access (D1 via repositories)
+- Data validation and schema enforcement
+- RPC interface for other services
+
+**Coordinator (`services/coordinator`) responsibilities**:
+
+- Workflow run orchestration (DO per run)
+- Token state management and fan-out/fan-in
+- Context storage in DO SQLite
+- Task dispatch to executor via RPC
+- WebSocket event streaming
+
+**Executor (`services/executor`) responsibilities**:
+
+- Action execution (LLM calls, HTTP requests, MCP tools)
+- Provider integrations (Anthropic, OpenAI, etc.)
+- Task result generation
+- RPC interface for coordinator
+
+**Events (`services/events`) responsibilities**:
+
+- Event persistence to D1
+- Metrics to Analytics Engine
+- Event streaming and replay
+- RPC interface for event writes
 
 **Web (`services/web`) responsibilities**:
 
@@ -54,107 +102,152 @@ wonder/
 - Static assets
 - Session management
 - Authentication flow (login UI)
-- API client (via RPC)
+- API client (via HTTP service)
 
 **Hard boundaries (CANNOT cross)**:
 
+- ❌ Services cannot import code from other services (use RPC bindings)
 - ❌ Web cannot access D1 directly
-- ❌ Web cannot import api code directly (use RPC binding)
-- ❌ Web cannot implement business logic
-- ❌ API cannot render HTML/UI
+- ❌ HTTP service cannot implement business logic
+- ❌ Only resources service accesses D1 for entities
+- ❌ Only coordinator and events services use Durable Objects
 
-### 3. API Internal Structure
+### 3. Service Internal Structure
 
-**Resources + Execution Infrastructure**:
+**Resources Service** (`services/resources`):
 
 ```
-services/api/src/
-├── resources/            # RPC resources + data access (REST entities)
-│   ├── workspaces/
-│   │   ├── resource.ts       # RPC class: CRUD operations
-│   │   └── repository.ts     # D1 access for workspaces
-│   ├── projects/
-│   │   ├── resource.ts
-│   │   └── repository.ts
-│   ├── workflow-defs/
-│   │   ├── resource.ts       # RPC class: create/version workflow definitions
-│   │   ├── repository.ts     # WorkflowDef, Node, Transition data access
-│   │   └── transforms.ts     # Data transformations (owner, fan_in, etc.)
-│   ├── workflows/
-│   │   ├── resource.ts       # RPC class: bind workflows, start runs
-│   │   └── repository.ts
-│   ├── actions/
-│   │   ├── resource.ts
-│   │   └── repository.ts
-│   ├── prompt-specs/
-│   │   ├── resource.ts
-│   │   └── repository.ts
-│   ├── model-profiles/
-│   │   ├── resource.ts
-│   │   └── repository.ts
-│   └── workflow-runs/
-│       ├── resource.ts       # RPC class: query runs, get status
-│       └── repository.ts     # D1 persistence for completed runs
-├── coordinator/          # Durable Object (workflow orchestration)
-│   ├── index.ts              # WorkflowCoordinator DO class
-│   ├── lifecycle.ts          # Workflow lifecycle management
-│   ├── context.ts            # Context manager (DO SQLite)
-│   ├── tokens.ts             # Token manager (DO SQLite)
-│   ├── tasks.ts              # Task dispatcher (enqueues to worker)
-│   └── results.ts            # Task result processor
-├── events/               # Event sourcing (cross-cutting)
-│   ├── buffer.ts             # Event buffer (DO SQLite)
-│   └── stream.ts             # WebSocket event streaming
-├── execution/            # Task execution (queue consumer)
-│   ├── worker.ts             # Queue consumer entrypoint
-│   ├── executor.ts           # Action execution logic
-│   └── definitions.ts        # Shared types (Context, Token, WorkflowTask, etc.)
-└── infrastructure/       # External systems & platform services
-    ├── db/
-    │   └── schema.ts         # Drizzle schema (D1)
-    ├── context.ts            # ServiceContext type
-    └── clients/              # External APIs (Anthropic, OpenAI, etc.)
+src/
+├── resources/              # RPC resources (application services)
+│   ├── workspaces.ts           # WorkerEntrypoint RPC methods
+│   ├── projects.ts
+│   ├── workflow-defs.ts
+│   ├── workflows.ts
+│   ├── actions.ts
+│   ├── prompt-specs.ts
+│   └── model-profiles.ts
+├── infrastructure/
+│   ├── db/
+│   │   ├── schema.ts           # Drizzle schema (D1)
+│   │   └── repositories.ts     # Data access layer
+│   └── context.ts              # ServiceContext type
+├── handlers/
+│   └── fetch.ts                # Minimal HTTP handler (health check)
+├── errors.ts
+└── index.ts                    # WorkerEntrypoint assembly
+```
+
+**Coordinator Service** (`services/coordinator`):
+
+```
+src/
+├── coordinator.ts          # WorkflowCoordinator DO class
+│   ├── fetch()                 # HTTP + WebSocket handler
+│   ├── processTaskAsync()      # RPC call to executor
+│   └── broadcast()             # WebSocket event streaming
+└── index.ts                # Export DO class
+```
+
+**Executor Service** (`services/executor`):
+
+```
+src/
+└── index.ts                # WorkerEntrypoint with executeTask() RPC
+    ├── executeTask()           # Main RPC method
+    ├── executeAction()         # Action dispatch logic
+    └── fetch()                 # Health check endpoint
+```
+
+**Events Service** (`services/events`):
+
+```
+src/
+└── index.ts                # Event DO + RPC methods
+    ├── writeEvent()            # Persist to D1
+    ├── writeMetric()           # Send to Analytics Engine
+    └── getEvents()             # Query for replay
+```
+
+**HTTP Service** (`services/http`):
+
+```
+src/
+├── routes/                 # OpenAPI route handlers
+│   ├── workspaces.ts           # Proxy to resources RPC
+│   ├── projects.ts
+│   ├── workflows.ts
+│   └── coordinator.ts          # WebSocket proxying
+└── index.ts                # Hono app assembly
 ```
 
 **Architecture principles:**
 
-1. **Resources = Application services + Data access**
+1. **Service separation by responsibility**
 
-   - RPC resources handle orchestration across repositories
-   - Repositories provide clean data access layer
-   - Co-located for cohesion (resource owns its data access)
-   - Testable: unit test repositories, integration test resources
+   - Each service is independently deployable
+   - Communication via RPC service bindings
+   - No code sharing between services (use RPC)
+   - Clear ownership boundaries
 
-2. **Coordinator = Workflow state management**
+2. **Resources = Data access only**
 
-   - Durable Object with SQLite storage
-   - Manages workflow lifecycle, tokens, context
-   - Calls resource repositories for workflow definitions and metadata
-   - Not a resource (doesn't map to REST entity)
+   - CRUD operations on entities
+   - Repository pattern for D1 access
+   - Schema validation and enforcement
+   - Exposes RPC methods for other services
 
-3. **Execution = Task processing**
+3. **Coordinator = Workflow orchestration**
 
-   - Queue consumer for workflow tasks
-   - Calls LLM providers, executes actions
-   - Reports results back to coordinator
-   - Calls resource repositories for action/prompt specs
+   - Durable Object per workflow run
+   - Manages tokens, context, fan-out/fan-in
+   - Calls executor via RPC for task execution
+   - Calls resources via RPC for definitions
+   - Calls events via RPC for persistence
 
-4. **Events = Observability**
-   - Event sourcing for workflow execution
-   - WebSocket streaming for live updates
-   - Cross-cutting concern used by coordinator
+4. **Executor = Action execution**
+
+   - Stateless task processing
+   - Provider integrations (LLMs, APIs)
+   - Returns results synchronously via RPC
+   - No direct data persistence
+
+5. **Events = Observability infrastructure**
+
+   - Event persistence (D1 + Analytics Engine)
+   - Event replay and time-travel debugging
+   - Metrics collection and aggregation
+   - Exposes RPC methods for writes/queries
+
+6. **HTTP = Thin routing layer**
+   - OpenAPI request validation
+   - Route to services via RPC
+   - WebSocket proxying only
+   - No business logic
 
 **Data flow:**
 
 ```
-HTTP → resources/workflows (RPC) → D1
+HTTP Request
+  ↓
+HTTP Service (routing)
+  ↓ (RPC)
+Resources Service → D1 (read/write entities)
 
-coordinator → resources/workflow-defs/repository → D1
-           → resources/actions/repository → D1
-           → events/buffer → DO SQLite
-
-execution/worker → resources/model-profiles/repository → D1
-                → coordinator (via DO stub) → DO SQLite
+Workflow Start
+  ↓
+HTTP Service
+  ↓ (WebSocket proxy)
+Coordinator DO
+  ↓ (RPC)
+Resources Service (get workflow definition) → D1
+  ↓ (RPC)
+Executor Service (execute task)
+  ↓ (returns result)
+Coordinator DO
+  ↓ (RPC)
+Events Service → D1 (events) + Analytics Engine (metrics)
+  ↓ (WebSocket)
+HTTP Service → Client (live updates)
 ```
 
 **File pattern** (within each resource):

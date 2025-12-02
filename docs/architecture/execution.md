@@ -78,9 +78,13 @@ Applied when fan-in completes, writes to `context.state[target]`:
 - Transition conditions query against columns/tables directly
 - Ephemeral (run lifetime); snapshots to D1 per `ProjectSettings.snapshot_policy`
 
-## Event Buffering
+## Event Persistence
 
-- Events buffered in DO SQLite, flushed to D1 in batches
+- Coordinator calls event service via RPC for each significant state change
+- Event service persists to D1 for queryable history
+- Metrics sent to Analytics Engine for time-series analysis
+- Events batched at event service level for efficiency
+- WebSocket streaming handled by coordinator (not queued)
 
 ## Sub-workflows
 
@@ -92,10 +96,19 @@ Applied when fan-in completes, writes to `context.state[target]`:
 - `inherit_artifacts: false` by default
 - `on_failure: 'propagate'` default (sub-workflow error fails parent node)
 
+## Task Execution
+
+- Coordinator calls executor service via RPC with `WorkflowTask`
+- Executor executes action synchronously and returns `WorkflowTaskResult`
+- No queue buffering; direct RPC call for immediate execution
+- Coordinator receives result and updates state/tokens
+- Parallel execution via multiple concurrent RPC calls
+
 ## Error Handling
 
-- Retries at Worker/task level per `execution.retry_policy` in ActionDef
+- Retries at executor level per `execution.retry_policy` in ActionDef
 - Exhausted retries return `WorkflowTaskResult` with `status: 'failure'`
-- DO receives failure result, transitions can match on `state._last_error` or similar
+- Coordinator receives failure result, transitions can match on `state._last_error`
 - No retry policy = fail immediately on error
-- Timeout enforced at Worker via `execution.timeout_ms`
+- Timeout enforced at executor via `execution.timeout_ms`
+- RPC timeout handled by coordinator (fallback to failure)

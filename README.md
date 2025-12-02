@@ -278,14 +278,14 @@ Every workflow run gets its own Cloudflare Durable Object:
 
 ### Worker Execution
 
-Actual work happens in Workers:
+Actual work happens in Workers via RPC:
 
-1. DO enqueues `WorkflowTask` to Cloudflare Queue
-2. Worker picks up task, executes action (LLM call, API request, etc.)
-3. Worker returns `WorkflowTaskResult` to DO
-4. DO updates state, advances tokens, enqueues next tasks
+1. DO calls executor service via RPC with `WorkflowTask`
+2. Executor executes action (LLM call, API request, etc.)
+3. Executor returns `WorkflowTaskResult` to DO
+4. DO updates state, advances tokens, calls executor for next tasks
 
-This separation means the DO is a lightweight coordinator while Workers handle compute-intensive operations in parallel.
+This separation means the DO is a lightweight coordinator while executor service handles compute-intensive operations in parallel.
 
 ### Task Results Stage Output
 
@@ -489,14 +489,14 @@ Workflows waiting at Gates:
 
 ## Platform: Cloudflare
 
-| Service              | Role                                                           |
-| -------------------- | -------------------------------------------------------------- |
-| **Durable Objects**  | Workflow run coordination, token state, fan-in synchronization |
-| **Workers**          | Task execution (LLM calls, HTTP requests, compute)             |
-| **Queues**           | Work distribution, retry handling                              |
-| **D1**               | Global storage (definitions, artifacts, completed runs)        |
-| **Vectorize**        | Semantic search over artifacts                                 |
-| **Analytics Engine** | Time-series metrics                                            |
+| Service              | Role                                                                           |
+| -------------------- | ------------------------------------------------------------------------------ |
+| **Durable Objects**  | Workflow run coordination, token state, fan-in synchronization, event sourcing |
+| **Workers**          | Task execution (LLM calls, HTTP requests, compute)                             |
+| **Service Bindings** | RPC communication between services (coordinator ↔ executor, event service)     |
+| **D1**               | Global storage (definitions, artifacts, completed runs, events)                |
+| **Vectorize**        | Semantic search over artifacts                                                 |
+| **Analytics Engine** | Time-series metrics and observability data                                     |
 
 ## What Wonder Enables
 
