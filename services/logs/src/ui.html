@@ -162,6 +162,8 @@
     <script>
       const logsContainer = document.getElementById('logs');
       const statusEl = document.getElementById('status');
+      const seenLogIds = new Set();
+      let lastLogTimestamp = 0;
 
       function setStatus(state) {
         statusEl.className = `status ${state}`;
@@ -185,6 +187,22 @@
       }
 
       function addLogEntry(log) {
+        // Skip if we've already seen this log ID
+        if (log.id && seenLogIds.has(log.id)) {
+          return;
+        }
+        
+        // Skip if timestamp is older than our last log (prevents duplicates on reconnect)
+        if (log.timestamp < lastLogTimestamp) {
+          return;
+        }
+        
+        // Track this log
+        if (log.id) {
+          seenLogIds.add(log.id);
+        }
+        lastLogTimestamp = Math.max(lastLogTimestamp, log.timestamp);
+        
         const entry = document.createElement('div');
         entry.className = `log-entry ${log.level}`;
 
@@ -240,6 +258,13 @@
         // Keep only last 1000 entries
         while (logsContainer.children.length > 1000) {
           logsContainer.removeChild(logsContainer.firstChild);
+        }
+        
+        // Trim seenLogIds set to prevent memory growth
+        if (seenLogIds.size > 2000) {
+          const idsArray = Array.from(seenLogIds);
+          seenLogIds.clear();
+          idsArray.slice(-1000).forEach(id => seenLogIds.add(id));
         }
       }
 
