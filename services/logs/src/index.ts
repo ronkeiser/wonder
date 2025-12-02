@@ -78,14 +78,25 @@ export class LogsService extends WorkerEntrypoint<Env> {
   write(context: LogContext, level: LogLevel, input: LoggerInput): void {
     this.ctx.waitUntil(
       (async () => {
-        await this.db.insert(logs).values({
+        const logEntry = {
           id: crypto.randomUUID(),
           timestamp: Date.now(),
           level,
           ...context,
           ...input,
           metadata: JSON.stringify(input.metadata || {}),
-        });
+        };
+
+        await this.db.insert(logs).values(logEntry);
+
+        // Broadcast to connected WebSocket clients
+        try {
+          const id = this.env.STREAMER.idFromName('logs-streamer');
+          const stub = this.env.STREAMER.get(id);
+          await stub.broadcast(logEntry);
+        } catch (error) {
+          console.error('Failed to broadcast log to WebSocket clients:', error);
+        }
       })(),
     );
   }
