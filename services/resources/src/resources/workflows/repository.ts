@@ -108,6 +108,14 @@ export async function getWorkflowWithDef(
 
 type WorkflowRun = typeof workflow_runs.$inferSelect;
 
+export async function getWorkflowRun(
+  db: DrizzleD1Database,
+  id: string,
+): Promise<WorkflowRun | null> {
+  const result = await db.select().from(workflow_runs).where(eq(workflow_runs.id, id)).get();
+  return result ?? null;
+}
+
 export async function createWorkflowRun(
   db: DrizzleD1Database,
   data: {

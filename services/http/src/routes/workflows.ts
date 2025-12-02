@@ -108,11 +108,9 @@ workflows.openapi(startWorkflowRoute, async (c) => {
   const result = await workflowsResource.start(id, input);
 
   // Trigger workflow execution via coordinator DO
-  // For minimal implementation, send a mock execution request
   const coordinatorId = c.env.COORDINATOR.idFromName(result.durable_object_id);
   const coordinator = c.env.COORDINATOR.get(coordinatorId);
   
-  // Trigger execution by calling the DO's fetch with a special path
   try {
     const coordinatorResponse = await coordinator.fetch(
       new Request(`http://internal/start`, {

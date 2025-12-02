@@ -1,4 +1,4 @@
-import type { EventContext } from '@wonder/events';
+import type { Emitter, EventContext, EventInput } from '@wonder/events';
 import type { Logger } from '@wonder/logs';
 import { DurableObject } from 'cloudflare:workers';
 
@@ -8,6 +8,7 @@ import { DurableObject } from 'cloudflare:workers';
 export class WorkflowCoordinator extends DurableObject {
   private sessions: Set<WebSocket> = new Set();
   private logger: Logger | null = null;
+  private emitter: Emitter | null = null;
   private sequenceCounter = 0;
 
   /**
@@ -22,6 +23,21 @@ export class WorkflowCoordinator extends DurableObject {
       });
     }
     return this.logger;
+  }
+
+  /**
+   * Get or create universal emitter instance
+   */
+  private getEmitter(): Emitter {
+    if (!this.emitter) {
+      // Create emitter that calls EventsService.write() via RPC
+      this.emitter = {
+        emit: (context: EventContext, input: EventInput) => {
+          this.env.EVENTS.write(context, input);
+        },
+      };
+    }
+    return this.emitter;
   }
 
   /**
@@ -55,50 +71,56 @@ export class WorkflowCoordinator extends DurableObject {
       try {
         const data = (await request.json()) as {
           workflow_run_id: string;
-          workspace_id: string;
-          project_id: string;
-          workflow_def_id?: string;
-          parent_run_id?: string;
           input: Record<string, unknown>;
+        };
+
+        // Look up workflow run metadata from resources service
+        const workflowRun = (await this.env.RESOURCES.workflowRuns().get(data.workflow_run_id)) as {
+          workflow_run: {
+            id: string;
+            project_id: string;
+            workspace_id: string;
+            workflow_id: string;
+            workflow_def_id: string;
+            parent_run_id: string | null;
+          };
         };
 
         logger.info({
           event_type: 'workflow_start_request',
           message: 'Received workflow start request',
           trace_id: data.workflow_run_id,
-          workspace_id: data.workspace_id,
-          project_id: data.project_id,
+          workspace_id: workflowRun.workflow_run.workspace_id,
+          project_id: workflowRun.workflow_run.project_id,
           metadata: { duration_ms: Date.now() - startTime },
         });
 
         // Create event context for this workflow run
         const eventContext: EventContext = {
           workflow_run_id: data.workflow_run_id,
-          workspace_id: data.workspace_id,
-          project_id: data.project_id,
-          parent_run_id: data.parent_run_id,
-          workflow_def_id: data.workflow_def_id,
+          workspace_id: workflowRun.workflow_run.workspace_id,
+          project_id: workflowRun.workflow_run.project_id,
+          workflow_def_id: workflowRun.workflow_run.workflow_def_id,
+          parent_run_id: workflowRun.workflow_run.parent_run_id ?? undefined,
         };
 
-        // Emit workflow_started event
-        const emitter = this.env.EVENTS.newEmitter(eventContext);
-        emitter.emit({
+        const emitter = this.getEmitter();
+        console.log('[COORDINATOR] About to emit workflow_started with context:', eventContext);
+        emitter.emit(eventContext, {
           event_type: 'workflow_started',
           sequence_number: this.sequenceCounter++,
           metadata: { input: data.input },
         });
+        console.log('[COORDINATOR] Emitted workflow_started');
 
         // Create task
         const task = {
           workflow_run_id: data.workflow_run_id,
-          workspace_id: data.workspace_id,
-          project_id: data.project_id,
           token_id: 'token-' + Date.now(),
           node_id: 'initial-node',
           action_kind: 'llm_call',
           input_data: data.input,
           retry_count: 0,
-          eventContext,
         };
 
         logger.debug({
@@ -237,18 +259,34 @@ export class WorkflowCoordinator extends DurableObject {
    */
   async processTaskAsync(task: {
     workflow_run_id: string;
-    workspace_id: string;
-    project_id: string;
     token_id: string;
     node_id: string;
     action_kind: string;
     input_data: Record<string, unknown>;
     retry_count: number;
-    eventContext: EventContext;
   }): Promise<void> {
     const taskStartTime = Date.now();
     const logger = this.getLogger();
-    const emitter = this.env.EVENTS.newEmitter(task.eventContext);
+    const emitter = this.getEmitter();
+
+    // Look up workflow run metadata for event context
+    const workflowRun = (await this.env.RESOURCES.workflowRuns().get(task.workflow_run_id)) as {
+      workflow_run: {
+        id: string;
+        project_id: string;
+        workspace_id: string;
+        workflow_id: string;
+        workflow_def_id: string;
+        parent_run_id: string | null;
+      };
+    };
+    const eventContext: EventContext = {
+      workflow_run_id: task.workflow_run_id,
+      workspace_id: workflowRun.workflow_run.workspace_id,
+      project_id: workflowRun.workflow_run.project_id,
+      workflow_def_id: workflowRun.workflow_run.workflow_def_id,
+      parent_run_id: workflowRun.workflow_run.parent_run_id ?? undefined,
+    };
 
     try {
       logger.info({
@@ -259,7 +297,7 @@ export class WorkflowCoordinator extends DurableObject {
       });
 
       // Emit node_started event
-      emitter.emit({
+      emitter.emit(eventContext, {
         event_type: 'node_started',
         sequence_number: this.sequenceCounter++,
         node_id: task.node_id,
@@ -293,7 +331,7 @@ export class WorkflowCoordinator extends DurableObject {
         });
 
         // Emit node_completed event
-        emitter.emit({
+        emitter.emit(eventContext, {
           event_type: 'node_completed',
           sequence_number: this.sequenceCounter++,
           node_id: task.node_id,
@@ -304,7 +342,7 @@ export class WorkflowCoordinator extends DurableObject {
         });
 
         // Emit workflow_completed event (for now, since this is a simple single-node flow)
-        emitter.emit({
+        emitter.emit(eventContext, {
           event_type: 'workflow_completed',
           sequence_number: this.sequenceCounter++,
           metadata: { output: result.output_data, duration_ms: duration },
@@ -334,7 +372,7 @@ export class WorkflowCoordinator extends DurableObject {
         });
 
         // Emit node_failed event
-        emitter.emit({
+        emitter.emit(eventContext, {
           event_type: 'node_failed',
           sequence_number: this.sequenceCounter++,
           node_id: task.node_id,
@@ -344,7 +382,7 @@ export class WorkflowCoordinator extends DurableObject {
         });
 
         // Emit workflow_failed event
-        emitter.emit({
+        emitter.emit(eventContext, {
           event_type: 'workflow_failed',
           sequence_number: this.sequenceCounter++,
           message: result.error || 'Workflow execution failed',
@@ -367,7 +405,7 @@ export class WorkflowCoordinator extends DurableObject {
       });
 
       // Emit node_failed event
-      emitter.emit({
+      emitter.emit(eventContext, {
         event_type: 'node_failed',
         sequence_number: this.sequenceCounter++,
         node_id: task.node_id,
@@ -377,7 +415,7 @@ export class WorkflowCoordinator extends DurableObject {
       });
 
       // Emit workflow_failed event
-      emitter.emit({
+      emitter.emit(eventContext, {
         event_type: 'workflow_failed',
         sequence_number: this.sequenceCounter++,
         message: `Workflow execution error: ${String(error)}`,

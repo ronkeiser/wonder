@@ -3,7 +3,7 @@ import { client } from '../client';
 
 describe('Workflow Execution API', () => {
   it('should start a workflow execution and return workflow_run_id', async () => {
-    const testName = 'batman';
+    const testName = 'Flapjack';
     // Create workspace
     const { data: workspaceResponse } = await client.POST('/api/workspaces', {
       body: {

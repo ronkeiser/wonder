@@ -3,10 +3,24 @@ import { and, desc, eq } from 'drizzle-orm';
 import { drizzle } from 'drizzle-orm/d1';
 import { ulid } from 'ulid';
 import { events } from './db/schema.js';
-import type { EventContext, EventEntry, EventInput, EventType, GetEventsOptions } from './types.js';
+import type {
+  Emitter,
+  EventContext,
+  EventEntry,
+  EventInput,
+  EventType,
+  GetEventsOptions,
+} from './types.js';
 
 export { Streamer } from './streamer';
-export type { EventContext, EventEntry, EventInput, EventType, GetEventsOptions } from './types.js';
+export type {
+  Emitter,
+  EventContext,
+  EventEntry,
+  EventInput,
+  EventType,
+  GetEventsOptions,
+} from './types.js';
 
 /**
  * Main service
@@ -50,40 +64,35 @@ export class EventsService extends WorkerEntrypoint<Env> {
   }
 
   /**
-   * Factory method - returns an event emitter with context baked in
-   */
-  newEmitter(context: EventContext) {
-    return {
-      emit: (input: EventInput) => {
-        this.write(context, input);
-      },
-    };
-  }
-
-  /**
    * RPC method - writes event to D1
    */
   write(context: EventContext, input: EventInput): void {
-    console.log('BAOASDDD: ', input);
+    console.log('[EVENTS] write() called:', { context, input });
     this.ctx.waitUntil(
       (async () => {
-        const eventEntry = {
-          id: ulid(),
-          timestamp: Date.now(),
-          ...context,
-          ...input,
-          metadata: JSON.stringify(input.metadata || {}),
-        };
-
-        await this.db.insert(events).values(eventEntry);
-
-        // Broadcast to connected WebSocket clients
         try {
-          const id = this.env.STREAMER.idFromName('events-streamer');
-          const stub = this.env.STREAMER.get(id);
-          await stub.broadcast(eventEntry);
+          const eventEntry = {
+            id: ulid(),
+            timestamp: Date.now(),
+            ...context,
+            ...input,
+            metadata: JSON.stringify(input.metadata || {}),
+          };
+
+          console.log('[EVENTS] Inserting event:', eventEntry);
+          await this.db.insert(events).values(eventEntry);
+          console.log('[EVENTS] Successfully inserted event');
+
+          // Broadcast to connected WebSocket clients
+          try {
+            const id = this.env.STREAMER.idFromName('events-streamer');
+            const stub = this.env.STREAMER.get(id);
+            await stub.broadcast(eventEntry);
+          } catch (error) {
+            console.error('[EVENTS] Failed to broadcast event to WebSocket clients:', error);
+          }
         } catch (error) {
-          console.error('Failed to broadcast event to WebSocket clients:', error);
+          console.error('[EVENTS] Failed to insert event:', error, { context, input });
         }
       })(),
     );

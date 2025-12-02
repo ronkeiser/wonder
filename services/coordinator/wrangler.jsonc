@@ -24,6 +24,10 @@
     {
       "binding": "EVENTS",
       "service": "wonder-events"
+    },
+    {
+      "binding": "RESOURCES",
+      "service": "wonder-resources"
     }
   ],
   "migrations": [

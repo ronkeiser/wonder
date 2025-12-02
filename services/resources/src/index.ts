@@ -10,6 +10,7 @@ import { ModelProfiles } from './resources/model-profiles';
 import { Projects } from './resources/projects';
 import { PromptSpecs } from './resources/prompt-specs';
 import { WorkflowDefs } from './resources/workflow-defs';
+import { WorkflowRuns } from './resources/workflow-runs';
 import { Workflows } from './resources/workflows';
 import { Workspaces } from './resources/workspaces';
 
@@ -36,6 +37,11 @@ class WonderResources extends WorkerEntrypoint<Env> {
   /** RPC: Workflows adapter */
   workflows() {
     return new Workflows(this.env, this.ctx);
+  }
+
+  /** RPC: WorkflowRuns adapter */
+  workflowRuns() {
+    return new WorkflowRuns(this.env, this.ctx);
   }
 
   /** RPC: Actions adapter */

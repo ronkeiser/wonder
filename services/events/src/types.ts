@@ -79,3 +79,10 @@ export interface GetEventsOptions {
   limit?: number;
   after_sequence?: number; // For replay from checkpoint
 }
+
+/**
+ * Universal event emitter - accepts context on each emit call
+ */
+export interface Emitter {
+  emit: (context: EventContext, input: EventInput) => void;
+}
