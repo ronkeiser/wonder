@@ -1,0 +1,16 @@
+{
+  "name": "wonder-ducky",
+  "main": "src/index.ts",
+  "compatibility_date": "2025-12-01",
+
+  "services": [
+    {
+      "binding": "LOGS",
+      "service": "wonder-logs"
+    }
+  ],
+
+  "observability": {
+    "enabled": true
+  }
+}
