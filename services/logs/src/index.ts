@@ -4,6 +4,8 @@ import { drizzle } from 'drizzle-orm/d1';
 import { logs } from './db/schema.js';
 import type { GetLogsOptions, LogContext, LogLevel, Logger, LoggerInput } from './types.js';
 
+export { Streamer } from './streamer';
+
 /**
  * Main service
  */
@@ -15,6 +17,13 @@ export class LogsService extends WorkerEntrypoint<Env> {
    */
   async fetch(request: Request): Promise<Response> {
     const url = new URL(request.url);
+
+    // Route to Streamer DO for UI and WebSocket connections
+    if (url.pathname === '/' || url.pathname === '/stream') {
+      const id = this.env.STREAMER.idFromName('logs-streamer');
+      const stub = this.env.STREAMER.get(id);
+      return stub.fetch(request);
+    }
 
     if (url.pathname === '/logs') {
       const options: GetLogsOptions = {
