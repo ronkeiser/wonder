@@ -182,6 +182,9 @@ importers:
       '@wonder/logger':
         specifier: workspace:*
         version: link:../../packages/logger
+      '@wonder/logs':
+        specifier: workspace:*
+        version: link:../logs
       '@wonder/schema':
         specifier: workspace:*
         version: link:../../packages/schema

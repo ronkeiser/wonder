@@ -5,6 +5,7 @@ import { logs } from './db/schema.js';
 import type { GetLogsOptions, LogContext, LogLevel, Logger, LoggerInput } from './types.js';
 
 export { Streamer } from './streamer';
+export type { GetLogsOptions, LogContext, LogLevel, Logger, LoggerInput } from './types.js';
 
 /**
  * Main service

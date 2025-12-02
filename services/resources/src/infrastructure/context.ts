@@ -1,6 +1,6 @@
 /** Service context for dependency injection */
 
-import type { Logger } from '@wonder/logger';
+import type { Logger } from '@wonder/logs';
 import type { DrizzleD1Database } from 'drizzle-orm/d1';
 
 /**
@@ -10,12 +10,6 @@ import type { DrizzleD1Database } from 'drizzle-orm/d1';
 export interface ServiceContext {
   /** Drizzle D1 database connection */
   db: DrizzleD1Database;
-
-  /** Workers AI binding for LLM inference */
-  ai: Ai;
-
-  /** Durable Object namespace for workflow coordination */
-  do: Env['WORKFLOW_COORDINATOR'];
 
   /** Structured logger for application events */
   logger: Logger;
@@ -34,15 +28,11 @@ export interface ServiceContext {
  */
 export function createServiceContext(
   db: DrizzleD1Database,
-  ai: Ai,
-  durableObject: Env['WORKFLOW_COORDINATOR'],
   logger: Logger,
   executionContext: ExecutionContext,
 ): ServiceContext {
   return {
     db,
-    ai,
-    do: durableObject,
     logger,
     executionContext,
   };

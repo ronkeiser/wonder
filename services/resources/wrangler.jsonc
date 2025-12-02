@@ -12,6 +12,16 @@
       "remote": true
     }
   ],
+  "services": [
+    {
+      "binding": "LOGS",
+      "service": "wonder-logs",
+      "entrypoint": "LogsService"
+    }
+  ],
+  "vars": {
+    "ENVIRONMENT": "development"
+  },
   "observability": {
     "logs": {
       "enabled": true,
