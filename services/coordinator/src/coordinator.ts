@@ -1,8 +1,4 @@
 import { DurableObject } from 'cloudflare:workers';
-import { ContextManager } from './context.js';
-import { handleTaskResults } from './results.js';
-import { TokenManager } from './tokens.js';
-import type { TaskResult } from './types.js';
 
 /**
  * WorkflowCoordinator Durable Object
@@ -205,58 +201,6 @@ export class WorkflowCoordinator extends DurableObject {
     } catch (error) {
       console.error(`[Coordinator ASYNC] Task processing failed:`, error);
     }
-  }
-
-  /**
-   * Process task results
-   */
-  async processResults(results: TaskResult[]): Promise<void> {
-    const processTime = Date.now();
-    console.log(
-      `[Coordinator processResults t+0ms] RPC method called with ${results.length} results, sessions count: ${this.sessions.size}`,
-    );
-
-    // For minimal implementation: skip context/token management
-    // Just broadcast workflow completion event
-    for (const result of results) {
-      console.log(
-        `[Coordinator processResults t+${Date.now() - processTime}ms] Processing result:`,
-        JSON.stringify(result),
-      );
-      if (result.success && result.output_data) {
-        console.log(
-          `[Coordinator processResults t+${Date.now() - processTime}ms] Creating completion event`,
-        );
-        const completionEvent = {
-          kind: 'workflow_completed',
-          payload: {
-            full_context: {
-              output: result.output_data,
-            },
-          },
-        };
-        console.log(
-          `[Coordinator processResults t+${Date.now() - processTime}ms] Broadcasting to ${
-            this.sessions.size
-          } sessions`,
-        );
-        this.broadcast(completionEvent);
-        console.log(
-          `[Coordinator processResults t+${Date.now() - processTime}ms] Broadcast complete`,
-        );
-      } else {
-        console.log(
-          `[Coordinator processResults t+${
-            Date.now() - processTime
-          }ms] Result not successful or missing output_data`,
-        );
-      }
-    }
-    console.log(
-      `[Coordinator processResults t+${
-        Date.now() - processTime
-      }ms] processResults method returning`,
-    );
   }
 
   /**
