@@ -1,4 +1,5 @@
 import { WorkerEntrypoint } from 'cloudflare:workers';
+import type { TaskResult, WorkflowTask } from './types.js';
 
 /**
  * Wonder Executor Service
@@ -6,32 +7,6 @@ import { WorkerEntrypoint } from 'cloudflare:workers';
  * RPC-based task execution service.
  * Executes actions (LLM calls, HTTP requests, etc.) and returns results.
  */
-
-/**
- * WorkflowTask - Task format for RPC
- */
-interface WorkflowTask {
-  workflow_run_id: string;
-  token_id: string;
-  node_id: string;
-  action_kind: string;
-  input_data: Record<string, unknown>;
-  retry_count: number;
-}
-
-/**
- * TaskResult - Result format returned via RPC
- */
-interface TaskResult {
-  task_id: string;
-  workflow_run_id: string;
-  token_id: string;
-  node_id: string;
-  success: boolean;
-  output_data?: Record<string, unknown>;
-  error?: string;
-  completed_at: string;
-}
 
 /**
  * Executor service with RPC methods
