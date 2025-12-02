@@ -23,13 +23,12 @@ export default class DuckyService extends WorkerEntrypoint<Env> {
   }
 
   async quack(): Promise<string> {
-    const logger = await this.env.LOGS.newLogger({
+    const logger = this.env.LOGS.newLogger({
       service: 'ducky',
       environment: 'development',
     });
 
-    logger({
-      level: 'info',
+    logger.info({
       event_type: 'quack_called',
       message: 'Ducky says quack!',
     });
@@ -43,8 +42,7 @@ export default class DuckyService extends WorkerEntrypoint<Env> {
       environment: 'development',
     });
 
-    await logger({
-      level: 'info',
+    logger.info({
       event_type: 'swim_started',
       message: `Swimming ${distance}m`,
       metadata: { distance },
@@ -52,16 +50,14 @@ export default class DuckyService extends WorkerEntrypoint<Env> {
 
     // Simulate swimming
     if (distance > 1000) {
-      await logger({
-        level: 'warn',
+      logger.warn({
         event_type: 'swim_distance_high',
         message: 'Swimming a long distance',
         metadata: { distance, threshold: 1000 },
       });
     }
 
-    await logger({
-      level: 'info',
+    logger.info({
       event_type: 'swim_completed',
       message: 'Swim complete',
       metadata: { distance },

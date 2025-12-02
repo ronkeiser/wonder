@@ -1,5 +1,7 @@
 // services/logs/src/types.ts
 
+export type LogLevel = 'error' | 'warn' | 'info' | 'debug';
+
 export interface LogContext {
   service: string;
   environment: string;
@@ -8,8 +10,7 @@ export interface LogContext {
 }
 
 export interface LoggerInput {
-  level: 'error' | 'warn' | 'info' | 'debug';
-  event_type: string;
+  event_type?: string;
   message?: string;
   source_location?: string;
   trace_id?: string;
@@ -20,9 +21,24 @@ export interface LoggerInput {
   metadata?: Record<string, unknown>;
 }
 
-export interface LogEntry extends LoggerInput, LogContext {
+export interface LogEntry extends LogContext {
   id: string;
   timestamp: number;
+  level: LogLevel;
+  event_type: string;
+  message?: string;
+  source_location?: string;
+  trace_id?: string;
+  request_id?: string;
+  workspace_id?: string;
+  project_id?: string;
+  user_id?: string;
+  metadata: string;
 }
 
-export type Logger = (input: LoggerInput) => void;
+export interface Logger {
+  error(input: LoggerInput | string): void;
+  warn(input: LoggerInput | string): void;
+  info(input: LoggerInput | string): void;
+  debug(input: LoggerInput | string): void;
+}

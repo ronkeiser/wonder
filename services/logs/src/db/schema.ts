@@ -21,7 +21,7 @@ export const logs = sqliteTable(
     level: text('level').notNull(),
     service: text('service').notNull(),
     environment: text('environment').notNull(),
-    event_type: text('event_type').notNull(),
+    event_type: text('event_type'),
     message: text('message'),
     source_location: text('source_location'), // 'coordinator.ts:142'
     trace_id: text('trace_id'),
