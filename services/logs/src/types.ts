@@ -1,6 +1,6 @@
 // services/logs/src/types.ts
 
-export type LogLevel = 'error' | 'warn' | 'info' | 'debug';
+export type LogLevel = 'error' | 'warn' | 'info' | 'debug' | 'fatal';
 
 export interface LogContext {
   service: string;
@@ -41,4 +41,5 @@ export interface Logger {
   warn(input: LoggerInput | string): void;
   info(input: LoggerInput | string): void;
   debug(input: LoggerInput | string): void;
+  fatal(input: LoggerInput | string): void;
 }

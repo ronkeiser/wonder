@@ -1,4 +1,3 @@
-// services/logs/src/index.ts
 import { WorkerEntrypoint } from 'cloudflare:workers';
 import { drizzle } from 'drizzle-orm/d1';
 import { logs } from './db/schema.js';
@@ -9,6 +8,13 @@ import type { LogContext, LogLevel, Logger, LoggerInput } from './types.js';
  */
 export class LogsService extends WorkerEntrypoint<Env> {
   private db = drizzle(this.env.DB);
+
+  /**
+   * HTTP entrypoint
+   */
+  async fetch(): Promise<Response> {
+    return new Response('Logs service', { status: 200 });
+  }
 
   /**
    * Factory method - returns a function with context baked in
@@ -31,6 +37,9 @@ export class LogsService extends WorkerEntrypoint<Env> {
       debug: (input: LoggerInput | string) => {
         this.write(context, 'debug', normalizeInput(input));
       },
+      fatal: (input: LoggerInput | string) => {
+        this.write(context, 'fatal', normalizeInput(input));
+      },
     };
   }
 
@@ -38,8 +47,6 @@ export class LogsService extends WorkerEntrypoint<Env> {
    * RPC method - writes log to D1
    */
   write(context: LogContext, level: LogLevel, input: LoggerInput): void {
-    console.log('CONTEXT:', context);
-    console.log('INPUT:', input);
     this.ctx.waitUntil(
       (async () => {
         await this.db.insert(logs).values({
