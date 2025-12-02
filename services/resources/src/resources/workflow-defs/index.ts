@@ -41,15 +41,18 @@ export class WorkflowDefs extends Resource {
     workflow_def_id: string;
     workflow_def: any;
   }> {
-    this.serviceCtx.logger.info('workflow_def_create_started', { name: data.name });
+    this.serviceCtx.logger.info({
+      event_type: 'workflow_def_create_started',
+      metadata: { name: data.name },
+    });
 
     // 1. Validate all node refs are unique
     const nodeRefs = new Set<string>();
     for (const nodeData of data.nodes) {
       if (nodeRefs.has(nodeData.ref)) {
-        this.serviceCtx.logger.warn('workflow_def_validation_failed', {
-          error: 'duplicate_node_ref',
-          ref: nodeData.ref,
+        this.serviceCtx.logger.warn({
+          event_type: 'workflow_def_validation_failed',
+          metadata: { error: 'duplicate_node_ref', ref: nodeData.ref },
         });
         throw new ValidationError(
           `Duplicate node ref: ${nodeData.ref}`,
@@ -63,9 +66,9 @@ export class WorkflowDefs extends Resource {
     // 2. Validate all transition refs point to valid nodes
     for (const transition of data.transitions ?? []) {
       if (!nodeRefs.has(transition.from_node_ref)) {
-        this.serviceCtx.logger.warn('workflow_def_validation_failed', {
-          error: 'invalid_from_node_ref',
-          ref: transition.from_node_ref,
+        this.serviceCtx.logger.warn({
+          event_type: 'workflow_def_validation_failed',
+          metadata: { error: 'invalid_from_node_ref', ref: transition.from_node_ref },
         });
         throw new ValidationError(
           `Invalid from_node_ref: ${transition.from_node_ref}`,
@@ -74,9 +77,9 @@ export class WorkflowDefs extends Resource {
         );
       }
       if (!nodeRefs.has(transition.to_node_ref)) {
-        this.serviceCtx.logger.warn('workflow_def_validation_failed', {
-          error: 'invalid_to_node_ref',
-          ref: transition.to_node_ref,
+        this.serviceCtx.logger.warn({
+          event_type: 'workflow_def_validation_failed',
+          metadata: { error: 'invalid_to_node_ref', ref: transition.to_node_ref },
         });
         throw new ValidationError(
           `Invalid to_node_ref: ${transition.to_node_ref}`,
@@ -88,9 +91,9 @@ export class WorkflowDefs extends Resource {
 
     // 3. Validate initial_node_ref exists
     if (!nodeRefs.has(data.initial_node_ref)) {
-      this.serviceCtx.logger.warn('workflow_def_validation_failed', {
-        error: 'invalid_initial_node_ref',
-        ref: data.initial_node_ref,
+      this.serviceCtx.logger.warn({
+        event_type: 'workflow_def_validation_failed',
+        metadata: { error: 'invalid_initial_node_ref', ref: data.initial_node_ref },
       });
       throw new ValidationError(
         `Invalid initial_node_ref: ${data.initial_node_ref}`,
@@ -102,9 +105,9 @@ export class WorkflowDefs extends Resource {
     // 4. Validate joins_node_ref if provided
     for (const nodeData of data.nodes) {
       if (nodeData.joins_node_ref && !nodeRefs.has(nodeData.joins_node_ref)) {
-        this.serviceCtx.logger.warn('workflow_def_validation_failed', {
-          error: 'invalid_joins_node_ref',
-          ref: nodeData.joins_node_ref,
+        this.serviceCtx.logger.warn({
+          event_type: 'workflow_def_validation_failed',
+          metadata: { error: 'invalid_joins_node_ref', ref: nodeData.joins_node_ref },
         });
         throw new ValidationError(
           `Invalid joins_node_ref: ${nodeData.joins_node_ref}`,
@@ -131,9 +134,9 @@ export class WorkflowDefs extends Resource {
       const dbError = extractDbError(error);
 
       if (dbError.constraint === 'unique') {
-        this.serviceCtx.logger.warn('workflow_def_create_conflict', {
-          name: data.name,
-          field: dbError.field,
+        this.serviceCtx.logger.warn({
+          event_type: 'workflow_def_create_conflict',
+          metadata: { name: data.name, field: dbError.field },
         });
         throw new ConflictError(
           `WorkflowDef with ${dbError.field} already exists`,
@@ -142,9 +145,10 @@ export class WorkflowDefs extends Resource {
         );
       }
 
-      this.serviceCtx.logger.error('workflow_def_create_failed', {
-        name: data.name,
-        error: dbError.message,
+      this.serviceCtx.logger.error({
+        event_type: 'workflow_def_create_failed',
+        message: dbError.message,
+        metadata: { name: data.name },
       });
       throw error;
     }
@@ -203,10 +207,13 @@ export class WorkflowDefs extends Resource {
       }
     }
 
-    this.serviceCtx.logger.info('workflow_def_created', {
-      workflow_def_id: workflowDef.id,
-      version: workflowDef.version,
-      name: workflowDef.name,
+    this.serviceCtx.logger.info({
+      event_type: 'workflow_def_created',
+      metadata: {
+        workflow_def_id: workflowDef.id,
+        version: workflowDef.version,
+        name: workflowDef.name,
+      },
     });
 
     return {
@@ -223,16 +230,16 @@ export class WorkflowDefs extends Resource {
     nodes: any[];
     transitions: any[];
   }> {
-    this.serviceCtx.logger.info('workflow_def_get', {
-      workflow_def_id: workflowDefId,
-      version,
+    this.serviceCtx.logger.info({
+      event_type: 'workflow_def_get',
+      metadata: { workflow_def_id: workflowDefId, version },
     });
 
     const workflowDef = await repo.getWorkflowDef(this.serviceCtx.db, workflowDefId, version);
     if (!workflowDef) {
-      this.serviceCtx.logger.warn('workflow_def_not_found', {
-        workflow_def_id: workflowDefId,
-        version,
+      this.serviceCtx.logger.warn({
+        event_type: 'workflow_def_not_found',
+        metadata: { workflow_def_id: workflowDefId, version },
       });
       throw new NotFoundError(
         `WorkflowDef not found: ${workflowDefId}`,

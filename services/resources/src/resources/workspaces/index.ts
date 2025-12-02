@@ -15,7 +15,10 @@ export class Workspaces extends Resource {
       updated_at: string;
     };
   }> {
-    this.serviceCtx.logger.info('workspace_create_started', { name: data.name });
+    this.serviceCtx.logger.info({
+      event_type: 'workspace_create_started',
+      metadata: { name: data.name },
+    });
 
     try {
       const workspace = await repo.createWorkspace(this.serviceCtx.db, {
@@ -23,9 +26,10 @@ export class Workspaces extends Resource {
         settings: data.settings ?? null,
       });
 
-      this.serviceCtx.logger.info('workspace_created', {
+      this.serviceCtx.logger.info({
+        event_type: 'workspace_created',
         workspace_id: workspace.id,
-        name: workspace.name,
+        metadata: { name: workspace.name },
       });
 
       return {
@@ -39,9 +43,9 @@ export class Workspaces extends Resource {
       const dbError = extractDbError(error);
 
       if (dbError.constraint === 'unique') {
-        this.serviceCtx.logger.warn('workspace_create_conflict', {
-          name: data.name,
-          field: dbError.field,
+        this.serviceCtx.logger.warn({
+          event_type: 'workspace_create_conflict',
+          metadata: { name: data.name, field: dbError.field },
         });
         throw new ConflictError(
           `Workspace with ${dbError.field} already exists`,
@@ -50,9 +54,10 @@ export class Workspaces extends Resource {
         );
       }
 
-      this.serviceCtx.logger.error('workspace_create_failed', {
-        name: data.name,
-        error: dbError.message,
+      this.serviceCtx.logger.error({
+        event_type: 'workspace_create_failed',
+        message: dbError.message,
+        metadata: { name: data.name },
       });
       throw error;
     }
@@ -67,11 +72,11 @@ export class Workspaces extends Resource {
       updated_at: string;
     };
   }> {
-    this.serviceCtx.logger.info('workspace_get', { workspace_id: id });
+    this.serviceCtx.logger.info({ event_type: 'workspace_get', workspace_id: id });
 
     const workspace = await repo.getWorkspace(this.serviceCtx.db, id);
     if (!workspace) {
-      this.serviceCtx.logger.warn('workspace_not_found', { workspace_id: id });
+      this.serviceCtx.logger.warn({ event_type: 'workspace_not_found', workspace_id: id });
       throw new NotFoundError(`Workspace not found: ${id}`, 'workspace', id);
     }
 
@@ -92,7 +97,7 @@ export class Workspaces extends Resource {
       updated_at: string;
     }>;
   }> {
-    this.serviceCtx.logger.info('workspace_list', params);
+    this.serviceCtx.logger.info({ event_type: 'workspace_list', metadata: params });
 
     const workspaces = await repo.listWorkspaces(this.serviceCtx.db, params?.limit);
 
@@ -116,17 +121,18 @@ export class Workspaces extends Resource {
       updated_at: string;
     };
   }> {
-    this.serviceCtx.logger.info('workspace_update_started', { workspace_id: id });
+    this.serviceCtx.logger.info({ event_type: 'workspace_update_started', workspace_id: id });
 
     const workspace = await repo.updateWorkspace(this.serviceCtx.db, id, data);
     if (!workspace) {
-      this.serviceCtx.logger.warn('workspace_not_found', { workspace_id: id });
+      this.serviceCtx.logger.warn({ event_type: 'workspace_not_found', workspace_id: id });
       throw new NotFoundError(`Workspace not found: ${id}`, 'workspace', id);
     }
 
-    this.serviceCtx.logger.info('workspace_updated', {
+    this.serviceCtx.logger.info({
+      event_type: 'workspace_updated',
       workspace_id: workspace.id,
-      name: workspace.name,
+      metadata: { name: workspace.name },
     });
 
     return {
@@ -138,17 +144,17 @@ export class Workspaces extends Resource {
   }
 
   async delete(id: string): Promise<{ success: boolean }> {
-    this.serviceCtx.logger.info('workspace_delete_started', { workspace_id: id });
+    this.serviceCtx.logger.info({ event_type: 'workspace_delete_started', workspace_id: id });
 
     // Verify workspace exists
     const workspace = await repo.getWorkspace(this.serviceCtx.db, id);
     if (!workspace) {
-      this.serviceCtx.logger.warn('workspace_not_found', { workspace_id: id });
+      this.serviceCtx.logger.warn({ event_type: 'workspace_not_found', workspace_id: id });
       throw new NotFoundError(`Workspace not found: ${id}`, 'workspace', id);
     }
 
     await repo.deleteWorkspace(this.serviceCtx.db, id);
-    this.serviceCtx.logger.info('workspace_deleted', { workspace_id: id });
+    this.serviceCtx.logger.info({ event_type: 'workspace_deleted', workspace_id: id });
 
     return { success: true };
   }

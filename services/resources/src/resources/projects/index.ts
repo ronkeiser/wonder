@@ -22,9 +22,10 @@ export class Projects extends Resource {
       updated_at: string;
     };
   }> {
-    this.serviceCtx.logger.info('project_create_started', {
+    this.serviceCtx.logger.info({
+      event_type: 'project_create_started',
       workspace_id: data.workspace_id,
-      name: data.name,
+      metadata: { name: data.name },
     });
 
     try {
@@ -35,10 +36,11 @@ export class Projects extends Resource {
         settings: data.settings ?? null,
       });
 
-      this.serviceCtx.logger.info('project_created', {
+      this.serviceCtx.logger.info({
+        event_type: 'project_created',
         project_id: project.id,
         workspace_id: project.workspace_id,
-        name: project.name,
+        metadata: { name: project.name },
       });
 
       return {
@@ -52,10 +54,10 @@ export class Projects extends Resource {
       const dbError = extractDbError(error);
 
       if (dbError.constraint === 'unique') {
-        this.serviceCtx.logger.warn('project_create_conflict', {
+        this.serviceCtx.logger.warn({
+          event_type: 'project_create_conflict',
           workspace_id: data.workspace_id,
-          name: data.name,
-          field: dbError.field,
+          metadata: { name: data.name, field: dbError.field },
         });
         throw new ConflictError(
           `Project with ${dbError.field} already exists`,
@@ -65,7 +67,8 @@ export class Projects extends Resource {
       }
 
       if (dbError.constraint === 'foreign_key') {
-        this.serviceCtx.logger.warn('project_create_invalid_workspace', {
+        this.serviceCtx.logger.warn({
+          event_type: 'project_create_invalid_workspace',
           workspace_id: data.workspace_id,
         });
         throw new NotFoundError(
@@ -75,10 +78,11 @@ export class Projects extends Resource {
         );
       }
 
-      this.serviceCtx.logger.error('project_create_failed', {
+      this.serviceCtx.logger.error({
+        event_type: 'project_create_failed',
         workspace_id: data.workspace_id,
-        name: data.name,
-        error: dbError.message,
+        message: dbError.message,
+        metadata: { name: data.name },
       });
       throw error;
     }
@@ -95,11 +99,11 @@ export class Projects extends Resource {
       updated_at: string;
     };
   }> {
-    this.serviceCtx.logger.info('project_get', { project_id: id });
+    this.serviceCtx.logger.info({ event_type: 'project_get', project_id: id });
 
     const project = await repo.getProject(this.serviceCtx.db, id);
     if (!project) {
-      this.serviceCtx.logger.warn('project_not_found', { project_id: id });
+      this.serviceCtx.logger.warn({ event_type: 'project_not_found', project_id: id });
       throw new NotFoundError(`Project not found: ${id}`, 'project', id);
     }
 
@@ -122,7 +126,7 @@ export class Projects extends Resource {
       updated_at: string;
     }>;
   }> {
-    this.serviceCtx.logger.info('project_list', params);
+    this.serviceCtx.logger.info({ event_type: 'project_list', metadata: params });
 
     const projects = await repo.listProjects(
       this.serviceCtx.db,
@@ -152,17 +156,18 @@ export class Projects extends Resource {
       updated_at: string;
     };
   }> {
-    this.serviceCtx.logger.info('project_update_started', { project_id: id });
+    this.serviceCtx.logger.info({ event_type: 'project_update_started', project_id: id });
 
     const project = await repo.updateProject(this.serviceCtx.db, id, data);
     if (!project) {
-      this.serviceCtx.logger.warn('project_not_found', { project_id: id });
+      this.serviceCtx.logger.warn({ event_type: 'project_not_found', project_id: id });
       throw new NotFoundError(`Project not found: ${id}`, 'project', id);
     }
 
-    this.serviceCtx.logger.info('project_updated', {
+    this.serviceCtx.logger.info({
+      event_type: 'project_updated',
       project_id: project.id,
-      name: project.name,
+      metadata: { name: project.name },
     });
 
     return {
@@ -174,17 +179,17 @@ export class Projects extends Resource {
   }
 
   async delete(id: string): Promise<{ success: boolean }> {
-    this.serviceCtx.logger.info('project_delete_started', { project_id: id });
+    this.serviceCtx.logger.info({ event_type: 'project_delete_started', project_id: id });
 
     // Verify project exists
     const project = await repo.getProject(this.serviceCtx.db, id);
     if (!project) {
-      this.serviceCtx.logger.warn('project_not_found', { project_id: id });
+      this.serviceCtx.logger.warn({ event_type: 'project_not_found', project_id: id });
       throw new NotFoundError(`Project not found: ${id}`, 'project', id);
     }
 
     await repo.deleteProject(this.serviceCtx.db, id);
-    this.serviceCtx.logger.info('project_deleted', { project_id: id });
+    this.serviceCtx.logger.info({ event_type: 'project_deleted', project_id: id });
 
     return { success: true };
   }

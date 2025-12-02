@@ -43,10 +43,13 @@ export class Actions extends Resource {
       updated_at: string;
     };
   }> {
-    this.serviceCtx.logger.info('action_create_started', {
-      name: data.name,
-      version: data.version,
-      kind: data.kind,
+    this.serviceCtx.logger.info({
+      event_type: 'action_create_started',
+      metadata: {
+        name: data.name,
+        version: data.version,
+        kind: data.kind,
+      },
     });
 
     try {
@@ -62,10 +65,13 @@ export class Actions extends Resource {
         idempotency: data.idempotency ?? null,
       });
 
-      this.serviceCtx.logger.info('action_created', {
-        action_id: action.id,
-        name: action.name,
-        version: action.version,
+      this.serviceCtx.logger.info({
+        event_type: 'action_created',
+        metadata: {
+          action_id: action.id,
+          name: action.name,
+          version: action.version,
+        },
       });
 
       return {
@@ -76,10 +82,13 @@ export class Actions extends Resource {
       const dbError = extractDbError(error);
 
       if (dbError.constraint === 'unique') {
-        this.serviceCtx.logger.warn('action_create_conflict', {
-          name: data.name,
-          version: data.version,
-          field: dbError.field,
+        this.serviceCtx.logger.warn({
+          event_type: 'action_create_conflict',
+          metadata: {
+            name: data.name,
+            version: data.version,
+            field: dbError.field,
+          },
         });
         throw new ConflictError(
           `Action with ${dbError.field} already exists`,
@@ -89,13 +98,17 @@ export class Actions extends Resource {
       }
 
       if (dbError.constraint === 'foreign_key') {
-        this.serviceCtx.logger.warn('action_create_invalid_reference', { name: data.name });
+        this.serviceCtx.logger.warn({
+          event_type: 'action_create_invalid_reference',
+          metadata: { name: data.name },
+        });
         throw new ConflictError('Referenced entity does not exist', undefined, 'foreign_key');
       }
 
-      this.serviceCtx.logger.error('action_create_failed', {
-        name: data.name,
-        error: dbError.message,
+      this.serviceCtx.logger.error({
+        event_type: 'action_create_failed',
+        message: dbError.message,
+        metadata: { name: data.name },
       });
       throw error;
     }
@@ -120,7 +133,10 @@ export class Actions extends Resource {
       updated_at: string;
     };
   }> {
-    this.serviceCtx.logger.info('action_get', { action_id: id, version });
+    this.serviceCtx.logger.info({
+      event_type: 'action_get',
+      metadata: { action_id: id, version },
+    });
 
     const action =
       version !== undefined
@@ -128,7 +144,10 @@ export class Actions extends Resource {
         : await repo.getLatestAction(this.serviceCtx.db, id);
 
     if (!action) {
-      this.serviceCtx.logger.warn('action_not_found', { action_id: id, version });
+      this.serviceCtx.logger.warn({
+        event_type: 'action_not_found',
+        metadata: { action_id: id, version },
+      });
       throw new NotFoundError(
         `Action not found: ${id}${version !== undefined ? ` version ${version}` : ''}`,
         'action',
@@ -155,7 +174,7 @@ export class Actions extends Resource {
       updated_at: string;
     }>;
   }> {
-    this.serviceCtx.logger.info('action_list', params);
+    this.serviceCtx.logger.info({ event_type: 'action_list', metadata: params ?? {} });
 
     const actionsResult = params?.kind
       ? await repo.listActionsByKind(this.serviceCtx.db, params.kind, params.limit)
@@ -165,7 +184,10 @@ export class Actions extends Resource {
   }
 
   async delete(id: string, version?: number): Promise<{ success: boolean }> {
-    this.serviceCtx.logger.info('action_delete_started', { action_id: id, version });
+    this.serviceCtx.logger.info({
+      event_type: 'action_delete_started',
+      metadata: { action_id: id, version },
+    });
 
     // Verify action exists
     const action =
@@ -174,7 +196,10 @@ export class Actions extends Resource {
         : await repo.getAction(this.serviceCtx.db, id);
 
     if (!action) {
-      this.serviceCtx.logger.warn('action_not_found', { action_id: id, version });
+      this.serviceCtx.logger.warn({
+        event_type: 'action_not_found',
+        metadata: { action_id: id, version },
+      });
       throw new NotFoundError(
         `Action not found: ${id}${version !== undefined ? ` version ${version}` : ''}`,
         'action',
@@ -183,7 +208,10 @@ export class Actions extends Resource {
     }
 
     await repo.deleteAction(this.serviceCtx.db, id, version);
-    this.serviceCtx.logger.info('action_deleted', { action_id: id, version });
+    this.serviceCtx.logger.info({
+      event_type: 'action_deleted',
+      metadata: { action_id: id, version },
+    });
 
     return { success: true };
   }

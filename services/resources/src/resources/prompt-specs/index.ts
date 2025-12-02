@@ -34,9 +34,9 @@ export class PromptSpecs extends Resource {
       updated_at: string;
     };
   }> {
-    this.serviceCtx.logger.info('prompt_spec_create_started', {
-      name: data.name,
-      version: data.version,
+    this.serviceCtx.logger.info({
+      event_type: 'prompt_spec_create_started',
+      metadata: { name: data.name, version: data.version },
     });
 
     try {
@@ -53,9 +53,9 @@ export class PromptSpecs extends Resource {
         tags: data.tags ?? null,
       });
 
-      this.serviceCtx.logger.info('prompt_spec_created', {
-        prompt_spec_id: promptSpec.id,
-        name: promptSpec.name,
+      this.serviceCtx.logger.info({
+        event_type: 'prompt_spec_created',
+        metadata: { prompt_spec_id: promptSpec.id, name: promptSpec.name },
       });
 
       return {
@@ -66,9 +66,9 @@ export class PromptSpecs extends Resource {
       const dbError = extractDbError(error);
 
       if (dbError.constraint === 'unique') {
-        this.serviceCtx.logger.warn('prompt_spec_create_conflict', {
-          name: data.name,
-          field: dbError.field,
+        this.serviceCtx.logger.warn({
+          event_type: 'prompt_spec_create_conflict',
+          metadata: { name: data.name, field: dbError.field },
         });
         throw new ConflictError(
           `PromptSpec with ${dbError.field} already exists`,
@@ -77,9 +77,10 @@ export class PromptSpecs extends Resource {
         );
       }
 
-      this.serviceCtx.logger.error('prompt_spec_create_failed', {
-        name: data.name,
-        error: dbError.message,
+      this.serviceCtx.logger.error({
+        event_type: 'prompt_spec_create_failed',
+        message: dbError.message,
+        metadata: { name: data.name },
       });
       throw error;
     }
@@ -105,7 +106,10 @@ export class PromptSpecs extends Resource {
       updated_at: string;
     };
   }> {
-    this.serviceCtx.logger.info('prompt_spec_get', { prompt_spec_id: id, version });
+    this.serviceCtx.logger.info({
+      event_type: 'prompt_spec_get',
+      metadata: { prompt_spec_id: id, version },
+    });
 
     const promptSpec =
       version !== undefined
@@ -113,7 +117,10 @@ export class PromptSpecs extends Resource {
         : await repo.getLatestPromptSpec(this.serviceCtx.db, id);
 
     if (!promptSpec) {
-      this.serviceCtx.logger.warn('prompt_spec_not_found', { prompt_spec_id: id, version });
+      this.serviceCtx.logger.warn({
+        event_type: 'prompt_spec_not_found',
+        metadata: { prompt_spec_id: id, version },
+      });
       throw new NotFoundError(
         `PromptSpec not found: ${id}${version !== undefined ? ` version ${version}` : ''}`,
         'prompt_spec',
@@ -141,7 +148,10 @@ export class PromptSpecs extends Resource {
       updated_at: string;
     }>;
   }> {
-    this.serviceCtx.logger.info('prompt_spec_list', params);
+    this.serviceCtx.logger.info({
+      event_type: 'prompt_spec_list',
+      metadata: params ?? {},
+    });
 
     const promptSpecs = await repo.listPromptSpecs(this.serviceCtx.db, params?.limit);
 
@@ -149,7 +159,10 @@ export class PromptSpecs extends Resource {
   }
 
   async delete(id: string, version?: number): Promise<{ success: boolean }> {
-    this.serviceCtx.logger.info('prompt_spec_delete_started', { prompt_spec_id: id, version });
+    this.serviceCtx.logger.info({
+      event_type: 'prompt_spec_delete_started',
+      metadata: { prompt_spec_id: id, version },
+    });
 
     // Verify prompt spec exists
     const promptSpec =
@@ -158,7 +171,10 @@ export class PromptSpecs extends Resource {
         : await repo.getPromptSpec(this.serviceCtx.db, id);
 
     if (!promptSpec) {
-      this.serviceCtx.logger.warn('prompt_spec_not_found', { prompt_spec_id: id, version });
+      this.serviceCtx.logger.warn({
+        event_type: 'prompt_spec_not_found',
+        metadata: { prompt_spec_id: id, version },
+      });
       throw new NotFoundError(
         `PromptSpec not found: ${id}${version !== undefined ? ` version ${version}` : ''}`,
         'prompt_spec',
@@ -167,7 +183,10 @@ export class PromptSpecs extends Resource {
     }
 
     await repo.deletePromptSpec(this.serviceCtx.db, id, version);
-    this.serviceCtx.logger.info('prompt_spec_deleted', { prompt_spec_id: id, version });
+    this.serviceCtx.logger.info({
+      event_type: 'prompt_spec_deleted',
+      metadata: { prompt_spec_id: id, version },
+    });
 
     return { success: true };
   }
