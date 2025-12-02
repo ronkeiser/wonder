@@ -9,11 +9,6 @@ import type { TaskResult } from './types.js';
  */
 export class WorkflowCoordinator extends DurableObject {
   private sessions: Set<WebSocket> = new Set();
-  private lastCompletionEvent?: {
-    kind: string;
-    payload?: Record<string, unknown>;
-    metadata?: Record<string, unknown>;
-  };
 
   /**
    * Handle HTTP requests to the Durable Object
@@ -38,14 +33,14 @@ export class WorkflowCoordinator extends DurableObject {
     if (url.pathname === '/start' && request.method === 'POST') {
       const startTime = Date.now();
       console.log(`[Coordinator START t+0ms] Received start request`);
-      
+
       const data = (await request.json()) as {
         workflow_run_id: string;
         input: Record<string, unknown>;
       };
       console.log(`[Coordinator START t+${Date.now() - startTime}ms] Parsed request body`);
 
-      // Send task to executor queue
+      // Create task
       const task = {
         workflow_run_id: data.workflow_run_id,
         token_id: 'token-' + Date.now(),
@@ -55,9 +50,17 @@ export class WorkflowCoordinator extends DurableObject {
         retry_count: 0,
       };
 
-      console.log(`[Coordinator START t+${Date.now() - startTime}ms] Sending task to TASKS queue:`, JSON.stringify(task));
-      await this.env.TASKS.send(task);
-      console.log(`[Coordinator START t+${Date.now() - startTime}ms] Task sent successfully, returning response`);
+      console.log(
+        `[Coordinator START t+${Date.now() - startTime}ms] Dispatching task via RPC:`,
+        JSON.stringify(task),
+      );
+
+      // Dispatch work async via waitUntil
+      this.ctx.waitUntil(this.processTaskAsync(task));
+
+      console.log(
+        `[Coordinator START t+${Date.now() - startTime}ms] Task dispatched, returning response`,
+      );
 
       return new Response(JSON.stringify({ status: 'started' }), {
         headers: { 'Content-Type': 'application/json' },
@@ -69,25 +72,20 @@ export class WorkflowCoordinator extends DurableObject {
     if (upgradeHeader === 'websocket') {
       const wsStartTime = Date.now();
       console.log(`[Coordinator WS t+0ms] WebSocket upgrade requested`);
-      
+
       const pair = new WebSocketPair();
       const [client, server] = Object.values(pair);
       console.log(`[Coordinator WS t+${Date.now() - wsStartTime}ms] WebSocketPair created`);
 
       this.ctx.acceptWebSocket(server);
       console.log(`[Coordinator WS t+${Date.now() - wsStartTime}ms] WebSocket accepted`);
-      
-      this.sessions.add(server);
-      console.log(`[Coordinator WS t+${Date.now() - wsStartTime}ms] WebSocket added to sessions, count: ${this.sessions.size}`);
 
-      // If workflow already completed, send the completion event immediately
-      if (this.lastCompletionEvent) {
-        console.log(`[Coordinator WS t+${Date.now() - wsStartTime}ms] Sending stored completion event to new session`);
-        server.send(JSON.stringify(this.lastCompletionEvent));
-        console.log(`[Coordinator WS t+${Date.now() - wsStartTime}ms] Stored event sent`);
-      } else {
-        console.log(`[Coordinator WS t+${Date.now() - wsStartTime}ms] No stored completion event yet`);
-      }
+      this.sessions.add(server);
+      console.log(
+        `[Coordinator WS t+${Date.now() - wsStartTime}ms] WebSocket added to sessions, count: ${
+          this.sessions.size
+        }`,
+      );
 
       return new Response(null, {
         status: 101,
@@ -147,6 +145,69 @@ export class WorkflowCoordinator extends DurableObject {
   }
 
   /**
+   * Process task asynchronously via RPC to executor
+   */
+  async processTaskAsync(task: {
+    workflow_run_id: string;
+    token_id: string;
+    node_id: string;
+    action_kind: string;
+    input_data: Record<string, unknown>;
+    retry_count: number;
+  }): Promise<void> {
+    const taskStartTime = Date.now();
+    try {
+      console.log(`[Coordinator ASYNC t+0ms] Processing task async:`, JSON.stringify(task));
+
+      // Call executor via RPC
+      console.log(`[Coordinator ASYNC t+${Date.now() - taskStartTime}ms] Calling executor RPC`);
+      const result = (await this.env.EXECUTOR.executeTask(task)) as {
+        task_id: string;
+        workflow_run_id: string;
+        token_id: string;
+        node_id: string;
+        success: boolean;
+        output_data?: Record<string, unknown>;
+        error?: string;
+        completed_at: string;
+      };
+      console.log(
+        `[Coordinator ASYNC t+${Date.now() - taskStartTime}ms] Executor RPC returned:`,
+        JSON.stringify(result),
+      );
+
+      // Process the result
+      if (result.success && result.output_data) {
+        console.log(
+          `[Coordinator ASYNC t+${Date.now() - taskStartTime}ms] Creating completion event`,
+        );
+        const completionEvent = {
+          kind: 'workflow_completed',
+          payload: {
+            full_context: {
+              output: result.output_data,
+            },
+          },
+        };
+
+        console.log(
+          `[Coordinator ASYNC t+${Date.now() - taskStartTime}ms] Broadcasting to ${
+            this.sessions.size
+          } sessions`,
+        );
+        this.broadcast(completionEvent);
+        console.log(
+          `[Coordinator ASYNC t+${Date.now() - taskStartTime}ms] Task processing complete`,
+        );
+      } else {
+        console.error(`[Coordinator ASYNC] Task failed or missing output_data`);
+      }
+    } catch (error) {
+      console.error(`[Coordinator ASYNC] Task processing failed:`, error);
+    }
+  }
+
+  /**
    * Process task results
    */
   async processResults(results: TaskResult[]): Promise<void> {
@@ -158,12 +219,13 @@ export class WorkflowCoordinator extends DurableObject {
     // For minimal implementation: skip context/token management
     // Just broadcast workflow completion event
     for (const result of results) {
-      console.log(`[Coordinator processResults t+${Date.now() - processTime}ms] Processing result:`, JSON.stringify(result));
+      console.log(
+        `[Coordinator processResults t+${Date.now() - processTime}ms] Processing result:`,
+        JSON.stringify(result),
+      );
       if (result.success && result.output_data) {
         console.log(
-          `[Coordinator processResults t+${
-            Date.now() - processTime
-          }ms] Creating completion event`,
+          `[Coordinator processResults t+${Date.now() - processTime}ms] Creating completion event`,
         );
         const completionEvent = {
           kind: 'workflow_completed',
@@ -174,27 +236,27 @@ export class WorkflowCoordinator extends DurableObject {
           },
         };
         console.log(
-          `[Coordinator processResults t+${
-            Date.now() - processTime
-          }ms] Storing completion event`,
-        );
-        this.lastCompletionEvent = completionEvent;
-        console.log(
-          `[Coordinator processResults t+${
-            Date.now() - processTime
-          }ms] Broadcasting to ${this.sessions.size} sessions`,
+          `[Coordinator processResults t+${Date.now() - processTime}ms] Broadcasting to ${
+            this.sessions.size
+          } sessions`,
         );
         this.broadcast(completionEvent);
         console.log(
-          `[Coordinator processResults t+${
-            Date.now() - processTime
-          }ms] Broadcast complete`,
+          `[Coordinator processResults t+${Date.now() - processTime}ms] Broadcast complete`,
         );
       } else {
-        console.log(`[Coordinator processResults t+${Date.now() - processTime}ms] Result not successful or missing output_data`);
+        console.log(
+          `[Coordinator processResults t+${
+            Date.now() - processTime
+          }ms] Result not successful or missing output_data`,
+        );
       }
     }
-    console.log(`[Coordinator processResults t+${Date.now() - processTime}ms] processResults method returning`);
+    console.log(
+      `[Coordinator processResults t+${
+        Date.now() - processTime
+      }ms] processResults method returning`,
+    );
   }
 
   /**

@@ -3,23 +3,6 @@
   "main": "src/index.ts",
   "compatibility_date": "2025-12-01",
 
-  "queues": {
-    "producers": [
-      {
-        "binding": "RESULTS",
-        "queue": "workflow-results"
-      }
-    ],
-    "consumers": [
-      {
-        "queue": "workflow-tasks",
-        "max_batch_size": 1,
-        "max_batch_timeout": 1,
-        "max_retries": 3
-      }
-    ]
-  },
-
   "ai": {
     "binding": "AI"
   },

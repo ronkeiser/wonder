@@ -2,7 +2,9 @@
   "name": "wonderful",
   "version": "0.0.1",
   "private": true,
-  "scripts": {},
+  "scripts": {
+    "types": "pnpm run --parallel --filter \"./services/*\" types"
+  },
   "engines": {
     "node": ">=24.0.0",
     "pnpm": ">=10.0.0"

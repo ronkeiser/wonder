@@ -1,12 +1,14 @@
+import { WorkerEntrypoint } from 'cloudflare:workers';
+
 /**
  * Wonder Executor Service
  *
- * Queue consumer for workflow task execution.
+ * RPC-based task execution service.
  * Executes actions (LLM calls, HTTP requests, etc.) and returns results.
  */
 
 /**
- * WorkflowTask - Message format for queue
+ * WorkflowTask - Task format for RPC
  */
 interface WorkflowTask {
   workflow_run_id: string;
@@ -18,66 +20,70 @@ interface WorkflowTask {
 }
 
 /**
- * Queue consumer - processes workflow tasks
+ * TaskResult - Result format returned via RPC
  */
-export default {
-  async queue(batch: MessageBatch<WorkflowTask>, env: Env, ctx: ExecutionContext): Promise<void> {
+interface TaskResult {
+  task_id: string;
+  workflow_run_id: string;
+  token_id: string;
+  node_id: string;
+  success: boolean;
+  output_data?: Record<string, unknown>;
+  error?: string;
+  completed_at: string;
+}
+
+/**
+ * Executor service with RPC methods
+ */
+export default class ExecutorService extends WorkerEntrypoint<Env> {
+  /**
+   * RPC method - execute a task and return the result
+   */
+  async executeTask(task: WorkflowTask): Promise<TaskResult> {
     const executorStartTime = Date.now();
-    console.log(`[Executor t+0ms] Queue handler called!`);
-    console.log(`[Executor t+0ms] Processing batch of ${batch.messages.length} tasks`);
+    console.log(`[Executor RPC t+0ms] executeTask called:`, JSON.stringify(task));
 
-    for (const message of batch.messages) {
-      const task = message.body;
+    try {
+      // Execute the action based on kind
+      console.log(`[Executor RPC t+${Date.now() - executorStartTime}ms] Executing action`);
+      const result = await executeAction(task, this.env);
+      console.log(
+        `[Executor RPC t+${Date.now() - executorStartTime}ms] Action completed:`,
+        JSON.stringify(result),
+      );
 
-      try {
-        console.log(
-          `[Executor t+${Date.now() - executorStartTime}ms] Executing task:`,
-          JSON.stringify(task),
-        );
+      const taskResult: TaskResult = {
+        task_id: `task-${task.token_id}-${Date.now()}`,
+        workflow_run_id: task.workflow_run_id,
+        token_id: task.token_id,
+        node_id: task.node_id,
+        success: true,
+        output_data: result,
+        completed_at: new Date().toISOString(),
+      };
 
-        // Execute the action based on kind
-        const result = await executeAction(task, env);
+      console.log(`[Executor RPC t+${Date.now() - executorStartTime}ms] Returning result`);
+      return taskResult;
+    } catch (error) {
+      console.error(`[Executor RPC] Task execution failed:`, error);
 
-        console.log(
-          `[Executor t+${Date.now() - executorStartTime}ms] Task completed successfully:`,
-          JSON.stringify(result),
-        );
-
-        // Send result back to coordinator via results queue
-        const taskResult = {
-          task_id: `task-${task.token_id}-${Date.now()}`,
-          workflow_run_id: task.workflow_run_id,
-          token_id: task.token_id,
-          node_id: task.node_id,
-          success: true,
-          output_data: result,
-          completed_at: new Date().toISOString(),
-        };
-
-        console.log(
-          `[Executor t+${Date.now() - executorStartTime}ms] Sending result to RESULTS queue:`,
-          JSON.stringify(taskResult),
-        );
-        await env.RESULTS.send(taskResult);
-        console.log(`[Executor t+${Date.now() - executorStartTime}ms] Result sent successfully`);
-
-        // Acknowledge the message only after result is queued
-        message.ack();
-        console.log(`[Executor t+${Date.now() - executorStartTime}ms] Message acknowledged`);
-      } catch (error) {
-        console.error(`[Executor] Task execution failed:`, error);
-
-        // Retry the message (don't ack on failure)
-        message.retry();
-        console.log(`[Executor] Message will be retried`);
-      }
+      return {
+        task_id: `task-${task.token_id}-${Date.now()}`,
+        workflow_run_id: task.workflow_run_id,
+        token_id: task.token_id,
+        node_id: task.node_id,
+        success: false,
+        error: error instanceof Error ? error.message : String(error),
+        completed_at: new Date().toISOString(),
+      };
     }
-  },
+  }
 
   /**
    * HTTP handler for testing/health checks
    */
-  async fetch(request: Request, env: Env): Promise<Response> {
+  async fetch(request: Request): Promise<Response> {
     const url = new URL(request.url);
 
     if (url.pathname === '/health') {
@@ -96,43 +102,40 @@ export default {
     return new Response(
       JSON.stringify({
         message: 'Wonder Executor Service',
-        note: 'This service processes tasks from the workflow-tasks queue',
+        note: 'This service executes tasks via RPC',
       }),
       {
         headers: { 'Content-Type': 'application/json' },
       },
     );
-  },
-};
-
+  }
+}
 /**
  * Execute an action based on its kind
  */
 async function executeAction(task: WorkflowTask, env: Env): Promise<Record<string, unknown>> {
   switch (task.action_kind) {
     case 'llm_call':
-      // TEMPORARILY MOCKED - Workers AI call suspended for timing test
       const aiStartTime = Date.now();
       const prompt = `You are a friendly assistant. User said: "${
         task.input_data.name || 'Hello'
       }". Respond in a warm, welcoming way.`;
 
-      console.log(`[Executor AI t+0ms] MOCK: Skipping Workers AI call`);
-      
-      // Mock response instead of actual AI call
-      // const response = (await env.AI.run('@cf/meta/llama-3.1-8b-instruct' as any, {
-      //   messages: [
-      //     {
-      //       role: 'user',
-      //       content: prompt,
-      //     },
-      //   ],
-      // })) as any;
-      
-      console.log(`[Executor AI t+${Date.now() - aiStartTime}ms] MOCK: Returning mock response`);
+      console.log(`[Executor AI t+0ms] Calling Workers AI`);
+
+      const response = (await env.AI.run('@cf/meta/llama-3.1-8b-instruct' as any, {
+        messages: [
+          {
+            role: 'user',
+            content: prompt,
+          },
+        ],
+      })) as any;
+
+      console.log(`[Executor AI t+${Date.now() - aiStartTime}ms] Workers AI call completed`);
 
       return {
-        response: `MOCK: Hello! This is a mock response for testing timing. Input was: ${task.input_data.name || 'Hello'}`,
+        response: response?.response || 'Hello! How can I help you today?',
       };
 
     case 'http_request':

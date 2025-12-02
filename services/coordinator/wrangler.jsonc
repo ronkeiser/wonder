@@ -11,24 +11,12 @@
       }
     ]
   },
-  "queues": {
-    "producers": [
-      {
-        "binding": "TASKS",
-        "queue": "workflow-tasks"
-      }
-    ],
-    "consumers": [
-      {
-        "queue": "workflow-results",
-        "max_batch_size": 1,
-        "max_batch_timeout": 1,
-        "max_retries": 3,
-        "max_concurrency": 5,
-        "dead_letter_queue": "workflow-results-dlq"
-      }
-    ]
-  },
+  "services": [
+    {
+      "binding": "EXECUTOR",
+      "service": "wonder-executor"
+    }
+  ],
   "migrations": [
     {
       "tag": "v1",
