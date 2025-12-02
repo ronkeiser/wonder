@@ -1,4 +1,5 @@
 {
+  "$schema": "./node_modules/wrangler/config-schema.json",
   "name": "wonder-ducky",
   "main": "src/index.ts",
   "compatibility_date": "2025-12-01",

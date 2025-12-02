@@ -7,13 +7,18 @@
     "dev": "wrangler dev",
     "deploy": "wrangler deploy",
     "types": "wrangler types -c wrangler.jsonc",
+    "db:generate": "drizzle-kit generate",
+    "db:migrate:local": "wrangler d1 migrations apply wonder-logs --local",
+    "db:migrate:remote": "wrangler d1 migrations apply wonder-logs --remote",
+    "db:studio": "drizzle-kit studio",
     "test": "vitest"
   },
   "dependencies": {
-    "@wonder/logger": "workspace:*"
+    "drizzle-orm": "^0.44.7"
   },
   "devDependencies": {
     "@cloudflare/vitest-pool-workers": "^0.10.11",
+    "drizzle-kit": "^0.31.7",
     "wrangler": "^4.51.0"
   }
 }

@@ -1,7 +1,17 @@
 {
+  "$schema": "./node_modules/wrangler/config-schema.json",
   "name": "wonder-logs",
   "main": "src/index.ts",
   "compatibility_date": "2025-12-01",
+
+  "d1_databases": [
+    {
+      "binding": "DB",
+      "database_name": "wonder-logs",
+      "database_id": "6b9dfbac-506a-4efa-8118-0bee9f0946ea",
+      "migrations_dir": "./src/db/migrations"
+    }
+  ],
 
   "observability": {
     "enabled": true
