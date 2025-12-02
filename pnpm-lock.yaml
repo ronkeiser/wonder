@@ -69,6 +69,12 @@ importers:
 
   services/coordinator:
     dependencies:
+      '@wonder/events':
+        specifier: workspace:*
+        version: link:../events
+      '@wonder/logs':
+        specifier: workspace:*
+        version: link:../logs
       '@wonder/schema':
         specifier: workspace:*
         version: link:../../packages/schema

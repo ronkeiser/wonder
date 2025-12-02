@@ -16,6 +16,14 @@
     {
       "binding": "EXECUTOR",
       "service": "wonder-executor"
+    },
+    {
+      "binding": "LOGS",
+      "service": "wonder-logs"
+    },
+    {
+      "binding": "EVENTS",
+      "service": "wonder-events"
     }
   ],
   "migrations": [
