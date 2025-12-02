@@ -27,24 +27,19 @@ export interface FullLogEntry extends LogEntry, LogContext {
   timestamp: number;
 }
 
-// Logger wrapper with baked-in context
-export class Logger {
-  constructor(private service: LogsService, private context: LogContext) {}
-
-  async write(entry: LogEntry): Promise<void> {
-    return this.service.write({ ...this.context, ...entry });
-  }
-}
-
 // Main service
 export class LogsService extends WorkerEntrypoint<Env> {
-  // Factory method - returns Logger with context
-  newLogger(context: LogContext): Logger {
-    return new Logger(this, context);
+  // Factory method - returns a function with context baked in
+  newLogger(context: LogContext) {
+    return (entry: LogEntry) => {
+      return this.write({ ...context, ...entry });
+    };
   }
 
   // RPC method - writes log to D1
   async write(entry: LogEntry & Partial<LogContext>): Promise<void> {
+    console.log('[LOGS SERVICE] Received log entry from:', entry.service);
+
     const fullEntry: FullLogEntry = {
       id: crypto.randomUUID(),
       timestamp: Date.now(),
@@ -68,7 +63,7 @@ export class LogsService extends WorkerEntrypoint<Env> {
     // await this.env.DB.prepare('INSERT INTO logs ...').bind(...).run();
 
     // For now, just log to console
-    console.log('[LOGS]', JSON.stringify(fullEntry));
+    console.log('[LOGS SERVICE] Writing:', JSON.stringify(fullEntry, null, 2));
   }
 }
 

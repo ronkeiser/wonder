@@ -28,7 +28,7 @@ export default class DuckyService extends WorkerEntrypoint<Env> {
       environment: 'development',
     });
 
-    await logger.write({
+    await logger({
       level: 'info',
       event_type: 'quack_called',
       message: 'Ducky says quack!',
@@ -43,7 +43,7 @@ export default class DuckyService extends WorkerEntrypoint<Env> {
       environment: 'development',
     });
 
-    await logger.write({
+    await logger({
       level: 'info',
       event_type: 'swim_started',
       message: `Swimming ${distance}m`,
@@ -52,7 +52,7 @@ export default class DuckyService extends WorkerEntrypoint<Env> {
 
     // Simulate swimming
     if (distance > 1000) {
-      await logger.write({
+      await logger({
         level: 'warn',
         event_type: 'swim_distance_high',
         message: 'Swimming a long distance',
@@ -60,7 +60,7 @@ export default class DuckyService extends WorkerEntrypoint<Env> {
       });
     }
 
-    await logger.write({
+    await logger({
       level: 'info',
       event_type: 'swim_completed',
       message: 'Swim complete',
