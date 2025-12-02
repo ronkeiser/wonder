@@ -7,6 +7,7 @@ import { OpenAPIHono } from '@hono/zod-openapi';
 import { cors } from 'hono/cors';
 import { actions } from './routes/actions';
 import { coordinator } from './routes/coordinator';
+import { logs } from './routes/logs';
 import { modelProfiles } from './routes/model-profiles';
 import { projects } from './routes/projects';
 import { promptSpecs } from './routes/prompt-specs';
@@ -37,7 +38,8 @@ const routes = app
   .route('/api/model-profiles', modelProfiles)
   .route('/api/workflow-defs', workflowDefs)
   .route('/api/workflows', workflows)
-  .route('/api/coordinator', coordinator);
+  .route('/api/coordinator', coordinator)
+  .route('/api/logs', logs);
 
 // OpenAPI documentation
 routes.doc('/doc', {

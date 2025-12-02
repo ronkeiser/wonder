@@ -8,6 +8,11 @@
       "binding": "RESOURCES",
       "service": "wonder-resources",
       "entrypoint": "WonderResources"
+    },
+    {
+      "binding": "LOGS",
+      "service": "wonder-logs",
+      "entrypoint": "LogsService"
     }
   ],
   "durable_objects": {

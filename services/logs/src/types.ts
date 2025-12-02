@@ -43,3 +43,15 @@ export interface Logger {
   debug(input: LoggerInput | string): void;
   fatal(input: LoggerInput | string): void;
 }
+
+export interface GetLogsOptions {
+  service?: string;
+  level?: LogLevel;
+  event_type?: string;
+  trace_id?: string;
+  request_id?: string;
+  workspace_id?: string;
+  project_id?: string;
+  user_id?: string;
+  limit?: number;
+}
