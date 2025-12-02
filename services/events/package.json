@@ -1,5 +1,5 @@
 {
-  "name": "@wonder/logs",
+  "name": "@wonder/events",
   "version": "0.0.1",
   "private": true,
   "type": "module",
@@ -12,8 +12,8 @@
     "deploy": "wrangler deploy",
     "types": "wrangler types -c wrangler.jsonc",
     "db:generate": "drizzle-kit generate",
-    "db:migrate:local": "wrangler d1 migrations apply wonder-logs --local",
-    "db:migrate:remote": "wrangler d1 migrations apply wonder-logs --remote",
+    "db:migrate:local": "wrangler d1 migrations apply wonder-events --local",
+    "db:migrate:remote": "wrangler d1 migrations apply wonder-events --remote",
     "db:studio": "drizzle-kit studio",
     "test": "vitest"
   },

@@ -9,9 +9,7 @@
     "types": "wrangler types -c wrangler.jsonc -c ../logs/wrangler.jsonc",
     "test": "vitest"
   },
-  "dependencies": {
-    "@wonder/logger": "workspace:*"
-  },
+  "dependencies": {},
   "devDependencies": {
     "@cloudflare/vitest-pool-workers": "^0.10.11",
     "wrangler": "^4.51.0"

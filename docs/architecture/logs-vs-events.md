@@ -8,7 +8,7 @@ Ask "Why am I recording this?"
 
 **Purpose:** Debug service problems, track operations, investigate errors
 
-**Package:** `@wonder/logger`  
+**Package:** `@wonder/logs`  
 **Storage:** D1 (operational database)  
 **Retention:** 30 days → R2 archive
 
@@ -106,7 +106,7 @@ Operational only:
           │                   │
           ▼                   ▼
 ┌──────────────────┐  ┌──────────────────┐
-│  @wonder/logger  │  │  Event Service   │
+│  @wonder/logs    │  │  Event Service   │
 │                  │  │   (DO + RPC)     │
 └─────────┬────────┘  └────────┬─────────┘
           │                    │
@@ -145,8 +145,8 @@ WHERE request_id = 'req_abc123'
 WHERE workflow_run_id = 'run_xyz789' ORDER BY timestamp
 
 -- LLM cost analysis
-WHERE event_type = 'llm_call_completed' 
-  AND timestamp > ? 
+WHERE event_type = 'llm_call_completed'
+  AND timestamp > ?
   GROUP BY workspace_id
 
 -- Fan-out performance
