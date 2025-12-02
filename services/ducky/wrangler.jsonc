@@ -8,6 +8,10 @@
     {
       "binding": "LOGS",
       "service": "wonder-logs"
+    },
+    {
+      "binding": "EVENTS",
+      "service": "wonder-events"
     }
   ],
 

@@ -64,6 +64,7 @@ export class EventsService extends WorkerEntrypoint<Env> {
    * RPC method - writes event to D1
    */
   write(context: EventContext, input: EventInput): void {
+    console.log('BAOASDDD: ', input);
     this.ctx.waitUntil(
       (async () => {
         const eventEntry = {

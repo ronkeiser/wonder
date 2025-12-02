@@ -90,6 +90,10 @@ importers:
         version: 4.51.0(@cloudflare/workers-types@4.20251127.0)
 
   services/ducky:
+    dependencies:
+      ulid:
+        specifier: ^2.3.0
+        version: 2.4.0
     devDependencies:
       '@cloudflare/vitest-pool-workers':
         specifier: ^0.10.11
