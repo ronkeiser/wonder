@@ -12,10 +12,6 @@ import {
   unique,
 } from 'drizzle-orm/sqlite-core';
 
-/** Infrastructure */
-
-export { logs } from '@wonder/logger/schema';
-
 /** Workspace & Project */
 
 export const workspaces = sqliteTable('workspaces', {
