@@ -23,12 +23,12 @@ export default class DuckyService extends WorkerEntrypoint<Env> {
   }
 
   async quack(): Promise<string> {
-    const logger = this.env.LOGS.newLogger({
+    const logger = await this.env.LOGS.newLogger({
       service: 'ducky',
       environment: 'development',
     });
 
-    await logger({
+    logger({
       level: 'info',
       event_type: 'quack_called',
       message: 'Ducky says quack!',

@@ -9,7 +9,8 @@
       "binding": "DB",
       "database_name": "wonder-logs",
       "database_id": "6b9dfbac-506a-4efa-8118-0bee9f0946ea",
-      "migrations_dir": "./src/db/migrations"
+      "migrations_dir": "./src/db/migrations",
+      "remote": true
     }
   ],
 
