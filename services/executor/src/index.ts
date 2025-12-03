@@ -1,4 +1,3 @@
-import type { Logger } from '@wonder/logs';
 import { WorkerEntrypoint } from 'cloudflare:workers';
 
 /**
@@ -22,29 +21,27 @@ export interface LLMCallResult {
  * Executor service with RPC methods
  */
 export default class ExecutorService extends WorkerEntrypoint<Env> {
+  private readonly loggerConfig = {
+    service: 'wonder-executor',
+    environment: 'production',
+  } as const;
+
   /**
    * RPC method - call LLM with given parameters
    */
   async llmCall(params: LLMCallParams): Promise<LLMCallResult> {
+    const logger = this.env.LOGS.newLogger(this.loggerConfig);
     const startTime = Date.now();
 
-    // Use writeSync to ensure logs persist before RPC returns
-    await this.env.LOGS.writeSync(
-      {
-        service: 'wonder-executor',
-        environment: 'production',
+    await logger.info({
+      event_type: 'llm_call_started',
+      message: 'LLM call started',
+      metadata: {
+        model: params.model,
+        prompt_length: params.prompt.length,
+        temperature: params.temperature,
       },
-      'info',
-      {
-        event_type: 'llm_call_started',
-        message: 'LLM call started',
-        metadata: {
-          model: params.model,
-          prompt_length: params.prompt.length,
-          temperature: params.temperature,
-        },
-      },
-    );
+    });
 
     try {
       const response = (await this.env.AI.run(params.model as any, {
@@ -62,41 +59,27 @@ export default class ExecutorService extends WorkerEntrypoint<Env> {
         response: response?.response || 'No response from LLM',
       };
 
-      await this.env.LOGS.writeSync(
-        {
-          service: 'wonder-executor',
-          environment: 'production',
+      await logger.info({
+        event_type: 'llm_call_completed',
+        message: 'LLM call completed successfully',
+        metadata: {
+          model: params.model,
+          duration_ms: duration,
+          response_length: result.response.length,
         },
-        'info',
-        {
-          event_type: 'llm_call_completed',
-          message: 'LLM call completed successfully',
-          metadata: {
-            model: params.model,
-            duration_ms: duration,
-            response_length: result.response.length,
-          },
-        },
-      );
+      });
 
       return result;
     } catch (error) {
-      await this.env.LOGS.writeSync(
-        {
-          service: 'wonder-executor',
-          environment: 'production',
+      await logger.error({
+        event_type: 'llm_call_failed',
+        message: 'LLM call failed',
+        metadata: {
+          model: params.model,
+          duration_ms: Date.now() - startTime,
+          error: error instanceof Error ? error.message : String(error),
         },
-        'error',
-        {
-          event_type: 'llm_call_failed',
-          message: 'LLM call failed',
-          metadata: {
-            model: params.model,
-            duration_ms: Date.now() - startTime,
-            error: error instanceof Error ? error.message : String(error),
-          },
-        },
-      );
+      });
       throw error;
     }
   }
