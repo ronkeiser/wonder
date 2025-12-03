@@ -76,12 +76,12 @@ export class WorkflowCoordinator extends DurableObject {
   }
 
   /**
-   * Process a token by executing its node and creating transition tokens
+   * Dispatch a token for execution - prepares task and calls executor
    */
-  private async processToken(token_id: string): Promise<void> {
+  private async dispatchToken(token_id: string): Promise<void> {
     const logger = this.getLogger();
 
-    // Step 7: Fetch the token's node from the workflow definition
+    // Fetch the token's node from the workflow definition
     const tokenRow = this.ctx.storage.sql.exec(
       `SELECT node_id, workflow_run_id FROM tokens WHERE id = ?`,
       token_id
@@ -119,7 +119,7 @@ export class WorkflowCoordinator extends DurableObject {
       },
     });
 
-    // Step 8: Fetch the action definition
+    // Fetch the action definition
     using actions = this.env.RESOURCES.actions();
     const actionResult = await actions.get(node.action_id, node.action_version);
 
@@ -135,7 +135,7 @@ export class WorkflowCoordinator extends DurableObject {
       },
     });
 
-    // Step 9: Route to appropriate executor action based on kind
+    // Route to appropriate executor action based on kind
     let actionResult_output: Record<string, unknown>;
 
     switch (actionResult.action.kind) {
@@ -189,33 +189,75 @@ export class WorkflowCoordinator extends DurableObject {
         // Render template with context
         const prompt = renderTemplate(promptSpecResult.prompt_spec.template, templateContext);
 
-        const result = await this.env.EXECUTOR.llmCall({
-          model: implementation.model || '@cf/meta/llama-3.1-8b-instruct',
-          prompt,
-          temperature: implementation.temperature,
+        // Mark token as executing
+        const executingAt = new Date().toISOString();
+        this.ctx.storage.sql.exec(
+          `UPDATE tokens SET status = ?, updated_at = ? WHERE id = ?`,
+          'executing',
+          executingAt,
+          token_id,
+        );
+
+        logger.info({
+          event_type: 'token_executing',
+          message: 'Token status updated to executing',
+          trace_id: workflow_run_id,
+          metadata: {
+            token_id,
+            node_id: node.id,
+            status: 'executing',
+          },
         });
 
-        actionResult_output = { response: result.response };
-        break;
+        // Fire-and-forget to executor - executor will callback to handleTaskResult
+        this.ctx.waitUntil(
+          this.env.EXECUTOR.llmCall({
+            model: implementation.model || '@cf/meta/llama-3.1-8b-instruct',
+            prompt,
+            temperature: implementation.temperature,
+            workflow_run_id,
+            token_id,
+          })
+        );
+
+        logger.info({
+          event_type: 'task_dispatched',
+          message: 'Task dispatched to executor (fire-and-forget)',
+          trace_id: workflow_run_id,
+          metadata: {
+            token_id,
+            node_id: node.id,
+            action_kind: actionResult.action.kind,
+          },
+        });
+
+        return; // Don't wait - executor will callback
       }
 
       default:
         throw new Error(`Unsupported action kind: ${actionResult.action.kind}`);
     }
+  }
 
-    logger.info({
-      event_type: 'action_executed',
-      message: 'Action executed by executor service',
-      trace_id: workflow_run_id,
-      metadata: {
-        token_id,
-        node_id: node.id,
-        action_kind: actionResult.action.kind,
-        output_data: actionResult_output,
-      },
-    });
+  /**
+   * Handle task result from executor - applies output and advances tokens (RPC method)
+   */
+  async handleTaskResult(
+    token_id: string,
+    result: { output_data: Record<string, unknown> }
+  ): Promise<void> {
+    const logger = this.getLogger();
 
-    // Step 10: Update token status to completed
+    // Fetch token info
+    const tokenRow = this.ctx.storage.sql.exec(
+      `SELECT node_id, workflow_run_id FROM tokens WHERE id = ?`,
+      token_id
+    ).one();
+
+    const workflow_run_id = tokenRow.workflow_run_id as string;
+    const node_id = tokenRow.node_id as string;
+
+    // Update token status to completed
     const completedAt = new Date().toISOString();
     this.ctx.storage.sql.exec(
       `UPDATE tokens SET status = ?, updated_at = ? WHERE id = ?`,
@@ -230,15 +272,15 @@ export class WorkflowCoordinator extends DurableObject {
       trace_id: workflow_run_id,
       metadata: {
         token_id,
-        node_id: node.id,
+        node_id,
         status: 'completed',
         updated_at: completedAt,
       },
     });
 
-    // Step 11: Store action output in context
-    for (const [key, value] of Object.entries(actionResult_output)) {
-      const contextPath = `${node.id}_output.${key}`;
+    // Store action output in context
+    for (const [key, value] of Object.entries(result.output_data)) {
+      const contextPath = `${node_id}_output.${key}`;
       this.ctx.storage.sql.exec(
         `INSERT OR REPLACE INTO context (path, value) VALUES (?, ?)`,
         contextPath,
@@ -252,15 +294,25 @@ export class WorkflowCoordinator extends DurableObject {
       trace_id: workflow_run_id,
       metadata: {
         token_id,
-        node_id: node.id,
-        output_keys: Object.keys(actionResult_output),
-        context_paths: Object.keys(actionResult_output).map(key => `${node.id}_output.${key}`),
+        node_id,
+        output_keys: Object.keys(result.output_data),
+        context_paths: Object.keys(result.output_data).map(key => `${node_id}_output.${key}`),
       },
     });
 
-    // Step 12: Query for transitions from completed node
+    // Fetch workflow definition for transitions
+    using workflowRuns = this.env.RESOURCES.workflowRuns();
+    const workflowRun = await workflowRuns.get(workflow_run_id);
+
+    using workflowDefs = this.env.RESOURCES.workflowDefs();
+    const workflowDef = await workflowDefs.get(
+      workflowRun.workflow_run.workflow_def_id,
+      workflowRun.workflow_run.workflow_version,
+    );
+
+    // Query for transitions from completed node
     const transitions = workflowDef.transitions.filter(
-      (t: any) => t.from_node_id === node.id
+      (t: any) => t.from_node_id === node_id
     );
 
     logger.info({
@@ -269,7 +321,7 @@ export class WorkflowCoordinator extends DurableObject {
       trace_id: workflow_run_id,
       metadata: {
         token_id,
-        node_id: node.id,
+        node_id,
         transition_count: transitions.length,
         transitions: transitions.map((t: any) => ({
           id: t.id,
@@ -280,7 +332,7 @@ export class WorkflowCoordinator extends DurableObject {
       },
     });
 
-    // Step 13: Create tokens for all outgoing transitions
+    // Create tokens for all outgoing transitions
     for (const transition of transitions) {
       const nextTokenId = this.createToken(
         workflow_run_id,
@@ -450,8 +502,8 @@ export class WorkflowCoordinator extends DurableObject {
         },
       });
 
-      // Step 7: Process the initial token
-      await this.processToken(token_id);
+      // Step 7: Dispatch the initial token for execution
+      await this.dispatchToken(token_id);
 
       logger.info({
         event_type: 'coordinator_start_completed',
