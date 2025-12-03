@@ -402,6 +402,32 @@ export class WorkflowCoordinator extends DurableObject {
       },
     });
 
+    // Step 13: Create tokens for all outgoing transitions
+    for (const transition of transitions) {
+      const nextTokenId = this.createToken(
+        workflow_run_id,
+        transition.to_node_id,
+        token_id, // parent_token_id: current completed token
+        '', // path_id: same as parent for now
+        null, // fan_out_node_id: null for simple linear flow
+        0, // branch_index: 0 for single branch
+        1, // branch_total: 1 for single branch
+      );
+
+      logger.info({
+        event_type: 'transition_token_created',
+        message: 'Token created for transition target node',
+        trace_id: workflow_run_id,
+        metadata: {
+          parent_token_id: token_id,
+          new_token_id: nextTokenId,
+          transition_id: transition.id,
+          from_node_id: transition.from_node_id,
+          to_node_id: transition.to_node_id,
+        },
+      });
+    }
+
       logger.info({
         event_type: 'coordinator_start_completed',
         message: 'Coordinator.start() completed',
