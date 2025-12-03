@@ -238,8 +238,8 @@ export class WorkflowCoordinator extends DurableObject {
         token_id: taskResult.token_id,
         node_id: taskResult.node_id,
         success: taskResult.success,
-        has_output: !!taskResult.output_data,
-        has_error: !!taskResult.error,
+        output_data: taskResult.output_data,
+        error: taskResult.error,
       },
     });
 
