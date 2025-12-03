@@ -198,6 +198,25 @@ export class WorkflowCoordinator extends DurableObject {
       metadata: { workflow_run_id },
     });
 
+    // Step 8: Initialize context with workflow input
+    for (const [key, value] of Object.entries(input)) {
+      this.ctx.storage.sql.exec(
+        `INSERT INTO context (path, value) VALUES (?, ?)`,
+        `input.${key}`,
+        JSON.stringify(value),
+      );
+    }
+
+    logger.info({
+      event_type: 'context_initialized',
+      message: 'Context initialized with workflow input',
+      trace_id: workflow_run_id,
+      metadata: {
+        workflow_run_id,
+        input_keys: Object.keys(input),
+      },
+    });
+
     logger.info({
       event_type: 'coordinator_start_completed',
       message: 'Coordinator.start() completed',
