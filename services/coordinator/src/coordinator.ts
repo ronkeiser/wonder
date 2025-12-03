@@ -1,5 +1,6 @@
 import type { Logger } from '@wonder/logs';
 import { DurableObject } from 'cloudflare:workers';
+import { ulid } from 'ulid';
 
 /**
  * WorkflowCoordinator Durable Object
@@ -129,6 +130,54 @@ export class WorkflowCoordinator extends DurableObject {
       message: 'Tokens table created successfully',
       trace_id: workflow_run_id,
       metadata: { workflow_run_id },
+    });
+
+    // Step 4: Create and insert initial token
+    const token_id = ulid();
+    const now = new Date().toISOString();
+
+    logger.info({
+      event_type: 'creating_initial_token',
+      message: 'Creating initial token for workflow execution',
+      trace_id: workflow_run_id,
+      metadata: {
+        token_id,
+        workflow_run_id,
+        node_id: workflowDef.workflow_def.initial_node_id,
+        status: 'pending',
+      },
+    });
+
+    this.ctx.storage.sql.exec(
+      `INSERT INTO tokens (
+        id, workflow_run_id, node_id, status, path_id,
+        parent_token_id, fan_out_node_id, branch_index, branch_total,
+        created_at, updated_at
+      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+      token_id,
+      workflow_run_id,
+      workflowDef.workflow_def.initial_node_id,
+      'pending',
+      '', // path_id: empty string for root
+      null, // parent_token_id: null for initial token
+      null, // fan_out_node_id: null for initial token
+      0, // branch_index: 0 for single branch
+      1, // branch_total: 1 for single branch
+      now, // created_at
+      now, // updated_at
+    );
+
+    logger.info({
+      event_type: 'initial_token_created',
+      message: 'Initial token created and inserted',
+      trace_id: workflow_run_id,
+      metadata: {
+        token_id,
+        workflow_run_id,
+        node_id: workflowDef.workflow_def.initial_node_id,
+        status: 'pending',
+        path_id: '',
+      },
     });
 
     // Success for now
