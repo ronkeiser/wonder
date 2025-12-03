@@ -3,6 +3,15 @@ import { DurableObject } from 'cloudflare:workers';
 import { ulid } from 'ulid';
 
 /**
+ * Simple template renderer for {{variable}} syntax
+ */
+function renderTemplate(template: string, context: Record<string, unknown>): string {
+  return template.replace(/\{\{(\w+)\}\}/g, (match, varName) => {
+    return String(context[varName] ?? '');
+  });
+}
+
+/**
  * WorkflowCoordinator Durable Object
  *
  * Minimal hello world implementation.
@@ -241,9 +250,37 @@ export class WorkflowCoordinator extends DurableObject {
           },
         });
 
-        const prompt = `You are a friendly assistant. User said: "${
-          input.name || 'Hello'
-        }". Respond in a warm, welcoming way.`;
+        // Evaluate input_mapping to build template context
+        const templateContext: Record<string, unknown> = {};
+        if (initialNode.input_mapping) {
+          for (const [varName, jsonPath] of Object.entries(initialNode.input_mapping)) {
+            // Simple JSONPath evaluation for $.input.* and $.nodeId_output.*
+            const pathStr = jsonPath as string;
+            if (pathStr.startsWith('$.')) {
+              const contextPath = pathStr.slice(2); // Remove $.
+              const row = this.ctx.storage.sql.exec(
+                `SELECT value FROM context WHERE path = ?`,
+                contextPath
+              ).one();
+              if (row) {
+                templateContext[varName] = JSON.parse(row.value as string);
+              }
+            }
+          }
+        }
+
+        logger.info({
+          event_type: 'input_mapping_evaluated',
+          message: 'Input mapping evaluated for prompt rendering',
+          trace_id: workflow_run_id,
+          metadata: {
+            input_mapping: initialNode.input_mapping,
+            template_context: templateContext,
+          },
+        });
+
+        // Render template with context
+        const prompt = renderTemplate(promptSpecResult.prompt_spec.template, templateContext);
 
         const result = await this.env.EXECUTOR.llmCall({
           model: implementation.model || '@cf/meta/llama-3.1-8b-instruct',
