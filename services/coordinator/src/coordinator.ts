@@ -47,13 +47,6 @@ export class WorkflowCoordinator extends DurableObject {
     });
 
     // Step 1: Fetch workflow run metadata from Resources service
-    logger.info({
-      event_type: 'fetching_workflow_run',
-      message: 'Fetching workflow run metadata',
-      trace_id: workflow_run_id,
-      metadata: { workflow_run_id },
-    });
-
     using workflowRuns = this.env.RESOURCES.workflowRuns();
     const workflowRun = await workflowRuns.get(workflow_run_id);
 
@@ -72,16 +65,6 @@ export class WorkflowCoordinator extends DurableObject {
     });
 
     // Step 2: Fetch WorkflowDef to get initial node and schema
-    logger.info({
-      event_type: 'fetching_workflow_def',
-      message: 'Fetching workflow definition',
-      trace_id: workflow_run_id,
-      metadata: {
-        workflow_def_id: workflowRun.workflow_run.workflow_def_id,
-        workflow_version: workflowRun.workflow_run.workflow_version,
-      },
-    });
-
     using workflowDefs = this.env.RESOURCES.workflowDefs();
     const workflowDef = await workflowDefs.get(
       workflowRun.workflow_run.workflow_def_id,
@@ -102,13 +85,6 @@ export class WorkflowCoordinator extends DurableObject {
     });
 
     // Step 3: Create tokens table in SQLite
-    logger.info({
-      event_type: 'creating_tokens_table',
-      message: 'Creating tokens table in SQLite',
-      trace_id: workflow_run_id,
-      metadata: { workflow_run_id },
-    });
-
     this.ctx.storage.sql.exec(`
       CREATE TABLE IF NOT EXISTS tokens (
         id TEXT PRIMARY KEY,
@@ -135,18 +111,6 @@ export class WorkflowCoordinator extends DurableObject {
     // Step 4: Create and insert initial token
     const token_id = ulid();
     const now = new Date().toISOString();
-
-    logger.info({
-      event_type: 'creating_initial_token',
-      message: 'Creating initial token for workflow execution',
-      trace_id: workflow_run_id,
-      metadata: {
-        token_id,
-        workflow_run_id,
-        node_id: workflowDef.workflow_def.initial_node_id,
-        status: 'pending',
-      },
-    });
 
     this.ctx.storage.sql.exec(
       `INSERT INTO tokens (
@@ -180,7 +144,6 @@ export class WorkflowCoordinator extends DurableObject {
       },
     });
 
-    // Success for now
     logger.info({
       event_type: 'coordinator_start_completed',
       message: 'Coordinator.start() completed',
