@@ -351,6 +351,28 @@ export class WorkflowCoordinator extends DurableObject {
       },
     });
 
+    // Step 12: Query for transitions from completed node
+    const transitions = workflowDef.transitions.filter(
+      (t: any) => t.from_node_id === initialNode.id
+    );
+
+    logger.info({
+      event_type: 'transitions_queried',
+      message: 'Transitions queried for completed node',
+      trace_id: workflow_run_id,
+      metadata: {
+        token_id,
+        node_id: initialNode.id,
+        transition_count: transitions.length,
+        transitions: transitions.map((t: any) => ({
+          id: t.id,
+          from_node_id: t.from_node_id,
+          to_node_id: t.to_node_id,
+          priority: t.priority,
+        })),
+      },
+    });
+
       logger.info({
         event_type: 'coordinator_start_completed',
         message: 'Coordinator.start() completed',
