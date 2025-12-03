@@ -1,14 +1,16 @@
-import { createRoute, OpenAPIHono, z } from '@hono/zod-openapi';
+/**
+ * Project OpenAPI Route Specifications
+ */
+
+import { createRoute, z } from '@hono/zod-openapi';
+import { ulid } from '../../validators';
 import {
-    CreateProjectSchema,
-    ProjectCreateResponseSchema,
-    ProjectGetResponseSchema,
-    ulid,
-} from '../schemas.js';
+  CreateProjectSchema,
+  ProjectCreateResponseSchema,
+  ProjectGetResponseSchema,
+} from './schema';
 
-export const projects = new OpenAPIHono<{ Bindings: Env }>();
-
-const createProjectRoute = createRoute({
+export const createProjectRoute = createRoute({
   method: 'post',
   path: '/',
   tags: ['projects'],
@@ -33,14 +35,7 @@ const createProjectRoute = createRoute({
   },
 });
 
-projects.openapi(createProjectRoute, async (c) => {
-  const validated = c.req.valid('json');
-  using projects = c.env.RESOURCES.projects();
-  const result = await projects.create(validated);
-  return c.json(result, 201);
-});
-
-const getProjectRoute = createRoute({
+export const getProjectRoute = createRoute({
   method: 'get',
   path: '/{id}',
   tags: ['projects'],
@@ -61,14 +56,7 @@ const getProjectRoute = createRoute({
   },
 });
 
-projects.openapi(getProjectRoute, async (c) => {
-  const { id } = c.req.valid('param');
-  using projects = c.env.RESOURCES.projects();
-  const result = await projects.get(id);
-  return c.json(result);
-});
-
-const deleteProjectRoute = createRoute({
+export const deleteProjectRoute = createRoute({
   method: 'delete',
   path: '/{id}',
   tags: ['projects'],
@@ -87,11 +75,4 @@ const deleteProjectRoute = createRoute({
       description: 'Project deleted successfully',
     },
   },
-});
-
-projects.openapi(deleteProjectRoute, async (c) => {
-  const { id } = c.req.valid('param');
-  using projects = c.env.RESOURCES.projects();
-  await projects.delete(id);
-  return c.json({ success: true });
 });

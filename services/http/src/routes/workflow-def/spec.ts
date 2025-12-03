@@ -1,16 +1,17 @@
-import { createRoute, OpenAPIHono, z } from '@hono/zod-openapi';
+/**
+ * Workflow Definition OpenAPI Route Specifications
+ */
+
+import { createRoute, z } from '@hono/zod-openapi';
+import { ulid } from '../../validators';
 import {
   CreateWorkflowDefSchema,
-  ulid,
   WorkflowDefCreateResponseSchema,
   WorkflowDefGetResponseSchema,
   WorkflowDefListResponseSchema,
-  WorkflowDefSchema,
-} from '../schemas.js';
+} from './schema';
 
-export const workflowDefs = new OpenAPIHono<{ Bindings: Env }>();
-
-const createWorkflowDefRoute = createRoute({
+export const createWorkflowDefRoute = createRoute({
   method: 'post',
   path: '/',
   tags: ['workflow-defs'],
@@ -35,14 +36,7 @@ const createWorkflowDefRoute = createRoute({
   },
 });
 
-workflowDefs.openapi(createWorkflowDefRoute, async (c) => {
-  const validated = c.req.valid('json');
-  using workflowDefs = c.env.RESOURCES.workflowDefs();
-  const result = await workflowDefs.create(validated);
-  return c.json(result, 201);
-});
-
-const getWorkflowDefRoute = createRoute({
+export const getWorkflowDefRoute = createRoute({
   method: 'get',
   path: '/{id}',
   tags: ['workflow-defs'],
@@ -51,7 +45,12 @@ const getWorkflowDefRoute = createRoute({
       id: ulid().openapi({ param: { name: 'id', in: 'path' } }),
     }),
     query: z.object({
-      version: z.coerce.number().int().positive().optional().openapi({ param: { name: 'version', in: 'query' } }),
+      version: z.coerce
+        .number()
+        .int()
+        .positive()
+        .optional()
+        .openapi({ param: { name: 'version', in: 'query' } }),
     }),
   },
   responses: {
@@ -66,15 +65,7 @@ const getWorkflowDefRoute = createRoute({
   },
 });
 
-workflowDefs.openapi(getWorkflowDefRoute, async (c) => {
-  const { id } = c.req.valid('param');
-  const { version } = c.req.valid('query');
-  using workflowDefs = c.env.RESOURCES.workflowDefs();
-  const result = await workflowDefs.get(id, version);
-  return c.json(result);
-});
-
-const listWorkflowDefsByProjectRoute = createRoute({
+export const listWorkflowDefsByProjectRoute = createRoute({
   method: 'get',
   path: '/project/{project_id}',
   tags: ['workflow-defs'],
@@ -95,14 +86,7 @@ const listWorkflowDefsByProjectRoute = createRoute({
   },
 });
 
-workflowDefs.openapi(listWorkflowDefsByProjectRoute, async (c) => {
-  const { project_id } = c.req.valid('param');
-  using workflowDefs = c.env.RESOURCES.workflowDefs();
-  const result = await workflowDefs.listByProject(project_id);
-  return c.json(result);
-});
-
-const listWorkflowDefsByLibraryRoute = createRoute({
+export const listWorkflowDefsByLibraryRoute = createRoute({
   method: 'get',
   path: '/library/{library_id}',
   tags: ['workflow-defs'],
@@ -121,11 +105,4 @@ const listWorkflowDefsByLibraryRoute = createRoute({
       description: 'Workflow definitions retrieved successfully',
     },
   },
-});
-
-workflowDefs.openapi(listWorkflowDefsByLibraryRoute, async (c) => {
-  const { library_id } = c.req.valid('param');
-  using workflowDefs = c.env.RESOURCES.workflowDefs();
-  const result = await workflowDefs.listByLibrary(library_id);
-  return c.json(result);
 });

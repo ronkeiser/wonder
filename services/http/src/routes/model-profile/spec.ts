@@ -1,15 +1,17 @@
-import { createRoute, OpenAPIHono, z } from '@hono/zod-openapi';
+/**
+ * Model Profile OpenAPI Route Specifications
+ */
+
+import { createRoute, z } from '@hono/zod-openapi';
+import { ulid } from '../../validators';
 import {
-    CreateModelProfileSchema,
-    ModelProfileCreateResponseSchema,
-    ModelProfileGetResponseSchema,
-    ModelProfileSchema,
-    ulid,
-} from '../schemas.js';
+  CreateModelProfileSchema,
+  ModelProfileCreateResponseSchema,
+  ModelProfileGetResponseSchema,
+  ModelProfileSchema,
+} from './schema';
 
-export const modelProfiles = new OpenAPIHono<{ Bindings: Env }>();
-
-const listModelProfilesRoute = createRoute({
+export const listModelProfilesRoute = createRoute({
   method: 'get',
   path: '/',
   tags: ['model-profiles'],
@@ -32,15 +34,7 @@ const listModelProfilesRoute = createRoute({
   },
 });
 
-modelProfiles.openapi(listModelProfilesRoute, async (c) => {
-  const { provider } = c.req.valid('query');
-  using modelProfiles = c.env.RESOURCES.modelProfiles();
-  const filters = provider ? { provider } : undefined;
-  const result = await modelProfiles.list(filters);
-  return c.json(result);
-});
-
-const getModelProfileRoute = createRoute({
+export const getModelProfileRoute = createRoute({
   method: 'get',
   path: '/{id}',
   tags: ['model-profiles'],
@@ -61,14 +55,7 @@ const getModelProfileRoute = createRoute({
   },
 });
 
-modelProfiles.openapi(getModelProfileRoute, async (c) => {
-  const { id } = c.req.valid('param');
-  using modelProfiles = c.env.RESOURCES.modelProfiles();
-  const result = await modelProfiles.get(id);
-  return c.json(result);
-});
-
-const createModelProfileRoute = createRoute({
+export const createModelProfileRoute = createRoute({
   method: 'post',
   path: '/',
   tags: ['model-profiles'],
@@ -93,14 +80,7 @@ const createModelProfileRoute = createRoute({
   },
 });
 
-modelProfiles.openapi(createModelProfileRoute, async (c) => {
-  const validated = c.req.valid('json');
-  using modelProfiles = c.env.RESOURCES.modelProfiles();
-  const result = await modelProfiles.create(validated);
-  return c.json(result, 201);
-});
-
-const deleteModelProfileRoute = createRoute({
+export const deleteModelProfileRoute = createRoute({
   method: 'delete',
   path: '/{id}',
   tags: ['model-profiles'],
@@ -119,11 +99,4 @@ const deleteModelProfileRoute = createRoute({
       description: 'Model profile deleted successfully',
     },
   },
-});
-
-modelProfiles.openapi(deleteModelProfileRoute, async (c) => {
-  const { id } = c.req.valid('param');
-  using modelProfiles = c.env.RESOURCES.modelProfiles();
-  await modelProfiles.delete(id);
-  return c.json({ success: true });
 });

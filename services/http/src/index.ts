@@ -5,15 +5,15 @@
 
 import { OpenAPIHono } from '@hono/zod-openapi';
 import { cors } from 'hono/cors';
-import { actions } from './routes/actions';
-import { coordinator } from './routes/coordinator';
-import { logs } from './routes/logs';
-import { modelProfiles } from './routes/model-profiles';
-import { projects } from './routes/projects';
-import { promptSpecs } from './routes/prompt-specs';
-import { workflowDefs } from './routes/workflow-defs';
-import { workflows } from './routes/workflows';
-import { workspaces } from './routes/workspaces';
+import { actions } from './routes/action/route';
+import { coordinator } from './routes/coordinator/route';
+import { logs } from './routes/log/route';
+import { modelProfiles } from './routes/model-profile/route';
+import { projects } from './routes/project/route';
+import { promptSpecs } from './routes/prompt-spec/route';
+import { workflowDefs } from './routes/workflow-def/route';
+import { workflows } from './routes/workflow/route';
+import { workspaces } from './routes/workspace/route';
 
 const app = new OpenAPIHono<{ Bindings: Env }>({
   defaultHook: (result, c) => {

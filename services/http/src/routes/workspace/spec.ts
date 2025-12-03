@@ -1,17 +1,19 @@
-import { createRoute, OpenAPIHono, z } from '@hono/zod-openapi';
+/**
+ * Workspace OpenAPI Route Specifications
+ */
+
+import { createRoute, z } from '@hono/zod-openapi';
+import { ulid } from '../../validators';
 import {
-    CreateWorkspaceSchema,
-    ulid,
-    UpdateWorkspaceSchema,
-    WorkspaceCreateResponseSchema,
-    WorkspaceGetResponseSchema,
-    WorkspaceListResponseSchema,
-    WorkspaceUpdateResponseSchema,
-} from '../schemas.js';
+  CreateWorkspaceSchema,
+  UpdateWorkspaceSchema,
+  WorkspaceCreateResponseSchema,
+  WorkspaceGetResponseSchema,
+  WorkspaceListResponseSchema,
+  WorkspaceUpdateResponseSchema,
+} from './schema';
 
-export const workspaces = new OpenAPIHono<{ Bindings: Env }>();
-
-const listWorkspacesRoute = createRoute({
+export const listWorkspacesRoute = createRoute({
   method: 'get',
   path: '/',
   tags: ['workspaces'],
@@ -33,14 +35,7 @@ const listWorkspacesRoute = createRoute({
   },
 });
 
-workspaces.openapi(listWorkspacesRoute, async (c) => {
-  const query = c.req.valid('query');
-  using workspaces = c.env.RESOURCES.workspaces();
-  const result = await workspaces.list(query);
-  return c.json(result);
-});
-
-const createWorkspaceRoute = createRoute({
+export const createWorkspaceRoute = createRoute({
   method: 'post',
   path: '/',
   tags: ['workspaces'],
@@ -65,20 +60,16 @@ const createWorkspaceRoute = createRoute({
   },
 });
 
-workspaces.openapi(createWorkspaceRoute, async (c) => {
-  const validated = c.req.valid('json');
-  using workspaces = c.env.RESOURCES.workspaces();
-  const result = await workspaces.create(validated);
-  return c.json(result, 201);
-});
-
-const getWorkspaceRoute = createRoute({
+export const getWorkspaceRoute = createRoute({
   method: 'get',
   path: '/{id}',
   tags: ['workspaces'],
   request: {
     params: z.object({
-      id: ulid().openapi({ param: { name: 'id', in: 'path' }, example: '01ARZ3NDEKTSV4RRFFQ69G5FAV' }),
+      id: ulid().openapi({
+        param: { name: 'id', in: 'path' },
+        example: '01ARZ3NDEKTSV4RRFFQ69G5FAV',
+      }),
     }),
   },
   responses: {
@@ -93,14 +84,7 @@ const getWorkspaceRoute = createRoute({
   },
 });
 
-workspaces.openapi(getWorkspaceRoute, async (c) => {
-  const { id } = c.req.valid('param');
-  using workspaces = c.env.RESOURCES.workspaces();
-  const result = await workspaces.get(id);
-  return c.json(result);
-});
-
-const deleteWorkspaceRoute = createRoute({
+export const deleteWorkspaceRoute = createRoute({
   method: 'delete',
   path: '/{id}',
   tags: ['workspaces'],
@@ -121,20 +105,16 @@ const deleteWorkspaceRoute = createRoute({
   },
 });
 
-workspaces.openapi(deleteWorkspaceRoute, async (c) => {
-  const { id } = c.req.valid('param');
-  using workspaces = c.env.RESOURCES.workspaces();
-  await workspaces.delete(id);
-  return c.json({ success: true });
-});
-
-const updateWorkspaceRoute = createRoute({
+export const updateWorkspaceRoute = createRoute({
   method: 'patch',
   path: '/{id}',
   tags: ['workspaces'],
   request: {
     params: z.object({
-      id: ulid().openapi({ param: { name: 'id', in: 'path' }, example: '01ARZ3NDEKTSV4RRFFQ69G5FAV' }),
+      id: ulid().openapi({
+        param: { name: 'id', in: 'path' },
+        example: '01ARZ3NDEKTSV4RRFFQ69G5FAV',
+      }),
     }),
     body: {
       content: {
@@ -154,12 +134,4 @@ const updateWorkspaceRoute = createRoute({
       description: 'Workspace updated successfully',
     },
   },
-});
-
-workspaces.openapi(updateWorkspaceRoute, async (c) => {
-  const { id } = c.req.valid('param');
-  const validated = c.req.valid('json');
-  using workspaces = c.env.RESOURCES.workspaces();
-  const result = await workspaces.update(id, validated);
-  return c.json(result);
 });
