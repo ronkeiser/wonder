@@ -70,6 +70,36 @@ export class WorkflowCoordinator extends DurableObject {
       },
     });
 
+    // Step 2: Fetch WorkflowDef to get initial node and schema
+    logger.info({
+      event_type: 'fetching_workflow_def',
+      message: 'Fetching workflow definition',
+      trace_id: workflow_run_id,
+      metadata: {
+        workflow_def_id: workflowRun.workflow_run.workflow_def_id,
+        workflow_version: workflowRun.workflow_run.workflow_version,
+      },
+    });
+
+    using workflowDefs = this.env.RESOURCES.workflowDefs();
+    const workflowDef = await workflowDefs.get(
+      workflowRun.workflow_run.workflow_def_id,
+      workflowRun.workflow_run.workflow_version,
+    );
+
+    logger.info({
+      event_type: 'workflow_def_fetched',
+      message: 'Workflow definition retrieved',
+      trace_id: workflow_run_id,
+      metadata: {
+        workflow_def_id: workflowDef.workflow_def.id,
+        workflow_def_name: workflowDef.workflow_def.name,
+        workflow_version: workflowDef.workflow_def.version,
+        initial_node_id: workflowDef.workflow_def.initial_node_id,
+        has_context_schema: !!workflowDef.workflow_def.context_schema,
+      },
+    });
+
     // Success for now
     logger.info({
       event_type: 'coordinator_start_completed',
