@@ -217,29 +217,39 @@ export class WorkflowCoordinator extends DurableObject {
       },
     });
 
-    // Step 9: Build task and call executor
-    const task = {
-      workflow_run_id,
-      token_id,
-      node_id: initialNode.id,
-      action_kind: actionResult.action.kind,
-      input_data: input,
-      retry_count: 0,
-    };
+    // Step 9: Route to appropriate executor action based on kind
+    let actionResult_output: Record<string, unknown>;
 
-    const taskResult = await this.env.EXECUTOR.executeTask(task);
+    switch (actionResult.action.kind) {
+      case 'llm_call': {
+        const implementation = actionResult.action.implementation as any;
+        const prompt = `You are a friendly assistant. User said: "${
+          input.name || 'Hello'
+        }". Respond in a warm, welcoming way.`;
+
+        const result = await this.env.EXECUTOR.llmCall({
+          model: implementation.model || '@cf/meta/llama-3.1-8b-instruct',
+          prompt,
+          temperature: implementation.temperature,
+        });
+
+        actionResult_output = { response: result.response };
+        break;
+      }
+
+      default:
+        throw new Error(`Unsupported action kind: ${actionResult.action.kind}`);
+    }
 
     logger.info({
-      event_type: 'task_executed',
-      message: 'Task executed by executor service',
+      event_type: 'action_executed',
+      message: 'Action executed by executor service',
       trace_id: workflow_run_id,
       metadata: {
-        task_id: taskResult.task_id,
-        token_id: taskResult.token_id,
-        node_id: taskResult.node_id,
-        success: taskResult.success,
-        output_data: taskResult.output_data,
-        error: taskResult.error,
+        token_id,
+        node_id: initialNode.id,
+        action_kind: actionResult.action.kind,
+        output_data: actionResult_output,
       },
     });
 
