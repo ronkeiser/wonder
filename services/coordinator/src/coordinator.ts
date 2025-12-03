@@ -217,6 +217,32 @@ export class WorkflowCoordinator extends DurableObject {
       },
     });
 
+    // Step 9: Build task and call executor
+    const task = {
+      workflow_run_id,
+      token_id,
+      node_id: initialNode.id,
+      action_kind: actionResult.action.kind,
+      input_data: input,
+      retry_count: 0,
+    };
+
+    const taskResult = await this.env.EXECUTOR.executeTask(task);
+
+    logger.info({
+      event_type: 'task_executed',
+      message: 'Task executed by executor service',
+      trace_id: workflow_run_id,
+      metadata: {
+        task_id: taskResult.task_id,
+        token_id: taskResult.token_id,
+        node_id: taskResult.node_id,
+        success: taskResult.success,
+        has_output: !!taskResult.output_data,
+        has_error: !!taskResult.error,
+      },
+    });
+
     logger.info({
       event_type: 'coordinator_start_completed',
       message: 'Coordinator.start() completed',

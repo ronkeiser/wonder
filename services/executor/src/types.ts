@@ -19,7 +19,7 @@ export interface TaskResult {
   token_id: string;
   node_id: string;
   success: boolean;
-  output_data?: Record<string, unknown>;
+  output_data?: object;
   error?: string;
   completed_at: string;
 }
