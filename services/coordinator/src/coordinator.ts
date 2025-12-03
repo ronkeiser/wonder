@@ -45,7 +45,32 @@ export class WorkflowCoordinator extends DurableObject {
       },
     });
 
-    // Return success for now
+    // Step 1: Fetch workflow run metadata from Resources service
+    logger.info({
+      event_type: 'fetching_workflow_run',
+      message: 'Fetching workflow run metadata',
+      trace_id: workflow_run_id,
+      metadata: { workflow_run_id },
+    });
+
+    using workflowRuns = this.env.RESOURCES.workflowRuns();
+    const workflowRun = await workflowRuns.get(workflow_run_id);
+
+    logger.info({
+      event_type: 'workflow_run_fetched',
+      message: 'Workflow run metadata retrieved',
+      trace_id: workflow_run_id,
+      metadata: {
+        workflow_run_id: workflowRun.workflow_run.id,
+        workflow_def_id: workflowRun.workflow_run.workflow_def_id,
+        workflow_version: workflowRun.workflow_run.workflow_version,
+        workspace_id: workflowRun.workflow_run.workspace_id,
+        project_id: workflowRun.workflow_run.project_id,
+        parent_run_id: workflowRun.workflow_run.parent_run_id,
+      },
+    });
+
+    // Success for now
     logger.info({
       event_type: 'coordinator_start_completed',
       message: 'Coordinator.start() completed',
