@@ -39,6 +39,43 @@ export class WorkflowCoordinator extends DurableObject {
   }
 
   /**
+   * Create a new token for workflow execution
+   */
+  private createToken(
+    workflow_run_id: string,
+    node_id: string,
+    parent_token_id: string | null,
+    path_id: string,
+    fan_out_node_id: string | null,
+    branch_index: number,
+    branch_total: number,
+  ): string {
+    const token_id = ulid();
+    const now = new Date().toISOString();
+
+    this.ctx.storage.sql.exec(
+      `INSERT INTO tokens (
+        id, workflow_run_id, node_id, status, path_id,
+        parent_token_id, fan_out_node_id, branch_index, branch_total,
+        created_at, updated_at
+      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+      token_id,
+      workflow_run_id,
+      node_id,
+      'pending',
+      path_id,
+      parent_token_id,
+      fan_out_node_id,
+      branch_index,
+      branch_total,
+      now,
+      now,
+    );
+
+    return token_id;
+  }
+
+  /**
    * Start workflow execution (RPC method)
    */
   async start(workflow_run_id: string, input: Record<string, unknown>): Promise<void> {
@@ -120,26 +157,18 @@ export class WorkflowCoordinator extends DurableObject {
     });
 
     // Step 4: Create and insert initial token
-    token_id = ulid();
-    const now = new Date().toISOString();
-
-    this.ctx.storage.sql.exec(
-      `INSERT INTO tokens (
-        id, workflow_run_id, node_id, status, path_id,
-        parent_token_id, fan_out_node_id, branch_index, branch_total,
-        created_at, updated_at
-      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
-      token_id,
+    if (!workflowDef.workflow_def.initial_node_id) {
+      throw new Error('Workflow definition has no initial_node_id');
+    }
+    
+    token_id = this.createToken(
       workflow_run_id,
       workflowDef.workflow_def.initial_node_id,
-      'pending',
-      '', // path_id: empty string for root
       null, // parent_token_id: null for initial token
+      '', // path_id: empty string for root
       null, // fan_out_node_id: null for initial token
       0, // branch_index: 0 for single branch
       1, // branch_total: 1 for single branch
-      now, // created_at
-      now, // updated_at
     );
 
     logger.info({
