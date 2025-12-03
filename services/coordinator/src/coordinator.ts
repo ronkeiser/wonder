@@ -100,6 +100,37 @@ export class WorkflowCoordinator extends DurableObject {
       },
     });
 
+    // Step 3: Create tokens table in SQLite
+    logger.info({
+      event_type: 'creating_tokens_table',
+      message: 'Creating tokens table in SQLite',
+      trace_id: workflow_run_id,
+      metadata: { workflow_run_id },
+    });
+
+    this.ctx.storage.sql.exec(`
+      CREATE TABLE IF NOT EXISTS tokens (
+        id TEXT PRIMARY KEY,
+        workflow_run_id TEXT NOT NULL,
+        node_id TEXT NOT NULL,
+        status TEXT NOT NULL,
+        path_id TEXT NOT NULL,
+        parent_token_id TEXT,
+        fan_out_node_id TEXT,
+        branch_index INTEGER NOT NULL,
+        branch_total INTEGER NOT NULL,
+        created_at TEXT NOT NULL,
+        updated_at TEXT NOT NULL
+      )
+    `);
+
+    logger.info({
+      event_type: 'tokens_table_created',
+      message: 'Tokens table created successfully',
+      trace_id: workflow_run_id,
+      metadata: { workflow_run_id },
+    });
+
     // Success for now
     logger.info({
       event_type: 'coordinator_start_completed',
