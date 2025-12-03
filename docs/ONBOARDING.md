@@ -4,6 +4,7 @@ Read these docs in order:
 2. `docs/REQUIREMENTS.md` — Compact requirements summary, keep in context
 3. `docs/architecture/structure.md` — Workspace, project, library hierarchy
 4. `docs/architecture/cloudflare.md` — Modern Cloudflare guide
+5. `docs/architecture/debugging.md` — Using Logs & Events for debugging
 
 Reference if necessary:
 
