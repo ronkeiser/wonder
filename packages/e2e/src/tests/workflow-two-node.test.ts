@@ -40,7 +40,7 @@ describe('Workflow Execution API', () => {
 
     expect(modelProfileError).toBeUndefined();
 
-    // Create prompt spec (before action since action references it)
+    // Create prompt spec for node 1 (create madlib)
     const { data: promptSpecResponse } = await client.POST('/api/prompt-specs', {
       body: {
         version: 1,
@@ -58,7 +58,24 @@ describe('Workflow Execution API', () => {
       },
     });
 
-    // Create action (after prompt spec since action references it)
+    // Create prompt spec for node 2 (complete madlib)
+    const { data: promptSpec2Response } = await client.POST('/api/prompt-specs', {
+      body: {
+        version: 1,
+        name: 'Complete Madlib Prompt',
+        description: 'Prompt to fill in madlib blanks',
+        template: 'Fill in the blanks in this madlib: {{madlib}}',
+        template_language: 'handlebars',
+        requires: {
+          madlib: 'string',
+        },
+        produces: {
+          response: 'string',
+        },
+      },
+    });
+
+    // Create action 1 (after prompt spec since action references it)
     const { data: actionResponse } = await client.POST('/api/actions', {
       body: {
         version: 1,
@@ -72,7 +89,21 @@ describe('Workflow Execution API', () => {
       },
     });
 
-    // Create workflow definition with single LLM node
+    // Create action 2
+    const { data: action2Response } = await client.POST('/api/actions', {
+      body: {
+        version: 1,
+        name: 'Complete Madlib Action',
+        description: 'LLM action to complete the madlib',
+        kind: 'llm_call',
+        implementation: {
+          prompt_spec_id: promptSpec2Response!.prompt_spec.id,
+          model_profile_id: modelProfileResponse!.model_profile.id,
+        },
+      },
+    });
+
+    // Create workflow definition with two LLM nodes
     const { data: workflowDefResponse, error: wfDefError } = await client.POST(
       '/api/workflow-defs',
       {
@@ -101,18 +132,36 @@ describe('Workflow Execution API', () => {
           nodes: [
             {
               ref: 'llm_greet',
-              name: 'LLM Node',
+              name: 'Create Madlib',
               action_id: actionResponse!.action.id,
               action_version: 1,
               input_mapping: {
                 name: '$.input.name',
               },
               output_mapping: {
+                madlib: '$.response',
+              },
+            },
+            {
+              ref: 'llm_complete',
+              name: 'Complete Madlib',
+              action_id: action2Response!.action.id,
+              action_version: 1,
+              input_mapping: {
+                madlib: '$.llm_greet_output.madlib',
+              },
+              output_mapping: {
                 response: '$.response',
               },
             },
           ],
-          transitions: [],
+          transitions: [
+            {
+              from_node_ref: 'llm_greet',
+              to_node_ref: 'llm_complete',
+              priority: 1,
+            },
+          ],
         },
       },
     );
