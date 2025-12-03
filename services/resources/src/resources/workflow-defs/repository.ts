@@ -4,68 +4,7 @@ import { and, eq } from 'drizzle-orm';
 import type { DrizzleD1Database } from 'drizzle-orm/d1';
 import { ulid } from 'ulid';
 import { nodes, transitions, workflow_defs } from '~/infrastructure/db/schema';
-
-export type WorkflowDefOwner =
-  | { type: 'project'; project_id: string }
-  | { type: 'library'; library_id: string };
-
-export type FanIn = 'any' | 'all' | { m_of_n: number };
-
-type WorkflowDefRow = typeof workflow_defs.$inferSelect;
-type NodeRow = typeof nodes.$inferSelect;
-type TransitionRow = typeof transitions.$inferSelect;
-
-// export type WorkflowDef = Omit<WorkflowDefRow, 'owner_type' | 'owner_id'> & {
-//   owner: WorkflowDefOwner;
-// };
-
-export type WorkflowDef = WorkflowDefRow;
-
-// export type WorkflowDef = { butt: string };
-
-// export type Node = Omit<NodeRow, 'fan_in'> & {
-//   fan_in: FanIn;
-// };
-
-export type Node = NodeRow;
-
-export type Transition = TransitionRow;
-
-/** Transform owner object to DB columns */
-function fromWorkflowDefOwner(owner: WorkflowDefOwner): {
-  owner_type: 'project' | 'library';
-  owner_id: string;
-} {
-  if (owner.type === 'project') {
-    return { owner_type: 'project', owner_id: owner.project_id };
-  }
-  return { owner_type: 'library', owner_id: owner.library_id };
-}
-
-/** Transform DB columns to owner object */
-function toWorkflowDefOwner(owner_type: string, owner_id: string): WorkflowDefOwner {
-  if (owner_type === 'project') {
-    return { type: 'project', project_id: owner_id };
-  }
-  return { type: 'library', library_id: owner_id };
-}
-
-/** Transform fan_in DB column to typed value */
-function toFanIn(fanIn: string | null): FanIn {
-  if (!fanIn || fanIn === 'any') return 'any';
-  if (fanIn === 'all') return 'all';
-  // Handle m_of_n format: "m_of_n:3"
-  if (fanIn.startsWith('m_of_n:')) {
-    return { m_of_n: parseInt(fanIn.split(':')[1]) };
-  }
-  return 'any';
-}
-
-/** Transform fan_in typed value to DB column */
-function fromFanIn(fanIn: FanIn): string {
-  if (typeof fanIn === 'string') return fanIn;
-  return `m_of_n:${fanIn.m_of_n}`;
-}
+import type { Node, Transition, WorkflowDef } from './types';
 
 /** WorkflowDef */
 
@@ -74,7 +13,8 @@ export async function createWorkflowDef(
   data: {
     name: string;
     description: string;
-    owner: WorkflowDefOwner;
+    project_id?: string | null;
+    library_id?: string | null;
     tags?: string[] | null;
     input_schema: object;
     output_schema: object;
@@ -83,25 +23,25 @@ export async function createWorkflowDef(
   },
 ): Promise<WorkflowDef> {
   const now = new Date().toISOString();
-  const { owner, ...rest } = data;
-  const { owner_type, owner_id } = fromWorkflowDefOwner(owner);
 
   const row = {
     id: ulid(),
     version: 1,
-    owner_type,
-    owner_id,
-    ...rest,
+    name: data.name,
+    description: data.description,
+    project_id: data.project_id ?? null,
+    library_id: data.library_id ?? null,
+    tags: data.tags ?? null,
+    input_schema: data.input_schema,
+    output_schema: data.output_schema,
+    context_schema: data.context_schema ?? null,
+    initial_node_id: data.initial_node_id,
     created_at: now,
     updated_at: now,
   };
 
   await db.insert(workflow_defs).values(row).run();
-
-  return {
-    ...row,
-    owner,
-  } as WorkflowDef;
+  return row;
 }
 
 export async function getWorkflowDef(
@@ -120,13 +60,8 @@ export async function getWorkflowDef(
         .where(eq(workflow_defs.id, id))
         .orderBy(workflow_defs.version);
 
-  const row = await query.get();
-  if (!row) return null;
-
-  return {
-    ...row,
-    owner: toWorkflowDefOwner(row.owner_type, row.owner_id),
-  };
+  const result = await query.get();
+  return result ?? null;
 }
 
 export async function updateWorkflowDef(
@@ -146,21 +81,26 @@ export async function updateWorkflowDef(
     .run();
 }
 
-export async function listWorkflowDefsByOwner(
+export async function listWorkflowDefsByProject(
   db: DrizzleD1Database,
-  owner_type: 'project' | 'library',
-  owner_id: string,
+  project_id: string,
 ): Promise<WorkflowDef[]> {
-  const rows = await db
+  return await db
     .select()
     .from(workflow_defs)
-    .where(and(eq(workflow_defs.owner_type, owner_type), eq(workflow_defs.owner_id, owner_id)))
+    .where(eq(workflow_defs.project_id, project_id))
     .all();
+}
 
-  return rows.map((row) => ({
-    ...row,
-    owner: toWorkflowDefOwner(row.owner_type, row.owner_id),
-  }));
+export async function listWorkflowDefsByLibrary(
+  db: DrizzleD1Database,
+  library_id: string,
+): Promise<WorkflowDef[]> {
+  return await db
+    .select()
+    .from(workflow_defs)
+    .where(eq(workflow_defs.library_id, library_id))
+    .all();
 }
 
 /** Node */
@@ -177,17 +117,14 @@ export async function createNode(
     input_mapping?: object | null;
     output_mapping?: object | null;
     fan_out?: 'first_match' | 'all';
-    fan_in?: FanIn;
+    fan_in?: string;
     joins_node?: string | null;
     merge?: object | null;
     on_early_complete?: 'cancel' | 'abandon' | 'allow_late_merge' | null;
   },
 ): Promise<Node> {
-  const id = ulid();
-  const fanInValue = data.fan_in ?? 'any';
-
   const row = {
-    id,
+    id: ulid(),
     ref: data.ref,
     workflow_def_id: data.workflow_def_id,
     workflow_def_version: data.workflow_def_version,
@@ -197,18 +134,14 @@ export async function createNode(
     input_mapping: data.input_mapping ?? null,
     output_mapping: data.output_mapping ?? null,
     fan_out: data.fan_out ?? 'first_match',
-    fan_in: fromFanIn(fanInValue),
+    fan_in: data.fan_in ?? 'any',
     joins_node: data.joins_node ?? null,
     merge: data.merge ?? null,
     on_early_complete: data.on_early_complete ?? null,
   };
 
   await db.insert(nodes).values(row).run();
-
-  return {
-    ...row,
-    fan_in: fanInValue,
-  };
+  return row;
 }
 
 export async function getNode(
@@ -217,7 +150,7 @@ export async function getNode(
   workflowDefVersion: number,
   nodeId: string,
 ): Promise<Node | null> {
-  const row = await db
+  const result = await db
     .select()
     .from(nodes)
     .where(
@@ -228,13 +161,7 @@ export async function getNode(
       ),
     )
     .get();
-
-  if (!row) return null;
-
-  return {
-    ...row,
-    fan_in: toFanIn(row.fan_in),
-  };
+  return result ?? null;
 }
 
 export async function updateNode(
@@ -249,12 +176,7 @@ export async function listNodesByWorkflowDef(
   db: DrizzleD1Database,
   workflowDefId: string,
 ): Promise<Node[]> {
-  const rows = await db.select().from(nodes).where(eq(nodes.workflow_def_id, workflowDefId)).all();
-
-  return rows.map((row) => ({
-    ...row,
-    fan_in: toFanIn(row.fan_in),
-  }));
+  return await db.select().from(nodes).where(eq(nodes.workflow_def_id, workflowDefId)).all();
 }
 
 /** Transition */

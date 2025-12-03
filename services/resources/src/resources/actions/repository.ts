@@ -4,20 +4,11 @@ import { and, desc, eq } from 'drizzle-orm';
 import type { DrizzleD1Database } from 'drizzle-orm/d1';
 import { ulid } from 'ulid';
 import { actions } from '~/infrastructure/db/schema';
+import type { Action } from './types';
 
-type Action = typeof actions.$inferSelect;
 type NewAction = Omit<typeof actions.$inferInsert, 'id' | 'created_at' | 'updated_at'>;
 
-type ActionKind =
-  | 'llm_call'
-  | 'mcp_tool'
-  | 'http_request'
-  | 'human_input'
-  | 'update_context'
-  | 'write_artifact'
-  | 'workflow_call'
-  | 'vector_search'
-  | 'emit_metric';
+type ActionKind = Action['kind'];
 
 export async function createAction(db: DrizzleD1Database, data: NewAction): Promise<Action> {
   const now = new Date().toISOString();

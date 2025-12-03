@@ -2,14 +2,15 @@
 
 import { ConflictError, NotFoundError, ValidationError, extractDbError } from '~/errors';
 import { Resource } from '../base';
-import type { FanIn, Node, Transition, WorkflowDef, WorkflowDefOwner } from './repository';
 import * as repo from './repository';
+import type { Node, Transition, WorkflowDef } from './types';
 
 export class WorkflowDefs extends Resource {
   async create(data: {
     name: string;
     description: string;
-    owner: WorkflowDefOwner;
+    project_id?: string;
+    library_id?: string;
     tags?: string[];
     input_schema: object;
     output_schema: object;
@@ -23,7 +24,7 @@ export class WorkflowDefs extends Resource {
       input_mapping?: object;
       output_mapping?: object;
       fan_out?: 'first_match' | 'all';
-      fan_in?: FanIn;
+      fan_in?: string;
       joins_node_ref?: string;
       merge?: object;
       on_early_complete?: 'cancel' | 'abandon' | 'allow_late_merge';
@@ -123,7 +124,8 @@ export class WorkflowDefs extends Resource {
       workflowDef = await repo.createWorkflowDef(this.serviceCtx.db, {
         name: data.name,
         description: data.description,
-        owner: data.owner,
+        project_id: data.project_id ?? null,
+        library_id: data.library_id ?? null,
         tags: data.tags ?? null,
         input_schema: data.input_schema,
         output_schema: data.output_schema,
@@ -258,15 +260,13 @@ export class WorkflowDefs extends Resource {
     };
   }
 
-  async listByOwner(owner: {
-    type: 'project' | 'library';
-    id: string;
-  }): Promise<{ workflow_defs: WorkflowDef[] }> {
-    const workflowDefs = await repo.listWorkflowDefsByOwner(
-      this.serviceCtx.db,
-      owner.type,
-      owner.id,
-    );
+  async listByProject(project_id: string): Promise<{ workflow_defs: WorkflowDef[] }> {
+    const workflowDefs = await repo.listWorkflowDefsByProject(this.serviceCtx.db, project_id);
+    return { workflow_defs: workflowDefs };
+  }
+
+  async listByLibrary(library_id: string): Promise<{ workflow_defs: WorkflowDef[] }> {
+    const workflowDefs = await repo.listWorkflowDefsByLibrary(this.serviceCtx.db, library_id);
     return { workflow_defs: workflowDefs };
   }
 }

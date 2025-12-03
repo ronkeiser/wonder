@@ -4,24 +4,10 @@ import { eq } from 'drizzle-orm';
 import type { DrizzleD1Database } from 'drizzle-orm/d1';
 import { ulid } from 'ulid';
 import { project_settings, projects } from '~/infrastructure/db/schema';
+import type { Project, ProjectSettings } from './types';
 
 type ProjectRow = typeof projects.$inferSelect;
 type ProjectSettingsRow = typeof project_settings.$inferSelect;
-
-export type ProjectSettings = {
-  default_model_profile_id?: string;
-  rate_limit_max_concurrent_runs?: number;
-  rate_limit_max_llm_calls_per_hour?: number;
-  budget_max_monthly_spend_cents?: number;
-  budget_alert_threshold_cents?: number;
-  snapshot_policy_every_n_events?: number;
-  snapshot_policy_every_n_seconds?: number;
-  snapshot_policy_on_fan_in_complete?: boolean;
-};
-
-type Project = Omit<ProjectRow, 'settings'> & {
-  settings: ProjectSettings | null;
-};
 
 type NewProject = {
   workspace_id: string;

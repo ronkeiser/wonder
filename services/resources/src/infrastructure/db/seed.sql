@@ -71,14 +71,14 @@ VALUES (
 );
 
 -- Workflow Definition
-INSERT INTO workflow_defs (id, name, description, version, owner_type, owner_id, tags, input_schema, output_schema, context_schema, initial_node_id, created_at, updated_at)
+INSERT INTO workflow_defs (id, name, description, version, project_id, library_id, tags, input_schema, output_schema, context_schema, initial_node_id, created_at, updated_at)
 VALUES (
   '01JDXSEED0000WORKFLOWDEF1',
   'Hello World',
   'Simple one-node greeting workflow',
   1,
-  'project',
   '01JDXSEED0000PROJECT000001',
+  NULL,
   NULL,
   '{"type":"object","properties":{"name":{"type":"string"}},"required":["name"]}',
   '{"type":"object","properties":{"greeting":{"type":"string"}},"required":["greeting"]}',

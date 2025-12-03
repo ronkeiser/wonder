@@ -4,8 +4,8 @@ import { and, desc, eq } from 'drizzle-orm';
 import type { DrizzleD1Database } from 'drizzle-orm/d1';
 import { ulid } from 'ulid';
 import { prompt_specs } from '~/infrastructure/db/schema';
+import type { PromptSpec } from './types';
 
-type PromptSpec = typeof prompt_specs.$inferSelect;
 type NewPromptSpec = Omit<typeof prompt_specs.$inferInsert, 'id' | 'created_at' | 'updated_at'>;
 
 export async function createPromptSpec(

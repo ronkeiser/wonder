@@ -74,14 +74,13 @@ workflowDefs.openapi(getWorkflowDefRoute, async (c) => {
   return c.json(result);
 });
 
-const listWorkflowDefsByOwnerRoute = createRoute({
+const listWorkflowDefsByProjectRoute = createRoute({
   method: 'get',
-  path: '/owner/{type}/{id}',
+  path: '/project/{project_id}',
   tags: ['workflow-defs'],
   request: {
     params: z.object({
-      type: z.enum(['project', 'library']).openapi({ param: { name: 'type', in: 'path' } }),
-      id: z.string().openapi({ param: { name: 'id', in: 'path' } }),
+      project_id: ulid().openapi({ param: { name: 'project_id', in: 'path' } }),
     }),
   },
   responses: {
@@ -96,9 +95,37 @@ const listWorkflowDefsByOwnerRoute = createRoute({
   },
 });
 
-workflowDefs.openapi(listWorkflowDefsByOwnerRoute, async (c) => {
-  const { type, id } = c.req.valid('param');
+workflowDefs.openapi(listWorkflowDefsByProjectRoute, async (c) => {
+  const { project_id } = c.req.valid('param');
   using workflowDefs = c.env.RESOURCES.workflowDefs();
-  const result = await workflowDefs.listByOwner({ type, id });
+  const result = await workflowDefs.listByProject(project_id);
+  return c.json(result);
+});
+
+const listWorkflowDefsByLibraryRoute = createRoute({
+  method: 'get',
+  path: '/library/{library_id}',
+  tags: ['workflow-defs'],
+  request: {
+    params: z.object({
+      library_id: ulid().openapi({ param: { name: 'library_id', in: 'path' } }),
+    }),
+  },
+  responses: {
+    200: {
+      content: {
+        'application/json': {
+          schema: WorkflowDefListResponseSchema,
+        },
+      },
+      description: 'Workflow definitions retrieved successfully',
+    },
+  },
+});
+
+workflowDefs.openapi(listWorkflowDefsByLibraryRoute, async (c) => {
+  const { library_id } = c.req.valid('param');
+  using workflowDefs = c.env.RESOURCES.workflowDefs();
+  const result = await workflowDefs.listByLibrary(library_id);
   return c.json(result);
 });

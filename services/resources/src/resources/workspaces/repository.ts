@@ -4,20 +4,10 @@ import { eq } from 'drizzle-orm';
 import type { DrizzleD1Database } from 'drizzle-orm/d1';
 import { ulid } from 'ulid';
 import { workspace_settings, workspaces } from '~/infrastructure/db/schema';
+import type { Workspace, WorkspaceSettings } from './types';
 
 type WorkspaceRow = typeof workspaces.$inferSelect;
 type WorkspaceSettingsRow = typeof workspace_settings.$inferSelect;
-
-export type WorkspaceSettings = {
-  allowed_model_providers?: string[];
-  allowed_mcp_servers?: string[];
-  budget_max_monthly_spend_cents?: number;
-  budget_alert_threshold_cents?: number;
-};
-
-export type Workspace = WorkspaceRow & {
-  settings: WorkspaceSettings | null;
-};
 
 export async function createWorkspace(
   db: DrizzleD1Database,

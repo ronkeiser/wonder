@@ -4,8 +4,8 @@ import { and, desc, eq } from 'drizzle-orm';
 import type { DrizzleD1Database } from 'drizzle-orm/d1';
 import { ulid } from 'ulid';
 import { workflow_defs, workflow_runs, workflows } from '~/infrastructure/db/schema';
+import type { Workflow, WorkflowRun } from './types';
 
-type Workflow = typeof workflows.$inferSelect;
 type NewWorkflow = Omit<typeof workflows.$inferInsert, 'id' | 'created_at' | 'updated_at'>;
 
 export async function createWorkflow(db: DrizzleD1Database, data: NewWorkflow): Promise<Workflow> {
@@ -105,8 +105,6 @@ export async function getWorkflowWithDef(
     workflow_def: workflowDef,
   };
 }
-
-type WorkflowRun = typeof workflow_runs.$inferSelect;
 
 export async function getWorkflowRun(
   db: DrizzleD1Database,

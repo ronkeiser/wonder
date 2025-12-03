@@ -4,11 +4,11 @@ import { eq } from 'drizzle-orm';
 import type { DrizzleD1Database } from 'drizzle-orm/d1';
 import { ulid } from 'ulid';
 import { model_profiles } from '~/infrastructure/db/schema';
+import type { ModelProfile } from './types';
 
-type ModelProfile = typeof model_profiles.$inferSelect;
 type NewModelProfile = Omit<typeof model_profiles.$inferInsert, 'id'>;
 
-type ModelProvider = 'anthropic' | 'openai' | 'google' | 'cloudflare' | 'local';
+type ModelProvider = ModelProfile['provider'];
 
 export async function createModelProfile(
   db: DrizzleD1Database,

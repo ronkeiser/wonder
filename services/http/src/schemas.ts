@@ -258,14 +258,8 @@ export const CreateWorkflowDefSchema = z
     name: z.string().min(1).max(255).openapi({ example: 'Content Generation Pipeline' }),
     description: z.string().min(1).openapi({ example: 'Generates and reviews content' }),
     version: z.number().int().positive().default(1).openapi({ example: 1 }),
-    owner: z
-      .discriminatedUnion('type', [
-        z.object({ type: z.literal('project'), project_id: ulid() }),
-        z.object({ type: z.literal('library'), library_id: ulid() }),
-      ])
-      .openapi({
-        example: { type: 'project', project_id: '01ARZ3NDEKTSV4RRFFQ69G5FAV' },
-      }),
+    project_id: ulid().optional().openapi({ example: '01ARZ3NDEKTSV4RRFFQ69G5FAV' }),
+    library_id: ulid().optional(),
     tags: z.array(z.string()).optional(),
     input_schema: z.record(z.string(), z.unknown()).openapi({ example: { topic: 'string' } }),
     output_schema: z.record(z.string(), z.unknown()).openapi({ example: { content: 'string' } }),
@@ -288,7 +282,7 @@ export const CreateWorkflowDefSchema = z
         input_mapping: z.record(z.string(), z.unknown()).optional(),
         output_mapping: z.record(z.string(), z.unknown()).optional(),
         fan_out: z.enum(['first_match', 'all']).optional(),
-        fan_in: z.union([z.enum(['any', 'all']), z.object({ m_of_n: z.number() })]).optional(),
+        fan_in: z.string().optional().openapi({ example: 'any' }),
         joins_node_ref: z.string().optional(),
         merge: z.record(z.string(), z.unknown()).optional(),
         on_early_complete: z.enum(['cancel', 'abandon', 'allow_late_merge']).optional(),
@@ -353,8 +347,8 @@ export const WorkflowDefSchema = z
     name: z.string(),
     description: z.string(),
     version: z.number().int(),
-    owner_type: z.enum(['project', 'library']),
-    owner_id: ulid(),
+    project_id: ulid().nullable(),
+    library_id: ulid().nullable(),
     tags: z.array(z.string()).nullable(),
     input_schema: z.record(z.string(), z.unknown()),
     output_schema: z.record(z.string(), z.unknown()),
