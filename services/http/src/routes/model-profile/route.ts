@@ -4,16 +4,20 @@
 
 import { OpenAPIHono } from '@hono/zod-openapi';
 import {
-    createModelProfileRoute,
-    deleteModelProfileRoute,
-    getModelProfileRoute,
-    listModelProfilesRoute,
+  createModelProfileRoute,
+  deleteModelProfileRoute,
+  getModelProfileRoute,
+  listModelProfilesRoute,
 } from './spec';
 
-/** /model-profiles */
+/**
+ * /model-profiles
+ */
 export const modelProfiles = new OpenAPIHono<{ Bindings: Env }>();
 
-/** GET / */
+/**
+ * GET /
+ */
 modelProfiles.openapi(listModelProfilesRoute, async (c) => {
   const { provider } = c.req.valid('query');
   using modelProfiles = c.env.RESOURCES.modelProfiles();
@@ -22,7 +26,9 @@ modelProfiles.openapi(listModelProfilesRoute, async (c) => {
   return c.json(result);
 });
 
-/** GET /{id} */
+/**
+ * GET /{id}
+ */
 modelProfiles.openapi(getModelProfileRoute, async (c) => {
   const { id } = c.req.valid('param');
   using modelProfiles = c.env.RESOURCES.modelProfiles();
@@ -30,7 +36,9 @@ modelProfiles.openapi(getModelProfileRoute, async (c) => {
   return c.json(result);
 });
 
-/** POST / */
+/**
+ * POST /
+ */
 modelProfiles.openapi(createModelProfileRoute, async (c) => {
   const validated = c.req.valid('json');
   using modelProfiles = c.env.RESOURCES.modelProfiles();
@@ -38,7 +46,9 @@ modelProfiles.openapi(createModelProfileRoute, async (c) => {
   return c.json(result, 201);
 });
 
-/** DELETE /{id} */
+/**
+ * DELETE /{id}
+ */
 modelProfiles.openapi(deleteModelProfileRoute, async (c) => {
   const { id } = c.req.valid('param');
   using modelProfiles = c.env.RESOURCES.modelProfiles();

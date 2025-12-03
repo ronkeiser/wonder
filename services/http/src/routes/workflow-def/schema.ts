@@ -125,9 +125,3 @@ export const WorkflowDefGetResponseSchema = z
     transitions: z.array(TransitionSchema),
   })
   .openapi('WorkflowDefGetResponse');
-
-export const WorkflowDefListResponseSchema = z
-  .object({
-    workflow_defs: z.array(WorkflowDefSchema),
-  })
-  .openapi('WorkflowDefListResponse');

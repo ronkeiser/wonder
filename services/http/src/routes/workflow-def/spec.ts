@@ -8,7 +8,6 @@ import {
   CreateWorkflowDefSchema,
   WorkflowDefCreateResponseSchema,
   WorkflowDefGetResponseSchema,
-  WorkflowDefListResponseSchema,
 } from './schema';
 
 export const createWorkflowDefRoute = createRoute({
@@ -61,48 +60,6 @@ export const getWorkflowDefRoute = createRoute({
         },
       },
       description: 'Workflow definition retrieved successfully',
-    },
-  },
-});
-
-export const listWorkflowDefsByProjectRoute = createRoute({
-  method: 'get',
-  path: '/project/{project_id}',
-  tags: ['workflow-defs'],
-  request: {
-    params: z.object({
-      project_id: ulid().openapi({ param: { name: 'project_id', in: 'path' } }),
-    }),
-  },
-  responses: {
-    200: {
-      content: {
-        'application/json': {
-          schema: WorkflowDefListResponseSchema,
-        },
-      },
-      description: 'Workflow definitions retrieved successfully',
-    },
-  },
-});
-
-export const listWorkflowDefsByLibraryRoute = createRoute({
-  method: 'get',
-  path: '/library/{library_id}',
-  tags: ['workflow-defs'],
-  request: {
-    params: z.object({
-      library_id: ulid().openapi({ param: { name: 'library_id', in: 'path' } }),
-    }),
-  },
-  responses: {
-    200: {
-      content: {
-        'application/json': {
-          schema: WorkflowDefListResponseSchema,
-        },
-      },
-      description: 'Workflow definitions retrieved successfully',
     },
   },
 });

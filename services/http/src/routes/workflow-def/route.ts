@@ -3,12 +3,7 @@
  */
 
 import { OpenAPIHono } from '@hono/zod-openapi';
-import {
-  createWorkflowDefRoute,
-  getWorkflowDefRoute,
-  listWorkflowDefsByLibraryRoute,
-  listWorkflowDefsByProjectRoute,
-} from './spec';
+import { createWorkflowDefRoute, getWorkflowDefRoute } from './spec';
 
 /** /workflow-defs */
 export const workflowDefs = new OpenAPIHono<{ Bindings: Env }>();
@@ -27,21 +22,5 @@ workflowDefs.openapi(getWorkflowDefRoute, async (c) => {
   const { version } = c.req.valid('query');
   using workflowDefs = c.env.RESOURCES.workflowDefs();
   const result = await workflowDefs.get(id, version);
-  return c.json(result);
-});
-
-/** GET /project/{project_id} */
-workflowDefs.openapi(listWorkflowDefsByProjectRoute, async (c) => {
-  const { project_id } = c.req.valid('param');
-  using workflowDefs = c.env.RESOURCES.workflowDefs();
-  const result = await workflowDefs.listByProject(project_id);
-  return c.json(result);
-});
-
-/** GET /library/{library_id} */
-workflowDefs.openapi(listWorkflowDefsByLibraryRoute, async (c) => {
-  const { library_id } = c.req.valid('param');
-  using workflowDefs = c.env.RESOURCES.workflowDefs();
-  const result = await workflowDefs.listByLibrary(library_id);
   return c.json(result);
 });

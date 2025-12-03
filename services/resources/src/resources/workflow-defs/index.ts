@@ -259,14 +259,4 @@ export class WorkflowDefs extends Resource {
       transitions,
     };
   }
-
-  async listByProject(project_id: string): Promise<{ workflow_defs: WorkflowDef[] }> {
-    const workflowDefs = await repo.listWorkflowDefsByProject(this.serviceCtx.db, project_id);
-    return { workflow_defs: workflowDefs };
-  }
-
-  async listByLibrary(library_id: string): Promise<{ workflow_defs: WorkflowDef[] }> {
-    const workflowDefs = await repo.listWorkflowDefsByLibrary(this.serviceCtx.db, library_id);
-    return { workflow_defs: workflowDefs };
-  }
 }
