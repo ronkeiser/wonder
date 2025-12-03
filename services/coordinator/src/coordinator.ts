@@ -1,14 +1,26 @@
 import type { Emitter, EventContext, EventInput } from '@wonder/events';
 import type { Logger } from '@wonder/logs';
 import { DurableObject } from 'cloudflare:workers';
+import { ContextManager } from './context';
+import { TokenManager } from './tokens';
+import type { ContextSchema } from './types';
 
 /**
  * WorkflowCoordinator Durable Object
  */
 export class WorkflowCoordinator extends DurableObject {
+  private contextManager: ContextManager;
+  private tokenManager: TokenManager;
   private logger: Logger | null = null;
   private emitter: Emitter | null = null;
   private sequenceCounter = 0;
+  private initialized = false;
+
+  constructor(ctx: DurableObjectState, env: Env) {
+    super(ctx, env);
+    this.contextManager = new ContextManager(ctx.storage.sql);
+    this.tokenManager = new TokenManager(ctx.storage.sql);
+  }
 
   /**
    * Get or create logger instance
@@ -40,6 +52,49 @@ export class WorkflowCoordinator extends DurableObject {
   }
 
   /**
+   * Initialize workflow storage from WorkflowDef schema
+   */
+  private async initializeStorage(workflowDefId: string, workflowVersion: number): Promise<void> {
+    if (this.initialized) return;
+
+    const logger = this.getLogger();
+
+    // Fetch full WorkflowDef including context schema
+    const result = (await this.env.RESOURCES.workflowDefs().get(
+      workflowDefId,
+      workflowVersion,
+    )) as {
+      workflow_def: {
+        id: string;
+        name: string;
+        version: number;
+        context_schema: ContextSchema | null;
+        initial_node_id: string | null;
+      };
+    };
+
+    // Initialize token manager (creates tokens table)
+    this.tokenManager.initialize();
+
+    // Initialize context manager if schema exists
+    if (result.workflow_def.context_schema) {
+      this.contextManager.initializeContext(result.workflow_def.context_schema, {});
+    }
+
+    this.initialized = true;
+
+    logger.info({
+      event_type: 'storage_initialized',
+      message: 'Initialized SQLite storage for workflow',
+      metadata: {
+        workflow_def_id: workflowDefId,
+        workflow_version: workflowVersion,
+        has_context_schema: !!result.workflow_def.context_schema,
+      },
+    });
+  }
+
+  /**
    * Start workflow execution (RPC method)
    */
   async start(workflow_run_id: string, input: Record<string, unknown>): Promise<void> {
@@ -55,9 +110,16 @@ export class WorkflowCoordinator extends DurableObject {
           workspace_id: string;
           workflow_id: string;
           workflow_def_id: string;
+          workflow_version: number;
           parent_run_id: string | null;
         };
       };
+
+      // Initialize storage from WorkflowDef schema
+      await this.initializeStorage(
+        workflowRun.workflow_run.workflow_def_id,
+        workflowRun.workflow_run.workflow_version,
+      );
 
       logger.info({
         event_type: 'workflow_start_request',
@@ -84,12 +146,47 @@ export class WorkflowCoordinator extends DurableObject {
         metadata: { input },
       });
 
+      // Fetch workflow def to get initial node
+      const workflowDef = (await this.env.RESOURCES.workflowDefs().get(
+        workflowRun.workflow_run.workflow_def_id,
+        workflowRun.workflow_run.workflow_version,
+      )) as {
+        workflow_def: {
+          initial_node_id: string | null;
+          context_schema: ContextSchema | null;
+        };
+      };
+
+      if (!workflowDef.workflow_def.initial_node_id) {
+        throw new Error('WorkflowDef has no initial_node_id');
+      }
+
+      // Insert initial context data if schema exists
+      if (workflowDef.workflow_def.context_schema && Object.keys(input).length > 0) {
+        for (const [key, value] of Object.entries(input)) {
+          this.contextManager.updateContext(`/${key}`, value);
+        }
+      }
+
+      // Create initial token
+      const tokenPathId = crypto.randomUUID();
+      const token = this.tokenManager.createToken({
+        workflow_run_id,
+        node_id: workflowDef.workflow_def.initial_node_id,
+        status: 'active',
+        path_id: tokenPathId,
+        parent_token_id: null,
+        branch_index: 0,
+        branch_total: 1,
+        fan_out_node_id: null,
+      });
+
       // Create task
       const task = {
         workflow_run_id,
-        token_id: 'token-' + Date.now(),
-        node_id: 'initial-node',
-        action_kind: 'llm_call',
+        token_id: token.id,
+        node_id: workflowDef.workflow_def.initial_node_id,
+        action_kind: 'llm_call', // TODO: lookup from NodeDef
         input_data: input,
         retry_count: 0,
       };
@@ -189,6 +286,9 @@ export class WorkflowCoordinator extends DurableObject {
           metadata: { task_id: task.node_id, token_id: task.token_id, duration_ms: duration },
         });
 
+        // Update token state to completed
+        this.tokenManager.updateStatus(task.token_id, 'completed');
+
         // Emit node_completed event
         emitter.emit(eventContext, {
           event_type: 'node_completed',
@@ -200,12 +300,14 @@ export class WorkflowCoordinator extends DurableObject {
           metadata: { output_data: result.output_data, duration_ms: duration },
         });
 
-        // Emit workflow_completed event (for now, since this is a simple single-node flow)
-        emitter.emit(eventContext, {
-          event_type: 'workflow_completed',
-          sequence_number: this.sequenceCounter++,
-          metadata: { output: result.output_data, duration_ms: duration },
-        });
+        // Check if workflow is complete (all tokens in terminal state)
+        if (this.tokenManager.allTokensTerminal(task.workflow_run_id)) {
+          emitter.emit(eventContext, {
+            event_type: 'workflow_completed',
+            sequence_number: this.sequenceCounter++,
+            metadata: { output: result.output_data, duration_ms: duration },
+          });
+        }
       } else {
         logger.error({
           event_type: 'task_processing_failed',
