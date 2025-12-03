@@ -356,6 +356,9 @@ export class WorkflowCoordinator extends DurableObject {
           to_node_id: transition.to_node_id,
         },
       });
+
+      // Dispatch the newly created token
+      await this.dispatchToken(nextTokenId);
     }
   }
 
