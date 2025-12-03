@@ -21,19 +21,22 @@ export interface LLMCallResult {
  * Executor service with RPC methods
  */
 export default class ExecutorService extends WorkerEntrypoint<Env> {
-  private readonly loggerConfig = {
+  private readonly logContext = {
     service: 'wonder-executor',
     environment: 'production',
   } as const;
+
+  constructor(ctx: ExecutionContext, env: Env) {
+    super(ctx, env);
+  }
 
   /**
    * RPC method - call LLM with given parameters
    */
   async llmCall(params: LLMCallParams): Promise<LLMCallResult> {
-    const logger = this.env.LOGS.newLogger(this.loggerConfig);
     const startTime = Date.now();
 
-    await logger.info({
+    await this.env.LOGS.info(this.logContext, {
       event_type: 'llm_call_started',
       message: 'LLM call started',
       metadata: {
@@ -59,7 +62,7 @@ export default class ExecutorService extends WorkerEntrypoint<Env> {
         response: response?.response || 'No response from LLM',
       };
 
-      await logger.info({
+      await this.env.LOGS.info(this.logContext, {
         event_type: 'llm_call_completed',
         message: 'LLM call completed successfully',
         metadata: {
@@ -71,7 +74,7 @@ export default class ExecutorService extends WorkerEntrypoint<Env> {
 
       return result;
     } catch (error) {
-      await logger.error({
+      await this.env.LOGS.error(this.logContext, {
         event_type: 'llm_call_failed',
         message: 'LLM call failed',
         metadata: {

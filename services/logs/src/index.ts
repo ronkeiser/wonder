@@ -9,6 +9,13 @@ export { Streamer } from './streamer';
 export type { GetLogsOptions, LogContext, LogLevel, Logger, LoggerInput } from './types.js';
 
 /**
+ * Helper to normalize logger input
+ */
+function normalizeInput(input: LoggerInput | string): LoggerInput {
+  return typeof input === 'string' ? { message: input } : input;
+}
+
+/**
  * Main service
  */
 export class LogsService extends WorkerEntrypoint<Env> {
@@ -51,10 +58,6 @@ export class LogsService extends WorkerEntrypoint<Env> {
    * Factory method - returns a function with context baked in
    */
   newLogger(context: LogContext): Logger {
-    const normalizeInput = (input: LoggerInput | string): LoggerInput => {
-      return typeof input === 'string' ? { message: input } : input;
-    };
-
     return {
       error: (input: LoggerInput | string) => {
         this.write(context, 'error', normalizeInput(input));
@@ -75,9 +78,9 @@ export class LogsService extends WorkerEntrypoint<Env> {
   }
 
   /**
-   * RPC method - writes log to D1
+   * Internal method - writes log to D1
    */
-  write(context: LogContext, level: LogLevel, input: LoggerInput): void {
+  private write(context: LogContext, level: LogLevel, input: LoggerInput): void {
     this.ctx.waitUntil(
       (async () => {
         const logEntry = {
@@ -104,33 +107,38 @@ export class LogsService extends WorkerEntrypoint<Env> {
   }
 
   /**
-   * RPC method - writes log to D1 synchronously (awaitable)
-   * Use this when you need to ensure logs are persisted before RPC returns
+   * RPC method - logs error level message
    */
-  async writeSync(context: LogContext, level: LogLevel, input: LoggerInput): Promise<void> {
-    const logEntry = {
-      id: ulid(),
-      timestamp: Date.now(),
-      level,
-      ...context,
-      ...input,
-      metadata: JSON.stringify(input.metadata || {}),
-    };
+  error(context: LogContext, input: LoggerInput | string): void {
+    this.write(context, 'error', normalizeInput(input));
+  }
 
-    await this.db.insert(logs).values(logEntry);
+  /**
+   * RPC method - logs warn level message
+   */
+  warn(context: LogContext, input: LoggerInput | string): void {
+    this.write(context, 'warn', normalizeInput(input));
+  }
 
-    // Broadcast to connected WebSocket clients
-    this.ctx.waitUntil(
-      (async () => {
-        try {
-          const id = this.env.STREAMER.idFromName('logs-streamer');
-          const stub = this.env.STREAMER.get(id);
-          await stub.broadcast(logEntry);
-        } catch (error) {
-          console.error('Failed to broadcast log to WebSocket clients:', error);
-        }
-      })(),
-    );
+  /**
+   * RPC method - logs info level message
+   */
+  info(context: LogContext, input: LoggerInput | string): void {
+    this.write(context, 'info', normalizeInput(input));
+  }
+
+  /**
+   * RPC method - logs debug level message
+   */
+  debug(context: LogContext, input: LoggerInput | string): void {
+    this.write(context, 'debug', normalizeInput(input));
+  }
+
+  /**
+   * RPC method - logs fatal level message
+   */
+  fatal(context: LogContext, input: LoggerInput | string): void {
+    this.write(context, 'fatal', normalizeInput(input));
   }
 
   /**
