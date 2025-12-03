@@ -167,6 +167,22 @@ export class WorkflowCoordinator extends DurableObject {
       },
     });
 
+    // Step 6: Fetch the action definition
+    using actions = this.env.RESOURCES.actions();
+    const actionResult = await actions.get(initialNode.action_id, initialNode.action_version);
+
+    logger.info({
+      event_type: 'action_fetched',
+      message: 'Action definition retrieved',
+      trace_id: workflow_run_id,
+      metadata: {
+        action_id: actionResult.action.id,
+        action_name: actionResult.action.name,
+        action_kind: actionResult.action.kind,
+        action_version: actionResult.action.version,
+      },
+    });
+
     logger.info({
       event_type: 'coordinator_start_completed',
       message: 'Coordinator.start() completed',
