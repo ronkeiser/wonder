@@ -22,6 +22,13 @@
       "when": 1764538036480,
       "tag": "0002_quiet_landau",
       "breakpoints": true
+    },
+    {
+      "idx": 3,
+      "version": "6",
+      "when": 1764719847242,
+      "tag": "0003_round_starhawk",
+      "breakpoints": true
     }
   ]
 }

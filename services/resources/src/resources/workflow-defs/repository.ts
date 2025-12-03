@@ -70,9 +70,9 @@ export async function createWorkflowDef(
     description: string;
     owner: WorkflowDefOwner;
     tags?: string[] | null;
-    input_schema: unknown;
-    output_schema: unknown;
-    context_schema?: unknown | null;
+    input_schema: object;
+    output_schema: object;
+    context_schema?: object | null;
     initial_node_id: string | null;
   },
 ): Promise<WorkflowDef> {

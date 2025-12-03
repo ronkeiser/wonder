@@ -5,12 +5,25 @@ import { Resource } from '../base';
 import * as repo from './repository';
 
 export class Workspaces extends Resource {
-  async create(data: { name: string; settings?: Record<string, unknown> }): Promise<{
+  async create(data: {
+    name: string;
+    settings?: {
+      allowed_model_providers?: string[];
+      allowed_mcp_servers?: string[];
+      budget_max_monthly_spend_cents?: number;
+      budget_alert_threshold_cents?: number;
+    };
+  }): Promise<{
     workspace_id: string;
     workspace: {
       id: string;
       name: string;
-      settings: Record<string, unknown> | null;
+      settings: {
+        allowed_model_providers?: string[];
+        allowed_mcp_servers?: string[];
+        budget_max_monthly_spend_cents?: number;
+        budget_alert_threshold_cents?: number;
+      } | null;
       created_at: string;
       updated_at: string;
     };
@@ -34,10 +47,7 @@ export class Workspaces extends Resource {
 
       return {
         workspace_id: workspace.id,
-        workspace: {
-          ...workspace,
-          settings: workspace.settings as Record<string, unknown> | null,
-        },
+        workspace,
       };
     } catch (error) {
       const dbError = extractDbError(error);
@@ -67,7 +77,12 @@ export class Workspaces extends Resource {
     workspace: {
       id: string;
       name: string;
-      settings: Record<string, unknown> | null;
+      settings: {
+        allowed_model_providers?: string[];
+        allowed_mcp_servers?: string[];
+        budget_max_monthly_spend_cents?: number;
+        budget_alert_threshold_cents?: number;
+      } | null;
       created_at: string;
       updated_at: string;
     };
@@ -80,19 +95,19 @@ export class Workspaces extends Resource {
       throw new NotFoundError(`Workspace not found: ${id}`, 'workspace', id);
     }
 
-    return {
-      workspace: {
-        ...workspace,
-        settings: workspace.settings as Record<string, unknown> | null,
-      },
-    };
+    return { workspace };
   }
 
   async list(params?: { limit?: number }): Promise<{
     workspaces: Array<{
       id: string;
       name: string;
-      settings: Record<string, unknown> | null;
+      settings: {
+        allowed_model_providers?: string[];
+        allowed_mcp_servers?: string[];
+        budget_max_monthly_spend_cents?: number;
+        budget_alert_threshold_cents?: number;
+      } | null;
       created_at: string;
       updated_at: string;
     }>;
@@ -101,22 +116,30 @@ export class Workspaces extends Resource {
 
     const workspaces = await repo.listWorkspaces(this.serviceCtx.db, params?.limit);
 
-    return {
-      workspaces: workspaces.map((w) => ({
-        ...w,
-        settings: w.settings as Record<string, unknown> | null,
-      })),
-    };
+    return { workspaces };
   }
 
   async update(
     id: string,
-    data: { name?: string; settings?: Record<string, unknown> },
+    data: {
+      name?: string;
+      settings?: {
+        allowed_model_providers?: string[];
+        allowed_mcp_servers?: string[];
+        budget_max_monthly_spend_cents?: number;
+        budget_alert_threshold_cents?: number;
+      };
+    },
   ): Promise<{
     workspace: {
       id: string;
       name: string;
-      settings: Record<string, unknown> | null;
+      settings: {
+        allowed_model_providers?: string[];
+        allowed_mcp_servers?: string[];
+        budget_max_monthly_spend_cents?: number;
+        budget_alert_threshold_cents?: number;
+      } | null;
       created_at: string;
       updated_at: string;
     };
@@ -135,12 +158,7 @@ export class Workspaces extends Resource {
       metadata: { name: workspace.name },
     });
 
-    return {
-      workspace: {
-        ...workspace,
-        settings: workspace.settings as Record<string, unknown> | null,
-      },
-    };
+    return { workspace };
   }
 
   async delete(id: string): Promise<{ success: boolean }> {
