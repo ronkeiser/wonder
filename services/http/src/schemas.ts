@@ -232,8 +232,8 @@ export const ModelProfileSchema = z
     name: z.string(),
     provider: z.enum(['anthropic', 'openai', 'google', 'cloudflare', 'local']),
     model_id: z.string(),
-    parameters: z.record(z.string(), z.unknown()),
-    execution_config: z.record(z.string(), z.unknown()).nullable(),
+    parameters: z.any().nullable(),
+    execution_config: z.any().nullable(),
     cost_per_1k_input_tokens: z.number(),
     cost_per_1k_output_tokens: z.number(),
   })
@@ -290,7 +290,7 @@ export const CreateWorkflowDefSchema = z
         fan_out: z.enum(['first_match', 'all']).optional(),
         fan_in: z.union([z.enum(['any', 'all']), z.object({ m_of_n: z.number() })]).optional(),
         joins_node_ref: z.string().optional(),
-        merge: z.unknown().optional(),
+        merge: z.record(z.string(), z.unknown()).optional(),
         on_early_complete: z.enum(['cancel', 'abandon', 'allow_late_merge']).optional(),
       }),
     ),
@@ -304,14 +304,48 @@ export const CreateWorkflowDefSchema = z
           from_node_ref: z.string().min(1),
           to_node_ref: z.string().min(1),
           priority: z.number().int(),
-          condition: z.unknown().optional(),
-          foreach: z.unknown().optional(),
-          loop_config: z.unknown().optional(),
+          condition: z.record(z.string(), z.unknown()).optional(),
+          foreach: z.record(z.string(), z.unknown()).optional(),
+          loop_config: z.record(z.string(), z.unknown()).optional(),
         }),
       )
       .optional(),
   })
   .openapi('CreateWorkflowDef');
+
+export const NodeSchema = z
+  .object({
+    id: ulid(),
+    workflow_def_id: ulid(),
+    workflow_def_version: z.number().int(),
+    ref: z.string(),
+    name: z.string(),
+    action_id: z.string(),
+    action_version: z.number().int(),
+    input_mapping: z.record(z.string(), z.unknown()).nullable(),
+    output_mapping: z.record(z.string(), z.unknown()).nullable(),
+    fan_out: z.enum(['first_match', 'all']),
+    fan_in: z.union([z.literal('any'), z.literal('all'), z.string()]),
+    joins_node: z.string().nullable(),
+    merge: z.record(z.string(), z.unknown()).nullable(),
+    on_early_complete: z.enum(['cancel', 'abandon', 'allow_late_merge']).nullable(),
+  })
+  .openapi('Node');
+
+export const TransitionSchema = z
+  .object({
+    id: ulid(),
+    workflow_def_id: ulid(),
+    workflow_def_version: z.number().int(),
+    ref: z.string().nullable(),
+    from_node_id: z.string(),
+    to_node_id: z.string(),
+    priority: z.number().int(),
+    condition: z.record(z.string(), z.unknown()).nullable(),
+    foreach: z.record(z.string(), z.unknown()).nullable(),
+    loop_config: z.record(z.string(), z.unknown()).nullable(),
+  })
+  .openapi('Transition');
 
 export const WorkflowDefSchema = z
   .object({
@@ -321,11 +355,11 @@ export const WorkflowDefSchema = z
     version: z.number().int(),
     owner_type: z.enum(['project', 'library']),
     owner_id: ulid(),
-    tags: z.record(z.string(), z.unknown()).nullable(),
+    tags: z.array(z.string()).nullable(),
     input_schema: z.record(z.string(), z.unknown()),
     output_schema: z.record(z.string(), z.unknown()),
     context_schema: z.record(z.string(), z.unknown()).nullable(),
-    initial_node_id: z.string(),
+    initial_node_id: z.string().nullable(),
     created_at: z.string(),
     updated_at: z.string(),
   })
@@ -341,8 +375,8 @@ export const WorkflowDefCreateResponseSchema = z
 export const WorkflowDefGetResponseSchema = z
   .object({
     workflow_def: WorkflowDefSchema,
-    nodes: z.array(z.unknown()),
-    transitions: z.array(z.unknown()),
+    nodes: z.array(NodeSchema),
+    transitions: z.array(TransitionSchema),
   })
   .openapi('WorkflowDefGetResponse');
 

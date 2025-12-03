@@ -14,12 +14,12 @@ export class WorkflowRuns extends Resource {
       workflow_def_id: string;
       workflow_version: number;
       status: string;
-      context: unknown;
-      active_tokens: unknown;
+      context: object;
+      active_tokens: object[];
       durable_object_id: string;
       parent_run_id: string | null;
       parent_node_id: string | null;
-      latest_snapshot: unknown | null;
+      latest_snapshot: object | null;
       created_at: string;
       updated_at: string;
       completed_at: string | null;

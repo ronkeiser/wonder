@@ -11,8 +11,8 @@ export class ModelProfiles extends Resource {
     name: string;
     provider: ModelProvider;
     model_id: string;
-    parameters?: unknown;
-    execution_config?: unknown;
+    parameters?: object;
+    execution_config?: object;
     cost_per_1k_input_tokens?: number;
     cost_per_1k_output_tokens?: number;
   }): Promise<{
@@ -22,8 +22,8 @@ export class ModelProfiles extends Resource {
       name: string;
       provider: ModelProvider;
       model_id: string;
-      parameters: unknown;
-      execution_config: unknown;
+      parameters: object | null;
+      execution_config: object | null;
       cost_per_1k_input_tokens: number;
       cost_per_1k_output_tokens: number;
     };
@@ -38,7 +38,7 @@ export class ModelProfiles extends Resource {
         name: data.name,
         provider: data.provider,
         model_id: data.model_id,
-        parameters: data.parameters ?? null,
+        parameters: (data.parameters ?? {}) as object,
         execution_config: data.execution_config ?? null,
         cost_per_1k_input_tokens: data.cost_per_1k_input_tokens ?? 0,
         cost_per_1k_output_tokens: data.cost_per_1k_output_tokens ?? 0,
@@ -83,8 +83,8 @@ export class ModelProfiles extends Resource {
       name: string;
       provider: ModelProvider;
       model_id: string;
-      parameters: unknown;
-      execution_config: unknown;
+      parameters: object | null;
+      execution_config: object | null;
       cost_per_1k_input_tokens: number;
       cost_per_1k_output_tokens: number;
     };
@@ -112,8 +112,8 @@ export class ModelProfiles extends Resource {
       name: string;
       provider: ModelProvider;
       model_id: string;
-      parameters: unknown;
-      execution_config: unknown;
+      parameters: object | null;
+      execution_config: object | null;
       cost_per_1k_input_tokens: number;
       cost_per_1k_output_tokens: number;
     }>;

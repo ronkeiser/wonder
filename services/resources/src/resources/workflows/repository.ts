@@ -125,8 +125,8 @@ export async function createWorkflowRun(
     workflow_def_id: string;
     workflow_version: number;
     status: 'running' | 'completed' | 'failed' | 'waiting';
-    context: unknown;
-    active_tokens: unknown;
+    context: object;
+    active_tokens: object[];
     durable_object_id: string;
     parent_run_id?: string | null;
     parent_node_id?: string | null;

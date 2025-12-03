@@ -39,7 +39,6 @@ workflowDefs.openapi(createWorkflowDefRoute, async (c) => {
   const validated = c.req.valid('json');
   using workflowDefs = c.env.RESOURCES.workflowDefs();
   const result = await workflowDefs.create(validated);
-  // @ts-ignore
   return c.json(result, 201);
 });
 

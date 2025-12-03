@@ -9,7 +9,16 @@ export class Projects extends Resource {
     workspace_id: string;
     name: string;
     description?: string;
-    settings?: Record<string, unknown>;
+    settings?: {
+      default_model_profile_id?: string;
+      rate_limit_max_concurrent_runs?: number;
+      rate_limit_max_llm_calls_per_hour?: number;
+      budget_max_monthly_spend_cents?: number;
+      budget_alert_threshold_cents?: number;
+      snapshot_policy_every_n_events?: number;
+      snapshot_policy_every_n_seconds?: number;
+      snapshot_policy_on_fan_in_complete?: boolean;
+    };
   }): Promise<{
     project_id: string;
     project: {
@@ -17,7 +26,16 @@ export class Projects extends Resource {
       workspace_id: string;
       name: string;
       description: string | null;
-      settings: Record<string, unknown> | null;
+      settings: {
+        default_model_profile_id?: string;
+        rate_limit_max_concurrent_runs?: number;
+        rate_limit_max_llm_calls_per_hour?: number;
+        budget_max_monthly_spend_cents?: number;
+        budget_alert_threshold_cents?: number;
+        snapshot_policy_every_n_events?: number;
+        snapshot_policy_every_n_seconds?: number;
+        snapshot_policy_on_fan_in_complete?: boolean;
+      } | null;
       created_at: string;
       updated_at: string;
     };
@@ -45,10 +63,7 @@ export class Projects extends Resource {
 
       return {
         project_id: project.id,
-        project: {
-          ...project,
-          settings: project.settings as Record<string, unknown> | null,
-        },
+        project,
       };
     } catch (error) {
       const dbError = extractDbError(error);
@@ -94,7 +109,16 @@ export class Projects extends Resource {
       workspace_id: string;
       name: string;
       description: string | null;
-      settings: Record<string, unknown> | null;
+      settings: {
+        default_model_profile_id?: string;
+        rate_limit_max_concurrent_runs?: number;
+        rate_limit_max_llm_calls_per_hour?: number;
+        budget_max_monthly_spend_cents?: number;
+        budget_alert_threshold_cents?: number;
+        snapshot_policy_every_n_events?: number;
+        snapshot_policy_every_n_seconds?: number;
+        snapshot_policy_on_fan_in_complete?: boolean;
+      } | null;
       created_at: string;
       updated_at: string;
     };
@@ -108,10 +132,7 @@ export class Projects extends Resource {
     }
 
     return {
-      project: {
-        ...project,
-        settings: project.settings as Record<string, unknown> | null,
-      },
+      project,
     };
   }
 
@@ -121,7 +142,16 @@ export class Projects extends Resource {
       workspace_id: string;
       name: string;
       description: string | null;
-      settings: Record<string, unknown> | null;
+      settings: {
+        default_model_profile_id?: string;
+        rate_limit_max_concurrent_runs?: number;
+        rate_limit_max_llm_calls_per_hour?: number;
+        budget_max_monthly_spend_cents?: number;
+        budget_alert_threshold_cents?: number;
+        snapshot_policy_every_n_events?: number;
+        snapshot_policy_every_n_seconds?: number;
+        snapshot_policy_on_fan_in_complete?: boolean;
+      } | null;
       created_at: string;
       updated_at: string;
     }>;
@@ -135,23 +165,42 @@ export class Projects extends Resource {
     );
 
     return {
-      projects: projects.map((p) => ({
-        ...p,
-        settings: p.settings as Record<string, unknown> | null,
-      })),
+      projects,
     };
   }
 
   async update(
     id: string,
-    data: { name?: string; description?: string; settings?: Record<string, unknown> },
+    data: {
+      name?: string;
+      description?: string;
+      settings?: {
+        default_model_profile_id?: string;
+        rate_limit_max_concurrent_runs?: number;
+        rate_limit_max_llm_calls_per_hour?: number;
+        budget_max_monthly_spend_cents?: number;
+        budget_alert_threshold_cents?: number;
+        snapshot_policy_every_n_events?: number;
+        snapshot_policy_every_n_seconds?: number;
+        snapshot_policy_on_fan_in_complete?: boolean;
+      };
+    },
   ): Promise<{
     project: {
       id: string;
       workspace_id: string;
       name: string;
       description: string | null;
-      settings: Record<string, unknown> | null;
+      settings: {
+        default_model_profile_id?: string;
+        rate_limit_max_concurrent_runs?: number;
+        rate_limit_max_llm_calls_per_hour?: number;
+        budget_max_monthly_spend_cents?: number;
+        budget_alert_threshold_cents?: number;
+        snapshot_policy_every_n_events?: number;
+        snapshot_policy_every_n_seconds?: number;
+        snapshot_policy_on_fan_in_complete?: boolean;
+      } | null;
       created_at: string;
       updated_at: string;
     };
@@ -171,10 +220,7 @@ export class Projects extends Resource {
     });
 
     return {
-      project: {
-        ...project,
-        settings: project.settings as Record<string, unknown> | null,
-      },
+      project,
     };
   }
 

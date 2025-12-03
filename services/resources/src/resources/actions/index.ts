@@ -21,11 +21,11 @@ export class Actions extends Resource {
     name: string;
     description?: string;
     kind: ActionKind;
-    implementation: unknown;
-    requires?: unknown;
-    produces?: unknown;
-    execution?: unknown;
-    idempotency?: unknown;
+    implementation: object;
+    requires?: object;
+    produces?: object;
+    execution?: object;
+    idempotency?: object;
   }): Promise<{
     action_id: string;
     action: {
@@ -34,11 +34,11 @@ export class Actions extends Resource {
       description: string;
       version: number;
       kind: ActionKind;
-      implementation: unknown;
-      requires: unknown;
-      produces: unknown;
-      execution: unknown;
-      idempotency: unknown;
+      implementation: object;
+      requires: object | null;
+      produces: object | null;
+      execution: object | null;
+      idempotency: object | null;
       created_at: string;
       updated_at: string;
     };
@@ -124,11 +124,11 @@ export class Actions extends Resource {
       description: string;
       version: number;
       kind: ActionKind;
-      implementation: unknown;
-      requires: unknown;
-      produces: unknown;
-      execution: unknown;
-      idempotency: unknown;
+      implementation: object;
+      requires: object | null;
+      produces: object | null;
+      execution: object | null;
+      idempotency: object | null;
       created_at: string;
       updated_at: string;
     };
@@ -165,11 +165,11 @@ export class Actions extends Resource {
       description: string;
       version: number;
       kind: ActionKind;
-      implementation: unknown;
-      requires: unknown;
-      produces: unknown;
-      execution: unknown;
-      idempotency: unknown;
+      implementation: object;
+      requires: object | null;
+      produces: object | null;
+      execution: object | null;
+      idempotency: object | null;
       created_at: string;
       updated_at: string;
     }>;

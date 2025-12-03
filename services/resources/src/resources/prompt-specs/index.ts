@@ -12,9 +12,9 @@ export class PromptSpecs extends Resource {
     system_prompt?: string;
     template: string;
     template_language?: 'handlebars' | 'jinja2';
-    requires?: unknown;
-    produces?: unknown;
-    examples?: unknown;
+    requires?: object;
+    produces?: object;
+    examples?: object;
     tags?: string[];
   }): Promise<{
     prompt_spec_id: string;
@@ -26,10 +26,10 @@ export class PromptSpecs extends Resource {
       system_prompt: string | null;
       template: string;
       template_language: 'handlebars' | 'jinja2';
-      requires: unknown;
-      produces: unknown;
-      examples: unknown;
-      tags: unknown;
+      requires: object;
+      produces: object;
+      examples: object | null;
+      tags: string[] | null;
       created_at: string;
       updated_at: string;
     };
@@ -98,10 +98,10 @@ export class PromptSpecs extends Resource {
       system_prompt: string | null;
       template: string;
       template_language: 'handlebars' | 'jinja2';
-      requires: unknown;
-      produces: unknown;
-      examples: unknown;
-      tags: unknown;
+      requires: object;
+      produces: object;
+      examples: object | null;
+      tags: string[] | null;
       created_at: string;
       updated_at: string;
     };
@@ -140,10 +140,10 @@ export class PromptSpecs extends Resource {
       system_prompt: string | null;
       template: string;
       template_language: 'handlebars' | 'jinja2';
-      requires: unknown;
-      produces: unknown;
-      examples: unknown;
-      tags: unknown;
+      requires: object;
+      produces: object;
+      examples: object | null;
+      tags: string[] | null;
       created_at: string;
       updated_at: string;
     }>;

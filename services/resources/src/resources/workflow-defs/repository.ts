@@ -15,15 +15,21 @@ type WorkflowDefRow = typeof workflow_defs.$inferSelect;
 type NodeRow = typeof nodes.$inferSelect;
 type TransitionRow = typeof transitions.$inferSelect;
 
-type WorkflowDef = Omit<WorkflowDefRow, 'owner_type' | 'owner_id'> & {
-  owner: WorkflowDefOwner;
-};
+// export type WorkflowDef = Omit<WorkflowDefRow, 'owner_type' | 'owner_id'> & {
+//   owner: WorkflowDefOwner;
+// };
 
-type Node = Omit<NodeRow, 'fan_in'> & {
-  fan_in: FanIn;
-};
+export type WorkflowDef = WorkflowDefRow;
 
-type Transition = TransitionRow;
+// export type WorkflowDef = { butt: string };
+
+// export type Node = Omit<NodeRow, 'fan_in'> & {
+//   fan_in: FanIn;
+// };
+
+export type Node = NodeRow;
+
+export type Transition = TransitionRow;
 
 /** Transform owner object to DB columns */
 function fromWorkflowDefOwner(owner: WorkflowDefOwner): {
@@ -168,12 +174,12 @@ export async function createNode(
     name: string;
     action_id: string;
     action_version: number;
-    input_mapping?: unknown | null;
-    output_mapping?: unknown | null;
+    input_mapping?: object | null;
+    output_mapping?: object | null;
     fan_out?: 'first_match' | 'all';
     fan_in?: FanIn;
     joins_node?: string | null;
-    merge?: unknown | null;
+    merge?: object | null;
     on_early_complete?: 'cancel' | 'abandon' | 'allow_late_merge' | null;
   },
 ): Promise<Node> {
@@ -262,9 +268,9 @@ export async function createTransition(
     from_node_id: string;
     to_node_id: string;
     priority: number;
-    condition?: unknown | null;
-    foreach?: unknown | null;
-    loop_config?: unknown | null;
+    condition?: object | null;
+    foreach?: object | null;
+    loop_config?: object | null;
   },
 ): Promise<Transition> {
   const row = {

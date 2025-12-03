@@ -2,7 +2,7 @@
 
 import { ConflictError, NotFoundError, ValidationError, extractDbError } from '~/errors';
 import { Resource } from '../base';
-import type { FanIn, WorkflowDefOwner } from './repository';
+import type { FanIn, Node, Transition, WorkflowDef, WorkflowDefOwner } from './repository';
 import * as repo from './repository';
 
 export class WorkflowDefs extends Resource {
@@ -11,21 +11,21 @@ export class WorkflowDefs extends Resource {
     description: string;
     owner: WorkflowDefOwner;
     tags?: string[];
-    input_schema: unknown;
-    output_schema: unknown;
-    context_schema?: unknown;
+    input_schema: object;
+    output_schema: object;
+    context_schema?: object;
     initial_node_ref: string;
     nodes: Array<{
       ref: string;
       name: string;
       action_id: string;
       action_version: number;
-      input_mapping?: unknown;
-      output_mapping?: unknown;
+      input_mapping?: object;
+      output_mapping?: object;
       fan_out?: 'first_match' | 'all';
       fan_in?: FanIn;
       joins_node_ref?: string;
-      merge?: unknown;
+      merge?: object;
       on_early_complete?: 'cancel' | 'abandon' | 'allow_late_merge';
     }>;
     transitions?: Array<{
@@ -33,13 +33,13 @@ export class WorkflowDefs extends Resource {
       from_node_ref: string;
       to_node_ref: string;
       priority: number;
-      condition?: unknown;
-      foreach?: unknown;
-      loop_config?: unknown;
+      condition?: object;
+      foreach?: object;
+      loop_config?: object;
     }>;
   }): Promise<{
     workflow_def_id: string;
-    workflow_def: any;
+    workflow_def: WorkflowDef;
   }> {
     this.serviceCtx.logger.info({
       event_type: 'workflow_def_create_started',
@@ -226,9 +226,9 @@ export class WorkflowDefs extends Resource {
     workflowDefId: string,
     version?: number,
   ): Promise<{
-    workflow_def: any;
-    nodes: any[];
-    transitions: any[];
+    workflow_def: WorkflowDef;
+    nodes: Node[];
+    transitions: Transition[];
   }> {
     this.serviceCtx.logger.info({
       event_type: 'workflow_def_get',
@@ -261,7 +261,7 @@ export class WorkflowDefs extends Resource {
   async listByOwner(owner: {
     type: 'project' | 'library';
     id: string;
-  }): Promise<{ workflow_defs: any[] }> {
+  }): Promise<{ workflow_defs: WorkflowDef[] }> {
     const workflowDefs = await repo.listWorkflowDefsByOwner(
       this.serviceCtx.db,
       owner.type,
