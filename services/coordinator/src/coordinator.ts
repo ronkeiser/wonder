@@ -225,6 +225,22 @@ export class WorkflowCoordinator extends DurableObject {
     switch (actionResult.action.kind) {
       case 'llm_call': {
         const implementation = actionResult.action.implementation as any;
+        
+        // Fetch prompt spec
+        using promptSpecs = this.env.RESOURCES.promptSpecs();
+        const promptSpecResult = await promptSpecs.get(implementation.prompt_spec_id);
+
+        logger.info({
+          event_type: 'prompt_spec_fetched',
+          message: 'Prompt spec retrieved',
+          trace_id: workflow_run_id,
+          metadata: {
+            prompt_spec_id: promptSpecResult.prompt_spec.id,
+            prompt_spec_name: promptSpecResult.prompt_spec.name,
+            template: promptSpecResult.prompt_spec.template,
+          },
+        });
+
         const prompt = `You are a friendly assistant. User said: "${
           input.name || 'Hello'
         }". Respond in a warm, welcoming way.`;

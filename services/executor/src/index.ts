@@ -41,6 +41,7 @@ export default class ExecutorService extends WorkerEntrypoint<Env> {
       message: 'LLM call started',
       metadata: {
         model: params.model,
+        prompt: params.prompt,
         prompt_length: params.prompt.length,
         temperature: params.temperature,
       },
