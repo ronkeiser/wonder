@@ -253,6 +253,27 @@ export class WorkflowCoordinator extends DurableObject {
       },
     });
 
+    // Step 10: Update token status to completed
+    const completedAt = new Date().toISOString();
+    this.ctx.storage.sql.exec(
+      `UPDATE tokens SET status = ?, updated_at = ? WHERE id = ?`,
+      'completed',
+      completedAt,
+      token_id,
+    );
+
+    logger.info({
+      event_type: 'token_completed',
+      message: 'Token status updated to completed',
+      trace_id: workflow_run_id,
+      metadata: {
+        token_id,
+        node_id: initialNode.id,
+        status: 'completed',
+        updated_at: completedAt,
+      },
+    });
+
     logger.info({
       event_type: 'coordinator_start_completed',
       message: 'Coordinator.start() completed',
