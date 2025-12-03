@@ -144,6 +144,29 @@ export class WorkflowCoordinator extends DurableObject {
       },
     });
 
+    // Step 5: Fetch the initial node from the workflow definition
+    const initialNode = workflowDef.nodes.find(
+      (node: any) => node.id === workflowDef.workflow_def.initial_node_id,
+    );
+
+    if (!initialNode) {
+      throw new Error(
+        `Initial node not found: ${workflowDef.workflow_def.initial_node_id}`,
+      );
+    }
+
+    logger.info({
+      event_type: 'initial_node_fetched',
+      message: 'Initial node retrieved from workflow definition',
+      trace_id: workflow_run_id,
+      metadata: {
+        node_id: initialNode.id,
+        node_name: initialNode.name,
+        action_id: initialNode.action_id,
+        action_version: initialNode.action_version,
+      },
+    });
+
     logger.info({
       event_type: 'coordinator_start_completed',
       message: 'Coordinator.start() completed',
