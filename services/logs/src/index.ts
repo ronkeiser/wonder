@@ -104,6 +104,36 @@ export class LogsService extends WorkerEntrypoint<Env> {
   }
 
   /**
+   * RPC method - writes log to D1 synchronously (awaitable)
+   * Use this when you need to ensure logs are persisted before RPC returns
+   */
+  async writeSync(context: LogContext, level: LogLevel, input: LoggerInput): Promise<void> {
+    const logEntry = {
+      id: ulid(),
+      timestamp: Date.now(),
+      level,
+      ...context,
+      ...input,
+      metadata: JSON.stringify(input.metadata || {}),
+    };
+
+    await this.db.insert(logs).values(logEntry);
+
+    // Broadcast to connected WebSocket clients
+    this.ctx.waitUntil(
+      (async () => {
+        try {
+          const id = this.env.STREAMER.idFromName('logs-streamer');
+          const stub = this.env.STREAMER.get(id);
+          await stub.broadcast(logEntry);
+        } catch (error) {
+          console.error('Failed to broadcast log to WebSocket clients:', error);
+        }
+      })(),
+    );
+  }
+
+  /**
    * RPC method - retrieves logs from D1
    */
   async getLogs(options: GetLogsOptions = {}) {

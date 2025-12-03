@@ -1,3 +1,4 @@
+import type { Logger } from '@wonder/logs';
 import { WorkerEntrypoint } from 'cloudflare:workers';
 
 /**
@@ -26,7 +27,24 @@ export default class ExecutorService extends WorkerEntrypoint<Env> {
    */
   async llmCall(params: LLMCallParams): Promise<LLMCallResult> {
     const startTime = Date.now();
-    console.log(`[Executor] llmCall started:`, JSON.stringify(params));
+
+    // Use writeSync to ensure logs persist before RPC returns
+    await this.env.LOGS.writeSync(
+      {
+        service: 'wonder-executor',
+        environment: 'production',
+      },
+      'info',
+      {
+        event_type: 'llm_call_started',
+        message: 'LLM call started',
+        metadata: {
+          model: params.model,
+          prompt_length: params.prompt.length,
+          temperature: params.temperature,
+        },
+      },
+    );
 
     try {
       const response = (await this.env.AI.run(params.model as any, {
@@ -39,13 +57,46 @@ export default class ExecutorService extends WorkerEntrypoint<Env> {
         temperature: params.temperature,
       })) as any;
 
-      console.log(`[Executor] llmCall completed in ${Date.now() - startTime}ms`);
-
-      return {
+      const duration = Date.now() - startTime;
+      const result = {
         response: response?.response || 'No response from LLM',
       };
+
+      await this.env.LOGS.writeSync(
+        {
+          service: 'wonder-executor',
+          environment: 'production',
+        },
+        'info',
+        {
+          event_type: 'llm_call_completed',
+          message: 'LLM call completed successfully',
+          metadata: {
+            model: params.model,
+            duration_ms: duration,
+            response_length: result.response.length,
+          },
+        },
+      );
+
+      return result;
     } catch (error) {
-      console.error(`[Executor] llmCall failed:`, error);
+      await this.env.LOGS.writeSync(
+        {
+          service: 'wonder-executor',
+          environment: 'production',
+        },
+        'error',
+        {
+          event_type: 'llm_call_failed',
+          message: 'LLM call failed',
+          metadata: {
+            model: params.model,
+            duration_ms: Date.now() - startTime,
+            error: error instanceof Error ? error.message : String(error),
+          },
+        },
+      );
       throw error;
     }
   }

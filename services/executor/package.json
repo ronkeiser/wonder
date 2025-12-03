@@ -6,10 +6,12 @@
   "scripts": {
     "dev": "wrangler dev",
     "deploy": "wrangler deploy",
-    "types": "wrangler types -c wrangler.jsonc -c ../coordinator/wrangler.jsonc -c ../resources/wrangler.jsonc",
+    "types": "wrangler types -c wrangler.jsonc -c ../coordinator/wrangler.jsonc -c ../resources/wrangler.jsonc -c ../events/wrangler.jsonc -c ../logs/wrangler.jsonc",
     "test": "vitest"
   },
-  "dependencies": {},
+  "dependencies": {
+    "@wonder/logs": "workspace:*"
+  },
   "devDependencies": {
     "@cloudflare/vitest-pool-workers": "^0.10.11",
     "wrangler": "^4.51.0"

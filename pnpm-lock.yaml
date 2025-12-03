@@ -89,19 +89,6 @@ importers:
         specifier: ^4.51.0
         version: 4.51.0(@cloudflare/workers-types@4.20251127.0)
 
-  services/ducky:
-    dependencies:
-      ulid:
-        specifier: ^2.3.0
-        version: 2.4.0
-    devDependencies:
-      '@cloudflare/vitest-pool-workers':
-        specifier: ^0.10.11
-        version: 0.10.11(@cloudflare/workers-types@4.20251127.0)(@vitest/runner@3.2.4)(@vitest/snapshot@3.2.4)(vitest@3.2.4)
-      wrangler:
-        specifier: ^4.51.0
-        version: 4.51.0(@cloudflare/workers-types@4.20251127.0)
-
   services/events:
     dependencies:
       drizzle-orm:
@@ -122,6 +109,10 @@ importers:
         version: 4.51.0(@cloudflare/workers-types@4.20251127.0)
 
   services/executor:
+    dependencies:
+      '@wonder/logs':
+        specifier: workspace:*
+        version: link:../logs
     devDependencies:
       '@cloudflare/vitest-pool-workers':
         specifier: ^0.10.11
