@@ -274,6 +274,28 @@ export class WorkflowCoordinator extends DurableObject {
       },
     });
 
+    // Step 11: Store action output in context
+    for (const [key, value] of Object.entries(actionResult_output)) {
+      const contextPath = `${initialNode.id}_output.${key}`;
+      this.ctx.storage.sql.exec(
+        `INSERT OR REPLACE INTO context (path, value) VALUES (?, ?)`,
+        contextPath,
+        JSON.stringify(value),
+      );
+    }
+
+    logger.info({
+      event_type: 'context_output_stored',
+      message: 'Action output stored in context',
+      trace_id: workflow_run_id,
+      metadata: {
+        token_id,
+        node_id: initialNode.id,
+        output_keys: Object.keys(actionResult_output),
+        context_paths: Object.keys(actionResult_output).map(key => `${initialNode.id}_output.${key}`),
+      },
+    });
+
     logger.info({
       event_type: 'coordinator_start_completed',
       message: 'Coordinator.start() completed',
