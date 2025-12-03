@@ -34,19 +34,21 @@ export class WorkflowCoordinator extends DurableObject {
    */
   async start(workflow_run_id: string, input: Record<string, unknown>): Promise<void> {
     const logger = this.getLogger();
+    let token_id: string | undefined;
 
-    logger.info({
-      event_type: 'coordinator_start_called',
-      message: 'Coordinator.start() called',
-      trace_id: workflow_run_id,
-      metadata: {
-        workflow_run_id,
-        input,
-        durable_object_id: this.ctx.id.toString(),
-      },
-    });
+    try {
+      logger.info({
+        event_type: 'coordinator_start_called',
+        message: 'Coordinator.start() called',
+        trace_id: workflow_run_id,
+        metadata: {
+          workflow_run_id,
+          input,
+          durable_object_id: this.ctx.id.toString(),
+        },
+      });
 
-    // Step 1: Fetch workflow run metadata from Resources service
+      // Step 1: Fetch workflow run metadata from Resources service
     using workflowRuns = this.env.RESOURCES.workflowRuns();
     const workflowRun = await workflowRuns.get(workflow_run_id);
 
@@ -109,7 +111,7 @@ export class WorkflowCoordinator extends DurableObject {
     });
 
     // Step 4: Create and insert initial token
-    const token_id = ulid();
+    token_id = ulid();
     const now = new Date().toISOString();
 
     this.ctx.storage.sql.exec(
@@ -296,12 +298,62 @@ export class WorkflowCoordinator extends DurableObject {
       },
     });
 
-    logger.info({
-      event_type: 'coordinator_start_completed',
-      message: 'Coordinator.start() completed',
-      trace_id: workflow_run_id,
-      metadata: { workflow_run_id },
-    });
+      logger.info({
+        event_type: 'coordinator_start_completed',
+        message: 'Coordinator.start() completed',
+        trace_id: workflow_run_id,
+        metadata: { workflow_run_id },
+      });
+    } catch (error) {
+      logger.error({
+        event_type: 'coordinator_start_failed',
+        message: 'Coordinator.start() failed with error',
+        trace_id: workflow_run_id,
+        metadata: {
+          workflow_run_id,
+          token_id,
+          error: error instanceof Error ? error.message : String(error),
+          error_stack: error instanceof Error ? error.stack : undefined,
+        },
+      });
+
+      // Update token status to failed if token was created
+      if (token_id) {
+        try {
+          const failedAt = new Date().toISOString();
+          this.ctx.storage.sql.exec(
+            `UPDATE tokens SET status = ?, updated_at = ? WHERE id = ?`,
+            'failed',
+            failedAt,
+            token_id,
+          );
+
+          logger.info({
+            event_type: 'token_failed',
+            message: 'Token status updated to failed',
+            trace_id: workflow_run_id,
+            metadata: {
+              token_id,
+              status: 'failed',
+              updated_at: failedAt,
+            },
+          });
+        } catch (updateError) {
+          logger.error({
+            event_type: 'token_update_failed',
+            message: 'Failed to update token status to failed',
+            trace_id: workflow_run_id,
+            metadata: {
+              token_id,
+              error: updateError instanceof Error ? updateError.message : String(updateError),
+            },
+          });
+        }
+      }
+
+      // Re-throw to propagate error to caller
+      throw error;
+    }
   }
 
   /**
