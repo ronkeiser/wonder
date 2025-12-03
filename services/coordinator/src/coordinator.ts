@@ -183,6 +183,21 @@ export class WorkflowCoordinator extends DurableObject {
       },
     });
 
+    // Step 7: Create context table in SQLite
+    this.ctx.storage.sql.exec(`
+      CREATE TABLE IF NOT EXISTS context (
+        path TEXT PRIMARY KEY,
+        value TEXT NOT NULL
+      )
+    `);
+
+    logger.info({
+      event_type: 'context_table_created',
+      message: 'Context table created successfully',
+      trace_id: workflow_run_id,
+      metadata: { workflow_run_id },
+    });
+
     logger.info({
       event_type: 'coordinator_start_completed',
       message: 'Coordinator.start() completed',
