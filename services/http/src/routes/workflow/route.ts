@@ -31,30 +31,16 @@ workflows.openapi(startWorkflowRoute, async (c) => {
   using workflowsResource = c.env.RESOURCES.workflows();
   const result = await workflowsResource.start(id, input);
 
-  // Trigger workflow execution via coordinator DO
+  // Trigger workflow execution via coordinator DO (RPC)
   const coordinatorId = c.env.COORDINATOR.idFromName(result.durable_object_id);
   const coordinator = c.env.COORDINATOR.get(coordinatorId);
 
   try {
-    const coordinatorResponse = await coordinator.fetch(
-      new Request(`http://internal/start`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          workflow_run_id: result.workflow_run_id,
-          input,
-        }),
-      }),
-    );
-
-    if (!coordinatorResponse.ok) {
-      const errorText = await coordinatorResponse.text();
-      console.error('Coordinator error:', errorText);
-      throw new Error(`Coordinator returned ${coordinatorResponse.status}: ${errorText}`);
-    }
+    await coordinator.start(result.workflow_run_id, input);
   } catch (error) {
     console.error('Failed to trigger coordinator:', error);
-    throw error;
+    const errorMessage = error instanceof Error ? error.message : String(error);
+    return c.json({ error: `Failed to start workflow: ${errorMessage}` }, 500);
   }
 
   return c.json(result);

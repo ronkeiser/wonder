@@ -32,8 +32,8 @@
   ],
   "migrations": [
     {
-      "tag": "v1",
-      "new_classes": ["WorkflowCoordinator"]
+      "tag": "v3",
+      "new_sqlite_classes": ["WorkflowCoordinator"]
     }
   ],
   "observability": {
