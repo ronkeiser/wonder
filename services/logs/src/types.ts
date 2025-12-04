@@ -2,9 +2,17 @@
 
 export type LogLevel = 'error' | 'warn' | 'info' | 'debug' | 'fatal';
 
-export type HighlightColor = 
-  | 'pink' | 'purple' | 'cyan' | 'lime' 
-  | 'orange' | 'yellow' | 'red' | 'green' | 'blue' | 'magenta';
+export type HighlightColor =
+  | 'pink'
+  | 'purple'
+  | 'cyan'
+  | 'lime'
+  | 'orange'
+  | 'yellow'
+  | 'red'
+  | 'green'
+  | 'blue'
+  | 'magenta';
 
 export interface LogContext {
   service: string;

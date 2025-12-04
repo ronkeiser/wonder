@@ -347,6 +347,47 @@
         font-size: 0.9rem;
       }
 
+      /* Highlight colors - only affect message text */
+      .log-entry[data-highlight='pink'] .log-message {
+        color: #ff69b4;
+      }
+
+      .log-entry[data-highlight='purple'] .log-message {
+        color: #9b59b6;
+      }
+
+      .log-entry[data-highlight='cyan'] .log-message {
+        color: #00bcd4;
+      }
+
+      .log-entry[data-highlight='lime'] .log-message {
+        color: #cddc39;
+      }
+
+      .log-entry[data-highlight='orange'] .log-message {
+        color: #ff9800;
+      }
+
+      .log-entry[data-highlight='yellow'] .log-message {
+        color: #ffeb3b;
+      }
+
+      .log-entry[data-highlight='red'] .log-message {
+        color: #f44336;
+      }
+
+      .log-entry[data-highlight='green'] .log-message {
+        color: #4caf50;
+      }
+
+      .log-entry[data-highlight='blue'] .log-message {
+        color: #2196f3;
+      }
+
+      .log-entry[data-highlight='magenta'] .log-message {
+        color: #e91e63;
+      }
+
       .log-metadata {
         color: #8b949e;
         font-size: 0.75rem;
@@ -517,6 +558,11 @@
 
         const entry = document.createElement('div');
         entry.className = `log-entry ${log.level}`;
+
+        // Add highlight data attribute if present
+        if (log.highlight) {
+          entry.dataset.highlight = log.highlight;
+        }
 
         const content = document.createElement('div');
         content.className = 'log-content';
