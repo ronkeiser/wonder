@@ -1,3 +1,4 @@
+import { createLogger } from '@wonder/logs';
 import { RpcTarget } from 'cloudflare:workers';
 import { drizzle } from 'drizzle-orm/d1';
 import type { ServiceContext } from '~/infrastructure/context';
@@ -14,7 +15,7 @@ export abstract class Resource extends RpcTarget {
     super();
     this.env = env as any;
     const db = drizzle(env.DB);
-    const logger = env.LOGS.newLogger({
+    const logger = createLogger(ctx, env.LOGS, {
       service: 'resources',
       environment: env.ENVIRONMENT ?? 'local',
     });

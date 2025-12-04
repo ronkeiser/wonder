@@ -56,29 +56,6 @@ export class LogsService extends WorkerEntrypoint<Env> {
   }
 
   /**
-   * Factory method - returns a function with context baked in
-   */
-  newLogger(context: LogContext): Logger {
-    return {
-      error: (input: LoggerInput | string) => {
-        this.write(context, 'error', normalizeInput(input));
-      },
-      warn: (input: LoggerInput | string) => {
-        this.write(context, 'warn', normalizeInput(input));
-      },
-      info: (input: LoggerInput | string) => {
-        this.write(context, 'info', normalizeInput(input));
-      },
-      debug: (input: LoggerInput | string) => {
-        this.write(context, 'debug', normalizeInput(input));
-      },
-      fatal: (input: LoggerInput | string) => {
-        this.write(context, 'fatal', normalizeInput(input));
-      },
-    };
-  }
-
-  /**
    * Internal method - writes log to D1
    */
   private write(context: LogContext, level: LogLevel, input: LoggerInput): void {
