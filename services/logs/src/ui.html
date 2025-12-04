@@ -53,6 +53,34 @@
         font-weight: 600;
       }
 
+      .controls {
+        display: flex;
+        gap: 1rem;
+        align-items: center;
+      }
+
+      .service-filter {
+        padding: 0.375rem 0.75rem;
+        background: #21262d;
+        border: 1px solid #30363d;
+        border-radius: 6px;
+        color: #c9d1d9;
+        cursor: pointer;
+        font-size: 0.875rem;
+        font-family: inherit;
+        transition: background 0.2s, border-color 0.2s;
+      }
+
+      .service-filter:hover {
+        background: #30363d;
+        border-color: #8b949e;
+      }
+
+      .service-filter:focus {
+        outline: none;
+        box-shadow: 0 0 0 2px #58a6ff40;
+      }
+
       .time-filters {
         display: flex;
         gap: 0.5rem;
@@ -73,6 +101,11 @@
       .time-filter-btn:hover {
         background: #30363d;
         border-color: #8b949e;
+      }
+
+      .time-filter-btn:focus {
+        outline: none;
+        box-shadow: 0 0 0 2px #58a6ff40;
       }
 
       .time-filter-btn.active {
@@ -99,6 +132,11 @@
       .refresh-btn:hover {
         background: #30363d;
         border-color: #8b949e;
+      }
+
+      .refresh-btn:focus {
+        outline: none;
+        box-shadow: 0 0 0 2px #58a6ff40;
       }
 
       .refresh-btn:active {
@@ -306,21 +344,29 @@
   <body>
     <header>
       <h1>Logs <span id="status" class="status connecting">Connecting...</span></h1>
-      <div class="time-filters">
-        <button class="time-filter-btn" data-minutes="1">1m</button>
-        <button class="time-filter-btn active" data-minutes="5">5m</button>
-        <button class="time-filter-btn" data-minutes="20">20m</button>
-        <button class="time-filter-btn" data-minutes="60">1h</button>
-        <button class="time-filter-btn" data-minutes="240">4h</button>
-        <button id="refresh-btn" class="refresh-btn" title="Refresh logs">
-          <svg viewBox="0 0 16 16" fill="currentColor">
-            <path
-              fill-rule="evenodd"
-              d="M8 2.5a5.487 5.487 0 0 0-4.131 1.869l1.204 1.204A.25.25 0 0 1 4.896 6H1.25A.25.25 0 0 1 1 5.75V2.104a.25.25 0 0 1 .427-.177l1.38 1.38A7.001 7.001 0 0 1 14.95 7.16a.75.75 0 1 1-1.49.178A5.501 5.501 0 0 0 8 2.5zM1.705 8.005a.75.75 0 0 1 .834.656 5.501 5.501 0 0 0 9.592 2.97l-1.204-1.204a.25.25 0 0 1 .177-.427h3.646a.25.25 0 0 1 .25.25v3.646a.25.25 0 0 1-.427.177l-1.38-1.38A7.001 7.001 0 0 1 1.05 8.84a.75.75 0 0 1 .656-.834z"
-            ></path>
-          </svg>
-          Refresh
-        </button>
+      <div class="controls">
+        <select id="service-filter" class="service-filter">
+          <option value="">All Services</option>
+          <option value="wonder-coordinator">Coordinator</option>
+          <option value="wonder-executor">Executor</option>
+          <option value="resources">Resources</option>
+        </select>
+        <div class="time-filters">
+          <button class="time-filter-btn" data-minutes="1">1m</button>
+          <button class="time-filter-btn active" data-minutes="5">5m</button>
+          <button class="time-filter-btn" data-minutes="20">20m</button>
+          <button class="time-filter-btn" data-minutes="60">1h</button>
+          <button class="time-filter-btn" data-minutes="240">4h</button>
+          <button id="refresh-btn" class="refresh-btn" title="Refresh logs">
+            <svg viewBox="0 0 16 16" fill="currentColor">
+              <path
+                fill-rule="evenodd"
+                d="M8 2.5a5.487 5.487 0 0 0-4.131 1.869l1.204 1.204A.25.25 0 0 1 4.896 6H1.25A.25.25 0 0 1 1 5.75V2.104a.25.25 0 0 1 .427-.177l1.38 1.38A7.001 7.001 0 0 1 14.95 7.16a.75.75 0 1 1-1.49.178A5.501 5.501 0 0 0 8 2.5zM1.705 8.005a.75.75 0 0 1 .834.656 5.501 5.501 0 0 0 9.592 2.97l-1.204-1.204a.25.25 0 0 1 .177-.427h3.646a.25.25 0 0 1 .25.25v3.646a.25.25 0 0 1-.427.177l-1.38-1.38A7.001 7.001 0 0 1 1.05 8.84a.75.75 0 0 1 .656-.834z"
+              ></path>
+            </svg>
+            Refresh
+          </button>
+        </div>
       </div>
     </header>
 
@@ -332,6 +378,7 @@
       const seenLogIds = new Set();
       let lastLogId = '';
       let currentFilter = null;
+      let currentService = '';
 
       function setStatus(state) {
         statusEl.className = `status ${state}`;
@@ -352,7 +399,13 @@
         const cutoffTime = Date.now() - minutes * 60 * 1000;
 
         try {
-          const response = await fetch('/logs?limit=1000');
+          const url = new URL('/logs', window.location.origin);
+          url.searchParams.set('limit', '1000');
+          if (currentService) {
+            url.searchParams.set('service', currentService);
+          }
+          
+          const response = await fetch(url);
           const data = await response.json();
 
           // Filter logs by time and add them
@@ -365,6 +418,25 @@
           console.error('Failed to fetch logs:', error);
         }
       }
+
+      // Setup service filter
+      document.getElementById('service-filter').addEventListener('change', (e) => {
+        currentService = e.target.value;
+
+        // Update URL params
+        const url = new URL(window.location);
+        if (currentService) {
+          url.searchParams.set('service', currentService);
+        } else {
+          url.searchParams.delete('service');
+        }
+        window.history.pushState({}, '', url);
+
+        // Refresh logs with current time filter
+        const activeBtn = document.querySelector('.time-filter-btn.active');
+        const minutes = activeBtn ? parseInt(activeBtn.dataset.minutes) : 5;
+        filterLogsByTime(minutes);
+      });
 
       // Setup time filter buttons
       document.querySelectorAll('.time-filter-btn').forEach((btn) => {
@@ -415,6 +487,11 @@
         // Skip if ULID is older than our last log (prevents duplicates on reconnect)
         // ULIDs are lexicographically sortable, so string comparison works
         if (log.id && lastLogId && log.id < lastLogId) {
+          return;
+        }
+
+        // Skip if service filter is active and log doesn't match
+        if (currentService && log.service !== currentService) {
           return;
         }
 
@@ -548,10 +625,16 @@
         };
       }
 
-      // Load filter from URL params or default to 5m
+      // Load filters from URL params or defaults
       const urlParams = new URLSearchParams(window.location.search);
       const savedMinutes = urlParams.get('m');
       const initialMinutes = savedMinutes ? parseInt(savedMinutes) : 5;
+      const savedService = urlParams.get('service');
+      
+      if (savedService) {
+        currentService = savedService;
+        document.getElementById('service-filter').value = savedService;
+      }
 
       // Update active button to match initial filter
       document.querySelectorAll('.time-filter-btn').forEach((btn) => {
