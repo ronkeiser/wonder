@@ -2,10 +2,10 @@ import type { LogContext, Logger, LoggerInput, LogLevel } from './types.js';
 
 /**
  * Create a logger instance that wraps the LOGS service binding
- * Uses the consumer's ExecutionContext for waitUntil
+ * Works with both Workers (ExecutionContext) and Durable Objects (DurableObjectState)
  */
 export function createLogger(
-  ctx: ExecutionContext,
+  ctx: { waitUntil(promise: Promise<any>): void },
   logsBinding: {
     log(level: LogLevel, context: LogContext, input: LoggerInput): Promise<void>;
   },

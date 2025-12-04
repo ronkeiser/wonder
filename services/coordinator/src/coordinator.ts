@@ -1,4 +1,4 @@
-import type { Logger } from '@wonder/logs';
+import { createLogger, type Logger } from '@wonder/logs';
 import { DurableObject } from 'cloudflare:workers';
 import { ulid } from 'ulid';
 
@@ -18,24 +18,14 @@ function renderTemplate(template: string, context: Record<string, unknown>): str
  * Will be rebuilt incrementally with full logging.
  */
 export class WorkflowCoordinator extends DurableObject {
-  private logger: Logger | null = null;
+  private logger: Logger;
 
   constructor(ctx: DurableObjectState, env: Env) {
     super(ctx, env);
-  }
-
-  /**
-   * Get or create logger instance
-   */
-  private getLogger(): Logger {
-    if (!this.logger) {
-      this.logger = this.env.LOGS.newLogger({
-        service: 'coordinator',
-        environment: 'production',
-        instance_id: this.ctx.id.toString(),
-      });
-    }
-    return this.logger;
+    this.logger = createLogger(this.ctx, this.env.LOGS, {
+      service: 'coordinator',
+      environment: 'production',
+    });
   }
 
   /**
@@ -79,8 +69,6 @@ export class WorkflowCoordinator extends DurableObject {
    * Dispatch a token for execution - prepares task and calls executor
    */
   private async dispatchToken(token_id: string): Promise<void> {
-    const logger = this.getLogger();
-
     // Fetch the token's node from the workflow definition
     const tokenRow = this.ctx.storage.sql.exec(
       `SELECT node_id, workflow_run_id FROM tokens WHERE id = ?`,
@@ -107,7 +95,7 @@ export class WorkflowCoordinator extends DurableObject {
       throw new Error(`Node not found: ${tokenRow.node_id}`);
     }
 
-    logger.info({
+    this.logger.info({
       event_type: 'node_fetched',
       message: 'Node retrieved from workflow definition',
       trace_id: workflow_run_id,
@@ -123,7 +111,7 @@ export class WorkflowCoordinator extends DurableObject {
     using actions = this.env.RESOURCES.actions();
     const actionResult = await actions.get(node.action_id, node.action_version);
 
-    logger.info({
+    this.logger.info({
       event_type: 'action_fetched',
       message: 'Action definition retrieved',
       trace_id: workflow_run_id,
@@ -146,7 +134,7 @@ export class WorkflowCoordinator extends DurableObject {
         using promptSpecs = this.env.RESOURCES.promptSpecs();
         const promptSpecResult = await promptSpecs.get(implementation.prompt_spec_id);
 
-        logger.info({
+        this.logger.info({
           event_type: 'prompt_spec_fetched',
           message: 'Prompt spec retrieved',
           trace_id: workflow_run_id,
@@ -176,7 +164,7 @@ export class WorkflowCoordinator extends DurableObject {
           }
         }
 
-        logger.info({
+        this.logger.info({
           event_type: 'input_mapping_evaluated',
           message: 'Input mapping evaluated for prompt rendering',
           trace_id: workflow_run_id,
@@ -198,7 +186,7 @@ export class WorkflowCoordinator extends DurableObject {
           token_id,
         );
 
-        logger.info({
+        this.logger.info({
           event_type: 'token_executing',
           message: 'Token status updated to executing',
           trace_id: workflow_run_id,
@@ -220,7 +208,7 @@ export class WorkflowCoordinator extends DurableObject {
           })
         );
 
-        logger.info({
+        this.logger.info({
           event_type: 'task_dispatched',
           message: 'Task dispatched to executor (fire-and-forget)',
           trace_id: workflow_run_id,
@@ -246,8 +234,6 @@ export class WorkflowCoordinator extends DurableObject {
     token_id: string,
     result: { output_data: Record<string, unknown> }
   ): Promise<void> {
-    const logger = this.getLogger();
-
     // Fetch token info
     const tokenRow = this.ctx.storage.sql.exec(
       `SELECT node_id, workflow_run_id FROM tokens WHERE id = ?`,
@@ -266,7 +252,7 @@ export class WorkflowCoordinator extends DurableObject {
       token_id,
     );
 
-    logger.info({
+    this.logger.info({
       event_type: 'token_completed',
       message: 'Token status updated to completed',
       trace_id: workflow_run_id,
@@ -303,7 +289,7 @@ export class WorkflowCoordinator extends DurableObject {
       );
     }
 
-    logger.info({
+    this.logger.info({
       event_type: 'context_output_stored',
       message: 'Action output stored in context',
       trace_id: workflow_run_id,
@@ -322,7 +308,7 @@ export class WorkflowCoordinator extends DurableObject {
       (t: any) => t.from_node_id === node_id
     );
 
-    logger.info({
+    this.logger.info({
       event_type: 'transitions_queried',
       message: 'Transitions queried for completed node',
       trace_id: workflow_run_id,
@@ -351,7 +337,7 @@ export class WorkflowCoordinator extends DurableObject {
         1, // branch_total: 1 for single branch
       );
 
-      logger.info({
+      this.logger.info({
         event_type: 'transition_token_created',
         message: 'Token created for transition target node',
         trace_id: workflow_run_id,
@@ -378,7 +364,7 @@ export class WorkflowCoordinator extends DurableObject {
       // Extract final output using output_mapping
       const finalOutput: Record<string, unknown> = {};
       
-      logger.info({
+      this.logger.info({
         event_type: 'extracting_final_output',
         message: 'Evaluating output_mapping',
         trace_id: workflow_run_id,
@@ -404,7 +390,7 @@ export class WorkflowCoordinator extends DurableObject {
         }
       }
 
-      logger.info({
+      this.logger.info({
         event_type: 'workflow_completed',
         message: 'Workflow execution completed - no pending tokens remain',
         trace_id: workflow_run_id,
@@ -426,11 +412,10 @@ export class WorkflowCoordinator extends DurableObject {
    * Start workflow execution (RPC method)
    */
   async start(workflow_run_id: string, input: Record<string, unknown>): Promise<void> {
-    const logger = this.getLogger();
     let token_id: string | undefined;
 
     try {
-      logger.info({
+      this.logger.info({
         event_type: 'coordinator_start_called',
         message: 'Coordinator.start() called',
         trace_id: workflow_run_id,
@@ -445,7 +430,7 @@ export class WorkflowCoordinator extends DurableObject {
       using workflowRuns = this.env.RESOURCES.workflowRuns();
       const workflowRun = await workflowRuns.get(workflow_run_id);
 
-      logger.info({
+      this.logger.info({
         event_type: 'workflow_run_fetched',
         message: 'Workflow run metadata retrieved',
         trace_id: workflow_run_id,
@@ -466,7 +451,7 @@ export class WorkflowCoordinator extends DurableObject {
         workflowRun.workflow_run.workflow_version,
       );
 
-      logger.info({
+      this.logger.info({
         event_type: 'workflow_def_fetched',
         message: 'Workflow definition retrieved',
         trace_id: workflow_run_id,
@@ -487,7 +472,7 @@ export class WorkflowCoordinator extends DurableObject {
         )
       `);
 
-      logger.info({
+      this.logger.info({
         event_type: 'context_table_created',
         message: 'Context table created successfully',
         trace_id: workflow_run_id,
@@ -503,7 +488,7 @@ export class WorkflowCoordinator extends DurableObject {
         );
       }
 
-      logger.info({
+      this.logger.info({
         event_type: 'context_initialized',
         message: 'Context initialized with workflow input',
         trace_id: workflow_run_id,
@@ -530,7 +515,7 @@ export class WorkflowCoordinator extends DurableObject {
         )
       `);
 
-      logger.info({
+      this.logger.info({
         event_type: 'tokens_table_created',
         message: 'Tokens table created successfully',
         trace_id: workflow_run_id,
@@ -552,7 +537,7 @@ export class WorkflowCoordinator extends DurableObject {
         1, // branch_total: 1 for single branch
       );
 
-      logger.info({
+      this.logger.info({
         event_type: 'initial_token_created',
         message: 'Initial token created and inserted',
         trace_id: workflow_run_id,
@@ -568,14 +553,14 @@ export class WorkflowCoordinator extends DurableObject {
       // Step 7: Dispatch the initial token for execution
       await this.dispatchToken(token_id);
 
-      logger.info({
+      this.logger.info({
         event_type: 'coordinator_start_completed',
         message: 'Coordinator.start() completed',
         trace_id: workflow_run_id,
         metadata: { workflow_run_id },
       });
     } catch (error) {
-      logger.error({
+      this.logger.error({
         event_type: 'coordinator_start_failed',
         message: 'Coordinator.start() failed with error',
         trace_id: workflow_run_id,
@@ -598,7 +583,7 @@ export class WorkflowCoordinator extends DurableObject {
             token_id,
           );
 
-          logger.info({
+          this.logger.info({
             event_type: 'token_failed',
             message: 'Token status updated to failed',
             trace_id: workflow_run_id,
@@ -609,7 +594,7 @@ export class WorkflowCoordinator extends DurableObject {
             },
           });
         } catch (updateError) {
-          logger.error({
+          this.logger.error({
             event_type: 'token_update_failed',
             message: 'Failed to update token status to failed',
             trace_id: workflow_run_id,
@@ -630,8 +615,7 @@ export class WorkflowCoordinator extends DurableObject {
    * Handle alarms for scheduled tasks
    */
   async alarm(): Promise<void> {
-    const logger = this.getLogger();
-    logger.info({
+    this.logger.info({
       event_type: 'alarm_triggered',
       message: 'Durable Object alarm triggered',
       metadata: { durable_object_id: this.ctx.id.toString() },
