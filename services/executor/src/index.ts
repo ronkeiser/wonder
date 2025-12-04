@@ -78,6 +78,7 @@ export default class ExecutorService extends WorkerEntrypoint<Env> {
           response_length: result.response.length,
           workflow_run_id: params.workflow_run_id,
           token_id: params.token_id,
+          output: result,
         },
       });
 

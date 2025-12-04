@@ -279,8 +279,25 @@ export class WorkflowCoordinator extends DurableObject {
       throw new Error(`Node not found: ${node_id}`);
     }
 
-    // Store action output in context using node.ref (matches input_mapping paths)
-    for (const [key, value] of Object.entries(result.output_data)) {
+    // Apply node's output_mapping to transform action output keys
+    const mappedOutput: Record<string, unknown> = {};
+    if (node.output_mapping) {
+      for (const [outputKey, jsonPath] of Object.entries(node.output_mapping)) {
+        const pathStr = jsonPath as string;
+        if (pathStr.startsWith('$.')) {
+          const sourceKey = pathStr.slice(2); // Remove $.
+          if (result.output_data[sourceKey] !== undefined) {
+            mappedOutput[outputKey] = result.output_data[sourceKey];
+          }
+        }
+      }
+    } else {
+      // If no output_mapping, use raw output
+      Object.assign(mappedOutput, result.output_data);
+    }
+
+    // Store mapped output in context using node.ref (matches input_mapping paths)
+    for (const [key, value] of Object.entries(mappedOutput)) {
       const contextPath = `${node.ref}_output.${key}`;
       this.ctx.storage.sql.exec(
         `INSERT OR REPLACE INTO context (path, value) VALUES (?, ?)`,
@@ -297,9 +314,10 @@ export class WorkflowCoordinator extends DurableObject {
         token_id,
         node_id,
         node_ref: node.ref,
-        output_keys: Object.keys(result.output_data),
-        output_data: result.output_data,
-        context_paths: Object.keys(result.output_data).map(key => `${node.ref}_output.${key}`),
+        raw_output_keys: Object.keys(result.output_data),
+        mapped_output_keys: Object.keys(mappedOutput),
+        output_mapping: node.output_mapping,
+        context_paths: Object.keys(mappedOutput).map(key => `${node.ref}_output.${key}`),
       },
     });
 

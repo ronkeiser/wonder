@@ -3,7 +3,7 @@ import { client } from '../client';
 
 describe('Workflow Execution API', () => {
   it('should start a workflow execution and return workflow_run_id', async () => {
-    const testName = 'Flapjack';
+    const testTopic = 'a pirate adventure';
     // Create workspace
     const { data: workspaceResponse } = await client.POST('/api/workspaces', {
       body: {
@@ -40,47 +40,67 @@ describe('Workflow Execution API', () => {
 
     expect(modelProfileError).toBeUndefined();
 
-    // Create prompt spec for node 1 (create madlib)
+    // Create prompt spec for node 1 (create madlib template)
     const { data: promptSpecResponse } = await client.POST('/api/prompt-specs', {
       body: {
         version: 1,
-        name: 'Test Prompt',
-        description: 'Prompt for workflow execution test',
+        name: 'Create Madlib Template',
+        description: 'Creates a madlib template with placeholders',
         template:
-          'Create a short madlib (2 sentences) about {{name}}. Use placeholders like [adjective], [noun], [verb], [adverb]. Do not fill in the blanks.',
+          'Create a short madlib story (2-3 sentences) about {{topic}}. Use placeholders like [adjective], [noun], [verb], [adverb], [animal], [color]. Output ONLY the template with placeholders - do not fill them in. Example: "The [adjective] [animal] [verb] down the [color] path."',
         template_language: 'handlebars',
         requires: {
-          name: 'string',
+          topic: 'string',
         },
         produces: {
-          response: 'string',
+          template: 'string',
         },
       },
     });
 
-    // Create prompt spec for node 2 (complete madlib)
+    // Create prompt spec for node 2 (provide words for placeholders)
     const { data: promptSpec2Response } = await client.POST('/api/prompt-specs', {
       body: {
         version: 1,
-        name: 'Complete Madlib Prompt',
-        description: 'Prompt to fill in madlib blanks',
-        template: 'Fill in the blanks in this madlib: {{madlib}}',
+        name: 'Fill Madlib Blanks',
+        description: 'Provides words for madlib placeholders without seeing the story',
+        template:
+          'I need words to fill in blanks for a madlib. The template has these placeholders: {{placeholders}}. For each placeholder, give me an appropriate word. Format your response as a simple list like:\n[adjective]: happy\n[noun]: banana\n[verb]: danced',
         template_language: 'handlebars',
         requires: {
-          madlib: 'string',
+          placeholders: 'string',
         },
         produces: {
-          response: 'string',
+          words: 'string',
         },
       },
     });
 
-    // Create action 1 (after prompt spec since action references it)
+    // Create prompt spec for node 3 (compose final madlib)
+    const { data: promptSpec3Response } = await client.POST('/api/prompt-specs', {
+      body: {
+        version: 1,
+        name: 'Compose Madlib',
+        description: 'Combines template and words into final story',
+        template:
+          'Here is a madlib template: {{template}}\n\nHere are the words to fill in: {{words}}\n\nReplace each placeholder in the template with the corresponding word and output ONLY the final completed story.',
+        template_language: 'handlebars',
+        requires: {
+          template: 'string',
+          words: 'string',
+        },
+        produces: {
+          story: 'string',
+        },
+      },
+    });
+
+    // Create action 1 (create template)
     const { data: actionResponse } = await client.POST('/api/actions', {
       body: {
         version: 1,
-        name: 'Test LLM Action',
-        description: 'LLM action for workflow execution test',
+        name: 'Create Madlib Template Action',
+        description: 'Creates madlib template with placeholders',
         kind: 'llm_call',
         implementation: {
           prompt_spec_id: promptSpecResponse!.prompt_spec.id,
@@ -89,12 +109,12 @@ describe('Workflow Execution API', () => {
       },
     });
 
-    // Create action 2
+    // Create action 2 (fill blanks)
     const { data: action2Response } = await client.POST('/api/actions', {
       body: {
         version: 1,
-        name: 'Complete Madlib Action',
-        description: 'LLM action to complete the madlib',
+        name: 'Fill Madlib Blanks Action',
+        description: 'Provides words for placeholders',
         kind: 'llm_call',
         implementation: {
           prompt_spec_id: promptSpec2Response!.prompt_spec.id,
@@ -103,13 +123,27 @@ describe('Workflow Execution API', () => {
       },
     });
 
-    // Create workflow definition with two LLM nodes
+    // Create action 3 (compose final story)
+    const { data: action3Response } = await client.POST('/api/actions', {
+      body: {
+        version: 1,
+        name: 'Compose Madlib Action',
+        description: 'Combines template and words into final story',
+        kind: 'llm_call',
+        implementation: {
+          prompt_spec_id: promptSpec3Response!.prompt_spec.id,
+          model_profile_id: modelProfileResponse!.model_profile.id,
+        },
+      },
+    });
+
+    // Create workflow definition with three LLM nodes
     const { data: workflowDefResponse, error: wfDefError } = await client.POST(
       '/api/workflow-defs',
       {
         body: {
-          name: `Test Workflow Def ${Date.now()}`,
-          description: 'Workflow definition for execution test',
+          name: `Three Node Madlib Workflow ${Date.now()}`,
+          description: 'Three-node madlib: create template, fill blanks, compose story',
           version: 1,
           owner: {
             type: 'project' as const,
@@ -118,50 +152,68 @@ describe('Workflow Execution API', () => {
           input_schema: {
             type: 'object',
             properties: {
-              name: { type: 'string' },
+              topic: { type: 'string' },
             },
-            required: ['name'],
+            required: ['topic'],
           },
           output_schema: {
             type: 'object',
             properties: {
-              response: { type: 'string' },
+              story: { type: 'string' },
             },
           },
           output_mapping: {
-            response: '$.llm_complete_output.response',
+            story: '$.compose_output.story',
           },
-          initial_node_ref: 'llm_greet',
+          initial_node_ref: 'create_template',
           nodes: [
             {
-              ref: 'llm_greet',
-              name: 'Create Madlib',
+              ref: 'create_template',
+              name: 'Create Madlib Template',
               action_id: actionResponse!.action.id,
               action_version: 1,
               input_mapping: {
-                name: '$.input.name',
+                topic: '$.input.topic',
               },
               output_mapping: {
-                response: '$.response',
+                template: '$.response',
               },
             },
             {
-              ref: 'llm_complete',
-              name: 'Complete Madlib',
+              ref: 'fill_blanks',
+              name: 'Fill Madlib Blanks',
               action_id: action2Response!.action.id,
               action_version: 1,
               input_mapping: {
-                madlib: '$.llm_greet_output.response',
+                placeholders: '$.create_template_output.template',
               },
               output_mapping: {
-                response: '$.response',
+                words: '$.response',
+              },
+            },
+            {
+              ref: 'compose',
+              name: 'Compose Final Story',
+              action_id: action3Response!.action.id,
+              action_version: 1,
+              input_mapping: {
+                template: '$.create_template_output.template',
+                words: '$.fill_blanks_output.words',
+              },
+              output_mapping: {
+                story: '$.response',
               },
             },
           ],
           transitions: [
             {
-              from_node_ref: 'llm_greet',
-              to_node_ref: 'llm_complete',
+              from_node_ref: 'create_template',
+              to_node_ref: 'fill_blanks',
+              priority: 1,
+            },
+            {
+              from_node_ref: 'fill_blanks',
+              to_node_ref: 'compose',
               priority: 1,
             },
           ],
@@ -190,7 +242,7 @@ describe('Workflow Execution API', () => {
       {
         params: { path: { id: workflowResponse!.workflow.id } },
         body: {
-          name: testName,
+          topic: testTopic,
         },
       },
     );
