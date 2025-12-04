@@ -286,9 +286,20 @@ export class WorkflowCoordinator extends DurableObject {
       for (const [outputKey, jsonPath] of Object.entries(node.output_mapping)) {
         const pathStr = jsonPath as string;
         if (pathStr.startsWith('$.')) {
-          const sourceKey = pathStr.slice(2); // Remove $.
-          if (result.output_data[sourceKey] !== undefined) {
-            mappedOutput[outputKey] = result.output_data[sourceKey];
+          const sourcePath = pathStr.slice(2); // Remove $.
+          // Navigate nested paths (e.g., "response.template")
+          const pathParts = sourcePath.split('.');
+          let value: any = result.output_data;
+          for (const part of pathParts) {
+            if (value && typeof value === 'object' && part in value) {
+              value = value[part];
+            } else {
+              value = undefined;
+              break;
+            }
+          }
+          if (value !== undefined) {
+            mappedOutput[outputKey] = value;
           }
         }
       }

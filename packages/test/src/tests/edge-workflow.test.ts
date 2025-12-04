@@ -55,7 +55,7 @@ describe('Edge Workflow - Single Node JSON Output', () => {
       },
     });
 
-    // Create action
+    // Create action for template generation
     const { data: actionResponse } = await client.POST('/api/actions', {
       body: {
         version: 1,
@@ -69,11 +69,44 @@ describe('Edge Workflow - Single Node JSON Output', () => {
       },
     });
 
-    // Create workflow definition with single node
+    // Create prompt spec for word generation
+    const { data: wordPromptSpecResponse } = await client.POST('/api/prompt-specs', {
+      body: {
+        version: 1,
+        name: 'Generate Madlib Words',
+        description: 'Generates words to fill madlib placeholders as JSON',
+        template:
+          'I need creative words to fill in a madlib story. The placeholders are: {{placeholders}}. For each placeholder type, give me one creative word. Return ONLY valid JSON with the placeholder types as keys and the words as values. Example: {"adjective": "sparkly", "noun": "telescope", "verb": "danced"}',
+        template_language: 'handlebars',
+        requires: {
+          placeholders: 'array',
+        },
+        produces: {
+          type: 'object',
+          additionalProperties: { type: 'string' },
+        },
+      },
+    });
+
+    // Create action for word generation
+    const { data: wordActionResponse } = await client.POST('/api/actions', {
+      body: {
+        version: 1,
+        name: 'Generate Words Action',
+        description: 'LLM action to generate words for placeholders',
+        kind: 'llm_call',
+        implementation: {
+          prompt_spec_id: wordPromptSpecResponse!.prompt_spec.id,
+          model_profile_id: modelProfileResponse!.model_profile.id,
+        },
+      },
+    });
+
+    // Create workflow definition with two nodes
     const { data: workflowDefResponse } = await client.POST('/api/workflow-defs', {
       body: {
-        name: `Single Node Madlib Workflow ${Date.now()}`,
-        description: 'Single node workflow that generates madlib JSON',
+        name: `Two Node Madlib Workflow ${Date.now()}`,
+        description: 'Two node workflow: generate template, then generate words',
         version: 1,
         owner: {
           type: 'project' as const,
@@ -89,13 +122,13 @@ describe('Edge Workflow - Single Node JSON Output', () => {
         output_schema: {
           type: 'object',
           properties: {
-            template: { type: 'string' },
-            placeholders: { type: 'array' },
+            template: { type: 'object' },
+            words: { type: 'object' },
           },
         },
         output_mapping: {
           template: '$.generate_output.template',
-          placeholders: '$.generate_output.placeholders',
+          words: '$.fill_words_output.words',
         },
         initial_node_ref: 'generate',
         nodes: [
@@ -108,12 +141,32 @@ describe('Edge Workflow - Single Node JSON Output', () => {
               topic: '$.input.topic',
             },
             output_mapping: {
-              template: '$.response',
-              placeholders: '$.response',
+              template: '$.response.template',
+              placeholders: '$.response.placeholders',
+            },
+          },
+          {
+            ref: 'fill_words',
+            name: 'Generate Words for Placeholders',
+            action_id: wordActionResponse!.action.id,
+            action_version: 1,
+            input_mapping: {
+              placeholders: '$.generate_output.placeholders',
+            },
+            output_mapping: {
+              words: '$.response',
             },
           },
         ],
-        transitions: [],
+        transitions: [
+          {
+            from_node_id: null, // Will be set by API using refs
+            to_node_id: null,
+            from_node_ref: 'generate',
+            to_node_ref: 'fill_words',
+            priority: 1,
+          },
+        ],
       },
     });
 
@@ -123,7 +176,7 @@ describe('Edge Workflow - Single Node JSON Output', () => {
         project_id: projectResponse!.project.id,
         workflow_def_id: workflowDefResponse!.workflow_def.id,
         name: `Test Workflow ${Date.now()}`,
-        description: 'Single node test workflow',
+        description: 'Two node test workflow',
       },
     });
 
