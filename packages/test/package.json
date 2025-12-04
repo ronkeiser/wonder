@@ -6,7 +6,7 @@
   "scripts": {
     "test": "vitest run",
     "test:watch": "vitest",
-    "test:edge": "vitest run src/tests/edge-workflow.test.ts"
+    "test:edge": "vitest run src/tests/edge.test.ts"
   },
   "dependencies": {
     "@wonder/sdk": "workspace:*"
