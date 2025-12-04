@@ -31,6 +31,7 @@ export const logs = sqliteTable(
     user_id: text('user_id'),
     version: text('version'),
     instance_id: text('instance_id'),
+    highlight: text('highlight'), // Optional color for visual emphasis (1-10)
     metadata: text('metadata').notNull(), // JSON blob
   },
   (table) => [

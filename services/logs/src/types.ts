@@ -2,6 +2,10 @@
 
 export type LogLevel = 'error' | 'warn' | 'info' | 'debug' | 'fatal';
 
+export type HighlightColor = 
+  | 'pink' | 'purple' | 'cyan' | 'lime' 
+  | 'orange' | 'yellow' | 'red' | 'green' | 'blue' | 'magenta';
+
 export interface LogContext {
   service: string;
   environment: string;
@@ -20,6 +24,7 @@ export interface LoggerInput {
   workspace_id?: string;
   project_id?: string;
   user_id?: string;
+  highlight?: HighlightColor;
   metadata?: Record<string, unknown>;
 }
 
@@ -35,6 +40,7 @@ export interface LogEntry extends LogContext {
   workspace_id?: string;
   project_id?: string;
   user_id?: string;
+  highlight?: string;
   metadata: string;
 }
 
