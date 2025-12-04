@@ -210,7 +210,7 @@ export class WorkflowCoordinator extends DurableObject {
 
         this.logger.info({
           event_type: 'task_dispatched',
-          message: 'Task dispatched to executor (fire-and-forget)',
+          message: 'Task dispatched to executor',
           trace_id: workflow_run_id,
           metadata: {
             token_id,
@@ -392,7 +392,7 @@ export class WorkflowCoordinator extends DurableObject {
 
       this.logger.info({
         event_type: 'workflow_completed',
-        message: 'Workflow execution completed - no pending tokens remain',
+        message: 'Workflow execution completed',
         trace_id: workflow_run_id,
         metadata: {
           workflow_run_id,
