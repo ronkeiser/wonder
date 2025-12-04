@@ -1,6 +1,6 @@
 import { createLogger, type Logger } from '@wonder/logs';
 import { DurableObject } from 'cloudflare:workers';
-import { ulid } from 'ulid';
+import * as tokens from './tokens';
 
 /**
  * Template renderer supporting:
@@ -43,52 +43,14 @@ export class WorkflowCoordinator extends DurableObject {
     });
   }
 
-  /**
-   * Create a new token for workflow execution
-   */
-  private createToken(
-    workflow_run_id: string,
-    node_id: string,
-    parent_token_id: string | null,
-    path_id: string,
-    fan_out_node_id: string | null,
-    branch_index: number,
-    branch_total: number,
-  ): string {
-    const token_id = ulid();
-    const now = new Date().toISOString();
 
-    this.ctx.storage.sql.exec(
-      `INSERT INTO tokens (
-        id, workflow_run_id, node_id, status, path_id,
-        parent_token_id, fan_out_node_id, branch_index, branch_total,
-        created_at, updated_at
-      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
-      token_id,
-      workflow_run_id,
-      node_id,
-      'pending',
-      path_id,
-      parent_token_id,
-      fan_out_node_id,
-      branch_index,
-      branch_total,
-      now,
-      now,
-    );
-
-    return token_id;
-  }
 
   /**
    * Dispatch a token for execution - prepares task and calls executor
    */
   private async dispatchToken(token_id: string): Promise<void> {
     // Fetch the token's node from the workflow definition
-    const tokenRow = this.ctx.storage.sql.exec(
-      `SELECT node_id, workflow_run_id FROM tokens WHERE id = ?`,
-      token_id
-    ).one();
+    const tokenRow = tokens.getToken(this.ctx.storage.sql, token_id);
 
     const workflow_run_id = tokenRow.workflow_run_id as string;
 
@@ -209,13 +171,7 @@ export class WorkflowCoordinator extends DurableObject {
         const prompt = renderTemplate(promptSpecResult.prompt_spec.template, templateContext);
 
         // Mark token as executing
-        const executingAt = new Date().toISOString();
-        this.ctx.storage.sql.exec(
-          `UPDATE tokens SET status = ?, updated_at = ? WHERE id = ?`,
-          'executing',
-          executingAt,
-          token_id,
-        );
+        tokens.updateTokenStatus(this.ctx.storage.sql, token_id, 'executing');
 
         this.logger.info({
           event_type: 'token_executing',
@@ -269,22 +225,13 @@ export class WorkflowCoordinator extends DurableObject {
     result: { output_data: Record<string, unknown> }
   ): Promise<void> {
     // Fetch token info
-    const tokenRow = this.ctx.storage.sql.exec(
-      `SELECT node_id, workflow_run_id FROM tokens WHERE id = ?`,
-      token_id
-    ).one();
+    const tokenRow = tokens.getToken(this.ctx.storage.sql, token_id);
 
     const workflow_run_id = tokenRow.workflow_run_id as string;
     const node_id = tokenRow.node_id as string;
 
     // Update token status to completed
-    const completedAt = new Date().toISOString();
-    this.ctx.storage.sql.exec(
-      `UPDATE tokens SET status = ?, updated_at = ? WHERE id = ?`,
-      'completed',
-      completedAt,
-      token_id,
-    );
+    tokens.updateTokenStatus(this.ctx.storage.sql, token_id, 'completed');
 
     this.logger.info({
       event_type: 'token_completed',
@@ -294,7 +241,6 @@ export class WorkflowCoordinator extends DurableObject {
         token_id,
         node_id,
         status: 'completed',
-        updated_at: completedAt,
       },
     });
 
@@ -390,15 +336,15 @@ export class WorkflowCoordinator extends DurableObject {
 
     // Create tokens for all outgoing transitions
     for (const transition of transitions) {
-      const nextTokenId = this.createToken(
+      const nextTokenId = tokens.createToken(this.ctx.storage.sql, {
         workflow_run_id,
-        transition.to_node_id,
-        token_id, // parent_token_id: current completed token
-        '', // path_id: same as parent for now
-        null, // fan_out_node_id: null for simple linear flow
-        0, // branch_index: 0 for single branch
-        1, // branch_total: 1 for single branch
-      );
+        node_id: transition.to_node_id,
+        parent_token_id: token_id, // current completed token
+        path_id: '', // same as parent for now
+        fan_out_node_id: null, // null for simple linear flow
+        branch_index: 0, // 0 for single branch
+        branch_total: 1, // 1 for single branch
+      });
 
       this.logger.info({
         event_type: 'transition_token_created',
@@ -418,12 +364,9 @@ export class WorkflowCoordinator extends DurableObject {
     }
 
     // Check if workflow is complete (no pending or executing tokens remain)
-    const pendingTokens = this.ctx.storage.sql.exec(
-      `SELECT COUNT(*) as count FROM tokens WHERE workflow_run_id = ? AND status IN ('pending', 'executing')`,
-      workflow_run_id
-    ).one();
+    const activeCount = tokens.getActiveTokenCount(this.ctx.storage.sql, workflow_run_id);
 
-    if (pendingTokens.count === 0) {
+    if (activeCount === 0) {
       // Extract final output using output_mapping
       const finalOutput: Record<string, unknown> = {};
       
@@ -564,21 +507,7 @@ export class WorkflowCoordinator extends DurableObject {
       });
 
       // Step 5: Create tokens table in SQLite
-      this.ctx.storage.sql.exec(`
-        CREATE TABLE IF NOT EXISTS tokens (
-          id TEXT PRIMARY KEY,
-          workflow_run_id TEXT NOT NULL,
-          node_id TEXT NOT NULL,
-          status TEXT NOT NULL,
-          path_id TEXT NOT NULL,
-          parent_token_id TEXT,
-          fan_out_node_id TEXT,
-          branch_index INTEGER NOT NULL,
-          branch_total INTEGER NOT NULL,
-          created_at TEXT NOT NULL,
-          updated_at TEXT NOT NULL
-        )
-      `);
+      tokens.initializeTokensTable(this.ctx.storage.sql);
 
       this.logger.info({
         event_type: 'tokens_table_created',
@@ -592,15 +521,15 @@ export class WorkflowCoordinator extends DurableObject {
         throw new Error('Workflow definition has no initial_node_id');
       }
       
-      token_id = this.createToken(
+      token_id = tokens.createToken(this.ctx.storage.sql, {
         workflow_run_id,
-        workflowDef.workflow_def.initial_node_id,
-        null, // parent_token_id: null for initial token
-        '', // path_id: empty string for root
-        null, // fan_out_node_id: null for initial token
-        0, // branch_index: 0 for single branch
-        1, // branch_total: 1 for single branch
-      );
+        node_id: workflowDef.workflow_def.initial_node_id,
+        parent_token_id: null, // null for initial token
+        path_id: '', // empty string for root
+        fan_out_node_id: null, // null for initial token
+        branch_index: 0, // 0 for single branch
+        branch_total: 1, // 1 for single branch
+      });
 
       this.logger.info({
         event_type: 'initial_token_created',
@@ -640,13 +569,7 @@ export class WorkflowCoordinator extends DurableObject {
       // Update token status to failed if token was created
       if (token_id) {
         try {
-          const failedAt = new Date().toISOString();
-          this.ctx.storage.sql.exec(
-            `UPDATE tokens SET status = ?, updated_at = ? WHERE id = ?`,
-            'failed',
-            failedAt,
-            token_id,
-          );
+          tokens.updateTokenStatus(this.ctx.storage.sql, token_id, 'failed');
 
           this.logger.info({
             event_type: 'token_failed',
@@ -655,7 +578,6 @@ export class WorkflowCoordinator extends DurableObject {
             metadata: {
               token_id,
               status: 'failed',
-              updated_at: failedAt,
             },
           });
         } catch (updateError) {
