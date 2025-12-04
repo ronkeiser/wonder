@@ -25,7 +25,7 @@ export interface LLMCallResult {
  */
 export default class ExecutorService extends WorkerEntrypoint<Env> {
   private readonly logContext = {
-    service: 'wonder-executor',
+    service: 'executor',
     environment: 'production',
   } as const;
 

@@ -30,7 +30,7 @@ export class WorkflowCoordinator extends DurableObject {
   private getLogger(): Logger {
     if (!this.logger) {
       this.logger = this.env.LOGS.newLogger({
-        service: 'wonder-coordinator',
+        service: 'coordinator',
         environment: 'production',
         instance_id: this.ctx.id.toString(),
       });
