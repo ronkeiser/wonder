@@ -231,9 +231,8 @@ export class WorkflowCoordinator extends DurableObject {
         // Fire-and-forget to executor - executor will callback to handleTaskResult
         this.ctx.waitUntil(
           this.env.EXECUTOR.llmCall({
-            model: modelProfileResult.model_profile.model_id,
+            model_profile: modelProfileResult.model_profile,
             prompt,
-            temperature: modelProfileResult.model_profile.parameters?.temperature,
             json_schema: promptSpecResult.prompt_spec.produces, // Pass output schema for structured output
             workflow_run_id,
             token_id,
@@ -248,9 +247,9 @@ export class WorkflowCoordinator extends DurableObject {
             token_id,
             node_id: node.id,
             action_kind: actionResult.action.kind,
-            model: modelProfileResult.model_profile.model_id,
+            model_id: modelProfileResult.model_profile.model_id,
+            provider: modelProfileResult.model_profile.provider,
             model_parameters: modelProfileResult.model_profile.parameters,
-            temperature_passed: modelProfileResult.model_profile.parameters?.temperature,
           },
         });
 

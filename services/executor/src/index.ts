@@ -1,4 +1,5 @@
 import { createLogger } from '@wonder/logs';
+import type { ModelProfile } from '@wonder/resources/types';
 import { WorkerEntrypoint } from 'cloudflare:workers';
 
 /**
@@ -9,9 +10,8 @@ import { WorkerEntrypoint } from 'cloudflare:workers';
  */
 
 export interface LLMCallParams {
-  model: string;
+  model_profile: ModelProfile;
   prompt: string;
-  temperature?: number;
   json_schema?: object; // JSON schema for structured output
   // Callback info for async execution
   workflow_run_id: string;
@@ -45,10 +45,11 @@ export default class ExecutorService extends WorkerEntrypoint<Env> {
       event_type: 'llm_call_started',
       message: 'LLM call started',
       metadata: {
-        model: params.model,
+        model: params.model_profile.model_id,
+        provider: params.model_profile.provider,
         prompt: params.prompt,
         prompt_length: params.prompt.length,
-        temperature: params.temperature,
+        parameters: params.model_profile.parameters,
         has_json_schema: !!params.json_schema,
         workflow_run_id: params.workflow_run_id,
         token_id: params.token_id,
@@ -64,7 +65,7 @@ export default class ExecutorService extends WorkerEntrypoint<Env> {
             content: params.prompt,
           },
         ],
-        temperature: params.temperature,
+        ...params.model_profile.parameters,
       };
 
       // Add response_format if json_schema provided
@@ -75,7 +76,10 @@ export default class ExecutorService extends WorkerEntrypoint<Env> {
         };
       }
 
-      const response = (await this.env.AI.run(params.model as any, aiOptions)) as any;
+      const response = (await this.env.AI.run(
+        params.model_profile.model_id as any,
+        aiOptions,
+      )) as any;
 
       const duration = Date.now() - startTime;
       const rawResponse = response?.response || 'No response from LLM';
@@ -136,7 +140,8 @@ export default class ExecutorService extends WorkerEntrypoint<Env> {
         event_type: 'llm_call_completed',
         message: 'LLM call completed successfully',
         metadata: {
-          model: params.model,
+          model: params.model_profile.model_id,
+          provider: params.model_profile.provider,
           duration_ms: duration,
           response_length:
             typeof result.response === 'string'
@@ -157,7 +162,8 @@ export default class ExecutorService extends WorkerEntrypoint<Env> {
         event_type: 'llm_call_failed',
         message: 'LLM call failed',
         metadata: {
-          model: params.model,
+          model: params.model_profile.model_id,
+          provider: params.model_profile.provider,
           duration_ms: Date.now() - startTime,
           error: error instanceof Error ? error.message : String(error),
           workflow_run_id: params.workflow_run_id,
