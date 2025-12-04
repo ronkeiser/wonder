@@ -1,4 +1,4 @@
-import { index, integer, sqliteTable, text } from 'drizzle-orm/sqlite-core';
+import { index, real, sqliteTable, text } from 'drizzle-orm/sqlite-core';
 
 /**
  * Logs table for operational logging
@@ -17,7 +17,7 @@ export const logs = sqliteTable(
   'logs',
   {
     id: text('id').primaryKey(),
-    timestamp: integer('timestamp').notNull(),
+    timestamp: real('timestamp').notNull(), // High-precision timestamp with microseconds
     level: text('level').notNull(),
     service: text('service').notNull(),
     environment: text('environment').notNull(),

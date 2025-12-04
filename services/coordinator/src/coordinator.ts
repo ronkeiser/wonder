@@ -168,7 +168,6 @@ export class WorkflowCoordinator extends DurableObject {
           event_type: 'input_mapping_evaluated',
           message: 'Input mapping evaluated for prompt rendering',
           trace_id: workflow_run_id,
-          highlight: 'green',
           metadata: {
             input_mapping: node.input_mapping,
             template_context: templateContext,
@@ -213,7 +212,6 @@ export class WorkflowCoordinator extends DurableObject {
           event_type: 'task_dispatched',
           message: 'Task dispatched to executor',
           trace_id: workflow_run_id,
-          highlight: 'orange',
           metadata: {
             token_id,
             node_id: node.id,
@@ -258,7 +256,6 @@ export class WorkflowCoordinator extends DurableObject {
       event_type: 'token_completed',
       message: 'Token status updated to completed',
       trace_id: workflow_run_id,
-      highlight: 'pink',
       metadata: {
         token_id,
         node_id,
@@ -296,7 +293,6 @@ export class WorkflowCoordinator extends DurableObject {
       event_type: 'context_output_stored',
       message: 'Action output stored in context',
       trace_id: workflow_run_id,
-      highlight: 'purple',
       metadata: {
         token_id,
         node_id,
@@ -345,7 +341,6 @@ export class WorkflowCoordinator extends DurableObject {
         event_type: 'transition_token_created',
         message: 'Token created for transition target node',
         trace_id: workflow_run_id,
-        highlight: 'yellow',
         metadata: {
           parent_token_id: token_id,
           new_token_id: nextTokenId,
@@ -399,7 +394,7 @@ export class WorkflowCoordinator extends DurableObject {
         event_type: 'workflow_completed',
         message: 'Workflow execution completed',
         trace_id: workflow_run_id,
-        highlight: 'lime',
+        highlight: 'green',
         metadata: {
           workflow_run_id,
           last_completed_node_id: node_id,
@@ -462,7 +457,6 @@ export class WorkflowCoordinator extends DurableObject {
         event_type: 'workflow_def_fetched',
         message: 'Workflow definition retrieved',
         trace_id: workflow_run_id,
-        highlight: 'blue',
         metadata: {
           workflow_def_id: workflowDef.workflow_def.id,
           workflow_def_name: workflowDef.workflow_def.name,
@@ -549,7 +543,6 @@ export class WorkflowCoordinator extends DurableObject {
         event_type: 'initial_token_created',
         message: 'Initial token created and inserted',
         trace_id: workflow_run_id,
-        highlight: 'magenta',
         metadata: {
           token_id,
           workflow_run_id,
@@ -573,7 +566,6 @@ export class WorkflowCoordinator extends DurableObject {
         event_type: 'coordinator_start_failed',
         message: 'Coordinator.start() failed with error',
         trace_id: workflow_run_id,
-        highlight: 'red',
         metadata: {
           workflow_run_id,
           token_id,
