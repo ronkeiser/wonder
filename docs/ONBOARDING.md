@@ -6,7 +6,7 @@ Read these docs in order:
 4. `docs/architecture/cloudflare.md` — Modern Cloudflare guide
 5. `docs/architecture/debugging.md` — Using Logs & Events for debugging
 
-Reference if necessary:
+Do not read these during onboard, but take note of their existence:
 
 - `docs/architecture/data-model.md` — Core data types and schemas
 - `docs/architecture/execution.md` — Token-based execution, fan-out/fan-in
