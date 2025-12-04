@@ -206,7 +206,7 @@
       const logsContainer = document.getElementById('logs');
       const statusEl = document.getElementById('status');
       const seenLogIds = new Set();
-      let lastLogTimestamp = 0;
+      let lastLogId = '';
 
       function setStatus(state) {
         statusEl.className = `status ${state}`;
@@ -235,16 +235,17 @@
           return;
         }
 
-        // Skip if timestamp is older than our last log (prevents duplicates on reconnect)
-        if (log.timestamp < lastLogTimestamp) {
+        // Skip if ULID is older than our last log (prevents duplicates on reconnect)
+        // ULIDs are lexicographically sortable, so string comparison works
+        if (log.id && lastLogId && log.id < lastLogId) {
           return;
         }
 
         // Track this log
         if (log.id) {
           seenLogIds.add(log.id);
+          lastLogId = log.id;
         }
-        lastLogTimestamp = Math.max(lastLogTimestamp, log.timestamp);
 
         const entry = document.createElement('div');
         entry.className = `log-entry ${log.level}`;
