@@ -367,6 +367,28 @@ export class WorkflowCoordinator extends DurableObject {
       // Dispatch the newly created token
       await this.dispatchToken(nextTokenId);
     }
+
+    // Check if workflow is complete (no pending or executing tokens remain)
+    const pendingTokens = this.ctx.storage.sql.exec(
+      `SELECT COUNT(*) as count FROM tokens WHERE workflow_run_id = ? AND status IN ('pending', 'executing')`,
+      workflow_run_id
+    ).one();
+
+    if (pendingTokens.count === 0) {
+      logger.info({
+        event_type: 'workflow_completed',
+        message: 'Workflow execution completed.',
+        trace_id: workflow_run_id,
+        metadata: {
+          workflow_run_id,
+          last_completed_node_id: node_id,
+          last_completed_node_ref: node.ref,
+        },
+      });
+
+      // TODO: Extract final output from context based on workflow output_schema
+      // TODO: Update workflow_run status to 'completed' in Resources service
+    }
   }
 
   /**
