@@ -12,6 +12,7 @@ export interface LLMCallParams {
   model: string;
   prompt: string;
   temperature?: number;
+  json_schema?: object; // JSON schema for structured output
   // Callback info for async execution
   workflow_run_id: string;
   token_id: string;
@@ -54,7 +55,8 @@ export default class ExecutorService extends WorkerEntrypoint<Env> {
     });
 
     try {
-      const response = (await this.env.AI.run(params.model as any, {
+      // Build AI.run options
+      const aiOptions: any = {
         messages: [
           {
             role: 'user',
@@ -62,12 +64,72 @@ export default class ExecutorService extends WorkerEntrypoint<Env> {
           },
         ],
         temperature: params.temperature,
-      })) as any;
+      };
+
+      // Add response_format if json_schema provided
+      if (params.json_schema) {
+        aiOptions.response_format = {
+          type: 'json_schema',
+          json_schema: params.json_schema,
+        };
+      }
+
+      const response = (await this.env.AI.run(params.model as any, aiOptions)) as any;
 
       const duration = Date.now() - startTime;
-      const result = {
-        response: response?.response || 'No response from LLM',
-      };
+      const rawResponse = response?.response || 'No response from LLM';
+
+      // When using json_schema, Workers AI returns parsed JSON automatically
+      let result: { response: any };
+      if (params.json_schema) {
+        // Workers AI already parsed the JSON for us when response_format is set
+        if (typeof rawResponse === 'object') {
+          result = { response: rawResponse };
+
+          this.logger.info({
+            event_type: 'json_response_received',
+            message: 'Structured JSON response received from Workers AI',
+            metadata: {
+              workflow_run_id: params.workflow_run_id,
+              token_id: params.token_id,
+              response: rawResponse,
+            },
+          });
+        } else {
+          // Fallback: if it's still a string, try to parse it
+          try {
+            const parsed = JSON.parse(rawResponse);
+            result = { response: parsed };
+
+            this.logger.info({
+              event_type: 'json_parsed_successfully',
+              message: 'JSON response parsed from string',
+              metadata: {
+                workflow_run_id: params.workflow_run_id,
+                token_id: params.token_id,
+                raw_response: rawResponse,
+                parsed_response: parsed,
+              },
+            });
+          } catch (parseError) {
+            this.logger.error({
+              event_type: 'json_parse_failed',
+              message: 'Failed to parse JSON response',
+              metadata: {
+                workflow_run_id: params.workflow_run_id,
+                token_id: params.token_id,
+                raw_response: rawResponse,
+                error: parseError instanceof Error ? parseError.message : String(parseError),
+              },
+            });
+            // Return raw response as fallback
+            result = { response: rawResponse };
+          }
+        }
+      } else {
+        // No JSON schema - return raw string
+        result = { response: rawResponse };
+      }
 
       this.logger.info({
         event_type: 'llm_call_completed',
@@ -75,7 +137,10 @@ export default class ExecutorService extends WorkerEntrypoint<Env> {
         metadata: {
           model: params.model,
           duration_ms: duration,
-          response_length: result.response.length,
+          response_length:
+            typeof result.response === 'string'
+              ? result.response.length
+              : JSON.stringify(result.response).length,
           workflow_run_id: params.workflow_run_id,
           token_id: params.token_id,
           output: result,

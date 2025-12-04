@@ -203,6 +203,7 @@ export class WorkflowCoordinator extends DurableObject {
             model: implementation.model || '@cf/meta/llama-3.1-8b-instruct',
             prompt,
             temperature: implementation.temperature,
+            json_schema: promptSpecResult.prompt_spec.produces, // Pass output schema for structured output
             workflow_run_id,
             token_id,
           })
