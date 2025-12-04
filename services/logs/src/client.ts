@@ -17,10 +17,10 @@ export function createLogger(
 
   const log = (level: LogLevel, input: LoggerInput | string) => {
     const normalizedInput = typeof input === 'string' ? { message: input } : input;
-    
+
     // Get current timestamp
     const now = Date.now();
-    
+
     // If same millisecond as last log, increment sequence counter
     // Otherwise reset sequence to 0
     if (now === lastTimestamp) {
@@ -29,10 +29,10 @@ export function createLogger(
       sequence = 0;
       lastTimestamp = now;
     }
-    
+
     // Add sequence as fractional component (0.001, 0.002, etc.)
-    const preciseTimestamp = now + (sequence * 0.001);
-    
+    const preciseTimestamp = now + sequence * 0.001;
+
     const logEntry: LoggerInput = {
       id: ulid(),
       timestamp: preciseTimestamp,

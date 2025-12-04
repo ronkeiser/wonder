@@ -466,7 +466,7 @@
           // Filter logs by time and add them
           const filteredLogs = data.logs
             .filter((log) => log.timestamp >= cutoffTime)
-            .sort((a, b) => a.id.localeCompare(b.id)); // Sort by ULID (oldest first)
+            .sort((a, b) => a.timestamp - b.timestamp); // Sort by timestamp (oldest first)
 
           filteredLogs.forEach((log) => addLogEntry(log));
         } catch (error) {
@@ -539,12 +539,6 @@
           return;
         }
 
-        // Skip if ULID is older than our last log (prevents duplicates on reconnect)
-        // ULIDs are lexicographically sortable, so string comparison works
-        if (log.id && lastLogId && log.id < lastLogId) {
-          return;
-        }
-
         // Skip if service filter is active and log doesn't match
         if (currentService && log.service !== currentService) {
           return;
@@ -553,7 +547,6 @@
         // Track this log
         if (log.id) {
           seenLogIds.add(log.id);
-          lastLogId = log.id;
         }
 
         const entry = document.createElement('div');

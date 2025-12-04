@@ -57,7 +57,7 @@ export class Streamer extends DurableObject {
       .select()
       .from(logs)
       .where(gte(logs.timestamp, fiveMinutesAgo))
-      .orderBy(desc(logs.id))
+      .orderBy(desc(logs.timestamp))
       .limit(100);
 
     if (recentLogs.length > 0) {
