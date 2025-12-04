@@ -340,6 +340,12 @@
           btn.classList.add('active');
 
           currentFilter = minutes;
+          
+          // Update URL params
+          const url = new URL(window.location);
+          url.searchParams.set('m', minutes);
+          window.history.pushState({}, '', url);
+          
           filterLogsByTime(minutes);
         });
       });
@@ -497,8 +503,21 @@
         };
       }
 
-      // Load default filter (5m) on page load, then connect WebSocket
-      filterLogsByTime(5);
+      // Load filter from URL params or default to 5m
+      const urlParams = new URLSearchParams(window.location.search);
+      const savedMinutes = urlParams.get('m');
+      const initialMinutes = savedMinutes ? parseInt(savedMinutes) : 5;
+      
+      // Update active button to match initial filter
+      document.querySelectorAll('.time-filter-btn').forEach((btn) => {
+        if (parseInt(btn.dataset.minutes) === initialMinutes) {
+          btn.classList.add('active');
+        } else {
+          btn.classList.remove('active');
+        }
+      });
+      
+      filterLogsByTime(initialMinutes);
       connect();
     </script>
   </body>
