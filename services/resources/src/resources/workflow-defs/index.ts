@@ -24,11 +24,7 @@ export class WorkflowDefs extends Resource {
       action_version: number;
       input_mapping?: object;
       output_mapping?: object;
-      fan_out?: 'first_match' | 'all';
-      fan_in?: string;
-      joins_node_ref?: string;
-      merge?: object;
-      on_early_complete?: 'cancel' | 'abandon' | 'allow_late_merge';
+      // No branching logic - nodes only execute actions
     }>;
     transitions?: Array<{
       ref?: string;
@@ -36,7 +32,9 @@ export class WorkflowDefs extends Resource {
       to_node_ref: string;
       priority: number;
       condition?: object;
+      spawn_count?: number;
       foreach?: object;
+      synchronization?: object;
       loop_config?: object;
     }>;
   }): Promise<{
@@ -104,22 +102,7 @@ export class WorkflowDefs extends Resource {
       );
     }
 
-    // 4. Validate joins_node_ref if provided
-    for (const nodeData of data.nodes) {
-      if (nodeData.joins_node_ref && !nodeRefs.has(nodeData.joins_node_ref)) {
-        this.serviceCtx.logger.warn({
-          event_type: 'workflow_def_validation_failed',
-          metadata: { error: 'invalid_joins_node_ref', ref: nodeData.joins_node_ref },
-        });
-        throw new ValidationError(
-          `Invalid joins_node_ref: ${nodeData.joins_node_ref}`,
-          `nodes[${nodeData.ref}].joins_node_ref`,
-          'INVALID_NODE_REF',
-        );
-      }
-    }
-
-    // 5. Create workflow def (initial_node_id will be set after nodes created)
+    // 4. Create workflow def (initial_node_id will be set after nodes created)
     let workflowDef;
     try {
       workflowDef = await repo.createWorkflowDef(this.serviceCtx.db, {
@@ -157,8 +140,7 @@ export class WorkflowDefs extends Resource {
       throw error;
     }
 
-    // 6. Create all nodes and build ref→ID map
-    // Note: joins_node references are resolved in a second pass since they point to node IDs
+    // 5. Create all nodes and build ref→ID map
     const refToIdMap = new Map<string, string>();
     for (const nodeData of data.nodes) {
       const node = await repo.createNode(this.serviceCtx.db, {
@@ -170,33 +152,18 @@ export class WorkflowDefs extends Resource {
         action_version: nodeData.action_version,
         input_mapping: nodeData.input_mapping ?? null,
         output_mapping: nodeData.output_mapping ?? null,
-        fan_out: nodeData.fan_out ?? 'first_match',
-        fan_in: nodeData.fan_in ?? 'any',
-        joins_node: null,
-        merge: nodeData.merge ?? null,
-        on_early_complete: nodeData.on_early_complete ?? null,
       });
       refToIdMap.set(nodeData.ref, node.id);
     }
 
-    // 7. Resolve joins_node_ref → joins_node (ID) for nodes that have it
-    for (const nodeData of data.nodes) {
-      if (nodeData.joins_node_ref) {
-        const nodeId = refToIdMap.get(nodeData.ref)!;
-        await repo.updateNode(this.serviceCtx.db, nodeId, {
-          joins_node: refToIdMap.get(nodeData.joins_node_ref)!,
-        });
-      }
-    }
-
-    // 8. Set initial_node_id using ref→ID map
+    // 6. Set initial_node_id using ref→ID map
     const initialNodeId = refToIdMap.get(data.initial_node_ref)!;
     await repo.updateWorkflowDef(this.serviceCtx.db, workflowDef.id, workflowDef.version, {
       initial_node_id: initialNodeId,
     });
     workflowDef.initial_node_id = initialNodeId;
 
-    // 9. Create transitions (from_node_ref/to_node_ref → from_node_id/to_node_id)
+    // 7. Create transitions (from_node_ref/to_node_ref → from_node_id/to_node_id)
     if (data.transitions) {
       for (const transitionData of data.transitions) {
         await repo.createTransition(this.serviceCtx.db, {
@@ -207,7 +174,9 @@ export class WorkflowDefs extends Resource {
           to_node_id: refToIdMap.get(transitionData.to_node_ref)!,
           priority: transitionData.priority,
           condition: transitionData.condition ?? null,
+          spawn_count: transitionData.spawn_count ?? null,
           foreach: transitionData.foreach ?? null,
+          synchronization: transitionData.synchronization ?? null,
           loop_config: transitionData.loop_config ?? null,
         });
       }

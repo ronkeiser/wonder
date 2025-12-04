@@ -120,8 +120,7 @@ describe('Edge Test - Hello World', () => {
             output_mapping: {
               greeting: '$.greeting',
             },
-            fan_out: 'first_match' as const,
-            fan_in: 'any' as const,
+            // No branching logic - nodes only execute actions
           },
         ],
         transitions: [],

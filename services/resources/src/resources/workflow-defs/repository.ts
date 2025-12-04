@@ -118,11 +118,6 @@ export async function createNode(
     action_version: number;
     input_mapping?: object | null;
     output_mapping?: object | null;
-    fan_out?: 'first_match' | 'all';
-    fan_in?: string;
-    joins_node?: string | null;
-    merge?: object | null;
-    on_early_complete?: 'cancel' | 'abandon' | 'allow_late_merge' | null;
   },
 ): Promise<Node> {
   const row = {
@@ -135,11 +130,6 @@ export async function createNode(
     action_version: data.action_version,
     input_mapping: data.input_mapping ?? null,
     output_mapping: data.output_mapping ?? null,
-    fan_out: data.fan_out ?? 'first_match',
-    fan_in: data.fan_in ?? 'any',
-    joins_node: data.joins_node ?? null,
-    merge: data.merge ?? null,
-    on_early_complete: data.on_early_complete ?? null,
   };
 
   await db.insert(nodes).values(row).run();
@@ -166,13 +156,7 @@ export async function getNode(
   return result ?? null;
 }
 
-export async function updateNode(
-  db: DrizzleD1Database,
-  nodeId: string,
-  data: { joins_node?: string | null },
-): Promise<void> {
-  await db.update(nodes).set(data).where(eq(nodes.id, nodeId)).run();
-}
+// updateNode function removed - nodes no longer have mutable branching fields
 
 export async function listNodesByWorkflowDef(
   db: DrizzleD1Database,
@@ -193,7 +177,9 @@ export async function createTransition(
     to_node_id: string;
     priority: number;
     condition?: object | null;
+    spawn_count?: number | null;
     foreach?: object | null;
+    synchronization?: object | null;
     loop_config?: object | null;
   },
 ): Promise<Transition> {
@@ -206,7 +192,9 @@ export async function createTransition(
     to_node_id: data.to_node_id,
     priority: data.priority,
     condition: data.condition ?? null,
+    spawn_count: data.spawn_count ?? null,
     foreach: data.foreach ?? null,
+    synchronization: data.synchronization ?? null,
     loop_config: data.loop_config ?? null,
   };
 

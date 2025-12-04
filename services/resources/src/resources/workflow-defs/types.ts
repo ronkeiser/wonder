@@ -28,11 +28,7 @@ export type Node = {
   action_version: number;
   input_mapping: object | null;
   output_mapping: object | null;
-  fan_out: 'first_match' | 'all';
-  fan_in: string; // 'any' | 'all' | 'm_of_n:N'
-  joins_node: string | null;
-  merge: object | null;
-  on_early_complete: 'cancel' | 'abandon' | 'allow_late_merge' | null;
+  // No branching logic - nodes only execute actions
 };
 
 export type Transition = {
@@ -44,6 +40,8 @@ export type Transition = {
   to_node_id: string;
   priority: number;
   condition: object | null;
+  spawn_count: number | null;
   foreach: object | null;
+  synchronization: object | null;
   loop_config: object | null;
 };

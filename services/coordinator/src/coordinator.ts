@@ -305,7 +305,7 @@ export class WorkflowCoordinator extends DurableObject {
         node_id: transition.to_node_id,
         parent_token_id: token_id, // current completed token
         path_id: '', // same as parent for now
-        fan_out_node_id: null, // null for simple linear flow
+        fan_out_transition_id: null, // null for simple linear flow
         branch_index: 0, // 0 for single branch
         branch_total: 1, // 1 for single branch
       });
@@ -475,8 +475,8 @@ export class WorkflowCoordinator extends DurableObject {
         workflow_run_id,
         node_id: workflowDef.workflow_def.initial_node_id,
         parent_token_id: null, // null for initial token
-        path_id: '', // empty string for root
-        fan_out_node_id: null, // null for initial token
+        path_id: 'root', // 'root' for initial token per branching doc
+        fan_out_transition_id: null, // null for initial token
         branch_index: 0, // 0 for single branch
         branch_total: 1, // 1 for single branch
       });

@@ -158,14 +158,8 @@ export const nodes = sqliteTable(
     input_mapping: text('input_mapping', { mode: 'json' }).$type<object>(),
     output_mapping: text('output_mapping', { mode: 'json' }).$type<object>(),
 
-    fan_out: text('fan_out', { enum: ['first_match', 'all'] }).notNull(),
-    fan_in: text('fan_in').$type<'any' | 'all' | string>().notNull(), // 'any' | 'all' | 'm_of_n:N'
-
-    joins_node: text('joins_node'), // self-reference to nodes.id (enforced at application level)
-    merge: text('merge', { mode: 'json' }).$type<object>(), // merge strategy config
-    on_early_complete: text('on_early_complete', {
-      enum: ['cancel', 'abandon', 'allow_late_merge'],
-    }),
+    // No branching logic - nodes only execute actions
+    // All branching is specified on transitions
   },
   (table) => [
     primaryKey({ columns: [table.workflow_def_id, table.workflow_def_version, table.id] }),
@@ -195,7 +189,9 @@ export const transitions = sqliteTable(
     priority: integer('priority').notNull(),
 
     condition: text('condition', { mode: 'json' }).$type<object>(), // structured or expression
+    spawn_count: integer('spawn_count'), // How many tokens to spawn (default: 1)
     foreach: text('foreach', { mode: 'json' }).$type<object>(), // foreach config
+    synchronization: text('synchronization', { mode: 'json' }).$type<object>(), // fan-in config
     loop_config: text('loop_config', { mode: 'json' }).$type<object>(),
   },
   (table) => [
