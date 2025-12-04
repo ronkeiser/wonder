@@ -139,7 +139,7 @@ describe('Workflow Execution API', () => {
                 name: '$.input.name',
               },
               output_mapping: {
-                madlib: '$.response',
+                response: '$.response',
               },
             },
             {
@@ -148,7 +148,7 @@ describe('Workflow Execution API', () => {
               action_id: action2Response!.action.id,
               action_version: 1,
               input_mapping: {
-                madlib: '$.llm_greet_output.madlib',
+                madlib: '$.llm_greet_output.response',
               },
               output_mapping: {
                 response: '$.response',

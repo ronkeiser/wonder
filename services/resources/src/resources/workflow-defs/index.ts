@@ -155,7 +155,8 @@ export class WorkflowDefs extends Resource {
       throw error;
     }
 
-    // 6. Create nodes and build ref→ULID map
+    // 6. Create all nodes and build ref→ID map
+    // Note: joins_node references are resolved in a second pass since they point to node IDs
     const refToIdMap = new Map<string, string>();
     for (const nodeData of data.nodes) {
       const node = await repo.createNode(this.serviceCtx.db, {
@@ -169,30 +170,31 @@ export class WorkflowDefs extends Resource {
         output_mapping: nodeData.output_mapping ?? null,
         fan_out: nodeData.fan_out ?? 'first_match',
         fan_in: nodeData.fan_in ?? 'any',
-        joins_node: null, // Will be resolved in second pass
+        joins_node: null,
         merge: nodeData.merge ?? null,
         on_early_complete: nodeData.on_early_complete ?? null,
       });
       refToIdMap.set(nodeData.ref, node.id);
     }
 
-    // 7. Second pass: update joins_node references
+    // 7. Resolve joins_node_ref → joins_node (ID) for nodes that have it
     for (const nodeData of data.nodes) {
       if (nodeData.joins_node_ref) {
         const nodeId = refToIdMap.get(nodeData.ref)!;
-        const joinsNodeId = refToIdMap.get(nodeData.joins_node_ref)!;
-        await repo.updateNode(this.serviceCtx.db, nodeId, { joins_node: joinsNodeId });
+        await repo.updateNode(this.serviceCtx.db, nodeId, {
+          joins_node: refToIdMap.get(nodeData.joins_node_ref)!,
+        });
       }
     }
 
-    // 8. Update initial_node_id using resolved ULID
+    // 8. Set initial_node_id using ref→ID map
     const initialNodeId = refToIdMap.get(data.initial_node_ref)!;
     await repo.updateWorkflowDef(this.serviceCtx.db, workflowDef.id, workflowDef.version, {
       initial_node_id: initialNodeId,
     });
     workflowDef.initial_node_id = initialNodeId;
 
-    // 9. Create transitions using resolved ULIDs
+    // 9. Create transitions (from_node_ref/to_node_ref → from_node_id/to_node_id)
     if (data.transitions) {
       for (const transitionData of data.transitions) {
         await repo.createTransition(this.serviceCtx.db, {

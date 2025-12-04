@@ -278,9 +278,24 @@ export class WorkflowCoordinator extends DurableObject {
       },
     });
 
-    // Store action output in context
+    // Get node ref for context path (refs are stable identifiers used in input_mapping)
+    using workflowRuns = this.env.RESOURCES.workflowRuns();
+    const workflowRun = await workflowRuns.get(workflow_run_id);
+
+    using workflowDefs = this.env.RESOURCES.workflowDefs();
+    const workflowDef = await workflowDefs.get(
+      workflowRun.workflow_run.workflow_def_id,
+      workflowRun.workflow_run.workflow_version,
+    );
+
+    const node = workflowDef.nodes.find((n: any) => n.id === node_id);
+    if (!node) {
+      throw new Error(`Node not found: ${node_id}`);
+    }
+
+    // Store action output in context using node.ref (matches input_mapping paths)
     for (const [key, value] of Object.entries(result.output_data)) {
-      const contextPath = `${node_id}_output.${key}`;
+      const contextPath = `${node.ref}_output.${key}`;
       this.ctx.storage.sql.exec(
         `INSERT OR REPLACE INTO context (path, value) VALUES (?, ?)`,
         contextPath,
@@ -295,20 +310,12 @@ export class WorkflowCoordinator extends DurableObject {
       metadata: {
         token_id,
         node_id,
+        node_ref: node.ref,
         output_keys: Object.keys(result.output_data),
-        context_paths: Object.keys(result.output_data).map(key => `${node_id}_output.${key}`),
+        output_data: result.output_data,
+        context_paths: Object.keys(result.output_data).map(key => `${node.ref}_output.${key}`),
       },
     });
-
-    // Fetch workflow definition for transitions
-    using workflowRuns = this.env.RESOURCES.workflowRuns();
-    const workflowRun = await workflowRuns.get(workflow_run_id);
-
-    using workflowDefs = this.env.RESOURCES.workflowDefs();
-    const workflowDef = await workflowDefs.get(
-      workflowRun.workflow_run.workflow_def_id,
-      workflowRun.workflow_run.workflow_version,
-    );
 
     // Query for transitions from completed node
     const transitions = workflowDef.transitions.filter(
