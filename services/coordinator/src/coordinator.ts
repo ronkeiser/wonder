@@ -1,31 +1,8 @@
 import { createLogger, type Logger } from '@wonder/logs';
 import { DurableObject } from 'cloudflare:workers';
 import * as context from './context';
+import { renderTemplate } from './template';
 import * as tokens from './tokens';
-
-/**
- * Template renderer supporting:
- * - {{variable}} for simple variable substitution
- * - {{json variable}} for JSON serialization of objects
- */
-function renderTemplate(template: string, context: Record<string, unknown>): string {
-  // First handle {{json variable}} syntax
-  let rendered = template.replace(/\{\{json\s+(\w+)\}\}/g, (match, varName) => {
-    const value = context[varName];
-    if (value === undefined || value === null) return '';
-    return typeof value === 'object' ? JSON.stringify(value, null, 2) : String(value);
-  });
-  
-  // Then handle regular {{variable}} syntax
-  rendered = rendered.replace(/\{\{(\w+)\}\}/g, (match, varName) => {
-    const value = context[varName];
-    if (value === undefined || value === null) return '';
-    // Auto-stringify objects that weren't explicitly marked with 'json'
-    return typeof value === 'object' ? JSON.stringify(value) : String(value);
-  });
-  
-  return rendered;
-}
 
 /**
  * WorkflowCoordinator Durable Object
@@ -44,15 +21,12 @@ export class WorkflowCoordinator extends DurableObject {
     });
   }
 
-
-
   /**
    * Dispatch a token for execution - prepares task and calls executor
    */
   private async dispatchToken(token_id: string): Promise<void> {
     // Fetch the token's node from the workflow definition
     const tokenRow = tokens.getToken(this.ctx.storage.sql, token_id);
-
     const workflow_run_id = tokenRow.workflow_run_id as string;
 
     // Fetch workflow definition
@@ -224,7 +198,6 @@ export class WorkflowCoordinator extends DurableObject {
   ): Promise<void> {
     // Fetch token info
     const tokenRow = tokens.getToken(this.ctx.storage.sql, token_id);
-
     const workflow_run_id = tokenRow.workflow_run_id as string;
     const node_id = tokenRow.node_id as string;
 
