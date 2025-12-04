@@ -1,5 +1,6 @@
 import { createLogger, type Logger } from '@wonder/logs';
 import { DurableObject } from 'cloudflare:workers';
+import * as context from './context';
 import * as tokens from './tokens';
 
 /**
@@ -146,12 +147,9 @@ export class WorkflowCoordinator extends DurableObject {
             const pathStr = jsonPath as string;
             if (pathStr.startsWith('$.')) {
               const contextPath = pathStr.slice(2); // Remove $.
-              const row = this.ctx.storage.sql.exec(
-                `SELECT value FROM context WHERE path = ?`,
-                contextPath
-              ).one();
-              if (row) {
-                templateContext[varName] = JSON.parse(row.value as string);
+              const value = context.getContextValue(this.ctx.storage.sql, contextPath);
+              if (value !== undefined) {
+                templateContext[varName] = value;
               }
             }
           }
@@ -288,14 +286,7 @@ export class WorkflowCoordinator extends DurableObject {
     }
 
     // Store mapped output in context using node.ref (matches input_mapping paths)
-    for (const [key, value] of Object.entries(mappedOutput)) {
-      const contextPath = `${node.ref}_output.${key}`;
-      this.ctx.storage.sql.exec(
-        `INSERT OR REPLACE INTO context (path, value) VALUES (?, ?)`,
-        contextPath,
-        JSON.stringify(value),
-      );
-    }
+    context.setNodeOutput(this.ctx.storage.sql, node.ref, mappedOutput);
 
     this.logger.info({
       event_type: 'context_output_stored',
@@ -385,12 +376,9 @@ export class WorkflowCoordinator extends DurableObject {
           const pathStr = jsonPath as string;
           if (pathStr.startsWith('$.')) {
             const contextPath = pathStr.slice(2); // Remove $.
-            const row = this.ctx.storage.sql.exec(
-              `SELECT value FROM context WHERE path = ?`,
-              contextPath
-            ).one();
-            if (row) {
-              finalOutput[key] = JSON.parse(row.value as string);
+            const value = context.getContextValue(this.ctx.storage.sql, contextPath);
+            if (value !== undefined) {
+              finalOutput[key] = value;
             }
           }
         }
@@ -473,12 +461,7 @@ export class WorkflowCoordinator extends DurableObject {
       });
 
       // Step 3: Create context table in SQLite
-      this.ctx.storage.sql.exec(`
-        CREATE TABLE IF NOT EXISTS context (
-          path TEXT PRIMARY KEY,
-          value TEXT NOT NULL
-        )
-      `);
+      context.initializeContextTable(this.ctx.storage.sql);
 
       this.logger.info({
         event_type: 'context_table_created',
@@ -488,13 +471,7 @@ export class WorkflowCoordinator extends DurableObject {
       });
 
       // Step 4: Initialize context with workflow input
-      for (const [key, value] of Object.entries(input)) {
-        this.ctx.storage.sql.exec(
-          `INSERT INTO context (path, value) VALUES (?, ?)`,
-          `input.${key}`,
-          JSON.stringify(value),
-        );
-      }
+      context.initializeContextWithInput(this.ctx.storage.sql, input);
 
       this.logger.info({
         event_type: 'context_initialized',
