@@ -37,13 +37,13 @@ describe('Edge Workflow - Single Node JSON Output', () => {
     });
 
     // Create prompt spec for madlib generation
-    const { data: promptSpecResponse } = await client.POST('/api/prompt-specs', {
+    const { data: templatePromptSpecResponse } = await client.POST('/api/prompt-specs', {
       body: {
         version: 1,
         name: 'Generate Madlib Template',
-        description: 'Generates a madlib template with placeholders as JSON',
+        description: 'Creates a madlib template with placeholders',
         template:
-          'Create a short madlib story (2-3 sentences) about {{topic}}. Use placeholders like [adjective], [noun], [verb], [adverb], [animal], [color]. Respond with ONLY valid JSON, no markdown formatting, no explanation. Use this exact format: {"template": "The [adjective] [animal] [verb] down the [color] path.", "placeholders": ["adjective", "animal", "verb", "color"]}',
+          'Create a 2-3 sentence madlib story about {{topic}}. Use placeholders in [brackets] like [adjective], [noun], [verb], [adverb], [animal], [color].\n\nReturn JSON with:\n- "template": the story with [placeholders]\n- "placeholders": array of placeholder types used\n\nExample: {"template": "The [adjective] [animal] [verb].", "placeholders": ["adjective", "animal", "verb"]}',
         template_language: 'handlebars',
         requires: {
           topic: 'string',
@@ -63,7 +63,7 @@ describe('Edge Workflow - Single Node JSON Output', () => {
         description: 'LLM action to generate madlib template',
         kind: 'llm_call',
         implementation: {
-          prompt_spec_id: promptSpecResponse!.prompt_spec.id,
+          prompt_spec_id: templatePromptSpecResponse!.prompt_spec.id,
           model_profile_id: modelProfileResponse!.model_profile.id,
         },
       },
@@ -74,9 +74,9 @@ describe('Edge Workflow - Single Node JSON Output', () => {
       body: {
         version: 1,
         name: 'Generate Madlib Words',
-        description: 'Generates words to fill madlib placeholders as JSON',
+        description: 'Generates creative words for madlib placeholders',
         template:
-          'I need creative words to fill in a madlib story. The placeholders are: {{placeholders}}. For each placeholder type, give me one creative word. Return ONLY valid JSON with the placeholder types as keys and the words as values. Example: {"adjective": "sparkly", "noun": "telescope", "verb": "danced"}',
+          'Generate creative words for these placeholder types: {{placeholders}}\n\nReturn JSON with each placeholder type as a key and a creative word as the value.\n\nExample: {"adjective": "sparkly", "noun": "telescope", "verb": "danced"}',
         template_language: 'handlebars',
         requires: {
           placeholders: 'array',
@@ -102,11 +102,44 @@ describe('Edge Workflow - Single Node JSON Output', () => {
       },
     });
 
-    // Create workflow definition with two nodes
+    // Create prompt spec for story completion
+    const { data: completePromptSpecResponse } = await client.POST('/api/prompt-specs', {
+      body: {
+        version: 1,
+        name: 'Complete Madlib Story',
+        description: 'Fills in the madlib template with words to create final story',
+        template:
+          'Fill in this madlib template:\n\n{{template}}\n\nUsing these words:\n{{json words}}\n\nReplace each [placeholder] with its matching word from the JSON. For example, replace [adjective] with the value of "adjective".\n\nReturn ONLY the completed story with all placeholders replaced. Do not make up new words.',
+        template_language: 'handlebars',
+        requires: {
+          template: 'string',
+          words: 'object',
+        },
+        produces: {
+          story: 'string',
+        },
+      },
+    });
+
+    // Create action for story completion
+    const { data: completeActionResponse } = await client.POST('/api/actions', {
+      body: {
+        version: 1,
+        name: 'Complete Story Action',
+        description: 'LLM action to complete the madlib story',
+        kind: 'llm_call',
+        implementation: {
+          prompt_spec_id: completePromptSpecResponse!.prompt_spec.id,
+          model_profile_id: modelProfileResponse!.model_profile.id,
+        },
+      },
+    });
+
+    // Create workflow definition with three nodes
     const { data: workflowDefResponse } = await client.POST('/api/workflow-defs', {
       body: {
-        name: `Two Node Madlib Workflow ${Date.now()}`,
-        description: 'Two node workflow: generate template, then generate words',
+        name: `Three Node Madlib Workflow ${Date.now()}`,
+        description: 'Three node workflow: generate template, generate words, complete story',
         version: 1,
         owner: {
           type: 'project' as const,
@@ -122,13 +155,11 @@ describe('Edge Workflow - Single Node JSON Output', () => {
         output_schema: {
           type: 'object',
           properties: {
-            template: { type: 'object' },
-            words: { type: 'object' },
+            story: { type: 'string' },
           },
         },
         output_mapping: {
-          template: '$.generate_output.template',
-          words: '$.fill_words_output.words',
+          story: '$.complete_output.story',
         },
         initial_node_ref: 'generate',
         nodes: [
@@ -157,6 +188,19 @@ describe('Edge Workflow - Single Node JSON Output', () => {
               words: '$.response',
             },
           },
+          {
+            ref: 'complete',
+            name: 'Complete Madlib Story',
+            action_id: completeActionResponse!.action.id,
+            action_version: 1,
+            input_mapping: {
+              template: '$.generate_output.template',
+              words: '$.fill_words_output.words',
+            },
+            output_mapping: {
+              story: '$.response.story',
+            },
+          },
         ],
         transitions: [
           {
@@ -164,6 +208,13 @@ describe('Edge Workflow - Single Node JSON Output', () => {
             to_node_id: null,
             from_node_ref: 'generate',
             to_node_ref: 'fill_words',
+            priority: 1,
+          },
+          {
+            from_node_id: null,
+            to_node_id: null,
+            from_node_ref: 'fill_words',
+            to_node_ref: 'complete',
             priority: 1,
           },
         ],
@@ -176,7 +227,7 @@ describe('Edge Workflow - Single Node JSON Output', () => {
         project_id: projectResponse!.project.id,
         workflow_def_id: workflowDefResponse!.workflow_def.id,
         name: `Test Workflow ${Date.now()}`,
-        description: 'Two node test workflow',
+        description: 'Three node test workflow - complete madlib pipeline',
       },
     });
 
