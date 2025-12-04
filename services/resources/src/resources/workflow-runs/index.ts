@@ -45,6 +45,7 @@ export class WorkflowRuns extends Resource {
   async complete(id: string, final_output: object): Promise<void> {
     this.serviceCtx.logger.info({
       event_type: 'workflow_run_complete',
+      trace_id: id,
       metadata: { workflow_run_id: id, final_output },
     });
 
@@ -57,6 +58,7 @@ export class WorkflowRuns extends Resource {
     if (!updated) {
       this.serviceCtx.logger.warn({
         event_type: 'workflow_run_complete_failed',
+        trace_id: id,
         metadata: { workflow_run_id: id },
       });
       throw new NotFoundError(`Workflow run not found: ${id}`, 'workflow_run', id);
@@ -64,6 +66,7 @@ export class WorkflowRuns extends Resource {
 
     this.serviceCtx.logger.info({
       event_type: 'workflow_run_completed',
+      trace_id: id,
       metadata: { workflow_run_id: id },
     });
   }
