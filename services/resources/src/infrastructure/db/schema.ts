@@ -11,6 +11,7 @@ import {
   text,
   unique,
 } from 'drizzle-orm/sqlite-core';
+import type { ModelParameters } from '../../resources/model-profiles/types.js';
 
 /** Type definitions for JSON columns */
 
@@ -290,7 +291,7 @@ export const model_profiles = sqliteTable('model_profiles', {
   }).notNull(),
   model_id: text('model_id').notNull(),
 
-  parameters: text('parameters', { mode: 'json' }).$type<object>().notNull(),
+  parameters: text('parameters', { mode: 'json' }).$type<ModelParameters>().notNull(),
   execution_config: text('execution_config', { mode: 'json' }).$type<object>(),
 
   cost_per_1k_input_tokens: real('cost_per_1k_input_tokens').notNull(),

@@ -160,6 +160,22 @@ export class WorkflowCoordinator extends DurableObject {
           },
         });
 
+        // Fetch model profile
+        using modelProfiles = this.env.RESOURCES.modelProfiles();
+        const modelProfileResult = await modelProfiles.get(implementation.model_profile_id);
+
+        this.logger.info({
+          event_type: 'model_profile_fetched',
+          message: 'Model profile retrieved',
+          trace_id: workflow_run_id,
+          metadata: {
+            model_profile_id: modelProfileResult.model_profile.id,
+            model_profile_name: modelProfileResult.model_profile.name,
+            model_id: modelProfileResult.model_profile.model_id,
+            parameters: modelProfileResult.model_profile.parameters,
+          },
+        });
+
         // Evaluate input_mapping to build template context
         const templateContext: Record<string, unknown> = {};
         if (node.input_mapping) {
@@ -215,9 +231,9 @@ export class WorkflowCoordinator extends DurableObject {
         // Fire-and-forget to executor - executor will callback to handleTaskResult
         this.ctx.waitUntil(
           this.env.EXECUTOR.llmCall({
-            model: implementation.model || '@cf/meta/llama-3.1-8b-instruct',
+            model: modelProfileResult.model_profile.model_id,
             prompt,
-            temperature: implementation.temperature,
+            temperature: modelProfileResult.model_profile.parameters?.temperature,
             json_schema: promptSpecResult.prompt_spec.produces, // Pass output schema for structured output
             workflow_run_id,
             token_id,
@@ -232,6 +248,9 @@ export class WorkflowCoordinator extends DurableObject {
             token_id,
             node_id: node.id,
             action_kind: actionResult.action.kind,
+            model: modelProfileResult.model_profile.model_id,
+            model_parameters: modelProfileResult.model_profile.parameters,
+            temperature_passed: modelProfileResult.model_profile.parameters?.temperature,
           },
         });
 

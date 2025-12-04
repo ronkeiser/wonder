@@ -3,6 +3,7 @@
 import { ConflictError, NotFoundError, extractDbError } from '~/errors';
 import { Resource } from '../base';
 import * as repo from './repository';
+import type { ModelProfile } from './types.js';
 
 type ModelProvider = 'anthropic' | 'openai' | 'google' | 'cloudflare' | 'local';
 
@@ -78,16 +79,7 @@ export class ModelProfiles extends Resource {
   }
 
   async get(id: string): Promise<{
-    model_profile: {
-      id: string;
-      name: string;
-      provider: ModelProvider;
-      model_id: string;
-      parameters: object | null;
-      execution_config: object | null;
-      cost_per_1k_input_tokens: number;
-      cost_per_1k_output_tokens: number;
-    };
+    model_profile: ModelProfile;
   }> {
     this.serviceCtx.logger.info({
       event_type: 'model_profile_get',
@@ -103,7 +95,7 @@ export class ModelProfiles extends Resource {
       throw new NotFoundError(`ModelProfile not found: ${id}`, 'model_profile', id);
     }
 
-    return { model_profile: profile };
+    return { model_profile: profile as ModelProfile };
   }
 
   async list(params?: { limit?: number; provider?: ModelProvider }): Promise<{

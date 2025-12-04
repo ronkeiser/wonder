@@ -29,7 +29,7 @@ describe('Edge Workflow - Single Node JSON Output', () => {
         model_id: '@cf/meta/llama-3.1-8b-instruct',
         parameters: {
           max_tokens: 512,
-          temperature: 0.7,
+          temperature: 1.0,
         },
         cost_per_1k_input_tokens: 0.0,
         cost_per_1k_output_tokens: 0.0,
@@ -43,7 +43,7 @@ describe('Edge Workflow - Single Node JSON Output', () => {
         name: 'Generate Madlib Template',
         description: 'Creates a madlib template with placeholders',
         template:
-          'Create a 2-3 sentence madlib story about {{topic}}. Use placeholders in [brackets] like [adjective], [noun], [verb], [adverb], [animal], [color].\n\nReturn JSON with:\n- "template": the story with [placeholders]\n- "placeholders": array of placeholder types used\n\nExample: {"template": "The [adjective] [animal] [verb].", "placeholders": ["adjective", "animal", "verb"]}',
+          'Create a fun and varied 2-3 sentence madlib story about {{topic}}. IMPORTANT: Be creative with story structure - vary sentence lengths, change the order of events, try different narrative perspectives. Avoid common or formulaic patterns. Use diverse SPECIFIC placeholders in [brackets] like [city], [food item], [weather condition], [body part], [vehicle], [profession], [musical instrument], [mythical creature], [feeling], [historical figure].\n\nMake the story structure unique and surprising.\n\nReturn JSON with:\n- "template": the story with [placeholders]\n- "placeholders": array of placeholder types used\n\nExample: {"template": "The [profession] rode a [vehicle] to [city].", "placeholders": ["profession", "vehicle", "city"]}',
         template_language: 'handlebars',
         requires: {
           topic: 'string',
@@ -76,7 +76,7 @@ describe('Edge Workflow - Single Node JSON Output', () => {
         name: 'Generate Madlib Words',
         description: 'Generates creative words for madlib placeholders',
         template:
-          'Generate creative words for these placeholder types: {{placeholders}}\n\nReturn JSON with each placeholder type as a key and a creative word as the value.\n\nExample: {"adjective": "sparkly", "noun": "telescope", "verb": "danced"}',
+          'Generate varied and interesting words for these placeholder types: {{placeholders}}\n\nUse mostly common to slightly unusual words. Be creative - pick unpredictable words and avoid obvious or cliche choices. Think of fresh, diverse options that are fun and natural.\n\nReturn JSON with each placeholder type as a key and a creative word as the value.\n\nExample: {"city": "Prague", "food item": "mango", "vehicle": "gondola"}',
         template_language: 'handlebars',
         requires: {
           placeholders: 'array',
@@ -109,7 +109,7 @@ describe('Edge Workflow - Single Node JSON Output', () => {
         name: 'Complete Madlib Story',
         description: 'Fills in the madlib template with words to create final story',
         template:
-          'Fill in this madlib template:\n\n{{template}}\n\nUsing these words:\n{{json words}}\n\nReplace each [placeholder] with its matching word from the JSON. For example, replace [adjective] with the value of "adjective".\n\nReturn ONLY the completed story with all placeholders replaced. Do not make up new words.',
+          'Create a story by filling in this madlib template:\n\n{{template}}\n\nUsing these random words:\n{{json words}}\n\nReplace each [placeholder] with its matching word from the JSON. You may adjust plurality (singular/plural) and verb tense to make the grammar correct, but you MUST use the fundamental word provided - do not substitute different words. Add small connecting words (a, an, the, etc.) only as needed for proper grammar.\n\nReturn the completed story with all placeholders replaced.',
         template_language: 'handlebars',
         requires: {
           template: 'string',
