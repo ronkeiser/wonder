@@ -25,12 +25,71 @@
         background: #161b22;
         padding: 1rem;
         border-bottom: 1px solid #30363d;
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
       }
 
       h1 {
         font-size: 1.25rem;
         font-weight: 600;
       }
+
+      .time-filters {
+        display: flex;
+        gap: 0.5rem;
+      }
+
+      .time-filter-btn {
+        padding: 0.375rem 0.75rem;
+        background: #21262d;
+        border: 1px solid #30363d;
+        border-radius: 6px;
+        color: #c9d1d9;
+        cursor: pointer;
+        font-size: 0.875rem;
+        font-family: inherit;
+        transition: background 0.2s, border-color 0.2s;
+      }
+
+      .time-filter-btn:hover {
+        background: #30363d;
+        border-color: #8b949e;
+      }
+
+      .time-filter-btn.active {
+        background: #58a6ff;
+        border-color: #58a6ff;
+        color: #000;
+      }
+
+      /* Alternative color options (uncomment to use):
+      
+      Option 1 - Blue (current):
+        background: #58a6ff;
+        border-color: #58a6ff;
+        color: #000;
+      
+      Option 2 - Purple:
+        background: #8957e5;
+        border-color: #8957e5;
+        color: #fff;
+      
+      Option 3 - Orange:
+        background: #d29922;
+        border-color: #d29922;
+        color: #000;
+      
+      Option 4 - Subtle (dark with accent border):
+        background: #30363d;
+        border-color: #58a6ff;
+        color: #58a6ff;
+      
+      Option 5 - Green (original):
+        background: #238636;
+        border-color: #238636;
+        color: #fff;
+      */
 
       .status {
         display: inline-block;
@@ -181,10 +240,12 @@
       .log-service {
         color: #a5d6ff;
         margin-right: 0.5rem;
+        font-size: 0.9rem;
       }
 
       .log-message {
         color: #c9d1d9;
+        font-size: 0.9rem;
       }
 
       .log-metadata {
@@ -198,6 +259,13 @@
   <body>
     <header>
       <h1>Logs <span id="status" class="status connecting">Connecting...</span></h1>
+      <div class="time-filters">
+        <button class="time-filter-btn" data-minutes="1">1m</button>
+        <button class="time-filter-btn active" data-minutes="5">5m</button>
+        <button class="time-filter-btn" data-minutes="20">20m</button>
+        <button class="time-filter-btn" data-minutes="60">1h</button>
+        <button class="time-filter-btn" data-minutes="240">4h</button>
+      </div>
     </header>
 
     <div id="logs"></div>
@@ -207,6 +275,7 @@
       const statusEl = document.getElementById('status');
       const seenLogIds = new Set();
       let lastLogId = '';
+      let currentFilter = null;
 
       function setStatus(state) {
         statusEl.className = `status ${state}`;
@@ -217,6 +286,43 @@
             ? 'Disconnected'
             : 'Connecting...';
       }
+
+      async function filterLogsByTime(minutes) {
+        // Clear current logs
+        logsContainer.innerHTML = '';
+        seenLogIds.clear();
+        lastLogId = '';
+
+        const cutoffTime = Date.now() - minutes * 60 * 1000;
+
+        try {
+          const response = await fetch('/logs?limit=1000');
+          const data = await response.json();
+
+          // Filter logs by time and add them
+          const filteredLogs = data.logs
+            .filter((log) => log.timestamp >= cutoffTime)
+            .sort((a, b) => a.id.localeCompare(b.id)); // Sort by ULID (oldest first)
+
+          filteredLogs.forEach((log) => addLogEntry(log));
+        } catch (error) {
+          console.error('Failed to fetch logs:', error);
+        }
+      }
+
+      // Setup time filter buttons
+      document.querySelectorAll('.time-filter-btn').forEach((btn) => {
+        btn.addEventListener('click', () => {
+          const minutes = parseInt(btn.dataset.minutes);
+
+          // Update active state
+          document.querySelectorAll('.time-filter-btn').forEach((b) => b.classList.remove('active'));
+          btn.classList.add('active');
+
+          currentFilter = minutes;
+          filterLogsByTime(minutes);
+        });
+      });
 
       function formatTime(timestamp) {
         const date = new Date(timestamp);
@@ -371,6 +477,8 @@
         };
       }
 
+      // Load default filter (5m) on page load, then connect WebSocket
+      filterLogsByTime(5);
       connect();
     </script>
   </body>
