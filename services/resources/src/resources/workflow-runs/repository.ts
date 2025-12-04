@@ -35,3 +35,24 @@ export async function getWorkflowRunWithProject(
     workspace_id: project.workspace_id,
   };
 }
+
+export async function updateWorkflowRun(
+  db: DrizzleD1Database,
+  id: string,
+  updates: {
+    status?: 'running' | 'completed' | 'failed' | 'waiting';
+    completed_at?: string;
+    context?: object;
+  },
+): Promise<boolean> {
+  const result = await db
+    .update(workflow_runs)
+    .set({
+      ...updates,
+      updated_at: new Date().toISOString(),
+    })
+    .where(eq(workflow_runs.id, id))
+    .returning({ id: workflow_runs.id });
+
+  return result.length > 0;
+}

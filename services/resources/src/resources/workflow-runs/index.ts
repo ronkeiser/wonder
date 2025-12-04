@@ -41,4 +41,30 @@ export class WorkflowRuns extends Resource {
 
     return { workflow_run: workflowRun };
   }
+
+  async complete(id: string, final_output: object): Promise<void> {
+    this.serviceCtx.logger.info({
+      event_type: 'workflow_run_complete',
+      metadata: { workflow_run_id: id, final_output },
+    });
+
+    const updated = await repo.updateWorkflowRun(this.serviceCtx.db, id, {
+      status: 'completed',
+      completed_at: new Date().toISOString(),
+      context: { final_output },
+    });
+
+    if (!updated) {
+      this.serviceCtx.logger.warn({
+        event_type: 'workflow_run_complete_failed',
+        metadata: { workflow_run_id: id },
+      });
+      throw new NotFoundError(`Workflow run not found: ${id}`, 'workflow_run', id);
+    }
+
+    this.serviceCtx.logger.info({
+      event_type: 'workflow_run_completed',
+      metadata: { workflow_run_id: id },
+    });
+  }
 }

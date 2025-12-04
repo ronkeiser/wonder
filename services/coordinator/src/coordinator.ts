@@ -416,7 +416,9 @@ export class WorkflowCoordinator extends DurableObject {
         },
       });
 
-      // TODO: Update workflow_run status to 'completed' in Resources service with final output
+      // Store final output with workflow_run in Resources service
+      using workflowRunsService = this.env.RESOURCES.workflowRuns();
+      await workflowRunsService.complete(workflow_run_id, finalOutput);
     }
   }
 
