@@ -492,3 +492,58 @@ Each transition creates its own sibling group via `fan_out_transition_id`. Synch
 - **Retry on failure**: Leverage `failed` state with retry_count to automatically retry failed tokens
 - **Conditional spawn_count**: `spawn_count: { from_context: 'input.num_judges' }`
 - **Streaming merge**: Process results as they arrive (trigger on each sibling reaching terminal state)
+
+## Open Questions & Concerns
+
+### Resource Limits
+
+- **Token explosion**: No documented limits on token count. Pattern: 100 judges × 50 candidates × 5 nested layers = tens of thousands of tokens in flight
+- Need: Max tokens per workflow run, max spawn_count per transition, queuing/backpressure strategy
+- DO SQLite storage capacity and coordination overhead at scale
+
+### Timeout + Synchronization Interaction
+
+- **Critical gap**: What happens when `wait_for: 'all'` encounters a timed-out sibling?
+- Does fan-in block forever, or should it have `on_timeout: 'proceed_with_available' | 'fail'` policy?
+- Currently in "Future Enhancements" but needed for production (stuck workflow detection)
+
+### Partial Failure Handling
+
+- **Error propagation**: Errors flow through merge as `_branch.output`, mixing with successful results
+- If 50 of 100 judges fail, downstream gets mixed array of results + errors
+- Need: `min_success_count` or `success_threshold` on synchronization config
+- Should fan-in fail if too many branches fail? What's the policy?
+
+### Early Completion (Race Patterns)
+
+- **Currently missing**: `wait_for: 'any'` exists but doesn't cancel remaining siblings
+- Use cases: "First 3 judges to agree", "First passing solution from 10 attempts"
+- Listed as future enhancement but likely needed for AI workflow efficiency (cost + latency)
+- Requires cancellation protocol with executor service
+
+### Sub-Workflow Integration
+
+- **Documentation gap**: How do `workflow_call` tokens interact with this branching model?
+- Does parent token enter `waiting_for_siblings` state while sub-workflow runs?
+- How does sub-workflow completion flow back through transitions?
+- Nested composition is core requirement (5-6 layers) but not shown here
+
+### Human Input Gate Integration
+
+- **Documentation gap**: How do human input nodes use the token state machine?
+- Likely needs `waiting_for_input` state, but interaction with synchronization unclear
+- What happens if 100 tokens arrive at gate simultaneously? Queue? Batch UI?
+
+### Mixed Parallelism Synchronization
+
+- **Pattern 4 complexity**: Multiple transitions with different spawn counts create separate sibling groups
+- Example: Research (10 tokens) + Validation (20 tokens) both converge downstream
+- How to express "wait for all 30 total"? Requires two separate fan-in transitions with own configs
+- Works but increases graph complexity—is there a simpler pattern?
+
+### Synchronization Pass-Through Behavior
+
+- **Potential confusion**: Token with `fan_out_transition_id='A'` hits fan-in for `joins_transition='B'`
+- Doc says "pass through" but this could silently skip synchronization when intended
+- Should system warn/error on mismatched synchronization attempts?
+- Validation at graph authoring time vs runtime?
