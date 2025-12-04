@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest';
-import { client } from '../client';
+import { client } from '../../client';
 
-describe('Edge Workflow - Single Node JSON Output', () => {
+describe('Single Node JSON Output', () => {
   it('should create a madlib template with JSON output', async () => {
     const testTopic = 'a pirate adventure';
 
