@@ -1,3 +1,4 @@
+import { createLogger } from '@wonder/logs';
 import { WorkerEntrypoint } from 'cloudflare:workers';
 
 /**
@@ -24,10 +25,10 @@ export interface LLMCallResult {
  * Executor service with RPC methods
  */
 export default class ExecutorService extends WorkerEntrypoint<Env> {
-  private readonly logContext = {
+  private logger = createLogger(this.ctx, this.env.LOGS, {
     service: 'executor',
     environment: 'production',
-  } as const;
+  });
 
   constructor(ctx: ExecutionContext, env: Env) {
     super(ctx, env);
@@ -39,7 +40,7 @@ export default class ExecutorService extends WorkerEntrypoint<Env> {
   async llmCall(params: LLMCallParams): Promise<void> {
     const startTime = Date.now();
 
-    await this.env.LOGS.info(this.logContext, {
+    this.logger.info({
       event_type: 'llm_call_started',
       message: 'LLM call started',
       metadata: {
@@ -68,7 +69,7 @@ export default class ExecutorService extends WorkerEntrypoint<Env> {
         response: response?.response || 'No response from LLM',
       };
 
-      await this.env.LOGS.info(this.logContext, {
+      this.logger.info({
         event_type: 'llm_call_completed',
         message: 'LLM call completed successfully',
         metadata: {
@@ -85,7 +86,7 @@ export default class ExecutorService extends WorkerEntrypoint<Env> {
       const coordinator = this.env.COORDINATOR.get(coordinatorId);
       await coordinator.handleTaskResult(params.token_id, { output_data: result });
     } catch (error) {
-      await this.env.LOGS.error(this.logContext, {
+      this.logger.error({
         event_type: 'llm_call_failed',
         message: 'LLM call failed',
         metadata: {

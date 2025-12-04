@@ -5,6 +5,7 @@ import { ulid } from 'ulid';
 import { logs } from './db/schema.js';
 import type { GetLogsOptions, LogContext, LogLevel, Logger, LoggerInput } from './types.js';
 
+export { createLogger } from './client.js';
 export { Streamer } from './streamer';
 export type { GetLogsOptions, LogContext, LogLevel, Logger, LoggerInput } from './types.js';
 
@@ -104,6 +105,13 @@ export class LogsService extends WorkerEntrypoint<Env> {
         }
       })(),
     );
+  }
+
+  /**
+   * RPC method - generic log method that accepts level
+   */
+  log(level: LogLevel, context: LogContext, input: LoggerInput | string): void {
+    this.write(context, level, normalizeInput(input));
   }
 
   /**
