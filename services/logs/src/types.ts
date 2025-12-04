@@ -10,6 +10,8 @@ export interface LogContext {
 }
 
 export interface LoggerInput {
+  id?: string;
+  timestamp?: number;
   event_type?: string;
   message?: string;
   source_location?: string;

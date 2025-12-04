@@ -1,3 +1,4 @@
+import { ulid } from 'ulid';
 import type { LogContext, Logger, LoggerInput, LogLevel } from './types.js';
 
 /**
@@ -12,9 +13,13 @@ export function createLogger(
   logContext: LogContext,
 ): Logger {
   const log = (level: LogLevel, input: LoggerInput | string) => {
-    ctx.waitUntil(
-      logsBinding.log(level, logContext, typeof input === 'string' ? { message: input } : input),
-    );
+    const normalizedInput = typeof input === 'string' ? { message: input } : input;
+    const logEntry: LoggerInput = {
+      id: ulid(),
+      timestamp: Date.now(),
+      ...normalizedInput,
+    };
+    ctx.waitUntil(logsBinding.log(level, logContext, logEntry));
   };
 
   return {

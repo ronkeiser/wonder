@@ -62,8 +62,8 @@ export class LogsService extends WorkerEntrypoint<Env> {
     this.ctx.waitUntil(
       (async () => {
         const logEntry = {
-          id: ulid(),
-          timestamp: Date.now(),
+          id: input.id || ulid(), // Use client-provided ID, fallback to generating one
+          timestamp: input.timestamp || Date.now(), // Use client-provided timestamp
           level,
           ...context,
           ...input,
