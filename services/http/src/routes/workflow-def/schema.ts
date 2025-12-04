@@ -15,6 +15,10 @@ export const CreateWorkflowDefSchema = z
     tags: z.array(z.string()).optional(),
     input_schema: z.record(z.string(), z.unknown()).openapi({ example: { topic: 'string' } }),
     output_schema: z.record(z.string(), z.unknown()).openapi({ example: { content: 'string' } }),
+    output_mapping: z
+      .record(z.string(), z.string())
+      .optional()
+      .openapi({ example: { result: '$.final_node_output.response' } }),
     context_schema: z.record(z.string(), z.unknown()).optional(),
     initial_node_ref: z
       .string()

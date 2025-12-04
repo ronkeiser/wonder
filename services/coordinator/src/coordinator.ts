@@ -375,19 +375,48 @@ export class WorkflowCoordinator extends DurableObject {
     ).one();
 
     if (pendingTokens.count === 0) {
+      // Extract final output using output_mapping
+      const finalOutput: Record<string, unknown> = {};
+      
+      logger.info({
+        event_type: 'extracting_final_output',
+        message: 'Evaluating output_mapping',
+        trace_id: workflow_run_id,
+        metadata: {
+          output_mapping: workflowDef.workflow_def.output_mapping,
+          has_output_mapping: !!workflowDef.workflow_def.output_mapping,
+        },
+      });
+      
+      if (workflowDef.workflow_def.output_mapping) {
+        for (const [key, jsonPath] of Object.entries(workflowDef.workflow_def.output_mapping)) {
+          const pathStr = jsonPath as string;
+          if (pathStr.startsWith('$.')) {
+            const contextPath = pathStr.slice(2); // Remove $.
+            const row = this.ctx.storage.sql.exec(
+              `SELECT value FROM context WHERE path = ?`,
+              contextPath
+            ).one();
+            if (row) {
+              finalOutput[key] = JSON.parse(row.value as string);
+            }
+          }
+        }
+      }
+
       logger.info({
         event_type: 'workflow_completed',
-        message: 'Workflow execution completed.',
+        message: 'Workflow execution completed - no pending tokens remain',
         trace_id: workflow_run_id,
         metadata: {
           workflow_run_id,
           last_completed_node_id: node_id,
           last_completed_node_ref: node.ref,
+          final_output: finalOutput,
         },
       });
 
-      // TODO: Extract final output from context based on workflow output_schema
-      // TODO: Update workflow_run status to 'completed' in Resources service
+      // TODO: Update workflow_run status to 'completed' in Resources service with final output
     }
   }
 

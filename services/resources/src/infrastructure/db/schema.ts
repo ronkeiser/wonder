@@ -99,6 +99,7 @@ export const workflow_defs = sqliteTable(
     tags: text('tags', { mode: 'json' }).$type<string[]>(),
     input_schema: text('input_schema', { mode: 'json' }).$type<object>().notNull(),
     output_schema: text('output_schema', { mode: 'json' }).$type<object>().notNull(),
+    output_mapping: text('output_mapping', { mode: 'json' }).$type<object>(),
     context_schema: text('context_schema', { mode: 'json' }).$type<object>(),
 
     initial_node_id: text('initial_node_id'),

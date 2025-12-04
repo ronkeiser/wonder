@@ -11,6 +11,7 @@ export type WorkflowDef = {
   tags: string[] | null;
   input_schema: object;
   output_schema: object;
+  output_mapping: object | null;
   context_schema: object | null;
   initial_node_id: string | null;
   created_at: string;

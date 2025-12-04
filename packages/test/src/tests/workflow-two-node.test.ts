@@ -128,6 +128,9 @@ describe('Workflow Execution API', () => {
               response: { type: 'string' },
             },
           },
+          output_mapping: {
+            response: '$.llm_complete_output.response',
+          },
           initial_node_ref: 'llm_greet',
           nodes: [
             {

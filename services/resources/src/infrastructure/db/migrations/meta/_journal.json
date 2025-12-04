@@ -36,6 +36,13 @@
       "when": 1764729133825,
       "tag": "0004_volatile_lethal_legion",
       "breakpoints": true
+    },
+    {
+      "idx": 5,
+      "version": "6",
+      "when": 1764807256253,
+      "tag": "0005_natural_prowler",
+      "breakpoints": true
     }
   ]
 }

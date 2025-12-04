@@ -18,6 +18,7 @@ export async function createWorkflowDef(
     tags?: string[] | null;
     input_schema: object;
     output_schema: object;
+    output_mapping?: object | null;
     context_schema?: object | null;
     initial_node_id: string | null;
   },
@@ -34,6 +35,7 @@ export async function createWorkflowDef(
     tags: data.tags ?? null,
     input_schema: data.input_schema,
     output_schema: data.output_schema,
+    output_mapping: data.output_mapping ?? null,
     context_schema: data.context_schema ?? null,
     initial_node_id: data.initial_node_id,
     created_at: now,
