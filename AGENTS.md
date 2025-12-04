@@ -34,4 +34,5 @@ Options:
 ```
 
 Never say YAGNI.
-Always check for type errors after doing work.
+
+**_ALWAYS CHECK FOR TYPE ERRORS AFTER WRITING CODE_**
