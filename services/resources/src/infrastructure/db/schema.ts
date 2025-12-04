@@ -11,7 +11,7 @@ import {
   text,
   unique,
 } from 'drizzle-orm/sqlite-core';
-import type { ModelParameters } from '../../resources/model-profiles/types.js';
+import type { ModelId, ModelProfile } from '../../resources/model-profiles/types.js';
 
 /** Type definitions for JSON columns */
 
@@ -286,12 +286,10 @@ export const prompt_specs = sqliteTable(
 export const model_profiles = sqliteTable('model_profiles', {
   id: text('id').primaryKey(),
   name: text('name').notNull(),
-  provider: text('provider', {
-    enum: ['anthropic', 'openai', 'google', 'cloudflare', 'local'],
-  }).notNull(),
-  model_id: text('model_id').notNull(),
+  provider: text('provider').notNull(),
+  model_id: text('model_id').$type<ModelId>().notNull(),
 
-  parameters: text('parameters', { mode: 'json' }).$type<ModelParameters>().notNull(),
+  parameters: text('parameters', { mode: 'json' }).$type<ModelProfile['parameters']>().notNull(),
   execution_config: text('execution_config', { mode: 'json' }).$type<object>(),
 
   cost_per_1k_input_tokens: real('cost_per_1k_input_tokens').notNull(),

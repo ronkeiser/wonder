@@ -28,14 +28,14 @@ export async function getModelProfile(
   id: string,
 ): Promise<ModelProfile | null> {
   const result = await db.select().from(model_profiles).where(eq(model_profiles.id, id)).get();
-  return result ?? null;
+  return (result as ModelProfile) ?? null;
 }
 
 export async function listModelProfiles(
   db: DrizzleD1Database,
   limit: number = 100,
 ): Promise<ModelProfile[]> {
-  return await db.select().from(model_profiles).limit(limit).all();
+  return (await db.select().from(model_profiles).limit(limit).all()) as ModelProfile[];
 }
 
 export async function listModelProfilesByProvider(
@@ -43,12 +43,12 @@ export async function listModelProfilesByProvider(
   provider: ModelProvider,
   limit: number = 100,
 ): Promise<ModelProfile[]> {
-  return await db
+  return (await db
     .select()
     .from(model_profiles)
     .where(eq(model_profiles.provider, provider))
     .limit(limit)
-    .all();
+    .all()) as ModelProfile[];
 }
 
 export async function deleteModelProfile(db: DrizzleD1Database, id: string): Promise<void> {
