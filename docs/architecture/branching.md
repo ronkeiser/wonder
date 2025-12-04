@@ -8,8 +8,9 @@ Wonder's branching model is based on **transition-centric control flow**, inspir
 
 1. **Nodes execute actions** - no branching logic
 2. **Transitions control routing** - conditions, spawn counts, priorities
-3. **Tokens track lineage** - hierarchical path_id enables fan-in
-4. **Fan-in uses path matching** - siblings identified by common fan-out ancestor
+3. **Priority tiers control evaluation** - same priority = parallel dispatch, different priority = sequential tiers
+4. **Tokens track lineage** - hierarchical path_id enables fan-in
+5. **Fan-in uses path matching** - siblings identified by common fan-out ancestor
 
 ## Transition Schema
 
@@ -31,41 +32,41 @@ Transition {
 
 ### Pattern 1: Sequential (First Match)
 
-Only the first matching transition is followed.
+Transitions at different priority levels are evaluated in priority order. The first priority tier that has ANY matches is followed; remaining tiers are skipped.
 
 ```typescript
 // Node A completes
-Transitions (evaluated by priority):
-  1. condition: { approved == true } → Node B
-  2. condition: { rejected == true } → Node C
-  3. (no condition - default) → Node D
+Transitions (evaluated by priority tiers):
+  priority: 1, condition: { approved == true } → Node B
+  priority: 2, condition: { rejected == true } → Node C
+  priority: 3, (no condition - default) → Node D
 
-// If approved=true: 1 token to Node B
-// If approved=false, rejected=true: 1 token to Node C
+// If approved=true: 1 token to Node B (stop, don't evaluate priority 2 or 3)
+// If approved=false, rejected=true: 1 token to Node C (stop, don't evaluate priority 3)
 // Otherwise: 1 token to Node D
 ```
 
-**Implementation:** Evaluate transitions in priority order, follow first match, stop.
+**Implementation:** Evaluate transitions by priority tier. At each tier, check all conditions. If ANY match, follow ALL matches and stop. If NONE match, proceed to next tier.
 
 ### Pattern 2: Parallel Dispatch
 
-Multiple paths followed simultaneously when multiple conditions match.
+Multiple paths followed simultaneously when multiple transitions share the same priority.
 
 ```typescript
 // Node A completes
-Transitions (all evaluated):
-  1. condition: { score >= 80 } → Node B
-  2. condition: { hasErrors == false } → Node C
-  3. condition: { reviewCount > 3 } → Node D
+Transitions (all at same priority):
+  priority: 1, condition: { score >= 80 } → Node B
+  priority: 1, condition: { hasErrors == false } → Node C
+  priority: 1, condition: { reviewCount > 3 } → Node D
 
 // If score=85, hasErrors=false, reviewCount=5
-// → All conditions match
+// → All conditions at priority 1 match
 // → 3 tokens spawned (one to B, C, D each)
 ```
 
-**Implementation:** Evaluate all transitions, follow every match.
+**Implementation:** Transitions at the same priority level are evaluated together. All matching transitions are followed.
 
-**Control:** Set Node.fan_out = 'all' to enable (default is 'first_match').
+**Key insight:** Same priority = parallel dispatch. Different priority = sequential tiers.
 
 ### Pattern 3: Replication (Fan-out)
 
@@ -91,17 +92,17 @@ Transition:
 Combine parallel dispatch with per-transition replication.
 
 ```typescript
-// Node A completes (fan_out: 'all')
-Transitions:
-  1. condition: { mode == 'research' }, spawn_count: 3 → Node B
-  2. condition: { mode == 'validate' }, spawn_count: 5 → Node C
+// Node A completes
+Transitions (same priority = parallel dispatch):
+  priority: 1, condition: { mode == 'research' }, spawn_count: 3 → Node B
+  priority: 1, condition: { mode == 'validate' }, spawn_count: 5 → Node C
 
 // If mode='research' and mode='validate' both true
 // → 8 tokens total (3 to B, 5 to C)
 // → All have fan_out_node_id = 'A'
 ```
 
-**Use case:** Different strategies with different parallelism levels.
+**Use case:** Different strategies with different parallelism levels, evaluated in parallel.
 
 ### Pattern 5: Dynamic Iteration (foreach)
 
@@ -197,19 +198,35 @@ async function handleTaskResult(token, result) {
   // 2. Apply output to context
   applyOutputMapping(node, result);
 
-  // 3. Get outgoing transitions
+  // 3. Get outgoing transitions grouped by priority
   const transitions = getTransitions(node.id);
+  const grouped = groupBy(transitions, (t) => t.priority);
+  const sortedPriorities = Object.keys(grouped)
+    .map(Number)
+    .sort((a, b) => a - b);
 
-  // 4. Evaluate conditions
-  const matchingTransitions = transitions
-    .sort((a, b) => a.priority - b.priority)
-    .filter((t) => evaluateCondition(t.condition, context));
+  // 4. Evaluate by priority tier (stop at first non-empty tier)
+  let transitionsToFollow = [];
+  for (const priority of sortedPriorities) {
+    const transitionsAtThisPriority = grouped[priority];
+    const matches = transitionsAtThisPriority.filter((t) =>
+      evaluateCondition(t.condition, context),
+    );
 
-  // 5. Apply fan_out mode
-  const transitionsToFollow =
-    node.fan_out === 'first_match' ? matchingTransitions.slice(0, 1) : matchingTransitions;
+    if (matches.length > 0) {
+      // Found matches at this priority tier - follow all and stop
+      transitionsToFollow = matches;
+      break;
+    }
+    // No matches at this tier, try next priority
+  }
 
-  // 6. Spawn tokens
+  if (transitionsToFollow.length === 0) {
+    throw new Error('No matching transitions');
+  }
+
+  // 5. Spawn tokens
+
   for (const transition of transitionsToFollow) {
     const spawnCount = determineSpawnCount(transition, context);
     const fanOutNodeId = spawnCount > 1 ? node.id : null;
@@ -274,26 +291,43 @@ Structured conditions support:
 
 CEL expressions available as fallback for complex logic not covered by structured conditions.
 
-## Node Fan-out Mode
+## Priority Tier Semantics
 
-Despite transition-centric model, nodes still have `fan_out` to control evaluation strategy:
+The priority field on transitions controls both evaluation order and parallelism:
+
+**Same priority = parallel dispatch:**
 
 ```typescript
-Node {
-  fan_out: 'first_match' | 'all'
-}
+// All transitions at priority 1 evaluated together
+priority: 1, condition: {a} → B
+priority: 1, condition: {b} → C
+priority: 1, condition: {c} → D
+// If all match: 3 tokens spawned (to B, C, and D)
 ```
 
-- **`first_match`** (default): Sequential routing—first matching transition wins
-- **`all`**: Parallel dispatch—all matching transitions followed
+**Different priority = sequential tiers:**
 
-This prevents needing mutually exclusive conditions when sequential logic is desired.
+```typescript
+// Evaluate priority 1 first
+priority: 1, condition: {approved} → B
+// Only if priority 1 has NO matches, evaluate priority 2
+priority: 2, condition: {rejected} → C
+// Only if priority 2 has NO matches, evaluate priority 3
+priority: 3 → D  // default fallback
+```
+
+**Key insight:** If you want both priority 1 AND priority 2 transitions to fire, make them both priority 1. Priority tiers are for fallback logic, not for ordering parallel paths.
 
 ## Edge Cases
 
-### No matching transitions
+### No matching transitions at any priority tier
 
-Workflow error—forces explicit default transition (avoids implicit terminal nodes).
+Workflow error. Best practice: include an unconditional transition at lowest priority as a fallback.
+
+```typescript
+priority: 1, condition: {normal_path} → B
+priority: 999, (no condition) → ErrorHandler  // Catch-all
+```
 
 ### Fan-in without siblings
 
@@ -306,23 +340,6 @@ Tokens preserve full ancestry in `path_id`. Fan-in at any level queries by the a
 ### Multiple fan-outs converging
 
 Valid. All tokens from the same `fan_out_node_id` are siblings, regardless of intermediate paths.
-
-## Migration from Node-Level fan_out_count
-
-**Old model:**
-
-```typescript
-Node { fan_out: 'all', fan_out_count: 5 }
-```
-
-**New model:**
-
-```typescript
-Node { fan_out: 'all' }
-Transition { from_node_id, to_node_id, spawn_count: 5 }
-```
-
-If a node had `fan_out_count`, apply it to all outgoing transitions as their `spawn_count`.
 
 ## Future Enhancements
 
