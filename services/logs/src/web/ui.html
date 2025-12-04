@@ -434,6 +434,8 @@
       let lastLogId = '';
       let currentFilter = null;
       let currentService = '';
+      let streamBuffer = [];
+      let bufferTimeout = null;
 
       function setStatus(state) {
         statusEl.className = `status ${state}`;
@@ -659,7 +661,20 @@
             if (data.type === 'history') {
               data.logs.forEach((log) => addLogEntry(log));
             } else if (data.type === 'log') {
-              addLogEntry(data.log);
+              // Buffer streamed logs for 50ms to allow sorting
+              streamBuffer.push(data.log);
+
+              if (bufferTimeout) {
+                clearTimeout(bufferTimeout);
+              }
+
+              bufferTimeout = setTimeout(() => {
+                // Sort buffered logs by timestamp and add them
+                streamBuffer.sort((a, b) => a.timestamp - b.timestamp);
+                streamBuffer.forEach((log) => addLogEntry(log));
+                streamBuffer = [];
+                bufferTimeout = null;
+              }, 50);
             }
           } catch (e) {
             console.error('Failed to parse message:', e);
