@@ -547,3 +547,90 @@ Each transition creates its own sibling group via `fan_out_transition_id`. Synch
 - Doc says "pass through" but this could silently skip synchronization when intended
 - Should system warn/error on mismatched synchronization attempts?
 - Validation at graph authoring time vs runtime?
+
+## Proposed Enhancements (Addressable with Minimal Schema Changes)
+
+The following enhancements address the open questions above with small additions to existing structures:
+
+### 1. Timeout + Synchronization Policy
+
+Add timeout handling to synchronization config:
+
+```typescript
+synchronization: {
+  wait_for: 'all',
+  joins_transition: 'trans_judges',
+  timeout?: string,              // Duration (e.g., '5m', '1h')
+  on_timeout?: 'proceed' | 'fail',  // Default: 'fail'
+  merge: { ... }
+}
+```
+
+**Behavior:**
+
+- `on_timeout: 'fail'` - Transition waiting tokens to `failed` state, fail workflow
+- `on_timeout: 'proceed'` - Merge available tokens and continue with partial results
+
+**Implementation:** Background job monitors tokens in `waiting_for_siblings` state, transitions to `timed_out` when deadline exceeded.
+
+### 2. Partial Failure Handling
+
+Add success threshold to synchronization:
+
+```typescript
+synchronization: {
+  wait_for: 'all',
+  joins_transition: 'trans_judges',
+  min_success_count?: number,  // Minimum successful siblings required
+  merge: { ... }
+}
+```
+
+**Behavior:**
+
+- Count siblings in `completed` state (vs `failed`, `timed_out`, `cancelled`)
+- If successful count < `min_success_count`, fail the fan-in
+- Otherwise, proceed with merge (errors still flow through as `_branch.output`)
+
+**Example:** 100 judges, `min_success_count: 70` - need at least 70 successful completions to proceed.
+
+### 3. Race Patterns (Early Completion)
+
+Add completion policy to transitions:
+
+```typescript
+Transition {
+  id: 'trans_parallel_strategies',
+  from_node_id: 'A',
+  to_node_id: 'B',
+  spawn_count: 5,
+  on_first_completion?: 'cancel_remaining' | 'continue_all'  // Default: 'continue_all'
+}
+```
+
+**Behavior:**
+
+- `cancel_remaining` - When first token completes, cancel all siblings (transition to `cancelled` state)
+- `continue_all` - All tokens run to completion independently (current behavior)
+
+**Use case:** "Run 5 LLM strategies in parallel, use first successful result, cancel others to save cost."
+
+**Implementation:** Requires cancellation protocol with executor service—send RPC to cancel in-flight tasks.
+
+### 4. Resource Limits
+
+Add runtime constraints to workflow configuration:
+
+```typescript
+WorkflowConfig {
+  max_tokens_per_run?: number,     // Default: 10000
+  max_spawn_count?: number,        // Per transition, default: 1000
+  max_nesting_depth?: number       // For sub-workflows, default: 10
+}
+```
+
+**Behavior:**
+
+- Enforce limits at token creation time
+- Fail workflow with clear error if limit exceeded
+- Prevents runaway fan-out from bugs or misconfiguration
