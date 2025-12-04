@@ -3,7 +3,7 @@
   <head>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <title>Logs Viewer</title>
+    <title>Logs</title>
     <style>
       * {
         margin: 0;
@@ -79,6 +79,35 @@
         background: #58a6ff;
         border-color: #58a6ff;
         color: #000;
+      }
+
+      .refresh-btn {
+        padding: 0.375rem 0.75rem;
+        background: #21262d;
+        border: 1px solid #30363d;
+        border-radius: 6px;
+        color: #c9d1d9;
+        cursor: pointer;
+        font-size: 0.875rem;
+        font-family: inherit;
+        transition: background 0.2s, border-color 0.2s, transform 0.2s;
+        display: flex;
+        align-items: center;
+        gap: 0.375rem;
+      }
+
+      .refresh-btn:hover {
+        background: #30363d;
+        border-color: #8b949e;
+      }
+
+      .refresh-btn:active {
+        transform: scale(0.95);
+      }
+
+      .refresh-btn svg {
+        width: 14px;
+        height: 14px;
       }
 
       /* Alternative color options (uncomment to use):
@@ -283,6 +312,15 @@
         <button class="time-filter-btn" data-minutes="20">20m</button>
         <button class="time-filter-btn" data-minutes="60">1h</button>
         <button class="time-filter-btn" data-minutes="240">4h</button>
+        <button id="refresh-btn" class="refresh-btn" title="Refresh logs">
+          <svg viewBox="0 0 16 16" fill="currentColor">
+            <path
+              fill-rule="evenodd"
+              d="M8 2.5a5.487 5.487 0 0 0-4.131 1.869l1.204 1.204A.25.25 0 0 1 4.896 6H1.25A.25.25 0 0 1 1 5.75V2.104a.25.25 0 0 1 .427-.177l1.38 1.38A7.001 7.001 0 0 1 14.95 7.16a.75.75 0 1 1-1.49.178A5.501 5.501 0 0 0 8 2.5zM1.705 8.005a.75.75 0 0 1 .834.656 5.501 5.501 0 0 0 9.592 2.97l-1.204-1.204a.25.25 0 0 1 .177-.427h3.646a.25.25 0 0 1 .25.25v3.646a.25.25 0 0 1-.427.177l-1.38-1.38A7.001 7.001 0 0 1 1.05 8.84a.75.75 0 0 1 .656-.834z"
+            ></path>
+          </svg>
+          Refresh
+        </button>
       </div>
     </header>
 
@@ -340,14 +378,21 @@
           btn.classList.add('active');
 
           currentFilter = minutes;
-          
+
           // Update URL params
           const url = new URL(window.location);
           url.searchParams.set('m', minutes);
           window.history.pushState({}, '', url);
-          
+
           filterLogsByTime(minutes);
         });
+      });
+
+      // Setup refresh button
+      document.getElementById('refresh-btn').addEventListener('click', () => {
+        const activeBtn = document.querySelector('.time-filter-btn.active');
+        const minutes = activeBtn ? parseInt(activeBtn.dataset.minutes) : 5;
+        filterLogsByTime(minutes);
       });
 
       function formatTime(timestamp) {
@@ -507,7 +552,7 @@
       const urlParams = new URLSearchParams(window.location.search);
       const savedMinutes = urlParams.get('m');
       const initialMinutes = savedMinutes ? parseInt(savedMinutes) : 5;
-      
+
       // Update active button to match initial filter
       document.querySelectorAll('.time-filter-btn').forEach((btn) => {
         if (parseInt(btn.dataset.minutes) === initialMinutes) {
@@ -516,7 +561,7 @@
           btn.classList.remove('active');
         }
       });
-      
+
       filterLogsByTime(initialMinutes);
       connect();
     </script>
