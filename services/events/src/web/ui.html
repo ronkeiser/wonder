@@ -1,10 +1,32 @@
-<!DOCTYPE html>
+<!doctype html>
 <html lang="en">
   <head>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <title>Events</title>
     <style>
+      :root {
+        /* Semantic event colors */
+        --event-success: #238636;
+        --event-error: #f85149;
+        --event-info: #58a6ff;
+        --event-token: #a371f7;
+        --event-llm: #d29922;
+        --event-default: #30363d;
+
+        /* Base theme colors */
+        --bg-primary: #0d1117;
+        --bg-secondary: #161b22;
+        --bg-tertiary: #21262d;
+        --bg-hover: #30363d;
+        --text-primary: #c9d1d9;
+        --text-secondary: #8b949e;
+        --text-link: #a5d6ff;
+        --border: #30363d;
+        --accent: #58a6ff;
+        --accent-emphasis: #58a6ff80;
+      }
+
       * {
         margin: 0;
         padding: 0;
@@ -12,10 +34,11 @@
       }
 
       body {
-        font-family: ui-monospace, 'Cascadia Code', 'Source Code Pro', Menlo, Consolas,
-          'DejaVu Sans Mono', monospace;
-        background: #0d1117;
-        color: #c9d1d9;
+        font-family:
+          ui-monospace, 'Cascadia Code', 'Source Code Pro', Menlo, Consolas, 'DejaVu Sans Mono',
+          monospace;
+        background: var(--bg-primary);
+        color: var(--text-primary);
         height: 100vh;
         display: flex;
         flex-direction: column;
@@ -27,11 +50,11 @@
       }
 
       ::-webkit-scrollbar-track {
-        background: #0d1117;
+        background: var(--bg-primary);
       }
 
       ::-webkit-scrollbar-thumb {
-        background: #30363d;
+        background: var(--border);
         border-radius: 6px;
       }
 
@@ -40,9 +63,9 @@
       }
 
       header {
-        background: #161b22;
+        background: var(--bg-secondary);
         padding: 1rem;
-        border-bottom: 1px solid #30363d;
+        border-bottom: 1px solid var(--border);
         display: flex;
         justify-content: space-between;
         align-items: center;
@@ -62,7 +85,7 @@
       .event-type-filter {
         padding: 0.375rem 0.75rem;
         padding-right: 2rem;
-        background: #21262d;
+        background: var(--bg-tertiary);
         background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 16 16' fill='%23c9d1d9'%3E%3Cpath d='M4.427 7.427l3.396 3.396a.25.25 0 00.354 0l3.396-3.396A.25.25 0 0011.396 7H4.604a.25.25 0 00-.177.427z'/%3E%3C/svg%3E");
         background-repeat: no-repeat;
         background-position: right 0.5rem center;
@@ -72,7 +95,7 @@
         -moz-appearance: none;
         border: none;
         border-radius: 6px;
-        color: #c9d1d9;
+        color: var(--text-primary);
         cursor: pointer;
         font-size: 0.875rem;
         font-family: inherit;
@@ -80,7 +103,7 @@
       }
 
       .event-type-filter:hover {
-        background-color: #30363d;
+        background-color: var(--bg-hover);
         background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 16 16' fill='%23c9d1d9'%3E%3Cpath d='M4.427 7.427l3.396 3.396a.25.25 0 00.354 0l3.396-3.396A.25.25 0 0011.396 7H4.604a.25.25 0 00-.177.427z'/%3E%3C/svg%3E");
       }
 
@@ -89,7 +112,7 @@
       }
 
       .event-type-filter:focus-visible {
-        box-shadow: 0 0 0 2px #58a6ff80;
+        box-shadow: 0 0 0 2px var(--accent-emphasis);
       }
 
       .time-filters {
@@ -99,10 +122,10 @@
 
       .time-filter-btn {
         padding: 0.375rem 0.75rem;
-        background: #21262d;
+        background: var(--bg-tertiary);
         border: none;
         border-radius: 6px;
-        color: #c9d1d9;
+        color: var(--text-primary);
         cursor: pointer;
         font-size: 0.875rem;
         font-family: inherit;
@@ -110,7 +133,7 @@
       }
 
       .time-filter-btn:hover {
-        background: #30363d;
+        background: var(--bg-hover);
       }
 
       .time-filter-btn:focus {
@@ -118,31 +141,33 @@
       }
 
       .time-filter-btn:focus-visible {
-        box-shadow: 0 0 0 2px #58a6ff80;
+        box-shadow: 0 0 0 2px var(--accent-emphasis);
       }
 
       .time-filter-btn.active {
-        background: #58a6ff;
+        background: var(--accent);
         color: #000;
       }
 
       .refresh-btn {
         padding: 0.375rem 0.75rem;
-        background: #21262d;
+        background: var(--bg-tertiary);
         border: none;
         border-radius: 6px;
-        color: #c9d1d9;
+        color: var(--text-primary);
         cursor: pointer;
         font-size: 0.875rem;
         font-family: inherit;
-        transition: background 0.1s, transform 0.1s;
+        transition:
+          background 0.1s,
+          transform 0.1s;
         display: flex;
         align-items: center;
         gap: 0.375rem;
       }
 
       .refresh-btn:hover {
-        background: #30363d;
+        background: var(--bg-hover);
       }
 
       .refresh-btn:focus {
@@ -150,7 +175,7 @@
       }
 
       .refresh-btn:focus-visible {
-        box-shadow: 0 0 0 2px #58a6ff80;
+        box-shadow: 0 0 0 2px var(--accent-emphasis);
       }
 
       .refresh-btn:active {
@@ -172,17 +197,17 @@
       }
 
       .status.connected {
-        background: #238636;
+        background: var(--event-success);
         color: #fff;
       }
 
       .status.disconnected {
-        background: #da3633;
+        background: var(--event-error);
         color: #fff;
       }
 
       .status.connecting {
-        background: #9e6a03;
+        background: var(--event-llm);
         color: #fff;
       }
 
@@ -204,7 +229,7 @@
       }
 
       .event-entry:hover {
-        background: #161b22;
+        background: var(--bg-secondary);
       }
 
       .event-entry:hover .copy-btn {
@@ -220,25 +245,28 @@
         margin-left: auto;
         padding: 0.25rem;
         background: transparent;
-        border: 1px solid #30363d;
+        border: 1px solid var(--border);
         border-radius: 4px;
-        color: #8b949e;
+        color: var(--text-secondary);
         cursor: pointer;
         flex-shrink: 0;
         margin-top: 0.125rem;
-        transition: background 0.2s, color 0.2s, border-color 0.2s;
+        transition:
+          background 0.2s,
+          color 0.2s,
+          border-color 0.2s;
       }
 
       .copy-btn:hover {
-        background: #30363d;
-        color: #c9d1d9;
-        border-color: #8b949e;
+        background: var(--bg-hover);
+        color: var(--text-primary);
+        border-color: var(--text-secondary);
       }
 
       .copy-btn.copied {
         opacity: 1;
-        color: #238636;
-        border-color: #238636;
+        color: var(--event-success);
+        border-color: var(--event-success);
       }
 
       .copy-btn svg {
@@ -247,53 +275,35 @@
         height: 14px;
       }
 
-      /* Event type colors */
-      .event-entry.workflow_started {
-        border-left-color: #238636;
-      }
-
+      /* Event type border colors */
+      .event-entry.workflow_started,
       .event-entry.workflow_completed {
-        border-left-color: #238636;
+        border-left-color: var(--event-success);
       }
 
-      .event-entry.workflow_failed {
-        border-left-color: #f85149;
-      }
-
-      .event-entry.node_started {
-        border-left-color: #58a6ff;
-      }
-
-      .event-entry.node_completed {
-        border-left-color: #58a6ff;
-      }
-
-      .event-entry.node_failed {
-        border-left-color: #f85149;
-      }
-
-      .event-entry.token_spawned {
-        border-left-color: #a371f7;
-      }
-
-      .event-entry.token_merged {
-        border-left-color: #a371f7;
-      }
-
-      .event-entry.llm_call_started {
-        border-left-color: #d29922;
-      }
-
-      .event-entry.llm_call_completed {
-        border-left-color: #d29922;
-      }
-
+      .event-entry.workflow_failed,
+      .event-entry.node_failed,
       .event-entry.llm_call_failed {
-        border-left-color: #f85149;
+        border-left-color: var(--event-error);
+      }
+
+      .event-entry.node_started,
+      .event-entry.node_completed {
+        border-left-color: var(--event-info);
+      }
+
+      .event-entry.token_spawned,
+      .event-entry.token_merged {
+        border-left-color: var(--event-token);
+      }
+
+      .event-entry.llm_call_started,
+      .event-entry.llm_call_completed {
+        border-left-color: var(--event-llm);
       }
 
       .event-time {
-        color: #8b949e;
+        color: var(--text-secondary);
         margin-right: 0.5rem;
       }
 
@@ -304,54 +314,54 @@
         font-size: 0.75rem;
         font-weight: 600;
         margin-right: 0.5rem;
-        background: #30363d;
-        color: #c9d1d9;
+        background: var(--event-default);
+        color: var(--text-primary);
       }
 
       .event-type.workflow_started,
       .event-type.workflow_completed {
-        background: #238636;
+        background: var(--event-success);
         color: #fff;
       }
 
       .event-type.workflow_failed,
       .event-type.node_failed,
       .event-type.llm_call_failed {
-        background: #f85149;
+        background: var(--event-error);
         color: #000;
       }
 
       .event-type.node_started,
       .event-type.node_completed {
-        background: #58a6ff;
+        background: var(--event-info);
         color: #000;
       }
 
       .event-type.token_spawned,
       .event-type.token_merged {
-        background: #a371f7;
+        background: var(--event-token);
         color: #000;
       }
 
       .event-type.llm_call_started,
       .event-type.llm_call_completed {
-        background: #d29922;
+        background: var(--event-llm);
         color: #000;
       }
 
       .event-workflow-run {
-        color: #a5d6ff;
+        color: var(--text-link);
         margin-right: 0.5rem;
         font-size: 0.9rem;
       }
 
       .event-message {
-        color: #c9d1d9;
+        color: var(--text-primary);
         font-size: 0.9rem;
       }
 
       .event-metadata {
-        color: #8b949e;
+        color: var(--text-secondary);
         font-size: 0.75rem;
         margin-top: 0.25rem;
         margin-left: 1rem;
@@ -411,8 +421,8 @@
           state === 'connected'
             ? 'Connected'
             : state === 'disconnected'
-            ? 'Disconnected'
-            : 'Connecting...';
+              ? 'Disconnected'
+              : 'Connecting...';
       }
 
       async function filterEventsByTime(minutes) {
