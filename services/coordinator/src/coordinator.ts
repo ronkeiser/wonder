@@ -56,7 +56,7 @@ export class WorkflowCoordinator extends DurableObject {
    */
   async handleTaskResult(
     token_id: string,
-    result: { output_data: Record<string, unknown> }
+    result: { output_data: Record<string, unknown> },
   ): Promise<void> {
     // Fetch token info
     const tokenRow = this.tokens.getToken(token_id);
@@ -83,7 +83,6 @@ export class WorkflowCoordinator extends DurableObject {
     // Apply node's output_mapping to transform action output keys
     const mappedOutput = mapping.evaluateOutputMapping(node.output_mapping, result.output_data);
 
-    // Store mapped output in context using node.ref (matches input_mapping paths)
     // Store mapped output in context using node.ref (matches input_mapping paths)
     context.setNodeOutput(this.ctx.storage.sql, node.ref, mappedOutput);
 
@@ -146,92 +145,57 @@ export class WorkflowCoordinator extends DurableObject {
   async start(workflow_run_id: string, input: Record<string, unknown>): Promise<void> {
     let token_id: string | undefined;
 
-    try {
-      // Fetch workflow run metadata and definition
-      using workflowRuns = this.env.RESOURCES.workflowRuns();
-      const workflowRun = await workflowRuns.get(workflow_run_id);
+    // Fetch workflow run metadata and definition
+    using workflowRuns = this.env.RESOURCES.workflowRuns();
+    const workflowRun = await workflowRuns.get(workflow_run_id);
 
-      using workflowDefs = this.env.RESOURCES.workflowDefs();
-      const workflowDef = await workflowDefs.get(
-        workflowRun.workflow_run.workflow_def_id,
-        workflowRun.workflow_run.workflow_version,
-      );
+    using workflowDefs = this.env.RESOURCES.workflowDefs();
+    const workflowDef = await workflowDefs.get(
+      workflowRun.workflow_run.workflow_def_id,
+      workflowRun.workflow_run.workflow_version,
+    );
 
-      // Build event context for workflow events
-      const eventContext: EventContext = {
-        workflow_run_id,
-        workspace_id: workflowRun.workflow_run.workspace_id,
-        project_id: workflowRun.workflow_run.project_id,
-        workflow_def_id: workflowRun.workflow_run.workflow_def_id,
-        parent_run_id: workflowRun.workflow_run.parent_run_id ?? undefined,
-      };
+    // Build event context for workflow events
+    const eventContext: EventContext = {
+      workflow_run_id,
+      workspace_id: workflowRun.workflow_run.workspace_id,
+      project_id: workflowRun.workflow_run.project_id,
+      workflow_def_id: workflowRun.workflow_run.workflow_def_id,
+      parent_run_id: workflowRun.workflow_run.parent_run_id ?? undefined,
+    };
 
-      // Emit workflow_started event
-      this.emitter.emit(eventContext, {
-        event_type: 'workflow_started',
-        message: `Workflow ${workflowDef.workflow_def.name} started`,
-        metadata: { input },
-      });
+    // Emit workflow_started event
+    this.emitter.emit(eventContext, {
+      event_type: 'workflow_started',
+      message: `Workflow ${workflowDef.workflow_def.name} started`,
+      metadata: { input },
+    });
 
-      // Initialize storage tables
-      context.initializeContextTable(this.ctx.storage.sql);
-      this.tokens.initializeTable();
-      artifacts.initializeArtifactsTable(this.ctx.storage.sql);
+    // Initialize storage tables
+    context.initializeContextTable(this.ctx.storage.sql);
+    this.tokens.initializeTable();
+    artifacts.initializeArtifactsTable(this.ctx.storage.sql);
 
-      // Initialize context with workflow input
-      context.initializeContextWithInput(this.ctx.storage.sql, input);
+    // Initialize context with workflow input
+    context.initializeContextWithInput(this.ctx.storage.sql, input);
 
-      // Create initial token
-      if (!workflowDef.workflow_def.initial_node_id) {
-        throw new Error('Workflow definition has no initial_node_id');
-      }
-      
-      token_id = this.tokens.createToken({
-        workflow_run_id,
-        node_id: workflowDef.workflow_def.initial_node_id,
-        parent_token_id: null,
-        path_id: 'root',
-        fan_out_transition_id: null,
-        branch_index: 0,
-        branch_total: 1,
-      });
-
-      // Dispatch the initial token
-      await this.dispatchToken(token_id);
-    } catch (error) {
-      this.logger.error({
-        event_type: 'coordinator_start_failed',
-        message: 'Coordinator.start() failed with error',
-        trace_id: workflow_run_id,
-        metadata: {
-          workflow_run_id,
-          token_id,
-          error: error instanceof Error ? error.message : String(error),
-          error_stack: error instanceof Error ? error.stack : undefined,
-        },
-      });
-
-      // Emit workflow_failed event
-      this.emitter.emit(
-        {
-          workflow_run_id,
-          workspace_id: '',
-          project_id: '',
-        },
-        {
-          event_type: 'workflow_failed',
-          token_id,
-          message: error instanceof Error ? error.message : String(error),
-        },
-      );
-
-      // Update token status to failed if token was created
-      if (token_id) {
-        this.tokens.updateTokenStatus(token_id, 'failed');
-      }
-
-      throw error;
+    // Create initial token
+    if (!workflowDef.workflow_def.initial_node_id) {
+      throw new Error('Workflow definition has no initial_node_id');
     }
+
+    token_id = this.tokens.createToken({
+      workflow_run_id,
+      node_id: workflowDef.workflow_def.initial_node_id,
+      parent_token_id: null,
+      path_id: 'root',
+      fan_out_transition_id: null,
+      branch_index: 0,
+      branch_total: 1,
+    });
+
+    // Dispatch the initial token
+    await this.dispatchToken(token_id);
   }
 
   /**
