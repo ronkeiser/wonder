@@ -641,7 +641,30 @@ export interface paths {
         };
         put?: never;
         post?: never;
-        delete?: never;
+        delete: {
+            parameters: {
+                query?: never;
+                header?: never;
+                path: {
+                    id: string;
+                };
+                cookie?: never;
+            };
+            requestBody?: never;
+            responses: {
+                /** @description Workflow definition deleted successfully */
+                200: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": {
+                            success: boolean;
+                        };
+                    };
+                };
+            };
+        };
         options?: never;
         head?: never;
         patch?: never;
@@ -1165,16 +1188,6 @@ export interface components {
                 output_mapping?: {
                     [key: string]: unknown;
                 };
-                /** @enum {string} */
-                fan_out?: "first_match" | "all";
-                /** @example any */
-                fan_in?: string;
-                joins_node_ref?: string;
-                merge?: {
-                    [key: string]: unknown;
-                };
-                /** @enum {string} */
-                on_early_complete?: "cancel" | "abandon" | "allow_late_merge";
             }[];
             transitions?: {
                 ref?: string;
@@ -1184,7 +1197,11 @@ export interface components {
                 condition?: {
                     [key: string]: unknown;
                 };
+                spawn_count?: number;
                 foreach?: {
+                    [key: string]: unknown;
+                };
+                synchronization?: {
                     [key: string]: unknown;
                 };
                 loop_config?: {
@@ -1206,15 +1223,6 @@ export interface components {
             output_mapping: {
                 [key: string]: unknown;
             } | null;
-            /** @enum {string} */
-            fan_out: "first_match" | "all";
-            fan_in: "any" | "all" | string;
-            joins_node: string | null;
-            merge: {
-                [key: string]: unknown;
-            } | null;
-            /** @enum {string|null} */
-            on_early_complete: "cancel" | "abandon" | "allow_late_merge" | null;
         };
         Transition: {
             id: string;
@@ -1227,7 +1235,11 @@ export interface components {
             condition: {
                 [key: string]: unknown;
             } | null;
+            spawn_count: number | null;
             foreach: {
+                [key: string]: unknown;
+            } | null;
+            synchronization: {
                 [key: string]: unknown;
             } | null;
             loop_config: {
