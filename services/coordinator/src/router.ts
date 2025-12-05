@@ -599,7 +599,7 @@ export class Router {
       });
 
       // Determine if token should wait or dispatch
-      if (this.shouldTokenWait(transition, tokenRow)) {
+      if (this.shouldTokenWait(transition)) {
         tokens.updateTokenStatus(nextTokenId, 'waiting_for_siblings');
         this.logger.info({
           event_type: 'SYNC_TOKEN_WAITING',
@@ -616,15 +616,14 @@ export class Router {
   /**
    * Determine if a newly created token should wait for siblings
    */
-  private shouldTokenWait(transition: TransitionDef, completedTokenRow: TokenRow): boolean {
+  private shouldTokenWait(transition: TransitionDef): boolean {
     if (!transition.synchronization) {
       return false;
     }
 
     const syncConfig = transition.synchronization;
 
-    // Only wait if wait_for is not 'any' and token belongs to sibling group
-    // Note: We've already checked sibling membership earlier, but being explicit
+    // Only wait if wait_for is not 'any'
     return syncConfig.wait_for !== 'any';
   }
 
