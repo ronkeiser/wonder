@@ -20,8 +20,8 @@ export class WorkflowDefs extends Resource {
     nodes: Array<{
       ref: string;
       name: string;
-      action_id: string;
-      action_version: number;
+      action_id?: string;
+      action_version?: number;
       input_mapping?: object;
       output_mapping?: object;
       // No branching logic - nodes only execute actions

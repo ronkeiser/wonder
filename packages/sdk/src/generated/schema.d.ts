@@ -802,6 +802,15 @@ export interface paths {
                         "application/json": components["schemas"]["WorkflowStartResponse"];
                     };
                 };
+                /** @description Failed to start workflow */
+                500: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["WorkflowStartError"];
+                    };
+                };
             };
         };
         delete?: never;
@@ -1200,9 +1209,9 @@ export interface components {
                 ref: string;
                 name: string;
                 /** @example send-email */
-                action_id: string;
+                action_id?: string;
                 /** @example 1 */
-                action_version: number;
+                action_version?: number;
                 input_mapping?: {
                     [key: string]: unknown;
                 };
@@ -1236,8 +1245,8 @@ export interface components {
             workflow_def_version: number;
             ref: string;
             name: string;
-            action_id: string;
-            action_version: number;
+            action_id: string | null;
+            action_version: number | null;
             input_mapping: {
                 [key: string]: unknown;
             } | null;
@@ -1301,6 +1310,9 @@ export interface components {
         WorkflowStartResponse: {
             workflow_run_id: string;
             durable_object_id: string;
+        };
+        WorkflowStartError: {
+            error: string;
         };
         WorkflowDeleteResponse: {
             success: boolean;

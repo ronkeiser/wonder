@@ -19,6 +19,11 @@ export interface BuildPayloadParams {
   emitter: Emitter;
 }
 
+export interface BuildPayloadResult {
+  completedSynchronously: boolean;
+  output_data?: Record<string, unknown>;
+}
+
 /**
  * TaskManager builds executor payloads for tokens
  */
@@ -30,8 +35,11 @@ export class TaskManager {
    *
    * Fetches node, action, prompt spec, model profile from RESOURCES,
    * evaluates input_mapping, and renders template.
+   * 
+   * Returns whether the task completed synchronously (nodes without actions)
+   * or was dispatched asynchronously (nodes with actions).
    */
-  async buildPayload(params: BuildPayloadParams): Promise<void> {
+  async buildPayload(params: BuildPayloadParams): Promise<BuildPayloadResult> {
     const { token_id, node_id, workflow_run_id, sql, env, emitter } = params;
 
     // Fetch workflow definition
@@ -62,9 +70,28 @@ export class TaskManager {
       },
     });
 
+    // If node has no action, complete immediately with empty output
+    if (!node.action_id) {
+      this.logger.info({
+        event_type: 'node_no_action',
+        message: 'Node has no action - completing synchronously',
+        trace_id: workflow_run_id,
+        metadata: {
+          node_id: node.id,
+          node_name: node.name,
+        },
+      });
+
+      // Return empty output to complete synchronously
+      return {
+        completedSynchronously: true,
+        output_data: {},
+      };
+    }
+
     // Fetch the action definition
     using actions = env.RESOURCES.actions();
-    const actionResult = await actions.get(node.action_id, node.action_version);
+    const actionResult = await actions.get(node.action_id, node.action_version ?? undefined);
 
     this.logger.info({
       event_type: 'action_fetched',
@@ -194,7 +221,10 @@ export class TaskManager {
           },
         });
 
-        return; // Don't wait - executor will callback
+        // Async dispatch - executor will callback
+        return {
+          completedSynchronously: false,
+        };
       }
 
       default:

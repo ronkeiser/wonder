@@ -131,12 +131,7 @@ describe('Edge Test - Branching Architecture', () => {
             {
               ref: 'start_node',
               name: 'Start',
-              action_id: actionId,
-              action_version: 1,
-              input_mapping: {},
-              output_mapping: {
-                name: '$.response.name',
-              },
+              // No action - this is just an entry point
             },
             {
               ref: 'ideation_node',
@@ -151,12 +146,7 @@ describe('Edge Test - Branching Architecture', () => {
             {
               ref: 'terminal_node',
               name: 'Terminal',
-              action_id: actionId,
-              action_version: 1,
-              input_mapping: {},
-              output_mapping: {
-                name: '$.response.name',
-              },
+              // No action - this is just a merge point
             },
           ],
           transitions: [
@@ -186,6 +176,11 @@ describe('Edge Test - Branching Architecture', () => {
         },
       },
     );
+
+    if (workflowDefError) {
+      console.error('Workflow def creation error:', workflowDefError);
+      throw new Error(`Failed to create workflow def: ${JSON.stringify(workflowDefError)}`);
+    }
 
     expect(workflowDefResponse).toBeDefined();
     expect(workflowDefResponse!.workflow_def_id).toBeDefined();

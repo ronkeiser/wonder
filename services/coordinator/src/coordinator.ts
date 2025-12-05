@@ -44,7 +44,7 @@ export class WorkflowCoordinator extends DurableObject {
     this.tokens.updateTokenStatus(token_id, 'executing');
 
     // Delegate to tasks service to build and dispatch payload
-    await this.tasks.buildPayload({
+    const result = await this.tasks.buildPayload({
       token_id,
       node_id: tokenRow.node_id as string,
       workflow_run_id,
@@ -52,6 +52,12 @@ export class WorkflowCoordinator extends DurableObject {
       env: this.env,
       emitter: this.emitter,
     });
+
+    // If the task completed synchronously (node without action), handle it immediately
+    if (result.completedSynchronously) {
+      await this.handleTaskResult(token_id, { output_data: result.output_data ?? {} });
+    }
+    // Otherwise, the executor will callback asynchronously
   }
 
   /**

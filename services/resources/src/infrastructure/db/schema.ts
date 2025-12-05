@@ -151,8 +151,8 @@ export const nodes = sqliteTable(
     workflow_def_id: text('workflow_def_id').notNull(),
     workflow_def_version: integer('workflow_def_version').notNull(),
     name: text('name').notNull(),
-    action_id: text('action_id').notNull(),
-    action_version: integer('action_version').notNull(),
+    action_id: text('action_id'),
+    action_version: integer('action_version'),
 
     input_mapping: text('input_mapping', { mode: 'json' }).$type<object>(),
     output_mapping: text('output_mapping', { mode: 'json' }).$type<object>(),
@@ -165,10 +165,6 @@ export const nodes = sqliteTable(
     foreignKey({
       columns: [table.workflow_def_id, table.workflow_def_version],
       foreignColumns: [workflow_defs.id, workflow_defs.version],
-    }),
-    foreignKey({
-      columns: [table.action_id, table.action_version],
-      foreignColumns: [actions.id, actions.version],
     }),
     index('idx_nodes_workflow_def').on(table.workflow_def_id, table.workflow_def_version),
     index('idx_nodes_action').on(table.action_id, table.action_version),

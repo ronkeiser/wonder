@@ -33,8 +33,8 @@ export const CreateWorkflowDefSchema = z
           .regex(/^[a-z_][a-z0-9_]*$/)
           .openapi({ example: 'llm_call_node' }),
         name: z.string().min(1),
-        action_id: z.string().min(1).openapi({ example: 'send-email' }),
-        action_version: z.number().int().positive().openapi({ example: 1 }),
+        action_id: z.string().min(1).optional().openapi({ example: 'send-email' }),
+        action_version: z.number().int().positive().optional().openapi({ example: 1 }),
         input_mapping: z.record(z.string(), z.unknown()).optional(),
         output_mapping: z.record(z.string(), z.unknown()).optional(),
       }),
@@ -67,8 +67,8 @@ export const NodeSchema = z
     workflow_def_version: z.number().int(),
     ref: z.string(),
     name: z.string(),
-    action_id: z.string(),
-    action_version: z.number().int(),
+    action_id: z.string().nullable(),
+    action_version: z.number().int().nullable(),
     input_mapping: z.record(z.string(), z.unknown()).nullable(),
     output_mapping: z.record(z.string(), z.unknown()).nullable(),
   })

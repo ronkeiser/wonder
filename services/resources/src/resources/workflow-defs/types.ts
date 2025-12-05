@@ -24,8 +24,8 @@ export type Node = {
   workflow_def_id: string;
   workflow_def_version: number;
   name: string;
-  action_id: string;
-  action_version: number;
+  action_id: string | null;
+  action_version: number | null;
   input_mapping: object | null;
   output_mapping: object | null;
   // No branching logic - nodes only execute actions
