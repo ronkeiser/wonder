@@ -434,8 +434,6 @@
       let lastLogId = '';
       let currentFilter = null;
       let currentService = '';
-      let streamBuffer = [];
-      let bufferTimeout = null;
 
       function setStatus(state) {
         statusEl.className = `status ${state}`;
@@ -625,7 +623,30 @@
 
         entry.appendChild(content);
         entry.appendChild(copyBtn);
-        logsContainer.appendChild(entry);
+
+        // Store timestamp on entry for sorted insertion
+        entry.dataset.timestamp = log.timestamp;
+
+        // Insert in sorted order (by timestamp, ascending)
+        let inserted = false;
+        const children = logsContainer.children;
+        for (let i = children.length - 1; i >= 0; i--) {
+          const childTimestamp = parseInt(children[i].dataset.timestamp || '0');
+          if (childTimestamp <= log.timestamp) {
+            // Insert after this element
+            if (i === children.length - 1) {
+              logsContainer.appendChild(entry);
+            } else {
+              logsContainer.insertBefore(entry, children[i + 1]);
+            }
+            inserted = true;
+            break;
+          }
+        }
+        if (!inserted) {
+          // This log is older than all existing entries, insert at the beginning
+          logsContainer.insertBefore(entry, logsContainer.firstChild);
+        }
 
         // Auto-scroll to bottom
         logsContainer.scrollTop = logsContainer.scrollHeight;
@@ -661,20 +682,7 @@
             if (data.type === 'history') {
               data.logs.forEach((log) => addLogEntry(log));
             } else if (data.type === 'log') {
-              // Buffer streamed logs for 50ms to allow sorting
-              streamBuffer.push(data.log);
-
-              if (bufferTimeout) {
-                clearTimeout(bufferTimeout);
-              }
-
-              bufferTimeout = setTimeout(() => {
-                // Sort buffered logs by timestamp and add them
-                streamBuffer.sort((a, b) => a.timestamp - b.timestamp);
-                streamBuffer.forEach((log) => addLogEntry(log));
-                streamBuffer = [];
-                bufferTimeout = null;
-              }, 50);
+              addLogEntry(data.log);
             }
           } catch (e) {
             console.error('Failed to parse message:', e);

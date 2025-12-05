@@ -404,8 +404,6 @@
       let lastEventId = '';
       let currentFilter = null;
       let currentEventType = '';
-      let streamBuffer = [];
-      let bufferTimeout = null;
 
       function setStatus(state) {
         statusEl.className = `status ${state}`;
@@ -595,7 +593,30 @@
 
         entry.appendChild(content);
         entry.appendChild(copyBtn);
-        eventsContainer.appendChild(entry);
+
+        // Store timestamp on entry for sorted insertion
+        entry.dataset.timestamp = event.timestamp;
+
+        // Insert in sorted order (by timestamp, ascending)
+        let inserted = false;
+        const children = eventsContainer.children;
+        for (let i = children.length - 1; i >= 0; i--) {
+          const childTimestamp = parseInt(children[i].dataset.timestamp || '0');
+          if (childTimestamp <= event.timestamp) {
+            // Insert after this element
+            if (i === children.length - 1) {
+              eventsContainer.appendChild(entry);
+            } else {
+              eventsContainer.insertBefore(entry, children[i + 1]);
+            }
+            inserted = true;
+            break;
+          }
+        }
+        if (!inserted) {
+          // This event is older than all existing entries, insert at the beginning
+          eventsContainer.insertBefore(entry, eventsContainer.firstChild);
+        }
 
         // Auto-scroll to bottom
         eventsContainer.scrollTop = eventsContainer.scrollHeight;
@@ -631,20 +652,7 @@
             if (data.type === 'history') {
               data.events.forEach((event) => addEventEntry(event));
             } else if (data.type === 'event') {
-              // Buffer streamed events for 50ms to allow sorting
-              streamBuffer.push(data.event);
-
-              if (bufferTimeout) {
-                clearTimeout(bufferTimeout);
-              }
-
-              bufferTimeout = setTimeout(() => {
-                // Sort buffered events by timestamp and add them
-                streamBuffer.sort((a, b) => a.timestamp - b.timestamp);
-                streamBuffer.forEach((event) => addEventEntry(event));
-                streamBuffer = [];
-                bufferTimeout = null;
-              }, 50);
+              addEventEntry(data.event);
             }
           } catch (e) {
             console.error('Failed to parse message:', e);
