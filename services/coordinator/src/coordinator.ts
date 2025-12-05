@@ -86,7 +86,8 @@ export class WorkflowCoordinator extends DurableObject {
     const mappedOutput = mapping.evaluateOutputMapping(node.output_mapping, result.output_data);
 
     // Store mapped output in context using node.ref (matches input_mapping paths)
-    context.setNodeOutput(this.ctx.storage.sql, node.ref, mappedOutput);
+    // Pass token_id to track branch outputs
+    context.setNodeOutput(this.ctx.storage.sql, node.ref, mappedOutput, token_id);
 
     // Build event context
     const eventContext: EventContext = {

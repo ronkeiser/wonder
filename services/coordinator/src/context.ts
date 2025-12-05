@@ -69,11 +69,13 @@ export function initializeContextWithInput(sql: SqlStorage, input: Record<string
  * @param sql - SQLite storage
  * @param nodeRef - Node reference (stable identifier)
  * @param output - Output object to store under "{nodeRef}_output.*" paths
+ * @param tokenId - Optional token ID for branch tracking
  */
 export function setNodeOutput(
   sql: SqlStorage,
   nodeRef: string,
   output: Record<string, unknown>,
+  tokenId?: string,
 ): void {
   for (const [key, value] of Object.entries(output)) {
     const contextPath = `${nodeRef}_output.${key}`;
@@ -83,4 +85,30 @@ export function setNodeOutput(
       JSON.stringify(value),
     );
   }
+
+  // If this is a branch execution (has tokenId), also store in branch-specific path
+  if (tokenId) {
+    const branchPath = `${nodeRef}_output._branches.${tokenId}`;
+    sql.exec(
+      `INSERT OR REPLACE INTO context (path, value) VALUES (?, ?)`,
+      branchPath,
+      JSON.stringify(output),
+    );
+  }
+}
+
+/**
+ * Get all branch outputs for a node
+ *
+ * @param sql - SQLite storage
+ * @param nodeRef - Node reference
+ * @returns Array of branch outputs
+ */
+export function getBranchOutputs(sql: SqlStorage, nodeRef: string): Array<Record<string, unknown>> {
+  const prefix = `${nodeRef}_output._branches.`;
+  const rows = sql
+    .exec(`SELECT path, value FROM context WHERE path LIKE ?`, `${prefix}%`)
+    .toArray();
+
+  return rows.map((row) => JSON.parse(row.value as string));
 }

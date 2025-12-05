@@ -42,7 +42,7 @@ describe('Edge Test - Branching Architecture', () => {
         model_id: '@cf/meta/llama-3.1-8b-instruct',
         parameters: {
           max_tokens: 128,
-          temperature: 0.7,
+          temperature: 1.2,
         },
         cost_per_1k_input_tokens: 0.0,
         cost_per_1k_output_tokens: 0.0,
@@ -60,15 +60,14 @@ describe('Edge Test - Branching Architecture', () => {
     const { data: promptSpecResponse } = await client.POST('/api/prompt-specs', {
       body: {
         version: 1,
-        name: 'Ideation Prompt',
-        description: 'Generate creative ideas',
-        template: 'Generate a creative idea for: {{topic}}',
+        name: 'Dog Name Ideation',
+        description: 'Generate creative dog name ideas',
+        template:
+          'Suggest a creative and unique name for my dog. Just respond with the name, nothing else.',
         template_language: 'handlebars',
-        requires: {
-          topic: 'string',
-        },
+        requires: {},
         produces: {
-          idea: 'string',
+          name: 'string',
         },
       },
     });
@@ -106,58 +105,54 @@ describe('Edge Test - Branching Architecture', () => {
       '/api/workflow-defs',
       {
         body: {
-          name: `Fan-Out Test Workflow ${Date.now()}`,
-          description: 'Tests spawn_count=3 fan-out',
+          name: `Dog Name Ideation Workflow ${Date.now()}`,
+          description: 'Tests spawn_count=3 fan-out for dog name ideas',
           version: 1,
           project_id: projectId,
           input_schema: {
             type: 'object',
-            properties: {
-              topic: { type: 'string' },
-            },
-            required: ['topic'],
+            properties: {},
           },
           output_schema: {
             type: 'object',
             properties: {
-              idea: { type: 'string' },
+              names: {
+                type: 'array',
+                items: { type: 'object' },
+              },
             },
-            required: ['idea'],
+            required: ['names'],
           },
           output_mapping: {
-            idea: '$.end_node_output.idea',
+            names: '$.ideation_node_output._branches',
           },
-          initial_node_ref: 'worker_node',
+          initial_node_ref: 'start_node',
           nodes: [
             {
-              ref: 'worker_node',
-              name: 'Worker Node',
+              ref: 'start_node',
+              name: 'Start',
               action_id: actionId,
               action_version: 1,
-              input_mapping: {
-                topic: '$.input.topic',
-              },
+              input_mapping: {},
               output_mapping: {
-                idea: '$.response.idea',
+                name: '$.response.name',
               },
             },
             {
-              ref: 'end_node',
-              name: 'End Node',
+              ref: 'ideation_node',
+              name: 'Dog Name Ideation',
               action_id: actionId,
               action_version: 1,
-              input_mapping: {
-                topic: '$.input.topic',
-              },
+              input_mapping: {},
               output_mapping: {
-                idea: '$.response.idea',
+                name: '$.response.name',
               },
             },
           ],
           transitions: [
             {
-              from_node_ref: 'worker_node',
-              to_node_ref: 'end_node',
+              from_node_ref: 'start_node',
+              to_node_ref: 'ideation_node',
               priority: 1,
               spawn_count: 3,
             },
@@ -197,9 +192,7 @@ describe('Edge Test - Branching Architecture', () => {
       '/api/workflows/{id}/start',
       {
         params: { path: { id: workflowId } },
-        body: {
-          topic: 'a test topic for the edge test',
-        },
+        body: {},
       },
     );
 
@@ -210,15 +203,16 @@ describe('Edge Test - Branching Architecture', () => {
     console.log('✓ Workflow started:', startResponse!.workflow_run_id);
     console.log('');
     console.log('Expected behavior:');
-    console.log('  1. Initial token executes worker_node (path_id=root)');
-    console.log('  2. Worker node completes → transition with spawn_count=3 triggers');
-    console.log('  3. Three tokens spawned to end_node:');
-    console.log('     - path_id=root.worker_node.0, branch_index=0, branch_total=3');
-    console.log('     - path_id=root.worker_node.1, branch_index=1, branch_total=3');
-    console.log('     - path_id=root.worker_node.2, branch_index=2, branch_total=3');
+    console.log('  1. Initial token executes ideation_node (path_id=root)');
+    console.log('  2. Ideation node completes → transition with spawn_count=3 triggers');
+    console.log('  3. Three tokens spawned to ideation_node (self-loop):');
+    console.log('     - path_id=root.ideation_node.0, branch_index=0, branch_total=3');
+    console.log('     - path_id=root.ideation_node.1, branch_index=1, branch_total=3');
+    console.log('     - path_id=root.ideation_node.2, branch_index=2, branch_total=3');
     console.log('  4. All share fan_out_transition_id (sibling group)');
-    console.log('  5. Each token completes at end_node (no transitions)');
+    console.log('  5. Each token completes at ideation_node (no more transitions)');
     console.log('  6. When all 3 complete, activeCount=0, workflow finishes');
+    console.log('  7. Final output contains names array with 3 dog name suggestions');
     console.log('');
     console.log('Check logs with:');
     console.log(

@@ -184,9 +184,19 @@ export class Router {
           const pathStr = jsonPath as string;
           if (pathStr.startsWith('$.')) {
             const contextPath = pathStr.slice(2); // Remove $.
-            const value = context.getContextValue(sql, contextPath);
-            if (value !== undefined) {
-              finalOutput[key] = value;
+
+            // Check if this is a branch collection path (ends with ._branches)
+            if (contextPath.endsWith('._branches')) {
+              const nodeRef = contextPath.replace('_output._branches', '');
+              const branchOutputs = context.getBranchOutputs(sql, nodeRef);
+              if (branchOutputs.length > 0) {
+                finalOutput[key] = branchOutputs;
+              }
+            } else {
+              const value = context.getContextValue(sql, contextPath);
+              if (value !== undefined) {
+                finalOutput[key] = value;
+              }
             }
           }
         }

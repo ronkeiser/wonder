@@ -172,6 +172,7 @@ export async function buildPayload(params: BuildPayloadParams): Promise<void> {
         metadata: {
           model_id: modelProfileResult.model_profile.model_id,
           provider: modelProfileResult.model_profile.provider,
+          prompt,
         },
       });
 
