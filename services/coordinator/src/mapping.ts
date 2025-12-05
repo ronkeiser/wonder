@@ -29,12 +29,16 @@ export function evaluateInputMapping(
 
   for (const [varName, jsonPath] of Object.entries(input_mapping)) {
     const pathStr = jsonPath as string;
-    if (pathStr.startsWith('$.')) {
-      const contextPath = pathStr.slice(2); // Remove $.
-      const value = context.getContextValue(sql, contextPath);
-      if (value !== undefined) {
-        templateContext[varName] = value;
-      }
+
+    if (!pathStr.startsWith('$.')) {
+      continue;
+    }
+
+    const contextPath = pathStr.slice(2); // Remove $.
+    const value = context.getContextValue(sql, contextPath);
+
+    if (value !== undefined) {
+      templateContext[varName] = value;
     }
   }
 
@@ -51,6 +55,22 @@ export function evaluateInputMapping(
  * @param output_data - Raw action output data
  * @returns Mapped output object with transformed keys
  */
+/**
+ * Navigate a nested object path safely
+ */
+function getNestedValue(obj: unknown, pathParts: string[]): unknown {
+  let value: any = obj;
+
+  for (const part of pathParts) {
+    if (!value || typeof value !== 'object' || !(part in value)) {
+      return undefined;
+    }
+    value = value[part];
+  }
+
+  return value;
+}
+
 export function evaluateOutputMapping(
   output_mapping: Record<string, string> | object | null | undefined,
   output_data: Record<string, unknown>,
@@ -65,22 +85,17 @@ export function evaluateOutputMapping(
 
   for (const [outputKey, jsonPath] of Object.entries(output_mapping)) {
     const pathStr = jsonPath as string;
-    if (pathStr.startsWith('$.')) {
-      const sourcePath = pathStr.slice(2); // Remove $.
-      // Navigate nested paths (e.g., "response.template")
-      const pathParts = sourcePath.split('.');
-      let value: any = output_data;
-      for (const part of pathParts) {
-        if (value && typeof value === 'object' && part in value) {
-          value = value[part];
-        } else {
-          value = undefined;
-          break;
-        }
-      }
-      if (value !== undefined) {
-        mappedOutput[outputKey] = value;
-      }
+
+    if (!pathStr.startsWith('$.')) {
+      continue;
+    }
+
+    const sourcePath = pathStr.slice(2); // Remove $.
+    const pathParts = sourcePath.split('.');
+    const value = getNestedValue(output_data, pathParts);
+
+    if (value !== undefined) {
+      mappedOutput[outputKey] = value;
     }
   }
 
