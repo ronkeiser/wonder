@@ -9,11 +9,8 @@ export class WorkflowDefs extends Resource {
   async create(data: {
     name: string;
     description: string;
-    owner: {
-      type: 'project' | 'library';
-      project_id?: string;
-      library_id?: string;
-    };
+    project_id?: string;
+    library_id?: string;
     tags?: string[];
     input_schema: object;
     output_schema: object;
@@ -105,17 +102,38 @@ export class WorkflowDefs extends Resource {
       );
     }
 
-    // 4. Create workflow def (initial_node_id will be set after nodes created)
+    // 4. Validate ownership - exactly one of project_id or library_id must be set
+    if (!data.project_id && !data.library_id) {
+      this.serviceCtx.logger.warn({
+        event_type: 'workflow_def_validation_failed',
+        metadata: { error: 'missing_owner' },
+      });
+      throw new ValidationError(
+        'Either project_id or library_id must be provided',
+        'project_id|library_id',
+        'MISSING_OWNER',
+      );
+    }
+    if (data.project_id && data.library_id) {
+      this.serviceCtx.logger.warn({
+        event_type: 'workflow_def_validation_failed',
+        metadata: { error: 'multiple_owners' },
+      });
+      throw new ValidationError(
+        'Cannot specify both project_id and library_id',
+        'project_id|library_id',
+        'MULTIPLE_OWNERS',
+      );
+    }
+
+    // 5. Create workflow def (initial_node_id will be set after nodes created)
     let workflowDef;
     try {
-      const owner_id =
-        data.owner.type === 'project' ? data.owner.project_id! : data.owner.library_id!;
-
       workflowDef = await repo.createWorkflowDef(this.serviceCtx.db, {
         name: data.name,
         description: data.description,
-        owner_type: data.owner.type,
-        owner_id,
+        project_id: data.project_id ?? null,
+        library_id: data.library_id ?? null,
         tags: data.tags ?? null,
         input_schema: data.input_schema,
         output_schema: data.output_schema,
@@ -145,7 +163,7 @@ export class WorkflowDefs extends Resource {
       throw error;
     }
 
-    // 5. Create all nodes and build ref→ID map
+    // 6. Create all nodes and build ref→ID map
     const refToIdMap = new Map<string, string>();
     for (const nodeData of data.nodes) {
       const node = await repo.createNode(this.serviceCtx.db, {
@@ -161,14 +179,14 @@ export class WorkflowDefs extends Resource {
       refToIdMap.set(nodeData.ref, node.id);
     }
 
-    // 6. Set initial_node_id using ref→ID map
+    // 7. Set initial_node_id using ref→ID map
     const initialNodeId = refToIdMap.get(data.initial_node_ref)!;
     await repo.updateWorkflowDef(this.serviceCtx.db, workflowDef.id, workflowDef.version, {
       initial_node_id: initialNodeId,
     });
     workflowDef.initial_node_id = initialNodeId;
 
-    // 7. Create transitions (from_node_ref/to_node_ref → from_node_id/to_node_id)
+    // 8. Create transitions (from_node_ref/to_node_ref → from_node_id/to_node_id)
     if (data.transitions) {
       for (const transitionData of data.transitions) {
         await repo.createTransition(this.serviceCtx.db, {

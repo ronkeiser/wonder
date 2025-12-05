@@ -37,11 +37,6 @@ export const CreateWorkflowDefSchema = z
         action_version: z.number().int().positive().openapi({ example: 1 }),
         input_mapping: z.record(z.string(), z.unknown()).optional(),
         output_mapping: z.record(z.string(), z.unknown()).optional(),
-        fan_out: z.enum(['first_match', 'all']).optional(),
-        fan_in: z.string().optional().openapi({ example: 'any' }),
-        joins_node_ref: z.string().optional(),
-        merge: z.record(z.string(), z.unknown()).optional(),
-        on_early_complete: z.enum(['cancel', 'abandon', 'allow_late_merge']).optional(),
       }),
     ),
     transitions: z
@@ -55,7 +50,9 @@ export const CreateWorkflowDefSchema = z
           to_node_ref: z.string().min(1),
           priority: z.number().int(),
           condition: z.record(z.string(), z.unknown()).optional(),
+          spawn_count: z.number().int().optional(),
           foreach: z.record(z.string(), z.unknown()).optional(),
+          synchronization: z.record(z.string(), z.unknown()).optional(),
           loop_config: z.record(z.string(), z.unknown()).optional(),
         }),
       )
@@ -74,11 +71,6 @@ export const NodeSchema = z
     action_version: z.number().int(),
     input_mapping: z.record(z.string(), z.unknown()).nullable(),
     output_mapping: z.record(z.string(), z.unknown()).nullable(),
-    fan_out: z.enum(['first_match', 'all']),
-    fan_in: z.union([z.literal('any'), z.literal('all'), z.string()]),
-    joins_node: z.string().nullable(),
-    merge: z.record(z.string(), z.unknown()).nullable(),
-    on_early_complete: z.enum(['cancel', 'abandon', 'allow_late_merge']).nullable(),
   })
   .openapi('Node');
 
@@ -92,7 +84,9 @@ export const TransitionSchema = z
     to_node_id: z.string(),
     priority: z.number().int(),
     condition: z.record(z.string(), z.unknown()).nullable(),
+    spawn_count: z.number().int().nullable(),
     foreach: z.record(z.string(), z.unknown()).nullable(),
+    synchronization: z.record(z.string(), z.unknown()).nullable(),
     loop_config: z.record(z.string(), z.unknown()).nullable(),
   })
   .openapi('Transition');

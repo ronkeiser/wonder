@@ -6,8 +6,8 @@ export type WorkflowDef = {
   name: string;
   description: string;
   version: number;
-  owner_type: 'project' | 'library';
-  owner_id: string;
+  project_id: string | null;
+  library_id: string | null;
   tags: string[] | null;
   input_schema: object;
   output_schema: object;
