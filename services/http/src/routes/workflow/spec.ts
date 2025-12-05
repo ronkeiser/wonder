@@ -88,3 +88,24 @@ export const startWorkflowRoute = createRoute({
     },
   },
 });
+
+export const deleteWorkflowRoute = createRoute({
+  method: 'delete',
+  path: '/{id}',
+  tags: ['workflows'],
+  request: {
+    params: z.object({
+      id: ulid().openapi({ param: { name: 'id', in: 'path' } }),
+    }),
+  },
+  responses: {
+    200: {
+      content: {
+        'application/json': {
+          schema: z.object({ success: z.boolean() }).openapi('WorkflowDeleteResponse'),
+        },
+      },
+      description: 'Workflow deleted successfully',
+    },
+  },
+});

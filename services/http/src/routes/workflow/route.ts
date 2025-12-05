@@ -3,7 +3,7 @@
  */
 
 import { OpenAPIHono } from '@hono/zod-openapi';
-import { createWorkflowRoute, getWorkflowRoute, startWorkflowRoute } from './spec';
+import { createWorkflowRoute, deleteWorkflowRoute, getWorkflowRoute, startWorkflowRoute } from './spec';
 
 /** /workflows */
 export const workflows = new OpenAPIHono<{ Bindings: Env }>();
@@ -43,5 +43,13 @@ workflows.openapi(startWorkflowRoute, async (c) => {
     return c.json({ error: `Failed to start workflow: ${errorMessage}` }, 500);
   }
 
+  return c.json(result);
+});
+
+/** DELETE /{id} */
+workflows.openapi(deleteWorkflowRoute, async (c) => {
+  const { id } = c.req.valid('param');
+  using workflows = c.env.RESOURCES.workflows();
+  const result = await workflows.delete(id);
   return c.json(result);
 });

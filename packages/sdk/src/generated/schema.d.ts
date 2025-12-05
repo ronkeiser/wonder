@@ -740,7 +740,28 @@ export interface paths {
         };
         put?: never;
         post?: never;
-        delete?: never;
+        delete: {
+            parameters: {
+                query?: never;
+                header?: never;
+                path: {
+                    id: string;
+                };
+                cookie?: never;
+            };
+            requestBody?: never;
+            responses: {
+                /** @description Workflow deleted successfully */
+                200: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["WorkflowDeleteResponse"];
+                    };
+                };
+            };
+        };
         options?: never;
         head?: never;
         patch?: never;
@@ -1280,6 +1301,9 @@ export interface components {
         WorkflowStartResponse: {
             workflow_run_id: string;
             durable_object_id: string;
+        };
+        WorkflowDeleteResponse: {
+            success: boolean;
         };
     };
     responses: never;
