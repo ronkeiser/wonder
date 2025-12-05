@@ -7,12 +7,15 @@
     <style>
       :root {
         /* Palette colors - the actual color values */
-        --green: #238636;
         --red: #f85149;
-        --blue: #58a6ff;
-        --purple: #a371f7;
-        --orange: #eab645;
-        --pink: #f778ba;
+        --orange: #ffb640;
+        --yellow: #ffe44a;
+        --green: #38a05c;
+        --blue: #56a5ff;
+        --indigo: #8a5cff;
+        --violet: #bf76ff;
+        --pink: #ff77bd;
+
         --gray: #30363d;
         --gray-dark: #21262d;
         --gray-darker: #161b22;
@@ -283,24 +286,32 @@
       }
 
       /* Color-based styling via data attributes */
-      .event-entry[data-color='green'] {
-        border-left-color: var(--green);
-      }
-
       .event-entry[data-color='red'] {
         border-left-color: var(--red);
+      }
+
+      .event-entry[data-color='orange'] {
+        border-left-color: var(--orange);
+      }
+
+      .event-entry[data-color='yellow'] {
+        border-left-color: var(--yellow);
+      }
+
+      .event-entry[data-color='green'] {
+        border-left-color: var(--green);
       }
 
       .event-entry[data-color='blue'] {
         border-left-color: var(--blue);
       }
 
-      .event-entry[data-color='purple'] {
-        border-left-color: var(--purple);
+      .event-entry[data-color='indigo'] {
+        border-left-color: var(--indigo);
       }
 
-      .event-entry[data-color='orange'] {
-        border-left-color: var(--orange);
+      .event-entry[data-color='violet'] {
+        border-left-color: var(--violet);
       }
 
       .event-entry[data-color='pink'] {
@@ -327,14 +338,24 @@
         color: var(--text-primary);
       }
 
-      .event-type[data-color='green'] {
-        background: var(--green);
-        color: #fff;
-      }
-
       .event-type[data-color='red'] {
         background: var(--red);
         color: #000;
+      }
+
+      .event-type[data-color='orange'] {
+        background: var(--orange);
+        color: #000;
+      }
+
+      .event-type[data-color='yellow'] {
+        background: var(--yellow);
+        color: #000;
+      }
+
+      .event-type[data-color='green'] {
+        background: var(--green);
+        color: #fff;
       }
 
       .event-type[data-color='blue'] {
@@ -342,13 +363,13 @@
         color: #000;
       }
 
-      .event-type[data-color='purple'] {
-        background: var(--purple);
+      .event-type[data-color='indigo'] {
+        background: var(--indigo);
         color: #000;
       }
 
-      .event-type[data-color='orange'] {
-        background: var(--orange);
+      .event-type[data-color='violet'] {
+        background: var(--violet);
         color: #000;
       }
 
@@ -523,10 +544,10 @@
         node_started: 'blue',
         node_completed: 'blue',
         node_failed: 'red',
-        token_spawned: 'purple',
-        token_merged: 'purple',
-        llm_call_started: 'orange',
-        llm_call_completed: 'orange',
+        token_spawned: 'indigo',
+        token_merged: 'indigo',
+        llm_call_started: 'yellow',
+        llm_call_completed: 'yellow',
         llm_call_failed: 'red',
       };
 
