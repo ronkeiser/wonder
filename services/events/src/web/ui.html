@@ -12,6 +12,7 @@
         --blue: #58a6ff;
         --purple: #a371f7;
         --orange: #d29922;
+        --pink: #f778ba;
         --gray: #30363d;
         --gray-dark: #21262d;
         --gray-darker: #161b22;
@@ -302,6 +303,10 @@
         border-left-color: var(--orange);
       }
 
+      .event-entry[data-color='pink'] {
+        border-left-color: var(--pink);
+      }
+
       .event-entry[data-color='gray'] {
         border-left-color: var(--gray);
       }
@@ -344,6 +349,11 @@
 
       .event-type[data-color='orange'] {
         background: var(--orange);
+        color: #000;
+      }
+
+      .event-type[data-color='pink'] {
+        background: var(--pink);
         color: #000;
       }
 
@@ -507,7 +517,7 @@
 
       // Event type to color mapping
       const EVENT_COLOR_MAP = {
-        workflow_started: 'green',
+        workflow_started: 'pink',
         workflow_completed: 'green',
         workflow_failed: 'red',
         node_started: 'blue',
