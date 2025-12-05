@@ -605,8 +605,10 @@
           const childTimestamp = parseInt(children[i].dataset.timestamp || '0');
           const childSequence = parseInt(children[i].dataset.sequence || '0');
           // Compare: first by timestamp, then by sequence_number
-          if (childTimestamp < event.timestamp || 
-              (childTimestamp === event.timestamp && childSequence <= (event.sequence_number || 0))) {
+          if (
+            childTimestamp < event.timestamp ||
+            (childTimestamp === event.timestamp && childSequence <= (event.sequence_number || 0))
+          ) {
             // Insert after this element
             if (i === children.length - 1) {
               eventsContainer.appendChild(entry);
