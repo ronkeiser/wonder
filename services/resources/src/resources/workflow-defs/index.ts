@@ -137,6 +137,7 @@ export class WorkflowDefs extends Resource {
         tags: data.tags ?? null,
         input_schema: data.input_schema,
         output_schema: data.output_schema,
+        output_mapping: data.output_mapping ?? null,
         context_schema: data.context_schema ?? null,
         initial_node_id: null,
       });

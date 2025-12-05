@@ -11,6 +11,7 @@
     "dev": "wrangler dev",
     "deploy": "wrangler deploy",
     "types": "wrangler types -c wrangler.jsonc",
+    "typecheck": "tsc --noEmit",
     "db:generate": "drizzle-kit generate",
     "db:migrate:local": "wrangler d1 migrations apply wonder-events --local",
     "db:migrate:remote": "wrangler d1 migrations apply wonder-events --remote",
@@ -24,6 +25,7 @@
   "devDependencies": {
     "@cloudflare/vitest-pool-workers": "^0.10.11",
     "drizzle-kit": "^0.31.7",
+    "typescript": "^5.9.3",
     "wrangler": "^4.51.0"
   }
 }
