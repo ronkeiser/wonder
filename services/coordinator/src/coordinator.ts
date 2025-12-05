@@ -3,6 +3,7 @@ import { createLogger, type Logger } from '@wonder/logs';
 import { DurableObject } from 'cloudflare:workers';
 import * as artifacts from './artifacts';
 import * as context from './context';
+import * as mapping from './mapping';
 import * as routing from './routing';
 import * as tasks from './tasks';
 import * as tokens from './tokens';
@@ -83,40 +84,15 @@ export class WorkflowCoordinator extends DurableObject {
       workflowRun.workflow_run.workflow_def_id,
       workflowRun.workflow_run.workflow_version,
     );
-
     const node = workflowDef.nodes.find((n: any) => n.id === node_id);
     if (!node) {
       throw new Error(`Node not found: ${node_id}`);
     }
 
     // Apply node's output_mapping to transform action output keys
-    const mappedOutput: Record<string, unknown> = {};
-    if (node.output_mapping) {
-      for (const [outputKey, jsonPath] of Object.entries(node.output_mapping)) {
-        const pathStr = jsonPath as string;
-        if (pathStr.startsWith('$.')) {
-          const sourcePath = pathStr.slice(2); // Remove $.
-          // Navigate nested paths (e.g., "response.template")
-          const pathParts = sourcePath.split('.');
-          let value: any = result.output_data;
-          for (const part of pathParts) {
-            if (value && typeof value === 'object' && part in value) {
-              value = value[part];
-            } else {
-              value = undefined;
-              break;
-            }
-          }
-          if (value !== undefined) {
-            mappedOutput[outputKey] = value;
-          }
-        }
-      }
-    } else {
-      // If no output_mapping, use raw output
-      Object.assign(mappedOutput, result.output_data);
-    }
+    const mappedOutput = mapping.evaluateOutputMapping(node.output_mapping, result.output_data);
 
+    // Store mapped output in context using node.ref (matches input_mapping paths)
     // Store mapped output in context using node.ref (matches input_mapping paths)
     context.setNodeOutput(this.ctx.storage.sql, node.ref, mappedOutput);
 

@@ -5,10 +5,11 @@
  * Pure business logic - no direct SQL access.
  */
 
-import type { Logger } from '@wonder/logs';
 import type { Emitter, EventContext } from '@wonder/events';
-import { renderTemplate } from './template';
+import type { Logger } from '@wonder/logs';
 import * as context from './context';
+import * as mapping from './mapping';
+import { renderTemplate } from './template';
 
 export interface BuildPayloadParams {
   token_id: string;
@@ -110,20 +111,7 @@ export async function buildPayload(params: BuildPayloadParams): Promise<void> {
       });
 
       // Evaluate input_mapping to build template context
-      const templateContext: Record<string, unknown> = {};
-      if (node.input_mapping) {
-        for (const [varName, jsonPath] of Object.entries(node.input_mapping)) {
-          // Simple JSONPath evaluation for $.input.* and $.nodeId_output.*
-          const pathStr = jsonPath as string;
-          if (pathStr.startsWith('$.')) {
-            const contextPath = pathStr.slice(2); // Remove $.
-            const value = context.getContextValue(sql, contextPath);
-            if (value !== undefined) {
-              templateContext[varName] = value;
-            }
-          }
-        }
-      }
+      const templateContext = mapping.evaluateInputMapping(node.input_mapping, sql);
 
       logger.info({
         event_type: 'input_mapping_evaluated',
