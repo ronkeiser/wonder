@@ -155,7 +155,48 @@ describe('Edge Test - Branching Architecture', () => {
     console.log('✓ Workflow def created:', workflowDefId);
     console.log('  Initial node ID:', workflowDefResponse!.workflow_def.initial_node_id);
 
+    // Step 7: Create workflow (binds workflow_def to project)
+    const { data: workflowResponse, error: workflowError } = await client.POST('/api/workflows', {
+      body: {
+        project_id: projectId,
+        workflow_def_id: workflowDefId,
+        name: `Test Workflow ${Date.now()}`,
+        description: 'Single node test workflow',
+      },
+    });
+
+    expect(workflowError).toBeUndefined();
+    expect(workflowResponse).toBeDefined();
+    expect(workflowResponse!.workflow).toBeDefined();
+    expect(workflowResponse!.workflow.id).toBeDefined();
+
+    const workflowId = workflowResponse!.workflow.id;
+    console.log('✓ Workflow created:', workflowId);
+
+    // Step 8: Start workflow execution
+    const { data: startResponse, error: startError } = await client.POST(
+      '/api/workflows/{id}/start',
+      {
+        params: { path: { id: workflowId } },
+        body: {
+          topic: 'a test topic for the edge test',
+        },
+      },
+    );
+
+    expect(startError).toBeUndefined();
+    expect(startResponse).toBeDefined();
+    expect(startResponse!.workflow_run_id).toBeDefined();
+
+    console.log('✓ Workflow started:', startResponse!.workflow_run_id);
+    console.log('  Check logs for coordinator execution');
+
     // Cleanup: Delete in reverse order of creation
+    await client.DELETE('/api/workflows/{id}', {
+      params: { path: { id: workflowId } },
+    });
+    console.log('✓ Workflow deleted');
+
     await client.DELETE('/api/workflow-defs/{id}', {
       params: { path: { id: workflowDefId } },
     });

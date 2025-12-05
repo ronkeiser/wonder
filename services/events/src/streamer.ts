@@ -2,7 +2,7 @@ import { DurableObject } from 'cloudflare:workers';
 import { and, desc, eq, gte } from 'drizzle-orm';
 import { drizzle } from 'drizzle-orm/d1';
 import { events } from './db/schema.js';
-import uiHTML from './ui.html';
+import uiHTML from './web/ui.html';
 
 /**
  * Durable Object for managing WebSocket connections to stream events in real-time

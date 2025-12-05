@@ -12,7 +12,8 @@ import type {
   GetEventsOptions,
 } from './types.js';
 
-export { Streamer } from './streamer';
+export { createEmitter } from './client.js';
+export { Streamer } from './streamer.js';
 export type {
   Emitter,
   EventContext,
@@ -67,7 +68,6 @@ export class EventsService extends WorkerEntrypoint<Env> {
    * RPC method - writes event to D1
    */
   write(context: EventContext, input: EventInput): void {
-    console.log('[EVENTS] write() called:', { context, input });
     this.ctx.waitUntil(
       (async () => {
         try {
@@ -79,9 +79,7 @@ export class EventsService extends WorkerEntrypoint<Env> {
             metadata: JSON.stringify(input.metadata || {}),
           };
 
-          console.log('[EVENTS] Inserting event:', eventEntry);
           await this.db.insert(events).values(eventEntry);
-          console.log('[EVENTS] Successfully inserted event');
 
           // Broadcast to connected WebSocket clients
           try {
