@@ -594,15 +594,19 @@
         entry.appendChild(content);
         entry.appendChild(copyBtn);
 
-        // Store timestamp on entry for sorted insertion
+        // Store timestamp and sequence_number on entry for sorted insertion
         entry.dataset.timestamp = event.timestamp;
+        entry.dataset.sequence = event.sequence_number || 0;
 
-        // Insert in sorted order (by timestamp, ascending)
+        // Insert in sorted order (by timestamp, then sequence_number as tiebreaker)
         let inserted = false;
         const children = eventsContainer.children;
         for (let i = children.length - 1; i >= 0; i--) {
           const childTimestamp = parseInt(children[i].dataset.timestamp || '0');
-          if (childTimestamp <= event.timestamp) {
+          const childSequence = parseInt(children[i].dataset.sequence || '0');
+          // Compare: first by timestamp, then by sequence_number
+          if (childTimestamp < event.timestamp || 
+              (childTimestamp === event.timestamp && childSequence <= (event.sequence_number || 0))) {
             // Insert after this element
             if (i === children.length - 1) {
               eventsContainer.appendChild(entry);
