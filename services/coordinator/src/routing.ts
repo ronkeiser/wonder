@@ -28,7 +28,7 @@ export interface RouteParams {
 
 /**
  * Decide what happens after a token completes
- * 
+ *
  * Evaluates transitions from completed node, creates new tokens,
  * checks synchronization, determines if workflow is complete.
  */
@@ -55,9 +55,7 @@ export async function decide(params: RouteParams): Promise<RoutingDecision> {
   }
 
   // Query for transitions from completed node
-  const transitions = workflowDef.transitions.filter(
-    (t: any) => t.from_node_id === node_id
-  );
+  const transitions = workflowDef.transitions.filter((t: any) => t.from_node_id === node_id);
 
   logger.info({
     event_type: 'transitions_queried',
@@ -85,46 +83,78 @@ export async function decide(params: RouteParams): Promise<RoutingDecision> {
     parent_run_id: workflowRun.workflow_run.parent_run_id ?? undefined,
   };
 
+  // Get the completed node's ref for path building
+  const completedNodeRef = node.ref;
+
   // Create tokens for all outgoing transitions
   const tokensToDispatch: string[] = [];
 
   for (const transition of transitions) {
-    const nextTokenId = tokens.createToken({
-      workflow_run_id,
-      node_id: transition.to_node_id,
-      parent_token_id: completed_token_id,
-      path_id: '', // TODO: Implement proper path_id building per branching doc
-      fan_out_transition_id: null, // TODO: Implement spawn_count and fan-out
-      branch_index: 0,
-      branch_total: 1,
-    });
-
-    // Emit token_spawned event
-    emitter.emit(eventContext, {
-      event_type: 'token_spawned',
-      node_id: transition.to_node_id,
-      token_id: nextTokenId,
-      message: `Token spawned for transition to node`,
-      metadata: {
-        parent_token_id: completed_token_id,
-        transition_id: transition.id,
-      },
-    });
+    // Determine spawn count (default: 1)
+    const spawnCount = transition.spawn_count ?? 1;
 
     logger.info({
-      event_type: 'transition_token_created',
-      message: 'Token created for transition target node',
+      event_type: 'transition_evaluated',
+      message: `Transition evaluated: spawning ${spawnCount} token(s)`,
       trace_id: workflow_run_id,
       metadata: {
-        parent_token_id: completed_token_id,
-        new_token_id: nextTokenId,
         transition_id: transition.id,
         from_node_id: transition.from_node_id,
         to_node_id: transition.to_node_id,
+        spawn_count: spawnCount,
       },
     });
 
-    tokensToDispatch.push(nextTokenId);
+    // Create spawn_count tokens for this transition
+    for (let i = 0; i < spawnCount; i++) {
+      // Build path_id: parent_path.nodeRef.branchIndex
+      // Example: root.hello_node.0, root.hello_node.1, root.hello_node.2
+      const newPathId = `${tokenRow.path_id}.${completedNodeRef}.${i}`;
+
+      const nextTokenId = tokens.createToken({
+        workflow_run_id,
+        node_id: transition.to_node_id,
+        parent_token_id: completed_token_id,
+        path_id: newPathId,
+        fan_out_transition_id: transition.id, // All siblings share this transition ID
+        branch_index: i,
+        branch_total: spawnCount,
+      });
+
+      // Emit token_spawned event
+      emitter.emit(eventContext, {
+        event_type: 'token_spawned',
+        node_id: transition.to_node_id,
+        token_id: nextTokenId,
+        message: `Token spawned (${i + 1}/${spawnCount})`,
+        metadata: {
+          parent_token_id: completed_token_id,
+          transition_id: transition.id,
+          path_id: newPathId,
+          branch_index: i,
+          branch_total: spawnCount,
+          fan_out_transition_id: transition.id,
+        },
+      });
+
+      logger.info({
+        event_type: 'token_created',
+        message: `Token created (${i + 1}/${spawnCount})`,
+        trace_id: workflow_run_id,
+        metadata: {
+          parent_token_id: completed_token_id,
+          new_token_id: nextTokenId,
+          transition_id: transition.id,
+          from_node_id: transition.from_node_id,
+          to_node_id: transition.to_node_id,
+          path_id: newPathId,
+          branch_index: i,
+          branch_total: spawnCount,
+        },
+      });
+
+      tokensToDispatch.push(nextTokenId);
+    }
   }
 
   // Check if workflow is complete (no pending or executing tokens remain)
@@ -133,7 +163,7 @@ export async function decide(params: RouteParams): Promise<RoutingDecision> {
   if (activeCount === 0) {
     // Extract final output using output_mapping
     const finalOutput: Record<string, unknown> = {};
-    
+
     logger.info({
       event_type: 'extracting_final_output',
       message: 'Evaluating output_mapping',
@@ -143,7 +173,7 @@ export async function decide(params: RouteParams): Promise<RoutingDecision> {
         has_output_mapping: !!workflowDef.workflow_def.output_mapping,
       },
     });
-    
+
     if (workflowDef.workflow_def.output_mapping) {
       for (const [key, jsonPath] of Object.entries(workflowDef.workflow_def.output_mapping)) {
         const pathStr = jsonPath as string;

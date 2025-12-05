@@ -2,7 +2,7 @@ import { describe, expect, it } from 'vitest';
 import { client } from '../client';
 
 describe('Edge Test - Branching Architecture', () => {
-  it('step 2: create project', async () => {
+  it('fan-out with spawn_count=3', async () => {
     // Step 1: Create workspace
     const { data: workspaceResponse } = await client.POST('/api/workspaces', {
       body: {
@@ -101,13 +101,13 @@ describe('Edge Test - Branching Architecture', () => {
     const actionId = actionResponse!.action.id;
     console.log('✓ Action created:', actionId);
 
-    // Step 6: Create workflow definition with single hello world node
+    // Step 6: Create workflow definition with fan-out
     const { data: workflowDefResponse, error: workflowDefError } = await client.POST(
       '/api/workflow-defs',
       {
         body: {
-          name: `Hello World Workflow ${Date.now()}`,
-          description: 'Single node workflow for testing',
+          name: `Fan-Out Test Workflow ${Date.now()}`,
+          description: 'Tests spawn_count=3 fan-out',
           version: 1,
           project_id: projectId,
           input_schema: {
@@ -125,13 +125,25 @@ describe('Edge Test - Branching Architecture', () => {
             required: ['idea'],
           },
           output_mapping: {
-            idea: '$.hello_node_output.idea',
+            idea: '$.end_node_output.idea',
           },
-          initial_node_ref: 'hello_node',
+          initial_node_ref: 'worker_node',
           nodes: [
             {
-              ref: 'hello_node',
-              name: 'Hello World Node',
+              ref: 'worker_node',
+              name: 'Worker Node',
+              action_id: actionId,
+              action_version: 1,
+              input_mapping: {
+                topic: '$.input.topic',
+              },
+              output_mapping: {
+                idea: '$.response.idea',
+              },
+            },
+            {
+              ref: 'end_node',
+              name: 'End Node',
               action_id: actionId,
               action_version: 1,
               input_mapping: {
@@ -142,7 +154,14 @@ describe('Edge Test - Branching Architecture', () => {
               },
             },
           ],
-          transitions: [],
+          transitions: [
+            {
+              from_node_ref: 'worker_node',
+              to_node_ref: 'end_node',
+              priority: 1,
+              spawn_count: 3,
+            },
+          ],
         },
       },
     );
@@ -160,8 +179,8 @@ describe('Edge Test - Branching Architecture', () => {
       body: {
         project_id: projectId,
         workflow_def_id: workflowDefId,
-        name: `Test Workflow ${Date.now()}`,
-        description: 'Single node test workflow',
+        name: `Fan-Out Test Workflow ${Date.now()}`,
+        description: 'Tests spawn_count=3 fan-out with proper path_id',
       },
     });
 
@@ -189,7 +208,22 @@ describe('Edge Test - Branching Architecture', () => {
     expect(startResponse!.workflow_run_id).toBeDefined();
 
     console.log('✓ Workflow started:', startResponse!.workflow_run_id);
-    console.log('  Check logs for coordinator execution');
+    console.log('');
+    console.log('Expected behavior:');
+    console.log('  1. Initial token executes worker_node (path_id=root)');
+    console.log('  2. Worker node completes → transition with spawn_count=3 triggers');
+    console.log('  3. Three tokens spawned to end_node:');
+    console.log('     - path_id=root.worker_node.0, branch_index=0, branch_total=3');
+    console.log('     - path_id=root.worker_node.1, branch_index=1, branch_total=3');
+    console.log('     - path_id=root.worker_node.2, branch_index=2, branch_total=3');
+    console.log('  4. All share fan_out_transition_id (sibling group)');
+    console.log('  5. Each token completes at end_node (no transitions)');
+    console.log('  6. When all 3 complete, activeCount=0, workflow finishes');
+    console.log('');
+    console.log('Check logs with:');
+    console.log(
+      `  curl "https://wonder-logs.ron-keiser.workers.dev/logs?trace_id=${startResponse!.workflow_run_id}&limit=50"`,
+    );
 
     // Cleanup: Delete in reverse order of creation
     // await client.DELETE('/api/workflows/{id}', {
