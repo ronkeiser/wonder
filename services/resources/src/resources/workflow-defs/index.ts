@@ -237,4 +237,32 @@ export class WorkflowDefs extends Resource {
       transitions,
     };
   }
+
+  async delete(workflowDefId: string, version?: number): Promise<void> {
+    this.serviceCtx.logger.info({
+      event_type: 'workflow_def_delete_started',
+      metadata: { workflow_def_id: workflowDefId, version },
+    });
+
+    // Check if workflow def exists
+    const workflowDef = await repo.getWorkflowDef(this.serviceCtx.db, workflowDefId, version);
+    if (!workflowDef) {
+      this.serviceCtx.logger.warn({
+        event_type: 'workflow_def_not_found',
+        metadata: { workflow_def_id: workflowDefId, version },
+      });
+      throw new NotFoundError(
+        `WorkflowDef not found: ${workflowDefId}`,
+        'workflow_def',
+        workflowDefId,
+      );
+    }
+
+    await repo.deleteWorkflowDef(this.serviceCtx.db, workflowDefId, version);
+
+    this.serviceCtx.logger.info({
+      event_type: 'workflow_def_deleted',
+      metadata: { workflow_def_id: workflowDefId, version },
+    });
+  }
 }

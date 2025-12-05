@@ -5,64 +5,8 @@
     {
       "idx": 0,
       "version": "6",
-      "when": 1764534116686,
-      "tag": "0000_right_madrox",
-      "breakpoints": true
-    },
-    {
-      "idx": 1,
-      "version": "6",
-      "when": 1764535723335,
-      "tag": "0001_glossy_valeria_richards",
-      "breakpoints": true
-    },
-    {
-      "idx": 2,
-      "version": "6",
-      "when": 1764538036480,
-      "tag": "0002_quiet_landau",
-      "breakpoints": true
-    },
-    {
-      "idx": 3,
-      "version": "6",
-      "when": 1764719847242,
-      "tag": "0003_round_starhawk",
-      "breakpoints": true
-    },
-    {
-      "idx": 4,
-      "version": "6",
-      "when": 1764729133825,
-      "tag": "0004_volatile_lethal_legion",
-      "breakpoints": true
-    },
-    {
-      "idx": 5,
-      "version": "6",
-      "when": 1764807256253,
-      "tag": "0005_natural_prowler",
-      "breakpoints": true
-    },
-    {
-      "idx": 6,
-      "version": "6",
-      "when": 1764857942345,
-      "tag": "0006_noisy_fantastic_four",
-      "breakpoints": true
-    },
-    {
-      "idx": 7,
-      "version": "6",
-      "when": 1764858330135,
-      "tag": "0007_steady_lilith",
-      "breakpoints": true
-    },
-    {
-      "idx": 8,
-      "version": "6",
-      "when": 1764900897365,
-      "tag": "0008_petite_iron_lad",
+      "when": 1764902583521,
+      "tag": "0000_shiny_menace",
       "breakpoints": true
     }
   ]

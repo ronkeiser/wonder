@@ -101,7 +101,69 @@ describe('Edge Test - Branching Architecture', () => {
     const actionId = actionResponse!.action.id;
     console.log('✓ Action created:', actionId);
 
+    // Step 6: Create workflow definition with single hello world node
+    const { data: workflowDefResponse, error: workflowDefError } = await client.POST(
+      '/api/workflow-defs',
+      {
+        body: {
+          name: `Hello World Workflow ${Date.now()}`,
+          description: 'Single node workflow for testing',
+          version: 1,
+          owner: {
+            type: 'project' as const,
+            project_id: projectId,
+          },
+          input_schema: {
+            type: 'object',
+            properties: {
+              topic: { type: 'string' },
+            },
+            required: ['topic'],
+          },
+          output_schema: {
+            type: 'object',
+            properties: {
+              idea: { type: 'string' },
+            },
+            required: ['idea'],
+          },
+          output_mapping: {
+            idea: '$.hello_node_output.idea',
+          },
+          initial_node_ref: 'hello_node',
+          nodes: [
+            {
+              ref: 'hello_node',
+              name: 'Hello World Node',
+              action_id: actionId,
+              action_version: 1,
+              input_mapping: {
+                topic: '$.input.topic',
+              },
+              output_mapping: {
+                idea: '$.idea',
+              },
+            },
+          ],
+          transitions: [],
+        },
+      },
+    );
+
+    expect(workflowDefResponse).toBeDefined();
+    expect(workflowDefResponse!.workflow_def_id).toBeDefined();
+    expect(workflowDefResponse!.workflow_def.initial_node_id).toBeDefined();
+
+    const workflowDefId = workflowDefResponse!.workflow_def_id;
+    console.log('✓ Workflow def created:', workflowDefId);
+    console.log('  Initial node ID:', workflowDefResponse!.workflow_def.initial_node_id);
+
     // Cleanup: Delete in reverse order of creation
+    await client.DELETE('/api/workflow-defs/{id}', {
+      params: { path: { id: workflowDefId } },
+    });
+    console.log('✓ Workflow def deleted');
+
     await client.DELETE('/api/actions/{id}', {
       params: { path: { id: actionId } },
     });

@@ -93,18 +93,6 @@ CREATE TABLE `libraries` (
 --> statement-breakpoint
 CREATE INDEX `idx_libraries_workspace` ON `libraries` (`workspace_id`);--> statement-breakpoint
 CREATE UNIQUE INDEX `unique_libraries_workspace_name` ON `libraries` (`workspace_id`,`name`);--> statement-breakpoint
-CREATE TABLE `logs` (
-	`id` text PRIMARY KEY NOT NULL,
-	`level` text NOT NULL,
-	`event_type` text NOT NULL,
-	`message` text,
-	`metadata` text NOT NULL,
-	`timestamp` integer NOT NULL
-);
---> statement-breakpoint
-CREATE INDEX `idx_logs_level` ON `logs` (`level`);--> statement-breakpoint
-CREATE INDEX `idx_logs_event_type` ON `logs` (`event_type`);--> statement-breakpoint
-CREATE INDEX `idx_logs_timestamp` ON `logs` (`timestamp`);--> statement-breakpoint
 CREATE TABLE `mcp_servers` (
 	`id` text PRIMARY KEY NOT NULL,
 	`workspace_id` text NOT NULL,
@@ -136,6 +124,7 @@ CREATE TABLE `model_profiles` (
 --> statement-breakpoint
 CREATE TABLE `nodes` (
 	`id` text NOT NULL,
+	`ref` text NOT NULL,
 	`workflow_def_id` text NOT NULL,
 	`workflow_def_version` integer NOT NULL,
 	`name` text NOT NULL,
@@ -143,11 +132,6 @@ CREATE TABLE `nodes` (
 	`action_version` integer NOT NULL,
 	`input_mapping` text,
 	`output_mapping` text,
-	`fan_out` text NOT NULL,
-	`fan_in` text NOT NULL,
-	`joins_node` text,
-	`merge` text,
-	`on_early_complete` text,
 	PRIMARY KEY(`workflow_def_id`, `workflow_def_version`, `id`),
 	FOREIGN KEY (`workflow_def_id`,`workflow_def_version`) REFERENCES `workflow_defs`(`id`,`version`) ON UPDATE no action ON DELETE no action,
 	FOREIGN KEY (`action_id`,`action_version`) REFERENCES `actions`(`id`,`version`) ON UPDATE no action ON DELETE no action
@@ -155,12 +139,25 @@ CREATE TABLE `nodes` (
 --> statement-breakpoint
 CREATE INDEX `idx_nodes_workflow_def` ON `nodes` (`workflow_def_id`,`workflow_def_version`);--> statement-breakpoint
 CREATE INDEX `idx_nodes_action` ON `nodes` (`action_id`,`action_version`);--> statement-breakpoint
+CREATE INDEX `idx_nodes_ref` ON `nodes` (`workflow_def_id`,`workflow_def_version`,`ref`);--> statement-breakpoint
+CREATE TABLE `project_settings` (
+	`project_id` text PRIMARY KEY NOT NULL,
+	`default_model_profile_id` text,
+	`rate_limit_max_concurrent_runs` integer,
+	`rate_limit_max_llm_calls_per_hour` integer,
+	`budget_max_monthly_spend_cents` integer,
+	`budget_alert_threshold_cents` integer,
+	`snapshot_policy_every_n_events` integer,
+	`snapshot_policy_every_n_seconds` integer,
+	`snapshot_policy_on_fan_in_complete` integer,
+	FOREIGN KEY (`project_id`) REFERENCES `projects`(`id`) ON UPDATE no action ON DELETE cascade
+);
+--> statement-breakpoint
 CREATE TABLE `projects` (
 	`id` text PRIMARY KEY NOT NULL,
 	`workspace_id` text NOT NULL,
 	`name` text NOT NULL,
 	`description` text,
-	`settings` text,
 	`created_at` text NOT NULL,
 	`updated_at` text NOT NULL,
 	FOREIGN KEY (`workspace_id`) REFERENCES `workspaces`(`id`) ON UPDATE no action ON DELETE cascade
@@ -197,13 +194,16 @@ CREATE TABLE `secrets` (
 CREATE UNIQUE INDEX `unique_secrets_workspace_key` ON `secrets` (`workspace_id`,`key`);--> statement-breakpoint
 CREATE TABLE `transitions` (
 	`id` text NOT NULL,
+	`ref` text,
 	`workflow_def_id` text NOT NULL,
 	`workflow_def_version` integer NOT NULL,
 	`from_node_id` text NOT NULL,
 	`to_node_id` text NOT NULL,
 	`priority` integer NOT NULL,
 	`condition` text,
+	`spawn_count` integer,
 	`foreach` text,
+	`synchronization` text,
 	`loop_config` text,
 	PRIMARY KEY(`workflow_def_id`, `workflow_def_version`, `id`),
 	FOREIGN KEY (`workflow_def_id`,`workflow_def_version`) REFERENCES `workflow_defs`(`id`,`version`) ON UPDATE no action ON DELETE no action,
@@ -214,6 +214,7 @@ CREATE TABLE `transitions` (
 CREATE INDEX `idx_transitions_workflow_def` ON `transitions` (`workflow_def_id`,`workflow_def_version`);--> statement-breakpoint
 CREATE INDEX `idx_transitions_from_node` ON `transitions` (`from_node_id`);--> statement-breakpoint
 CREATE INDEX `idx_transitions_to_node` ON `transitions` (`to_node_id`);--> statement-breakpoint
+CREATE INDEX `idx_transitions_ref` ON `transitions` (`workflow_def_id`,`workflow_def_version`,`ref`);--> statement-breakpoint
 CREATE TABLE `triggers` (
 	`id` text PRIMARY KEY NOT NULL,
 	`workflow_id` text NOT NULL,
@@ -245,20 +246,23 @@ CREATE TABLE `workflow_defs` (
 	`name` text NOT NULL,
 	`description` text NOT NULL,
 	`version` integer NOT NULL,
-	`owner_type` text NOT NULL,
-	`owner_id` text NOT NULL,
+	`project_id` text,
+	`library_id` text,
 	`tags` text,
 	`input_schema` text NOT NULL,
 	`output_schema` text NOT NULL,
+	`output_mapping` text,
 	`context_schema` text,
-	`initial_node_id` text NOT NULL,
+	`initial_node_id` text,
 	`created_at` text NOT NULL,
 	`updated_at` text NOT NULL,
-	PRIMARY KEY(`id`, `version`)
+	PRIMARY KEY(`id`, `version`),
+	FOREIGN KEY (`project_id`) REFERENCES `projects`(`id`) ON UPDATE no action ON DELETE no action
 );
 --> statement-breakpoint
-CREATE INDEX `idx_workflow_defs_owner` ON `workflow_defs` (`owner_type`,`owner_id`);--> statement-breakpoint
-CREATE INDEX `idx_workflow_defs_name_version` ON `workflow_defs` (`name`,`owner_type`,`owner_id`,`version`);--> statement-breakpoint
+CREATE INDEX `idx_workflow_defs_project` ON `workflow_defs` (`project_id`);--> statement-breakpoint
+CREATE INDEX `idx_workflow_defs_library` ON `workflow_defs` (`library_id`);--> statement-breakpoint
+CREATE INDEX `idx_workflow_defs_name_version` ON `workflow_defs` (`name`,`project_id`,`library_id`,`version`);--> statement-breakpoint
 CREATE TABLE `workflow_runs` (
 	`id` text PRIMARY KEY NOT NULL,
 	`project_id` text NOT NULL,
@@ -300,10 +304,18 @@ CREATE TABLE `workflows` (
 --> statement-breakpoint
 CREATE INDEX `idx_workflows_project` ON `workflows` (`project_id`);--> statement-breakpoint
 CREATE INDEX `idx_workflows_def` ON `workflows` (`workflow_def_id`,`pinned_version`);--> statement-breakpoint
+CREATE TABLE `workspace_settings` (
+	`workspace_id` text PRIMARY KEY NOT NULL,
+	`allowed_model_providers` text,
+	`allowed_mcp_servers` text,
+	`budget_max_monthly_spend_cents` integer,
+	`budget_alert_threshold_cents` integer,
+	FOREIGN KEY (`workspace_id`) REFERENCES `workspaces`(`id`) ON UPDATE no action ON DELETE cascade
+);
+--> statement-breakpoint
 CREATE TABLE `workspaces` (
 	`id` text PRIMARY KEY NOT NULL,
 	`name` text NOT NULL,
-	`settings` text,
 	`created_at` text NOT NULL,
 	`updated_at` text NOT NULL
 );

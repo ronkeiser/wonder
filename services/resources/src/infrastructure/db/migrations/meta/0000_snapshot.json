@@ -1,7 +1,7 @@
 {
   "version": "6",
   "dialect": "sqlite",
-  "id": "5e6a85f7-fd21-475f-ba1f-9e499c4b581e",
+  "id": "644cd071-3231-4d77-8988-99bb2873feb4",
   "prevId": "00000000-0000-0000-0000-000000000000",
   "tables": {
     "actions": {
@@ -648,80 +648,6 @@
       "uniqueConstraints": {},
       "checkConstraints": {}
     },
-    "logs": {
-      "name": "logs",
-      "columns": {
-        "id": {
-          "name": "id",
-          "type": "text",
-          "primaryKey": true,
-          "notNull": true,
-          "autoincrement": false
-        },
-        "level": {
-          "name": "level",
-          "type": "text",
-          "primaryKey": false,
-          "notNull": true,
-          "autoincrement": false
-        },
-        "event_type": {
-          "name": "event_type",
-          "type": "text",
-          "primaryKey": false,
-          "notNull": true,
-          "autoincrement": false
-        },
-        "message": {
-          "name": "message",
-          "type": "text",
-          "primaryKey": false,
-          "notNull": false,
-          "autoincrement": false
-        },
-        "metadata": {
-          "name": "metadata",
-          "type": "text",
-          "primaryKey": false,
-          "notNull": true,
-          "autoincrement": false
-        },
-        "timestamp": {
-          "name": "timestamp",
-          "type": "integer",
-          "primaryKey": false,
-          "notNull": true,
-          "autoincrement": false
-        }
-      },
-      "indexes": {
-        "idx_logs_level": {
-          "name": "idx_logs_level",
-          "columns": [
-            "level"
-          ],
-          "isUnique": false
-        },
-        "idx_logs_event_type": {
-          "name": "idx_logs_event_type",
-          "columns": [
-            "event_type"
-          ],
-          "isUnique": false
-        },
-        "idx_logs_timestamp": {
-          "name": "idx_logs_timestamp",
-          "columns": [
-            "timestamp"
-          ],
-          "isUnique": false
-        }
-      },
-      "foreignKeys": {},
-      "compositePrimaryKeys": {},
-      "uniqueConstraints": {},
-      "checkConstraints": {}
-    },
     "mcp_servers": {
       "name": "mcp_servers",
       "columns": {
@@ -923,6 +849,13 @@
           "notNull": true,
           "autoincrement": false
         },
+        "ref": {
+          "name": "ref",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false
+        },
         "workflow_def_id": {
           "name": "workflow_def_id",
           "type": "text",
@@ -971,41 +904,6 @@
           "primaryKey": false,
           "notNull": false,
           "autoincrement": false
-        },
-        "fan_out": {
-          "name": "fan_out",
-          "type": "text",
-          "primaryKey": false,
-          "notNull": true,
-          "autoincrement": false
-        },
-        "fan_in": {
-          "name": "fan_in",
-          "type": "text",
-          "primaryKey": false,
-          "notNull": true,
-          "autoincrement": false
-        },
-        "joins_node": {
-          "name": "joins_node",
-          "type": "text",
-          "primaryKey": false,
-          "notNull": false,
-          "autoincrement": false
-        },
-        "merge": {
-          "name": "merge",
-          "type": "text",
-          "primaryKey": false,
-          "notNull": false,
-          "autoincrement": false
-        },
-        "on_early_complete": {
-          "name": "on_early_complete",
-          "type": "text",
-          "primaryKey": false,
-          "notNull": false,
-          "autoincrement": false
         }
       },
       "indexes": {
@@ -1022,6 +920,15 @@
           "columns": [
             "action_id",
             "action_version"
+          ],
+          "isUnique": false
+        },
+        "idx_nodes_ref": {
+          "name": "idx_nodes_ref",
+          "columns": [
+            "workflow_def_id",
+            "workflow_def_version",
+            "ref"
           ],
           "isUnique": false
         }
@@ -1071,6 +978,93 @@
       "uniqueConstraints": {},
       "checkConstraints": {}
     },
+    "project_settings": {
+      "name": "project_settings",
+      "columns": {
+        "project_id": {
+          "name": "project_id",
+          "type": "text",
+          "primaryKey": true,
+          "notNull": true,
+          "autoincrement": false
+        },
+        "default_model_profile_id": {
+          "name": "default_model_profile_id",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false,
+          "autoincrement": false
+        },
+        "rate_limit_max_concurrent_runs": {
+          "name": "rate_limit_max_concurrent_runs",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": false,
+          "autoincrement": false
+        },
+        "rate_limit_max_llm_calls_per_hour": {
+          "name": "rate_limit_max_llm_calls_per_hour",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": false,
+          "autoincrement": false
+        },
+        "budget_max_monthly_spend_cents": {
+          "name": "budget_max_monthly_spend_cents",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": false,
+          "autoincrement": false
+        },
+        "budget_alert_threshold_cents": {
+          "name": "budget_alert_threshold_cents",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": false,
+          "autoincrement": false
+        },
+        "snapshot_policy_every_n_events": {
+          "name": "snapshot_policy_every_n_events",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": false,
+          "autoincrement": false
+        },
+        "snapshot_policy_every_n_seconds": {
+          "name": "snapshot_policy_every_n_seconds",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": false,
+          "autoincrement": false
+        },
+        "snapshot_policy_on_fan_in_complete": {
+          "name": "snapshot_policy_on_fan_in_complete",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": false,
+          "autoincrement": false
+        }
+      },
+      "indexes": {},
+      "foreignKeys": {
+        "project_settings_project_id_projects_id_fk": {
+          "name": "project_settings_project_id_projects_id_fk",
+          "tableFrom": "project_settings",
+          "tableTo": "projects",
+          "columnsFrom": [
+            "project_id"
+          ],
+          "columnsTo": [
+            "id"
+          ],
+          "onDelete": "cascade",
+          "onUpdate": "no action"
+        }
+      },
+      "compositePrimaryKeys": {},
+      "uniqueConstraints": {},
+      "checkConstraints": {}
+    },
     "projects": {
       "name": "projects",
       "columns": {
@@ -1097,13 +1091,6 @@
         },
         "description": {
           "name": "description",
-          "type": "text",
-          "primaryKey": false,
-          "notNull": false,
-          "autoincrement": false
-        },
-        "settings": {
-          "name": "settings",
           "type": "text",
           "primaryKey": false,
           "notNull": false,
@@ -1346,6 +1333,13 @@
           "notNull": true,
           "autoincrement": false
         },
+        "ref": {
+          "name": "ref",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false,
+          "autoincrement": false
+        },
         "workflow_def_id": {
           "name": "workflow_def_id",
           "type": "text",
@@ -1388,8 +1382,22 @@
           "notNull": false,
           "autoincrement": false
         },
+        "spawn_count": {
+          "name": "spawn_count",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": false,
+          "autoincrement": false
+        },
         "foreach": {
           "name": "foreach",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false,
+          "autoincrement": false
+        },
+        "synchronization": {
+          "name": "synchronization",
           "type": "text",
           "primaryKey": false,
           "notNull": false,
@@ -1423,6 +1431,15 @@
           "name": "idx_transitions_to_node",
           "columns": [
             "to_node_id"
+          ],
+          "isUnique": false
+        },
+        "idx_transitions_ref": {
+          "name": "idx_transitions_ref",
+          "columns": [
+            "workflow_def_id",
+            "workflow_def_version",
+            "ref"
           ],
           "isUnique": false
         }
@@ -1694,18 +1711,18 @@
           "notNull": true,
           "autoincrement": false
         },
-        "owner_type": {
-          "name": "owner_type",
+        "project_id": {
+          "name": "project_id",
           "type": "text",
           "primaryKey": false,
-          "notNull": true,
+          "notNull": false,
           "autoincrement": false
         },
-        "owner_id": {
-          "name": "owner_id",
+        "library_id": {
+          "name": "library_id",
           "type": "text",
           "primaryKey": false,
-          "notNull": true,
+          "notNull": false,
           "autoincrement": false
         },
         "tags": {
@@ -1729,6 +1746,13 @@
           "notNull": true,
           "autoincrement": false
         },
+        "output_mapping": {
+          "name": "output_mapping",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false,
+          "autoincrement": false
+        },
         "context_schema": {
           "name": "context_schema",
           "type": "text",
@@ -1740,7 +1764,7 @@
           "name": "initial_node_id",
           "type": "text",
           "primaryKey": false,
-          "notNull": true,
+          "notNull": false,
           "autoincrement": false
         },
         "created_at": {
@@ -1759,11 +1783,17 @@
         }
       },
       "indexes": {
-        "idx_workflow_defs_owner": {
-          "name": "idx_workflow_defs_owner",
+        "idx_workflow_defs_project": {
+          "name": "idx_workflow_defs_project",
           "columns": [
-            "owner_type",
-            "owner_id"
+            "project_id"
+          ],
+          "isUnique": false
+        },
+        "idx_workflow_defs_library": {
+          "name": "idx_workflow_defs_library",
+          "columns": [
+            "library_id"
           ],
           "isUnique": false
         },
@@ -1771,14 +1801,28 @@
           "name": "idx_workflow_defs_name_version",
           "columns": [
             "name",
-            "owner_type",
-            "owner_id",
+            "project_id",
+            "library_id",
             "version"
           ],
           "isUnique": false
         }
       },
-      "foreignKeys": {},
+      "foreignKeys": {
+        "workflow_defs_project_id_projects_id_fk": {
+          "name": "workflow_defs_project_id_projects_id_fk",
+          "tableFrom": "workflow_defs",
+          "tableTo": "projects",
+          "columnsFrom": [
+            "project_id"
+          ],
+          "columnsTo": [
+            "id"
+          ],
+          "onDelete": "no action",
+          "onUpdate": "no action"
+        }
+      },
       "compositePrimaryKeys": {
         "workflow_defs_id_version_pk": {
           "columns": [
@@ -2090,6 +2134,65 @@
       "uniqueConstraints": {},
       "checkConstraints": {}
     },
+    "workspace_settings": {
+      "name": "workspace_settings",
+      "columns": {
+        "workspace_id": {
+          "name": "workspace_id",
+          "type": "text",
+          "primaryKey": true,
+          "notNull": true,
+          "autoincrement": false
+        },
+        "allowed_model_providers": {
+          "name": "allowed_model_providers",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false,
+          "autoincrement": false
+        },
+        "allowed_mcp_servers": {
+          "name": "allowed_mcp_servers",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false,
+          "autoincrement": false
+        },
+        "budget_max_monthly_spend_cents": {
+          "name": "budget_max_monthly_spend_cents",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": false,
+          "autoincrement": false
+        },
+        "budget_alert_threshold_cents": {
+          "name": "budget_alert_threshold_cents",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": false,
+          "autoincrement": false
+        }
+      },
+      "indexes": {},
+      "foreignKeys": {
+        "workspace_settings_workspace_id_workspaces_id_fk": {
+          "name": "workspace_settings_workspace_id_workspaces_id_fk",
+          "tableFrom": "workspace_settings",
+          "tableTo": "workspaces",
+          "columnsFrom": [
+            "workspace_id"
+          ],
+          "columnsTo": [
+            "id"
+          ],
+          "onDelete": "cascade",
+          "onUpdate": "no action"
+        }
+      },
+      "compositePrimaryKeys": {},
+      "uniqueConstraints": {},
+      "checkConstraints": {}
+    },
     "workspaces": {
       "name": "workspaces",
       "columns": {
@@ -2105,13 +2208,6 @@
           "type": "text",
           "primaryKey": false,
           "notNull": true,
-          "autoincrement": false
-        },
-        "settings": {
-          "name": "settings",
-          "type": "text",
-          "primaryKey": false,
-          "notNull": false,
           "autoincrement": false
         },
         "created_at": {

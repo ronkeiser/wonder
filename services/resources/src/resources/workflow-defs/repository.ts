@@ -210,3 +210,27 @@ export async function listTransitionsByWorkflowDef(
     .where(eq(transitions.workflow_def_id, workflowDefId))
     .all();
 }
+
+/** Delete WorkflowDef and all associated nodes and transitions */
+
+export async function deleteWorkflowDef(
+  db: DrizzleD1Database,
+  id: string,
+  version?: number,
+): Promise<void> {
+  // Delete associated nodes
+  await db.delete(nodes).where(eq(nodes.workflow_def_id, id)).run();
+
+  // Delete associated transitions
+  await db.delete(transitions).where(eq(transitions.workflow_def_id, id)).run();
+
+  // Delete workflow_def(s)
+  if (version !== undefined) {
+    await db
+      .delete(workflow_defs)
+      .where(and(eq(workflow_defs.id, id), eq(workflow_defs.version, version)))
+      .run();
+  } else {
+    await db.delete(workflow_defs).where(eq(workflow_defs.id, id)).run();
+  }
+}

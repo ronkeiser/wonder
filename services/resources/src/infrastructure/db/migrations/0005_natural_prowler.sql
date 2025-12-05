@@ -1,1 +1,0 @@
-ALTER TABLE `workflow_defs` ADD `output_mapping` text;

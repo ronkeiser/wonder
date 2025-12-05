@@ -618,7 +618,7 @@ export interface paths {
         get: {
             parameters: {
                 query?: {
-                    version?: string;
+                    version?: number;
                 };
                 header?: never;
                 path: {
@@ -635,43 +635,6 @@ export interface paths {
                     };
                     content: {
                         "application/json": components["schemas"]["WorkflowDefGetResponse"];
-                    };
-                };
-            };
-        };
-        put?: never;
-        post?: never;
-        delete?: never;
-        options?: never;
-        head?: never;
-        patch?: never;
-        trace?: never;
-    };
-    "/api/workflow-defs/owner/{owner}": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        get: {
-            parameters: {
-                query?: never;
-                header?: never;
-                path: {
-                    owner: string;
-                };
-                cookie?: never;
-            };
-            requestBody?: never;
-            responses: {
-                /** @description Workflow definitions retrieved successfully */
-                200: {
-                    headers: {
-                        [name: string]: unknown;
-                    };
-                    content: {
-                        "application/json": components["schemas"]["WorkflowDefListResponse"];
                     };
                 };
             };
@@ -792,9 +755,7 @@ export interface paths {
                         [name: string]: unknown;
                     };
                     content: {
-                        "application/json": {
-                            [key: string]: unknown;
-                        };
+                        "application/json": components["schemas"]["WorkflowStartResponse"];
                     };
                 };
             };
@@ -805,7 +766,7 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
-    "/api/workflows/runs/{id}": {
+    "/api/logs": {
         parameters: {
             query?: never;
             header?: never;
@@ -814,24 +775,47 @@ export interface paths {
         };
         get: {
             parameters: {
-                query?: never;
-                header?: never;
-                path: {
-                    id: string;
+                query?: {
+                    service?: string;
+                    level?: "error" | "warn" | "info" | "debug" | "fatal";
+                    event_type?: string;
+                    trace_id?: string;
+                    request_id?: string;
+                    workspace_id?: string;
+                    project_id?: string;
+                    user_id?: string;
+                    limit?: number;
                 };
+                header?: never;
+                path?: never;
                 cookie?: never;
             };
             requestBody?: never;
             responses: {
-                /** @description Workflow run retrieved successfully */
+                /** @description Logs retrieved successfully */
                 200: {
                     headers: {
                         [name: string]: unknown;
                     };
                     content: {
                         "application/json": {
-                            [key: string]: unknown;
-                        };
+                            id: string;
+                            timestamp: number;
+                            level: string;
+                            service: string;
+                            environment: string;
+                            event_type: string | null;
+                            message: string | null;
+                            source_location: string | null;
+                            trace_id: string | null;
+                            request_id: string | null;
+                            workspace_id: string | null;
+                            project_id: string | null;
+                            user_id: string | null;
+                            version: string | null;
+                            instance_id: string | null;
+                            metadata: string;
+                        }[];
                     };
                 };
             };
@@ -1005,12 +989,8 @@ export interface components {
             produces: {
                 [key: string]: unknown;
             };
-            examples: {
-                [key: string]: unknown;
-            } | null;
-            tags: {
-                [key: string]: unknown;
-            } | null;
+            examples: unknown[] | null;
+            tags: string[] | null;
             created_at: string;
             updated_at: string;
         };
@@ -1065,12 +1045,8 @@ export interface components {
             /** @enum {string} */
             provider: "anthropic" | "openai" | "google" | "cloudflare" | "local";
             model_id: string;
-            parameters: {
-                [key: string]: unknown;
-            };
-            execution_config: {
-                [key: string]: unknown;
-            } | null;
+            parameters?: unknown;
+            execution_config?: unknown;
             cost_per_1k_input_tokens: number;
             cost_per_1k_output_tokens: number;
         };
@@ -1112,12 +1088,9 @@ export interface components {
             name: string;
             description: string;
             version: number;
-            /** @enum {string} */
-            owner_type: "project" | "library";
-            owner_id: string;
-            tags: {
-                [key: string]: unknown;
-            } | null;
+            project_id: string | null;
+            library_id: string | null;
+            tags: string[] | null;
             input_schema: {
                 [key: string]: unknown;
             };
@@ -1127,7 +1100,7 @@ export interface components {
             context_schema: {
                 [key: string]: unknown;
             } | null;
-            initial_node_id: string;
+            initial_node_id: string | null;
             created_at: string;
             updated_at: string;
         };
@@ -1145,21 +1118,9 @@ export interface components {
              * @example 1
              */
             version: number;
-            /**
-             * @example {
-             *       "type": "project",
-             *       "project_id": "01ARZ3NDEKTSV4RRFFQ69G5FAV"
-             *     }
-             */
-            owner: {
-                /** @enum {string} */
-                type: "project";
-                project_id: string;
-            } | {
-                /** @enum {string} */
-                type: "library";
-                library_id: string;
-            };
+            /** @example 01ARZ3NDEKTSV4RRFFQ69G5FAV */
+            project_id?: string;
+            library_id?: string;
             tags?: string[];
             /**
              * @example {
@@ -1176,6 +1137,14 @@ export interface components {
              */
             output_schema: {
                 [key: string]: unknown;
+            };
+            /**
+             * @example {
+             *       "result": "$.final_node_output.response"
+             *     }
+             */
+            output_mapping?: {
+                [key: string]: string;
             };
             context_schema?: {
                 [key: string]: unknown;
@@ -1198,11 +1167,12 @@ export interface components {
                 };
                 /** @enum {string} */
                 fan_out?: "first_match" | "all";
-                fan_in?: ("any" | "all") | {
-                    m_of_n: number;
-                };
+                /** @example any */
+                fan_in?: string;
                 joins_node_ref?: string;
-                merge?: unknown;
+                merge?: {
+                    [key: string]: unknown;
+                };
                 /** @enum {string} */
                 on_early_complete?: "cancel" | "abandon" | "allow_late_merge";
             }[];
@@ -1211,18 +1181,63 @@ export interface components {
                 from_node_ref: string;
                 to_node_ref: string;
                 priority: number;
-                condition?: unknown;
-                foreach?: unknown;
-                loop_config?: unknown;
+                condition?: {
+                    [key: string]: unknown;
+                };
+                foreach?: {
+                    [key: string]: unknown;
+                };
+                loop_config?: {
+                    [key: string]: unknown;
+                };
             }[];
+        };
+        Node: {
+            id: string;
+            workflow_def_id: string;
+            workflow_def_version: number;
+            ref: string;
+            name: string;
+            action_id: string;
+            action_version: number;
+            input_mapping: {
+                [key: string]: unknown;
+            } | null;
+            output_mapping: {
+                [key: string]: unknown;
+            } | null;
+            /** @enum {string} */
+            fan_out: "first_match" | "all";
+            fan_in: "any" | "all" | string;
+            joins_node: string | null;
+            merge: {
+                [key: string]: unknown;
+            } | null;
+            /** @enum {string|null} */
+            on_early_complete: "cancel" | "abandon" | "allow_late_merge" | null;
+        };
+        Transition: {
+            id: string;
+            workflow_def_id: string;
+            workflow_def_version: number;
+            ref: string | null;
+            from_node_id: string;
+            to_node_id: string;
+            priority: number;
+            condition: {
+                [key: string]: unknown;
+            } | null;
+            foreach: {
+                [key: string]: unknown;
+            } | null;
+            loop_config: {
+                [key: string]: unknown;
+            } | null;
         };
         WorkflowDefGetResponse: {
             workflow_def: components["schemas"]["WorkflowDef"];
-            nodes: unknown[];
-            transitions: unknown[];
-        };
-        WorkflowDefListResponse: {
-            workflow_defs: components["schemas"]["WorkflowDef"][];
+            nodes: components["schemas"]["Node"][];
+            transitions: components["schemas"]["Transition"][];
         };
         Workflow: {
             id: string;
@@ -1249,6 +1264,10 @@ export interface components {
         };
         WorkflowGetResponse: {
             workflow: components["schemas"]["Workflow"];
+        };
+        WorkflowStartResponse: {
+            workflow_run_id: string;
+            durable_object_id: string;
         };
     };
     responses: never;
