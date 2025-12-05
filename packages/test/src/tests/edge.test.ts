@@ -192,38 +192,38 @@ describe('Edge Test - Branching Architecture', () => {
     console.log('  Check logs for coordinator execution');
 
     // Cleanup: Delete in reverse order of creation
-    await client.DELETE('/api/workflows/{id}', {
-      params: { path: { id: workflowId } },
-    });
-    console.log('✓ Workflow deleted');
+    // await client.DELETE('/api/workflows/{id}', {
+    //   params: { path: { id: workflowId } },
+    // });
+    // console.log('✓ Workflow deleted');
 
-    await client.DELETE('/api/workflow-defs/{id}', {
-      params: { path: { id: workflowDefId } },
-    });
-    console.log('✓ Workflow def deleted');
+    // await client.DELETE('/api/workflow-defs/{id}', {
+    //   params: { path: { id: workflowDefId } },
+    // });
+    // console.log('✓ Workflow def deleted');
 
-    await client.DELETE('/api/actions/{id}', {
-      params: { path: { id: actionId } },
-    });
-    console.log('✓ Action deleted');
-    await client.DELETE('/api/prompt-specs/{id}', {
-      params: { path: { id: promptSpecId } },
-    });
-    console.log('✓ Prompt spec deleted');
+    // await client.DELETE('/api/actions/{id}', {
+    //   params: { path: { id: actionId } },
+    // });
+    // console.log('✓ Action deleted');
+    // await client.DELETE('/api/prompt-specs/{id}', {
+    //   params: { path: { id: promptSpecId } },
+    // });
+    // console.log('✓ Prompt spec deleted');
 
-    await client.DELETE('/api/model-profiles/{id}', {
-      params: { path: { id: modelProfileId } },
-    });
-    console.log('✓ Model profile deleted');
+    // await client.DELETE('/api/model-profiles/{id}', {
+    //   params: { path: { id: modelProfileId } },
+    // });
+    // console.log('✓ Model profile deleted');
 
-    await client.DELETE('/api/projects/{id}', {
-      params: { path: { id: projectId } },
-    });
-    console.log('✓ Project deleted');
+    // await client.DELETE('/api/projects/{id}', {
+    //   params: { path: { id: projectId } },
+    // });
+    // console.log('✓ Project deleted');
 
-    await client.DELETE('/api/workspaces/{id}', {
-      params: { path: { id: workspaceId } },
-    });
-    console.log('✓ Workspace deleted');
+    // await client.DELETE('/api/workspaces/{id}', {
+    //   params: { path: { id: workspaceId } },
+    // });
+    // console.log('✓ Workspace deleted');
   });
 });

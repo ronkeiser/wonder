@@ -25,9 +25,9 @@ export function initializeContextTable(sql: SqlStorage): void {
  * @returns Parsed value or undefined if not found
  */
 export function getContextValue(sql: SqlStorage, path: string): unknown {
-  const row = sql.exec(`SELECT value FROM context WHERE path = ?`, path).one();
-  if (row) {
-    return JSON.parse(row.value as string);
+  const rows = sql.exec(`SELECT value FROM context WHERE path = ?`, path).toArray();
+  if (rows.length > 0) {
+    return JSON.parse(rows[0].value as string);
   }
   return undefined;
 }

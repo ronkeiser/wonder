@@ -92,9 +92,10 @@ export function createToken(sql: SqlStorage, params: CreateTokenParams): string 
 
 /**
  * Get token by ID
+ * @throws Error if token not found
  */
 export function getToken(sql: SqlStorage, token_id: string): TokenRow {
-  const row = sql
+  const rows = sql
     .exec<TokenRow>(
       `SELECT id, workflow_run_id, node_id, status, path_id, 
      parent_token_id, fan_out_transition_id, branch_index, branch_total,
@@ -102,9 +103,13 @@ export function getToken(sql: SqlStorage, token_id: string): TokenRow {
      FROM tokens WHERE id = ?`,
       token_id,
     )
-    .one();
+    .toArray();
 
-  return row;
+  if (rows.length === 0) {
+    throw new Error(`Token not found: ${token_id}`);
+  }
+
+  return rows[0];
 }
 
 /**
@@ -119,12 +124,12 @@ export function updateTokenStatus(sql: SqlStorage, token_id: string, status: Tok
  * Get count of active (pending or executing) tokens for a workflow run
  */
 export function getActiveTokenCount(sql: SqlStorage, workflow_run_id: string): number {
-  const result = sql
+  const rows = sql
     .exec(
       `SELECT COUNT(*) as count FROM tokens WHERE workflow_run_id = ? AND status IN ('pending', 'executing')`,
       workflow_run_id,
     )
-    .one();
+    .toArray();
 
-  return result.count as number;
+  return (rows[0]?.count as number) ?? 0;
 }
