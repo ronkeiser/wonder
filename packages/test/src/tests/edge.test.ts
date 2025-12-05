@@ -138,7 +138,7 @@ describe('Edge Test - Branching Architecture', () => {
                 topic: '$.input.topic',
               },
               output_mapping: {
-                idea: '$.idea',
+                idea: '$.response.idea',
               },
             },
           ],
