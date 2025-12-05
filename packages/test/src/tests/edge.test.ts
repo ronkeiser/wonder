@@ -109,10 +109,7 @@ describe('Edge Test - Branching Architecture', () => {
           name: `Hello World Workflow ${Date.now()}`,
           description: 'Single node workflow for testing',
           version: 1,
-          owner: {
-            type: 'project' as const,
-            project_id: projectId,
-          },
+          project_id: projectId,
           input_schema: {
             type: 'object',
             properties: {
