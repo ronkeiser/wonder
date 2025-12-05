@@ -6,24 +6,30 @@
     <title>Events</title>
     <style>
       :root {
-        /* Semantic event colors */
-        --event-success: #238636;
-        --event-error: #f85149;
-        --event-info: #58a6ff;
-        --event-token: #a371f7;
-        --event-llm: #d29922;
-        --event-default: #30363d;
+        /* Palette colors - the actual color values */
+        --green: #238636;
+        --red: #f85149;
+        --blue: #58a6ff;
+        --purple: #a371f7;
+        --orange: #d29922;
+        --gray: #30363d;
+        --gray-dark: #21262d;
+        --gray-darker: #161b22;
+        --gray-darkest: #0d1117;
+        --gray-light: #8b949e;
+        --gray-lighter: #c9d1d9;
+        --blue-light: #a5d6ff;
 
         /* Base theme colors */
-        --bg-primary: #0d1117;
-        --bg-secondary: #161b22;
-        --bg-tertiary: #21262d;
-        --bg-hover: #30363d;
-        --text-primary: #c9d1d9;
-        --text-secondary: #8b949e;
-        --text-link: #a5d6ff;
-        --border: #30363d;
-        --accent: #58a6ff;
+        --bg-primary: var(--gray-darkest);
+        --bg-secondary: var(--gray-darker);
+        --bg-tertiary: var(--gray-dark);
+        --bg-hover: var(--gray);
+        --text-primary: var(--gray-lighter);
+        --text-secondary: var(--gray-light);
+        --text-link: var(--blue-light);
+        --border: var(--gray);
+        --accent: var(--blue);
         --accent-emphasis: #58a6ff80;
       }
 
@@ -197,17 +203,17 @@
       }
 
       .status.connected {
-        background: var(--event-success);
+        background: var(--green);
         color: #fff;
       }
 
       .status.disconnected {
-        background: var(--event-error);
+        background: var(--red);
         color: #fff;
       }
 
       .status.connecting {
-        background: var(--event-llm);
+        background: var(--orange);
         color: #fff;
       }
 
@@ -265,8 +271,8 @@
 
       .copy-btn.copied {
         opacity: 1;
-        color: var(--event-success);
-        border-color: var(--event-success);
+        color: var(--green);
+        border-color: var(--green);
       }
 
       .copy-btn svg {
@@ -275,31 +281,29 @@
         height: 14px;
       }
 
-      /* Event type border colors */
-      .event-entry.workflow_started,
-      .event-entry.workflow_completed {
-        border-left-color: var(--event-success);
+      /* Color-based styling via data attributes */
+      .event-entry[data-color='green'] {
+        border-left-color: var(--green);
       }
 
-      .event-entry.workflow_failed,
-      .event-entry.node_failed,
-      .event-entry.llm_call_failed {
-        border-left-color: var(--event-error);
+      .event-entry[data-color='red'] {
+        border-left-color: var(--red);
       }
 
-      .event-entry.node_started,
-      .event-entry.node_completed {
-        border-left-color: var(--event-info);
+      .event-entry[data-color='blue'] {
+        border-left-color: var(--blue);
       }
 
-      .event-entry.token_spawned,
-      .event-entry.token_merged {
-        border-left-color: var(--event-token);
+      .event-entry[data-color='purple'] {
+        border-left-color: var(--purple);
       }
 
-      .event-entry.llm_call_started,
-      .event-entry.llm_call_completed {
-        border-left-color: var(--event-llm);
+      .event-entry[data-color='orange'] {
+        border-left-color: var(--orange);
+      }
+
+      .event-entry[data-color='gray'] {
+        border-left-color: var(--gray);
       }
 
       .event-time {
@@ -314,39 +318,38 @@
         font-size: 0.75rem;
         font-weight: 600;
         margin-right: 0.5rem;
-        background: var(--event-default);
+        background: var(--gray);
         color: var(--text-primary);
       }
 
-      .event-type.workflow_started,
-      .event-type.workflow_completed {
-        background: var(--event-success);
+      .event-type[data-color='green'] {
+        background: var(--green);
         color: #fff;
       }
 
-      .event-type.workflow_failed,
-      .event-type.node_failed,
-      .event-type.llm_call_failed {
-        background: var(--event-error);
+      .event-type[data-color='red'] {
+        background: var(--red);
         color: #000;
       }
 
-      .event-type.node_started,
-      .event-type.node_completed {
-        background: var(--event-info);
+      .event-type[data-color='blue'] {
+        background: var(--blue);
         color: #000;
       }
 
-      .event-type.token_spawned,
-      .event-type.token_merged {
-        background: var(--event-token);
+      .event-type[data-color='purple'] {
+        background: var(--purple);
         color: #000;
       }
 
-      .event-type.llm_call_started,
-      .event-type.llm_call_completed {
-        background: var(--event-llm);
+      .event-type[data-color='orange'] {
+        background: var(--orange);
         color: #000;
+      }
+
+      .event-type[data-color='gray'] {
+        background: var(--gray);
+        color: var(--text-primary);
       }
 
       .event-workflow-run {
@@ -502,6 +505,21 @@
         filterEventsByTime(minutes);
       });
 
+      // Event type to color mapping
+      const EVENT_COLOR_MAP = {
+        workflow_started: 'green',
+        workflow_completed: 'green',
+        workflow_failed: 'red',
+        node_started: 'blue',
+        node_completed: 'blue',
+        node_failed: 'red',
+        token_spawned: 'purple',
+        token_merged: 'purple',
+        llm_call_started: 'orange',
+        llm_call_completed: 'orange',
+        llm_call_failed: 'red',
+      };
+
       function formatTime(timestamp) {
         const date = new Date(timestamp);
         return date.toLocaleTimeString('en-US', {
@@ -529,8 +547,11 @@
           seenEventIds.add(event.id);
         }
 
+        const color = EVENT_COLOR_MAP[event.event_type] || 'gray';
+
         const entry = document.createElement('div');
-        entry.className = `event-entry ${event.event_type}`;
+        entry.className = 'event-entry';
+        entry.dataset.color = color;
 
         const content = document.createElement('div');
         content.className = 'event-content';
@@ -540,7 +561,8 @@
         time.textContent = formatTime(event.timestamp);
 
         const eventType = document.createElement('span');
-        eventType.className = `event-type ${event.event_type}`;
+        eventType.className = 'event-type';
+        eventType.dataset.color = color;
         eventType.textContent = event.event_type;
 
         const workflowRun = document.createElement('span');
