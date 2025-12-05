@@ -1,3 +1,4 @@
+import type { Logger } from '@wonder/logs';
 import { ulid } from 'ulid';
 
 export type TokenStatus =
@@ -37,99 +38,111 @@ export interface CreateTokenParams {
 }
 
 /**
- * Initialize tokens table in SQLite storage
+ * TokenManager handles token lifecycle operations with logging
  */
-export function initializeTokensTable(sql: SqlStorage): void {
-  sql.exec(`
-    CREATE TABLE IF NOT EXISTS tokens (
-      id TEXT PRIMARY KEY,
-      workflow_run_id TEXT NOT NULL,
-      node_id TEXT NOT NULL,
-      status TEXT NOT NULL,
-      path_id TEXT NOT NULL,
-      parent_token_id TEXT,
-      fan_out_transition_id TEXT,
-      branch_index INTEGER NOT NULL,
-      branch_total INTEGER NOT NULL,
-      state_data TEXT,
-      state_updated_at TEXT NOT NULL,
-      created_at TEXT NOT NULL,
-      updated_at TEXT NOT NULL
-    )
-  `);
-}
+export class TokenManager {
+  constructor(private sql: SqlStorage, private logger: Logger) {}
 
-/**
- * Create a new token for workflow execution
- */
-export function createToken(sql: SqlStorage, params: CreateTokenParams): string {
-  const token_id = ulid();
-  const now = new Date().toISOString();
-
-  sql.exec(
-    `INSERT INTO tokens (
-      id, workflow_run_id, node_id, status, path_id,
-      parent_token_id, fan_out_transition_id, branch_index, branch_total,
-      state_data, state_updated_at, created_at, updated_at
-    ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
-    token_id,
-    params.workflow_run_id,
-    params.node_id,
-    'pending',
-    params.path_id,
-    params.parent_token_id,
-    params.fan_out_transition_id,
-    params.branch_index,
-    params.branch_total,
-    null, // state_data
-    now, // state_updated_at
-    now, // created_at
-    now, // updated_at
-  );
-
-  return token_id;
-}
-
-/**
- * Get token by ID
- * @throws Error if token not found
- */
-export function getToken(sql: SqlStorage, token_id: string): TokenRow {
-  const rows = sql
-    .exec<TokenRow>(
-      `SELECT id, workflow_run_id, node_id, status, path_id, 
-     parent_token_id, fan_out_transition_id, branch_index, branch_total,
-     state_data, state_updated_at, created_at, updated_at 
-     FROM tokens WHERE id = ?`,
-      token_id,
-    )
-    .toArray();
-
-  if (rows.length === 0) {
-    throw new Error(`Token not found: ${token_id}`);
+  /**
+   * Initialize tokens table in SQLite storage
+   */
+  initializeTable(): void {
+    this.sql.exec(`
+      CREATE TABLE IF NOT EXISTS tokens (
+        id TEXT PRIMARY KEY,
+        workflow_run_id TEXT NOT NULL,
+        node_id TEXT NOT NULL,
+        status TEXT NOT NULL,
+        path_id TEXT NOT NULL,
+        parent_token_id TEXT,
+        fan_out_transition_id TEXT,
+        branch_index INTEGER NOT NULL,
+        branch_total INTEGER NOT NULL,
+        state_data TEXT,
+        state_updated_at TEXT NOT NULL,
+        created_at TEXT NOT NULL,
+        updated_at TEXT NOT NULL
+      )
+    `);
   }
 
-  return rows[0];
-}
+  /**
+   * Create a new token for workflow execution
+   */
+  createToken(params: CreateTokenParams): string {
+    const token_id = ulid();
+    const now = new Date().toISOString();
 
-/**
- * Update token status
- */
-export function updateTokenStatus(sql: SqlStorage, token_id: string, status: TokenStatus): void {
-  const now = new Date().toISOString();
-  sql.exec(`UPDATE tokens SET status = ?, updated_at = ? WHERE id = ?`, status, now, token_id);
-}
+    this.sql.exec(
+      `INSERT INTO tokens (
+        id, workflow_run_id, node_id, status, path_id,
+        parent_token_id, fan_out_transition_id, branch_index, branch_total,
+        state_data, state_updated_at, created_at, updated_at
+      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+      token_id,
+      params.workflow_run_id,
+      params.node_id,
+      'pending',
+      params.path_id,
+      params.parent_token_id,
+      params.fan_out_transition_id,
+      params.branch_index,
+      params.branch_total,
+      null, // state_data
+      now, // state_updated_at
+      now, // created_at
+      now, // updated_at
+    );
 
-/**
- * Get count of active (pending or executing) tokens for a workflow run
- */
-export function getActiveTokenCount(sql: SqlStorage, workflow_run_id: string): number {
-  const rows = sql
-    .exec(
-      `SELECT COUNT(*) as count FROM tokens WHERE workflow_run_id = ? AND status IN ('pending', 'executing')`,
-      workflow_run_id,
-    )
-    .toArray();
+    return token_id;
+  }
 
-  return (rows[0]?.count as number) ?? 0;
+  /**
+   * Get token by ID
+   * @throws Error if token not found
+   */
+  getToken(token_id: string): TokenRow {
+    const rows = this.sql
+      .exec<TokenRow>(
+        `SELECT id, workflow_run_id, node_id, status, path_id, 
+       parent_token_id, fan_out_transition_id, branch_index, branch_total,
+       state_data, state_updated_at, created_at, updated_at 
+       FROM tokens WHERE id = ?`,
+        token_id,
+      )
+      .toArray();
+
+    if (rows.length === 0) {
+      throw new Error(`Token not found: ${token_id}`);
+    }
+
+    return rows[0];
+  }
+
+  /**
+   * Update token status
+   */
+  updateTokenStatus(token_id: string, status: TokenStatus): void {
+    const now = new Date().toISOString();
+    this.sql.exec(
+      `UPDATE tokens SET status = ?, updated_at = ? WHERE id = ?`,
+      status,
+      now,
+      token_id,
+    );
+  }
+
+  /**
+   * Get count of active (pending or executing) tokens for a workflow run
+   */
+  getActiveTokenCount(workflow_run_id: string): number {
+    const rows = this.sql
+      .exec(
+        `SELECT COUNT(*) as count FROM tokens WHERE workflow_run_id = ? AND status IN ('pending', 'executing')`,
+        workflow_run_id,
+      )
+      .toArray();
+
+    return (rows[0]?.count as number) ?? 0;
+  }
 }

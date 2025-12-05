@@ -6,7 +6,7 @@ import * as context from './context';
 import * as mapping from './mapping';
 import * as routing from './routing';
 import * as tasks from './tasks';
-import * as tokens from './tokens';
+import { TokenManager } from './tokens';
 
 /**
  * WorkflowCoordinator Durable Object
@@ -17,6 +17,7 @@ import * as tokens from './tokens';
 export class WorkflowCoordinator extends DurableObject {
   private logger: Logger;
   private emitter: Emitter;
+  private tokens: TokenManager;
 
   constructor(ctx: DurableObjectState, env: Env) {
     super(ctx, env);
@@ -25,17 +26,18 @@ export class WorkflowCoordinator extends DurableObject {
       environment: 'production',
     });
     this.emitter = createEmitter(this.ctx, this.env.EVENTS);
+    this.tokens = new TokenManager(this.ctx.storage.sql, this.logger);
   }
 
   /**
    * Dispatch a token for execution - delegates to tasks service
    */
   private async dispatchToken(token_id: string): Promise<void> {
-    const tokenRow = tokens.getToken(this.ctx.storage.sql, token_id);
+    const tokenRow = this.tokens.getToken(token_id);
     const workflow_run_id = tokenRow.workflow_run_id as string;
 
     // Mark token as executing
-    tokens.updateTokenStatus(this.ctx.storage.sql, token_id, 'executing');
+    this.tokens.updateTokenStatus(token_id, 'executing');
 
     // Delegate to tasks service to build and dispatch payload
     await tasks.buildPayload({
@@ -57,12 +59,12 @@ export class WorkflowCoordinator extends DurableObject {
     result: { output_data: Record<string, unknown> }
   ): Promise<void> {
     // Fetch token info
-    const tokenRow = tokens.getToken(this.ctx.storage.sql, token_id);
+    const tokenRow = this.tokens.getToken(token_id);
     const workflow_run_id = tokenRow.workflow_run_id as string;
     const node_id = tokenRow.node_id as string;
 
     // Update token status to completed
-    tokens.updateTokenStatus(this.ctx.storage.sql, token_id, 'completed');
+    this.tokens.updateTokenStatus(token_id, 'completed');
 
     // Get node ref for context path (refs are stable identifiers used in input_mapping)
     using workflowRuns = this.env.RESOURCES.workflowRuns();
@@ -115,6 +117,7 @@ export class WorkflowCoordinator extends DurableObject {
     const decision = await routing.decide({
       completed_token_id: token_id,
       workflow_run_id,
+      tokens: this.tokens,
       sql: this.ctx.storage.sql,
       env: this.env,
       logger: this.logger,
@@ -172,7 +175,7 @@ export class WorkflowCoordinator extends DurableObject {
 
       // Initialize storage tables
       context.initializeContextTable(this.ctx.storage.sql);
-      tokens.initializeTokensTable(this.ctx.storage.sql);
+      this.tokens.initializeTable();
       artifacts.initializeArtifactsTable(this.ctx.storage.sql);
 
       // Initialize context with workflow input
@@ -183,7 +186,7 @@ export class WorkflowCoordinator extends DurableObject {
         throw new Error('Workflow definition has no initial_node_id');
       }
       
-      token_id = tokens.createToken(this.ctx.storage.sql, {
+      token_id = this.tokens.createToken({
         workflow_run_id,
         node_id: workflowDef.workflow_def.initial_node_id,
         parent_token_id: null,
@@ -224,19 +227,7 @@ export class WorkflowCoordinator extends DurableObject {
 
       // Update token status to failed if token was created
       if (token_id) {
-        try {
-          tokens.updateTokenStatus(this.ctx.storage.sql, token_id, 'failed');
-        } catch (updateError) {
-          this.logger.error({
-            event_type: 'token_update_failed',
-            message: 'Failed to update token status to failed',
-            trace_id: workflow_run_id,
-            metadata: {
-              token_id,
-              error: updateError instanceof Error ? updateError.message : String(updateError),
-            },
-          });
-        }
+        this.tokens.updateTokenStatus(token_id, 'failed');
       }
 
       throw error;

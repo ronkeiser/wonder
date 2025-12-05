@@ -5,10 +5,10 @@
  * Evaluates transitions, creates new tokens, checks workflow completion.
  */
 
-import type { Logger } from '@wonder/logs';
 import type { Emitter, EventContext } from '@wonder/events';
-import * as tokens from './tokens';
+import type { Logger } from '@wonder/logs';
 import * as context from './context';
+import type { TokenManager } from './tokens';
 
 export interface RoutingDecision {
   tokensToDispatch: string[];
@@ -19,6 +19,7 @@ export interface RoutingDecision {
 export interface RouteParams {
   completed_token_id: string;
   workflow_run_id: string;
+  tokens: TokenManager;
   sql: SqlStorage;
   env: Env;
   logger: Logger;
@@ -32,10 +33,10 @@ export interface RouteParams {
  * checks synchronization, determines if workflow is complete.
  */
 export async function decide(params: RouteParams): Promise<RoutingDecision> {
-  const { completed_token_id, workflow_run_id, sql, env, logger, emitter } = params;
+  const { completed_token_id, workflow_run_id, tokens, sql, env, logger, emitter } = params;
 
   // Get completed token info
-  const tokenRow = tokens.getToken(sql, completed_token_id);
+  const tokenRow = tokens.getToken(completed_token_id);
   const node_id = tokenRow.node_id as string;
 
   // Fetch workflow definition to get transitions
@@ -88,7 +89,7 @@ export async function decide(params: RouteParams): Promise<RoutingDecision> {
   const tokensToDispatch: string[] = [];
 
   for (const transition of transitions) {
-    const nextTokenId = tokens.createToken(sql, {
+    const nextTokenId = tokens.createToken({
       workflow_run_id,
       node_id: transition.to_node_id,
       parent_token_id: completed_token_id,
@@ -127,7 +128,7 @@ export async function decide(params: RouteParams): Promise<RoutingDecision> {
   }
 
   // Check if workflow is complete (no pending or executing tokens remain)
-  const activeCount = tokens.getActiveTokenCount(sql, workflow_run_id);
+  const activeCount = tokens.getActiveTokenCount(workflow_run_id);
 
   if (activeCount === 0) {
     // Extract final output using output_mapping
