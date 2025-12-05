@@ -4,7 +4,7 @@ import { DurableObject } from 'cloudflare:workers';
 import * as artifacts from './artifacts';
 import * as context from './context';
 import * as mapping from './mapping';
-import * as routing from './routing';
+import { Router } from './router';
 import * as tasks from './tasks';
 import { TokenManager } from './tokens';
 
@@ -18,6 +18,7 @@ export class WorkflowCoordinator extends DurableObject {
   private logger: Logger;
   private emitter: Emitter;
   private tokens: TokenManager;
+  private router: Router;
 
   constructor(ctx: DurableObjectState, env: Env) {
     super(ctx, env);
@@ -27,6 +28,7 @@ export class WorkflowCoordinator extends DurableObject {
     });
     this.emitter = createEmitter(this.ctx, this.env.EVENTS);
     this.tokens = new TokenManager(this.ctx.storage.sql, this.logger);
+    this.router = new Router(this.logger);
   }
 
   /**
@@ -112,14 +114,13 @@ export class WorkflowCoordinator extends DurableObject {
       metadata: { output_keys: Object.keys(mappedOutput) },
     });
 
-    // Delegate to routing service to decide what happens next
-    const decision = await routing.decide({
+    // Delegate to router to decide what happens next
+    const decision = await this.router.decide({
       completed_token_id: token_id,
       workflow_run_id,
       tokens: this.tokens,
       sql: this.ctx.storage.sql,
       env: this.env,
-      logger: this.logger,
       emitter: this.emitter,
     });
 
