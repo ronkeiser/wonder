@@ -7,8 +7,7 @@
 
 import type { Emitter, EventContext } from '@wonder/events';
 import type { Logger } from '@wonder/logs';
-import * as context from './context';
-import * as mapping from './mapping';
+import { evaluateInputMapping } from './mapping';
 import { renderTemplate } from './template';
 
 export interface BuildPayloadParams {
@@ -116,7 +115,7 @@ export class TaskManager {
         });
 
         // Evaluate input_mapping to build template context
-        const templateContext = mapping.evaluateInputMapping(node.input_mapping, sql);
+        const templateContext = evaluateInputMapping(node.input_mapping, sql);
 
         this.logger.info({
           event_type: 'input_mapping_evaluated',
