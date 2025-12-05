@@ -42,11 +42,11 @@ export interface EventContext {
 }
 
 /**
- * Input for writing an event - flexible metadata
+ * Input for emitting an event - caller provides event data
  */
 export interface EventInput {
   event_type: EventType | string; // Allow custom event types
-  sequence_number: number;
+  sequence_number?: number;
   node_id?: string;
   token_id?: string;
   path_id?: string;
@@ -62,6 +62,7 @@ export interface EventInput {
 export interface EventEntry extends EventContext, Omit<EventInput, 'metadata'> {
   id: string;
   timestamp: number;
+  sequence_number: number;
   metadata: string; // JSON string
 }
 

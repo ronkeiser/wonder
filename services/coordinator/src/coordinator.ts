@@ -1,3 +1,4 @@
+import { createEmitter, type Emitter, type EventContext } from '@wonder/events';
 import { createLogger, type Logger } from '@wonder/logs';
 import { DurableObject } from 'cloudflare:workers';
 import * as context from './context';
@@ -12,6 +13,7 @@ import * as tokens from './tokens';
  */
 export class WorkflowCoordinator extends DurableObject {
   private logger: Logger;
+  private emitter: Emitter;
 
   constructor(ctx: DurableObjectState, env: Env) {
     super(ctx, env);
@@ -19,6 +21,7 @@ export class WorkflowCoordinator extends DurableObject {
       service: 'coordinator',
       environment: 'production',
     });
+    this.emitter = createEmitter(this.ctx, this.env.EVENTS);
   }
 
   /**
@@ -145,6 +148,23 @@ export class WorkflowCoordinator extends DurableObject {
         // Mark token as executing
         tokens.updateTokenStatus(this.ctx.storage.sql, token_id, 'executing');
 
+        // Build event context
+        const eventContext: EventContext = {
+          workflow_run_id,
+          workspace_id: workflowRun.workflow_run.workspace_id,
+          project_id: workflowRun.workflow_run.project_id,
+          workflow_def_id: workflowRun.workflow_run.workflow_def_id,
+          parent_run_id: workflowRun.workflow_run.parent_run_id ?? undefined,
+        };
+
+        // Emit node_started event
+        this.emitter.emit(eventContext, {
+          event_type: 'node_started',
+          node_id: node.id,
+          token_id,
+          message: `Node ${node.name} started`,
+        });
+
         this.logger.info({
           event_type: 'token_executing',
           message: 'Token status updated to executing',
@@ -166,6 +186,18 @@ export class WorkflowCoordinator extends DurableObject {
             token_id,
           })
         );
+
+        // Emit llm_call_started event
+        this.emitter.emit(eventContext, {
+          event_type: 'llm_call_started',
+          node_id: node.id,
+          token_id,
+          message: `LLM call started: ${modelProfileResult.model_profile.model_id}`,
+          metadata: {
+            model_id: modelProfileResult.model_profile.model_id,
+            provider: modelProfileResult.model_profile.provider,
+          },
+        });
 
         this.logger.info({
           event_type: 'task_dispatched',
@@ -261,6 +293,32 @@ export class WorkflowCoordinator extends DurableObject {
     // Store mapped output in context using node.ref (matches input_mapping paths)
     context.setNodeOutput(this.ctx.storage.sql, node.ref, mappedOutput);
 
+    // Build event context
+    const eventContext: EventContext = {
+      workflow_run_id,
+      workspace_id: workflowRun.workflow_run.workspace_id,
+      project_id: workflowRun.workflow_run.project_id,
+      workflow_def_id: workflowRun.workflow_run.workflow_def_id,
+      parent_run_id: workflowRun.workflow_run.parent_run_id ?? undefined,
+    };
+
+    // Emit node_completed event
+    this.emitter.emit(eventContext, {
+      event_type: 'node_completed',
+      node_id,
+      token_id,
+      message: `Node ${node.name} completed`,
+    });
+
+    // Emit context_updated event
+    this.emitter.emit(eventContext, {
+      event_type: 'context_updated',
+      node_id,
+      token_id,
+      message: `Context updated with output from ${node.ref}`,
+      metadata: { output_keys: Object.keys(mappedOutput) },
+    });
+
     this.logger.info({
       event_type: 'context_output_stored',
       message: 'Action output stored in context',
@@ -308,6 +366,18 @@ export class WorkflowCoordinator extends DurableObject {
         fan_out_transition_id: null, // null for simple linear flow
         branch_index: 0, // 0 for single branch
         branch_total: 1, // 1 for single branch
+      });
+
+      // Emit token_spawned event
+      this.emitter.emit(eventContext, {
+        event_type: 'token_spawned',
+        node_id: transition.to_node_id,
+        token_id: nextTokenId,
+        message: `Token spawned for transition to node`,
+        metadata: {
+          parent_token_id: token_id,
+          transition_id: transition.id,
+        },
       });
 
       this.logger.info({
@@ -368,6 +438,13 @@ export class WorkflowCoordinator extends DurableObject {
           last_completed_node_ref: node.ref,
           final_output: finalOutput,
         },
+      });
+
+      // Emit workflow_completed event
+      this.emitter.emit(eventContext, {
+        event_type: 'workflow_completed',
+        message: 'Workflow execution completed',
+        metadata: { final_output: finalOutput },
       });
 
       // Store final output with workflow_run in Resources service
@@ -431,6 +508,22 @@ export class WorkflowCoordinator extends DurableObject {
           initial_node_id: workflowDef.workflow_def.initial_node_id,
           has_context_schema: !!workflowDef.workflow_def.context_schema,
         },
+      });
+
+      // Build event context for workflow events
+      const eventContext: EventContext = {
+        workflow_run_id,
+        workspace_id: workflowRun.workflow_run.workspace_id,
+        project_id: workflowRun.workflow_run.project_id,
+        workflow_def_id: workflowRun.workflow_run.workflow_def_id,
+        parent_run_id: workflowRun.workflow_run.parent_run_id ?? undefined,
+      };
+
+      // Emit workflow_started event
+      this.emitter.emit(eventContext, {
+        event_type: 'workflow_started',
+        message: `Workflow ${workflowDef.workflow_def.name} started`,
+        metadata: { input },
       });
 
       // Step 3: Create context table in SQLite
@@ -515,6 +608,20 @@ export class WorkflowCoordinator extends DurableObject {
           error_stack: error instanceof Error ? error.stack : undefined,
         },
       });
+
+      // Emit workflow_failed event (need to build context without workflowRun if it failed early)
+      this.emitter.emit(
+        {
+          workflow_run_id,
+          workspace_id: '', // May not have this if fetch failed
+          project_id: '',
+        },
+        {
+          event_type: 'workflow_failed',
+          token_id,
+          message: error instanceof Error ? error.message : String(error),
+        },
+      );
 
       // Update token status to failed if token was created
       if (token_id) {

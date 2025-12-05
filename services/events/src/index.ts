@@ -76,6 +76,7 @@ export class EventsService extends WorkerEntrypoint<Env> {
             timestamp: Date.now(),
             ...context,
             ...input,
+            sequence_number: input.sequence_number ?? 0,
             metadata: JSON.stringify(input.metadata || {}),
           };
 
