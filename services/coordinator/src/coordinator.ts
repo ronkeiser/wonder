@@ -64,17 +64,6 @@ export class WorkflowCoordinator extends DurableObject {
     // Update token status to completed
     tokens.updateTokenStatus(this.ctx.storage.sql, token_id, 'completed');
 
-    this.logger.info({
-      event_type: 'token_completed',
-      message: 'Token status updated to completed',
-      trace_id: workflow_run_id,
-      metadata: {
-        token_id,
-        node_id,
-        status: 'completed',
-      },
-    });
-
     // Get node ref for context path (refs are stable identifiers used in input_mapping)
     using workflowRuns = this.env.RESOURCES.workflowRuns();
     const workflowRun = await workflowRuns.get(workflow_run_id);
@@ -122,21 +111,6 @@ export class WorkflowCoordinator extends DurableObject {
       metadata: { output_keys: Object.keys(mappedOutput) },
     });
 
-    this.logger.info({
-      event_type: 'context_output_stored',
-      message: 'Action output stored in context',
-      trace_id: workflow_run_id,
-      metadata: {
-        token_id,
-        node_id,
-        node_ref: node.ref,
-        raw_output_keys: Object.keys(result.output_data),
-        mapped_output_keys: Object.keys(mappedOutput),
-        output_mapping: node.output_mapping,
-        context_paths: Object.keys(mappedOutput).map(key => `${node.ref}_output.${key}`),
-      },
-    });
-
     // Delegate to routing service to decide what happens next
     const decision = await routing.decide({
       completed_token_id: token_id,
@@ -170,54 +144,15 @@ export class WorkflowCoordinator extends DurableObject {
     let token_id: string | undefined;
 
     try {
-      this.logger.info({
-        event_type: 'coordinator_start_called',
-        message: 'Coordinator.start() called',
-        trace_id: workflow_run_id,
-        highlight: 'cyan',
-        metadata: {
-          workflow_run_id,
-          input,
-          durable_object_id: this.ctx.id.toString(),
-        },
-      });
-
       // Fetch workflow run metadata and definition
       using workflowRuns = this.env.RESOURCES.workflowRuns();
       const workflowRun = await workflowRuns.get(workflow_run_id);
-
-      this.logger.info({
-        event_type: 'workflow_run_fetched',
-        message: 'Workflow run metadata retrieved',
-        trace_id: workflow_run_id,
-        metadata: {
-          workflow_run_id: workflowRun.workflow_run.id,
-          workflow_def_id: workflowRun.workflow_run.workflow_def_id,
-          workflow_version: workflowRun.workflow_run.workflow_version,
-          workspace_id: workflowRun.workflow_run.workspace_id,
-          project_id: workflowRun.workflow_run.project_id,
-          parent_run_id: workflowRun.workflow_run.parent_run_id,
-        },
-      });
 
       using workflowDefs = this.env.RESOURCES.workflowDefs();
       const workflowDef = await workflowDefs.get(
         workflowRun.workflow_run.workflow_def_id,
         workflowRun.workflow_run.workflow_version,
       );
-
-      this.logger.info({
-        event_type: 'workflow_def_fetched',
-        message: 'Workflow definition retrieved',
-        trace_id: workflow_run_id,
-        metadata: {
-          workflow_def_id: workflowDef.workflow_def.id,
-          workflow_def_name: workflowDef.workflow_def.name,
-          workflow_version: workflowDef.workflow_def.version,
-          initial_node_id: workflowDef.workflow_def.initial_node_id,
-          has_context_schema: !!workflowDef.workflow_def.context_schema,
-        },
-      });
 
       // Build event context for workflow events
       const eventContext: EventContext = {
@@ -240,25 +175,8 @@ export class WorkflowCoordinator extends DurableObject {
       tokens.initializeTokensTable(this.ctx.storage.sql);
       artifacts.initializeArtifactsTable(this.ctx.storage.sql);
 
-      this.logger.info({
-        event_type: 'storage_initialized',
-        message: 'Storage tables created successfully',
-        trace_id: workflow_run_id,
-        metadata: { workflow_run_id },
-      });
-
       // Initialize context with workflow input
       context.initializeContextWithInput(this.ctx.storage.sql, input);
-
-      this.logger.info({
-        event_type: 'context_initialized',
-        message: 'Context initialized with workflow input',
-        trace_id: workflow_run_id,
-        metadata: {
-          workflow_run_id,
-          input_keys: Object.keys(input),
-        },
-      });
 
       // Create initial token
       if (!workflowDef.workflow_def.initial_node_id) {
@@ -275,28 +193,8 @@ export class WorkflowCoordinator extends DurableObject {
         branch_total: 1,
       });
 
-      this.logger.info({
-        event_type: 'initial_token_created',
-        message: 'Initial token created and inserted',
-        trace_id: workflow_run_id,
-        metadata: {
-          token_id,
-          workflow_run_id,
-          node_id: workflowDef.workflow_def.initial_node_id,
-          status: 'pending',
-          path_id: 'root',
-        },
-      });
-
       // Dispatch the initial token
       await this.dispatchToken(token_id);
-
-      this.logger.info({
-        event_type: 'coordinator_start_completed',
-        message: 'Coordinator.start() completed',
-        trace_id: workflow_run_id,
-        metadata: { workflow_run_id },
-      });
     } catch (error) {
       this.logger.error({
         event_type: 'coordinator_start_failed',
@@ -328,16 +226,6 @@ export class WorkflowCoordinator extends DurableObject {
       if (token_id) {
         try {
           tokens.updateTokenStatus(this.ctx.storage.sql, token_id, 'failed');
-
-          this.logger.info({
-            event_type: 'token_failed',
-            message: 'Token status updated to failed',
-            trace_id: workflow_run_id,
-            metadata: {
-              token_id,
-              status: 'failed',
-            },
-          });
         } catch (updateError) {
           this.logger.error({
             event_type: 'token_update_failed',
@@ -359,10 +247,6 @@ export class WorkflowCoordinator extends DurableObject {
    * Handle alarms for scheduled tasks
    */
   async alarm(): Promise<void> {
-    this.logger.info({
-      event_type: 'alarm_triggered',
-      message: 'Durable Object alarm triggered',
-      metadata: { durable_object_id: this.ctx.id.toString() },
-    });
+    // Alarm triggered
   }
 }
