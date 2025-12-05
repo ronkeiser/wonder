@@ -57,6 +57,13 @@
       "when": 1764858330135,
       "tag": "0007_steady_lilith",
       "breakpoints": true
+    },
+    {
+      "idx": 8,
+      "version": "6",
+      "when": 1764900897365,
+      "tag": "0008_petite_iron_lad",
+      "breakpoints": true
     }
   ]
 }

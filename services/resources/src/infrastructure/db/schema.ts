@@ -93,9 +93,9 @@ export const workflow_defs = sqliteTable(
     description: text('description').notNull(),
     version: integer('version').notNull(),
 
-    // Owner foreign keys (nullable for drafts)
-    project_id: text('project_id').references(() => projects.id, { onDelete: 'cascade' }),
-    library_id: text('library_id'), // TODO: add reference when libraries table exists
+    // Owner as discriminated union
+    owner_type: text('owner_type', { enum: ['project', 'library'] }).notNull(),
+    owner_id: text('owner_id').notNull(),
 
     tags: text('tags', { mode: 'json' }).$type<string[]>(),
     input_schema: text('input_schema', { mode: 'json' }).$type<object>().notNull(),
@@ -110,12 +110,11 @@ export const workflow_defs = sqliteTable(
   },
   (table) => [
     primaryKey({ columns: [table.id, table.version] }),
-    index('idx_workflow_defs_project').on(table.project_id),
-    index('idx_workflow_defs_library').on(table.library_id),
+    index('idx_workflow_defs_owner').on(table.owner_type, table.owner_id),
     index('idx_workflow_defs_name_version').on(
       table.name,
-      table.project_id,
-      table.library_id,
+      table.owner_type,
+      table.owner_id,
       table.version,
     ),
   ],

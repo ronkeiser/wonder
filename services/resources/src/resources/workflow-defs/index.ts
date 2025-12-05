@@ -9,8 +9,11 @@ export class WorkflowDefs extends Resource {
   async create(data: {
     name: string;
     description: string;
-    project_id?: string;
-    library_id?: string;
+    owner: {
+      type: 'project' | 'library';
+      project_id?: string;
+      library_id?: string;
+    };
     tags?: string[];
     input_schema: object;
     output_schema: object;
@@ -105,15 +108,17 @@ export class WorkflowDefs extends Resource {
     // 4. Create workflow def (initial_node_id will be set after nodes created)
     let workflowDef;
     try {
+      const owner_id =
+        data.owner.type === 'project' ? data.owner.project_id! : data.owner.library_id!;
+
       workflowDef = await repo.createWorkflowDef(this.serviceCtx.db, {
         name: data.name,
         description: data.description,
-        project_id: data.project_id ?? null,
-        library_id: data.library_id ?? null,
+        owner_type: data.owner.type,
+        owner_id,
         tags: data.tags ?? null,
         input_schema: data.input_schema,
         output_schema: data.output_schema,
-        output_mapping: data.output_mapping ?? null,
         context_schema: data.context_schema ?? null,
         initial_node_id: null,
       });

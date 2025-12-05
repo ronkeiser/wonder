@@ -13,12 +13,11 @@ export async function createWorkflowDef(
   data: {
     name: string;
     description: string;
-    project_id?: string | null;
-    library_id?: string | null;
+    owner_type: 'project' | 'library';
+    owner_id: string;
     tags?: string[] | null;
     input_schema: object;
     output_schema: object;
-    output_mapping?: object | null;
     context_schema?: object | null;
     initial_node_id: string | null;
   },
@@ -30,12 +29,11 @@ export async function createWorkflowDef(
     version: 1,
     name: data.name,
     description: data.description,
-    project_id: data.project_id ?? null,
-    library_id: data.library_id ?? null,
+    owner_type: data.owner_type,
+    owner_id: data.owner_id,
     tags: data.tags ?? null,
     input_schema: data.input_schema,
     output_schema: data.output_schema,
-    output_mapping: data.output_mapping ?? null,
     context_schema: data.context_schema ?? null,
     initial_node_id: data.initial_node_id,
     created_at: now,
@@ -90,7 +88,7 @@ export async function listWorkflowDefsByProject(
   return await db
     .select()
     .from(workflow_defs)
-    .where(eq(workflow_defs.project_id, project_id))
+    .where(and(eq(workflow_defs.owner_type, 'project'), eq(workflow_defs.owner_id, project_id)))
     .all();
 }
 
@@ -101,7 +99,7 @@ export async function listWorkflowDefsByLibrary(
   return await db
     .select()
     .from(workflow_defs)
-    .where(eq(workflow_defs.library_id, library_id))
+    .where(and(eq(workflow_defs.owner_type, 'library'), eq(workflow_defs.owner_id, library_id)))
     .all();
 }
 
