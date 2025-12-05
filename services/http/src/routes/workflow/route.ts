@@ -43,7 +43,13 @@ workflows.openapi(startWorkflowRoute, async (c) => {
     return c.json({ error: `Failed to start workflow: ${errorMessage}` }, 500);
   }
 
-  return c.json(result);
+  return c.json(
+    {
+      workflow_run_id: result.workflow_run_id,
+      durable_object_id: result.durable_object_id,
+    },
+    200,
+  );
 });
 
 /** DELETE /{id} */

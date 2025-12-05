@@ -86,6 +86,14 @@ export const startWorkflowRoute = createRoute({
       },
       description: 'Workflow execution started successfully',
     },
+    500: {
+      content: {
+        'application/json': {
+          schema: z.object({ error: z.string() }).openapi('WorkflowStartError'),
+        },
+      },
+      description: 'Failed to start workflow',
+    },
   },
 });
 
