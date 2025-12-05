@@ -23,7 +23,7 @@ export interface BuildPayloadParams {
 
 /**
  * Build executor payload for a token
- * 
+ *
  * Fetches node, action, prompt spec, model profile from RESOURCES,
  * evaluates input_mapping, and renders template.
  */
@@ -78,7 +78,7 @@ export async function buildPayload(params: BuildPayloadParams): Promise<void> {
   switch (actionResult.action.kind) {
     case 'llm_call': {
       const implementation = actionResult.action.implementation as any;
-      
+
       // Fetch prompt spec
       using promptSpecs = env.RESOURCES.promptSpecs();
       const promptSpecResult = await promptSpecs.get(implementation.prompt_spec_id);

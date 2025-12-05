@@ -41,7 +41,10 @@ export interface CreateTokenParams {
  * TokenManager handles token lifecycle operations with logging
  */
 export class TokenManager {
-  constructor(private sql: SqlStorage, private logger: Logger) {}
+  constructor(
+    private sql: SqlStorage,
+    private logger: Logger,
+  ) {}
 
   /**
    * Initialize tokens table in SQLite storage
@@ -144,5 +147,62 @@ export class TokenManager {
       .toArray();
 
     return (rows[0]?.count as number) ?? 0;
+  }
+
+  /**
+   * Get all sibling tokens by fan_out_transition_id
+   */
+  getSiblingsByFanOutTransition(
+    workflow_run_id: string,
+    fan_out_transition_id: string,
+  ): TokenRow[] {
+    return this.sql
+      .exec<TokenRow>(
+        `SELECT id, workflow_run_id, node_id, status, path_id,
+         parent_token_id, fan_out_transition_id, branch_index, branch_total,
+         state_data, state_updated_at, created_at, updated_at
+         FROM tokens 
+         WHERE workflow_run_id = ? AND fan_out_transition_id = ?
+         ORDER BY branch_index`,
+        workflow_run_id,
+        fan_out_transition_id,
+      )
+      .toArray();
+  }
+
+  /**
+   * Get tokens by target node and parent fan_out_transition_id
+   * Used to detect if a fan-in token has already been created
+   */
+  getTokensByNodeAndFanOut(
+    workflow_run_id: string,
+    node_id: string,
+    parent_fan_out_transition_id: string,
+  ): TokenRow[] {
+    return this.sql
+      .exec<TokenRow>(
+        `SELECT id, workflow_run_id, node_id, status, path_id,
+         parent_token_id, fan_out_transition_id, branch_index, branch_total,
+         state_data, state_updated_at, created_at, updated_at
+         FROM tokens 
+         WHERE workflow_run_id = ? 
+         AND node_id = ?
+         AND parent_token_id IN (
+           SELECT id FROM tokens 
+           WHERE workflow_run_id = ? AND fan_out_transition_id = ?
+         )`,
+        workflow_run_id,
+        node_id,
+        workflow_run_id,
+        parent_fan_out_transition_id,
+      )
+      .toArray();
+  }
+
+  /**
+   * Delete a token by ID
+   */
+  deleteToken(token_id: string): void {
+    this.sql.exec(`DELETE FROM tokens WHERE id = ?`, token_id);
   }
 }

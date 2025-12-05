@@ -118,13 +118,13 @@ describe('Edge Test - Branching Architecture', () => {
             properties: {
               names: {
                 type: 'array',
-                items: { type: 'object' },
+                items: { type: 'string' },
               },
             },
             required: ['names'],
           },
           output_mapping: {
-            names: '$.ideation_node_output._branches',
+            names: '$.terminal_node_output.merged_names',
           },
           initial_node_ref: 'start_node',
           nodes: [
@@ -148,13 +148,39 @@ describe('Edge Test - Branching Architecture', () => {
                 name: '$.response.name',
               },
             },
+            {
+              ref: 'terminal_node',
+              name: 'Terminal',
+              action_id: actionId,
+              action_version: 1,
+              input_mapping: {},
+              output_mapping: {
+                name: '$.response.name',
+              },
+            },
           ],
           transitions: [
             {
+              ref: 'start_to_ideation',
               from_node_ref: 'start_node',
               to_node_ref: 'ideation_node',
               priority: 1,
               spawn_count: 3,
+            },
+            {
+              ref: 'ideation_to_terminal',
+              from_node_ref: 'ideation_node',
+              to_node_ref: 'terminal_node',
+              priority: 1,
+              synchronization: {
+                wait_for: 'all',
+                joins_transition: 'start_to_ideation',
+                merge: {
+                  source: '*.name',
+                  target: '$.terminal_node_output.merged_names',
+                  strategy: 'array',
+                },
+              },
             },
           ],
         },
@@ -203,16 +229,21 @@ describe('Edge Test - Branching Architecture', () => {
     console.log('✓ Workflow started:', startResponse!.workflow_run_id);
     console.log('');
     console.log('Expected behavior:');
-    console.log('  1. Initial token executes ideation_node (path_id=root)');
-    console.log('  2. Ideation node completes → transition with spawn_count=3 triggers');
-    console.log('  3. Three tokens spawned to ideation_node (self-loop):');
+    console.log('  1. Initial token executes start_node (path_id=root)');
+    console.log('  2. Start node completes → transition with spawn_count=3 triggers');
+    console.log('  3. Three tokens spawned to ideation_node:');
     console.log('     - path_id=root.ideation_node.0, branch_index=0, branch_total=3');
     console.log('     - path_id=root.ideation_node.1, branch_index=1, branch_total=3');
     console.log('     - path_id=root.ideation_node.2, branch_index=2, branch_total=3');
     console.log('  4. All share fan_out_transition_id (sibling group)');
-    console.log('  5. Each token completes at ideation_node (no more transitions)');
-    console.log('  6. When all 3 complete, activeCount=0, workflow finishes');
-    console.log('  7. Final output contains names array with 3 dog name suggestions');
+    console.log('  5. As each ideation token completes:');
+    console.log('     - Checks synchronization condition (wait_for=all)');
+    console.log('     - First two tokens enter waiting_for_siblings state');
+    console.log('     - Third token triggers merge: extracts *.name from branches');
+    console.log('     - Stores ["Name1", "Name2", "Name3"] at $.terminal_node_output.merged_names');
+    console.log('     - Creates single token for terminal_node');
+    console.log('  6. Terminal token completes, workflow finishes');
+    console.log('  7. Final output: {names: ["Name1", "Name2", "Name3"]}');
     console.log('');
     console.log('Check logs with:');
     console.log(

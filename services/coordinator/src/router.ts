@@ -28,8 +28,38 @@ export interface RouteParams {
 /**
  * Router handles workflow routing decisions
  */
+type SynchronizationConfig = {
+  wait_for: 'any' | 'all' | { m_of_n: number };
+  joins_transition: string;
+  merge?: {
+    source: string;
+    target: string;
+    strategy: 'append' | 'merge' | 'keyed' | 'last_wins';
+  };
+};
+
 export class Router {
   constructor(private logger: Logger) {}
+
+  /**
+   * Check if synchronization condition is met
+   */
+  private checkSynchronizationCondition(
+    finishedCount: number,
+    totalCount: number,
+    waitFor: 'any' | 'all' | { m_of_n: number },
+  ): boolean {
+    if (waitFor === 'any') {
+      return finishedCount > 0;
+    }
+    if (waitFor === 'all') {
+      return finishedCount === totalCount;
+    }
+    if (typeof waitFor === 'object' && 'm_of_n' in waitFor) {
+      return finishedCount >= waitFor.m_of_n;
+    }
+    return false;
+  }
 
   /**
    * Decide what happens after a token completes
@@ -110,6 +140,185 @@ export class Router {
         },
       });
 
+      // CHECK FOR SYNCHRONIZATION *BEFORE* CREATING TOKENS
+      if (transition.synchronization) {
+        const syncConfig = transition.synchronization as SynchronizationConfig;
+        const joinsTransitionRef = syncConfig.joins_transition;
+
+        // Resolve the joins_transition ref to an ID
+        const joinsTransition = workflowDef.transitions.find(
+          (t: any) => t.ref === joinsTransitionRef,
+        );
+        if (!joinsTransition) {
+          this.logger.error({
+            event_type: 'invalid_joins_transition',
+            message: `joins_transition ref not found: ${joinsTransitionRef}`,
+            trace_id: workflow_run_id,
+            metadata: {
+              joins_transition_ref: joinsTransitionRef,
+              transition_id: transition.id,
+            },
+          });
+          continue;
+        }
+
+        const joinsTransitionId = joinsTransition.id;
+
+        // Verify the COMPLETED token belongs to the sibling group being joined
+        if (tokenRow.fan_out_transition_id === joinsTransitionId) {
+          this.logger.info({
+            event_type: 'SYNC_CHECK_BEFORE_CREATE',
+            message: `Checking synchronization BEFORE creating token`,
+            trace_id: workflow_run_id,
+            metadata: {
+              completed_token_id,
+              joins_transition_id: joinsTransitionId,
+              to_node_id: transition.to_node_id,
+            },
+          });
+
+          // Check for existing fan-in tokens BEFORE creating
+          const existingFanInTokens = tokens.getTokensByNodeAndFanOut(
+            workflow_run_id,
+            transition.to_node_id,
+            joinsTransitionId,
+          );
+
+          this.logger.info({
+            event_type: 'SYNC_EXISTING_BEFORE_CREATE',
+            message: `Found existing fan-in tokens`,
+            trace_id: workflow_run_id,
+            metadata: {
+              completed_token_id,
+              existing_count: existingFanInTokens.length,
+              existing_tokens: existingFanInTokens.map((t) => ({
+                id: t.id,
+                status: t.status,
+              })),
+            },
+          });
+
+          // If any token already exists (waiting or active), skip creating new one
+          if (existingFanInTokens.length > 0) {
+            const activeTokens = existingFanInTokens.filter(
+              (t) => t.status !== 'waiting_for_siblings',
+            );
+
+            if (activeTokens.length > 0) {
+              this.logger.info({
+                event_type: 'SYNC_SKIP_ACTIVE_EXISTS',
+                message: `Skipping token creation - active token exists`,
+                trace_id: workflow_run_id,
+                metadata: {
+                  completed_token_id,
+                  existing_active_token: activeTokens[0].id,
+                },
+              });
+              continue;
+            }
+
+            // Check if condition is now met
+            const siblings = tokens.getSiblingsByFanOutTransition(
+              workflow_run_id,
+              joinsTransitionId,
+            );
+            const terminalStates = ['completed', 'failed', 'timed_out', 'cancelled'];
+            const finishedSiblings = siblings.filter((s) =>
+              terminalStates.includes(s.status as string),
+            );
+
+            const shouldProceed = this.checkSynchronizationCondition(
+              finishedSiblings.length,
+              siblings.length,
+              syncConfig.wait_for,
+            );
+
+            this.logger.info({
+              event_type: 'SYNC_CONDITION_CHECK',
+              message: `Condition check result`,
+              trace_id: workflow_run_id,
+              metadata: {
+                completed_token_id,
+                should_proceed: shouldProceed,
+                finished_count: finishedSiblings.length,
+                total_count: siblings.length,
+              },
+            });
+
+            if (shouldProceed) {
+              // Activate the waiting token
+              const waitingToken = existingFanInTokens[0];
+
+              this.logger.info({
+                event_type: 'fan_in_condition_met',
+                message: `Activating existing waiting token`,
+                trace_id: workflow_run_id,
+                metadata: {
+                  completed_token_id,
+                  activated_token_id: waitingToken.id,
+                  finished_count: finishedSiblings.length,
+                  total_count: siblings.length,
+                },
+              });
+
+              // Merge branch outputs if needed
+              if (syncConfig.merge) {
+                const mergeConfig = syncConfig.merge;
+                const nodeRefForMerge = node.ref;
+                const branchOutputs = context.getBranchOutputs(sql, nodeRefForMerge);
+
+                let mergedData: unknown;
+                if (mergeConfig.source === '*') {
+                  mergedData = branchOutputs;
+                } else if (mergeConfig.source.startsWith('*.')) {
+                  const fieldPath = mergeConfig.source.slice(2);
+                  mergedData = branchOutputs.map((output) => {
+                    const keys = fieldPath.split('.');
+                    let value: any = output;
+                    for (const key of keys) {
+                      value = value?.[key];
+                    }
+                    return value;
+                  });
+                } else {
+                  mergedData = branchOutputs;
+                }
+
+                const targetPath = mergeConfig.target.replace('$.', '');
+                context.setContextValue(sql, targetPath, mergedData);
+
+                this.logger.info({
+                  event_type: 'branches_merged',
+                  message: `Merged ${branchOutputs.length} branch outputs`,
+                  trace_id: workflow_run_id,
+                  metadata: {
+                    node_ref: nodeRefForMerge,
+                    target_path: targetPath,
+                    branch_count: branchOutputs.length,
+                    source_pattern: mergeConfig.source,
+                  },
+                });
+              }
+
+              // Activate and dispatch
+              tokens.updateTokenStatus(waitingToken.id as string, 'pending');
+              tokensToDispatch.push(waitingToken.id as string);
+            } else {
+              this.logger.info({
+                event_type: 'SYNC_SKIP_ALREADY_WAITING',
+                message: `Skipping token creation - already waiting`,
+                trace_id: workflow_run_id,
+                metadata: {
+                  completed_token_id,
+                  existing_waiting_token: existingFanInTokens[0].id,
+                },
+              });
+            }
+            continue;
+          }
+        }
+      }
+
       // Create spawn_count tokens for this transition
       for (let i = 0; i < spawnCount; i++) {
         // Build path_id: parent_path.nodeRef.branchIndex
@@ -158,7 +367,61 @@ export class Router {
           },
         });
 
-        tokensToDispatch.push(nextTokenId);
+        // Check if newly created token needs to wait (only for first token created)
+        if (transition.synchronization) {
+          const syncConfig = transition.synchronization as SynchronizationConfig;
+          const joinsTransitionRef = syncConfig.joins_transition;
+
+          const joinsTransition = workflowDef.transitions.find(
+            (t: any) => t.ref === joinsTransitionRef,
+          );
+          if (!joinsTransition) {
+            tokensToDispatch.push(nextTokenId);
+            continue;
+          }
+
+          const joinsTransitionId = joinsTransition.id;
+
+          // Only apply if completed token belongs to the sibling group
+          if (tokenRow.fan_out_transition_id === joinsTransitionId) {
+            const waitFor = syncConfig.wait_for;
+
+            if (waitFor === 'any') {
+              tokensToDispatch.push(nextTokenId);
+            } else {
+              // Check if condition is met for this newly created token
+              const siblings = tokens.getSiblingsByFanOutTransition(
+                workflow_run_id,
+                joinsTransitionId,
+              );
+              const terminalStates = ['completed', 'failed', 'timed_out', 'cancelled'];
+              const finishedSiblings = siblings.filter((s) =>
+                terminalStates.includes(s.status as string),
+              );
+
+              // This should never happen - we handled synchronization before creating token
+              // But just in case, mark as waiting
+              this.logger.warn({
+                event_type: 'SYNC_UNEXPECTED_PATH',
+                message: `Unexpected: token created when sync should have been handled before`,
+                trace_id: workflow_run_id,
+                metadata: {
+                  new_token_id: nextTokenId,
+                  finished_count: finishedSiblings.length,
+                  total_count: siblings.length,
+                },
+              });
+
+              tokens.updateTokenStatus(nextTokenId, 'waiting_for_siblings');
+            }
+          } else {
+            // Token doesn't belong to this sibling group - pass through
+            tokensToDispatch.push(nextTokenId);
+          }
+        } else {
+          // No synchronization - dispatch immediately
+          tokensToDispatch.push(nextTokenId);
+        }
       }
     }
 
