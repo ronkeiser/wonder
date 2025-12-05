@@ -5,7 +5,7 @@ import * as artifacts from './artifacts';
 import * as context from './context';
 import * as mapping from './mapping';
 import { Router } from './router';
-import * as tasks from './tasks';
+import { TaskManager } from './tasks';
 import { TokenManager } from './tokens';
 
 /**
@@ -19,6 +19,7 @@ export class WorkflowCoordinator extends DurableObject {
   private emitter: Emitter;
   private tokens: TokenManager;
   private router: Router;
+  private tasks: TaskManager;
 
   constructor(ctx: DurableObjectState, env: Env) {
     super(ctx, env);
@@ -29,6 +30,7 @@ export class WorkflowCoordinator extends DurableObject {
     this.emitter = createEmitter(this.ctx, this.env.EVENTS);
     this.tokens = new TokenManager(this.ctx.storage.sql, this.logger);
     this.router = new Router(this.logger);
+    this.tasks = new TaskManager(this.logger);
   }
 
   /**
@@ -42,13 +44,12 @@ export class WorkflowCoordinator extends DurableObject {
     this.tokens.updateTokenStatus(token_id, 'executing');
 
     // Delegate to tasks service to build and dispatch payload
-    await tasks.buildPayload({
+    await this.tasks.buildPayload({
       token_id,
       node_id: tokenRow.node_id as string,
       workflow_run_id,
       sql: this.ctx.storage.sql,
       env: this.env,
-      logger: this.logger,
       emitter: this.emitter,
     });
   }
