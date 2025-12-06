@@ -1,6 +1,6 @@
 import { describe, expect, test } from 'vitest';
 import type { Position, SourceLocation } from '../../src/lexer/token';
-import type { Node } from '../../src/parser/ast-nodes';
+import type { Node, Program, Statement } from '../../src/parser/ast-nodes';
 
 describe('AST Base Node Types', () => {
   describe('Node interface', () => {
@@ -167,6 +167,121 @@ describe('AST Base Node Types', () => {
 
       expect(withLoc.loc).not.toBeNull();
       expect(withoutLoc.loc).toBeNull();
+    });
+  });
+
+  describe('Program node', () => {
+    test('has type "Program"', () => {
+      const program: Program = {
+        type: 'Program',
+        body: [],
+        loc: null,
+      };
+
+      expect(program.type).toBe('Program');
+    });
+
+    test('has body array', () => {
+      const program: Program = {
+        type: 'Program',
+        body: [],
+        loc: null,
+      };
+
+      expect(program.body).toEqual([]);
+      expect(Array.isArray(program.body)).toBe(true);
+    });
+
+    test('can have empty body', () => {
+      const program: Program = {
+        type: 'Program',
+        body: [],
+        loc: null,
+      };
+
+      expect(program.body).toHaveLength(0);
+    });
+
+    test('can have statements in body', () => {
+      const statements: Statement[] = [
+        { type: 'ContentStatement', loc: null },
+        { type: 'MustacheStatement', loc: null },
+      ];
+
+      const program: Program = {
+        type: 'Program',
+        body: statements,
+        loc: null,
+      };
+
+      expect(program.body).toHaveLength(2);
+      expect(program.body[0].type).toBe('ContentStatement');
+      expect(program.body[1].type).toBe('MustacheStatement');
+    });
+
+    test('can have multiple statements in body', () => {
+      const program: Program = {
+        type: 'Program',
+        body: [
+          { type: 'ContentStatement', loc: null },
+          { type: 'MustacheStatement', loc: null },
+          { type: 'BlockStatement', loc: null },
+          { type: 'CommentStatement', loc: null },
+        ],
+        loc: null,
+      };
+
+      expect(program.body).toHaveLength(4);
+    });
+
+    test('can have location information', () => {
+      const program: Program = {
+        type: 'Program',
+        body: [],
+        loc: {
+          start: { line: 1, column: 0, index: 0 },
+          end: { line: 5, column: 10, index: 100 },
+        },
+      };
+
+      expect(program.loc?.start.line).toBe(1);
+      expect(program.loc?.end.line).toBe(5);
+      expect(program.loc?.end.index).toBe(100);
+    });
+
+    test('extends Node interface', () => {
+      const program: Program = {
+        type: 'Program',
+        body: [],
+        loc: null,
+      };
+
+      // Program is assignable to Node
+      const node: Node = program;
+
+      expect(node.type).toBe('Program');
+    });
+
+    test('matches specification structure', () => {
+      const program: Program = {
+        type: 'Program',
+        body: [
+          { type: 'ContentStatement', loc: null },
+          { type: 'MustacheStatement', loc: null },
+        ],
+        loc: {
+          start: { line: 1, column: 0, index: 0 },
+          end: { line: 1, column: 20, index: 20 },
+        },
+      };
+
+      expect(program).toMatchObject({
+        type: 'Program',
+        body: expect.any(Array),
+        loc: expect.any(Object),
+      });
+
+      expect(program.body).toHaveLength(2);
     });
   });
 });
