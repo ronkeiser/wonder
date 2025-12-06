@@ -293,7 +293,7 @@
 
 ### Task C2-F4-T1: Parse Simple Paths
 
-**Status:** `[ ]` Not Started
+**Status:** `[x]` Complete
 
 - Recognize ID token as start of path
 - Parse sequence: ID (SEP ID)\*

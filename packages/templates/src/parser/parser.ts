@@ -241,4 +241,50 @@ export class Parser {
     this.advance(); // Move past COMMENT token
     return this.finishNode(node);
   }
+
+  /**
+   * Parse a path expression (variable path)
+   * Handles simple paths like: foo, foo.bar, foo.bar.baz
+   *
+   * This is the foundation for all path parsing. Currently handles only simple
+   * paths without parent references (..), data variables (@), or special prefixes (this, .).
+   *
+   * @returns PathExpression node
+   * @throws {ParserError} If path is invalid or malformed
+   */
+  parsePathExpression(): import('./ast-nodes').PathExpression {
+    this.startNode();
+
+    // Expect at least one identifier to start the path
+    const firstToken = this.expect(TokenType.ID, 'Expected identifier to start path expression');
+
+    const parts: string[] = [firstToken.value];
+    let original = firstToken.value;
+
+    this.advance(); // Move past first ID
+
+    // Parse additional path segments (dot/slash notation)
+    while (this.currentToken && this.match(TokenType.SEP)) {
+      this.advance(); // Move past SEP token
+
+      // After a separator, we must have another identifier
+      const segmentToken = this.expect(TokenType.ID, 'Expected identifier after path separator');
+
+      parts.push(segmentToken.value);
+      original += '.' + segmentToken.value; // Normalize to dot notation
+
+      this.advance(); // Move past ID token
+    }
+
+    const node: import('./ast-nodes').PathExpression = {
+      type: 'PathExpression',
+      data: false, // Simple paths are not data variables
+      depth: 0, // Simple paths are at current depth
+      parts: parts,
+      original: original,
+      loc: null,
+    };
+
+    return this.finishNode(node);
+  }
 }
