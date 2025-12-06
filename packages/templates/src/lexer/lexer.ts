@@ -7,6 +7,14 @@ import { TokenType } from './token-types';
  * Transforms template strings into token streams without using eval() or new Function()
  */
 export class Lexer {
+  // Keyword definitions for efficient scanning
+  private static readonly KEYWORDS = [
+    { word: 'true', type: TokenType.BOOLEAN, length: 4 },
+    { word: 'false', type: TokenType.BOOLEAN, length: 5 },
+    { word: 'null', type: TokenType.NULL, length: 4 },
+    { word: 'undefined', type: TokenType.UNDEFINED, length: 9 },
+  ] as const;
+
   private input: string = '';
   private index: number = 0;
   private line: number = 1;
@@ -123,18 +131,10 @@ export class Lexer {
 
       // Check for boolean, null, undefined literals (keywords)
       if (this.isAlpha(char)) {
-        // Peek ahead to see if it's a keyword
-        if (this.match('true') && !this.isAlphaNumeric(this.peekAt(4))) {
-          return this.scanKeyword(TokenType.BOOLEAN, 'true');
-        }
-        if (this.match('false') && !this.isAlphaNumeric(this.peekAt(5))) {
-          return this.scanKeyword(TokenType.BOOLEAN, 'false');
-        }
-        if (this.match('null') && !this.isAlphaNumeric(this.peekAt(4))) {
-          return this.scanKeyword(TokenType.NULL, 'null');
-        }
-        if (this.match('undefined') && !this.isAlphaNumeric(this.peekAt(9))) {
-          return this.scanKeyword(TokenType.UNDEFINED, 'undefined');
+        // Check if it's a keyword
+        const keyword = this.tryMatchKeyword();
+        if (keyword) {
+          return keyword;
         }
 
         // If not a keyword, scan as identifier
@@ -192,32 +192,43 @@ export class Lexer {
       return this.scanSeparator();
     }
 
-    const nextChar = this.peekAt(1);
-    const charAfterNext = this.peekAt(2);
-
-    // After OPEN, SEP, or other tokens (not ID), check if it's a special identifier
-    // IMPORTANT: Check for .. before checking for single .
-    // If nextChar is also a dot AND the character after is not alphanumeric, it's ..
-    if (nextChar === '.' && !this.isAlphaNumeric(charAfterNext)) {
+    // Check for .. (parent path reference)
+    if (this.isDoubleDot()) {
       return this.scanSpecialIdentifier('..');
     }
 
-    // Check if it's single . as standalone identifier
-    // Treat as identifier when:
-    // - followed by / (./foo pattern)
-    // - followed by }} (just . before closing)
-    // - followed by whitespace (standalone . before }}))
-    if (
-      nextChar === '/' ||
-      (nextChar === '}' && charAfterNext === '}') ||
-      nextChar === ' ' ||
-      nextChar === '\t'
-    ) {
+    // Check for . as standalone identifier
+    if (this.isSingleDotIdentifier()) {
       return this.scanSpecialIdentifier('.');
     }
 
     // Otherwise it's a separator (like in foo . bar where bar follows)
     return this.scanSeparator();
+  }
+
+  /**
+   * Check if current position has .. as a special identifier
+   */
+  private isDoubleDot(): boolean {
+    const nextChar = this.peekAt(1);
+    const charAfterNext = this.peekAt(2);
+    return nextChar === '.' && !this.isAlphaNumeric(charAfterNext);
+  }
+
+  /**
+   * Check if current dot should be treated as a standalone identifier
+   * Treats as identifier when followed by: / (./foo), }} (closing), or whitespace
+   */
+  private isSingleDotIdentifier(): boolean {
+    const nextChar = this.peekAt(1);
+    const charAfterNext = this.peekAt(2);
+
+    return (
+      nextChar === '/' ||
+      (nextChar === '}' && charAfterNext === '}') ||
+      nextChar === ' ' ||
+      nextChar === '\t'
+    );
   }
 
   /**
@@ -511,6 +522,19 @@ export class Lexer {
         end,
       },
     };
+  }
+
+  /**
+   * Try to match a keyword at the current position
+   * Returns the keyword token if matched, null otherwise
+   */
+  private tryMatchKeyword(): Token | null {
+    for (const { word, type, length } of Lexer.KEYWORDS) {
+      if (this.match(word) && !this.isAlphaNumeric(this.peekAt(length))) {
+        return this.scanKeyword(type, word);
+      }
+    }
+    return null;
   }
 
   /**

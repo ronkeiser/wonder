@@ -21,7 +21,7 @@ export interface SourceLocation {
 export interface Token {
   type: TokenType; // The token type
   value: string; // The lexeme (raw text)
-  loc: SourceLocation | null; // Position info (line, column, index)
+  loc: SourceLocation; // Position info (line, column, index)
 }
 
 import type { TokenType } from './token-types';
