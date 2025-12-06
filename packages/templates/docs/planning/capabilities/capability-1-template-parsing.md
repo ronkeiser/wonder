@@ -202,6 +202,8 @@
 
 ### Task C1-F1-T9: Implement Identifier Tokenization
 
+**Status:** `[ ]` Not Started
+
 - Recognize identifiers: start with letter, `_`, or `$`, followed by letters, digits, `_`, `$`
 - Create ID token with identifier name
 - Handle keywords: `if`, `unless`, `each`, `with`, `else` (context-dependent)
@@ -225,6 +227,8 @@
 
 ### Task C1-F2-T1: Implement Separator Tokenization
 
+**Status:** `[ ]` Not Started
+
 - Recognize `.` → SEP token
 - Recognize `/` → SEP token (equivalent to dot)
 - Only tokenize when inside mustache context
@@ -239,6 +243,8 @@
 
 ### Task C1-F2-T2: Implement Data Prefix Tokenization
 
+**Status:** `[ ]` Not Started
+
 - Recognize `@` → DATA token
 - Only valid at start of path inside mustache
 - Position tracking
@@ -251,6 +257,8 @@
 - `@` followed by identifier: `@index` → DATA, ID("index")
 
 ### Task C1-F2-T3: Test Path Sequences
+
+**Status:** `[ ]` Not Started
 
 - Verify sequences tokenize correctly:
   - `foo.bar.baz` → ID("foo"), SEP, ID("bar"), SEP, ID("baz")
@@ -278,6 +286,8 @@
 
 ### Task C1-F3-T1: Implement Escape Pre-processing
 
+**Status:** `[ ]` Not Started
+
 - Before tokenization, scan for `\\` sequences
 - `\\` followed by any character → remove backslash, mark character as escaped
 - Track which characters are escaped
@@ -293,6 +303,8 @@
 - Multiple escapes: `\\{{foo}} \\{{bar}}`
 
 ### Task C1-F3-T2: Handle Edge Cases
+
+**Status:** `[ ]` Not Started
 
 - Backslash at end of input: `text\\` → CONTENT("text\\")
 - Backslash before non-special char: `\\a` → CONTENT("a")
@@ -314,6 +326,8 @@
 
 ### Task C1-F4-T1: Implement Full Lexer State Management
 
+**Status:** `[ ]` Not Started
+
 - Track lexer state: `STATE_CONTENT` vs `STATE_MUSTACHE`
 - In `STATE_CONTENT`: scan for plain text and `{{`
 - In `STATE_MUSTACHE`: tokenize identifiers, literals, separators, etc.
@@ -329,6 +343,8 @@
 - EOF token generated at end
 
 ### Task C1-F4-T2: Implement Position Tracking
+
+**Status:** `[ ]` Not Started
 
 - Track line, column, and character index
 - Update on each character consumed
@@ -347,6 +363,8 @@
 - Token locations accurate
 
 ### Task C1-F4-T3: Implement Error Handling
+
+**Status:** `[ ]` Not Started
 
 - Create `LexerError` class extending `Error`
 - Include position information in errors
@@ -368,6 +386,8 @@
 
 ### Task C1-F4-T4: Implement Lexer Public Interface
 
+**Status:** `[ ]` Not Started
+
 - `tokenize(template: string): Token[]` — Convenience method that calls setInput, then lex() until EOF
 - Returns array of all tokens
 - Excludes EOF token from returned array (internal use)
@@ -382,6 +402,8 @@
 - Template with only content returns single CONTENT token
 
 ### Task C1-F4-T5: Integration Testing
+
+**Status:** `[ ]` Not Started
 
 - Test complex real-world templates
 - Verify token sequences match expectations
