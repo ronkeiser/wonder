@@ -244,10 +244,11 @@ export class Parser {
 
   /**
    * Parse a path expression (variable path)
-   * Handles simple paths like: foo, foo.bar, foo.bar.baz
-   *
-   * This is the foundation for all path parsing. Currently handles only simple
-   * paths without parent references (..), data variables (@), or special prefixes (this, .).
+   * Handles simple paths, parent references, data variables, and special paths:
+   * - Simple: foo, foo.bar, foo.bar.baz
+   * - Parent: ../parent, ../../grandparent, ../foo.bar
+   * - Data: @index, @root.user (handled in future task)
+   * - Special: this, this.foo, ./foo (handled in future task)
    *
    * @returns PathExpression node
    * @throws {ParserError} If path is invalid or malformed
@@ -255,31 +256,72 @@ export class Parser {
   parsePathExpression(): import('./ast-nodes').PathExpression {
     this.startNode();
 
+    let depth = 0;
+    let parts: string[] = [];
+    let original = '';
+
     // Expect at least one identifier to start the path
     const firstToken = this.expect(TokenType.ID, 'Expected identifier to start path expression');
 
-    const parts: string[] = [firstToken.value];
-    let original = firstToken.value;
+    // Check for parent references (..)
+    if (firstToken.value === '..') {
+      // Count consecutive .. segments to calculate depth
+      while (this.currentToken && this.match(TokenType.ID) && this.currentToken.value === '..') {
+        depth++;
+        original += this.currentToken.value; // Add ".."
+        this.advance(); // Move past ..
 
-    this.advance(); // Move past first ID
+        // Check for separator after ..
+        if (this.currentToken && this.match(TokenType.SEP)) {
+          original += '/'; // Use slash as that's what lexer uses between .. segments
+          this.advance(); // Move past SEP
+        }
+      }
 
-    // Parse additional path segments (dot/slash notation)
-    while (this.currentToken && this.match(TokenType.SEP)) {
-      this.advance(); // Move past SEP token
+      // Parse remaining path segments after .. (if any)
+      if (this.currentToken && this.match(TokenType.ID)) {
+        parts.push(this.currentToken.value);
+        original += this.currentToken.value;
+        this.advance();
 
-      // After a separator, we must have another identifier
-      const segmentToken = this.expect(TokenType.ID, 'Expected identifier after path separator');
+        // Parse additional segments
+        while (this.currentToken && this.match(TokenType.SEP)) {
+          this.advance(); // Move past SEP
 
-      parts.push(segmentToken.value);
-      original += '.' + segmentToken.value; // Normalize to dot notation
+          const segmentToken = this.expect(
+            TokenType.ID,
+            'Expected identifier after path separator',
+          );
 
-      this.advance(); // Move past ID token
+          parts.push(segmentToken.value);
+          original += '.' + segmentToken.value;
+          this.advance();
+        }
+      }
+    } else {
+      // Simple path (no parent reference)
+      parts.push(firstToken.value);
+      original = firstToken.value;
+      this.advance(); // Move past first ID
+
+      // Parse additional path segments (dot/slash notation)
+      while (this.currentToken && this.match(TokenType.SEP)) {
+        this.advance(); // Move past SEP token
+
+        // After a separator, we must have another identifier
+        const segmentToken = this.expect(TokenType.ID, 'Expected identifier after path separator');
+
+        parts.push(segmentToken.value);
+        original += '.' + segmentToken.value; // Normalize to dot notation
+
+        this.advance(); // Move past ID token
+      }
     }
 
     const node: import('./ast-nodes').PathExpression = {
       type: 'PathExpression',
-      data: false, // Simple paths are not data variables
-      depth: 0, // Simple paths are at current depth
+      data: false, // Simple and parent paths are not data variables
+      depth: depth,
       parts: parts,
       original: original,
       loc: null,

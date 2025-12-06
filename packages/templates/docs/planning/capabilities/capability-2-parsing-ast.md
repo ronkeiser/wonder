@@ -318,7 +318,7 @@
 
 ### Task C2-F4-T2: Parse Parent Paths
 
-**Status:** `[ ]` Not Started
+**Status:** `[x]` Complete
 
 - Recognize `..` as ID token indicating parent reference
 - Count consecutive `..` segments to determine depth

@@ -182,4 +182,107 @@ describe('Parser - Simple PathExpression', () => {
       expect(parser.getCurrentToken()).not.toBeNull(); // Should be at CLOSE
     });
   });
+
+  describe('parsePathExpression() - Parent paths', () => {
+    it('should parse single parent reference with property', () => {
+      const path = parsePathFromString('../parent');
+
+      expect(path.type).toBe('PathExpression');
+      expect(path.depth).toBe(1);
+      expect(path.parts).toEqual(['parent']);
+      expect(path.original).toBe('../parent');
+      expect(path.data).toBe(false);
+      expect(path.loc).not.toBeNull();
+    });
+
+    it('should parse double parent reference', () => {
+      const path = parsePathFromString('../../grandparent');
+
+      expect(path.depth).toBe(2);
+      expect(path.parts).toEqual(['grandparent']);
+      expect(path.original).toBe('../../grandparent');
+      expect(path.data).toBe(false);
+    });
+
+    it('should parse triple parent reference', () => {
+      const path = parsePathFromString('../../../great');
+
+      expect(path.depth).toBe(3);
+      expect(path.parts).toEqual(['great']);
+      expect(path.original).toBe('../../../great');
+      expect(path.data).toBe(false);
+    });
+
+    it('should parse parent with nested path', () => {
+      const path = parsePathFromString('../foo.bar');
+
+      expect(path.depth).toBe(1);
+      expect(path.parts).toEqual(['foo', 'bar']);
+      expect(path.original).toBe('../foo.bar');
+      expect(path.data).toBe(false);
+    });
+
+    it('should parse parent with three-level nested path', () => {
+      const path = parsePathFromString('../a.b.c');
+
+      expect(path.depth).toBe(1);
+      expect(path.parts).toEqual(['a', 'b', 'c']);
+      expect(path.original).toBe('../a.b.c');
+      expect(path.data).toBe(false);
+    });
+
+    it('should parse double parent with nested path', () => {
+      const path = parsePathFromString('../../user.name');
+
+      expect(path.depth).toBe(2);
+      expect(path.parts).toEqual(['user', 'name']);
+      expect(path.original).toBe('../../user.name');
+      expect(path.data).toBe(false);
+    });
+
+    it('should parse standalone parent reference', () => {
+      const path = parsePathFromString('..');
+
+      expect(path.depth).toBe(1);
+      expect(path.parts).toEqual([]);
+      expect(path.original).toBe('..');
+      expect(path.data).toBe(false);
+    });
+
+    it('should parse double standalone parent reference', () => {
+      const path = parsePathFromString('../..');
+
+      expect(path.depth).toBe(2);
+      expect(path.parts).toEqual([]);
+      expect(path.original).toBe('../..');
+      expect(path.data).toBe(false);
+    });
+
+    it('should parse triple standalone parent reference', () => {
+      const path = parsePathFromString('../../..');
+
+      expect(path.depth).toBe(3);
+      expect(path.parts).toEqual([]);
+      expect(path.original).toBe('../../..');
+      expect(path.data).toBe(false);
+    });
+
+    it('should handle parent paths with slash notation', () => {
+      const path = parsePathFromString('../foo/bar');
+
+      expect(path.depth).toBe(1);
+      expect(path.parts).toEqual(['foo', 'bar']);
+      expect(path.original).toBe('../foo.bar'); // Normalized to dots
+      expect(path.data).toBe(false);
+    });
+
+    it('should set correct location information for parent paths', () => {
+      const path = parsePathFromString('../foo.bar');
+
+      expect(path.loc).not.toBeNull();
+      expect(path.loc?.start).toBeDefined();
+      expect(path.loc?.end).toBeDefined();
+      expect(path.loc?.start.line).toBe(1);
+    });
+  });
 });
