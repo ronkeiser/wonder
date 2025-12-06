@@ -1,6 +1,6 @@
 import { describe, expect, test } from 'vitest';
-import { Lexer } from './lexer';
-import { LexerError } from './lexer-error';
+import { Lexer } from '../../src/lexer/lexer';
+import { LexerError } from '../../src/lexer/lexer-error';
 
 describe('Lexer Error Handling', () => {
   describe('Unclosed Comments', () => {
