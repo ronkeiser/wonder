@@ -12,7 +12,7 @@
 
 ### Task C3-F1-T1: Implement Basic Property Lookup
 
-**Status:** `[ ]` Not Started
+**Status:** `[x]` Complete ✅
 
 - Create `lookupProperty()` function with signature:
   - `lookupProperty(parent: any, propertyName: string): any`
@@ -30,13 +30,29 @@
 
 **Tests:**
 
-- Access existing own property returns value
-- Access undefined property returns `undefined`
-- Access null parent returns `undefined`
-- Access undefined parent returns `undefined`
-- Access inherited property returns `undefined` (security)
-- Access own property with `null` value returns `null`
-- Access own property with `undefined` value returns `undefined`
+- Access existing own property returns value ✅
+- Access undefined property returns `undefined` ✅
+- Access null parent returns `undefined` ✅
+- Access undefined parent returns `undefined` ✅
+- Access inherited property returns `undefined` (security) ✅
+- Access own property with `null` value returns `null` ✅
+- Access own property with `undefined` value returns `undefined` ✅
+- Blocks access to `__proto__`, `constructor`, `prototype` ✅
+- Blocks all inherited properties (toString, hasOwnProperty, etc.) ✅
+- Works with arrays and array indices ✅
+- Works with numeric string keys ✅
+- Returns undefined for primitive parents (string, number, boolean) ✅
+- Works with functions ✅
+- Works with objects with null prototype ✅
+- Handles deeply nested properties ✅
+- Handles property shadowing ✅
+- Distinguishes between missing and undefined properties ✅
+
+**Total Tests:** 28 tests (all passing)
+
+**Implementation:** `src/runtime/utils.ts` - `lookupProperty()` with security-critical own-property checking
+
+**Test File:** `test/runtime/utils.test.ts`
 
 ### Task C3-F1-T2: Handle Edge Cases
 
