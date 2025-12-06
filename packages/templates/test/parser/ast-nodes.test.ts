@@ -1,6 +1,15 @@
 import { describe, expect, test } from 'vitest';
 import type { Position, SourceLocation } from '../../src/lexer/token';
-import type { Node, Program, Statement } from '../../src/parser/ast-nodes';
+import type {
+  BlockStatement,
+  CommentStatement,
+  ContentStatement,
+  MustacheStatement,
+  Node,
+  Program,
+  Statement,
+  StripFlags,
+} from '../../src/parser/ast-nodes';
 
 describe('AST Base Node Types', () => {
   describe('Node interface', () => {
@@ -116,15 +125,15 @@ describe('AST Base Node Types', () => {
 
     test('can create multiple nodes with different types', () => {
       const nodes: Node[] = [
-        { type: 'ContentStatement', loc: null },
-        { type: 'MustacheStatement', loc: null },
-        { type: 'BlockStatement', loc: null },
+        { type: 'TestNodeA', loc: null },
+        { type: 'TestNodeB', loc: null },
+        { type: 'TestNodeC', loc: null },
       ];
 
       expect(nodes).toHaveLength(3);
-      expect(nodes[0].type).toBe('ContentStatement');
-      expect(nodes[1].type).toBe('MustacheStatement');
-      expect(nodes[2].type).toBe('BlockStatement');
+      expect(nodes[0].type).toBe('TestNodeA');
+      expect(nodes[1].type).toBe('TestNodeB');
+      expect(nodes[2].type).toBe('TestNodeC');
     });
   });
 
@@ -204,8 +213,15 @@ describe('AST Base Node Types', () => {
 
     test('can have statements in body', () => {
       const statements: Statement[] = [
-        { type: 'ContentStatement', loc: null },
-        { type: 'MustacheStatement', loc: null },
+        { type: 'ContentStatement', value: 'text', original: 'text', loc: null },
+        {
+          type: 'MustacheStatement',
+          path: { type: 'PathExpression', loc: null } as any,
+          params: [],
+          hash: { type: 'Hash', loc: null } as any,
+          escaped: true,
+          loc: null,
+        },
       ];
 
       const program: Program = {
@@ -223,10 +239,28 @@ describe('AST Base Node Types', () => {
       const program: Program = {
         type: 'Program',
         body: [
-          { type: 'ContentStatement', loc: null },
-          { type: 'MustacheStatement', loc: null },
-          { type: 'BlockStatement', loc: null },
-          { type: 'CommentStatement', loc: null },
+          { type: 'ContentStatement', value: 'text', original: 'text', loc: null },
+          {
+            type: 'MustacheStatement',
+            path: { type: 'PathExpression', loc: null } as any,
+            params: [],
+            hash: { type: 'Hash', loc: null } as any,
+            escaped: true,
+            loc: null,
+          },
+          {
+            type: 'BlockStatement',
+            path: { type: 'PathExpression', loc: null } as any,
+            params: [],
+            hash: { type: 'Hash', loc: null } as any,
+            program: null,
+            inverse: null,
+            openStrip: { open: false, close: false },
+            inverseStrip: { open: false, close: false },
+            closeStrip: { open: false, close: false },
+            loc: null,
+          },
+          { type: 'CommentStatement', value: 'comment', loc: null },
         ],
         loc: null,
       };
@@ -266,8 +300,15 @@ describe('AST Base Node Types', () => {
       const program: Program = {
         type: 'Program',
         body: [
-          { type: 'ContentStatement', loc: null },
-          { type: 'MustacheStatement', loc: null },
+          { type: 'ContentStatement', value: 'text', original: 'text', loc: null },
+          {
+            type: 'MustacheStatement',
+            path: { type: 'PathExpression', loc: null } as any,
+            params: [],
+            hash: { type: 'Hash', loc: null } as any,
+            escaped: true,
+            loc: null,
+          },
         ],
         loc: {
           start: { line: 1, column: 0, index: 0 },
@@ -282,6 +323,391 @@ describe('AST Base Node Types', () => {
       });
 
       expect(program.body).toHaveLength(2);
+    });
+  });
+
+  describe('ContentStatement', () => {
+    test('has type "ContentStatement"', () => {
+      const stmt: ContentStatement = {
+        type: 'ContentStatement',
+        value: 'Hello World',
+        original: 'Hello World',
+        loc: null,
+      };
+
+      expect(stmt.type).toBe('ContentStatement');
+    });
+
+    test('has value field for raw text', () => {
+      const stmt: ContentStatement = {
+        type: 'ContentStatement',
+        value: 'Hello World',
+        original: 'Hello World',
+        loc: null,
+      };
+
+      expect(stmt.value).toBe('Hello World');
+    });
+
+    test('has original field', () => {
+      const stmt: ContentStatement = {
+        type: 'ContentStatement',
+        value: '{{escaped}}',
+        original: '\\{{escaped}}',
+        loc: null,
+      };
+
+      expect(stmt.original).toBe('\\{{escaped}}');
+    });
+
+    test('is a Statement', () => {
+      const stmt: ContentStatement = {
+        type: 'ContentStatement',
+        value: 'text',
+        original: 'text',
+        loc: null,
+      };
+
+      const statement: Statement = stmt;
+      expect(statement.type).toBe('ContentStatement');
+    });
+  });
+
+  describe('MustacheStatement', () => {
+    test('has type "MustacheStatement"', () => {
+      const stmt: MustacheStatement = {
+        type: 'MustacheStatement',
+        path: { type: 'PathExpression', loc: null } as any,
+        params: [],
+        hash: { type: 'Hash', loc: null } as any,
+        escaped: true,
+        loc: null,
+      };
+
+      expect(stmt.type).toBe('MustacheStatement');
+    });
+
+    test('has path field', () => {
+      const path = { type: 'PathExpression', loc: null } as any;
+      const stmt: MustacheStatement = {
+        type: 'MustacheStatement',
+        path,
+        params: [],
+        hash: { type: 'Hash', loc: null } as any,
+        escaped: true,
+        loc: null,
+      };
+
+      expect(stmt.path).toBe(path);
+    });
+
+    test('has params array', () => {
+      const stmt: MustacheStatement = {
+        type: 'MustacheStatement',
+        path: { type: 'PathExpression', loc: null } as any,
+        params: [],
+        hash: { type: 'Hash', loc: null } as any,
+        escaped: true,
+        loc: null,
+      };
+
+      expect(Array.isArray(stmt.params)).toBe(true);
+      expect(stmt.params).toHaveLength(0);
+    });
+
+    test('has hash field', () => {
+      const hash = { type: 'Hash', loc: null } as any;
+      const stmt: MustacheStatement = {
+        type: 'MustacheStatement',
+        path: { type: 'PathExpression', loc: null } as any,
+        params: [],
+        hash,
+        escaped: true,
+        loc: null,
+      };
+
+      expect(stmt.hash).toBe(hash);
+    });
+
+    test('has escaped boolean flag', () => {
+      const escaped: MustacheStatement = {
+        type: 'MustacheStatement',
+        path: { type: 'PathExpression', loc: null } as any,
+        params: [],
+        hash: { type: 'Hash', loc: null } as any,
+        escaped: true,
+        loc: null,
+      };
+
+      const unescaped: MustacheStatement = {
+        type: 'MustacheStatement',
+        path: { type: 'PathExpression', loc: null } as any,
+        params: [],
+        hash: { type: 'Hash', loc: null } as any,
+        escaped: false,
+        loc: null,
+      };
+
+      expect(escaped.escaped).toBe(true);
+      expect(unescaped.escaped).toBe(false);
+    });
+
+    test('is a Statement', () => {
+      const stmt: MustacheStatement = {
+        type: 'MustacheStatement',
+        path: { type: 'PathExpression', loc: null } as any,
+        params: [],
+        hash: { type: 'Hash', loc: null } as any,
+        escaped: true,
+        loc: null,
+      };
+
+      const statement: Statement = stmt;
+      expect(statement.type).toBe('MustacheStatement');
+    });
+  });
+
+  describe('BlockStatement', () => {
+    test('has type "BlockStatement"', () => {
+      const stmt: BlockStatement = {
+        type: 'BlockStatement',
+        path: { type: 'PathExpression', loc: null } as any,
+        params: [],
+        hash: { type: 'Hash', loc: null } as any,
+        program: null,
+        inverse: null,
+        openStrip: { open: false, close: false },
+        inverseStrip: { open: false, close: false },
+        closeStrip: { open: false, close: false },
+        loc: null,
+      };
+
+      expect(stmt.type).toBe('BlockStatement');
+    });
+
+    test('has path field', () => {
+      const path = { type: 'PathExpression', loc: null } as any;
+      const stmt: BlockStatement = {
+        type: 'BlockStatement',
+        path,
+        params: [],
+        hash: { type: 'Hash', loc: null } as any,
+        program: null,
+        inverse: null,
+        openStrip: { open: false, close: false },
+        inverseStrip: { open: false, close: false },
+        closeStrip: { open: false, close: false },
+        loc: null,
+      };
+
+      expect(stmt.path).toBe(path);
+    });
+
+    test('has program field for main block', () => {
+      const program: Program = {
+        type: 'Program',
+        body: [],
+        loc: null,
+      };
+
+      const stmt: BlockStatement = {
+        type: 'BlockStatement',
+        path: { type: 'PathExpression', loc: null } as any,
+        params: [],
+        hash: { type: 'Hash', loc: null } as any,
+        program,
+        inverse: null,
+        openStrip: { open: false, close: false },
+        inverseStrip: { open: false, close: false },
+        closeStrip: { open: false, close: false },
+        loc: null,
+      };
+
+      expect(stmt.program).toBe(program);
+    });
+
+    test('has inverse field for else block', () => {
+      const inverse: Program = {
+        type: 'Program',
+        body: [],
+        loc: null,
+      };
+
+      const stmt: BlockStatement = {
+        type: 'BlockStatement',
+        path: { type: 'PathExpression', loc: null } as any,
+        params: [],
+        hash: { type: 'Hash', loc: null } as any,
+        program: null,
+        inverse,
+        openStrip: { open: false, close: false },
+        inverseStrip: { open: false, close: false },
+        closeStrip: { open: false, close: false },
+        loc: null,
+      };
+
+      expect(stmt.inverse).toBe(inverse);
+    });
+
+    test('has strip flags for whitespace control', () => {
+      const stmt: BlockStatement = {
+        type: 'BlockStatement',
+        path: { type: 'PathExpression', loc: null } as any,
+        params: [],
+        hash: { type: 'Hash', loc: null } as any,
+        program: null,
+        inverse: null,
+        openStrip: { open: true, close: false },
+        inverseStrip: { open: false, close: true },
+        closeStrip: { open: true, close: true },
+        loc: null,
+      };
+
+      expect(stmt.openStrip.open).toBe(true);
+      expect(stmt.inverseStrip.close).toBe(true);
+      expect(stmt.closeStrip.open).toBe(true);
+    });
+
+    test('is a Statement', () => {
+      const stmt: BlockStatement = {
+        type: 'BlockStatement',
+        path: { type: 'PathExpression', loc: null } as any,
+        params: [],
+        hash: { type: 'Hash', loc: null } as any,
+        program: null,
+        inverse: null,
+        openStrip: { open: false, close: false },
+        inverseStrip: { open: false, close: false },
+        closeStrip: { open: false, close: false },
+        loc: null,
+      };
+
+      const statement: Statement = stmt;
+      expect(statement.type).toBe('BlockStatement');
+    });
+  });
+
+  describe('CommentStatement', () => {
+    test('has type "CommentStatement"', () => {
+      const stmt: CommentStatement = {
+        type: 'CommentStatement',
+        value: 'This is a comment',
+        loc: null,
+      };
+
+      expect(stmt.type).toBe('CommentStatement');
+    });
+
+    test('has value field for comment text', () => {
+      const stmt: CommentStatement = {
+        type: 'CommentStatement',
+        value: 'This is a comment',
+        loc: null,
+      };
+
+      expect(stmt.value).toBe('This is a comment');
+    });
+
+    test('value excludes delimiters', () => {
+      const stmt: CommentStatement = {
+        type: 'CommentStatement',
+        value: 'comment text',
+        loc: null,
+      };
+
+      expect(stmt.value).not.toContain('{{');
+      expect(stmt.value).not.toContain('}}');
+    });
+
+    test('is a Statement', () => {
+      const stmt: CommentStatement = {
+        type: 'CommentStatement',
+        value: 'comment',
+        loc: null,
+      };
+
+      const statement: Statement = stmt;
+      expect(statement.type).toBe('CommentStatement');
+    });
+  });
+
+  describe('Statement union type', () => {
+    test('includes all statement types', () => {
+      const statements: Statement[] = [
+        { type: 'ContentStatement', value: 'text', original: 'text', loc: null },
+        {
+          type: 'MustacheStatement',
+          path: { type: 'PathExpression', loc: null } as any,
+          params: [],
+          hash: { type: 'Hash', loc: null } as any,
+          escaped: true,
+          loc: null,
+        },
+        {
+          type: 'BlockStatement',
+          path: { type: 'PathExpression', loc: null } as any,
+          params: [],
+          hash: { type: 'Hash', loc: null } as any,
+          program: null,
+          inverse: null,
+          openStrip: { open: false, close: false },
+          inverseStrip: { open: false, close: false },
+          closeStrip: { open: false, close: false },
+          loc: null,
+        },
+        { type: 'CommentStatement', value: 'comment', loc: null },
+      ];
+
+      expect(statements).toHaveLength(4);
+      expect(statements[0].type).toBe('ContentStatement');
+      expect(statements[1].type).toBe('MustacheStatement');
+      expect(statements[2].type).toBe('BlockStatement');
+      expect(statements[3].type).toBe('CommentStatement');
+    });
+
+    test('type discriminator works for narrowing', () => {
+      const stmt: Statement = {
+        type: 'ContentStatement',
+        value: 'text',
+        original: 'text',
+        loc: null,
+      };
+
+      if (stmt.type === 'ContentStatement') {
+        expect(stmt.value).toBe('text');
+      }
+    });
+  });
+
+  describe('StripFlags', () => {
+    test('has open and close boolean fields', () => {
+      const flags: StripFlags = {
+        open: true,
+        close: false,
+      };
+
+      expect(flags.open).toBe(true);
+      expect(flags.close).toBe(false);
+    });
+
+    test('can create flags with both false', () => {
+      const flags: StripFlags = {
+        open: false,
+        close: false,
+      };
+
+      expect(flags.open).toBe(false);
+      expect(flags.close).toBe(false);
+    });
+
+    test('can create flags with both true', () => {
+      const flags: StripFlags = {
+        open: true,
+        close: true,
+      };
+
+      expect(flags.open).toBe(true);
+      expect(flags.close).toBe(true);
     });
   });
 });
