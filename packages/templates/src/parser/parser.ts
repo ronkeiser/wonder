@@ -126,6 +126,52 @@ export class Parser {
   }
 
   /**
+   * Check if we're at an {{else}} clause
+   * {{else}} is tokenized as OPEN + ID("else") + CLOSE
+   *
+   * @returns True if current position is at {{else}}
+   */
+  private isAtElse(): boolean {
+    if (!this.match(TokenType.OPEN)) {
+      return false;
+    }
+
+    const nextToken = this.peek(1);
+    const closeToken = this.peek(2);
+
+    return (
+      nextToken !== null &&
+      nextToken.type === TokenType.ID &&
+      nextToken.value === 'else' &&
+      closeToken !== null &&
+      closeToken.type === TokenType.CLOSE
+    );
+  }
+
+  /**
+   * Consume an {{else}} clause
+   * Advances past OPEN + ID("else") + CLOSE tokens
+   *
+   * @throws {ParserError} If not currently at {{else}}
+   */
+  private consumeElse(): void {
+    if (!this.isAtElse()) {
+      throw ParserError.fromToken(
+        'Expected {{else}} clause',
+        this.currentToken!,
+        this.getErrorContext(),
+      );
+    }
+
+    // Consume OPEN token
+    this.advance();
+    // Consume ID("else") token
+    this.advance();
+    // Consume CLOSE token
+    this.advance();
+  }
+
+  /**
    * Assert that the current token matches the expected type
    *
    * @param type - Expected token type
@@ -604,8 +650,8 @@ export class Parser {
 
     // Parse statements until we hit EOF or a block terminator
     while (this.currentToken && this.currentToken.type !== TokenType.EOF) {
-      // Check for block terminators
-      if (this.match(TokenType.OPEN_ENDBLOCK) || this.match(TokenType.INVERSE)) {
+      // Check for block terminators: {{/...}}, {{^...}}, or {{else}}
+      if (this.match(TokenType.OPEN_ENDBLOCK) || this.match(TokenType.INVERSE) || this.isAtElse()) {
         break;
       }
 
@@ -649,7 +695,7 @@ export class Parser {
 
   /**
    * Parse a block statement (block helper)
-   * Handles {{#helper}}...{{/helper}} syntax without else blocks
+   * Handles {{#helper}}...{{/helper}} syntax with optional {{else}} blocks
    *
    * @returns BlockStatement node
    * @throws {ParserError} If block is malformed or has mismatched closing tag
@@ -677,6 +723,24 @@ export class Parser {
 
     // Parse the main block content
     const program = this.parseProgram();
+
+    // Check if there's an else block
+    // {{else}} is tokenized as OPEN + ID("else") + CLOSE
+    // {{^}} is tokenized as INVERSE
+    let inverse: Program | null = null;
+    if (this.isAtElse()) {
+      // Consume the {{else}} tokens (OPEN + ID + CLOSE)
+      this.consumeElse();
+
+      // Parse the inverse block content
+      inverse = this.parseProgram();
+    } else if (this.match(TokenType.INVERSE)) {
+      // Consume the INVERSE token ({{^}})
+      this.advance();
+
+      // Parse the inverse block content
+      inverse = this.parseProgram();
+    }
 
     // Expect OPEN_ENDBLOCK token ({{/)
     this.expect(
@@ -728,7 +792,7 @@ export class Parser {
       params: [], // Empty in V1 - no helper parameters support
       hash: hash, // Empty in V1 - no named parameters support
       program: program,
-      inverse: null, // No else block for this task
+      inverse: inverse, // Set to parsed inverse block if {{else}} was present
       openStrip: stripFlags, // V2 feature
       inverseStrip: stripFlags, // V2 feature
       closeStrip: stripFlags, // V2 feature
