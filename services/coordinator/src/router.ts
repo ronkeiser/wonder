@@ -146,7 +146,7 @@ export class Router {
       });
     }
 
-    // Check workflow completion
+    // Check workflow completion atomically
     const activeCount = tokens.getActiveTokenCount(workflow_run_id);
     this.logger.info({
       event_type: 'ROUTER_ACTIVE_COUNT',
@@ -156,15 +156,28 @@ export class Router {
     });
 
     if (activeCount === 0) {
-      return this.handleWorkflowCompletion(
-        workflowDef,
-        workflow_run_id,
-        node,
-        sql,
-        emitter,
-        eventContext,
-        tokensToDispatch,
-      );
+      // Atomically mark as completed - only one handler will succeed
+      const markedComplete = tokens.markWorkflowComplete(workflow_run_id);
+
+      if (markedComplete) {
+        // This handler won the race - handle completion
+        return this.handleWorkflowCompletion(
+          workflowDef,
+          workflow_run_id,
+          node,
+          sql,
+          emitter,
+          eventContext,
+          tokensToDispatch,
+        );
+      } else {
+        // Another handler already completed the workflow
+        this.logger.info({
+          event_type: 'ROUTER_ALREADY_COMPLETED',
+          message: 'Workflow already marked complete by another handler',
+          trace_id: workflow_run_id,
+        });
+      }
     }
 
     this.logger.info({

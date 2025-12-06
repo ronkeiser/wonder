@@ -76,6 +76,14 @@ export class TokenManager {
       CREATE UNIQUE INDEX IF NOT EXISTS idx_fan_in_token 
       ON tokens(workflow_run_id, path_id)
     `);
+
+    // Create workflow_state table for atomic completion tracking
+    this.sql.exec(`
+      CREATE TABLE IF NOT EXISTS workflow_state (
+        workflow_run_id TEXT PRIMARY KEY,
+        is_completed INTEGER NOT NULL DEFAULT 0
+      )
+    `);
   }
 
   /**
@@ -142,6 +150,21 @@ export class TokenManager {
       now,
       token_id,
     );
+  }
+
+  /**
+   * Atomically mark workflow as completed
+   * @returns true if this call successfully marked it complete, false if already completed
+   */
+  markWorkflowComplete(workflow_run_id: string): boolean {
+    // Try to update the completion flag from 0 to 1
+    const result = this.sql.exec(
+      `UPDATE workflow_state SET is_completed = 1 WHERE workflow_run_id = ? AND is_completed = 0`,
+      workflow_run_id,
+    );
+
+    // If rowsWritten is 0, another handler already marked it complete
+    return result.rowsWritten > 0;
   }
 
   /**

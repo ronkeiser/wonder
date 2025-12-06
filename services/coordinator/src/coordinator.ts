@@ -185,6 +185,12 @@ export class WorkflowCoordinator extends DurableObject {
     this.tokens.initializeTable();
     artifacts.initializeArtifactsTable(this.ctx.storage.sql);
 
+    // Initialize workflow state with completion flag
+    this.ctx.storage.sql.exec(
+      `INSERT INTO workflow_state (workflow_run_id, is_completed) VALUES (?, 0)`,
+      workflow_run_id,
+    );
+
     // Initialize context with workflow input
     context.initializeContextWithInput(this.ctx.storage.sql, input);
 

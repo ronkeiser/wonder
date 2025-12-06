@@ -1,3 +1,1 @@
-Currently, coordinator incorrectly dispatches workers synchronously (for loop). We need to dispatch them in parallel (Promise.all).
-However, this will likely break our synchronization code.
-We need to evaluate how to make coordinator work properly under these conditions, and we need to test our implementation against the edge test.
+We recently implemented the fan out and in logic for coordinator in router.ts. It appeared to be working well, so we started a refactor (thus duplication of code in synchronization.ts and completion.ts). However, when we were about to refactor router, we noticed that if we increase spawn count and run the test enough times, we'll sometimes get multiple workflow_completed events. Query the logs to see if you can see the results of the last edge test run.
