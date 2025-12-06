@@ -102,7 +102,7 @@
 
 ### Task C1-F1-T5: Implement Delimiter Tokenization
 
-**Status:** `[x]` Complete
+**Status:** `[x]` Complete ✅
 
 - Recognize `{{` → OPEN token
 - Recognize `}}` → CLOSE token
