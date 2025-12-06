@@ -1,3 +1,4 @@
+import { LexerError } from './lexer-error';
 import type { Position, Token } from './token';
 import { TokenType } from './token-types';
 
@@ -557,8 +558,7 @@ export class Lexer {
 
     // Check for unclosed comment
     if (this.isEOF() && !this.match(endSequence)) {
-      const pos = this.getPosition();
-      throw new Error(`Unclosed comment at line ${pos.line}, column ${pos.column}`);
+      throw new LexerError(`Unclosed comment: expected closing '${endSequence}'`, start);
     }
 
     // Consume the closing sequence
@@ -612,8 +612,7 @@ export class Lexer {
 
     // Check for unclosed string
     if (this.isEOF()) {
-      const pos = this.getPosition();
-      throw new Error(`Unclosed string at line ${pos.line}, column ${pos.column}`);
+      throw new LexerError(`Unclosed string: expected closing ${quote}`, start);
     }
 
     this.advance(); // Consume closing quote
