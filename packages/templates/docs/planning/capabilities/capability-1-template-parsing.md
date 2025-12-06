@@ -434,7 +434,7 @@
 
 ### Task C1-F5-T1: Implement Parenthesis Tokenization
 
-**Status:** `[ ]` Not Started
+**Status:** `[x]` Complete
 
 - Recognize `(` → OPEN_SEXPR token (only inside mustache context)
 - Recognize `)` → CLOSE_SEXPR token (only inside mustache context)
@@ -453,7 +453,7 @@
 
 ### Task C1-F5-T2: Test Subexpression Token Sequences
 
-**Status:** `[ ]` Not Started
+**Status:** `[x]` Complete
 
 - Verify subexpression patterns tokenize correctly:
   - `{{#if (gt x 1)}}` → OPEN_BLOCK, ID("if"), OPEN_SEXPR, ID("gt"), ID("x"), NUMBER(1), CLOSE_SEXPR, CLOSE
@@ -474,7 +474,7 @@
 
 ### Task C1-F5-T3: Update Integration Tests
 
-**Status:** `[ ]` Not Started
+**Status:** `[x]` Complete
 
 - Add subexpression examples to existing integration test suite
 - Verify complex templates with subexpressions tokenize correctly

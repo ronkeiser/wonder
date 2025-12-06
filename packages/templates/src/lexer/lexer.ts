@@ -197,6 +197,15 @@ export class Lexer {
         return this.scanSeparator();
       }
 
+      // Check for subexpression delimiters (parentheses)
+      if (char === '(') {
+        return this.scanDelimiter(TokenType.OPEN_SEXPR, '(');
+      }
+
+      if (char === ')') {
+        return this.scanDelimiter(TokenType.CLOSE_SEXPR, ')');
+      }
+
       // Check for number literals
       if (this.isDigit(char) || (char === '-' && this.isDigit(this.peekAt(1)))) {
         return this.scanNumber();
