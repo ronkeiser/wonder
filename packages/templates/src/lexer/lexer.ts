@@ -12,6 +12,7 @@ export class Lexer {
   private line: number = 1;
   private column: number = 0;
   private tokens: Token[] = [];
+  private inMustache: boolean = false;
 
   /**
    * Initialize lexer with template string
@@ -22,6 +23,7 @@ export class Lexer {
     this.line = 1;
     this.column = 0;
     this.tokens = [];
+    this.inMustache = false;
   }
 
   /**
@@ -35,6 +37,7 @@ export class Lexer {
 
     // Check for mustache opening - need to check triple braces before double
     if (this.match('{{{')) {
+      this.inMustache = true;
       return this.scanDelimiter(TokenType.OPEN_UNESCAPED, '{{{');
     }
 
@@ -48,58 +51,79 @@ export class Lexer {
 
       // Check for block delimiters after {{
       if (nextChar === '#') {
+        this.inMustache = true;
         return this.scanBlockDelimiter(TokenType.OPEN_BLOCK, '{{#');
       }
 
       if (nextChar === '/') {
+        this.inMustache = true;
         return this.scanBlockDelimiter(TokenType.OPEN_ENDBLOCK, '{{/');
       }
 
       if (nextChar === '^') {
+        this.inMustache = true;
         return this.scanBlockDelimiter(TokenType.OPEN_INVERSE, '{{^');
       }
 
+      this.inMustache = true;
       return this.scanDelimiter(TokenType.OPEN, '{{');
     }
 
     // Check for mustache closing - need to check triple braces before double
     if (this.match('}}}')) {
+      this.inMustache = false;
       return this.scanDelimiter(TokenType.CLOSE_UNESCAPED, '}}}');
     }
 
     if (this.match('}}')) {
+      this.inMustache = false;
       return this.scanDelimiter(TokenType.CLOSE, '}}');
     }
 
-    // Check for string literals
-    const char = this.peek();
-    if (char === '"' || char === "'") {
-      return this.scanString();
-    }
+    // If we're inside a mustache, check for mustache-specific tokens
+    if (this.inMustache) {
+      const char = this.peek();
 
-    // Check for number literals
-    if (this.isDigit(char) || (char === '-' && this.isDigit(this.input[this.index + 1]))) {
-      return this.scanNumber();
-    }
-
-    // Check for boolean, null, undefined literals (keywords)
-    if (this.isAlpha(char)) {
-      // Peek ahead to see if it's a keyword
-      if (this.match('true') && !this.isAlphaNumeric(this.input[this.index + 4])) {
-        return this.scanKeyword(TokenType.BOOLEAN, 'true');
-      }
-      if (this.match('false') && !this.isAlphaNumeric(this.input[this.index + 5])) {
-        return this.scanKeyword(TokenType.BOOLEAN, 'false');
-      }
-      if (this.match('null') && !this.isAlphaNumeric(this.input[this.index + 4])) {
-        return this.scanKeyword(TokenType.NULL, 'null');
-      }
-      if (this.match('undefined') && !this.isAlphaNumeric(this.input[this.index + 9])) {
-        return this.scanKeyword(TokenType.UNDEFINED, 'undefined');
+      // Check for string literals
+      if (char === '"' || char === "'") {
+        return this.scanString();
       }
 
-      // If not a keyword, scan as identifier
-      return this.scanIdentifier();
+      // Check for separators (. or /)
+      if (char === '.' || char === '/') {
+        return this.scanSeparator();
+      }
+
+      // Check for number literals
+      if (this.isDigit(char) || (char === '-' && this.isDigit(this.input[this.index + 1]))) {
+        return this.scanNumber();
+      }
+
+      // Check for boolean, null, undefined literals (keywords)
+      if (this.isAlpha(char)) {
+        // Peek ahead to see if it's a keyword
+        if (this.match('true') && !this.isAlphaNumeric(this.input[this.index + 4])) {
+          return this.scanKeyword(TokenType.BOOLEAN, 'true');
+        }
+        if (this.match('false') && !this.isAlphaNumeric(this.input[this.index + 5])) {
+          return this.scanKeyword(TokenType.BOOLEAN, 'false');
+        }
+        if (this.match('null') && !this.isAlphaNumeric(this.input[this.index + 4])) {
+          return this.scanKeyword(TokenType.NULL, 'null');
+        }
+        if (this.match('undefined') && !this.isAlphaNumeric(this.input[this.index + 9])) {
+          return this.scanKeyword(TokenType.UNDEFINED, 'undefined');
+        }
+
+        // If not a keyword, scan as identifier
+        return this.scanIdentifier();
+      }
+
+      // Skip whitespace in mustache context
+      if (char === ' ' || char === '\t' || char === '\n' || char === '\r') {
+        this.advance();
+        return this.lex(); // Recursively get next token
+      }
     }
 
     // Otherwise, scan content until we hit {{
@@ -145,6 +169,25 @@ export class Lexer {
     return {
       type,
       value: delimiter,
+      loc: {
+        start,
+        end,
+      },
+    };
+  }
+
+  /**
+   * Scan a separator token (. or /)
+   */
+  private scanSeparator(): Token {
+    const start = this.getPosition();
+    const value = this.advance(); // Consume . or /
+
+    const end = this.getPosition();
+
+    return {
+      type: TokenType.SEP,
+      value,
       loc: {
         start,
         end,

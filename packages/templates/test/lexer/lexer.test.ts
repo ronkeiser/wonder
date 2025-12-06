@@ -170,8 +170,9 @@ describe('Lexer - Identifier Tokenization (C1-F1-T9)', () => {
   });
 
   describe('Simple identifiers', () => {
-    it('should tokenize simple identifier', () => {
-      lexer.setInput('foo');
+    it('should tokenize simple identifier in mustache', () => {
+      lexer.setInput('{{foo}}');
+      lexer.lex(); // OPEN
       const token = lexer.lex();
 
       expect(token).toMatchObject({
@@ -181,8 +182,9 @@ describe('Lexer - Identifier Tokenization (C1-F1-T9)', () => {
       expect(token?.loc).toBeDefined();
     });
 
-    it('should tokenize identifier with underscore prefix', () => {
-      lexer.setInput('_var');
+    it('should tokenize identifier with underscore prefix in mustache', () => {
+      lexer.setInput('{{_var}}');
+      lexer.lex(); // OPEN
       const token = lexer.lex();
 
       expect(token).toMatchObject({
@@ -191,8 +193,9 @@ describe('Lexer - Identifier Tokenization (C1-F1-T9)', () => {
       });
     });
 
-    it('should tokenize identifier with dollar sign prefix', () => {
-      lexer.setInput('$var');
+    it('should tokenize identifier with dollar sign prefix in mustache', () => {
+      lexer.setInput('{{$var}}');
+      lexer.lex(); // OPEN
       const token = lexer.lex();
 
       expect(token).toMatchObject({
@@ -201,8 +204,9 @@ describe('Lexer - Identifier Tokenization (C1-F1-T9)', () => {
       });
     });
 
-    it('should tokenize identifier with digits in name', () => {
-      lexer.setInput('var1');
+    it('should tokenize identifier with digits in name in mustache', () => {
+      lexer.setInput('{{var1}}');
+      lexer.lex(); // OPEN
       const token = lexer.lex();
 
       expect(token).toMatchObject({
@@ -211,8 +215,9 @@ describe('Lexer - Identifier Tokenization (C1-F1-T9)', () => {
       });
     });
 
-    it('should tokenize identifier with multiple underscores', () => {
-      lexer.setInput('__private__');
+    it('should tokenize identifier with multiple underscores in mustache', () => {
+      lexer.setInput('{{__private__}}');
+      lexer.lex(); // OPEN
       const token = lexer.lex();
 
       expect(token).toMatchObject({
@@ -221,8 +226,9 @@ describe('Lexer - Identifier Tokenization (C1-F1-T9)', () => {
       });
     });
 
-    it('should tokenize identifier with dollar signs', () => {
-      lexer.setInput('$jquery$');
+    it('should tokenize identifier with dollar signs in mustache', () => {
+      lexer.setInput('{{$jquery$}}');
+      lexer.lex(); // OPEN
       const token = lexer.lex();
 
       expect(token).toMatchObject({
@@ -233,8 +239,9 @@ describe('Lexer - Identifier Tokenization (C1-F1-T9)', () => {
   });
 
   describe('Keywords recognized as identifiers', () => {
-    it('should tokenize "if" as identifier', () => {
-      lexer.setInput('if');
+    it('should tokenize "if" as identifier in mustache', () => {
+      lexer.setInput('{{if}}');
+      lexer.lex(); // OPEN
       const token = lexer.lex();
 
       expect(token).toMatchObject({
@@ -243,8 +250,9 @@ describe('Lexer - Identifier Tokenization (C1-F1-T9)', () => {
       });
     });
 
-    it('should tokenize "unless" as identifier', () => {
-      lexer.setInput('unless');
+    it('should tokenize "unless" as identifier in mustache', () => {
+      lexer.setInput('{{unless}}');
+      lexer.lex(); // OPEN
       const token = lexer.lex();
 
       expect(token).toMatchObject({
@@ -253,8 +261,9 @@ describe('Lexer - Identifier Tokenization (C1-F1-T9)', () => {
       });
     });
 
-    it('should tokenize "each" as identifier', () => {
-      lexer.setInput('each');
+    it('should tokenize "each" as identifier in mustache', () => {
+      lexer.setInput('{{each}}');
+      lexer.lex(); // OPEN
       const token = lexer.lex();
 
       expect(token).toMatchObject({
@@ -263,8 +272,9 @@ describe('Lexer - Identifier Tokenization (C1-F1-T9)', () => {
       });
     });
 
-    it('should tokenize "with" as identifier', () => {
-      lexer.setInput('with');
+    it('should tokenize "with" as identifier in mustache', () => {
+      lexer.setInput('{{with}}');
+      lexer.lex(); // OPEN
       const token = lexer.lex();
 
       expect(token).toMatchObject({
@@ -273,8 +283,9 @@ describe('Lexer - Identifier Tokenization (C1-F1-T9)', () => {
       });
     });
 
-    it('should tokenize "else" as identifier', () => {
-      lexer.setInput('else');
+    it('should tokenize "else" as identifier in mustache', () => {
+      lexer.setInput('{{else}}');
+      lexer.lex(); // OPEN
       const token = lexer.lex();
 
       expect(token).toMatchObject({
@@ -285,8 +296,9 @@ describe('Lexer - Identifier Tokenization (C1-F1-T9)', () => {
   });
 
   describe('Special identifiers', () => {
-    it('should tokenize "this" as identifier', () => {
-      lexer.setInput('this');
+    it('should tokenize "this" as identifier in mustache', () => {
+      lexer.setInput('{{this}}');
+      lexer.lex(); // OPEN
       const token = lexer.lex();
 
       expect(token).toMatchObject({
@@ -323,8 +335,9 @@ describe('Lexer - Identifier Tokenization (C1-F1-T9)', () => {
   });
 
   describe('Identifier boundaries', () => {
-    it('should stop at end of identifier', () => {
-      lexer.setInput('foo123');
+    it('should stop at end of identifier in mustache', () => {
+      lexer.setInput('{{foo123}}');
+      lexer.lex(); // OPEN
       const token = lexer.lex();
 
       expect(token?.type).toBe('ID');
@@ -363,6 +376,209 @@ describe('Lexer - Identifier Tokenization (C1-F1-T9)', () => {
 
       // Note: whitespace handling between identifiers would be handled
       // by a more complete implementation, but for now we verify identifiers work
+    });
+  });
+});
+
+describe('Lexer - Separator Tokenization (C1-F2-T1)', () => {
+  let lexer: Lexer;
+
+  beforeEach(() => {
+    lexer = new Lexer();
+  });
+
+  describe('Dot separator', () => {
+    it('should keep bare dot as CONTENT outside mustache', () => {
+      lexer.setInput('.');
+      const token = lexer.lex();
+
+      expect(token).toMatchObject({
+        type: 'CONTENT',
+        value: '.',
+      });
+      expect(token?.loc).toBeDefined();
+    });
+
+    it('should tokenize dot in mustache context', () => {
+      lexer.setInput('{{foo.bar}}');
+
+      const open = lexer.lex();
+      expect(open?.type).toBe('OPEN');
+
+      const id1 = lexer.lex();
+      expect(id1?.type).toBe('ID');
+      expect(id1?.value).toBe('foo');
+
+      const sep = lexer.lex();
+      expect(sep).toMatchObject({
+        type: 'SEP',
+        value: '.',
+      });
+
+      const id2 = lexer.lex();
+      expect(id2?.type).toBe('ID');
+      expect(id2?.value).toBe('bar');
+
+      const close = lexer.lex();
+      expect(close?.type).toBe('CLOSE');
+    });
+  });
+
+  describe('Slash separator', () => {
+    it('should keep bare slash as CONTENT outside mustache', () => {
+      lexer.setInput('/');
+      const token = lexer.lex();
+
+      expect(token).toMatchObject({
+        type: 'CONTENT',
+        value: '/',
+      });
+      expect(token?.loc).toBeDefined();
+    });
+
+    it('should tokenize slash in mustache context', () => {
+      lexer.setInput('{{foo/bar}}');
+
+      const open = lexer.lex();
+      expect(open?.type).toBe('OPEN');
+
+      const id1 = lexer.lex();
+      expect(id1?.type).toBe('ID');
+      expect(id1?.value).toBe('foo');
+
+      const sep = lexer.lex();
+      expect(sep).toMatchObject({
+        type: 'SEP',
+        value: '/',
+      });
+
+      const id2 = lexer.lex();
+      expect(id2?.type).toBe('ID');
+      expect(id2?.value).toBe('bar');
+
+      const close = lexer.lex();
+      expect(close?.type).toBe('CLOSE');
+    });
+  });
+
+  describe('Separators in CONTENT', () => {
+    it('should keep dot in CONTENT outside mustaches', () => {
+      lexer.setInput('Hello. World');
+      const token = lexer.lex();
+
+      expect(token?.type).toBe('CONTENT');
+      expect(token?.value).toBe('Hello. World');
+    });
+
+    it('should keep slash in CONTENT outside mustaches', () => {
+      lexer.setInput('path/to/file');
+      const token = lexer.lex();
+
+      expect(token?.type).toBe('CONTENT');
+      expect(token?.value).toBe('path/to/file');
+    });
+
+    it('should keep separators in mixed content', () => {
+      lexer.setInput('Hello. {{name}} is at path/here');
+
+      const content1 = lexer.lex();
+      expect(content1?.type).toBe('CONTENT');
+      expect(content1?.value).toBe('Hello. ');
+
+      const open = lexer.lex();
+      expect(open?.type).toBe('OPEN');
+
+      const id = lexer.lex();
+      expect(id?.type).toBe('ID');
+
+      const close = lexer.lex();
+      expect(close?.type).toBe('CLOSE');
+
+      const content2 = lexer.lex();
+      expect(content2?.type).toBe('CONTENT');
+      expect(content2?.value).toBe(' is at path/here');
+    });
+  });
+
+  describe('Position tracking', () => {
+    it('should track position correctly for dot separator', () => {
+      lexer.setInput('{{a.b}}');
+
+      lexer.lex(); // OPEN
+      lexer.lex(); // ID 'a'
+
+      const sep = lexer.lex();
+      expect(sep?.loc).toMatchObject({
+        start: { line: 1, column: 3, index: 3 },
+        end: { line: 1, column: 4, index: 4 },
+      });
+    });
+
+    it('should track position correctly for slash separator', () => {
+      lexer.setInput('{{a/b}}');
+
+      lexer.lex(); // OPEN
+      lexer.lex(); // ID 'a'
+
+      const sep = lexer.lex();
+      expect(sep?.loc).toMatchObject({
+        start: { line: 1, column: 3, index: 3 },
+        end: { line: 1, column: 4, index: 4 },
+      });
+    });
+  });
+
+  describe('Multiple separators', () => {
+    it('should tokenize multiple dots', () => {
+      lexer.setInput('{{a.b.c}}');
+
+      const open = lexer.lex();
+      expect(open?.type).toBe('OPEN');
+
+      const id1 = lexer.lex();
+      expect(id1?.value).toBe('a');
+
+      const sep1 = lexer.lex();
+      expect(sep1?.type).toBe('SEP');
+      expect(sep1?.value).toBe('.');
+
+      const id2 = lexer.lex();
+      expect(id2?.value).toBe('b');
+
+      const sep2 = lexer.lex();
+      expect(sep2?.type).toBe('SEP');
+      expect(sep2?.value).toBe('.');
+
+      const id3 = lexer.lex();
+      expect(id3?.value).toBe('c');
+
+      const close = lexer.lex();
+      expect(close?.type).toBe('CLOSE');
+    });
+
+    it('should tokenize mixed separators', () => {
+      lexer.setInput('{{a.b/c}}');
+
+      lexer.lex(); // OPEN
+
+      const id1 = lexer.lex();
+      expect(id1?.value).toBe('a');
+
+      const sep1 = lexer.lex();
+      expect(sep1?.type).toBe('SEP');
+      expect(sep1?.value).toBe('.');
+
+      const id2 = lexer.lex();
+      expect(id2?.value).toBe('b');
+
+      const sep2 = lexer.lex();
+      expect(sep2?.type).toBe('SEP');
+      expect(sep2?.value).toBe('/');
+
+      const id3 = lexer.lex();
+      expect(id3?.value).toBe('c');
+
+      lexer.lex(); // CLOSE
     });
   });
 });

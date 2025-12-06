@@ -227,7 +227,7 @@
 
 ### Task C1-F2-T1: Implement Separator Tokenization
 
-**Status:** `[ ]` Not Started
+**Status:** `[x]` Complete
 
 - Recognize `.` → SEP token
 - Recognize `/` → SEP token (equivalent to dot)
@@ -237,8 +237,8 @@
 
 **Tests:**
 
-- `.` → SEP
-- `/` → SEP
+- `.` → SEP (in mustache context)
+- `/` → SEP (in mustache context)
 - `.` in CONTENT (outside mustache) → stays in CONTENT
 
 ### Task C1-F2-T2: Implement Data Prefix Tokenization
