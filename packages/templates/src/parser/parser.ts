@@ -1,6 +1,7 @@
 import type { Lexer } from '../lexer/lexer';
-import type { Token } from '../lexer/token';
+import type { SourceLocation, Token } from '../lexer/token';
 import { TokenType } from '../lexer/token-types';
+import type { Node } from './ast-nodes';
 import { ParserError } from './parser-error';
 
 /**
@@ -14,6 +15,7 @@ export class Parser {
   private tokens: Token[] = [];
   private currentToken: Token | null = null;
   private position: number = 0;
+  private startToken: Token | null = null;
 
   /**
    * Initialize parser with lexer instance
@@ -141,5 +143,47 @@ export class Parser {
     }
 
     return context;
+  }
+
+  /**
+   * Create a SourceLocation from one or two tokens
+   *
+   * @param startToken - Token marking the start of the location
+   * @param endToken - Optional token marking the end (defaults to startToken)
+   * @returns SourceLocation spanning from start to end
+   */
+  getSourceLocation(startToken: Token, endToken?: Token): SourceLocation {
+    const end = endToken || startToken;
+    return {
+      start: startToken.loc.start,
+      end: end.loc.end,
+    };
+  }
+
+  /**
+   * Mark the start of parsing a node
+   * Saves the current token for later use in finishNode()
+   */
+  startNode(): void {
+    this.startToken = this.currentToken;
+  }
+
+  /**
+   * Complete a node with location information
+   * Sets the node's loc property based on saved start token and current token
+   *
+   * @param node - The node to complete with location
+   * @returns The node with location added
+   */
+  finishNode<T extends Node>(node: T): T {
+    if (this.startToken && this.currentToken) {
+      node.loc = this.getSourceLocation(this.startToken, this.currentToken);
+    } else if (this.startToken) {
+      node.loc = this.getSourceLocation(this.startToken);
+    } else {
+      node.loc = null;
+    }
+    this.startToken = null;
+    return node;
   }
 }
