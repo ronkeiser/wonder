@@ -1,4 +1,4 @@
-import type { Position, SourceLocation, Token } from './token';
+import type { Position, Token } from './token';
 import { TokenType } from './token-types';
 
 /**
@@ -11,8 +11,8 @@ export class Lexer {
   private index: number = 0;
   private line: number = 1;
   private column: number = 0;
-  private tokens: Token[] = [];
   private inMustache: boolean = false;
+  // Track last token type to disambiguate dot notation (foo.bar vs . as identifier)
   private lastTokenType: TokenType | null = null;
 
   /**
@@ -23,7 +23,6 @@ export class Lexer {
     this.index = 0;
     this.line = 1;
     this.column = 0;
-    this.tokens = [];
     this.inMustache = false;
     this.lastTokenType = null;
   }
@@ -56,7 +55,7 @@ export class Lexer {
 
     if (this.match('{{')) {
       // Check for comments first
-      const nextChar = this.input[this.index + 2];
+      const nextChar = this.peekAt(2);
 
       if (nextChar === '!') {
         return this.scanComment();
@@ -65,17 +64,17 @@ export class Lexer {
       // Check for block delimiters after {{
       if (nextChar === '#') {
         this.inMustache = true;
-        return this.scanBlockDelimiter(TokenType.OPEN_BLOCK, '{{#');
+        return this.scanDelimiter(TokenType.OPEN_BLOCK, '{{#');
       }
 
       if (nextChar === '/') {
         this.inMustache = true;
-        return this.scanBlockDelimiter(TokenType.OPEN_ENDBLOCK, '{{/');
+        return this.scanDelimiter(TokenType.OPEN_ENDBLOCK, '{{/');
       }
 
       if (nextChar === '^') {
         this.inMustache = true;
-        return this.scanBlockDelimiter(TokenType.OPEN_INVERSE, '{{^');
+        return this.scanDelimiter(TokenType.OPEN_INVERSE, '{{^');
       }
 
       this.inMustache = true;
@@ -109,37 +108,7 @@ export class Lexer {
 
       // Check for special dot identifiers (. or ..) before treating as separator
       if (char === '.') {
-        // After an identifier, the first dot is always a separator
-        if (this.lastTokenType === TokenType.ID) {
-          return this.scanSeparator();
-        }
-
-        const nextChar = this.input[this.index + 1];
-        const charAfterNext = this.input[this.index + 2];
-
-        // After OPEN, SEP, or other tokens (not ID), check if it's a special identifier
-        // IMPORTANT: Check for .. before checking for single .
-        // If nextChar is also a dot AND the character after is not alphanumeric, it's ..
-        if (nextChar === '.' && !this.isAlphaNumeric(charAfterNext)) {
-          return this.scanSpecialIdentifier('..');
-        }
-
-        // Check if it's single . as standalone identifier
-        // Treat as identifier when:
-        // - followed by / (./foo pattern)
-        // - followed by }} (just . before closing)
-        // - followed by whitespace (standalone . before }}))
-        if (
-          nextChar === '/' ||
-          (nextChar === '}' && charAfterNext === '}') ||
-          nextChar === ' ' ||
-          nextChar === '\t'
-        ) {
-          return this.scanSpecialIdentifier('.');
-        }
-
-        // Otherwise it's a separator (like in foo . bar where bar follows)
-        return this.scanSeparator();
+        return this.handleDot();
       }
 
       // Check for slash separator
@@ -148,23 +117,23 @@ export class Lexer {
       }
 
       // Check for number literals
-      if (this.isDigit(char) || (char === '-' && this.isDigit(this.input[this.index + 1]))) {
+      if (this.isDigit(char) || (char === '-' && this.isDigit(this.peekAt(1)))) {
         return this.scanNumber();
       }
 
       // Check for boolean, null, undefined literals (keywords)
       if (this.isAlpha(char)) {
         // Peek ahead to see if it's a keyword
-        if (this.match('true') && !this.isAlphaNumeric(this.input[this.index + 4])) {
+        if (this.match('true') && !this.isAlphaNumeric(this.peekAt(4))) {
           return this.scanKeyword(TokenType.BOOLEAN, 'true');
         }
-        if (this.match('false') && !this.isAlphaNumeric(this.input[this.index + 5])) {
+        if (this.match('false') && !this.isAlphaNumeric(this.peekAt(5))) {
           return this.scanKeyword(TokenType.BOOLEAN, 'false');
         }
-        if (this.match('null') && !this.isAlphaNumeric(this.input[this.index + 4])) {
+        if (this.match('null') && !this.isAlphaNumeric(this.peekAt(4))) {
           return this.scanKeyword(TokenType.NULL, 'null');
         }
-        if (this.match('undefined') && !this.isAlphaNumeric(this.input[this.index + 9])) {
+        if (this.match('undefined') && !this.isAlphaNumeric(this.peekAt(9))) {
           return this.scanKeyword(TokenType.UNDEFINED, 'undefined');
         }
 
@@ -173,41 +142,26 @@ export class Lexer {
       }
 
       // Skip whitespace in mustache context
-      if (char === ' ' || char === '\t' || char === '\n' || char === '\r') {
-        this.advance();
-        return this.lexInternal(); // Recursively get next token
+      if (this.isWhitespace(char)) {
+        while (!this.isEOF() && this.isWhitespace(this.peek())) {
+          this.advance();
+        }
+        return this.lexInternal();
       }
     }
 
     // Otherwise, scan content until we hit {{
-    return this.scanContent();
-  }
-
-  /**
-   * Scan a block delimiter token ({{#, {{/, {{^)
-   */
-  private scanBlockDelimiter(type: TokenType, delimiter: string): Token {
-    const start = this.getPosition();
-
-    // Consume the delimiter characters
-    for (let i = 0; i < delimiter.length; i++) {
-      this.advance();
+    // scanContent returns null for empty content (adjacent delimiters)
+    const content = this.scanContent();
+    if (content === null) {
+      // No content between delimiters, continue to next token
+      return this.lexInternal();
     }
-
-    const end = this.getPosition();
-
-    return {
-      type,
-      value: delimiter,
-      loc: {
-        start,
-        end,
-      },
-    };
+    return content;
   }
 
   /**
-   * Scan a delimiter token
+   * Scan a delimiter token ({{, }}, {{{, }}}, {{#, {{/, {{^)
    */
   private scanDelimiter(type: TokenType, delimiter: string): Token {
     const start = this.getPosition();
@@ -227,6 +181,43 @@ export class Lexer {
         end,
       },
     };
+  }
+
+  /**
+   * Handle dot character - determines if it's a separator or special identifier
+   */
+  private handleDot(): Token {
+    // After an identifier, the first dot is always a separator
+    if (this.lastTokenType === TokenType.ID) {
+      return this.scanSeparator();
+    }
+
+    const nextChar = this.peekAt(1);
+    const charAfterNext = this.peekAt(2);
+
+    // After OPEN, SEP, or other tokens (not ID), check if it's a special identifier
+    // IMPORTANT: Check for .. before checking for single .
+    // If nextChar is also a dot AND the character after is not alphanumeric, it's ..
+    if (nextChar === '.' && !this.isAlphaNumeric(charAfterNext)) {
+      return this.scanSpecialIdentifier('..');
+    }
+
+    // Check if it's single . as standalone identifier
+    // Treat as identifier when:
+    // - followed by / (./foo pattern)
+    // - followed by }} (just . before closing)
+    // - followed by whitespace (standalone . before }}))
+    if (
+      nextChar === '/' ||
+      (nextChar === '}' && charAfterNext === '}') ||
+      nextChar === ' ' ||
+      nextChar === '\t'
+    ) {
+      return this.scanSpecialIdentifier('.');
+    }
+
+    // Otherwise it's a separator (like in foo . bar where bar follows)
+    return this.scanSeparator();
   }
 
   /**
@@ -294,6 +285,8 @@ export class Lexer {
 
   /**
    * Scan plain text content until {{ or }} is encountered
+   * Returns null only if there's no content (adjacent mustaches),
+   * which triggers lexInternal to continue scanning for the next token
    */
   private scanContent(): Token | null {
     const start = this.getPosition();
@@ -311,6 +304,7 @@ export class Lexer {
     }
 
     // Handle empty content case (adjacent mustaches)
+    // Return null to signal lexInternal should continue
     if (value.length === 0) {
       return null;
     }
@@ -500,7 +494,7 @@ export class Lexer {
     }
 
     // Scan decimal part
-    if (this.peek() === '.' && this.isDigit(this.input[this.index + 1])) {
+    if (this.peek() === '.' && this.isDigit(this.peekAt(1))) {
       value += this.advance(); // Consume '.'
       while (!this.isEOF() && this.isDigit(this.peek())) {
         value += this.advance();
@@ -593,6 +587,24 @@ export class Lexer {
    */
   private isAlphaNumeric(char: string): boolean {
     return this.isAlpha(char) || this.isDigit(char);
+  }
+
+  /**
+   * Check if character is whitespace
+   */
+  private isWhitespace(char: string): boolean {
+    return char === ' ' || char === '\t' || char === '\n' || char === '\r';
+  }
+
+  /**
+   * Safely peek at character at specific offset from current position
+   */
+  private peekAt(offset: number): string {
+    const targetIndex = this.index + offset;
+    if (targetIndex >= this.input.length) {
+      return '';
+    }
+    return this.input[targetIndex];
   }
 
   /**
