@@ -1,4 +1,4 @@
-Read these docs completely, and in order:
+Read these docs, and in order:
 
 1. `packages/templates/docs/REQUIREMENTS.md`
 2. `packages/templates/docs/planning/overview.md`

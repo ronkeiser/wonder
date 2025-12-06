@@ -22,17 +22,78 @@ export class Lexer {
   private inMustache: boolean = false;
   // Track last token type to disambiguate dot notation (foo.bar vs . as identifier)
   private lastTokenType: TokenType | null = null;
+  // Track which characters are escaped (set of indices)
+  private escapedIndices: Set<number> = new Set();
 
   /**
    * Initialize lexer with template string
    */
   setInput(template: string): void {
-    this.input = template;
+    // Pre-process escape sequences before tokenization
+    const { processedInput, escapedIndices } = this.preprocessEscapes(template);
+    this.input = processedInput;
+    this.escapedIndices = escapedIndices;
     this.index = 0;
     this.line = 1;
     this.column = 0;
     this.inMustache = false;
     this.lastTokenType = null;
+  }
+
+  /**
+   * Pre-process escape sequences in the template
+   * Handles backslash escaping: \\ followed by mustache delimiters
+   * Returns processed input with backslashes removed (only for mustache escapes)
+   * and a set of escaped character indices
+   *
+   * NOTE: Only escapes mustache delimiters ({ and }). Other escapes (like \" in strings)
+   * are handled by their respective scanners (scanString, etc.)
+   */
+  private preprocessEscapes(template: string): {
+    processedInput: string;
+    escapedIndices: Set<number>;
+  } {
+    const escapedIndices = new Set<number>();
+    let processedInput = '';
+    let i = 0;
+
+    while (i < template.length) {
+      const char = template[i];
+
+      // Check for escape sequence
+      if (char === '\\' && i + 1 < template.length) {
+        const nextChar = template[i + 1];
+
+        // Handle backslash escaping another backslash
+        if (nextChar === '\\') {
+          // Two backslashes become one backslash in output
+          processedInput += '\\';
+          i += 2; // Skip both backslashes
+        }
+        // Handle escaping of mustache delimiters
+        else if (nextChar === '{' || nextChar === '}') {
+          // Remove the backslash and mark the next character as escaped
+          const escapedIndex = processedInput.length;
+          escapedIndices.add(escapedIndex);
+
+          // Mark positions for double and triple brace patterns
+          escapedIndices.add(escapedIndex + 1);
+          escapedIndices.add(escapedIndex + 2);
+
+          processedInput += nextChar;
+          i += 2; // Skip both backslash and the escaped character
+        } else {
+          // Not a brace or backslash escape - keep the backslash
+          processedInput += char;
+          i++;
+        }
+      } else {
+        processedInput += char;
+        i++;
+      }
+    }
+
+    return { processedInput, escapedIndices };
   }
 
   /**
@@ -56,12 +117,13 @@ export class Lexer {
     }
 
     // Check for mustache opening - need to check triple braces before double
-    if (this.match('{{{')) {
+    // Skip if the opening brace is escaped
+    if (this.match('{{{') && !this.isEscaped(this.index)) {
       this.inMustache = true;
       return this.scanDelimiter(TokenType.OPEN_UNESCAPED, '{{{');
     }
 
-    if (this.match('{{')) {
+    if (this.match('{{') && !this.isEscaped(this.index)) {
       // Check for comments first
       const nextChar = this.peekAt(2);
 
@@ -90,12 +152,13 @@ export class Lexer {
     }
 
     // Check for mustache closing - need to check triple braces before double
-    if (this.match('}}}')) {
+    // Skip if the closing brace is escaped
+    if (this.match('}}}') && !this.isEscaped(this.index)) {
       this.inMustache = false;
       return this.scanDelimiter(TokenType.CLOSE_UNESCAPED, '}}}');
     }
 
-    if (this.match('}}')) {
+    if (this.match('}}') && !this.isEscaped(this.index)) {
       this.inMustache = false;
       return this.scanDelimiter(TokenType.CLOSE, '}}');
     }
@@ -298,19 +361,76 @@ export class Lexer {
    * Scan plain text content until {{ or }} is encountered
    * Returns null only if there's no content (adjacent mustaches),
    * which triggers lexInternal to continue scanning for the next token
+   *
+   * Special case: When we encounter an escaped opening delimiter (like \{{),
+   * we treat the entire mustache-like structure as content, including finding
+   * and consuming the matching closing delimiter
    */
   private scanContent(): Token | null {
     const start = this.getPosition();
     let value = '';
 
-    // Scan until we hit a delimiter
-    while (
-      !this.isEOF() &&
-      !this.match('{{') &&
-      !this.match('}}') &&
-      !this.match('{{{') &&
-      !this.match('}}}')
-    ) {
+    // Scan until we hit a non-escaped delimiter
+    while (!this.isEOF()) {
+      // Check for escaped opening delimiters - these consume through closing
+      if (this.isEscaped(this.index)) {
+        if (this.match('{{{')) {
+          // Escaped triple brace - include it and find matching }}}
+          value += this.advance(); // First {
+          value += this.advance(); // Second {
+          value += this.advance(); // Third {
+
+          // Scan until we find }}}
+          while (!this.isEOF() && !this.match('}}}')) {
+            value += this.advance();
+          }
+
+          // Include the closing }}}
+          if (this.match('}}}')) {
+            value += this.advance(); // First }
+            value += this.advance(); // Second }
+            value += this.advance(); // Third }
+          }
+          continue;
+        } else if (this.match('{{')) {
+          // Escaped double brace - include it and find matching }}
+          value += this.advance(); // First {
+          value += this.advance(); // Second {
+
+          // Scan until we find }}
+          while (!this.isEOF() && !this.match('}}')) {
+            value += this.advance();
+          }
+
+          // Include the closing }}
+          if (this.match('}}')) {
+            value += this.advance(); // First }
+            value += this.advance(); // Second }
+          }
+          continue;
+        } else if (this.match('}}}') || this.match('}}')) {
+          // Escaped closing brace - just include it
+          value += this.advance();
+          if (this.peek() === '}') {
+            value += this.advance();
+            if (this.peek() === '}') {
+              value += this.advance();
+            }
+          }
+          continue;
+        }
+      }
+
+      // Check for non-escaped delimiters (these end content)
+      const isOpenDelimiter =
+        (this.match('{{{') || this.match('{{')) && !this.isEscaped(this.index);
+      const isCloseDelimiter =
+        (this.match('}}}') || this.match('}}')) && !this.isEscaped(this.index);
+
+      if (isOpenDelimiter || isCloseDelimiter) {
+        break;
+      }
+
       value += this.advance();
     }
 
@@ -330,6 +450,13 @@ export class Lexer {
         end,
       },
     };
+  }
+
+  /**
+   * Check if the character at the given index is escaped
+   */
+  private isEscaped(index: number): boolean {
+    return this.escapedIndices.has(index);
   }
 
   /**
