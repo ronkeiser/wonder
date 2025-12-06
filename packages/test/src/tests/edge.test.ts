@@ -1,6 +1,8 @@
 import { describe, expect, it } from 'vitest';
 import { client } from '~/client';
 
+const SPAWN_COUNT = 10;
+
 describe('Edge Test - Branching Architecture', () => {
   it('fan-out with spawn_count > 1', async () => {
     // Step 1: Create workspace
@@ -154,7 +156,7 @@ describe('Edge Test - Branching Architecture', () => {
               from_node_ref: 'start_node',
               to_node_ref: 'ideation_node',
               priority: 1,
-              spawn_count: 5,
+              spawn_count: SPAWN_COUNT,
             },
             {
               ref: 'ideation_to_terminal',
