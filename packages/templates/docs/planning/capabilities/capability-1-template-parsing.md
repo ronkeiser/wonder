@@ -243,7 +243,7 @@
 
 ### Task C1-F2-T2: Implement Data Prefix Tokenization
 
-**Status:** `[ ]` Not Started
+**Status:** `[x]` Complete
 
 - Recognize `@` → DATA token
 - Only valid at start of path inside mustache
@@ -258,7 +258,7 @@
 
 ### Task C1-F2-T3: Test Path Sequences
 
-**Status:** `[ ]` Not Started
+**Status:** `[x]` Complete
 
 - Verify sequences tokenize correctly:
   - `foo.bar.baz` → ID("foo"), SEP, ID("bar"), SEP, ID("baz")
@@ -277,6 +277,8 @@
 - All path patterns from overview tokenize correctly
 - Whitespace preserved: `{{ foo.bar }}` has spaces
 - Mixed notation: `{{../foo/bar.baz}}`
+- Context-aware dot tokenization: dots after identifiers vs. standalone dots
+- Edge cases: single dot `{{.}}`, double dots after identifier `{{foo...}}`
 
 ---
 

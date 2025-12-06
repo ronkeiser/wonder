@@ -13,6 +13,7 @@ export class Lexer {
   private column: number = 0;
   private tokens: Token[] = [];
   private inMustache: boolean = false;
+  private lastTokenType: TokenType | null = null;
 
   /**
    * Initialize lexer with template string
@@ -24,6 +25,7 @@ export class Lexer {
     this.column = 0;
     this.tokens = [];
     this.inMustache = false;
+    this.lastTokenType = null;
   }
 
   /**
@@ -31,6 +33,17 @@ export class Lexer {
    * Returns null when EOF is reached
    */
   lex(): Token | null {
+    const token = this.lexInternal();
+    if (token) {
+      this.lastTokenType = token.type;
+    }
+    return token;
+  }
+
+  /**
+   * Internal lexing logic
+   */
+  private lexInternal(): Token | null {
     if (this.isEOF()) {
       return null;
     }
@@ -89,8 +102,48 @@ export class Lexer {
         return this.scanString();
       }
 
-      // Check for separators (. or /)
-      if (char === '.' || char === '/') {
+      // Check for data prefix (@)
+      if (char === '@') {
+        return this.scanData();
+      }
+
+      // Check for special dot identifiers (. or ..) before treating as separator
+      if (char === '.') {
+        // After an identifier, the first dot is always a separator
+        if (this.lastTokenType === TokenType.ID) {
+          return this.scanSeparator();
+        }
+
+        const nextChar = this.input[this.index + 1];
+        const charAfterNext = this.input[this.index + 2];
+
+        // After OPEN, SEP, or other tokens (not ID), check if it's a special identifier
+        // IMPORTANT: Check for .. before checking for single .
+        // If nextChar is also a dot AND the character after is not alphanumeric, it's ..
+        if (nextChar === '.' && !this.isAlphaNumeric(charAfterNext)) {
+          return this.scanSpecialIdentifier('..');
+        }
+
+        // Check if it's single . as standalone identifier
+        // Treat as identifier when:
+        // - followed by / (./foo pattern)
+        // - followed by }} (just . before closing)
+        // - followed by whitespace (standalone . before }}))
+        if (
+          nextChar === '/' ||
+          (nextChar === '}' && charAfterNext === '}') ||
+          nextChar === ' ' ||
+          nextChar === '\t'
+        ) {
+          return this.scanSpecialIdentifier('.');
+        }
+
+        // Otherwise it's a separator (like in foo . bar where bar follows)
+        return this.scanSeparator();
+      }
+
+      // Check for slash separator
+      if (char === '/') {
         return this.scanSeparator();
       }
 
@@ -122,7 +175,7 @@ export class Lexer {
       // Skip whitespace in mustache context
       if (char === ' ' || char === '\t' || char === '\n' || char === '\r') {
         this.advance();
-        return this.lex(); // Recursively get next token
+        return this.lexInternal(); // Recursively get next token
       }
     }
 
@@ -187,6 +240,50 @@ export class Lexer {
 
     return {
       type: TokenType.SEP,
+      value,
+      loc: {
+        start,
+        end,
+      },
+    };
+  }
+
+  /**
+   * Scan a data prefix token (@)
+   */
+  private scanData(): Token {
+    const start = this.getPosition();
+    const value = this.advance(); // Consume @
+
+    const end = this.getPosition();
+
+    return {
+      type: TokenType.DATA,
+      value,
+      loc: {
+        start,
+        end,
+      },
+    };
+  }
+
+  /**
+   * Scan a special identifier (. or ..)
+   * These are identifiers, not separators, when they appear as standalone tokens
+   */
+  private scanSpecialIdentifier(expected: string): Token {
+    const start = this.getPosition();
+    let value = '';
+
+    // Consume the expected characters
+    for (let i = 0; i < expected.length; i++) {
+      value += this.advance();
+    }
+
+    const end = this.getPosition();
+
+    return {
+      type: TokenType.ID,
       value,
       loc: {
         start,
