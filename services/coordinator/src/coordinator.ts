@@ -116,7 +116,10 @@ export class WorkflowCoordinator extends DurableObject {
       node_id,
       token_id,
       message: `Context updated with output from ${node.ref}`,
-      metadata: { output_keys: Object.keys(mappedOutput) },
+      metadata: {
+        output_keys: Object.keys(mappedOutput),
+        output_values: mappedOutput,
+      },
     });
 
     // Mark token as completed now that its work is done
