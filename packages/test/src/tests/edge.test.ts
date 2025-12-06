@@ -64,7 +64,8 @@ describe('Edge Test - Branching Architecture', () => {
         version: 1,
         name: 'Dog Name Ideation',
         description: 'Generate creative dog name ideas',
-        template: 'Suggest a fun and friendly name for my dog. Make it just a little quirky!',
+        template:
+          'Suggest a fun and friendly name for my dog. Make it just a little quirky! Respond in the format: { name: [SUGGESTED_NAME]}',
         template_language: 'handlebars',
         requires: {},
         produces: {

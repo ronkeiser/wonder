@@ -72,9 +72,6 @@ export class WorkflowCoordinator extends DurableObject {
     const workflow_run_id = tokenRow.workflow_run_id as string;
     const node_id = tokenRow.node_id as string;
 
-    // Update token status to completed
-    this.tokens.updateTokenStatus(token_id, 'completed');
-
     // Get node ref for context path (refs are stable identifiers used in input_mapping)
     using workflowRuns = this.env.RESOURCES.workflowRuns();
     const workflowRun = await workflowRuns.get(workflow_run_id);
@@ -121,6 +118,10 @@ export class WorkflowCoordinator extends DurableObject {
       message: `Context updated with output from ${node.ref}`,
       metadata: { output_keys: Object.keys(mappedOutput) },
     });
+
+    // Mark token as completed now that its work is done
+    // This must happen before router.decide() so the active count is accurate
+    this.tokens.updateTokenStatus(token_id, 'completed');
 
     // Delegate to router to decide what happens next
     const decision = await this.router.decide({
