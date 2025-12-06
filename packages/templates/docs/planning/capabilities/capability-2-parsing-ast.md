@@ -396,7 +396,7 @@
 
 ### Task C2-F5-T1: Parse Escaped Mustaches
 
-**Status:** `[ ]` Not Started
+**Status:** `[x]` Complete
 
 - When current token is OPEN (`{{`):
   - Parse path expression
@@ -420,7 +420,7 @@
 
 ### Task C2-F5-T2: Parse Unescaped Mustaches
 
-**Status:** `[ ]` Not Started
+**Status:** `[x]` Complete
 
 - When current token is OPEN_UNESCAPED (`{{{`):
   - Parse path expression
@@ -442,7 +442,7 @@
 
 ### Task C2-F5-T3: Validate Mustache Closing
 
-**Status:** `[ ]` Not Started
+**Status:** `[x]` Complete
 
 - After OPEN, must find CLOSE (not CLOSE_UNESCAPED)
 - After OPEN_UNESCAPED, must find CLOSE_UNESCAPED (not CLOSE)
