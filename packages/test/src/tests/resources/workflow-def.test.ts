@@ -1,6 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { client } from '../client';
-
+import { client } from '~/client';
 describe('WorkflowDef API', () => {
   it('should create and retrieve a workflow definition with single LLM node', async () => {
     // Create workspace

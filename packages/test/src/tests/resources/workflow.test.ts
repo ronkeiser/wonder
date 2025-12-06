@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { client } from '../client';
+import { client } from '~/client';
 
 describe('Workflow (Binding) API', () => {
   it('should create and retrieve a workflow binding', async () => {

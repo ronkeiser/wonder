@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { client } from '../client';
+import { client } from '~/client';
 
 describe('Action API', () => {
   it('should create and retrieve an action', async () => {

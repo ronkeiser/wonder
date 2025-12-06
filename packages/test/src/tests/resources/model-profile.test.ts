@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { client } from '../client';
+import { client } from '~/client';
 
 describe('ModelProfile API', () => {
   it('should create and retrieve a model profile', async () => {

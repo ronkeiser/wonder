@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { client } from '../client';
+import { client } from '~/client';
 
 describe('Workflow Execution API', () => {
   it('should start a workflow execution and return workflow_run_id', async () => {
