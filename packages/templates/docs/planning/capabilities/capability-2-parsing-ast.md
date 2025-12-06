@@ -689,7 +689,7 @@
 
 ### Task C2-F8-T1: Parse String Literals
 
-**Status:** `[ ]` Not Started
+**Status:** `[x]` Complete ✅
 
 - When token type is STRING:
   - Create `StringLiteral` node
@@ -700,17 +700,22 @@
 
 **Deliverable:** StringLiteral parsing
 
-**Tests:**
+**Tests:** 8 tests in `test/parser/literal-parsing.test.ts` under "String Literals (C2-F8-T1)" (all passing)
 
-- `"hello"` → StringLiteral with value "hello"
-- `'world'` → StringLiteral with value "world"
-- String with escaped quotes
-- Original includes quote characters
-- Location correct
+- `"hello"` → StringLiteral with value "hello" ✅
+- `'world'` → StringLiteral with value "world" ✅
+- String with escaped quotes ✅
+- Original includes quote characters ✅
+- Location correct ✅
+- Empty strings ✅
+- Strings with spaces ✅
+- Multiple string parameters ✅
+
+**Note:** Literals tested in block helper context (e.g., `{{#if "literal"}}`) since V1 mustaches don't support parameters.
 
 ### Task C2-F8-T2: Parse Number Literals
 
-**Status:** `[ ]` Not Started
+**Status:** `[x]` Complete ✅
 
 - When token type is NUMBER:
   - Create `NumberLiteral` node
@@ -721,17 +726,21 @@
 
 **Deliverable:** NumberLiteral parsing
 
-**Tests:**
+**Tests:** 9 tests in `test/parser/literal-parsing.test.ts` under "Number Literals (C2-F8-T2)" (all passing)
 
-- `123` → NumberLiteral with value 123
-- `1.5` → NumberLiteral with value 1.5
-- `-42` → NumberLiteral with value -42
-- Original preserves string format
-- Location correct
+- `123` → NumberLiteral with value 123 ✅
+- `1.5` → NumberLiteral with value 1.5 ✅
+- `-42` → NumberLiteral with value -42 ✅
+- Original preserves string format ✅
+- Location correct ✅
+- Zero value ✅
+- Large numbers ✅
+- Decimals with leading zero ✅
+- Multiple number parameters ✅
 
 ### Task C2-F8-T3: Parse Boolean Literals
 
-**Status:** `[ ]` Not Started
+**Status:** `[x]` Complete ✅
 
 - When token type is BOOLEAN:
   - Create `BooleanLiteral` node
@@ -742,16 +751,17 @@
 
 **Deliverable:** BooleanLiteral parsing
 
-**Tests:**
+**Tests:** 6 tests in `test/parser/literal-parsing.test.ts` under "Boolean Literals (C2-F8-T3)" (all passing)
 
-- `true` → BooleanLiteral with value true
-- `false` → BooleanLiteral with value false
-- Original preserves string
-- Location correct
+- `true` → BooleanLiteral with value true ✅
+- `false` → BooleanLiteral with value false ✅
+- Original preserves string ✅
+- Location correct ✅
+- Multiple boolean parameters ✅
 
 ### Task C2-F8-T4: Parse Null and Undefined Literals
 
-**Status:** `[ ]` Not Started
+**Status:** `[x]` Complete ✅
 
 - When token type is NULL:
   - Create `NullLiteral` node
@@ -766,12 +776,16 @@
 
 **Deliverable:** Null and Undefined literal parsing
 
-**Tests:**
+**Tests:** 6 tests in `test/parser/literal-parsing.test.ts` under "Null and Undefined Literals (C2-F8-T4)" (all passing)
 
-- `null` → NullLiteral with value null
-- `undefined` → UndefinedLiteral with value undefined
-- Original strings correct
-- Locations correct
+- `null` → NullLiteral with value null ✅
+- `undefined` → UndefinedLiteral with value undefined ✅
+- Original strings correct ✅
+- Locations correct ✅
+
+**Additional Tests:** 4 tests under "Mixed Literal Types" covering combinations of all literal types (all passing)
+
+**Total Tests for Feature 2.8:** 33 tests (all passing)
 
 ---
 
