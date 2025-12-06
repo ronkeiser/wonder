@@ -1,5 +1,27 @@
 # Debugging
 
+## Testing Against Live Infrastructure
+
+All tests run against live Cloudflare infrastructure, not local mocks. This means you must deploy services before running tests.
+
+**Workflow:**
+
+1. Make code changes
+2. Deploy affected services (see monorepo root `package.json` for deploy scripts)
+3. Run tests
+
+**Deploy commands** (from monorepo root):
+
+```bash
+pnpm deploy:coordinator   # Deploy coordinator service
+pnpm deploy:resources     # Deploy resources service
+pnpm deploy:executor      # Deploy executor service
+pnpm deploy:events        # Deploy events service
+pnpm deploy:logs          # Deploy logs service
+pnpm deploy:http          # Deploy HTTP service
+pnpm deploy:all           # Deploy all services
+```
+
 ## Live Observability Services
 
 Two services expose HTTP endpoints for querying operational data in production:
@@ -64,21 +86,6 @@ curl -s "https://wonder-events.ron-keiser.workers.dev/events?workflow_run_id=01K
 
 # Get only workflow completions
 curl -s "https://wonder-events.ron-keiser.workers.dev/events?event_type=workflow_completed&limit=10" | jq '.'
-```
-
-## Local Development
-
-For local debugging with `wrangler dev` or `wrangler tail`:
-
-```bash
-# Tail live logs from HTTP service
-cd services/http && npx wrangler tail --format pretty
-
-# Tail coordinator logs
-cd services/coordinator && npx wrangler tail --format pretty
-
-# Run local dev server
-cd services/http && npx wrangler dev
 ```
 
 ## Common Patterns

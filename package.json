@@ -6,7 +6,13 @@
     "test": "vitest run packages/test/src/tests/edge.test.ts --config packages/test/vitest.config.ts",
     "types": "pnpm run --parallel --filter \"./services/*\" types",
     "typecheck": "pnpm run --parallel --filter \"./services/*\" typecheck",
-    "deploy": "pnpm -r --filter './services/*' --workspace-concurrency 1 deploy"
+    "deploy:all": "pnpm -r --filter './services/*' --workspace-concurrency 1 deploy",
+    "deploy:coordinator": "wrangler deploy --config services/coordinator/wrangler.jsonc",
+    "deploy:events": "wrangler deploy --config services/events/wrangler.jsonc",
+    "deploy:executor": "wrangler deploy --config services/executor/wrangler.jsonc",
+    "deploy:http": "wrangler deploy --config services/http/wrangler.jsonc",
+    "deploy:logs": "wrangler deploy --config services/logs/wrangler.jsonc",
+    "deploy:resources": "wrangler deploy --config services/resources/wrangler.jsonc"
   },
   "engines": {
     "node": ">=24.0.0",
