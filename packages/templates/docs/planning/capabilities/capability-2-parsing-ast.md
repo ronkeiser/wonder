@@ -480,7 +480,7 @@
 
 ### Task C2-F6-T1: Parse Simple Blocks
 
-**Status:** `[ ]` Not Started
+**Status:** `[x]` Complete ✅
 
 - When current token is OPEN_BLOCK (`{{#`):
   - Parse helper name as path expression
@@ -502,19 +502,22 @@
     - `inverse: null`
   - Set location spanning entire block
 
-**Deliverable:** Simple block parsing with parameters in Parser
+**Deliverable:** Simple block parsing with parameters in Parser (`parseBlockStatement()` method)
 
-**Tests:**
+**Tests:** 29 tests in `test/parser/block-statement.test.ts` (all passing)
 
-- `{{#if condition}}content{{/if}}` → BlockStatement
-- Helper name extracted correctly
-- Program contains content
-- Location spans full block
-- Nested content parsed into program.body
+- `{{#if condition}}content{{/if}}` → BlockStatement ✅
+- Helper name extracted correctly ✅
+- Program contains content ✅
+- Location spans full block ✅
+- Nested content parsed into program.body ✅
+- Block name validation (mismatched names throw errors) ✅
+- Unclosed block detection ✅
+- V1 compliance (empty hash, null inverse, false strip flags) ✅
 
 ### Task C2-F6-T2: Parse Blocks with Else
 
-**Status:** `[ ]` Not Started
+**Status:** `[x]` Complete ✅
 
 - While parsing block content, watch for INVERSE token (`{{else}}`)
 - When INVERSE found:
@@ -525,28 +528,30 @@
   - `program: Program` (content before else)
   - `inverse: Program` (content after else)
 
-**Deliverable:** Else block parsing in Parser
+**Deliverable:** Else block parsing in Parser (`parseBlockStatement()` with inverse support)
 
-**Tests:**
+**Tests:** 26 tests in `test/parser/block-with-else.test.ts` (all passing)
 
-- `{{#if condition}}yes{{else}}no{{/if}}` → BlockStatement with both programs
-- Main program contains "yes"
-- Inverse program contains "no"
-- Location information correct
-- Multiple statements in each block
+- `{{#if condition}}yes{{else}}no{{/if}}` → BlockStatement with both programs ✅
+- Main program contains "yes" ✅
+- Inverse program contains "no" ✅
+- Location information correct ✅
+- Multiple statements in each block ✅
+- Nested blocks in both branches ✅
+- Empty branches handled ✅
 
 ### Task C2-F6-T3: Validate Block Names
 
-**Status:** `[ ]` Not Started
+**Status:** `[x]` Complete ✅
 
 - Opening block name must match closing block name
 - Comparison is case-sensitive
 - Mismatched names throw error with both names
 - Error message: `"Expected closing tag {{/if}} but found {{/each}}"`
 
-**Deliverable:** Block name validation in Parser
+**Deliverable:** Block name validation in Parser (within `parseBlockStatement()`)
 
-**Tests:**
+**Tests:** 28 tests in `test/parser/block-name-validation.test.ts` (all passing)
 
 - `{{#if x}}{{/each}}` → Error with both names
 - `{{#if x}}{{/IF}}` → Error (case-sensitive)
@@ -555,7 +560,7 @@
 
 ### Task C2-F6-T4: Handle Nested Blocks
 
-**Status:** `[ ]` Not Started
+**Status:** `[x]` Complete ✅
 
 - Maintain stack of open blocks
 - When OPEN_BLOCK encountered:
@@ -566,33 +571,37 @@
   - Validate name matches
 - Handle deeply nested structures correctly
 
-**Deliverable:** Nested block parsing in Parser
+**Deliverable:** Nested block support in Parser (recursive `parseProgram()` calls)
 
-**Tests:**
+**Tests:** 32 tests in `test/parser/nested-blocks.test.ts` (all passing)
 
-- Two-level nesting: `{{#if a}}{{#if b}}{{/if}}{{/if}}`
-- Three-level nesting
-- Nested blocks with else: `{{#if a}}{{#if b}}x{{else}}y{{/if}}{{/if}}`
-- Mixed block types: `{{#if x}}{{#each items}}{{/each}}{{/if}}`
-- Each block gets correct content
+- Two-level nesting: `{{#if a}}{{#if b}}{{/if}}{{/if}}` ✅
+- Three-level nesting ✅
+- Six-level deep nesting ✅
+- Nested blocks with else: `{{#if a}}{{#if b}}x{{else}}y{{/if}}{{/if}}` ✅
+- Mixed block types: `{{#if x}}{{#each items}}{{/each}}{{/if}}` ✅
+- Each block gets correct content ✅
+- Location tracking for nested structures ✅
+- Content separation between levels ✅
 
 ### Task C2-F6-T5: Detect Unclosed Blocks
 
-**Status:** `[ ]` Not Started
+**Status:** `[x]` Complete ✅
 
 - If EOF reached while blocks are open:
   - Throw error naming unclosed block
   - Include position of opening tag
 - Track all open blocks for clear error messages
 
-**Deliverable:** Unclosed block detection in Parser
+**Deliverable:** Unclosed block detection in Parser (EOF checks in `parseProgram()`)
 
-**Tests:**
+**Tests:** 35 tests in `test/parser/unclosed-blocks.test.ts` (all passing)
 
-- `{{#if condition}}content` → Error: unclosed if block
-- `{{#if a}}{{#if b}}` → Error: unclosed nested blocks
-- Error includes line number of opening tag
-- Error lists all unclosed blocks
+- `{{#if condition}}content` → Error: unclosed if block ✅
+- `{{#if a}}{{#if b}}` → Error: unclosed nested blocks ✅
+- Error includes line number of opening tag ✅
+- Unclosed blocks with else clauses ✅
+- Clear error messages with block identifiers ✅
 
 ---
 
