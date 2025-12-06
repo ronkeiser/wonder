@@ -1023,6 +1023,468 @@ interface SourceLocation {
 
 ---
 
+## Critical Implementation Details
+
+### Helper vs Variable Resolution
+
+From `lib/handlebars/compiler/compiler.js` and `lib/handlebars/compiler/ast.js`:
+
+**Classification Algorithm:**
+
+```javascript
+classifySexpr: function(sexpr) {
+  let isSimple = AST.helpers.simpleId(sexpr.path);  // Single part, not scoped, no depth
+  let isBlockParam = isSimple && !!this.blockParamIndex(sexpr.path.parts[0]);
+
+  // a mustache is an eligible helper if:
+  // * its id is simple (a single part, not `this` or `..`)
+  let isHelper = !isBlockParam && AST.helpers.helperExpression(sexpr);
+
+  // if a mustache is an eligible helper but not a definite helper,
+  // it is ambiguous, and will be resolved in a later pass or at runtime.
+  let isEligible = !isBlockParam && (isHelper || isSimple);
+
+  // if ambiguous, we can possibly resolve the ambiguity now
+  // An eligible helper is one that does not have a complex path,
+  // i.e. `this.foo`, `../foo` etc.
+  if (isEligible && !isHelper) {
+    let name = sexpr.path.parts[0];
+    if (options.knownHelpers[name]) {
+      isHelper = true;
+    } else if (options.knownHelpersOnly) {
+      isEligible = false;
+    }
+  }
+
+  if (isHelper) {
+    return 'helper';
+  } else if (isEligible) {
+    return 'ambiguous';
+  } else {
+    return 'simple';
+  }
+}
+```
+
+**AST Helper Methods:**
+
+```javascript
+// From lib/handlebars/compiler/ast.js
+AST.helpers = {
+  // a mustache is definitely a helper if:
+  // * it is an eligible helper, and
+  // * it has at least one parameter or hash segment
+  helperExpression: function (node) {
+    return (
+      node.type === 'SubExpression' ||
+      ((node.type === 'MustacheStatement' || node.type === 'BlockStatement') &&
+        !!((node.params && node.params.length) || node.hash))
+    );
+  },
+
+  scopedId: function (path) {
+    return /^\.|this\b/.test(path.original);
+  },
+
+  // an ID is simple if it only has one part, and that part is not
+  // `..` or `this`.
+  simpleId: function (path) {
+    return path.parts.length === 1 && !AST.helpers.scopedId(path) && !path.depth;
+  },
+};
+```
+
+**Resolution Rules:**
+
+1. **Helper (definite)**:
+   - Has params OR hash: `{{foo bar}}` or `{{foo key=val}}`
+   - SubExpression: `{{outer (inner)}}`
+   - In knownHelpers list with single ID
+
+2. **Ambiguous** (runtime resolution):
+   - Simple single ID: `{{foo}}`
+   - No params, no hash
+   - Not in knownHelpers, not knownHelpersOnly mode
+
+3. **Simple** (variable lookup):
+   - Complex path: `{{foo.bar}}`, `{{../foo}}`, `{{this.foo}}`
+   - Block param reference
+   - Scoped: starts with `.` or `this`
+
+**Runtime Resolution for Ambiguous:**
+
+From `lib/handlebars/compiler/javascript-compiler.js`:
+
+```javascript
+invokeAmbiguous: function(name, helperCall) {
+  let nonHelper = this.popStack();  // Variable lookup result
+  let helper = this.setupHelper(0, name, helperCall);
+  let helperName = this.nameLookup('helpers', name, 'helper');
+
+  let lookup = ['(', '(helper = ', helperName, ' || ', nonHelper, ')'];
+  if (!this.options.strict) {
+    lookup.push(' != null ? helper : ',
+                this.aliasable('container.hooks.helperMissing'));
+  }
+
+  // Check if helper is function, if so call it, otherwise use as value
+  this.push(['(',
+    lookup,
+    helper.paramsInit ? ['),(', helper.paramsInit] : [],
+    '),',
+    '(typeof helper === ',
+    this.aliasable('"function"'),
+    ' ? ',
+    this.source.functionCall('helper', 'call', helper.callParams),
+    ' : helper)'
+  ]);
+}
+```
+
+**V1 Key Points:**
+
+- Helpers take precedence over context properties (test: "helpers take precedence over same-named context properties")
+- Pathed expressions `{{foo.bar}}` are NEVER helpers (cannot have params)
+- `{{.}}` or `{{this}}` alone cannot be helpers
+- `{{../foo}}` parent access cannot be a helper
+- Block params take highest precedence (shadow helpers and context)
+
+**helperMissing Fallback:**
+
+From `lib/handlebars/helpers/helper-missing.js`:
+
+```javascript
+instance.registerHelper('helperMissing', function (/* [args, ]options */) {
+  if (arguments.length === 1) {
+    // A missing field in a {{foo}} construct - just return undefined
+    return undefined;
+  } else {
+    // Someone is actually trying to call something, blow up.
+    throw new Exception('Missing helper: "' + arguments[arguments.length - 1].name + '"');
+  }
+});
+```
+
+---
+
+### `this` Context Handling
+
+From `lib/handlebars/compiler/compiler.js` and test specs:
+
+**Path Structure:**
+
+```typescript
+interface PathExpression {
+  type: 'PathExpression';
+  data: boolean; // true if starts with @
+  depth: number; // 0=current, 1=../, 2=../../, etc.
+  parts: string[]; // ['foo', 'bar'] - excludes '.', '..', 'this'
+  original: string; // Raw path as entered
+}
+```
+
+**Key Parsing Rules:**
+
+1. **`{{this}}`**:
+   - parts: `[]` (empty)
+   - depth: `0`
+   - Resolves to current context value
+
+2. **`{{this.property}}`**:
+   - parts: `['property']`
+   - depth: `0`
+   - Scoped (starts with `this`), so normal property lookup
+
+3. **`{{./property}}`** (explicit relative):
+   - parts: `['property']`
+   - depth: `0`
+   - Scoped (starts with `.`), prevents helper resolution
+
+4. **`{{../parent}}`** (parent context):
+   - parts: `['parent']`
+   - depth: `1`
+   - Look up `parent` in parent context
+
+5. **`{{../../grandparent}}`**:
+   - parts: `['grandparent']`
+   - depth: `2`
+   - Look up in grandparent context
+
+**Scoped ID Check:**
+
+```javascript
+scopedId: function(path) {
+  return /^\.|this\b/.test(path.original);
+}
+```
+
+- Returns `true` for: `{{.}}`, `{{./foo}}`, `{{this}}`, `{{this.foo}}`
+- Scoped paths are never eligible for helper resolution
+
+**PathExpression Compilation:**
+
+From `lib/handlebars/compiler/compiler.js`:
+
+```javascript
+PathExpression: function(path) {
+  this.addDepth(path.depth);
+  this.opcode('getContext', path.depth);  // Set context depth
+
+  let name = path.parts[0];
+  let scoped = AST.helpers.scopedId(path);
+  let blockParamId = !path.depth && !scoped &&
+                     this.blockParamIndex(name);
+
+  if (blockParamId) {
+    this.opcode('lookupBlockParam', blockParamId, path.parts);
+  } else if (!name) {
+    // Context reference, i.e. `{{foo .}}` or `{{foo ..}}`
+    // parts is empty, just push context
+    this.opcode('pushContext');
+  } else if (path.data) {
+    // @data variable
+    this.opcode('lookupData', path.depth, path.parts, path.strict);
+  } else {
+    // Normal property lookup
+    this.opcode('lookupOnContext',
+                path.parts,
+                path.falsy,
+                path.strict,
+                scoped);
+  }
+}
+```
+
+**Context Stack Management:**
+
+From `lib/handlebars/runtime.js`:
+
+```javascript
+// Depths array maintains context stack
+if (templateSpec.useDepths) {
+  if (options.depths) {
+    depths = context != options.depths[0]
+      ? [context].concat(options.depths)
+      : options.depths;
+  } else {
+    depths = [context];
+  }
+}
+
+// Access parent contexts
+data: function(value, depth) {
+  while (value && depth--) {
+    value = value._parent;
+  }
+  return value;
+}
+```
+
+**V1 Key Points:**
+
+- `{{this}}` with empty parts array returns the current context object
+- `{{this.foo}}` is equivalent to `{{foo}}` (both look up `foo` on current context)
+- `{{./foo}}` explicitly prevents helper resolution (forces variable lookup)
+- `{{../foo}}` accesses parent context (depth=1)
+- `{{this}}` in helper params passes current context: `{{helper this}}`
+- Cannot use `{{this/foo}}` (invalid syntax, throws error)
+- Bracket notation allows special names: `{{[this]}}` looks up property named "this"
+
+---
+
+### Data Variables (@variables)
+
+From `lib/handlebars/runtime.js`, `lib/handlebars/helpers/each.js`, and test specs:
+
+**Data Frame Structure:**
+
+```javascript
+// From lib/handlebars/utils.js
+export function createFrame(object) {
+  let frame = extend({}, object); // Copy all properties
+  frame._parent = object; // Link to parent frame
+  return frame;
+}
+
+// From lib/handlebars/runtime.js
+function initData(context, data) {
+  if (!data || !('root' in data)) {
+    data = data ? createFrame(data) : {};
+    data.root = context; // Top-level context
+  }
+  return data;
+}
+```
+
+**Built-in Data Variables:**
+
+1. **`@root`** - Always points to top-level context:
+
+```javascript
+// Set in initData
+data.root = context;
+
+// Access at any depth
+{{@root.topLevelProp}}
+```
+
+2. **`@index`** - Zero-based position in arrays/objects:
+
+```javascript
+// Set in #each helper
+data.index = index;
+
+// Usage
+{{#each items}}{{@index}}: {{name}}{{/each}}
+// Output: 0: foo 1: bar
+```
+
+3. **`@first`** - Boolean, true for first iteration:
+
+```javascript
+// Set in #each helper
+data.first = index === 0;
+
+// Usage
+{{#each items}}{{#if @first}}First!{{/if}}{{/each}}
+```
+
+4. **`@last`** - Boolean, true for last iteration:
+
+```javascript
+// Set in #each helper with lookahead
+data.last = !!last;
+
+// For objects, requires delayed iteration:
+let priorKey;
+Object.keys(context).forEach((key) => {
+  if (priorKey !== undefined) {
+    execIteration(priorKey, context[priorKey], i - 1);
+  }
+  priorKey = key;
+  i++;
+});
+if (priorKey !== undefined) {
+  execIteration(priorKey, context[priorKey], i - 1, true); // last=true
+}
+```
+
+5. **`@key`** - Property name in object iteration:
+
+```javascript
+// Set in #each helper for objects
+data.key = field;
+
+// Usage
+{{#each obj}}{{@key}}: {{this}}{{/each}}
+// Output: prop1: value1 prop2: value2
+```
+
+**Data Frame Inheritance:**
+
+From `lib/handlebars/helpers/each.js`:
+
+```javascript
+if (options.data) {
+  data = createFrame(options.data); // Inherit parent data
+}
+
+function execIteration(field, value, index, last) {
+  if (data) {
+    data.key = field;
+    data.index = index;
+    data.first = index === 0;
+    data.last = !!last;
+  }
+
+  ret =
+    ret +
+    fn(value, {
+      data: data, // Pass data frame
+      blockParams: [context[field], field],
+    });
+}
+```
+
+**Accessing Parent Data:**
+
+While not explicitly shown in the #each implementation, data frames have `_parent`:
+
+```javascript
+frame._parent; // Reference to parent data frame
+```
+
+However, from test specs, parent loop variables are NOT accessible via `{{@../index}}`. The `@` prefix only accesses the current data frame. Parent context variables use `{{../var}}` without `@`.
+
+**PathExpression.data Flag:**
+
+```typescript
+interface PathExpression {
+  data: boolean; // true if starts with @
+  // ...
+}
+```
+
+When `path.data === true`, compilation uses:
+
+```javascript
+this.opcode('lookupData', path.depth, path.parts, path.strict);
+```
+
+**Data Lookup Resolution:**
+
+From `lib/handlebars/compiler/javascript-compiler.js`:
+
+```javascript
+lookupData: function(depth, parts, strict) {
+  if (!depth) {
+    this.pushStackLiteral('data');
+  } else {
+    this.pushStackLiteral('container.data(data, ' + depth + ')');
+  }
+
+  this.resolvePath('data', parts, 0, true, strict);
+}
+```
+
+With depth tracking via `container.data()`:
+
+```javascript
+data: function(value, depth) {
+  while (value && depth--) {
+    value = value._parent;
+  }
+  return value;
+}
+```
+
+**V1 Key Points:**
+
+- Data variables use `@` prefix: `{{@index}}`, `{{@root.foo}}`
+- Each data frame inherits parent via `createFrame(options.data)`
+- `@root` is set once at template initialization to top-level context
+- Loop metadata (`@index`, `@first`, `@last`, `@key`) only in current frame
+- Cannot access parent loop's `@index` with `{{@../index}}` (not supported)
+- Use `{{../contextVar}}` for parent context, `{{@root.var}}` for top-level
+- Empty string keys are valid: `{{#each obj}}{{@key}}{{/each}}` handles `""` key
+- Data frames have `_parent` property (internal, but enumerable)
+
+**Custom Data Variables:**
+
+Helpers can add custom data properties:
+
+```javascript
+// In a helper
+let frame = Handlebars.createFrame(options.data);
+frame.customVar = 'value';
+return options.fn(this, { data: frame });
+
+// Then in template
+{{#helper}}{{@customVar}}{{/helper}}
+```
+
+---
+
 ## References
 
 - Main entry: `lib/handlebars.js`
@@ -1031,4 +1493,154 @@ interface SourceLocation {
 - JavaScript compiler: `lib/handlebars/compiler/javascript-compiler.js`
 - Code generation: `lib/handlebars/compiler/code-gen.js`
 - Utils: `lib/handlebars/utils.js` (escapeExpression, etc.)
-- Tests: `spec/tokenizer.js`, `spec/compiler.js`, `spec/basic.js`
+- Tests: `spec/tokenizer.js`, `spec/compiler.js`, `spec/basic.js`, `spec/helpers.js`, `spec/data.js`
+
+---
+
+## Implementation Gaps
+
+This section documents remaining areas that require further investigation from the Handlebars source code before implementing `@wonder/templates`.
+
+### Important Gaps (Clarify During Implementation)
+
+#### 1. Truthiness vs isEmpty Interaction
+
+**Status:** Both functions documented separately
+
+**What's Missing:**
+
+- Clear decision tree for conditional evaluation
+- Why `isEmpty([])` is true but `if([])` renders else block
+- When `includeZero` option applies and its default value
+- Whether custom helpers can override truthiness
+
+**Current Understanding:**
+
+```javascript
+// isEmpty - used for deciding whether to iterate
+isEmpty([])      // true (no items to iterate)
+isEmpty({})      // false (object exists)
+isEmpty(0)       // false (0 is a value)
+isEmpty("")      // true
+
+// Truthiness - used for if/unless conditionals
+if ([])          // false (empty array is falsy for conditionals)
+if ({})          // true (objects always truthy)
+if (0)           // false (unless includeZero: true)
+if ("")          // false
+```
+
+**Where to Look:**
+
+- `#if` helper implementation interaction with `isEmpty()`
+- Default options for `includeZero`
+- Test specs for edge cases
+
+**Impact:** MEDIUM - Could cause subtle bugs in conditional logic
+
+---
+
+#### 5. Block Parameters (as |variable| syntax)
+
+**Status:** Tokens listed, not explained
+
+**What's Missing:**
+
+- Parsing of `{{#each items as |item index|}}`
+- How block params shadow outer scope variables
+- Block param assignment in AST (BlockStatement structure)
+- Whether block params are required or optional
+- Nesting behavior: `{{#each outer as |o|}}{{#each inner as |i|}}...`
+
+**Examples Needed:**
+
+```handlebars
+{{#each items as |item|}}
+  {{item.name}}
+  <!-- Access via block param -->
+{{/each}}
+
+{{#each items as |item index|}}
+  {{index}}:
+  {{item}}
+  <!-- Multiple block params -->
+{{/each}}
+
+{{name}}
+<!-- Outer scope (not shadowed) -->
+{{#with user as |u|}}
+  {{u.name}}
+  <!-- Block param -->
+  {{name}}
+  <!-- Still accessible or shadowed? -->
+{{/with}}
+```
+
+**Where to Look:**
+
+- `OPEN_BLOCK_PARAMS` / `CLOSE_BLOCK_PARAMS` token handling
+- BlockStatement.blockParams in AST
+- Helper implementations using `options.blockParams`
+- Scope frame creation with block params
+
+**Impact:** MEDIUM - Useful for clean templates, but V1 can work without it
+
+---
+
+### Lower Priority Gaps (Can Defer to V2)
+
+#### 6. Subexpressions
+
+**Status:** Token types listed only
+
+**What's Missing:**
+
+- Complete subexpression syntax: `{{outer (inner arg1 arg2)}}`
+- Nesting rules and evaluation order
+- Using subexpressions in conditionals: `{{#if (gt value 10)}}`
+- SubExpression AST node structure and interpretation
+
+**Impact:** LOW - Nice to have for complex logic, not essential for V1
+
+---
+
+#### 7. Hash Parameters
+
+**Status:** AST structure documented, no usage examples
+
+**What's Missing:**
+
+- Hash syntax: `{{helper arg1 key1=value1 key2=value2}}`
+- Hash evaluation in helper invocations
+- Whether hash values can be expressions or only literals
+- Hash parameter precedence and overriding
+
+**Impact:** LOW - Advanced feature, likely not needed for prompt templates
+
+---
+
+#### 8. Property Iteration Order
+
+**Status:** Uses `Object.keys()` but edge cases unclear
+
+**What's Missing:**
+
+- ES2015+ property ordering guarantees (integer keys first, then insertion order)
+- Symbol properties handling (are they skipped?)
+- Prototype chain traversal behavior
+- Consistency across different contexts
+
+**Impact:** LOW - Edge case, unlikely to matter for typical usage
+
+---
+
+### Next Steps
+
+**During Implementation:**
+
+1. Validate understanding of Gaps #1-2 with test cases
+2. Make explicit decisions about whether to include block params
+
+**For V2 Planning:**
+
+3. Evaluate whether Gaps #3-5 are needed for LLM prompt use cases
