@@ -119,7 +119,7 @@ describe('Lexer - Delimiter Tokenization (C1-F1-T5)', () => {
     expect(tokens[0].type).toBe(TokenType.CONTENT);
     expect(tokens[0].value).toBe('Hello ');
     expect(tokens[1].type).toBe(TokenType.OPEN);
-    expect(tokens[2].type).toBe(TokenType.CONTENT);
+    expect(tokens[2].type).toBe(TokenType.ID);
     expect(tokens[2].value).toBe('name');
     expect(tokens[3].type).toBe(TokenType.CLOSE);
     expect(tokens[4].type).toBe(TokenType.CONTENT);
@@ -137,7 +137,7 @@ describe('Lexer - Delimiter Tokenization (C1-F1-T5)', () => {
 
     expect(tokens).toHaveLength(3);
     expect(tokens[0].type).toBe(TokenType.OPEN_UNESCAPED);
-    expect(tokens[1].type).toBe(TokenType.CONTENT);
+    expect(tokens[1].type).toBe(TokenType.ID);
     expect(tokens[1].value).toBe('html');
     expect(tokens[2].type).toBe(TokenType.CLOSE_UNESCAPED);
   });

@@ -70,26 +70,29 @@ describe('Lexer - Block Delimiter Tokenization (C1-F1-T6)', () => {
 
     // Expected token sequence:
     // 0: OPEN_BLOCK ({{#)
-    // 1: CONTENT (if condition)
-    // 2: CLOSE (}})
-    // 3: CONTENT (content)
-    // 4: OPEN_ENDBLOCK ({{/)
-    // 5: CONTENT (if)
-    // 6: CLOSE (}})
+    // 1: ID (if)
+    // 2: ID (condition)
+    // 3: CLOSE (}})
+    // 4: CONTENT (content)
+    // 5: OPEN_ENDBLOCK ({{/)
+    // 6: ID (if)
+    // 7: CLOSE (}})
 
-    expect(tokens).toHaveLength(7);
+    expect(tokens).toHaveLength(8);
     expect(tokens[0].type).toBe(TokenType.OPEN_BLOCK);
     expect(tokens[0].value).toBe('{{#');
-    expect(tokens[1].type).toBe(TokenType.CONTENT);
-    expect(tokens[1].value).toBe('if condition');
-    expect(tokens[2].type).toBe(TokenType.CLOSE);
-    expect(tokens[3].type).toBe(TokenType.CONTENT);
-    expect(tokens[3].value).toBe('content');
-    expect(tokens[4].type).toBe(TokenType.OPEN_ENDBLOCK);
-    expect(tokens[4].value).toBe('{{/');
-    expect(tokens[5].type).toBe(TokenType.CONTENT);
-    expect(tokens[5].value).toBe('if');
-    expect(tokens[6].type).toBe(TokenType.CLOSE);
+    expect(tokens[1].type).toBe(TokenType.ID);
+    expect(tokens[1].value).toBe('if');
+    expect(tokens[2].type).toBe(TokenType.ID);
+    expect(tokens[2].value).toBe('condition');
+    expect(tokens[3].type).toBe(TokenType.CLOSE);
+    expect(tokens[4].type).toBe(TokenType.CONTENT);
+    expect(tokens[4].value).toBe('content');
+    expect(tokens[5].type).toBe(TokenType.OPEN_ENDBLOCK);
+    expect(tokens[5].value).toBe('{{/');
+    expect(tokens[6].type).toBe(TokenType.ID);
+    expect(tokens[6].value).toBe('if');
+    expect(tokens[7].type).toBe(TokenType.CLOSE);
   });
 
   it('should handle inverse blocks', () => {
