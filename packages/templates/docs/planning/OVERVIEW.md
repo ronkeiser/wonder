@@ -89,7 +89,7 @@ Implement backslash escaping before tokenization:
 
 ## Capability 2: Syntax Analysis (Parsing & AST)
 
-**Status:** 🔄 Not Started
+**Status:** 🔄 In Progress
 
 **Goal:** Build Abstract Syntax Tree from token stream following Handlebars AST structure
 

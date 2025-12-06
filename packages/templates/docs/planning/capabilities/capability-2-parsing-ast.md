@@ -345,7 +345,7 @@
 
 ### Task C2-F4-T3: Parse Data Variables
 
-**Status:** `[ ]` Not Started
+**Status:** `[x]` Complete
 
 - Recognize DATA token (`@`) as start of data variable
 - Parse following identifier(s) for data variable name

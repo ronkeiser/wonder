@@ -247,7 +247,7 @@ export class Parser {
    * Handles simple paths, parent references, data variables, and special paths:
    * - Simple: foo, foo.bar, foo.bar.baz
    * - Parent: ../parent, ../../grandparent, ../foo.bar
-   * - Data: @index, @root.user (handled in future task)
+   * - Data: @index, @root.user
    * - Special: this, this.foo, ./foo (handled in future task)
    *
    * @returns PathExpression node
@@ -259,6 +259,44 @@ export class Parser {
     let depth = 0;
     let parts: string[] = [];
     let original = '';
+    let isDataVariable = false;
+
+    // Check for data variable (@)
+    if (this.currentToken && this.match(TokenType.DATA)) {
+      isDataVariable = true;
+      original = '@';
+      this.advance(); // Move past DATA token
+
+      // After @, we must have an identifier
+      const dataVarToken = this.expect(
+        TokenType.ID,
+        'Expected identifier after @ in data variable',
+      );
+      parts.push(dataVarToken.value);
+      original += dataVarToken.value;
+      this.advance(); // Move past ID token
+
+      // Parse additional path segments (e.g., @root.user)
+      while (this.currentToken && this.match(TokenType.SEP)) {
+        this.advance(); // Move past SEP token
+
+        const segmentToken = this.expect(TokenType.ID, 'Expected identifier after path separator');
+        parts.push(segmentToken.value);
+        original += '.' + segmentToken.value;
+        this.advance(); // Move past ID token
+      }
+
+      const node: import('./ast-nodes').PathExpression = {
+        type: 'PathExpression',
+        data: true,
+        depth: 0, // Data variables always have depth 0
+        parts: parts,
+        original: original,
+        loc: null,
+      };
+
+      return this.finishNode(node);
+    }
 
     // Expect at least one identifier to start the path
     const firstToken = this.expect(TokenType.ID, 'Expected identifier to start path expression');
