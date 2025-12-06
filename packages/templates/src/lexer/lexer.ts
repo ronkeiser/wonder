@@ -33,8 +33,84 @@ export class Lexer {
       return null;
     }
 
-    // TODO: Implement token extraction
-    return null;
+    // Check for mustache opening - need to check triple braces before double
+    if (this.match('{{{')) {
+      return this.scanDelimiter(TokenType.OPEN_UNESCAPED, '{{{');
+    }
+
+    if (this.match('{{')) {
+      return this.scanDelimiter(TokenType.OPEN, '{{');
+    }
+
+    // Check for mustache closing - need to check triple braces before double
+    if (this.match('}}}')) {
+      return this.scanDelimiter(TokenType.CLOSE_UNESCAPED, '}}}');
+    }
+
+    if (this.match('}}')) {
+      return this.scanDelimiter(TokenType.CLOSE, '}}');
+    }
+
+    // Otherwise, scan content until we hit {{
+    return this.scanContent();
+  }
+
+  /**
+   * Scan a delimiter token
+   */
+  private scanDelimiter(type: TokenType, delimiter: string): Token {
+    const start = this.getPosition();
+
+    // Consume the delimiter characters
+    for (let i = 0; i < delimiter.length; i++) {
+      this.advance();
+    }
+
+    const end = this.getPosition();
+
+    return {
+      type,
+      value: delimiter,
+      loc: {
+        start,
+        end,
+      },
+    };
+  }
+
+  /**
+   * Scan plain text content until {{ or }} is encountered
+   */
+  private scanContent(): Token | null {
+    const start = this.getPosition();
+    let value = '';
+
+    // Scan until we hit a delimiter
+    while (
+      !this.isEOF() &&
+      !this.match('{{') &&
+      !this.match('}}') &&
+      !this.match('{{{') &&
+      !this.match('}}}')
+    ) {
+      value += this.advance();
+    }
+
+    // Handle empty content case (adjacent mustaches)
+    if (value.length === 0) {
+      return null;
+    }
+
+    const end = this.getPosition();
+
+    return {
+      type: TokenType.CONTENT,
+      value,
+      loc: {
+        start,
+        end,
+      },
+    };
   }
 
   /**
