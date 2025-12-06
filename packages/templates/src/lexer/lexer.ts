@@ -797,4 +797,23 @@ export class Lexer {
       },
     };
   }
+
+  /**
+   * Convenience method to tokenize an entire template string
+   * @param template The template string to tokenize
+   * @returns Array of all tokens including EOF token
+   */
+  tokenize(template: string): Token[] {
+    this.setInput(template);
+    const tokens: Token[] = [];
+
+    while (!this.isEOF()) {
+      tokens.push(this.lex());
+    }
+
+    // Include EOF token
+    tokens.push(this.lex());
+
+    return tokens;
+  }
 }
