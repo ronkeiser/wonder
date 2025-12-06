@@ -134,6 +134,221 @@ From `spec/tokenizer.js` tests:
 
 ## Stage 2: Parser & AST
 
+### Critical Context Resolution Patterns
+
+**From runtime.js and javascript-compiler.js:**
+
+Handlebars uses a sophisticated context resolution system for `V1 Capability 2: Context Resolution`:
+
+#### lookupProperty Function
+
+Core security-aware property lookup:
+
+```javascript
+lookupProperty: function(parent, propertyName) {
+  if (Utils.isMap(parent)) {
+    return parent.get(propertyName);
+  }
+
+  let result = parent[propertyName];
+  if (result == null) {
+    return result;
+  }
+
+  // Security: Own property check
+  if (Object.prototype.hasOwnProperty.call(parent, propertyName)) {
+    return result;
+  }
+
+  // Proto access control for inherited properties
+  if (resultIsAllowed(result, container.protoAccessControl, propertyName)) {
+    return result;
+  }
+
+  return undefined;
+}
+```
+
+**Key V1 implications:**
+
+- Must handle null/undefined gracefully
+- Own properties always accessible
+- Prototype properties require allowlist (can skip for V1)
+- Special handling for Map objects
+
+#### Depth-based Context Lookup
+
+From `lib/handlebars/runtime.js`:
+
+```javascript
+lookup: function(depths, name) {
+  const len = depths.length;
+  for (let i = 0; i < len; i++) {
+    let result = depths[i] && container.lookupProperty(depths[i], name);
+    if (result != null) {
+      return depths[i][name];
+    }
+  }
+}
+```
+
+**V1 implementation:** Scope chain is array of context objects, search from innermost to outermost.
+
+#### escapeExpression Function
+
+From `lib/handlebars/utils.js`:
+
+```javascript
+const escape = {
+  '&': '&amp;',
+  '<': '&lt;',
+  '>': '&gt;',
+  '"': '&quot;',
+  "'": '&#x27;',
+  '`': '&#x60;',
+  '=': '&#x3D;',
+};
+
+const badChars = /[&<>"'`=]/g,
+  possible = /[&<>"'`=]/;
+
+function escapeChar(chr) {
+  return escape[chr];
+}
+
+export function escapeExpression(string) {
+  if (typeof string !== 'string') {
+    // don't escape SafeStrings, since they're already safe
+    if (string && string.toHTML) {
+      return string.toHTML();
+    } else if (string == null) {
+      return '';
+    } else if (!string) {
+      return string + '';
+    }
+
+    // Force a string conversion as this will be done by the append regardless and
+    // the regex test will do this transparently behind the scenes, causing issues if
+    // an object's to string has escaped characters in it.
+    string = '' + string;
+  }
+
+  if (!possible.test(string)) {
+    return string;
+  }
+  return string.replace(badChars, escapeChar);
+}
+```
+
+**V1 Key Points:**
+
+- **SafeString bypass**: Objects with `toHTML()` method are returned as-is (already safe)
+- **Null/undefined handling**: `null` and `undefined` → empty string `""`
+- **Falsy values**: `false`, `0` → coerced to string (`"false"`, `"0"`)
+- **Objects/arrays**: Converted to string first (`'' + string`), then escaped
+- **Fast path optimization**: Quick regex test before actual replacement
+- **7 characters escaped**: `&`, `<`, `>`, `"`, `'`, `` ` ``, `=`
+
+#### createFrame Function
+
+From `lib/handlebars/utils.js`:
+
+```javascript
+export function createFrame(object) {
+  let frame = extend({}, object);
+  frame._parent = object;
+  return frame;
+}
+```
+
+**V1 Key Points:**
+
+- Creates new object with all properties from parent
+- Adds `_parent` reference for scope chain traversal
+- Used for data frames (@variables) and context frames
+- Prevents pollution of parent scope when adding new properties
+
+#### Type Checking Utilities
+
+From `lib/handlebars/utils.js`:
+
+```javascript
+// Sourced from lodash
+export function isFunction(value) {
+  return typeof value === 'function';
+}
+
+function testTag(name) {
+  const tag = '[object ' + name + ']';
+  return function (value) {
+    return value && typeof value === 'object' ? toString.call(value) === tag : false;
+  };
+}
+
+export const isArray = Array.isArray;
+export const isMap = testTag('Map');
+export const isSet = testTag('Set');
+
+export function isEmpty(value) {
+  if (!value && value !== 0) {
+    return true;
+  } else if (isArray(value) && value.length === 0) {
+    return true;
+  } else {
+    return false;
+  }
+}
+```
+
+**V1 Key Points:**
+
+- **isEmpty**: Different from falsy! Returns `true` for `null`, `undefined`, `""`, `[]`; returns `false` for `0`, `false`, `{}`, non-empty arrays
+- **isArray**: Use native `Array.isArray` when available
+- **isMap/isSet**: ES6 Map/Set detection via `Object.prototype.toString`
+- **Type safety**: Always check type before using type-specific methods
+
+#### Path Resolution Algorithm
+
+From `javascript-compiler.js resolvePath`:
+
+```javascript
+resolvePath: function(type, parts, startPartIndex, falsy, strict) {
+  let len = parts.length;
+  for (let i = startPartIndex; i < len; i++) {
+    this.replaceStack((current) => {
+      let lookup = this.nameLookup(current, parts[i], type);
+
+      if (!falsy) {
+        // Standard: return empty if null
+        return [' != null ? ', lookup, ' : ', current];
+      } else {
+        // Falsy-aware: generic falsy handling
+        return [' && ', lookup];
+      }
+    });
+  }
+}
+```
+
+**V1 pattern for nested property access:**
+
+```typescript
+function resolvePath(context: any, parts: string[]): any {
+  let current = context;
+
+  for (const part of parts) {
+    if (current == null) return undefined;
+    current = lookupProperty(current, part);
+  }
+
+  return current;
+}
+```
+
+---
+
+## Stage 2: Parser & AST
+
 ### AST Node Types
 
 From `docs/compiler-api.md` and `lib/handlebars/compiler/ast.js`:
@@ -302,6 +517,38 @@ interface NullLiteral extends Node {
 }
 ```
 
+### Whitespace Control (StripFlags)
+
+From AST documentation and `spec/whitespace-control.js`:
+
+```typescript
+interface StripFlags {
+  open: boolean; // Strip whitespace before opening tag
+  close: boolean; // Strip whitespace after closing tag
+}
+```
+
+**Syntax:**
+
+- `{{~foo}}` - Strip whitespace **before** the tag
+- `{{foo~}}` - Strip whitespace **after** the tag
+- `{{~foo~}}` - Strip both before and after
+- Works with blocks: `{{~#if foo~}}...{{~/if~}}`
+
+**Examples:**
+
+```handlebars
+'
+{{~foo~}}
+' → 'value' (strips surrounding spaces) '
+{{~foo}}
+' → 'value ' (strips before only) '
+{{foo~}}
+' → ' value' (strips after only) '\n{{~foo}}\n' → 'value\n' (strips newline before)
+```
+
+**V1 Note:** Whitespace stripping modifies `ContentStatement.value` during parsing. The interpreter doesn't need to handle StripFlags—they're already applied to the AST.
+
 ### AST Helper Methods
 
 From `lib/handlebars/compiler/ast.js`:
@@ -368,6 +615,259 @@ export function precompile(input, options = {}, env) {
 
 ---
 
+## Built-in Helpers (Critical for V1)
+
+### #each Helper Implementation
+
+From `lib/handlebars/helpers/each.js`:
+
+```javascript
+instance.registerHelper('each', function (context, options) {
+  if (!options) {
+    throw new Exception('Must pass iterator to #each');
+  }
+
+  let fn = options.fn,
+    inverse = options.inverse,
+    i = 0,
+    ret = '',
+    data;
+
+  // Resolve if context is a function
+  if (isFunction(context)) {
+    context = context.call(this);
+  }
+
+  // Create data frame for @variables
+  if (options.data) {
+    data = createFrame(options.data);
+  }
+
+  function execIteration(field, value, index, last) {
+    if (data) {
+      data.key = field; // @key for object iteration
+      data.index = index; // @index (zero-based)
+      data.first = index === 0; // @first
+      data.last = !!last; // @last
+    }
+
+    ret =
+      ret +
+      fn(value, {
+        data: data,
+        blockParams: [context[field], field], // as |value key|
+      });
+  }
+
+  if (context && typeof context === 'object') {
+    if (isArray(context)) {
+      // Array iteration
+      for (let j = context.length; i < j; i++) {
+        if (i in context) {
+          // Skip sparse array holes
+          execIteration(i, context[i], i, i === context.length - 1);
+        }
+      }
+    } else if (isMap(context)) {
+      // ES6 Map support
+      const j = context.size;
+      for (const [key, value] of context) {
+        execIteration(key, value, i++, i === j);
+      }
+    } else if (isSet(context)) {
+      // ES6 Set support
+      const j = context.size;
+      for (const value of context) {
+        execIteration(i, value, i++, i === j);
+      }
+    } else if (typeof Symbol === 'function' && context[Symbol.iterator]) {
+      // Generic iterable support
+      const newContext = [];
+      const iterator = context[Symbol.iterator]();
+      for (let it = iterator.next(); !it.done; it = iterator.next()) {
+        newContext.push(it.value);
+      }
+      context = newContext;
+      for (let j = context.length; i < j; i++) {
+        execIteration(i, context[i], i, i === context.length - 1);
+      }
+    } else {
+      // Object iteration
+      let priorKey;
+      Object.keys(context).forEach((key) => {
+        // Delay iteration by one to detect @last
+        if (priorKey !== undefined) {
+          execIteration(priorKey, context[priorKey], i - 1);
+        }
+        priorKey = key;
+        i++;
+      });
+      if (priorKey !== undefined) {
+        execIteration(priorKey, context[priorKey], i - 1, true);
+      }
+    }
+  }
+
+  if (i === 0) {
+    ret = inverse(this); // Empty case
+  }
+
+  return ret;
+});
+```
+
+**V1 Key Points:**
+
+- **@index**: Zero-based for arrays, objects (incremented per iteration)
+- **@first**: True only for index === 0 (checked at start)
+- **@last**: Requires lookahead (delayed iteration for objects to detect end)
+- **@key**: Property name for object iteration (field parameter)
+- **Block params**: `{{#each items as |item index|}}` - passed as [value, key]
+- **Sparse arrays**: Check `i in context` before iteration to skip holes
+- **Empty arrays/objects**: Render inverse block when i === 0
+- **Data frame creation**: Uses `createFrame(options.data)` for @variables
+- **Object iteration strategy**: Delayed by one to detect @last (store priorKey)
+- **Iteration order**: Arrays by index, Objects by `Object.keys()` order
+
+**Critical implementation pattern for @last in objects:**
+
+```javascript
+// Delay iteration by one to detect @last
+let priorKey;
+Object.keys(context).forEach((key) => {
+  if (priorKey !== undefined) {
+    execIteration(priorKey, context[priorKey], i - 1);
+  }
+  priorKey = key;
+  i++;
+});
+if (priorKey !== undefined) {
+  execIteration(priorKey, context[priorKey], i - 1, true); // Set last=true
+}
+```
+
+### #if / #unless Helpers
+
+From `lib/handlebars/helpers/if.js`:
+
+```javascript
+instance.registerHelper('if', function (conditional, options) {
+  if (arguments.length != 2) {
+    throw new Exception('#if requires exactly one argument');
+  }
+
+  // Resolve functions
+  if (isFunction(conditional)) {
+    conditional = conditional.call(this);
+  }
+
+  // Truthiness evaluation
+  // includeZero option: treat 0 as truthy
+  if ((!options.hash.includeZero && !conditional) || isEmpty(conditional)) {
+    return options.inverse(this);
+  } else {
+    return options.fn(this);
+  }
+});
+
+instance.registerHelper('unless', function (conditional, options) {
+  if (arguments.length != 2) {
+    throw new Exception('#unless requires exactly one argument');
+  }
+  // Unless is just inverted if
+  return instance.helpers['if'].call(this, conditional, {
+    fn: options.inverse,
+    inverse: options.fn,
+    hash: options.hash,
+  });
+});
+```
+
+**isEmpty Utility:**
+
+From `lib/handlebars/utils.js`:
+
+```javascript
+export function isEmpty(value) {
+  if (!value && value !== 0) {
+    return true;
+  } else if (isArray(value) && value.length === 0) {
+    return true;
+  } else {
+    return false;
+  }
+}
+```
+
+**V1 Note:** This is separate from truthiness evaluation. `isEmpty` is specifically used for:
+
+- Determining whether to render inverse blocks
+- Empty array check (even though `[]` is truthy in if/unless)
+- Special handling for 0 (not considered empty)
+
+**V1 Truthiness Rules:**
+
+- **Falsy**: `false`, `null`, `undefined`, `""`, `[]`, `0` (unless includeZero)
+- **Truthy**: Everything else, including `{}`, non-empty arrays/strings
+- **Functions**: Resolved before evaluation
+- **Objects**: Always truthy (even empty `{}`)
+
+### #with Helper
+
+From `lib/handlebars/helpers/with.js`:
+
+```javascript
+instance.registerHelper('with', function (context, options) {
+  if (arguments.length != 2) {
+    throw new Exception('#with requires exactly one argument');
+  }
+
+  if (isFunction(context)) {
+    context = context.call(this);
+  }
+
+  let fn = options.fn;
+
+  if (!isEmpty(context)) {
+    return fn(context, {
+      data: options.data,
+      blockParams: [context], // as |value|
+    });
+  } else {
+    return options.inverse(this);
+  }
+});
+```
+
+### blockHelperMissing
+
+From `lib/handlebars/helpers/block-helper-missing.js`:
+
+```javascript
+instance.registerHelper('blockHelperMissing', function (context, options) {
+  let inverse = options.inverse,
+    fn = options.fn;
+
+  if (context === true) {
+    return fn(this);
+  } else if (context === false || context == null) {
+    return inverse(this);
+  } else if (isArray(context)) {
+    if (context.length > 0) {
+      return instance.helpers.each(context, options); // Delegates to #each
+    } else {
+      return inverse(this);
+    }
+  } else {
+    return fn(context, options);
+  }
+});
+```
+
+**V1 Key:** This is why `{{#items}}...{{/items}}` works without explicit `#each`.
+
+---
+
 ## Visitor Pattern
 
 From `docs/compiler-api.md`, Handlebars provides a Visitor base class for walking the AST:
@@ -418,6 +918,69 @@ visitor.accept(ast);
 - `NullLiteral(nul)`
 - `Hash(hash)`
 - `HashPair(pair)`
+
+---
+
+## Error Handling Patterns
+
+From helper implementations and specs:
+
+### Common Errors Thrown
+
+```javascript
+// From lib/handlebars/helpers/each.js
+throw new Exception('Must pass iterator to #each');
+
+// From lib/handlebars/helpers/if.js
+throw new Exception('#if requires exactly one argument');
+throw new Exception('#unless requires exactly one argument');
+
+// From lib/handlebars/helpers/with.js
+throw new Exception('#with requires exactly one argument');
+
+// From lib/handlebars/runtime.js
+throw new Exception(
+  'The partial ' + options.name + ' could not be compiled when running in runtime-only mode',
+);
+```
+
+### Exception Class
+
+From `@handlebars/parser`:
+
+```typescript
+class Exception {
+  constructor(message: string, node?: AST.Node);
+  message: string;
+  description: string;
+  fileName: string;
+  lineNumber?: number;
+  column?: number;
+  // ... additional properties for error context
+}
+```
+
+**V1 Error Handling Strategy:**
+
+- **Parse errors**: Throw during tokenization/parsing with position info
+- **Runtime errors**: Throw during interpretation with context
+- **Helper errors**: Validate argument counts and types
+- **Missing helpers**: Can be configured to error or silently fail
+- **Undefined variables**: By default return empty string (can enable strict mode)
+
+### Error Context
+
+Handlebars tracks location information in the AST:
+
+```typescript
+interface SourceLocation {
+  source: string | null;
+  start: Position; // { line: number, column: number }
+  end: Position;
+}
+```
+
+**V1 Priority:** Focus on clear error messages with template position for debugging. Line/column tracking is important for user experience.
 
 ---
 
