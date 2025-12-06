@@ -39,6 +39,26 @@ export class Lexer {
     }
 
     if (this.match('{{')) {
+      // Check for comments first
+      const nextChar = this.input[this.index + 2];
+
+      if (nextChar === '!') {
+        return this.scanComment();
+      }
+
+      // Check for block delimiters after {{
+      if (nextChar === '#') {
+        return this.scanBlockDelimiter(TokenType.OPEN_BLOCK, '{{#');
+      }
+
+      if (nextChar === '/') {
+        return this.scanBlockDelimiter(TokenType.OPEN_ENDBLOCK, '{{/');
+      }
+
+      if (nextChar === '^') {
+        return this.scanBlockDelimiter(TokenType.OPEN_INVERSE, '{{^');
+      }
+
       return this.scanDelimiter(TokenType.OPEN, '{{');
     }
 
@@ -51,8 +71,59 @@ export class Lexer {
       return this.scanDelimiter(TokenType.CLOSE, '}}');
     }
 
+    // Check for string literals
+    const char = this.peek();
+    if (char === '"' || char === "'") {
+      return this.scanString();
+    }
+
+    // Check for number literals
+    if (this.isDigit(char) || (char === '-' && this.isDigit(this.input[this.index + 1]))) {
+      return this.scanNumber();
+    }
+
+    // Check for boolean, null, undefined literals (keywords)
+    if (this.isAlpha(char)) {
+      // Peek ahead to see if it's a keyword
+      if (this.match('true') && !this.isAlphaNumeric(this.input[this.index + 4])) {
+        return this.scanKeyword(TokenType.BOOLEAN, 'true');
+      }
+      if (this.match('false') && !this.isAlphaNumeric(this.input[this.index + 5])) {
+        return this.scanKeyword(TokenType.BOOLEAN, 'false');
+      }
+      if (this.match('null') && !this.isAlphaNumeric(this.input[this.index + 4])) {
+        return this.scanKeyword(TokenType.NULL, 'null');
+      }
+      if (this.match('undefined') && !this.isAlphaNumeric(this.input[this.index + 9])) {
+        return this.scanKeyword(TokenType.UNDEFINED, 'undefined');
+      }
+    }
+
     // Otherwise, scan content until we hit {{
     return this.scanContent();
+  }
+
+  /**
+   * Scan a block delimiter token ({{#, {{/, {{^)
+   */
+  private scanBlockDelimiter(type: TokenType, delimiter: string): Token {
+    const start = this.getPosition();
+
+    // Consume the delimiter characters
+    for (let i = 0; i < delimiter.length; i++) {
+      this.advance();
+    }
+
+    const end = this.getPosition();
+
+    return {
+      type,
+      value: delimiter,
+      loc: {
+        start,
+        end,
+      },
+    };
   }
 
   /**
@@ -166,6 +237,189 @@ export class Lexer {
    */
   isEOF(): boolean {
     return this.index >= this.input.length;
+  }
+
+  /**
+   * Scan a comment token ({{! ... }} or {{!-- ... --}})
+   */
+  private scanComment(): Token {
+    const start = this.getPosition();
+
+    // Consume {{!
+    this.advance(); // {
+    this.advance(); // {
+    this.advance(); // !
+
+    // Check if it's a block comment {{!--
+    const isBlockComment = this.match('--');
+    if (isBlockComment) {
+      this.advance(); // -
+      this.advance(); // -
+    }
+
+    let value = '';
+    const endSequence = isBlockComment ? '--}}' : '}}';
+
+    // Scan until we find the closing sequence
+    while (!this.isEOF() && !this.match(endSequence)) {
+      value += this.advance();
+    }
+
+    // Check for unclosed comment
+    if (this.isEOF() && !this.match(endSequence)) {
+      const pos = this.getPosition();
+      throw new Error(`Unclosed comment at line ${pos.line}, column ${pos.column}`);
+    }
+
+    // Consume the closing sequence
+    for (let i = 0; i < endSequence.length; i++) {
+      this.advance();
+    }
+
+    const end = this.getPosition();
+
+    return {
+      type: TokenType.COMMENT,
+      value,
+      loc: {
+        start,
+        end,
+      },
+    };
+  }
+
+  /**
+   * Scan a string literal ("text" or 'text')
+   */
+  private scanString(): Token {
+    const start = this.getPosition();
+    const quote = this.advance(); // Consume opening quote
+    let value = '';
+
+    while (!this.isEOF() && this.peek() !== quote) {
+      const char = this.peek();
+
+      // Handle escape sequences
+      if (char === '\\') {
+        this.advance(); // Consume backslash
+        const nextChar = this.peek();
+
+        if (nextChar === '\\') {
+          value += '\\';
+          this.advance();
+        } else if (nextChar === quote) {
+          value += quote;
+          this.advance();
+        } else {
+          // Keep the escape sequence as-is for other characters
+          value += '\\' + nextChar;
+          this.advance();
+        }
+      } else {
+        value += this.advance();
+      }
+    }
+
+    // Check for unclosed string
+    if (this.isEOF()) {
+      const pos = this.getPosition();
+      throw new Error(`Unclosed string at line ${pos.line}, column ${pos.column}`);
+    }
+
+    this.advance(); // Consume closing quote
+    const end = this.getPosition();
+
+    return {
+      type: TokenType.STRING,
+      value,
+      loc: {
+        start,
+        end,
+      },
+    };
+  }
+
+  /**
+   * Scan a number literal (123, -42, 1.5)
+   */
+  private scanNumber(): Token {
+    const start = this.getPosition();
+    let value = '';
+
+    // Handle negative sign
+    if (this.peek() === '-') {
+      value += this.advance();
+    }
+
+    // Scan integer part
+    while (!this.isEOF() && this.isDigit(this.peek())) {
+      value += this.advance();
+    }
+
+    // Scan decimal part
+    if (this.peek() === '.' && this.isDigit(this.input[this.index + 1])) {
+      value += this.advance(); // Consume '.'
+      while (!this.isEOF() && this.isDigit(this.peek())) {
+        value += this.advance();
+      }
+    }
+
+    const end = this.getPosition();
+
+    return {
+      type: TokenType.NUMBER,
+      value,
+      loc: {
+        start,
+        end,
+      },
+    };
+  }
+
+  /**
+   * Scan a keyword (true, false, null, undefined)
+   */
+  private scanKeyword(type: TokenType, keyword: string): Token {
+    const start = this.getPosition();
+
+    // Consume the keyword characters
+    for (let i = 0; i < keyword.length; i++) {
+      this.advance();
+    }
+
+    const end = this.getPosition();
+
+    return {
+      type,
+      value: keyword,
+      loc: {
+        start,
+        end,
+      },
+    };
+  }
+
+  /**
+   * Check if character is a digit
+   */
+  private isDigit(char: string): boolean {
+    return char >= '0' && char <= '9';
+  }
+
+  /**
+   * Check if character is a letter
+   */
+  private isAlpha(char: string): boolean {
+    return (
+      (char >= 'a' && char <= 'z') || (char >= 'A' && char <= 'Z') || char === '_' || char === '$'
+    );
+  }
+
+  /**
+   * Check if character is alphanumeric
+   */
+  private isAlphaNumeric(char: string): boolean {
+    return this.isAlpha(char) || this.isDigit(char);
   }
 
   /**
