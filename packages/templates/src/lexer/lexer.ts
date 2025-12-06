@@ -2,6 +2,14 @@ import type { Position, Token } from './token';
 import { TokenType } from './token-types';
 
 /**
+ * Lexer states for template scanning
+ */
+const STATE_CONTENT = 0; // Scanning plain text content
+const STATE_MUSTACHE = 1; // Inside mustache delimiters ({{...}})
+
+type LexerState = typeof STATE_CONTENT | typeof STATE_MUSTACHE;
+
+/**
  * Lexer for Handlebars-compatible templates
  *
  * Transforms template strings into token streams without using eval() or new Function()
@@ -19,7 +27,7 @@ export class Lexer {
   private index: number = 0;
   private line: number = 1;
   private column: number = 0;
-  private inMustache: boolean = false;
+  private state: LexerState = STATE_CONTENT;
   // Track last token type to disambiguate dot notation (foo.bar vs . as identifier)
   private lastTokenType: TokenType | null = null;
   // Track which characters are escaped (set of indices)
@@ -36,7 +44,7 @@ export class Lexer {
     this.index = 0;
     this.line = 1;
     this.column = 0;
-    this.inMustache = false;
+    this.state = STATE_CONTENT;
     this.lastTokenType = null;
   }
 
@@ -119,7 +127,7 @@ export class Lexer {
     // Check for mustache opening - need to check triple braces before double
     // Skip if the opening brace is escaped
     if (this.match('{{{') && !this.isEscaped(this.index)) {
-      this.inMustache = true;
+      this.state = STATE_MUSTACHE;
       return this.scanDelimiter(TokenType.OPEN_UNESCAPED, '{{{');
     }
 
@@ -133,38 +141,38 @@ export class Lexer {
 
       // Check for block delimiters after {{
       if (nextChar === '#') {
-        this.inMustache = true;
+        this.state = STATE_MUSTACHE;
         return this.scanDelimiter(TokenType.OPEN_BLOCK, '{{#');
       }
 
       if (nextChar === '/') {
-        this.inMustache = true;
+        this.state = STATE_MUSTACHE;
         return this.scanDelimiter(TokenType.OPEN_ENDBLOCK, '{{/');
       }
 
       if (nextChar === '^') {
-        this.inMustache = true;
+        this.state = STATE_MUSTACHE;
         return this.scanDelimiter(TokenType.OPEN_INVERSE, '{{^');
       }
 
-      this.inMustache = true;
+      this.state = STATE_MUSTACHE;
       return this.scanDelimiter(TokenType.OPEN, '{{');
     }
 
     // Check for mustache closing - need to check triple braces before double
     // Skip if the closing brace is escaped
     if (this.match('}}}') && !this.isEscaped(this.index)) {
-      this.inMustache = false;
+      this.state = STATE_CONTENT;
       return this.scanDelimiter(TokenType.CLOSE_UNESCAPED, '}}}');
     }
 
     if (this.match('}}') && !this.isEscaped(this.index)) {
-      this.inMustache = false;
+      this.state = STATE_CONTENT;
       return this.scanDelimiter(TokenType.CLOSE, '}}');
     }
 
     // If we're inside a mustache, check for mustache-specific tokens
-    if (this.inMustache) {
+    if (this.state === STATE_MUSTACHE) {
       const char = this.peek();
 
       // Check for string literals
