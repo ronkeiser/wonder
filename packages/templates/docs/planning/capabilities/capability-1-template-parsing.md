@@ -1,468 +1,418 @@
-# Capability 1: Template Parsing
+# Capability 1: Lexical Analysis (Tokenization)
 
-**Goal:** Transform template strings into executable AST without using `eval()` or `new Function()`
-
----
-
-## Feature 1.1: Tokenization
-
-**Goal:** Scan template string and produce token stream
-
-### Task C1-F1-T1: Define Token Types
-
-**Scope:** ~20 LOC
-
-Define TypeScript types for tokens:
-
-- `TokenType` enum: `TEXT`, `MUSTACHE_OPEN`, `MUSTACHE_CLOSE`, `TRIPLE_OPEN`, `TRIPLE_CLOSE`
-- `Token` interface with `type`, `value`, `position` (line, column, index)
-- Export types from `types.ts`
-
-**Deliverable:** Type definitions file with full JSDoc comments
+**Goal:** Transform template strings into token streams following Handlebars tokenization rules. Must work in Cloudflare Workers without `eval()` or `new Function()`.
 
 ---
 
-### Task C1-F1-T2: Implement Scanner
+## Feature 1.1: Core Token Types
 
-**Scope:** ~60 LOC
+**Goal:** Implement recognition for essential token types from Handlebars spec
 
-Create scanner class that processes template string character by character:
+### Task C1-F1-T1: Define Token Type Enumerations
 
-- `Scanner` class with `template: string`, `position: number`, `line: number`, `column: number`
-- Methods: `peek()`, `advance()`, `isAtEnd()`, `match(expected: string)`
-- Helper: `createToken(type, value, start, end)` for position tracking
+- Create TypeScript enum or const object for all token types
+- Include delimiters: `OPEN` (`{{`), `CLOSE` (`}}`), `OPEN_UNESCAPED` (`{{{`), `CLOSE_UNESCAPED` (`}}}`)
+- Include block tokens: `OPEN_BLOCK` (`{{#`), `OPEN_ENDBLOCK` (`{{/`), `OPEN_INVERSE` (`{{^`)
+- Include special tokens: `INVERSE` (`{{else}}`), `COMMENT` (`{{!` or `{{!--`)
+- Include content: `CONTENT` (plain text between mustaches)
+- Include literals: `STRING`, `NUMBER`, `BOOLEAN`, `UNDEFINED`, `NULL`
+- Include identifiers: `ID` (variable/helper names)
+- Include separators: `SEP` (`.` or `/` for dot notation)
+- Include data prefix: `DATA` (`@` for data variables)
+- Include `EOF` for end of input
 
-**Deliverable:** `scanner.ts` with Scanner class
+**Deliverable:** `src/lexer/token-types.ts` with token type definitions
 
 **Tests:**
 
-- Scanner can peek at current character
-- Scanner advances position correctly
-- Scanner tracks line and column numbers
-- Scanner detects end of input
+- Token enum/const has all required types
+- Token types can be compared for equality
+- Token types are exported for use in parser
 
----
+### Task C1-F1-T2: Create Token Interface
 
-### Task C1-F1-T3: Tokenize Plain Text
+- Define Token interface with fields:
+  - `type: TokenType` — The token type
+  - `value: string` — The lexeme (raw text)
+  - `loc: SourceLocation | null` — Position info (line, column, index)
+- Define SourceLocation interface with:
+  - `start: Position` — Starting position
+  - `end: Position` — Ending position
+- Define Position interface with:
+  - `line: number` — Line number (1-based)
+  - `column: number` — Column number (0-based)
+  - `index: number` — Character index (0-based)
 
-**Scope:** ~40 LOC
-
-Implement text token extraction:
-
-- Scan until `{{` is found
-- Accumulate characters into text token
-- Handle empty text (between consecutive mustaches)
-- Handle template with no mustaches (pure text)
-
-**Deliverable:** `tokenize()` function returns array of TEXT tokens for plain text input
-
-**Tests:**
-
-- Plain text with no mustaches → single TEXT token
-- Empty string → empty token array
-- Text with newlines → preserves newlines in token value
-
----
-
-### Task C1-F1-T4: Tokenize Mustache Delimiters
-
-**Scope:** ~50 LOC
-
-Detect and tokenize mustache boundaries:
-
-- Recognize `{{` as `MUSTACHE_OPEN`
-- Recognize `}}` as `MUSTACHE_CLOSE`
-- Recognize `{{{` as `TRIPLE_OPEN`
-- Recognize `}}}` as `TRIPLE_CLOSE`
-- Handle ambiguous cases: `{{{{` should be `TRIPLE_OPEN` + `{`
-
-**Deliverable:** Tokenizer recognizes all delimiter types
+**Deliverable:** `src/lexer/token.ts` with Token, SourceLocation, and Position interfaces
 
 **Tests:**
 
-- `{{variable}}` → OPEN, TEXT("variable"), CLOSE
-- `{{{html}}}` → TRIPLE_OPEN, TEXT("html"), TRIPLE_CLOSE
-- `{{{{nested` → handles gracefully
-- Unclosed `{{` → error or TEXT fallback
+- Token interface includes all required fields
+- SourceLocation properly typed
+- Position properly typed
 
----
+### Task C1-F1-T3: Implement Basic Lexer Class Structure
 
-### Task C1-F1-T5: Integrate Text and Mustache Tokenization
+- Create Lexer class with state fields:
+  - `input: string` — The template string
+  - `index: number` — Current position in input
+  - `line: number` — Current line number
+  - `column: number` — Current column number
+  - `tokens: Token[]` — Accumulated tokens
+- Implement `setInput(template: string): void` method to initialize state
+- Implement `lex(): Token | null` method to extract next token
+- Implement helper: `peek(): string` to look ahead without consuming
+- Implement helper: `advance(): string` to consume and return next character
+- Implement helper: `match(str: string): boolean` to check if next chars match
+- Implement helper: `isEOF(): boolean` to check end of input
 
-**Scope:** ~40 LOC
-
-Combine text and mustache tokenization into single pass:
-
-- State machine: `TEXT_MODE` vs `MUSTACHE_MODE`
-- Switch modes when encountering `{{` or `}}`
-- Accumulate text/mustache content separately
-- Emit tokens at appropriate boundaries
-
-**Deliverable:** `tokenize(template: string): Token[]` main entry point
-
-**Tests:**
-
-- `Hello {{name}}!` → TEXT, OPEN, TEXT, CLOSE, TEXT
-- Multiple variables: `{{a}} {{b}}`
-- Adjacent mustaches: `{{a}}{{b}}`
-- Mixed: text, variables, more text
-
----
-
-### Task C1-F1-T6: Handle Whitespace
-
-**Scope:** ~30 LOC
-
-Preserve whitespace within tokens:
-
-- Don't trim whitespace in TEXT tokens
-- Preserve whitespace inside mustaches: `{{ name }}` keeps spaces
-- Track whether whitespace is significant for future trimming feature
-
-**Deliverable:** Whitespace-preserving tokenization
+**Deliverable:** `src/lexer/lexer.ts` with Lexer class skeleton
 
 **Tests:**
 
-- Leading/trailing spaces in text preserved
-- Spaces inside mustaches preserved: `{{ name }}`
-- Newlines preserved
-- Multiple spaces preserved
+- `setInput()` initializes state correctly
+- `advance()` moves position and updates line/column
+- `peek()` doesn't modify state
+- `match()` correctly identifies multi-character sequences
+- `isEOF()` returns true at end of input
 
----
+### Task C1-F1-T4: Implement Plain Text (CONTENT) Tokenization
 
-## Feature 1.2: Token Classification
+- Scan characters until `{{` is encountered
+- Create CONTENT token with accumulated text
+- Handle empty content (two mustaches adjacent)
+- Track position correctly across newlines
 
-**Goal:** Parse variable expressions and identify token types
-
-### Task C1-F2-T1: Define Expression AST Types
-
-**Scope:** ~40 LOC
-
-Define types for parsed expressions:
-
-- `ExpressionType` enum: `VARIABLE`, `PATH`, `PARENT_PATH`, `THIS`, `BLOCK_START`, `BLOCK_END`, `COMMENT`
-- `Expression` interface with `type`, `path: string[]`, `blockType?: string`
-- `PathExpression` for `object.property.nested`
-- `ParentExpression` for `../parent`
-
-**Deliverable:** Expression type definitions in `types.ts`
-
----
-
-### Task C1-F2-T2: Parse Simple Variables
-
-**Scope:** ~40 LOC
-
-Parse single identifier from mustache content:
-
-- Extract identifier: `{{name}}` → path: `["name"]`
-- Validate identifier (alphanumeric + underscore, no spaces)
-- Handle `{{this}}` as special case
-- Reject invalid identifiers
-
-**Deliverable:** `parseExpression(content: string): Expression` for simple variables
+**Deliverable:** CONTENT token recognition in Lexer
 
 **Tests:**
 
-- `name` → VARIABLE, path: ["name"]
-- `this` → THIS
-- `_var123` → valid
-- `invalid-name` → error
-- `invalid name` → error (space)
+- Plain text with no mustaches: `"Hello World"` → Single CONTENT token
+- Text before mustache: `"Hello {{name}}"` → CONTENT("Hello "), then tokens
+- Multiple newlines in content update line tracking
+- Empty content between mustaches handled gracefully
 
----
+### Task C1-F1-T5: Implement Delimiter Tokenization
 
-### Task C1-F2-T3: Parse Nested Property Access
+- Recognize `{{` → OPEN token
+- Recognize `}}` → CLOSE token
+- Recognize `{{{` → OPEN_UNESCAPED token (check 3 braces before 2)
+- Recognize `}}}` → CLOSE_UNESCAPED token
+- Track position for each delimiter
 
-**Scope:** ~50 LOC
-
-Parse dot notation into path array:
-
-- Split on `.` to get path segments: `user.name` → `["user", "name"]`
-- Validate each segment is valid identifier
-- Handle trailing/leading dots (error)
-- Handle consecutive dots (error)
-
-**Deliverable:** Path parsing for nested properties
+**Deliverable:** Delimiter token recognition in Lexer
 
 **Tests:**
 
-- `user.name` → path: ["user", "name"]
-- `a.b.c.d` → path: ["a", "b", "c", "d"]
-- `object.` → error (trailing dot)
-- `.property` → error (leading dot)
-- `a..b` → error (consecutive dots)
+- `{{` → OPEN token
+- `}}` → CLOSE token
+- `{{{` → OPEN_UNESCAPED (not OPEN)
+- `}}}` → CLOSE_UNESCAPED (not CLOSE)
+- Position tracking accurate
 
----
+### Task C1-F1-T6: Implement Block Delimiter Tokenization
 
-### Task C1-F2-T4: Parse Parent Path Access
+- After OPEN (`{{`), check next character:
+  - `#` → OPEN_BLOCK token
+  - `/` → OPEN_ENDBLOCK token
+  - `^` → OPEN_INVERSE token
+- Handle whitespace between `{{` and special char
+- Track position correctly
 
-**Scope:** ~40 LOC
-
-Parse `../` prefix for parent scope access:
-
-- Count leading `../` segments
-- Parse remaining path
-- Store parent depth + path: `../user.name` → depth: 1, path: ["user", "name"]
-- Handle multiple levels: `../../grandparent`
-
-**Deliverable:** Parent path parsing
+**Deliverable:** Block delimiter recognition in Lexer
 
 **Tests:**
 
-- `../parent` → PARENT_PATH, depth: 1, path: ["parent"]
-- `../../grandparent` → depth: 2, path: ["grandparent"]
-- `../../../a.b.c` → depth: 3, path: ["a", "b", "c"]
-- `../` alone → depth: 1, path: []
-- Invalid: `..` without `/` → error
+- `{{#` → OPEN_BLOCK
+- `{{/` → OPEN_ENDBLOCK
+- `{{^` → OPEN_INVERSE
+- `{{ #` with space → OPEN, then ID("#") (not OPEN_BLOCK)
+- Position tracking accurate
 
----
+### Task C1-F1-T7: Implement Comment Tokenization
 
-### Task C1-F2-T5: Parse Block Expressions
+- Recognize `{{!` → Start of comment
+- Recognize `{{!--` → Start of block comment
+- For `{{!`, consume until `}}`
+- For `{{!--`, consume until `--}}`
+- Create COMMENT token with comment text (excluding delimiters)
+- Handle unclosed comments → throw error
 
-**Scope:** ~60 LOC
-
-Identify and parse block helpers:
-
-- Detect `#` prefix for block start: `#if`, `#each`, `#unless`
-- Detect `/` prefix for block end: `/if`, `/each`, `/unless`
-- Extract block type and condition/target
-- Handle `else` as special block modifier
-
-**Deliverable:** Block expression parsing
+**Deliverable:** Comment token recognition in Lexer
 
 **Tests:**
 
-- `#if condition` → BLOCK_START, blockType: "if", target: "condition"
-- `/if` → BLOCK_END, blockType: "if"
-- `#each items` → BLOCK_START, blockType: "each", target: "items"
-- `/each` → BLOCK_END, blockType: "each"
-- `else` → BLOCK_MODIFIER, type: "else"
-- `#unless test` → BLOCK_START, blockType: "unless", target: "test"
+- `{{! comment }}` → COMMENT token
+- `{{!-- block comment --}}` → COMMENT token
+- Unclosed `{{! comment` → Error with position
+- Unclosed `{{!-- comment` → Error with position
+- Nested braces in comment: `{{! has }} in it }}` (consumes at first `}}`)
 
----
+### Task C1-F1-T8: Implement Literal Tokenization
 
-### Task C1-F2-T6: Parse Comments
+- **String literals:**
+  - Recognize `"` or `'` as string start
+  - Consume until matching quote
+  - Handle escaped quotes: `\"` and `\'`
+  - Handle escaped backslashes: `\\`
+  - Create STRING token with unescaped value
+  - Throw error on unclosed string
+- **Number literals:**
+  - Recognize digit or `-` followed by digit
+  - Support integers: `123`, `-42`
+  - Support decimals: `1.5`, `-0.5`
+  - Create NUMBER token with parsed numeric value
+- **Boolean literals:**
+  - Recognize `true` → BOOLEAN token with value `true`
+  - Recognize `false` → BOOLEAN token with value `false`
+- **Special values:**
+  - Recognize `null` → NULL token
+  - Recognize `undefined` → UNDEFINED token
 
-**Scope:** ~30 LOC
-
-Identify and parse comment expressions:
-
-- Detect `!` prefix: `{{! comment text }}`
-- Extract comment content (for debugging, not rendered)
-- Return COMMENT expression type
-
-**Deliverable:** Comment parsing
-
-**Tests:**
-
-- `! this is a comment` → COMMENT
-- `! multi-line\ncomment` → preserves content
-- Comment with mustaches inside: `! {{not}} {{parsed}}`
-
----
-
-### Task C1-F2-T7: Integrate Token Classification
-
-**Scope:** ~40 LOC
-
-Connect tokenizer output to expression parser:
-
-- Process token stream
-- For each MUSTACHE token, parse expression
-- Replace raw content with parsed Expression
-- Build `ParsedToken` with Expression instead of raw string
-
-**Deliverable:** `classifyTokens(tokens: Token[]): ParsedToken[]`
+**Deliverable:** Literal token recognition in Lexer
 
 **Tests:**
 
-- Token stream → classified tokens with expressions
-- Mix of variables, blocks, comments classified correctly
-- Invalid expressions produce clear errors
+- String: `"hello"` → STRING("hello")
+- String with escaped quote: `"say \"hi\""` → STRING('say "hi"')
+- String with escaped backslash: `"path\\file"` → STRING("path\file")
+- Unclosed string: `"hello` → Error
+- Integer: `123` → NUMBER(123)
+- Negative: `-42` → NUMBER(-42)
+- Decimal: `1.5` → NUMBER(1.5)
+- Boolean: `true` → BOOLEAN(true), `false` → BOOLEAN(false)
+- Null: `null` → NULL
+- Undefined: `undefined` → UNDEFINED
 
----
+### Task C1-F1-T9: Implement Identifier Tokenization
 
-## Feature 1.3: AST Construction
+- Recognize identifiers: start with letter, `_`, or `$`, followed by letters, digits, `_`, `$`
+- Create ID token with identifier name
+- Handle keywords: `if`, `unless`, `each`, `with`, `else` (context-dependent)
+- Handle special identifiers: `this`
 
-**Goal:** Build hierarchical tree from flat token stream
-
-### Task C1-F3-T1: Define AST Node Types
-
-**Scope:** ~50 LOC
-
-Define AST node type hierarchy:
-
-- `ASTNode` base type with `nodeType`, `position`
-- `TextNode` with `content: string`
-- `VariableNode` with `expression: Expression`, `escaped: boolean`
-- `BlockNode` with `blockType: string`, `target: Expression`, `children: ASTNode[]`, `elseChildren?: ASTNode[]`
-- `CommentNode` with `content: string`
-- `ProgramNode` (root) with `children: ASTNode[]`
-
-**Deliverable:** AST type definitions in `types.ts`
-
----
-
-### Task C1-F3-T2: Implement AST Builder Class
-
-**Scope:** ~60 LOC
-
-Create builder for constructing AST:
-
-- `ASTBuilder` class with token stream
-- Track current position in tokens
-- Methods: `buildProgram()`, `buildNode()`, `advance()`, `peek()`, `expect(type)`
-- Return `ProgramNode` as root
-
-**Deliverable:** `ASTBuilder` class skeleton
+**Deliverable:** Identifier token recognition in Lexer
 
 **Tests:**
 
-- Builder initializes with tokens
-- Builder can peek and advance
-- Builder creates ProgramNode root
+- Simple identifier: `foo` → ID("foo")
+- Underscore: `_var` → ID("\_var")
+- Dollar sign: `$var` → ID("$var")
+- Digits in name: `var1` → ID("var1")
+- Keywords recognized as IDs (context determines meaning)
 
 ---
 
-### Task C1-F3-T3: Build Text and Variable Nodes
+## Feature 1.2: Path Tokenization
 
-**Scope:** ~50 LOC
+**Goal:** Recognize dot and slash notation for property paths, parent paths, and data variables
 
-Convert simple tokens to AST nodes:
+### Task C1-F2-T1: Implement Separator Tokenization
 
-- TEXT token → `TextNode`
-- VARIABLE expression → `VariableNode` (escaped by default)
-- TRIPLE mustache → `VariableNode` (unescaped)
-- Handle position tracking for error messages
+- Recognize `.` → SEP token
+- Recognize `/` → SEP token (equivalent to dot)
+- Only tokenize when inside mustache context
 
-**Deliverable:** Text and variable node construction
+**Deliverable:** SEP token recognition in Lexer
 
 **Tests:**
 
-- `Hello world` → TextNode
-- `{{name}}` → VariableNode (escaped: true)
-- `{{{html}}}` → VariableNode (escaped: false)
-- Mixed text and variables → multiple nodes
+- `.` → SEP
+- `/` → SEP
+- `.` in CONTENT (outside mustache) → stays in CONTENT
 
----
+### Task C1-F2-T2: Implement Data Prefix Tokenization
 
-### Task C1-F3-T4: Build Comment Nodes
+- Recognize `@` → DATA token
+- Only valid at start of path inside mustache
+- Position tracking
 
-**Scope:** ~20 LOC
-
-Convert COMMENT tokens to AST nodes:
-
-- COMMENT expression → `CommentNode`
-- Store content for debugging (excluded from output)
-
-**Deliverable:** Comment node construction
+**Deliverable:** DATA token recognition in Lexer
 
 **Tests:**
 
-- `{{! comment }}` → CommentNode
-- Comments are nodes in AST but won't render
+- `@` → DATA
+- `@` followed by identifier: `@index` → DATA, ID("index")
 
----
+### Task C1-F2-T3: Test Path Sequences
 
-### Task C1-F3-T5: Build Block Nodes (Single-Level)
+- Verify sequences tokenize correctly:
+  - `foo.bar.baz` → ID("foo"), SEP, ID("bar"), SEP, ID("baz")
+  - `foo/bar` → ID("foo"), SEP, ID("bar")
+  - `../parent` → ID(".."), SEP, ID("parent")
+  - `../../grand` → ID(".."), SEP, ID(".."), SEP, ID("grand")
+  - `@index` → DATA, ID("index")
+  - `@root.value` → DATA, ID("root"), SEP, ID("value")
+  - `this.foo` → ID("this"), SEP, ID("foo")
+  - `./foo` → ID("."), SEP, ID("foo")
 
-**Scope:** ~80 LOC
-
-Construct block nodes with children:
-
-- Match BLOCK_START with corresponding BLOCK_END
-- Collect child nodes between start and end
-- Create `BlockNode` with blockType, target, and children
-- Validate matching block types: `#if` must close with `/if`
-
-**Deliverable:** Single-level block construction
-
-**Tests:**
-
-- `{{#if test}}content{{/if}}` → BlockNode with TextNode child
-- `{{#each items}}{{name}}{{/each}}` → BlockNode with VariableNode child
-- Mismatched blocks error: `{{#if}}{{/each}}`
-- Unclosed block error: `{{#if}}` with no close
-
----
-
-### Task C1-F3-T6: Handle Else Clauses
-
-**Scope:** ~60 LOC
-
-Split block children at `{{else}}`:
-
-- Detect ELSE modifier inside block
-- Partition children into main and else branches
-- Store in `BlockNode.elseChildren`
-- Validate else only appears in conditional blocks (if/unless)
-
-**Deliverable:** Else clause handling
+**Deliverable:** Integration tests for path tokenization
 
 **Tests:**
 
-- `{{#if test}}yes{{else}}no{{/if}}` → children + elseChildren
-- `{{#unless test}}no{{else}}yes{{/unless}}`
-- Multiple else error: `{{#if}}{{else}}{{else}}{{/if}}`
-- Else in each error: `{{#each}}{{else}}{{/each}}`
+- All path patterns from overview tokenize correctly
+- Whitespace preserved: `{{ foo.bar }}` has spaces
+- Mixed notation: `{{../foo/bar.baz}}`
 
 ---
 
-### Task C1-F3-T7: Build Nested Blocks
+## Feature 1.3: Escape Handling
 
-**Scope:** ~70 LOC
+**Goal:** Implement backslash escaping before tokenization to allow literal mustaches in output
 
-Support blocks within blocks:
+### Task C1-F3-T1: Implement Escape Pre-processing
 
-- Recursive descent: when building children, allow blocks as children
-- Maintain stack of open blocks for validation
-- Track nesting depth for debugging
-- Validate proper nesting (no overlapping blocks)
+- Before tokenization, scan for `\\` sequences
+- `\\` followed by any character → remove backslash, mark character as escaped
+- Track which characters are escaped
+- When tokenizing, skip mustache recognition for escaped `{`
 
-**Deliverable:** Nested block construction
+**Deliverable:** Escape handling in Lexer initialization
 
 **Tests:**
 
-- `{{#if outer}}{{#if inner}}text{{/if}}{{/if}}` → nested BlockNodes
-- `{{#each items}}{{#if condition}}{{value}}{{/if}}{{/each}}`
-- Three levels deep
-- Invalid nesting detected: `{{#if}}{{#each}}{{/if}}{{/each}}`
+- `\\{{foo}}` → CONTENT("{{foo}}") (literal mustaches)
+- `\\\\{{foo}}` → CONTENT("\\"), then normal tokenization of `{{foo}}`
+- `normal \\{{escaped}} normal` → CONTENT with literal `{{escaped}}`
+- Multiple escapes: `\\{{foo}} \\{{bar}}`
 
----
+### Task C1-F3-T2: Handle Edge Cases
 
-### Task C1-F3-T8: Integrate AST Construction
+- Backslash at end of input: `text\\` → CONTENT("text\\")
+- Backslash before non-special char: `\\a` → CONTENT("a")
+- Multiple backslashes: `\\\\\\{{` → `\{{` (two backslashes → one, third escapes brace)
 
-**Scope:** ~40 LOC
-
-Connect classification to AST building:
-
-- Create main `parse()` function
-- Call `tokenize()` → `classifyTokens()` → `buildAST()`
-- Return `ProgramNode` or throw parse error
-- Add comprehensive error messages with position info
-
-**Deliverable:** `parse(template: string): ProgramNode` entry point
+**Deliverable:** Edge case handling for escapes
 
 **Tests:**
 
-- End-to-end: template string → AST
-- Complex template with all node types
-- Parse errors include line/column information
-- Edge cases: empty template, template with only comments
+- Trailing backslash doesn't error
+- Escaped non-mustache characters handled
+- Chain of backslashes processed correctly
 
 ---
 
-## Summary
+## Feature 1.4: Lexer State Machine
 
-**Total Tasks:** 22 tasks across 3 features  
-**Estimated LOC:** ~1,000 lines for complete parsing capability  
-**Dependencies:** Sequential within features, but features can be validated incrementally
+**Goal:** Create stateful lexer with proper error handling and position tracking
 
-**Validation Strategy:**
+### Task C1-F4-T1: Implement Full Lexer State Management
 
-- Unit tests for each task
-- Integration tests at feature boundaries
-- End-to-end parse tests after Feature 1.3
+- Track lexer state: `STATE_CONTENT` vs `STATE_MUSTACHE`
+- In `STATE_CONTENT`: scan for plain text and `{{`
+- In `STATE_MUSTACHE`: tokenize identifiers, literals, separators, etc.
+- Switch states when entering/exiting mustaches
+- EOF token at end of input
 
-**Next Capability:** Context Resolution (depends on AST being complete)
+**Deliverable:** Complete state machine in Lexer
+
+**Tests:**
+
+- State switches correctly on `{{` and `}}`
+- Tokenization behavior differs by state
+- EOF token generated at end
+
+### Task C1-F4-T2: Implement Position Tracking
+
+- Track line, column, and character index
+- Update on each character consumed
+- Handle newlines: increment line, reset column
+- Handle tabs: configurable tab width (default 4)
+- Store position in every token
+
+**Deliverable:** Position tracking throughout lexer
+
+**Tests:**
+
+- Single-line template positions correct
+- Multi-line template line numbers correct
+- Newlines in CONTENT update line tracking
+- Tabs handled correctly
+- Token locations accurate
+
+### Task C1-F4-T3: Implement Error Handling
+
+- Create `LexerError` class extending `Error`
+- Include position information in errors
+- Throw errors for:
+  - Unclosed comments
+  - Unclosed strings
+  - Invalid characters in mustache context
+  - Unexpected EOF
+- Format error messages with line/column
+
+**Deliverable:** `src/lexer/lexer-error.ts` with error class, error throwing in Lexer
+
+**Tests:**
+
+- Unclosed comment error includes position
+- Unclosed string error includes position
+- Invalid character error clear and specific
+- Error messages formatted with line/column: `"Error at line 3, column 5: ..."`
+
+### Task C1-F4-T4: Implement Lexer Public Interface
+
+- `tokenize(template: string): Token[]` — Convenience method that calls setInput, then lex() until EOF
+- Returns array of all tokens
+- Excludes EOF token from returned array (internal use)
+
+**Deliverable:** Public tokenize method
+
+**Tests:**
+
+- `tokenize()` returns complete token array
+- Can tokenize same template multiple times (fresh state)
+- Empty template returns empty array
+- Template with only content returns single CONTENT token
+
+### Task C1-F4-T5: Integration Testing
+
+- Test complex real-world templates
+- Verify token sequences match expectations
+- Test all features together
+
+**Deliverable:** Comprehensive integration test suite
+
+**Tests:**
+
+- Simple variable: `"Hello {{name}}"` → Expected token sequence
+- Block with content: `"{{#if foo}}yes{{/if}}"` → Expected tokens
+- Nested blocks: `"{{#if a}}{{#each items}}{{this}}{{/each}}{{/if}}"`
+- Comments ignored: `"{{! ignore me }}{{foo}}"` → COMMENT, then variable tokens
+- Mixed content: Plain text, variables, blocks, comments
+- Multi-line template with all features
+- Real prompt template example from requirements
+
+---
+
+## Implementation Notes
+
+### Reference Implementation
+
+Study these for tokenization patterns:
+
+- **LiquidJS**: `src/scanner.ts` — Efficient character scanning
+- **Handlebars**: `src/handlebars.l` (Jison lexer spec) — Token definitions
+- **mustache.js**: Scanner implementation — Simple state machine
+
+### Performance Considerations
+
+- Single-pass scanning where possible
+- Avoid excessive string concatenation (use array and join)
+- Minimize backtracking
+- Pre-compile regex patterns
+
+### Security Considerations
+
+- Validate escape sequences properly
+- Prevent infinite loops on malformed input
+- Set reasonable input size limits (if needed)
+- Don't expose internal state through errors
+
+### Testing Strategy
+
+- Test each feature in isolation first
+- Then integration tests combining features
+- Include edge cases and error conditions
+- Test with actual Handlebars templates for compatibility
+- Property-based testing for fuzzing (optional, V2)
