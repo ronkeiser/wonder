@@ -1540,7 +1540,7 @@ if ("")          // false
 
 ---
 
-#### 5. Block Parameters (as |variable| syntax)
+#### 2. Block Parameters (as |variable| syntax)
 
 **Status:** Tokens listed, not explained
 
@@ -1587,60 +1587,9 @@ if ("")          // false
 
 ---
 
-### Lower Priority Gaps (Can Defer to V2)
-
-#### 6. Subexpressions
-
-**Status:** Token types listed only
-
-**What's Missing:**
-
-- Complete subexpression syntax: `{{outer (inner arg1 arg2)}}`
-- Nesting rules and evaluation order
-- Using subexpressions in conditionals: `{{#if (gt value 10)}}`
-- SubExpression AST node structure and interpretation
-
-**Impact:** LOW - Nice to have for complex logic, not essential for V1
-
----
-
-#### 7. Hash Parameters
-
-**Status:** AST structure documented, no usage examples
-
-**What's Missing:**
-
-- Hash syntax: `{{helper arg1 key1=value1 key2=value2}}`
-- Hash evaluation in helper invocations
-- Whether hash values can be expressions or only literals
-- Hash parameter precedence and overriding
-
-**Impact:** LOW - Advanced feature, likely not needed for prompt templates
-
----
-
-#### 8. Property Iteration Order
-
-**Status:** Uses `Object.keys()` but edge cases unclear
-
-**What's Missing:**
-
-- ES2015+ property ordering guarantees (integer keys first, then insertion order)
-- Symbol properties handling (are they skipped?)
-- Prototype chain traversal behavior
-- Consistency across different contexts
-
-**Impact:** LOW - Edge case, unlikely to matter for typical usage
-
----
-
 ### Next Steps
 
 **During Implementation:**
 
-1. Validate understanding of Gaps #1-2 with test cases
-2. Make explicit decisions about whether to include block params
-
-**For V2 Planning:**
-
-3. Evaluate whether Gaps #3-5 are needed for LLM prompt use cases
+1. Validate understanding of Gap #1 with test cases
+2. Make explicit decisions about whether to include block params (Gap #2)
