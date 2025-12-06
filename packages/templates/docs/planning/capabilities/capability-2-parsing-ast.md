@@ -10,7 +10,7 @@
 
 ### Task C2-F1-T1: Define Base Node Types
 
-**Status:** `[ ]` Not Started
+**Status:** `[x]` Complete
 
 - Create base `Node` interface with:
   - `type: string` — Node type discriminator
@@ -33,7 +33,7 @@
 
 ### Task C2-F1-T2: Define Program Node
 
-**Status:** `[ ]` Not Started
+**Status:** `[x]` Complete
 
 - Create `Program` interface:
   - `type: 'Program'`
@@ -52,7 +52,7 @@
 
 ### Task C2-F1-T3: Define Statement Node Types
 
-**Status:** `[ ]` Not Started
+**Status:** `[x]` Complete
 
 - Create `Statement` union type
 - Create `ContentStatement` interface:
@@ -94,7 +94,7 @@
 
 ### Task C2-F1-T4: Define Expression Node Types
 
-**Status:** `[ ]` Not Started
+**Status:** `[x]` Complete
 
 - Create `Expression` union type
 - Create `PathExpression` interface:
@@ -142,7 +142,7 @@
 
 ### Task C2-F1-T5: Define Helper Node Types
 
-**Status:** `[ ]` Not Started
+**Status:** `[x]` Complete
 
 - Create `Hash` interface:
   - `type: 'Hash'`
@@ -174,7 +174,7 @@
 
 ### Task C2-F2-T1: Implement Parser Class Skeleton
 
-**Status:** `[ ]` Not Started
+**Status:** `[x]` Complete
 
 - Create Parser class with state fields:
   - `tokens: Token[]` — Token stream from lexer
@@ -201,7 +201,7 @@
 
 ### Task C2-F2-T2: Implement Error Handling
 
-**Status:** `[ ]` Not Started
+**Status:** `[x]` Complete
 
 - Create `ParserError` class extending `Error`
 - Include token position information in errors
@@ -223,7 +223,7 @@
 
 ### Task C2-F2-T3: Implement Position Tracking
 
-**Status:** `[ ]` Not Started
+**Status:** `[x]` Complete
 
 - Track start and end positions for each node
 - Use token locations to construct node locations
@@ -248,7 +248,7 @@
 
 ### Task C2-F3-T1: Parse ContentStatement
 
-**Status:** `[ ]` Not Started
+**Status:** `[x]` Complete
 
 - When current token is CONTENT:
   - Create `ContentStatement` node
@@ -268,7 +268,7 @@
 
 ### Task C2-F3-T2: Parse CommentStatement
 
-**Status:** `[ ]` Not Started
+**Status:** `[x]` Complete
 
 - When current token is COMMENT:
   - Create `CommentStatement` node
