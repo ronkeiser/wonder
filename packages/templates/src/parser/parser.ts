@@ -750,6 +750,7 @@ export class Parser {
     this.advance();
 
     // Parse the closing helper name
+    const closingNameToken = this.currentToken; // Save for error reporting
     const closingName = this.parsePathExpression();
 
     // V1: Skip any parameters in closing tag (shouldn't be any, but be safe)
@@ -759,9 +760,11 @@ export class Parser {
 
     // Validate that closing name matches opening name
     if (helperName.original !== closingName.original) {
+      const openLine = blockStartToken?.loc?.start.line || '?';
+      const closeToken = closingNameToken || this.currentToken;
       throw ParserError.fromToken(
-        `Block closing tag mismatch: expected {{/${helperName.original}}} but found {{/${closingName.original}}}`,
-        this.currentToken!,
+        `Block closing tag mismatch: expected {{/${helperName.original}}} but found {{/${closingName.original}}} (block opened at line ${openLine})`,
+        closeToken!,
         this.getErrorContext(),
       );
     }
