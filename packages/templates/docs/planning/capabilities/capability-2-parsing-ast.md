@@ -63,15 +63,15 @@
 - Create `MustacheStatement` interface:
   - `type: 'MustacheStatement'`
   - `path: PathExpression`
-  - `params: Expression[]` — Helper arguments (empty in V1)
-  - `hash: Hash` — Named parameters (empty in V1)
+  - `params: Expression[]` — Helper arguments (parsed in V1 for built-in helpers)
+  - `hash: Hash` — Named parameters (reserved for V2)
   - `escaped: boolean` — true for `{{}}`, false for `{{{}}}`
   - `loc: SourceLocation | null`
 - Create `BlockStatement` interface:
   - `type: 'BlockStatement'`
   - `path: PathExpression` — Helper name
-  - `params: Expression[]` — Helper arguments (empty in V1)
-  - `hash: Hash` — Named parameters (empty in V1)
+  - `params: Expression[]` — Helper arguments (parsed in V1 for built-in helpers)
+  - `hash: Hash` — Named parameters (reserved for V2)
   - `program: Program | null` — Main block content
   - `inverse: Program | null` — `{{else}}` block content
   - `openStrip: StripFlags` — Whitespace control (V2)
@@ -128,6 +128,12 @@
   - `type: 'UndefinedLiteral'`
   - `value: undefined` — Always undefined
   - `original: string` — "undefined"
+  - `loc: SourceLocation | null`
+- Create `SubExpression` interface:
+  - `type: 'SubExpression'`
+  - `path: PathExpression` — Helper name
+  - `params: Expression[]` — Arguments (can include nested SubExpressions)
+  - `hash: Hash` — Named parameters (reserved for V2)
   - `loc: SourceLocation | null`
 - Define `Expression` as union of all expression types
 
@@ -400,15 +406,19 @@
 
 - When current token is OPEN (`{{`):
   - Parse path expression
+  - Parse parameter list (if present):
+    - While not CLOSE and not EQUALS (hash param):
+      - Parse expression (can be literal, path, or subexpression)
+      - Add to params array
   - Create `MustacheStatement` with:
     - `path: PathExpression`
-    - `params: []` (empty in V1)
-    - `hash: { type: 'Hash', pairs: [], loc: null }` (empty in V1)
+    - `params: Expression[]` (parsed arguments for helpers)
+    - `hash: { type: 'Hash', pairs: [], loc: null }` (V2)
     - `escaped: true`
   - Expect CLOSE (`}}`) token
   - Set location spanning OPEN to CLOSE
 
-**Deliverable:** Escaped mustache parsing in Parser
+**Deliverable:** Escaped mustache parsing with parameters in Parser
 
 **Tests:**
 
@@ -424,15 +434,19 @@
 
 - When current token is OPEN_UNESCAPED (`{{{`):
   - Parse path expression
+  - Parse parameter list (if present):
+    - While not CLOSE_UNESCAPED and not EQUALS:
+      - Parse expression (can be literal, path, or subexpression)
+      - Add to params array
   - Create `MustacheStatement` with:
     - `path: PathExpression`
-    - `params: []`
+    - `params: Expression[]` (parsed arguments)
     - `hash: { type: 'Hash', pairs: [], loc: null }`
     - `escaped: false`
   - Expect CLOSE_UNESCAPED (`}}}`) token
   - Set location spanning OPEN_UNESCAPED to CLOSE_UNESCAPED
 
-**Deliverable:** Unescaped mustache parsing in Parser
+**Deliverable:** Unescaped mustache parsing with parameters in Parser
 
 **Tests:**
 
@@ -470,6 +484,10 @@
 
 - When current token is OPEN_BLOCK (`{{#`):
   - Parse helper name as path expression
+  - Parse parameter list (if present):
+    - While not CLOSE and not EQUALS:
+      - Parse expression (can be literal, path, or subexpression)
+      - Add to params array
   - Expect CLOSE (`}}`)
   - Parse main block content into Program node
   - When OPEN_ENDBLOCK (`{{/`) encountered:
@@ -478,13 +496,13 @@
     - Validate end name matches start name
   - Create `BlockStatement` with:
     - `path: PathExpression` (helper name)
-    - `params: []`
+    - `params: Expression[]` (parsed arguments)
     - `hash: { type: 'Hash', pairs: [], loc: null }`
     - `program: Program` (main block content)
     - `inverse: null`
   - Set location spanning entire block
 
-**Deliverable:** Simple block parsing in Parser
+**Deliverable:** Simple block parsing with parameters in Parser
 
 **Tests:**
 
@@ -740,6 +758,99 @@
 - `undefined` → UndefinedLiteral with value undefined
 - Original strings correct
 - Locations correct
+
+---
+
+## Feature 2.10: SubExpression Parsing
+
+**Goal:** Parse nested helper calls within expressions for V1 built-in helpers
+
+### Task C2-F10-T1: Parse SubExpression Structure
+
+**Status:** `[ ]` Not Started
+
+- When current token is OPEN_SEXPR (`(`):
+  - Parse helper name as path expression
+  - Parse parameter list recursively:
+    - While not CLOSE_SEXPR:
+      - Parse expression (literal, path, or nested SubExpression)
+      - Add to params array
+  - Expect CLOSE_SEXPR (`)`)
+  - Create `SubExpression` with:
+    - `path: PathExpression` (helper name)
+    - `params: Expression[]` (evaluated arguments)
+    - `hash: { type: 'Hash', pairs: [], loc: null }`
+  - Set location spanning parentheses
+  - Return SubExpression node
+
+**Deliverable:** SubExpression parsing in Parser
+
+**Tests:**
+
+- `(gt x 1)` → SubExpression with 2 params
+- `(eq status "active")` → SubExpression with string literal
+- Simple subexpression in if: `{{#if (gt score 80)}}...{{/if}}`
+- Location spans parentheses
+
+### Task C2-F10-T2: Parse Nested SubExpressions
+
+**Status:** `[ ]` Not Started
+
+- Handle SubExpression as parameter to another SubExpression
+- Recursive descent: when parsing params, check for OPEN_SEXPR
+- If OPEN_SEXPR found, recursively call SubExpression parser
+- Support arbitrary nesting depth
+- Track nesting for error messages
+
+**Deliverable:** Nested SubExpression parsing in Parser
+
+**Tests:**
+
+- `(and (gt x 1) (lt x 10))` → SubExpression with 2 SubExpression params
+- Triple nested: `(or (and a b) (and c d))`
+- Mixed literals and subexpressions: `(add (mul x 2) 5)`
+- Location information correct for all levels
+
+### Task C2-F10-T3: Integrate with Expression Parsing
+
+**Status:** `[ ]` Not Started
+
+- Update `parseExpression()` method to handle OPEN_SEXPR
+- When parsing params for MustacheStatement:
+  - Check for OPEN_SEXPR token
+  - If found, parse SubExpression
+  - Add SubExpression to params array
+- When parsing params for BlockStatement:
+  - Same logic applies
+- SubExpressions can appear anywhere expressions are expected
+
+**Deliverable:** SubExpression integration in expression parsing
+
+**Tests:**
+
+- `{{#if (gt score 80)}}` → BlockStatement with SubExpression param
+- `{{uppercase (concat first " " last)}}` → MustacheStatement with SubExpression
+- Multiple subexpressions: `{{#if (and (gt x 1) (lt x 10))}}`
+- Subexpressions work in both mustaches and blocks
+
+### Task C2-F10-T4: Validate SubExpression Closing
+
+**Status:** `[ ]` Not Started
+
+- After OPEN_SEXPR, must find matching CLOSE_SEXPR
+- Track nesting depth for error messages
+- Unclosed subexpression throws error with position
+- Unexpected CLOSE_SEXPR throws error
+- Error messages include context about which helper
+
+**Deliverable:** SubExpression validation in Parser
+
+**Tests:**
+
+- `(gt x 1` → Error: unclosed subexpression
+- `gt x 1)` → Error: unexpected closing parenthesis
+- `(gt (lt x 5) 1` → Error identifies which subexpression unclosed
+- Error includes line/column information
 
 ---
 

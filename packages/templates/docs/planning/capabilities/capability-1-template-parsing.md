@@ -428,6 +428,72 @@
 
 ---
 
+## Feature 1.5: Subexpression Tokenization
+
+**Goal:** Tokenize parentheses for nested helper calls within expressions (V1 requirement)
+
+### Task C1-F5-T1: Implement Parenthesis Tokenization
+
+**Status:** `[ ]` Not Started
+
+- Recognize `(` → OPEN_SEXPR token (only inside mustache context)
+- Recognize `)` → CLOSE_SEXPR token (only inside mustache context)
+- Track position for each token
+- Only tokenize parentheses inside `{{ }}`, not in CONTENT
+
+**Deliverable:** OPEN_SEXPR and CLOSE_SEXPR token recognition in Lexer
+
+**Tests:**
+
+- `(` inside mustache → OPEN_SEXPR
+- `)` inside mustache → CLOSE_SEXPR
+- `(` in CONTENT → stays in CONTENT, not tokenized
+- Position tracking accurate
+- Nested parentheses tokenized separately: `((` → OPEN_SEXPR, OPEN_SEXPR
+
+### Task C1-F5-T2: Test Subexpression Token Sequences
+
+**Status:** `[ ]` Not Started
+
+- Verify subexpression patterns tokenize correctly:
+  - `{{#if (gt x 1)}}` → OPEN_BLOCK, ID("if"), OPEN_SEXPR, ID("gt"), ID("x"), NUMBER(1), CLOSE_SEXPR, CLOSE
+  - `{{#if (and (gt x 1) (lt x 10))}}` → nested subexpressions with proper token sequence
+  - `{{uppercase (concat first last)}}` → helper with subexpression parameter
+  - `(eq status "active")` → subexpression with string literal
+
+**Deliverable:** Integration tests for subexpression tokenization
+
+**Tests:**
+
+- Simple subexpression in block helper
+- Nested subexpressions (2+ levels deep)
+- Subexpression with string literals
+- Subexpression with multiple parameters
+- Subexpression in mustache statement vs block statement
+- Whitespace handling inside subexpressions: `( gt x 1 )`
+
+### Task C1-F5-T3: Update Integration Tests
+
+**Status:** `[ ]` Not Started
+
+- Add subexpression examples to existing integration test suite
+- Verify complex templates with subexpressions tokenize correctly
+- Test edge cases:
+  - Unmatched parentheses (should tokenize, parser will catch error)
+  - Empty subexpressions: `()`
+  - Deeply nested: `(a (b (c (d))))`
+
+**Deliverable:** Enhanced integration tests including subexpressions
+
+**Tests:**
+
+- Real-world templates with comparison helpers
+- Deeply nested subexpressions (5+ levels)
+- Mixed content, mustaches, blocks, and subexpressions
+- Subexpressions with all literal types
+
+---
+
 ## Implementation Notes
 
 ### Reference Implementation

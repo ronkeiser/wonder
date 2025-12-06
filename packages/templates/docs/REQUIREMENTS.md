@@ -28,30 +28,35 @@ A Handlebars-style template engine designed to run in Cloudflare Workers, where 
 
 ## Version 1 Features
 
-**Critical for LLM prompt templates in multi-judge workflows:**
+**Core rendering with in-memory data:**
 
-| Feature                | Notes                                                            |
-| ---------------------- | ---------------------------------------------------------------- |
-| Variable interpolation | `{{variable}}`, `{{object.property}}`, nested property access    |
-| HTML escaping          | Escape by default, `{{{variable}}}` for unescaped output         |
-| Array iteration        | `{{#each items}}{{this}}{{/each}}` - P0 blocker for edge tests   |
-| Nested iteration       | `{{#each outer}}{{#each inner}}{{/each}}{{/each}}` - for ranking |
-| Loop variables         | `{{this}}`, `{{@index}}`, `{{@first}}`, `{{@last}}`, `{{@key}}`  |
-| Parent context access  | `../` to access outer scope in nested blocks                     |
-| Conditionals           | `{{#if condition}}...{{else}}...{{/if}}`, `{{#unless}}`          |
-| Comments               | `{{! comment }}`                                                 |
+| Feature                | Notes                                                                    |
+| ---------------------- | ------------------------------------------------------------------------ |
+| Variable interpolation | `{{variable}}`, `{{object.property}}`, nested property access            |
+| HTML escaping          | Escape by default, `{{{variable}}}` for unescaped output                 |
+| Built-in block helpers | `#if`, `#unless`, `#each`, `#with` - all standard Handlebars blocks      |
+| Array iteration        | `{{#each items}}{{this}}{{/each}}` - P0 blocker for edge tests           |
+| Nested iteration       | `{{#each outer}}{{#each inner}}{{/each}}{{/each}}` - for ranking         |
+| Loop variables         | `{{this}}`, `{{@index}}`, `{{@first}}`, `{{@last}}`, `{{@key}}`          |
+| Parent context access  | `../` to access outer scope in nested blocks                             |
+| Conditionals           | `{{#if condition}}...{{else}}...{{/if}}`, `{{#unless}}`                  |
+| Context switching      | `{{#with object}}...{{/with}}` - scoped context                          |
+| Runtime helpers        | User-defined functions passed at render time via options                 |
+| Built-in helpers       | `eq`, `ne`, `gt`, `gte`, `lt`, `lte`, `and`, `or`, `not` for comparisons |
+| Subexpressions         | `{{#if (gt score 80)}}` - nested helper calls in expressions             |
+| Comments               | `{{! comment }}`                                                         |
 
 ## Version 2 Features
 
-**Template composition and extensibility:**
+**Async operations and stored templates:**
 
-| Feature            | Notes                                        |
-| ------------------ | -------------------------------------------- |
-| Partials           | `{{> partialName}}` - async resolution (D1)  |
-| Helpers            | User-defined functions passed at render time |
-| Block helpers      | Custom block logic                           |
-| Whitespace control | `{{~#if}}` strips whitespace                 |
-| `{{#with}}` blocks | Context switching                            |
+| Feature            | Notes                                                |
+| ------------------ | ---------------------------------------------------- |
+| Partials from D1   | `{{> partialName}}` - async resolution from database |
+| Helpers from D1    | User-defined helpers stored and retrieved from D1    |
+| Block params       | `{{#each items as \|item index\|}}` - param binding  |
+| Whitespace control | `{{~#if}}` strips whitespace                         |
+| Custom decorators  | Advanced template modification                       |
 
 ## Reference Implementations to Study
 

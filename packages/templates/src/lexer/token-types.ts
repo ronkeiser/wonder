@@ -20,6 +20,10 @@ export const TokenType = {
   INVERSE: 'INVERSE', // {{else}}
   COMMENT: 'COMMENT', // {{! ... }} or {{!-- ... --}}
 
+  // Subexpressions
+  OPEN_SEXPR: 'OPEN_SEXPR', // (
+  CLOSE_SEXPR: 'CLOSE_SEXPR', // )
+
   // Content
   CONTENT: 'CONTENT', // Plain text between mustaches
 

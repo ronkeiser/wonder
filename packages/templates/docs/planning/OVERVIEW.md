@@ -2,15 +2,19 @@
 
 ## Overview
 
-Version 1 provides the core template rendering capabilities needed for LLM prompt templates in multi-judge workflows. Implementation follows a layered architecture: Lexer → Parser → Interpreter.
+Version 1 provides complete template rendering with in-memory data, including helpers, comparisons, and all built-in blocks needed for LLM prompt templates. Implementation follows a layered architecture: Lexer → Parser → Interpreter.
 
 **Key Constraint:** Must work in Cloudflare Workers without `eval()` or `new Function()`. We implement stages 1-2 from Handlebars (Lexer + Parser to produce AST), then directly interpret the AST instead of compiling to JavaScript.
+
+**V1 Scope:** All features that work with in-memory data - variables, all built-in blocks (#if, #unless, #each, #with), runtime helpers, built-in comparison helpers, and subexpressions.
+
+**V2 Scope:** Async operations - partials/helpers stored in D1, block params, whitespace control.
 
 ---
 
 ## Capability 1: Lexical Analysis (Tokenization)
 
-**Status:** ✅ Completed
+**Status:** 🔄 In Progress
 
 **Goal:** Transform template strings into token streams following Handlebars tokenization rules
 
@@ -21,6 +25,7 @@ Implement recognition for essential token types from Handlebars spec:
 - **Delimiters:** `OPEN` (`{{`), `CLOSE` (`}}`), `OPEN_UNESCAPED` (`{{{`), `CLOSE_UNESCAPED` (`}}}`)
 - **Block tokens:** `OPEN_BLOCK` (`{{#`), `OPEN_ENDBLOCK` (`{{/`), `OPEN_INVERSE` (`{{^`)
 - **Special:** `INVERSE` (`{{else}}`), `COMMENT` (`{{!` or `{{!--`)
+- **Subexpressions:** `OPEN_SEXPR` (`(`), `CLOSE_SEXPR` (`)`)
 - **Content:** `CONTENT` (plain text between mustaches)
 - **Literals:** `STRING` (`"text"` or `'text'`), `NUMBER`, `BOOLEAN`, `UNDEFINED`, `NULL`
 - **Identifiers:** `ID` (variable/helper names)
@@ -113,6 +118,7 @@ Implement core node types from Handlebars AST specification:
 **Expressions:**
 
 - `PathExpression` — Variable paths with depth tracking
+- `SubExpression` — Nested helper calls like `(gt x 1)`
 - `StringLiteral`, `NumberLiteral`, `BooleanLiteral`, `NullLiteral`, `UndefinedLiteral`
 
 **Test cases:**
@@ -161,8 +167,8 @@ Parse block helpers with proper nesting:
 
 - `type: 'BlockStatement'`
 - `path: PathExpression`
-- `params: Expression[]` — Arguments (unused in V1)
-- `hash: Hash` — Named params (unused in V1)
+- `params: Expression[]` — Helper arguments (e.g., for built-in comparison helpers)
+- `hash: Hash` — Named parameters (reserved for future use)
 - `program: Program | null` — Main block content
 - `inverse: Program | null` — `{{else}}` content
 
@@ -188,8 +194,8 @@ Parse block helpers with proper nesting:
 
 - `type: 'MustacheStatement'`
 - `path: PathExpression`
-- `params: Expression[]` — Helper arguments (V1: empty)
-- `hash: Hash` — Named params (V1: empty)
+- `params: Expression[]` — Helper arguments (can include subexpressions)
+- `hash: Hash` — Named parameters (reserved for future use)
 - `escaped: boolean` — true for `{{`, false for `{{{`
 
 **Requirements:**
@@ -197,7 +203,8 @@ Parse block helpers with proper nesting:
 - Set `escaped: true` for `{{variable}}`
 - Set `escaped: false` for `{{{variable}}}`
 - Store path as PathExpression
-- Leave params/hash empty (V1 doesn't support helpers with arguments)
+- Parse params for helper calls like `{{uppercase name}}`
+- Parse nested subexpressions like `{{#if (gt score 80)}}`
 
 **Test cases:**
 
@@ -394,7 +401,7 @@ Maintain data frame stack for loop metadata:
 
 **Status:** 🔄 Not Started
 
-**Goal:** Implement #if, #unless, #each following Handlebars behavior exactly
+**Goal:** Implement #if, #unless, #each, #with following Handlebars behavior exactly
 
 ### Feature 5.1: #if Helper
 
@@ -489,7 +496,26 @@ Maintain data frame stack for loop metadata:
 - Empty object → render else block
 - Iteration order follows `Object.keys()`
 
-### Feature 5.5: Nested Iteration
+### Feature 5.5: #with Helper
+
+**Requirements:**
+
+- Resolve context object using path expression
+- Handle empty/null → render inverse block
+- Use `isEmpty()` for truthiness check
+- Push object as new context
+- Create new data frame
+- Render main block with new context
+- No inverse block: render empty string
+
+**Test cases:**
+
+- `{{#with user}}{{name}}{{/with}}` accesses user properties
+- `{{#with user}}{{../parentProp}}{{/with}}` accesses parent
+- Null/undefined/empty object → render else block
+- Nested with blocks
+
+### Feature 5.6: Nested Blocks
 
 **Requirements:**
 
@@ -505,16 +531,151 @@ Maintain data frame stack for loop metadata:
 - Access outer `@index` not possible (data variables are scoped to current frame)
 - Three-level nesting
 - Mixed array and object iteration
+- `#with` nested in `#each` and vice versa
 
 ---
 
-## Capability 6: Output Generation
+## Capability 6: Helpers & Subexpressions
+
+**Status:** 🔄 Not Started
+
+**Goal:** Support runtime helper functions and nested helper calls in expressions
+
+### Feature 6.1: SubExpression Parsing
+
+Parse nested helper calls within expressions:
+
+**SubExpression structure:**
+
+- `type: 'SubExpression'`
+- `path: PathExpression` — Helper name
+- `params: Expression[]` — Arguments (can include nested SubExpressions)
+- `hash: Hash` — Named parameters (reserved for future use)
+
+**Requirements:**
+
+- Recognize `(` token as subexpression start
+- Parse helper name as PathExpression
+- Parse parameters (can be nested subexpressions)
+- Recognize `)` token as subexpression end
+- Support arbitrary nesting depth
+
+**Test cases:**
+
+- Simple: `(gt x 1)` → SubExpression with 2 params
+- Nested: `(and (gt x 1) (lt x 10))` → SubExpression with 2 SubExpression params
+- Multiple params: `(add a b c)`
+- String literals in params: `(eq status "active")`
+
+### Feature 6.2: SubExpression Evaluation
+
+Evaluate subexpressions by calling helpers:
+
+**Requirements:**
+
+- Resolve helper name from path
+- Evaluate all parameters recursively (depth-first)
+- Call helper function with evaluated params
+- Return helper result for use in parent expression
+- Handle missing helpers → throw clear error
+
+**Test cases:**
+
+- `(gt 5 3)` → `true`
+- `(not true)` → `false`
+- `(eq "foo" "foo")` → `true`
+- Nested: `(and (gt x 5) (lt x 10))` evaluates inner expressions first
+- Unknown helper throws error
+
+### Feature 6.3: Built-in Comparison Helpers
+
+Implement standard comparison helpers needed for conditionals:
+
+**Comparison helpers:**
+
+- `eq(a, b)` — Strict equality (`a === b`)
+- `ne(a, b)` — Not equal (`a !== b`)
+- `lt(a, b)` — Less than (`a < b`)
+- `lte(a, b)` — Less than or equal (`a <= b`)
+- `gt(a, b)` — Greater than (`a > b`)
+- `gte(a, b)` — Greater than or equal (`a >= b`)
+
+**Logical helpers:**
+
+- `and(...args)` — Logical AND (all truthy)
+- `or(...args)` — Logical OR (any truthy)
+- `not(value)` — Logical NOT
+
+**Requirements:**
+
+- All helpers work with any value types
+- Use Handlebars truthiness rules (not JavaScript)
+- Comparison helpers do type coercion like JavaScript operators
+- Logical helpers use `isEmpty()` for truthiness
+
+**Test cases:**
+
+- `{{#if (gt score 80)}}` with various scores
+- `{{#if (eq status "active")}}` string comparison
+- `{{#if (and isValid hasPermission)}}` multiple conditions
+- `{{#if (or (eq role "admin") (eq role "owner"))}}` chained conditions
+- `{{#if (not isDisabled)}}` negation
+
+### Feature 6.4: Runtime Helper Registry
+
+Support user-provided helpers passed at render time:
+
+**Requirements:**
+
+- Accept `helpers` option in render/compile API
+- Merge with built-in helpers (user helpers can override built-ins)
+- Look up helper by name during evaluation
+- Pass evaluated arguments to helper function
+- Pass context as `this` binding
+- Return helper result
+
+**Helper function signature:**
+
+```typescript
+type Helper = (this: any, ...args: any[]) => any;
+```
+
+**Test cases:**
+
+- Custom helper: `helpers: { uppercase: (str) => str.toUpperCase() }`
+- Helper with multiple args: `helpers: { add: (a, b) => a + b }`
+- Helper accessing context: `function() { return this.value }`
+- Override built-in helper
+- Unknown helper throws error
+
+### Feature 6.5: Helper Detection
+
+Distinguish between variable lookups and helper calls:
+
+**Requirements:**
+
+- If MustacheStatement/BlockStatement has params → it's a helper call
+- If no params and name exists in helper registry → it's a helper call
+- Otherwise → it's a variable lookup
+- Scoped paths (starting with `./` or `this.`) are never helpers
+
+**Test cases:**
+
+- `{{uppercase name}}` with params → helper call
+- `{{uppercase}}` no params, helper exists → helper call
+- `{{uppercase}}` no params, no helper → variable lookup
+- `{{./uppercase}}` scoped → variable lookup (even if helper exists)
+- `{{this.uppercase}}` scoped → variable lookup
+
+---
+
+## Capability 7: Output Generation
 
 **Status:** 🔄 Not Started
 
 **Goal:** Walk AST and generate final string output
 
-### Feature 6.1: Interpreter Main Loop
+### Feature 7.1: Interpreter Main Loop
 
 **Requirements:**
 
@@ -531,7 +692,7 @@ Maintain data frame stack for loop metadata:
 - `BlockStatement` → evaluate helper
 - `CommentStatement` → return empty string
 
-### Feature 6.2: Mustache Evaluation
+### Feature 7.2: Mustache Evaluation
 
 **Requirements:**
 
@@ -552,7 +713,7 @@ Maintain data frame stack for loop metadata:
 - Objects → `"[object Object]"` (primitive coercion)
 - Escaped vs unescaped output
 
-### Feature 6.3: Block Evaluation
+### Feature 7.3: Block Evaluation
 
 **Requirements:**
 
@@ -572,15 +733,25 @@ Maintain data frame stack for loop metadata:
 
 ---
 
-## Capability 7: Public API
+## Capability 8: Public API
 
 **Status:** 🔄 Not Started
 
 **Goal:** Provide clean, simple API matching Handlebars conventions
 
-### Feature 7.1: render() Function
+### Feature 8.1: render() Function
 
-**Signature:** `async function render(template: string, context: any): Promise<string>`
+**Signature:**
+
+```typescript
+async function render(
+  template: string,
+  context: any,
+  options?: {
+    helpers?: Record<string, Helper>;
+  },
+): Promise<string>;
+```
 
 **Requirements:**
 
@@ -588,35 +759,46 @@ Maintain data frame stack for loop metadata:
 - Parse tokens to AST
 - Initialize context stack with context
 - Initialize data stack with `{ root: context }`
+- Merge built-in helpers with provided helpers (user helpers override built-ins)
 - Evaluate AST and return output string
 - Throw errors with position info on failure
 
 **Test cases:**
 
 - Simple: `await render('Hello {{name}}', { name: 'World' })`
+- With helpers: `await render('{{uppercase name}}', { name: 'foo' }, { helpers: { uppercase: (s) => s.toUpperCase() } })`
 - Complex templates with all features
 - Empty context
 - Null context
 
-### Feature 7.2: compile() Function
+### Feature 8.2: compile() Function
 
-**Signature:** `function compile(template: string): CompiledTemplate`
+**Signature:**
+
+```typescript
+function compile(template: string): CompiledTemplate;
+
+interface CompiledTemplate {
+  render(context: any, options?: { helpers?: Record<string, Helper> }): string;
+}
+```
 
 **Requirements:**
 
 - Lex and parse once (up-front)
-- Return object with `render(context)` method
+- Return object with `render(context, options)` method
 - Cache AST for reuse
 - Each render call initializes fresh stacks
-- Same template can be rendered with different contexts
+- Same template can be rendered with different contexts and helpers
 
 **Test cases:**
 
 - Compile once, render multiple times
 - Different contexts produce different output
+- Different helpers per render call
 - AST is cached (not re-parsed)
 
-### Feature 7.3: Error Handling
+### Feature 8.3: Error Handling
 
 **Requirements:**
 
@@ -642,12 +824,13 @@ Maintain data frame stack for loop metadata:
 
 ## Implementation Order
 
-1. **Capability 1** (Lexer) — Tokenize templates without AST
-2. **Capability 2** (Parser) — Build AST from tokens
+1. **Capability 1** (Lexer) — Tokenize templates including subexpressions
+2. **Capability 2** (Parser) — Build AST from tokens including SubExpression nodes
 3. **Capability 3** (Runtime Utilities) — Core functions for evaluation
 4. **Capability 4** (Interpreter Core) — Path resolution and basic evaluation
-5. **Capability 5** (Block Helpers) — #if, #unless, #each in order
-6. **Capability 6** (Output Generation) — Complete interpreter loop
-7. **Capability 7** (Public API) — Export clean interface
+5. **Capability 5** (Block Helpers) — #if, #unless, #each, #with
+6. **Capability 6** (Helpers & Subexpressions) — Built-in helpers, runtime helpers, subexpression evaluation
+7. **Capability 7** (Output Generation) — Complete interpreter loop
+8. **Capability 8** (Public API) — Export clean interface with helpers option
 
 Each capability should be test-driven: write tests first based on Handlebars behavior, then implement until tests pass.
