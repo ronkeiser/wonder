@@ -19,7 +19,7 @@ describe('Lexer - Escape Handling (C1-F3-T1)', () => {
         value: '{{foo}}',
       });
 
-      expect(lexer.lex()).toBeNull(); // EOF
+      expect(lexer.lex()).toMatchObject({ type: TokenType.EOF }); // EOF
     });
 
     it('should treat \\\\\\\\{{foo}} as literal backslash followed by {{foo}} mustache', () => {
@@ -51,7 +51,7 @@ describe('Lexer - Escape Handling (C1-F3-T1)', () => {
         value: '}}',
       });
 
-      expect(lexer.lex()).toBeNull(); // EOF
+      expect(lexer.lex()).toMatchObject({ type: TokenType.EOF }); // EOF
     });
 
     it('should handle escaped mustaches in mixed content', () => {
@@ -64,7 +64,7 @@ describe('Lexer - Escape Handling (C1-F3-T1)', () => {
         value: 'normal {{escaped}} normal',
       });
 
-      expect(lexer.lex()).toBeNull(); // EOF
+      expect(lexer.lex()).toMatchObject({ type: TokenType.EOF }); // EOF
     });
 
     it('should handle multiple escaped mustaches', () => {
@@ -76,7 +76,7 @@ describe('Lexer - Escape Handling (C1-F3-T1)', () => {
         value: '{{foo}} {{bar}}',
       });
 
-      expect(lexer.lex()).toBeNull(); // EOF
+      expect(lexer.lex()).toMatchObject({ type: TokenType.EOF }); // EOF
     });
   });
 
@@ -90,7 +90,7 @@ describe('Lexer - Escape Handling (C1-F3-T1)', () => {
         value: 'text {{ more text',
       });
 
-      expect(lexer.lex()).toBeNull();
+      expect(lexer.lex()).toMatchObject({ type: TokenType.EOF });
     });
 
     it('should escape {{{ delimiter', () => {
@@ -102,7 +102,7 @@ describe('Lexer - Escape Handling (C1-F3-T1)', () => {
         value: 'text {{{ more text',
       });
 
-      expect(lexer.lex()).toBeNull();
+      expect(lexer.lex()).toMatchObject({ type: TokenType.EOF });
     });
 
     it('should escape {{# block delimiter', () => {
@@ -114,7 +114,7 @@ describe('Lexer - Escape Handling (C1-F3-T1)', () => {
         value: 'text {{#if}} more text',
       });
 
-      expect(lexer.lex()).toBeNull();
+      expect(lexer.lex()).toMatchObject({ type: TokenType.EOF });
     });
 
     it('should escape {{/ end block delimiter', () => {
@@ -126,7 +126,7 @@ describe('Lexer - Escape Handling (C1-F3-T1)', () => {
         value: 'text {{/if}} more text',
       });
 
-      expect(lexer.lex()).toBeNull();
+      expect(lexer.lex()).toMatchObject({ type: TokenType.EOF });
     });
   });
 
@@ -140,7 +140,7 @@ describe('Lexer - Escape Handling (C1-F3-T1)', () => {
         value: 'text }} more text',
       });
 
-      expect(lexer.lex()).toBeNull();
+      expect(lexer.lex()).toMatchObject({ type: TokenType.EOF });
     });
 
     it('should escape }}} delimiter', () => {
@@ -152,7 +152,7 @@ describe('Lexer - Escape Handling (C1-F3-T1)', () => {
         value: 'text }}} more text',
       });
 
-      expect(lexer.lex()).toBeNull();
+      expect(lexer.lex()).toMatchObject({ type: TokenType.EOF });
     });
   });
 
@@ -182,7 +182,7 @@ describe('Lexer - Escape Handling (C1-F3-T1)', () => {
         value: ' {{bar}}',
       });
 
-      expect(lexer.lex()).toBeNull();
+      expect(lexer.lex()).toMatchObject({ type: TokenType.EOF });
     });
 
     it('should handle escaped mustache followed by normal mustache', () => {
@@ -210,7 +210,7 @@ describe('Lexer - Escape Handling (C1-F3-T1)', () => {
         value: '}}',
       });
 
-      expect(lexer.lex()).toBeNull();
+      expect(lexer.lex()).toMatchObject({ type: TokenType.EOF });
     });
 
     it('should handle alternating escaped and unescaped mustaches', () => {
@@ -238,7 +238,7 @@ describe('Lexer - Escape Handling (C1-F3-T1)', () => {
       expect(lexer.lex()).toMatchObject({ type: TokenType.ID, value: 'd' });
       expect(lexer.lex()).toMatchObject({ type: TokenType.CLOSE });
 
-      expect(lexer.lex()).toBeNull();
+      expect(lexer.lex()).toMatchObject({ type: TokenType.EOF });
     });
   });
 
@@ -252,7 +252,7 @@ describe('Lexer - Escape Handling (C1-F3-T1)', () => {
         value: 'text \\a more',
       });
 
-      expect(lexer.lex()).toBeNull();
+      expect(lexer.lex()).toMatchObject({ type: TokenType.EOF });
     });
 
     it('should NOT escape backslash before space (kept as-is)', () => {
@@ -264,7 +264,7 @@ describe('Lexer - Escape Handling (C1-F3-T1)', () => {
         value: 'text\\ space',
       });
 
-      expect(lexer.lex()).toBeNull();
+      expect(lexer.lex()).toMatchObject({ type: TokenType.EOF });
     });
 
     it('should NOT escape backslash before newline (kept as-is)', () => {
@@ -276,7 +276,7 @@ describe('Lexer - Escape Handling (C1-F3-T1)', () => {
         value: 'text\\\nmore',
       });
 
-      expect(lexer.lex()).toBeNull();
+      expect(lexer.lex()).toMatchObject({ type: TokenType.EOF });
     });
   });
 
@@ -292,7 +292,7 @@ describe('Lexer - Escape Handling (C1-F3-T1)', () => {
         value: '\\{{foo}}',
       });
 
-      expect(lexer.lex()).toBeNull();
+      expect(lexer.lex()).toMatchObject({ type: TokenType.EOF });
     });
 
     it('should handle four backslashes before mustache', () => {
@@ -311,7 +311,7 @@ describe('Lexer - Escape Handling (C1-F3-T1)', () => {
       expect(lexer.lex()).toMatchObject({ type: TokenType.ID, value: 'foo' });
       expect(lexer.lex()).toMatchObject({ type: TokenType.CLOSE });
 
-      expect(lexer.lex()).toBeNull();
+      expect(lexer.lex()).toMatchObject({ type: TokenType.EOF });
     });
   });
 
@@ -325,7 +325,7 @@ describe('Lexer - Escape Handling (C1-F3-T1)', () => {
         value: 'text\\',
       });
 
-      expect(lexer.lex()).toBeNull();
+      expect(lexer.lex()).toMatchObject({ type: TokenType.EOF });
     });
 
     it('should handle escaped mustache at start of template', () => {
@@ -337,7 +337,7 @@ describe('Lexer - Escape Handling (C1-F3-T1)', () => {
         value: '{{foo}}',
       });
 
-      expect(lexer.lex()).toBeNull();
+      expect(lexer.lex()).toMatchObject({ type: TokenType.EOF });
     });
 
     it('should handle escaped mustache at end of template', () => {
@@ -349,7 +349,7 @@ describe('Lexer - Escape Handling (C1-F3-T1)', () => {
         value: 'text {{foo}}',
       });
 
-      expect(lexer.lex()).toBeNull();
+      expect(lexer.lex()).toMatchObject({ type: TokenType.EOF });
     });
 
     it('should handle only escaped mustache', () => {
@@ -361,7 +361,7 @@ describe('Lexer - Escape Handling (C1-F3-T1)', () => {
         value: '{{}}',
       });
 
-      expect(lexer.lex()).toBeNull();
+      expect(lexer.lex()).toMatchObject({ type: TokenType.EOF });
     });
 
     it('should handle escaped triple mustache', () => {
@@ -373,12 +373,12 @@ describe('Lexer - Escape Handling (C1-F3-T1)', () => {
         value: '{{{foo}}}',
       });
 
-      expect(lexer.lex()).toBeNull();
+      expect(lexer.lex()).toMatchObject({ type: TokenType.EOF });
     });
 
     it('should handle empty template', () => {
       lexer.setInput('');
-      expect(lexer.lex()).toBeNull();
+      expect(lexer.lex()).toMatchObject({ type: TokenType.EOF });
     });
 
     it('should handle template with only backslashes', () => {
@@ -390,7 +390,7 @@ describe('Lexer - Escape Handling (C1-F3-T1)', () => {
         value: '\\\\',
       });
 
-      expect(lexer.lex()).toBeNull();
+      expect(lexer.lex()).toMatchObject({ type: TokenType.EOF });
     });
   });
 
@@ -409,7 +409,7 @@ describe('Lexer - Escape Handling (C1-F3-T1)', () => {
       expect(lexer.lex()).toMatchObject({ type: TokenType.ID, value: 'balance' });
       expect(lexer.lex()).toMatchObject({ type: TokenType.CLOSE });
 
-      expect(lexer.lex()).toBeNull();
+      expect(lexer.lex()).toMatchObject({ type: TokenType.EOF });
     });
 
     it('should handle escaped block helpers', () => {
@@ -421,7 +421,7 @@ describe('Lexer - Escape Handling (C1-F3-T1)', () => {
         value: '{{#if condition}}text{{/if}}',
       });
 
-      expect(lexer.lex()).toBeNull();
+      expect(lexer.lex()).toMatchObject({ type: TokenType.EOF });
     });
 
     it('should handle partially escaped block helper', () => {
@@ -441,7 +441,7 @@ describe('Lexer - Escape Handling (C1-F3-T1)', () => {
       expect(lexer.lex()).toMatchObject({ type: TokenType.ID, value: 'if' });
       expect(lexer.lex()).toMatchObject({ type: TokenType.CLOSE });
 
-      expect(lexer.lex()).toBeNull();
+      expect(lexer.lex()).toMatchObject({ type: TokenType.EOF });
     });
   });
 });

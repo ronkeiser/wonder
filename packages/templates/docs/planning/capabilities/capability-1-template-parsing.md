@@ -288,7 +288,7 @@
 
 ### Task C1-F3-T1: Implement Escape Pre-processing
 
-**Status:** `[ ]` Not Started
+**Status:** `[x]` Complete
 
 - Before tokenization, scan for `\\` sequences
 - `\\` followed by any character → remove backslash, mark character as escaped
@@ -306,7 +306,7 @@
 
 ### Task C1-F3-T2: Handle Edge Cases
 
-**Status:** `[ ]` Not Started
+**Status:** `[x]` Complete
 
 - Backslash at end of input: `text\\` → CONTENT("text\\")
 - Backslash before non-special char: `\\a` → CONTENT("a")

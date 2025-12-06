@@ -80,7 +80,7 @@ describe('Lexer - Comment Tokenization (C1-F1-T7)', () => {
 
     const tokens = [];
     let token;
-    while ((token = lexer.lex()) !== null) {
+    while ((token = lexer.lex()).type !== TokenType.EOF) {
       tokens.push(token);
     }
 
@@ -125,7 +125,7 @@ describe('Lexer - Comment Tokenization (C1-F1-T7)', () => {
 
     const tokens = [];
     let token;
-    while ((token = lexer.lex()) !== null) {
+    while ((token = lexer.lex()).type !== TokenType.EOF) {
       tokens.push(token);
     }
 

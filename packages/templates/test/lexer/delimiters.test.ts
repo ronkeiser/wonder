@@ -111,7 +111,7 @@ describe('Lexer - Delimiter Tokenization (C1-F1-T5)', () => {
 
     const tokens = [];
     let token;
-    while ((token = lexer.lex()) !== null) {
+    while ((token = lexer.lex()).type !== TokenType.EOF) {
       tokens.push(token);
     }
 
@@ -131,7 +131,7 @@ describe('Lexer - Delimiter Tokenization (C1-F1-T5)', () => {
 
     const tokens = [];
     let token;
-    while ((token = lexer.lex()) !== null) {
+    while ((token = lexer.lex()).type !== TokenType.EOF) {
       tokens.push(token);
     }
 

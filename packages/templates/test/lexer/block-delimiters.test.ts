@@ -64,7 +64,7 @@ describe('Lexer - Block Delimiter Tokenization (C1-F1-T6)', () => {
 
     const tokens = [];
     let token;
-    while ((token = lexer.lex()) !== null) {
+    while ((token = lexer.lex()).type !== TokenType.EOF) {
       tokens.push(token);
     }
 
@@ -109,7 +109,7 @@ describe('Lexer - Block Delimiter Tokenization (C1-F1-T6)', () => {
 
     const tokens = [];
     let token;
-    while ((token = lexer.lex()) !== null) {
+    while ((token = lexer.lex()).type !== TokenType.EOF) {
       tokens.push(token);
     }
 
@@ -129,7 +129,7 @@ describe('Lexer - Block Delimiter Tokenization (C1-F1-T6)', () => {
 
     const tokens = [];
     let token;
-    while ((token = lexer.lex()) !== null) {
+    while ((token = lexer.lex()).type !== TokenType.EOF) {
       tokens.push(token);
     }
 
@@ -156,7 +156,7 @@ describe('Lexer - Block Delimiter Tokenization (C1-F1-T6)', () => {
 
     const tokens = [];
     let token;
-    while ((token = lexer.lex()) !== null) {
+    while ((token = lexer.lex()).type !== TokenType.EOF) {
       tokens.push(token);
     }
 

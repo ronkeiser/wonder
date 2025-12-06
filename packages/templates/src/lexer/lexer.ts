@@ -98,9 +98,9 @@ export class Lexer {
 
   /**
    * Extract next token from input
-   * Returns null when EOF is reached
+   * Returns EOF token when end of input is reached
    */
-  lex(): Token | null {
+  lex(): Token {
     const token = this.lexInternal();
     if (token) {
       this.lastTokenType = token.type;
@@ -111,9 +111,9 @@ export class Lexer {
   /**
    * Internal lexing logic
    */
-  private lexInternal(): Token | null {
+  private lexInternal(): Token {
     if (this.isEOF()) {
-      return null;
+      return this.createEOFToken();
     }
 
     // Check for mustache opening - need to check triple braces before double
@@ -766,6 +766,21 @@ export class Lexer {
       line: this.line,
       column: this.column,
       index: this.index,
+    };
+  }
+
+  /**
+   * Create an EOF token at current position
+   */
+  private createEOFToken(): Token {
+    const pos = this.getPosition();
+    return {
+      type: TokenType.EOF,
+      value: '',
+      loc: {
+        start: pos,
+        end: pos,
+      },
     };
   }
 }

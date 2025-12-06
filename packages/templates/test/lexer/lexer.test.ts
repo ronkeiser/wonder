@@ -1,5 +1,6 @@
 import { beforeEach, describe, expect, it } from 'vitest';
 import { Lexer } from '../../src/lexer/lexer';
+import { TokenType } from '../../src/lexer/token-types';
 
 describe('Lexer - Basic Structure (C1-F1-T3)', () => {
   let lexer: Lexer;
@@ -155,9 +156,9 @@ describe('Lexer - Basic Structure (C1-F1-T3)', () => {
   });
 
   describe('lex()', () => {
-    it('should return null at EOF', () => {
+    it('should return EOF token at end of input', () => {
       lexer.setInput('');
-      expect(lexer.lex()).toBeNull();
+      expect(lexer.lex()).toMatchObject({ type: TokenType.EOF });
     });
   });
 });

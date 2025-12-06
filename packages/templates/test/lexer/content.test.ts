@@ -84,14 +84,14 @@ describe('Lexer - CONTENT Tokenization (C1-F1-T4)', () => {
     expect(token?.value).toBe('text { more text');
   });
 
-  it('should return null after consuming all content', () => {
+  it('should return EOF token after consuming all content', () => {
     lexer.setInput('Hello');
 
     const token1 = lexer.lex();
     expect(token1?.value).toBe('Hello');
 
     const token2 = lexer.lex();
-    expect(token2).toBeNull();
+    expect(token2).toMatchObject({ type: TokenType.EOF });
   });
 
   it('should handle content with special characters', () => {
