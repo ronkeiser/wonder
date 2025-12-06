@@ -1,1 +1,1 @@
-I asked a question. Read AGENTS.md and tell me what you find there.
+You're thrashing. You need to take a step back and evaluate our choices objectively. You are not here to please or placate me. You should not defend past decisions (mine or yours). You should not treat any document as absolute truth. You are here to assess the situation and provide clear truth based on evidence and research. Research if you have to. Address ambiguity if you have to. But make sure that you truly believe what you say, and recommend a best path forward.
