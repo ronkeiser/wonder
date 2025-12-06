@@ -3,6 +3,7 @@
   "version": "0.0.1",
   "private": true,
   "scripts": {
+    "test": "vitest run packages/test/src/tests/edge.test.ts --config packages/test/vitest.config.ts",
     "types": "pnpm run --parallel --filter \"./services/*\" types",
     "typecheck": "pnpm run --parallel --filter \"./services/*\" typecheck",
     "deploy": "pnpm -r --filter './services/*' --workspace-concurrency 1 deploy"
