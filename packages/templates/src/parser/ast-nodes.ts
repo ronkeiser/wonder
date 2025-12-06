@@ -15,9 +15,23 @@ export interface Node {
 }
 
 /**
- * Forward declaration for Hash (will be defined in C2-F1-T5)
+ * Key-value pair for hash parameters
+ * Example: in {{helper name="value"}}, name="value" is a HashPair
  */
-export type Hash = Node; // Placeholder - defined in C2-F1-T5
+export interface HashPair extends Node {
+  type: 'HashPair';
+  key: string; // Parameter name
+  value: Expression; // Parameter value (can be path or literal)
+}
+
+/**
+ * Hash for named parameters in helper calls
+ * Example: {{formatDate date format="YYYY-MM-DD" locale="en"}}
+ */
+export interface Hash extends Node {
+  type: 'Hash';
+  pairs: HashPair[]; // Array of key-value pairs
+}
 
 /**
  * Whitespace stripping flags for block delimiters

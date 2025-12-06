@@ -6,6 +6,8 @@ import type {
   CommentStatement,
   ContentStatement,
   Expression,
+  Hash,
+  HashPair,
   MustacheStatement,
   Node,
   NullLiteral,
@@ -1160,6 +1162,229 @@ describe('AST Base Node Types', () => {
         expect(expr.parts).toEqual(['foo']);
         expect(expr.depth).toBe(0);
       }
+    });
+  });
+
+  describe('HashPair', () => {
+    test('has type "HashPair"', () => {
+      const pair: HashPair = {
+        type: 'HashPair',
+        key: 'name',
+        value: {
+          type: 'StringLiteral',
+          value: 'value',
+          original: '"value"',
+          loc: null,
+        },
+        loc: null,
+      };
+
+      expect(pair.type).toBe('HashPair');
+    });
+
+    test('has key field for parameter name', () => {
+      const pair: HashPair = {
+        type: 'HashPair',
+        key: 'format',
+        value: {
+          type: 'StringLiteral',
+          value: 'YYYY-MM-DD',
+          original: '"YYYY-MM-DD"',
+          loc: null,
+        },
+        loc: null,
+      };
+
+      expect(pair.key).toBe('format');
+    });
+
+    test('has value field as Expression', () => {
+      const stringValue: HashPair = {
+        type: 'HashPair',
+        key: 'name',
+        value: {
+          type: 'StringLiteral',
+          value: 'test',
+          original: '"test"',
+          loc: null,
+        },
+        loc: null,
+      };
+
+      const pathValue: HashPair = {
+        type: 'HashPair',
+        key: 'data',
+        value: {
+          type: 'PathExpression',
+          data: false,
+          depth: 0,
+          parts: ['user', 'name'],
+          original: 'user.name',
+          loc: null,
+        },
+        loc: null,
+      };
+
+      const numberValue: HashPair = {
+        type: 'HashPair',
+        key: 'count',
+        value: {
+          type: 'NumberLiteral',
+          value: 42,
+          original: '42',
+          loc: null,
+        },
+        loc: null,
+      };
+
+      expect(stringValue.value.type).toBe('StringLiteral');
+      expect(pathValue.value.type).toBe('PathExpression');
+      expect(numberValue.value.type).toBe('NumberLiteral');
+    });
+
+    test('is a Node', () => {
+      const pair: HashPair = {
+        type: 'HashPair',
+        key: 'test',
+        value: {
+          type: 'BooleanLiteral',
+          value: true,
+          original: 'true',
+          loc: null,
+        },
+        loc: null,
+      };
+
+      const node: Node = pair;
+      expect(node.type).toBe('HashPair');
+    });
+  });
+
+  describe('Hash', () => {
+    test('has type "Hash"', () => {
+      const hash: Hash = {
+        type: 'Hash',
+        pairs: [],
+        loc: null,
+      };
+
+      expect(hash.type).toBe('Hash');
+    });
+
+    test('has pairs array', () => {
+      const hash: Hash = {
+        type: 'Hash',
+        pairs: [
+          {
+            type: 'HashPair',
+            key: 'format',
+            value: {
+              type: 'StringLiteral',
+              value: 'YYYY-MM-DD',
+              original: '"YYYY-MM-DD"',
+              loc: null,
+            },
+            loc: null,
+          },
+          {
+            type: 'HashPair',
+            key: 'locale',
+            value: {
+              type: 'StringLiteral',
+              value: 'en',
+              original: '"en"',
+              loc: null,
+            },
+            loc: null,
+          },
+        ],
+        loc: null,
+      };
+
+      expect(hash.pairs).toHaveLength(2);
+      expect(hash.pairs[0].key).toBe('format');
+      expect(hash.pairs[1].key).toBe('locale');
+    });
+
+    test('can have empty pairs array', () => {
+      const hash: Hash = {
+        type: 'Hash',
+        pairs: [],
+        loc: null,
+      };
+
+      expect(hash.pairs).toEqual([]);
+    });
+
+    test('supports multiple parameter types', () => {
+      const hash: Hash = {
+        type: 'Hash',
+        pairs: [
+          {
+            type: 'HashPair',
+            key: 'name',
+            value: {
+              type: 'StringLiteral',
+              value: 'test',
+              original: '"test"',
+              loc: null,
+            },
+            loc: null,
+          },
+          {
+            type: 'HashPair',
+            key: 'count',
+            value: {
+              type: 'NumberLiteral',
+              value: 5,
+              original: '5',
+              loc: null,
+            },
+            loc: null,
+          },
+          {
+            type: 'HashPair',
+            key: 'active',
+            value: {
+              type: 'BooleanLiteral',
+              value: true,
+              original: 'true',
+              loc: null,
+            },
+            loc: null,
+          },
+          {
+            type: 'HashPair',
+            key: 'data',
+            value: {
+              type: 'PathExpression',
+              data: false,
+              depth: 0,
+              parts: ['user'],
+              original: 'user',
+              loc: null,
+            },
+            loc: null,
+          },
+        ],
+        loc: null,
+      };
+
+      expect(hash.pairs[0].value.type).toBe('StringLiteral');
+      expect(hash.pairs[1].value.type).toBe('NumberLiteral');
+      expect(hash.pairs[2].value.type).toBe('BooleanLiteral');
+      expect(hash.pairs[3].value.type).toBe('PathExpression');
+    });
+
+    test('is a Node', () => {
+      const hash: Hash = {
+        type: 'Hash',
+        pairs: [],
+        loc: null,
+      };
+
+      const node: Node = hash;
+      expect(node.type).toBe('Hash');
     });
   });
 });
