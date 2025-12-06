@@ -305,7 +305,11 @@ content
     it('should throw error for unclosed block (EOF)', () => {
       parser.setInput('{{#if condition}}content');
 
-      expect(() => parser.parseBlockStatement()).toThrow(/expected/i);
+      expect(() => parser.parseBlockStatement()).toThrow(/unclosed block/i);
+
+      // Reset for second check
+      parser.setInput('{{#if condition}}content');
+      expect(() => parser.parseBlockStatement()).toThrow(/if/);
     });
 
     it('should throw error for missing closing tag name', () => {

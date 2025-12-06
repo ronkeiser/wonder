@@ -644,7 +644,7 @@ export class Parser {
    *
    * @returns Program node containing parsed statements
    */
-  parseProgram(): Program {
+  parseProgram(blockContext?: { helperName: string; openToken: Token }): Program {
     const programStartToken = this.currentToken;
     const body: Statement[] = [];
 
@@ -674,6 +674,16 @@ export class Parser {
           this.getErrorContext(),
         );
       }
+    }
+
+    // Check if we hit EOF while inside a block (unclosed block error)
+    if (blockContext && (!this.currentToken || this.currentToken.type === TokenType.EOF)) {
+      const openLine = blockContext.openToken.loc?.start.line || '?';
+      throw ParserError.fromToken(
+        `Unclosed block: ${blockContext.helperName} opened at line ${openLine} was never closed`,
+        blockContext.openToken,
+        this.getErrorContext(),
+      );
     }
 
     // Get the last token for location tracking
@@ -712,6 +722,12 @@ export class Parser {
     const helperName = this.parsePathExpression();
 
     // V1: Skip any parameters (we don't support them yet)
+    // But capture first parameter for better error messages
+    let firstParam: string | null = null;
+    if (this.currentToken && this.match(TokenType.ID) && !this.match(TokenType.CLOSE)) {
+      firstParam = this.currentToken.value;
+    }
+
     // Just consume tokens until we hit CLOSE
     while (this.currentToken && !this.match(TokenType.CLOSE)) {
       this.advance();
@@ -721,8 +737,16 @@ export class Parser {
     this.expect(TokenType.CLOSE, 'Expected }} after block helper name');
     this.advance();
 
+    // Build block identifier for error messages
+    const blockIdentifier = firstParam
+      ? `{{#${helperName.original} ${firstParam}}}`
+      : `{{#${helperName.original}}}`;
+
     // Parse the main block content
-    const program = this.parseProgram();
+    const program = this.parseProgram({
+      helperName: blockIdentifier,
+      openToken: blockStartToken!,
+    });
 
     // Check if there's an else block
     // {{else}} is tokenized as OPEN + ID("else") + CLOSE
@@ -733,13 +757,19 @@ export class Parser {
       this.consumeElse();
 
       // Parse the inverse block content
-      inverse = this.parseProgram();
+      inverse = this.parseProgram({
+        helperName: blockIdentifier,
+        openToken: blockStartToken!,
+      });
     } else if (this.match(TokenType.INVERSE)) {
       // Consume the INVERSE token ({{^}})
       this.advance();
 
       // Parse the inverse block content
-      inverse = this.parseProgram();
+      inverse = this.parseProgram({
+        helperName: blockIdentifier,
+        openToken: blockStartToken!,
+      });
     }
 
     // Expect OPEN_ENDBLOCK token ({{/)
