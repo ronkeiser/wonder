@@ -113,6 +113,18 @@ export interface UndefinedLiteral extends Node {
 }
 
 /**
+ * SubExpression - nested helper call within an expression
+ * Example: {{#if (gt x 1)}} where (gt x 1) is a SubExpression
+ */
+export interface SubExpression extends Node {
+  type: 'SubExpression';
+  path: PathExpression; // Helper name
+  params: Expression[]; // Arguments (can include nested SubExpressions)
+  hash: Hash; // Named parameters (reserved for V2)
+  loc: SourceLocation | null;
+}
+
+/**
  * Expression - union of all expression types
  */
 export type Expression =
@@ -121,7 +133,8 @@ export type Expression =
   | NumberLiteral
   | BooleanLiteral
   | NullLiteral
-  | UndefinedLiteral;
+  | UndefinedLiteral
+  | SubExpression;
 
 /**
  * ContentStatement - plain text content between mustaches

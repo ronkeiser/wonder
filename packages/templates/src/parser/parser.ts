@@ -2,11 +2,14 @@ import type { Lexer } from '../lexer/lexer';
 import type { SourceLocation, Token } from '../lexer/token';
 import { TokenType } from '../lexer/token-types';
 import type {
+  BlockStatement,
   CommentStatement,
   ContentStatement,
   MustacheStatement,
   Node,
   PathExpression,
+  Program,
+  Statement,
 } from './ast-nodes';
 import { ParserError } from './parser-error';
 
@@ -586,6 +589,152 @@ export class Parser {
     };
 
     this.advance(); // Move past CLOSE or CLOSE_UNESCAPED token
+    return node;
+  }
+
+  /**
+   * Parse the body of a program (main template or block content)
+   * Continues until EOF or block terminator (OPEN_ENDBLOCK or INVERSE)
+   *
+   * @returns Program node containing parsed statements
+   */
+  parseProgram(): Program {
+    const programStartToken = this.currentToken;
+    const body: Statement[] = [];
+
+    // Parse statements until we hit EOF or a block terminator
+    while (this.currentToken && this.currentToken.type !== TokenType.EOF) {
+      // Check for block terminators
+      if (this.match(TokenType.OPEN_ENDBLOCK) || this.match(TokenType.INVERSE)) {
+        break;
+      }
+
+      // Dispatch based on token type
+      if (this.match(TokenType.CONTENT)) {
+        body.push(this.parseContentStatement());
+      } else if (this.match(TokenType.COMMENT)) {
+        body.push(this.parseCommentStatement());
+      } else if (this.match(TokenType.OPEN)) {
+        body.push(this.parseMustacheStatement());
+      } else if (this.match(TokenType.OPEN_UNESCAPED)) {
+        body.push(this.parseMustacheStatement());
+      } else if (this.match(TokenType.OPEN_BLOCK)) {
+        body.push(this.parseBlockStatement());
+      } else {
+        // Unexpected token
+        throw ParserError.fromToken(
+          `Unexpected token ${TokenType[this.currentToken.type]} in program body`,
+          this.currentToken,
+          this.getErrorContext(),
+        );
+      }
+    }
+
+    // Get the last token for location tracking
+    // If body is empty, use the start token; otherwise use the previous token
+    const endToken =
+      body.length > 0 && this.position > 0 ? this.tokens[this.position - 1] : programStartToken;
+
+    const loc =
+      programStartToken && endToken ? this.getSourceLocation(programStartToken, endToken) : null;
+
+    const program: Program = {
+      type: 'Program',
+      body: body,
+      loc: loc,
+    };
+
+    return program;
+  }
+
+  /**
+   * Parse a block statement (block helper)
+   * Handles {{#helper}}...{{/helper}} syntax without else blocks
+   *
+   * @returns BlockStatement node
+   * @throws {ParserError} If block is malformed or has mismatched closing tag
+   */
+  parseBlockStatement(): BlockStatement {
+    // Save the opening token for location tracking
+    const blockStartToken = this.currentToken;
+
+    // Expect and consume OPEN_BLOCK token ({{#)
+    this.expect(TokenType.OPEN_BLOCK, 'Expected {{# to start block statement');
+    this.advance();
+
+    // Parse the helper name (path expression)
+    const helperName = this.parsePathExpression();
+
+    // V1: Skip any parameters (we don't support them yet)
+    // Just consume tokens until we hit CLOSE
+    while (this.currentToken && !this.match(TokenType.CLOSE)) {
+      this.advance();
+    }
+
+    // Expect CLOSE token (}})
+    this.expect(TokenType.CLOSE, 'Expected }} after block helper name');
+    this.advance();
+
+    // Parse the main block content
+    const program = this.parseProgram();
+
+    // Expect OPEN_ENDBLOCK token ({{/)
+    this.expect(
+      TokenType.OPEN_ENDBLOCK,
+      `Expected {{/ to close block started at line ${blockStartToken?.loc?.start.line || '?'}`,
+    );
+    this.advance();
+
+    // Parse the closing helper name
+    const closingName = this.parsePathExpression();
+
+    // V1: Skip any parameters in closing tag (shouldn't be any, but be safe)
+    while (this.currentToken && !this.match(TokenType.CLOSE)) {
+      this.advance();
+    }
+
+    // Validate that closing name matches opening name
+    if (helperName.original !== closingName.original) {
+      throw ParserError.fromToken(
+        `Block closing tag mismatch: expected {{/${helperName.original}}} but found {{/${closingName.original}}}`,
+        this.currentToken!,
+        this.getErrorContext(),
+      );
+    }
+
+    // Expect final CLOSE token (}})
+    const closeToken = this.expect(TokenType.CLOSE, 'Expected }} to close block end tag');
+    this.advance();
+
+    // Create empty hash for V1 (no named parameters support)
+    const hash = {
+      type: 'Hash' as const,
+      pairs: [],
+      loc: null,
+    };
+
+    // Create empty strip flags for V1 (no whitespace control support)
+    const stripFlags = {
+      open: false,
+      close: false,
+    };
+
+    // Build location spanning entire block
+    const loc = blockStartToken ? this.getSourceLocation(blockStartToken, closeToken) : null;
+
+    const node: BlockStatement = {
+      type: 'BlockStatement',
+      path: helperName,
+      params: [], // Empty in V1 - no helper parameters support
+      hash: hash, // Empty in V1 - no named parameters support
+      program: program,
+      inverse: null, // No else block for this task
+      openStrip: stripFlags, // V2 feature
+      inverseStrip: stripFlags, // V2 feature
+      closeStrip: stripFlags, // V2 feature
+      loc: loc,
+    };
+
     return node;
   }
 }
