@@ -2,7 +2,7 @@ import { describe, expect, it } from 'vitest';
 import { client } from '../client';
 
 describe('Edge Test - Branching Architecture', () => {
-  it('fan-out with spawn_count=3', async () => {
+  it('fan-out with spawn_count > 1', async () => {
     // Step 1: Create workspace
     const { data: workspaceResponse } = await client.POST('/api/workspaces', {
       body: {
@@ -62,8 +62,7 @@ describe('Edge Test - Branching Architecture', () => {
         version: 1,
         name: 'Dog Name Ideation',
         description: 'Generate creative dog name ideas',
-        template:
-          'Suggest a creative and unique name for my dog. Just respond with the name, nothing else.',
+        template: 'Suggest a fun and friendly name for my dog. Make it just a little quirky!',
         template_language: 'handlebars',
         requires: {},
         produces: {
@@ -106,7 +105,7 @@ describe('Edge Test - Branching Architecture', () => {
       {
         body: {
           name: `Dog Name Ideation Workflow ${Date.now()}`,
-          description: 'Tests spawn_count=3 fan-out for dog name ideas',
+          description: 'Tests fan-out for dog name ideas',
           version: 1,
           project_id: projectId,
           input_schema: {
@@ -155,7 +154,7 @@ describe('Edge Test - Branching Architecture', () => {
               from_node_ref: 'start_node',
               to_node_ref: 'ideation_node',
               priority: 1,
-              spawn_count: 3,
+              spawn_count: 5,
             },
             {
               ref: 'ideation_to_terminal',
@@ -196,7 +195,7 @@ describe('Edge Test - Branching Architecture', () => {
         project_id: projectId,
         workflow_def_id: workflowDefId,
         name: `Fan-Out Test Workflow ${Date.now()}`,
-        description: 'Tests spawn_count=3 fan-out with proper path_id',
+        description: 'Tests fan-out with proper path_id',
       },
     });
 
@@ -220,30 +219,6 @@ describe('Edge Test - Branching Architecture', () => {
     expect(startError).toBeUndefined();
     expect(startResponse).toBeDefined();
     expect(startResponse!.workflow_run_id).toBeDefined();
-
-    console.log('✓ Workflow started:', startResponse!.workflow_run_id);
-    console.log('');
-    console.log('Expected behavior:');
-    console.log('  1. Initial token executes start_node (path_id=root)');
-    console.log('  2. Start node completes → transition with spawn_count=3 triggers');
-    console.log('  3. Three tokens spawned to ideation_node:');
-    console.log('     - path_id=root.ideation_node.0, branch_index=0, branch_total=3');
-    console.log('     - path_id=root.ideation_node.1, branch_index=1, branch_total=3');
-    console.log('     - path_id=root.ideation_node.2, branch_index=2, branch_total=3');
-    console.log('  4. All share fan_out_transition_id (sibling group)');
-    console.log('  5. As each ideation token completes:');
-    console.log('     - Checks synchronization condition (wait_for=all)');
-    console.log('     - First two tokens enter waiting_for_siblings state');
-    console.log('     - Third token triggers merge: extracts *.name from branches');
-    console.log('     - Stores ["Name1", "Name2", "Name3"] at $.terminal_node_output.merged_names');
-    console.log('     - Creates single token for terminal_node');
-    console.log('  6. Terminal token completes, workflow finishes');
-    console.log('  7. Final output: {names: ["Name1", "Name2", "Name3"]}');
-    console.log('');
-    console.log('Check logs with:');
-    console.log(
-      `  curl "https://wonder-logs.ron-keiser.workers.dev/logs?trace_id=${startResponse!.workflow_run_id}&limit=50"`,
-    );
 
     // Cleanup: Delete in reverse order of creation
     // await client.DELETE('/api/workflows/{id}', {
