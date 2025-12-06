@@ -1196,18 +1196,22 @@ describe('Lexer - Path Sequences (C1-F2-T3)', () => {
     });
 
     it('should handle double dots after identifier', () => {
-      // foo... tokenizes as foo, SEP, then .. as parent identifier
+      // foo... tokenizes as foo, .., . (matching Handlebars spec)
       lexer.setInput('{{foo...}}');
 
       lexer.lex(); // OPEN
 
       expect(lexer.lex()?.value).toBe('foo');
-      expect(lexer.lex()?.type).toBe('SEP');
 
-      // Two dots together after separator -> .. identifier
-      const dotId = lexer.lex();
-      expect(dotId?.type).toBe('ID');
-      expect(dotId?.value).toBe('..');
+      // Triple dots after ID: first two dots are parent path (..)
+      const doubleDot = lexer.lex();
+      expect(doubleDot?.type).toBe('ID');
+      expect(doubleDot?.value).toBe('..');
+
+      // Third dot is current context (.)
+      const singleDot = lexer.lex();
+      expect(singleDot?.type).toBe('ID');
+      expect(singleDot?.value).toBe('.');
 
       lexer.lex(); // CLOSE
     });

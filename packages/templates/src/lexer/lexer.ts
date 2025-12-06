@@ -32,6 +32,7 @@ export class Lexer {
   private tabWidth: number = 4; // Number of spaces a tab counts as
   // Track last token type to disambiguate dot notation (foo.bar vs . as identifier)
   private lastTokenType: TokenType | null = null;
+  private lastTokenValue: string | null = null;
   // Track which characters are escaped (set of indices)
   private escapedIndices: Set<number> = new Set();
 
@@ -48,6 +49,8 @@ export class Lexer {
     this.column = 0;
     this.state = STATE_CONTENT;
     this.lastTokenType = null;
+    this.lastTokenValue = null;
+    this.lastTokenValue = null;
   }
 
   /**
@@ -114,6 +117,7 @@ export class Lexer {
     const token = this.lexInternal();
     if (token) {
       this.lastTokenType = token.type;
+      this.lastTokenValue = token.value;
     }
     return token;
   }
@@ -278,9 +282,18 @@ export class Lexer {
    * After a SEP (or at path start), check for .. before treating as separator.
    */
   private handleDot(): Token {
-    // After an ID token, ALWAYS treat first dot as separator (don't check for ..)
-    // This ensures foo... → foo, SEP, .. (not foo, .., SEP)
+    // After an ID token, check for triple dots first (foo... → foo, .., .)
+    // Otherwise treat first dot as separator
     if (this.lastTokenType === TokenType.ID) {
+      // Check for triple dots: ... → .., .
+      if (this.peekAt(1) === '.' && this.peekAt(2) === '.') {
+        return this.scanSpecialIdentifier('..');
+      }
+      // After .. (parent path), a single dot can be a standalone identifier
+      // Check if previous token was .. before defaulting to separator
+      if (this.lastTokenValue === '..' && this.isSingleDotIdentifier()) {
+        return this.scanSpecialIdentifier('.');
+      }
       return this.scanSeparator();
     }
 
