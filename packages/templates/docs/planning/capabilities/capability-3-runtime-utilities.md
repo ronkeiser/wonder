@@ -188,6 +188,7 @@
   - If no, perform normal escaping
 
 **Implementation Notes:**
+
 - `SafeString` class created with private string field
 - `escapeExpression()` checks `instanceof SafeString` before all other checks
 - If `SafeString`, returns `toString()` without escaping
@@ -248,7 +249,7 @@
 
 ### Task C3-F3-T2: Handle Edge Cases
 
-**Status:** `[ ]` Not Started
+**Status:** `[✓]` Complete (5 tests)
 
 - Handle null/undefined input:
   - Create empty frame with `_parent: null` or `_parent: undefined`
@@ -259,15 +260,24 @@
   - Properties named `_parent` in input don't break chain
   - New `_parent` always references immediate parent
 
+**Implementation Notes:**
+
+- Null/undefined check at function start returns `{ _parent: data }`
+- Spread operator creates shallow copy with all properties
+- New `_parent` always overwrites any existing `_parent` property
+- Nesting works correctly because each frame is a new object
+
 **Deliverable:** Robust `createFrame()` with edge case handling
 
 **Tests:**
 
-- `createFrame(null)` returns frame with `_parent: null`
-- `createFrame(undefined)` returns frame with `_parent: undefined`
-- Nested frames maintain `_parent` chain
-- Input with `_parent` property handled correctly
-- Multiple levels of nesting work correctly
+- `createFrame(null)` returns frame with `_parent: null` ✓
+- `createFrame(undefined)` returns frame with `_parent: undefined` ✓
+- Nested frames maintain `_parent` chain ✓
+- Input with `_parent` property handled correctly ✓
+- Multiple levels of nesting work correctly ✓
+
+**Feature 3.3 Status:** `[✓]` Complete (12 tests total: 7 basic + 5 edge cases)
 
 ---
 
@@ -277,7 +287,7 @@
 
 ### Task C3-F4-T1: Implement isEmpty Logic
 
-**Status:** `[ ]` Not Started
+**Status:** `[✓]` Complete (16 tests)
 
 - Create `isEmpty()` function with signature:
   - `isEmpty(value: any): boolean`
@@ -293,28 +303,36 @@
   - Non-empty arrays
   - All other truthy values
 
+**Implementation Notes:**
+
+- Early return for `null`, `undefined`, and `false` using `value == null || value === false`
+- Check for empty string with `value === ''`
+- Use `Array.isArray()` with length check for empty arrays
+- All other values return `false` (including 0 and {})
+
 **Critical Difference from JavaScript:** In Handlebars, `0` is truthy and `{}` is truthy. Only `null`, `undefined`, `false`, `""`, and `[]` are considered empty.
 
 **Deliverable:** `src/runtime/utils.ts` with `isEmpty()` function
 
 **Tests:**
 
-- `null` returns `true`
-- `undefined` returns `true`
-- `false` returns `true`
-- Empty string `""` returns `true`
-- Empty array `[]` returns `true`
-- Zero `0` returns `false` (truthy in Handlebars!)
-- Empty object `{}` returns `false` (truthy in Handlebars!)
-- Non-empty array `[1]` returns `false`
-- Non-empty string `"text"` returns `false`
-- `true` returns `false`
-- Positive numbers return `false`
-- Negative numbers return `false`
+- `null` returns `true` ✓
+- `undefined` returns `true` ✓
+- `false` returns `true` ✓
+- Empty string `""` returns `true` ✓
+- Empty array `[]` returns `true` ✓
+- Zero `0` returns `false` (truthy in Handlebars!) ✓
+- Empty object `{}` returns `false` (truthy in Handlebars!) ✓
+- Non-empty array `[1]` returns `false` ✓
+- Non-empty string `"text"` returns `false` ✓
+- `true` returns `false` ✓
+- Positive numbers return `false` ✓
+- Negative numbers return `false` ✓
+- Non-empty objects return `false` ✓
 
 ### Task C3-F4-T2: Handle Array Detection
 
-**Status:** `[ ]` Not Started
+**Status:** `[✓]` Complete (13 tests)
 
 - Use `Array.isArray()` for reliable array detection
 - Check array length for emptiness:
@@ -324,15 +342,35 @@
   - Only true arrays count as arrays
   - Objects with `length` property are NOT arrays
 
+**Implementation Notes:**
+
+- Uses `Array.isArray(value) && value.length === 0` to detect empty arrays
+- Array-like objects with `length` property return `false` (not arrays)
+- Sparse arrays with length > 0 are not empty
+- Arrays with null/undefined elements are not empty
+
 **Deliverable:** Correct array handling in `isEmpty()`
 
 **Tests:**
 
-- `[]` returns `true`
-- `[1, 2, 3]` returns `false`
-- `{ length: 0 }` returns `false` (not an array)
-- Array-like object (arguments) returns `false`
-- Sparse arrays with length > 0 return `false`
+- `[]` returns `true` ✓
+- `[1, 2, 3]` returns `false` ✓
+- `{ length: 0 }` returns `false` (not an array) ✓
+- Object with `length` property returns `false` ✓
+- Sparse arrays with length > 0 return `false` ✓
+- Arrays with `undefined` elements return `false` ✓
+- Arrays with `null` elements return `false` ✓
+- Functions return `false` ✓
+- Date objects return `false` ✓
+- RegExp objects return `false` ✓
+- Error objects return `false` ✓
+- Whitespace strings return `false` ✓
+- String "0" returns `false` ✓
+- String "false" returns `false` ✓
+- NaN returns `false` ✓
+- Infinity returns `false` ✓
+
+**Feature 3.4 Status:** `[✓]` Complete (29 tests total: 16 basic + 13 array detection & edge cases)
 
 ---
 

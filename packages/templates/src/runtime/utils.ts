@@ -154,3 +154,89 @@ export function escapeExpression(value: any): string {
   // Replace all special characters with their HTML entity equivalents
   return str.replace(escapeRegex, (char) => escapeMap[char]);
 }
+
+/**
+ * Creates a new data frame for scope isolation in block helpers.
+ *
+ * This function creates a shallow copy of the input data with a special
+ * `_parent` property that references the original data. This enables:
+ * - Scope isolation: changes in child scope don't affect parent
+ * - Parent access: child can access parent data via `_parent`
+ * - Nesting: multiple frames can be chained via `_parent`
+ *
+ * @param data - The data object to create a frame from
+ * @returns A new object with all properties copied and `_parent` added
+ *
+ * @example
+ * ```typescript
+ * const parent = { name: 'Alice', age: 30 };
+ * const frame = createFrame(parent);
+ * frame.name = 'Bob'; // doesn't affect parent.name
+ * console.log(frame._parent.name); // 'Alice'
+ * ```
+ */
+export function createFrame(data: any): any {
+  // Handle null/undefined input
+  if (data == null) {
+    return { _parent: data };
+  }
+
+  // Create new frame with all properties copied and _parent reference
+  return { ...data, _parent: data };
+}
+
+/**
+ * Checks if a value is considered "empty" in Handlebars semantics.
+ *
+ * Handlebars has different truthiness rules than JavaScript:
+ * - `0` is truthy (NOT empty)
+ * - `{}` is truthy (NOT empty)
+ * - `[]` is falsy (empty)
+ *
+ * Returns `true` for:
+ * - `null`
+ * - `undefined`
+ * - `false`
+ * - Empty string `""`
+ * - Empty array `[]`
+ *
+ * Returns `false` for everything else, including:
+ * - `0` (truthy in Handlebars!)
+ * - `{}` (truthy in Handlebars!)
+ * - Non-empty arrays
+ * - All other values
+ *
+ * @param value - The value to check for emptiness
+ * @returns `true` if the value is empty, `false` otherwise
+ *
+ * @example
+ * ```typescript
+ * isEmpty(null);      // true
+ * isEmpty(undefined); // true
+ * isEmpty(false);     // true
+ * isEmpty("");        // true
+ * isEmpty([]);        // true
+ * isEmpty(0);         // false (truthy in Handlebars!)
+ * isEmpty({});        // false (truthy in Handlebars!)
+ * isEmpty([1]);       // false
+ * ```
+ */
+export function isEmpty(value: any): boolean {
+  // null, undefined, and false are empty
+  if (value == null || value === false) {
+    return true;
+  }
+
+  // Empty string is empty
+  if (value === '') {
+    return true;
+  }
+
+  // Empty array is empty (but 0 and {} are NOT empty)
+  if (Array.isArray(value) && value.length === 0) {
+    return true;
+  }
+
+  // Everything else is not empty (including 0, {}, non-empty arrays, etc.)
+  return false;
+}

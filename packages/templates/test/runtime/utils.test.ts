@@ -1,5 +1,11 @@
 import { describe, expect, it } from 'vitest';
-import { SafeString, escapeExpression, lookupProperty } from '../../src/runtime/utils';
+import {
+  SafeString,
+  createFrame,
+  escapeExpression,
+  isEmpty,
+  lookupProperty,
+} from '../../src/runtime/utils';
 
 /**
  * Runtime Utilities Tests
@@ -545,6 +551,259 @@ describe('Runtime Utilities', () => {
         expect(escapeExpression(safe)).toBe(html);
         // Regular string would be escaped
         expect(escapeExpression(html)).toBe('&amp;&lt;&gt;&quot;&#x27;&#x60;&#x3D;');
+      });
+    });
+  });
+
+  describe('createFrame (Feature 3.3 - Task C3-F3-T1 & T2)', () => {
+    describe('Basic Frame Creation', () => {
+      it('creates new object (not same reference)', () => {
+        const data = { name: 'Alice', age: 30 };
+        const frame = createFrame(data);
+        expect(frame).not.toBe(data);
+      });
+
+      it('copies all properties from input', () => {
+        const data = { name: 'Alice', age: 30, city: 'NYC' };
+        const frame = createFrame(data);
+        expect(frame.name).toBe('Alice');
+        expect(frame.age).toBe(30);
+        expect(frame.city).toBe('NYC');
+      });
+
+      it('adds _parent property referencing input', () => {
+        const data = { name: 'Alice', age: 30 };
+        const frame = createFrame(data);
+        expect(frame._parent).toBe(data);
+      });
+
+      it('changes to frame do not affect parent', () => {
+        const data = { name: 'Alice', age: 30 };
+        const frame = createFrame(data);
+        frame.name = 'Bob';
+        frame.age = 25;
+        expect(data.name).toBe('Alice');
+        expect(data.age).toBe(30);
+      });
+
+      it('parent properties accessible via _parent', () => {
+        const data = { name: 'Alice', age: 30 };
+        const frame = createFrame(data);
+        expect(frame._parent.name).toBe('Alice');
+        expect(frame._parent.age).toBe(30);
+      });
+
+      it('works with empty object input', () => {
+        const data = {};
+        const frame = createFrame(data);
+        expect(frame).not.toBe(data);
+        expect(frame._parent).toBe(data);
+      });
+
+      it('works with object containing data variables', () => {
+        const data = { root: { name: 'Root' }, key: 'value', index: 0 };
+        const frame = createFrame(data);
+        expect(frame.root).toBe(data.root);
+        expect(frame.key).toBe('value');
+        expect(frame.index).toBe(0);
+        expect(frame._parent).toBe(data);
+      });
+    });
+
+    describe('Edge Cases', () => {
+      it('createFrame(null) returns frame with _parent: null', () => {
+        const frame = createFrame(null);
+        expect(frame).toEqual({ _parent: null });
+        expect(frame._parent).toBeNull();
+      });
+
+      it('createFrame(undefined) returns frame with _parent: undefined', () => {
+        const frame = createFrame(undefined);
+        expect(frame).toEqual({ _parent: undefined });
+        expect(frame._parent).toBeUndefined();
+      });
+
+      it('nested frames maintain _parent chain', () => {
+        const data1 = { level: 1 };
+        const frame1 = createFrame(data1);
+        const frame2 = createFrame(frame1);
+        const frame3 = createFrame(frame2);
+
+        expect(frame3._parent).toBe(frame2);
+        expect(frame3._parent._parent).toBe(frame1);
+        expect(frame3._parent._parent._parent).toBe(data1);
+      });
+
+      it('input with _parent property handled correctly', () => {
+        const grandparent = { level: 0 };
+        const parent = { level: 1, _parent: grandparent };
+        const frame = createFrame(parent);
+
+        // New _parent always references immediate parent
+        expect(frame._parent).toBe(parent);
+        // Can still access grandparent through parent
+        expect(frame._parent._parent).toBe(grandparent);
+      });
+
+      it('multiple levels of nesting work correctly', () => {
+        const root = { name: 'root', value: 0 };
+        const level1 = createFrame(root);
+        level1.value = 1;
+        const level2 = createFrame(level1);
+        level2.value = 2;
+        const level3 = createFrame(level2);
+        level3.value = 3;
+
+        expect(level3.value).toBe(3);
+        expect(level3._parent.value).toBe(2);
+        expect(level3._parent._parent.value).toBe(1);
+        expect(level3._parent._parent._parent.value).toBe(0);
+
+        // Changes don't propagate up
+        expect(root.value).toBe(0);
+        expect(level1.value).toBe(1);
+        expect(level2.value).toBe(2);
+      });
+    });
+  });
+
+  describe('isEmpty (Feature 3.4 - Task C3-F4-T1 & T2)', () => {
+    describe('Empty Values (return true)', () => {
+      it('returns true for null', () => {
+        expect(isEmpty(null)).toBe(true);
+      });
+
+      it('returns true for undefined', () => {
+        expect(isEmpty(undefined)).toBe(true);
+      });
+
+      it('returns true for false', () => {
+        expect(isEmpty(false)).toBe(true);
+      });
+
+      it('returns true for empty string', () => {
+        expect(isEmpty('')).toBe(true);
+      });
+
+      it('returns true for empty array', () => {
+        expect(isEmpty([])).toBe(true);
+      });
+    });
+
+    describe('Non-Empty Values (return false)', () => {
+      it('returns false for zero (truthy in Handlebars!)', () => {
+        expect(isEmpty(0)).toBe(false);
+      });
+
+      it('returns false for empty object (truthy in Handlebars!)', () => {
+        expect(isEmpty({})).toBe(false);
+      });
+
+      it('returns false for true', () => {
+        expect(isEmpty(true)).toBe(false);
+      });
+
+      it('returns false for non-empty string', () => {
+        expect(isEmpty('text')).toBe(false);
+        expect(isEmpty('hello world')).toBe(false);
+      });
+
+      it('returns false for non-empty array', () => {
+        expect(isEmpty([1])).toBe(false);
+        expect(isEmpty([1, 2, 3])).toBe(false);
+      });
+
+      it('returns false for positive numbers', () => {
+        expect(isEmpty(1)).toBe(false);
+        expect(isEmpty(42)).toBe(false);
+        expect(isEmpty(3.14)).toBe(false);
+      });
+
+      it('returns false for negative numbers', () => {
+        expect(isEmpty(-1)).toBe(false);
+        expect(isEmpty(-42)).toBe(false);
+      });
+
+      it('returns false for non-empty objects', () => {
+        expect(isEmpty({ key: 'value' })).toBe(false);
+        expect(isEmpty({ a: 1, b: 2 })).toBe(false);
+      });
+    });
+
+    describe('Array Detection (Task C3-F4-T2)', () => {
+      it('returns true for empty array', () => {
+        expect(isEmpty([])).toBe(true);
+      });
+
+      it('returns false for non-empty array', () => {
+        expect(isEmpty([1, 2, 3])).toBe(false);
+      });
+
+      it('returns false for array-like object with length property', () => {
+        const arrayLike = { length: 0 };
+        expect(isEmpty(arrayLike)).toBe(false);
+      });
+
+      it('returns false for object with length property', () => {
+        const obj = { length: 10, foo: 'bar' };
+        expect(isEmpty(obj)).toBe(false);
+      });
+
+      it('returns false for sparse arrays with length > 0', () => {
+        const sparse = new Array(5); // [empty × 5], length = 5
+        expect(isEmpty(sparse)).toBe(false);
+      });
+
+      it('returns false for array with undefined elements', () => {
+        expect(isEmpty([undefined])).toBe(false);
+        expect(isEmpty([undefined, undefined])).toBe(false);
+      });
+
+      it('returns false for array with null elements', () => {
+        expect(isEmpty([null])).toBe(false);
+        expect(isEmpty([null, null])).toBe(false);
+      });
+    });
+
+    describe('Edge Cases', () => {
+      it('returns false for functions', () => {
+        expect(isEmpty(() => {})).toBe(false);
+        expect(isEmpty(function () {})).toBe(false);
+      });
+
+      it('returns false for Date objects', () => {
+        expect(isEmpty(new Date())).toBe(false);
+      });
+
+      it('returns false for RegExp objects', () => {
+        expect(isEmpty(/test/)).toBe(false);
+      });
+
+      it('returns false for Error objects', () => {
+        expect(isEmpty(new Error('test'))).toBe(false);
+      });
+
+      it('returns false for whitespace strings', () => {
+        expect(isEmpty(' ')).toBe(false);
+        expect(isEmpty('\n')).toBe(false);
+        expect(isEmpty('\t')).toBe(false);
+      });
+
+      it('returns false for string "0"', () => {
+        expect(isEmpty('0')).toBe(false);
+      });
+
+      it('returns false for string "false"', () => {
+        expect(isEmpty('false')).toBe(false);
+      });
+
+      it('returns false for NaN', () => {
+        expect(isEmpty(NaN)).toBe(false);
+      });
+
+      it('returns false for Infinity', () => {
+        expect(isEmpty(Infinity)).toBe(false);
+        expect(isEmpty(-Infinity)).toBe(false);
       });
     });
   });
