@@ -1,7 +1,7 @@
 import type { Lexer } from '../lexer/lexer';
 import type { SourceLocation, Token } from '../lexer/token';
 import { TokenType } from '../lexer/token-types';
-import type { Node } from './ast-nodes';
+import type { ContentStatement, Node } from './ast-nodes';
 import { ParserError } from './parser-error';
 
 /**
@@ -185,5 +185,26 @@ export class Parser {
     }
     this.startToken = null;
     return node;
+  }
+
+  /**
+   * Parse a content statement (plain text)
+   *
+   * @returns ContentStatement node
+   * @throws {ParserError} If current token is not CONTENT
+   */
+  parseContentStatement(): ContentStatement {
+    this.startNode();
+    const token = this.expect(TokenType.CONTENT);
+
+    const node: ContentStatement = {
+      type: 'ContentStatement',
+      value: token.value,
+      original: token.value,
+      loc: null,
+    };
+
+    this.advance(); // Move past CONTENT token
+    return this.finishNode(node);
   }
 }
