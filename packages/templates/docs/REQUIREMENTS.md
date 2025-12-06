@@ -26,19 +26,32 @@ A Handlebars-style template engine designed to run in Cloudflare Workers, where 
 {{@index}}, {{@first}}, {{@last}}, {{@key}}  <!-- loop metadata -->
 ```
 
-## Features
+## Version 1 Features
 
-| Feature                             | Priority | Notes                                        |
-| ----------------------------------- | -------- | -------------------------------------------- |
-| Variable interpolation              | P0       | Dot notation, bracket notation               |
-| HTML escaping                       | P0       | Escape by default, triple-stache for raw     |
-| Conditionals (`if`/`unless`/`else`) | P0       | Truthy/falsy evaluation                      |
-| Iteration (`each`)                  | P0       | Arrays and objects                           |
-| Nested contexts                     | P0       | `../` parent access                          |
-| Partials                            | P1       | Async partial resolution (from D1)           |
-| Helpers                             | P1       | User-defined functions passed at render time |
-| Block helpers                       | P2       | Custom block logic                           |
-| Whitespace control (`~`)            | P2       | `{{~#if}}` strips whitespace                 |
+**Critical for LLM prompt templates in multi-judge workflows:**
+
+| Feature                | Notes                                                            |
+| ---------------------- | ---------------------------------------------------------------- |
+| Variable interpolation | `{{variable}}`, `{{object.property}}`, nested property access    |
+| HTML escaping          | Escape by default, `{{{variable}}}` for unescaped output         |
+| Array iteration        | `{{#each items}}{{this}}{{/each}}` - P0 blocker for edge tests   |
+| Nested iteration       | `{{#each outer}}{{#each inner}}{{/each}}{{/each}}` - for ranking |
+| Loop variables         | `{{this}}`, `{{@index}}`, `{{@first}}`, `{{@last}}`, `{{@key}}`  |
+| Parent context access  | `../` to access outer scope in nested blocks                     |
+| Conditionals           | `{{#if condition}}...{{else}}...{{/if}}`, `{{#unless}}`          |
+| Comments               | `{{! comment }}`                                                 |
+
+## Version 2 Features
+
+**Template composition and extensibility:**
+
+| Feature            | Notes                                        |
+| ------------------ | -------------------------------------------- |
+| Partials           | `{{> partialName}}` - async resolution (D1)  |
+| Helpers            | User-defined functions passed at render time |
+| Block helpers      | Custom block logic                           |
+| Whitespace control | `{{~#if}}` strips whitespace                 |
+| `{{#with}}` blocks | Context switching                            |
 
 ## Reference Implementations to Study
 
