@@ -1,7 +1,13 @@
 import type { Lexer } from '../lexer/lexer';
 import type { SourceLocation, Token } from '../lexer/token';
 import { TokenType } from '../lexer/token-types';
-import type { CommentStatement, ContentStatement, Node } from './ast-nodes';
+import type {
+  CommentStatement,
+  ContentStatement,
+  MustacheStatement,
+  Node,
+  PathExpression,
+} from './ast-nodes';
 import { ParserError } from './parser-error';
 
 /**
@@ -9,6 +15,21 @@ import { ParserError } from './parser-error';
  *
  * Transforms token streams from the lexer into an Abstract Syntax Tree (AST)
  * following the Handlebars AST specification for compatibility.
+ *
+ * ## Location Tracking Patterns
+ *
+ * The parser uses two patterns for tracking source locations in AST nodes:
+ *
+ * 1. **Simple nodes** (leaf nodes that don't parse child nodes):
+ *    - Call `startNode()` at the beginning to save the current token
+ *    - Create and populate the node
+ *    - Call `finishNode(node)` to attach location info
+ *
+ * 2. **Composite nodes** (nodes that call other parse methods):
+ *    - Save the starting token manually: `const startToken = this.currentToken`
+ *    - Parse child nodes (which will use startNode/finishNode internally)
+ *    - Use `getSourceLocation(startToken, endToken)` to create location manually
+ *    - This avoids conflicts since child parsers clear the shared `startToken` field
  */
 export class Parser {
   private lexer: Lexer;
@@ -148,6 +169,9 @@ export class Parser {
   /**
    * Create a SourceLocation from one or two tokens
    *
+   * Used by composite nodes that manually track location tokens instead of
+   * using startNode()/finishNode(). See class-level documentation for pattern details.
+   *
    * @param startToken - Token marking the start of the location
    * @param endToken - Optional token marking the end (defaults to startToken)
    * @returns SourceLocation spanning from start to end
@@ -162,7 +186,11 @@ export class Parser {
 
   /**
    * Mark the start of parsing a node
-   * Saves the current token for later use in finishNode()
+   *
+   * Saves the current token for later use in finishNode(). Only use this pattern
+   * for simple nodes that don't call other parse methods. For composite nodes,
+   * manually save the token and use getSourceLocation() instead.
+   * See class-level documentation for pattern details.
    */
   startNode(): void {
     this.startToken = this.currentToken;
@@ -170,7 +198,11 @@ export class Parser {
 
   /**
    * Complete a node with location information
-   * Sets the node's loc property based on saved start token and current token
+   *
+   * Sets the node's loc property based on saved start token and current token,
+   * then clears the saved start token. Only use with startNode() for simple nodes.
+   * For composite nodes, use getSourceLocation() manually instead.
+   * See class-level documentation for pattern details.
    *
    * @param node - The node to complete with location
    * @returns The node with location added
@@ -243,204 +275,177 @@ export class Parser {
   }
 
   /**
-   * Parse a path expression (variable path)
-   * Handles simple paths, parent references, data variables, and special paths:
-   * - Simple: foo, foo.bar, foo.bar.baz
-   * - Parent: ../parent, ../../grandparent, ../foo.bar
-   * - Data: @index, @root.user
-   * - Special: this, this.foo, ./foo, .
+   * Parse additional path segments after an initial segment
+   * Helper method to reduce code duplication in path expression parsing
    *
-   * @returns PathExpression node
-   * @throws {ParserError} If path is invalid or malformed
+   * @param parts - Array to append parsed segments to
+   * @param original - String to append parsed segments to (with dot notation)
+   * @returns Object with updated parts and original strings
    */
-  parsePathExpression(): import('./ast-nodes').PathExpression {
-    this.startNode();
+  private parsePathSegments(
+    parts: string[],
+    original: string,
+  ): { parts: string[]; original: string } {
+    while (this.currentToken && this.match(TokenType.SEP)) {
+      this.advance(); // Move past SEP token
 
+      const segmentToken = this.expect(TokenType.ID, 'Expected identifier after path separator');
+      parts.push(segmentToken.value);
+      original += '.' + segmentToken.value;
+      this.advance(); // Move past ID token
+    }
+
+    return { parts, original };
+  }
+
+  /**
+   * Parse a data variable path (@variable)
+   * Handles @index, @root, @root.user, etc.
+   *
+   * @returns PathExpression node for data variable
+   */
+  private parseDataVariablePath(): PathExpression {
+    let parts: string[] = [];
+    let original = '@';
+    this.advance(); // Move past DATA token
+
+    // After @, we must have an identifier
+    const dataVarToken = this.expect(TokenType.ID, 'Expected identifier after @ in data variable');
+    parts.push(dataVarToken.value);
+    original += dataVarToken.value;
+    this.advance(); // Move past ID token
+
+    // Parse additional path segments (e.g., @root.user)
+    const result = this.parsePathSegments(parts, original);
+    parts = result.parts;
+    original = result.original;
+
+    const node: PathExpression = {
+      type: 'PathExpression',
+      data: true,
+      depth: 0, // Data variables always have depth 0
+      parts: parts,
+      original: original,
+      loc: null,
+    };
+
+    return this.finishNode(node);
+  }
+
+  /**
+   * Parse a 'this' path (this, this.foo, etc.)
+   *
+   * @returns PathExpression node for 'this' path
+   */
+  private parseThisPath(): PathExpression {
+    let parts: string[] = [];
+    let original = 'this';
+    this.advance(); // Move past 'this'
+
+    // Check if there's a path after 'this'
+    if (this.currentToken && this.match(TokenType.SEP)) {
+      this.advance(); // Move past SEP
+
+      const segmentToken = this.expect(TokenType.ID, 'Expected identifier after path separator');
+      parts.push(segmentToken.value);
+      original += '.' + segmentToken.value;
+      this.advance();
+
+      // Parse additional segments
+      const result = this.parsePathSegments(parts, original);
+      parts = result.parts;
+      original = result.original;
+    }
+    // else: {{this}} alone - parts remains empty
+
+    const node: PathExpression = {
+      type: 'PathExpression',
+      data: false,
+      depth: 0,
+      parts: parts, // Empty for {{this}}, or ['foo'] for {{this.foo}}
+      original: original,
+      loc: null,
+    };
+
+    return this.finishNode(node);
+  }
+
+  /**
+   * Parse a current context path (., ./foo, etc.)
+   *
+   * @returns PathExpression node for current context path
+   */
+  private parseCurrentContextPath(): PathExpression {
+    let parts: string[] = [];
+    let original = '.';
+    this.advance(); // Move past '.'
+
+    // Check if there's a path after '.'
+    if (this.currentToken && this.match(TokenType.SEP)) {
+      this.advance(); // Move past SEP
+
+      const segmentToken = this.expect(TokenType.ID, 'Expected identifier after path separator');
+      parts.push(segmentToken.value);
+      original += '/' + segmentToken.value; // Use slash for ./ syntax
+      this.advance();
+
+      // Parse additional segments
+      const result = this.parsePathSegments(parts, original);
+      parts = result.parts;
+      original = result.original;
+    }
+    // else: {{.}} alone - parts remains empty
+
+    const node: PathExpression = {
+      type: 'PathExpression',
+      data: false,
+      depth: 0,
+      parts: parts, // Empty for {{.}}, or ['foo'] for {{./foo}}
+      original: original,
+      loc: null,
+    };
+
+    return this.finishNode(node);
+  }
+
+  /**
+   * Parse a parent reference path (.., ../foo, ../../bar, etc.)
+   *
+   * @returns PathExpression node for parent path
+   */
+  private parseParentPath(): PathExpression {
     let depth = 0;
     let parts: string[] = [];
     let original = '';
 
-    // Check for data variable (@)
-    if (this.currentToken && this.match(TokenType.DATA)) {
-      original = '@';
-      this.advance(); // Move past DATA token
+    // Count consecutive .. segments to calculate depth
+    while (this.currentToken && this.match(TokenType.ID) && this.currentToken.value === '..') {
+      depth++;
+      original += this.currentToken.value; // Add ".."
+      this.advance(); // Move past ..
 
-      // After @, we must have an identifier
-      const dataVarToken = this.expect(
-        TokenType.ID,
-        'Expected identifier after @ in data variable',
-      );
-      parts.push(dataVarToken.value);
-      original += dataVarToken.value;
-      this.advance(); // Move past ID token
-
-      // Parse additional path segments (e.g., @root.user)
-      while (this.currentToken && this.match(TokenType.SEP)) {
-        this.advance(); // Move past SEP token
-
-        const segmentToken = this.expect(TokenType.ID, 'Expected identifier after path separator');
-        parts.push(segmentToken.value);
-        original += '.' + segmentToken.value;
-        this.advance(); // Move past ID token
-      }
-
-      const node: import('./ast-nodes').PathExpression = {
-        type: 'PathExpression',
-        data: true,
-        depth: 0, // Data variables always have depth 0
-        parts: parts,
-        original: original,
-        loc: null,
-      };
-
-      return this.finishNode(node);
-    }
-
-    // Expect at least one identifier to start the path
-    const firstToken = this.expect(TokenType.ID, 'Expected identifier to start path expression');
-
-    // Check for special path: {{this}} or {{this.foo}}
-    if (firstToken.value === 'this') {
-      original = 'this';
-      this.advance(); // Move past 'this'
-
-      // Check if there's a path after 'this'
+      // Check for separator after ..
       if (this.currentToken && this.match(TokenType.SEP)) {
+        original += '/'; // Use slash as that's what lexer uses between .. segments
         this.advance(); // Move past SEP
-
-        const segmentToken = this.expect(TokenType.ID, 'Expected identifier after path separator');
-        parts.push(segmentToken.value);
-        original += '.' + segmentToken.value;
-        this.advance();
-
-        // Parse additional segments
-        while (this.currentToken && this.match(TokenType.SEP)) {
-          this.advance(); // Move past SEP
-
-          const segmentToken = this.expect(
-            TokenType.ID,
-            'Expected identifier after path separator',
-          );
-
-          parts.push(segmentToken.value);
-          original += '.' + segmentToken.value;
-          this.advance();
-        }
-      }
-      // else: {{this}} alone - parts remains empty
-
-      const node: import('./ast-nodes').PathExpression = {
-        type: 'PathExpression',
-        data: false,
-        depth: 0,
-        parts: parts, // Empty for {{this}}, or ['foo'] for {{this.foo}}
-        original: original,
-        loc: null,
-      };
-
-      return this.finishNode(node);
-    }
-
-    // Check for special path: {{.}} or {{./foo}}
-    if (firstToken.value === '.') {
-      original = '.';
-      this.advance(); // Move past '.'
-
-      // Check if there's a path after '.'
-      if (this.currentToken && this.match(TokenType.SEP)) {
-        this.advance(); // Move past SEP
-
-        const segmentToken = this.expect(TokenType.ID, 'Expected identifier after path separator');
-        parts.push(segmentToken.value);
-        original += '/' + segmentToken.value; // Use slash for ./ syntax
-        this.advance();
-
-        // Parse additional segments
-        while (this.currentToken && this.match(TokenType.SEP)) {
-          this.advance(); // Move past SEP
-
-          const segmentToken = this.expect(
-            TokenType.ID,
-            'Expected identifier after path separator',
-          );
-
-          parts.push(segmentToken.value);
-          original += '.' + segmentToken.value; // Use dot for subsequent segments
-          this.advance();
-        }
-      }
-      // else: {{.}} alone - parts remains empty
-
-      const node: import('./ast-nodes').PathExpression = {
-        type: 'PathExpression',
-        data: false,
-        depth: 0,
-        parts: parts, // Empty for {{.}}, or ['foo'] for {{./foo}}
-        original: original,
-        loc: null,
-      };
-
-      return this.finishNode(node);
-    }
-
-    // Check for parent references (..)
-    if (firstToken.value === '..') {
-      // Count consecutive .. segments to calculate depth
-      while (this.currentToken && this.match(TokenType.ID) && this.currentToken.value === '..') {
-        depth++;
-        original += this.currentToken.value; // Add ".."
-        this.advance(); // Move past ..
-
-        // Check for separator after ..
-        if (this.currentToken && this.match(TokenType.SEP)) {
-          original += '/'; // Use slash as that's what lexer uses between .. segments
-          this.advance(); // Move past SEP
-        }
-      }
-
-      // Parse remaining path segments after .. (if any)
-      if (this.currentToken && this.match(TokenType.ID)) {
-        parts.push(this.currentToken.value);
-        original += this.currentToken.value;
-        this.advance();
-
-        // Parse additional segments
-        while (this.currentToken && this.match(TokenType.SEP)) {
-          this.advance(); // Move past SEP
-
-          const segmentToken = this.expect(
-            TokenType.ID,
-            'Expected identifier after path separator',
-          );
-
-          parts.push(segmentToken.value);
-          original += '.' + segmentToken.value;
-          this.advance();
-        }
-      }
-    } else {
-      // Simple path (no parent reference)
-      parts.push(firstToken.value);
-      original = firstToken.value;
-      this.advance(); // Move past first ID
-
-      // Parse additional path segments (dot/slash notation)
-      while (this.currentToken && this.match(TokenType.SEP)) {
-        this.advance(); // Move past SEP token
-
-        // After a separator, we must have another identifier
-        const segmentToken = this.expect(TokenType.ID, 'Expected identifier after path separator');
-
-        parts.push(segmentToken.value);
-        original += '.' + segmentToken.value; // Normalize to dot notation
-
-        this.advance(); // Move past ID token
       }
     }
 
-    const node: import('./ast-nodes').PathExpression = {
+    // Parse remaining path segments after .. (if any)
+    if (this.currentToken && this.match(TokenType.ID)) {
+      parts.push(this.currentToken.value);
+      original += this.currentToken.value;
+      this.advance();
+
+      // Parse additional segments
+      const result = this.parsePathSegments(parts, original);
+      parts = result.parts;
+      original = result.original;
+    }
+
+    const node: PathExpression = {
       type: 'PathExpression',
-      data: false, // Simple and parent paths are not data variables
+      data: false,
       depth: depth,
       parts: parts,
       original: original,
@@ -451,13 +456,80 @@ export class Parser {
   }
 
   /**
+   * Parse a simple path (foo, foo.bar, foo.bar.baz)
+   *
+   * @param firstToken - The first token of the path
+   * @returns PathExpression node for simple path
+   */
+  private parseSimplePath(firstToken: Token): PathExpression {
+    let parts: string[] = [firstToken.value];
+    let original = firstToken.value;
+    this.advance(); // Move past first ID
+
+    // Parse additional path segments (dot/slash notation)
+    const result = this.parsePathSegments(parts, original);
+    parts = result.parts;
+    original = result.original;
+
+    const node: PathExpression = {
+      type: 'PathExpression',
+      data: false,
+      depth: 0,
+      parts: parts,
+      original: original,
+      loc: null,
+    };
+
+    return this.finishNode(node);
+  }
+
+  /**
+   * Parse a path expression (variable path)
+   * Handles simple paths, parent references, data variables, and special paths:
+   * - Simple: foo, foo.bar, foo.bar.baz
+   * - Parent: ../parent, ../../grandparent, ../foo.bar
+   * - Data: @index, @root.user
+   * - Special: this, this.foo, ./foo, .
+   *
+   * @returns PathExpression node
+   * @throws {ParserError} If path is invalid or malformed
+   */
+  parsePathExpression(): PathExpression {
+    this.startNode();
+
+    // Check for data variable (@)
+    if (this.currentToken && this.match(TokenType.DATA)) {
+      return this.parseDataVariablePath();
+    }
+
+    // Expect at least one identifier to start the path
+    const firstToken = this.expect(TokenType.ID, 'Expected identifier to start path expression');
+
+    // Dispatch to specialized parsers based on first token
+    if (firstToken.value === 'this') {
+      return this.parseThisPath();
+    }
+
+    if (firstToken.value === '.') {
+      return this.parseCurrentContextPath();
+    }
+
+    if (firstToken.value === '..') {
+      return this.parseParentPath();
+    }
+
+    // Simple path (no special syntax)
+    return this.parseSimplePath(firstToken);
+  }
+
+  /**
    * Parse a mustache statement (variable output)
    * Handles both escaped {{foo}} and unescaped {{{foo}}} syntax
    *
    * @returns MustacheStatement node
    * @throws {ParserError} If mustache is malformed or has mismatched closing
    */
-  parseMustacheStatement(): import('./ast-nodes').MustacheStatement {
+  parseMustacheStatement(): MustacheStatement {
     /**
      * Save the mustache opening token for location tracking.
      * We can't use startNode()/finishNode() because parsePathExpression()
@@ -494,8 +566,8 @@ export class Parser {
         );
 
     // Create empty hash for V1 (no named parameters support)
-    const hash: import('./ast-nodes').Hash = {
-      type: 'Hash',
+    const hash = {
+      type: 'Hash' as const,
       pairs: [],
       loc: null,
     };
@@ -504,7 +576,7 @@ export class Parser {
     // closeToken is guaranteed non-null because expect() throws if token doesn't exist
     const loc = mustacheStartToken ? this.getSourceLocation(mustacheStartToken, closeToken) : null;
 
-    const node: import('./ast-nodes').MustacheStatement = {
+    const node: MustacheStatement = {
       type: 'MustacheStatement',
       path: path,
       params: [], // Empty in V1 - no helper parameters support
