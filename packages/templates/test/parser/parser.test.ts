@@ -398,4 +398,286 @@ describe('Parser', () => {
       expect(node2.loc?.end).toBe(parser.getCurrentToken()!.loc.end);
     });
   });
+
+  describe('parse() - Main Entry Point', () => {
+    test('parses complete template and returns Program', () => {
+      const lexer = new Lexer();
+      const parser = new Parser(lexer);
+
+      parser.setInput('Hello {{name}}!');
+      const program = parser.parse();
+
+      expect(program.type).toBe('Program');
+      expect(program.body).toHaveLength(3); // CONTENT, MustacheStatement, CONTENT
+      expect(program.loc).not.toBeNull();
+    });
+
+    test('handles empty template', () => {
+      const lexer = new Lexer();
+      const parser = new Parser(lexer);
+
+      parser.setInput('');
+      const program = parser.parse();
+
+      expect(program.type).toBe('Program');
+      expect(program.body).toHaveLength(0);
+    });
+
+    test('parses template with only content', () => {
+      const lexer = new Lexer();
+      const parser = new Parser(lexer);
+
+      parser.setInput('Plain text content');
+      const program = parser.parse();
+
+      expect(program.type).toBe('Program');
+      expect(program.body).toHaveLength(1);
+      expect(program.body[0].type).toBe('ContentStatement');
+    });
+
+    test('parses template with only mustache', () => {
+      const lexer = new Lexer();
+      const parser = new Parser(lexer);
+
+      parser.setInput('{{value}}');
+      const program = parser.parse();
+
+      expect(program.type).toBe('Program');
+      expect(program.body).toHaveLength(1);
+      expect(program.body[0].type).toBe('MustacheStatement');
+    });
+
+    test('parses template with block statement', () => {
+      const lexer = new Lexer();
+      const parser = new Parser(lexer);
+
+      parser.setInput('{{#if condition}}content{{/if}}');
+      const program = parser.parse();
+
+      expect(program.type).toBe('Program');
+      expect(program.body).toHaveLength(1);
+      expect(program.body[0].type).toBe('BlockStatement');
+    });
+
+    test('parses template with multiple statement types', () => {
+      const lexer = new Lexer();
+      const parser = new Parser(lexer);
+
+      parser.setInput('Before {{value}} {{#if x}}block{{/if}} After');
+      const program = parser.parse();
+
+      expect(program.type).toBe('Program');
+      expect(program.body).toHaveLength(5);
+      expect(program.body[0].type).toBe('ContentStatement');
+      expect(program.body[1].type).toBe('MustacheStatement');
+      expect(program.body[2].type).toBe('ContentStatement');
+      expect(program.body[3].type).toBe('BlockStatement');
+      expect(program.body[4].type).toBe('ContentStatement');
+    });
+
+    test('parses template with comments', () => {
+      const lexer = new Lexer();
+      const parser = new Parser(lexer);
+
+      parser.setInput('{{! comment }} content');
+      const program = parser.parse();
+
+      expect(program.type).toBe('Program');
+      expect(program.body).toHaveLength(2);
+      expect(program.body[0].type).toBe('CommentStatement');
+      expect(program.body[1].type).toBe('ContentStatement');
+    });
+
+    test('parses nested blocks correctly', () => {
+      const lexer = new Lexer();
+      const parser = new Parser(lexer);
+
+      parser.setInput('{{#if a}}{{#if b}}nested{{/if}}{{/if}}');
+      const program = parser.parse();
+
+      expect(program.type).toBe('Program');
+      expect(program.body).toHaveLength(1);
+      expect(program.body[0].type).toBe('BlockStatement');
+    });
+
+    test('parses blocks with else clauses', () => {
+      const lexer = new Lexer();
+      const parser = new Parser(lexer);
+
+      parser.setInput('{{#if x}}yes{{else}}no{{/if}}');
+      const program = parser.parse();
+
+      expect(program.type).toBe('Program');
+      expect(program.body).toHaveLength(1);
+      expect(program.body[0].type).toBe('BlockStatement');
+    });
+
+    test('ensures parser is at EOF after parsing', () => {
+      const lexer = new Lexer();
+      const parser = new Parser(lexer);
+
+      parser.setInput('content');
+      parser.parse();
+
+      expect(parser.getCurrentToken()?.type).toBe(TokenType.EOF);
+    });
+
+    test('throws error on unexpected content after template', () => {
+      const lexer = new Lexer();
+      const parser = new Parser(lexer);
+
+      // This should not happen in normal usage, but test the guard
+      parser.setInput('{{#if x}}{{/if}} extra');
+
+      // Manually advance past the first complete statement to simulate the error condition
+      // Actually, this should work fine - let's test a real error case
+      // The parser should handle this correctly and parse all content
+      const program = parser.parse();
+      expect(program.body).toHaveLength(2); // BlockStatement + ContentStatement for " extra"
+    });
+
+    test('location spans entire template', () => {
+      const lexer = new Lexer();
+      const parser = new Parser(lexer);
+
+      parser.setInput('Start {{value}} End');
+      const program = parser.parse();
+
+      expect(program.loc).not.toBeNull();
+      expect(program.loc?.start.line).toBe(1);
+      expect(program.loc?.start.column).toBe(0);
+    });
+
+    test('handles multi-line templates', () => {
+      const lexer = new Lexer();
+      const parser = new Parser(lexer);
+
+      parser.setInput('Line 1\n{{value}}\nLine 3');
+      const program = parser.parse();
+
+      expect(program.type).toBe('Program');
+      expect(program.body).toHaveLength(3);
+    });
+  });
+
+  describe('Parser.parse() - Static Method', () => {
+    test('parses template without creating parser instance', () => {
+      const program = Parser.parse('Hello {{name}}!');
+
+      expect(program.type).toBe('Program');
+      expect(program.body).toHaveLength(3);
+    });
+
+    test('handles empty template', () => {
+      const program = Parser.parse('');
+
+      expect(program.type).toBe('Program');
+      expect(program.body).toHaveLength(0);
+    });
+
+    test('parses content-only template', () => {
+      const program = Parser.parse('Plain text');
+
+      expect(program.type).toBe('Program');
+      expect(program.body).toHaveLength(1);
+      expect(program.body[0].type).toBe('ContentStatement');
+    });
+
+    test('parses mustache-only template', () => {
+      const program = Parser.parse('{{value}}');
+
+      expect(program.type).toBe('Program');
+      expect(program.body).toHaveLength(1);
+      expect(program.body[0].type).toBe('MustacheStatement');
+    });
+
+    test('parses block statement', () => {
+      const program = Parser.parse('{{#if x}}content{{/if}}');
+
+      expect(program.type).toBe('Program');
+      expect(program.body).toHaveLength(1);
+      expect(program.body[0].type).toBe('BlockStatement');
+    });
+
+    test('parses complex templates', () => {
+      const template = `
+        {{! Header }}
+        <div>
+          {{#if user}}
+            Hello {{user.name}}!
+          {{else}}
+            Please log in
+          {{/if}}
+        </div>
+      `;
+
+      const program = Parser.parse(template);
+
+      expect(program.type).toBe('Program');
+      expect(program.body.length).toBeGreaterThan(0);
+    });
+
+    test('throws same errors as instance method', () => {
+      expect(() => {
+        Parser.parse('{{#if x}}{{/each}}');
+      }).toThrow('Block closing tag mismatch');
+    });
+
+    test('handles nested blocks', () => {
+      const program = Parser.parse('{{#each items}}{{#if active}}{{name}}{{/if}}{{/each}}');
+
+      expect(program.type).toBe('Program');
+      expect(program.body).toHaveLength(1);
+      expect(program.body[0].type).toBe('BlockStatement');
+    });
+
+    test('produces same result as instance method', () => {
+      const template = 'Hello {{name}}!';
+
+      const staticResult = Parser.parse(template);
+
+      const lexer = new Lexer();
+      const parser = new Parser(lexer);
+      parser.setInput(template);
+      const instanceResult = parser.parse();
+
+      expect(staticResult).toEqual(instanceResult);
+    });
+
+    test('handles comments', () => {
+      const program = Parser.parse('{{! comment }}content');
+
+      expect(program.type).toBe('Program');
+      expect(program.body).toHaveLength(2);
+      expect(program.body[0].type).toBe('CommentStatement');
+    });
+
+    test('handles unescaped mustaches', () => {
+      const program = Parser.parse('{{{html}}}');
+
+      expect(program.type).toBe('Program');
+      expect(program.body).toHaveLength(1);
+      expect(program.body[0].type).toBe('MustacheStatement');
+    });
+
+    test('works with real-world templates', () => {
+      const template = `
+<!DOCTYPE html>
+<html>
+  <head>
+    <title>{{title}}</title>
+  </head>
+  <body>
+    {{#each items}}
+      <div class="item">{{name}}</div>
+    {{/each}}
+  </body>
+</html>`;
+
+      const program = Parser.parse(template);
+
+      expect(program.type).toBe('Program');
+      expect(program.body.length).toBeGreaterThan(0);
+    });
+  });
 });

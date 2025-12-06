@@ -1,4 +1,4 @@
-import type { Lexer } from '../lexer/lexer';
+import { Lexer } from '../lexer/lexer';
 import type { SourceLocation, Token } from '../lexer/token';
 import { TokenType } from '../lexer/token-types';
 import type {
@@ -823,6 +823,53 @@ export class Parser {
     };
 
     return program;
+  }
+
+  /**
+   * Parse a complete template into a Program AST node
+   *
+   * This is the main entry point for parsing. It parses the entire template
+   * and ensures no unexpected tokens remain after parsing completes.
+   *
+   * @returns Program node representing the entire template
+   * @throws {ParserError} If there are unexpected tokens after the template
+   */
+  parse(): Program {
+    const program = this.parseProgram();
+
+    // After parsing the program, we should be at EOF
+    // If not, there are unexpected tokens after the template
+    if (this.currentToken && this.currentToken.type !== TokenType.EOF) {
+      throw ParserError.fromToken(
+        'Unexpected content after template',
+        this.currentToken,
+        this.getErrorContext(),
+      );
+    }
+
+    return program;
+  }
+
+  /**
+   * Static convenience method to parse a template string
+   *
+   * Creates a Lexer and Parser internally, parses the template,
+   * and returns the AST. Useful for one-off parsing operations.
+   *
+   * @param template - The template string to parse
+   * @returns Program node representing the parsed template
+   * @throws {ParserError} If the template is malformed
+   *
+   * @example
+   * ```typescript
+   * const ast = Parser.parse('Hello {{name}}!');
+   * ```
+   */
+  static parse(template: string): Program {
+    const lexer = new Lexer();
+    const parser = new Parser(lexer);
+    parser.setInput(template);
+    return parser.parse();
   }
 
   /**

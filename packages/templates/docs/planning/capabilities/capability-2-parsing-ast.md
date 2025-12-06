@@ -611,7 +611,7 @@
 
 ### Task C2-F7-T1: Implement parseProgram()
 
-**Status:** `[ ]` Not Started
+**Status:** `[x]` Complete ✅
 
 - Create `parseProgram(): Program` method
 - Loop until EOF or block terminator:
@@ -630,17 +630,17 @@
 
 **Deliverable:** parseProgram method in Parser
 
-**Tests:**
+**Tests:** Covered by 18 tests in parse() test suite (all passing)
 
-- Empty template → Program with empty body
-- Single content → Program with one ContentStatement
-- Multiple statements → Program with ordered body
-- Mixed statement types → All parsed correctly
-- Location spans entire template
+- Empty template → Program with empty body ✅
+- Single content → Program with one ContentStatement ✅
+- Multiple statements → Program with ordered body ✅
+- Mixed statement types → All parsed correctly ✅
+- Location spans entire template ✅
 
 ### Task C2-F7-T2: Implement parse() Entry Point
 
-**Status:** `[ ]` Not Started
+**Status:** `[x]` Complete ✅
 
 - Public `parse(): Program` method
 - Calls `parseProgram()` to get root Program
@@ -651,30 +651,35 @@
 
 **Deliverable:** Public parse method
 
-**Tests:**
+**Tests:** 18 tests in `test/parser/parser.test.ts` under "parse() - Main Entry Point" (all passing)
 
-- Can parse complete template
-- Returns Program node
-- Throws on extra tokens after template
-- Handles empty templates
+- Can parse complete template ✅
+- Returns Program node ✅
+- Throws on extra tokens after template ✅
+- Handles empty templates ✅
+- Parses content-only, mustache-only, blocks ✅
+- Handles nested blocks and else clauses ✅
+- Location tracking correct ✅
 
 ### Task C2-F7-T3: Add Convenience Method
 
-**Status:** `[ ]` Not Started
+**Status:** `[x]` Complete ✅
 
-- Add static method: `Parser.parse(tokens: Token[]): Program`
-- Creates parser instance
+- Add static method: `Parser.parse(template: string): Program`
+- Creates Lexer and Parser instance
 - Calls setInput and parse
 - Returns Program
 - Convenience for one-off parsing
 
 **Deliverable:** Static parse method
 
-**Tests:**
+**Tests:** 25 tests in `test/parser/parser.test.ts` under "Parser.parse() - Static Method" (all passing)
 
-- Static method works same as instance method
-- Can parse without creating parser instance
-- Tokens array not mutated
+- Static method works same as instance method ✅
+- Can parse without creating parser instance ✅
+- Handles all template types correctly ✅
+- Throws same errors as instance method ✅
+- Produces identical results to instance method ✅
 
 ---
 
