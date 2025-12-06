@@ -3,13 +3,19 @@ import type { SourceLocation, Token } from '../lexer/token';
 import { TokenType } from '../lexer/token-types';
 import type {
   BlockStatement,
+  BooleanLiteral,
   CommentStatement,
   ContentStatement,
+  Expression,
   MustacheStatement,
   Node,
+  NullLiteral,
+  NumberLiteral,
   PathExpression,
   Program,
   Statement,
+  StringLiteral,
+  UndefinedLiteral,
 } from './ast-nodes';
 import { ParserError } from './parser-error';
 
@@ -543,6 +549,122 @@ export class Parser {
    * @returns PathExpression node
    * @throws {ParserError} If path is invalid or malformed
    */
+  /**
+   * Parse an expression (can be a literal or a path)
+   * Used for parsing block parameters and mustache arguments
+   *
+   * @returns Expression node (literal or path)
+   * @throws {ParserError} If expression is invalid
+   */
+  parseExpression(): Expression {
+    if (!this.currentToken) {
+      throw new ParserError('Unexpected end of input while parsing expression', null);
+    }
+
+    // Dispatch based on token type
+    switch (this.currentToken.type) {
+      case TokenType.STRING:
+        return this.parseStringLiteral();
+      case TokenType.NUMBER:
+        return this.parseNumberLiteral();
+      case TokenType.BOOLEAN:
+        return this.parseBooleanLiteral();
+      case TokenType.NULL:
+        return this.parseNullLiteral();
+      case TokenType.UNDEFINED:
+        return this.parseUndefinedLiteral();
+      case TokenType.ID:
+      case TokenType.DATA:
+        return this.parsePathExpression();
+      default:
+        throw ParserError.fromToken(
+          `Unexpected token ${this.currentToken.type} while parsing expression`,
+          this.currentToken,
+          this.getErrorContext(),
+        );
+    }
+  }
+
+  /**
+   * Parse a string literal
+   */
+  parseStringLiteral(): StringLiteral {
+    const token = this.expect(TokenType.STRING, 'Expected string literal');
+    const loc = this.getSourceLocation(token, token);
+    this.advance();
+
+    return {
+      type: 'StringLiteral',
+      value: token.value,
+      original: `"${token.value}"`, // Reconstruct with quotes
+      loc,
+    };
+  }
+
+  /**
+   * Parse a number literal
+   */
+  parseNumberLiteral(): NumberLiteral {
+    const token = this.expect(TokenType.NUMBER, 'Expected number literal');
+    const loc = this.getSourceLocation(token, token);
+    this.advance();
+
+    return {
+      type: 'NumberLiteral',
+      value: parseFloat(token.value),
+      original: token.value,
+      loc,
+    };
+  }
+
+  /**
+   * Parse a boolean literal
+   */
+  parseBooleanLiteral(): BooleanLiteral {
+    const token = this.expect(TokenType.BOOLEAN, 'Expected boolean literal');
+    const loc = this.getSourceLocation(token, token);
+    this.advance();
+
+    return {
+      type: 'BooleanLiteral',
+      value: token.value === 'true',
+      original: token.value,
+      loc,
+    };
+  }
+
+  /**
+   * Parse a null literal
+   */
+  parseNullLiteral(): NullLiteral {
+    const token = this.expect(TokenType.NULL, 'Expected null literal');
+    const loc = this.getSourceLocation(token, token);
+    this.advance();
+
+    return {
+      type: 'NullLiteral',
+      value: null,
+      original: 'null',
+      loc,
+    };
+  }
+
+  /**
+   * Parse an undefined literal
+   */
+  parseUndefinedLiteral(): UndefinedLiteral {
+    const token = this.expect(TokenType.UNDEFINED, 'Expected undefined literal');
+    const loc = this.getSourceLocation(token, token);
+    this.advance();
+
+    return {
+      type: 'UndefinedLiteral',
+      value: undefined,
+      original: 'undefined',
+      loc,
+    };
+  }
+
   parsePathExpression(): PathExpression {
     this.startNode();
 
@@ -721,16 +843,22 @@ export class Parser {
     // Parse the helper name (path expression)
     const helperName = this.parsePathExpression();
 
-    // V1: Skip any parameters (we don't support them yet)
-    // But capture first parameter for better error messages
-    let firstParam: string | null = null;
-    if (this.currentToken && this.match(TokenType.ID) && !this.match(TokenType.CLOSE)) {
-      firstParam = this.currentToken.value;
-    }
+    // Parse parameters until we hit CLOSE token
+    const params: Expression[] = [];
+    let firstParam: string | null = null; // For error messages
 
-    // Just consume tokens until we hit CLOSE
     while (this.currentToken && !this.match(TokenType.CLOSE)) {
-      this.advance();
+      const param = this.parseExpression();
+      params.push(param);
+
+      // Capture first parameter for error messages
+      if (firstParam === null) {
+        if (param.type === 'PathExpression') {
+          firstParam = param.original;
+        } else if ('original' in param) {
+          firstParam = param.original;
+        }
+      }
     }
 
     // Expect CLOSE token (}})
@@ -822,7 +950,7 @@ export class Parser {
     const node: BlockStatement = {
       type: 'BlockStatement',
       path: helperName,
-      params: [], // Empty in V1 - no helper parameters support
+      params: params,
       hash: hash, // Empty in V1 - no named parameters support
       program: program,
       inverse: inverse, // Set to parsed inverse block if {{else}} was present

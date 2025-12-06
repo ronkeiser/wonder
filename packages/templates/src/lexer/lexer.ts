@@ -228,6 +228,7 @@ export class Lexer {
         while (!this.isEOF() && this.isWhitespace(this.peek())) {
           this.advance();
         }
+        this.lastTokenType = null;
         return this.lexInternal();
       }
     }
@@ -267,24 +268,33 @@ export class Lexer {
 
   /**
    * Handle dot character - determines if it's a separator or special identifier
+   *
+   * In Handlebars tokenization:
+   * - {{foo.bar}} → foo, SEP, bar
+   * - {{../value}} → .., SEP, value
+   * - {{foo...}} → foo, SEP, ..
+   *
+   * After an ID, the first . is ALWAYS a separator.
+   * After a SEP (or at path start), check for .. before treating as separator.
    */
   private handleDot(): Token {
-    // After an identifier, the first dot is always a separator
+    // After an ID token, ALWAYS treat first dot as separator (don't check for ..)
+    // This ensures foo... → foo, SEP, .. (not foo, .., SEP)
     if (this.lastTokenType === TokenType.ID) {
       return this.scanSeparator();
     }
 
-    // Check for .. (parent path reference)
+    // Check for double dot (..) - it's a special identifier
     if (this.isDoubleDot()) {
       return this.scanSpecialIdentifier('..');
     }
 
-    // Check for . as standalone identifier
+    // Check for current context (.)
     if (this.isSingleDotIdentifier()) {
       return this.scanSpecialIdentifier('.');
     }
 
-    // Otherwise it's a separator (like in foo . bar where bar follows)
+    // Otherwise it's a separator
     return this.scanSeparator();
   }
 

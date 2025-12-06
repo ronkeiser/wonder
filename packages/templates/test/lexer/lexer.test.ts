@@ -1086,8 +1086,10 @@ describe('Lexer - Path Sequences (C1-F2-T3)', () => {
       expect(id1?.type).toBe('ID');
       expect(id1?.value).toBe('foo');
 
-      const sep = lexer.lex();
-      expect(sep?.type).toBe('SEP');
+      // Dot with whitespace on both sides is current context identifier, not separator
+      const dotId = lexer.lex();
+      expect(dotId?.type).toBe('ID');
+      expect(dotId?.value).toBe('.');
 
       const id2 = lexer.lex();
       expect(id2?.type).toBe('ID');

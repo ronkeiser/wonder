@@ -22,7 +22,8 @@ describe('Parser - BlockStatement Parsing (Simple Blocks)', () => {
       expect(node.path.type).toBe('PathExpression');
       expect(node.path.parts).toEqual(['if']);
       expect(node.path.original).toBe('if');
-      expect(node.params).toEqual([]);
+      expect(node.params).toHaveLength(1); // condition parameter
+      expect(node.params[0].type).toBe('PathExpression');
       expect(node.hash.pairs).toEqual([]);
       expect(node.inverse).toBeNull();
     });
@@ -224,12 +225,13 @@ content
   });
 
   describe('V1 Feature Compliance', () => {
-    it('should set params to empty array (V1 has no parameters)', () => {
+    it('should parse block parameters', () => {
       parser.setInput('{{#if condition}}content{{/if}}');
 
       const node = parser.parseBlockStatement();
 
-      expect(node.params).toEqual([]);
+      expect(node.params).toHaveLength(1);
+      expect(node.params[0].type).toBe('PathExpression');
     });
 
     it('should set hash.pairs to empty array (V1 has no named params)', () => {
@@ -323,7 +325,8 @@ content
     it('should throw error for missing }} after helper name', () => {
       parser.setInput('{{#if condition');
 
-      expect(() => parser.parseBlockStatement()).toThrow(/expected.*}}/i);
+      // Now that we parse parameters, we get an EOF error while parsing the parameter
+      expect(() => parser.parseBlockStatement()).toThrow(/unexpected.*eof|expected.*}}/i);
     });
 
     it('should throw error for missing }} after closing tag', () => {
