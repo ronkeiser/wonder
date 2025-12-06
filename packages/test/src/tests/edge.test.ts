@@ -93,7 +93,7 @@ describe('Edge Test - Branching Architecture', () => {
         name: 'Dog Name Judge',
         description: 'Judge dog names and score them',
         template:
-          'You are a dog name expert. Rate these dog names from 1-10 based on creativity, friendliness, and memorability:\n\n{{#each names}}\n- {{this}}\n{{/each}}\n\nRespond in JSON format: { "scores": [{"name": "...", "score": 8, "reasoning": "..."}] }',
+          'You are a dog name expert. Rate these dog names from 1-10 based on creativity, friendliness, and memorability:\n\n{{#each names}}\n- {{this}}\n{{/each}}\n\nRespond in JSON format: { "scores": [{"name": "...", "score": 8}] }',
         template_language: 'handlebars',
         requires: {
           names: 'array',
@@ -108,9 +108,8 @@ describe('Edge Test - Branching Architecture', () => {
                 properties: {
                   name: { type: 'string' },
                   score: { type: 'number' },
-                  reasoning: { type: 'string' },
                 },
-                required: ['name', 'score', 'reasoning'],
+                required: ['name', 'score'],
                 additionalProperties: false,
               },
             },
@@ -134,7 +133,7 @@ describe('Edge Test - Branching Architecture', () => {
         name: 'Dog Name Ranker',
         description: 'Aggregate judge scores and create final ranking',
         template:
-          'Aggregate these judge scores and create a final ranking. Each judge scored the same set of names:\n\n{{#each judge_scores}}\nJudge {{@index}}:\n{{#each this}}\n- {{this.name}}: {{this.score}}/10 ({{this.reasoning}})\n{{/each}}\n{{/each}}\n\nCalculate average scores and rank the names. Respond in JSON format: { "ranking": [{"name": "...", "average_score": 8.5, "rank": 1}] }',
+          'Aggregate these judge scores and create a final ranking. Each judge scored the same set of names:\n\n{{#each judge_scores}}\nJudge {{@index}}:\n{{#each this}}\n- {{this.name}}: {{this.score}}/10\n{{/each}}\n{{/each}}\n\nCalculate average scores and rank the names. Respond in JSON format: { "ranking": [{"name": "...", "average_score": 8.5, "rank": 1}] }',
         template_language: 'handlebars',
         requires: {
           judge_scores: 'array',

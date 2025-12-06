@@ -41,21 +41,6 @@ export default class ExecutorService extends WorkerEntrypoint<Env> {
   async llmCall(params: LLMCallParams): Promise<void> {
     const startTime = Date.now();
 
-    this.logger.info({
-      event_type: 'llm_call_started',
-      message: 'LLM call started',
-      metadata: {
-        model: params.model_profile.model_id,
-        provider: params.model_profile.provider,
-        prompt: params.prompt,
-        prompt_length: params.prompt.length,
-        parameters: params.model_profile.parameters,
-        has_json_schema: !!params.json_schema,
-        workflow_run_id: params.workflow_run_id,
-        token_id: params.token_id,
-      },
-    });
-
     try {
       // Build AI.run options
       const aiOptions: any = {
@@ -72,9 +57,32 @@ export default class ExecutorService extends WorkerEntrypoint<Env> {
       if (params.json_schema) {
         aiOptions.response_format = {
           type: 'json_schema',
-          json_schema: params.json_schema,
+          json_schema: {
+            name: 'response_schema',
+            strict: true,
+            schema: params.json_schema,
+          },
         };
       }
+
+      this.logger.info({
+        event_type: 'llm_call_started',
+        message: 'LLM call started',
+        trace_id: params.workflow_run_id,
+        metadata: {
+          model: params.model_profile.model_id,
+          provider: params.model_profile.provider,
+          prompt: params.prompt,
+          prompt_length: params.prompt.length,
+          parameters: params.model_profile.parameters,
+          has_json_schema: !!params.json_schema,
+          json_schema: params.json_schema,
+          response_format: aiOptions.response_format,
+          full_ai_options: aiOptions,
+          workflow_run_id: params.workflow_run_id,
+          token_id: params.token_id,
+        },
+      });
 
       const response = (await this.env.AI.run(
         params.model_profile.model_id as any,
@@ -83,6 +91,19 @@ export default class ExecutorService extends WorkerEntrypoint<Env> {
 
       const duration = Date.now() - startTime;
       const rawResponse = response?.response || 'No response from LLM';
+
+      this.logger.info({
+        event_type: 'llm_raw_response',
+        message: 'Raw response from Workers AI',
+        trace_id: params.workflow_run_id,
+        metadata: {
+          workflow_run_id: params.workflow_run_id,
+          token_id: params.token_id,
+          raw_response: rawResponse,
+          response_type: typeof rawResponse,
+          full_response: response,
+        },
+      });
 
       // When using json_schema, Workers AI returns parsed JSON automatically
       let result: { response: any };
@@ -94,6 +115,7 @@ export default class ExecutorService extends WorkerEntrypoint<Env> {
           this.logger.info({
             event_type: 'json_response_received',
             message: 'Structured JSON response received from Workers AI',
+            trace_id: params.workflow_run_id,
             metadata: {
               workflow_run_id: params.workflow_run_id,
               token_id: params.token_id,
@@ -109,6 +131,7 @@ export default class ExecutorService extends WorkerEntrypoint<Env> {
             this.logger.info({
               event_type: 'json_parsed_successfully',
               message: 'JSON response parsed from string',
+              trace_id: params.workflow_run_id,
               metadata: {
                 workflow_run_id: params.workflow_run_id,
                 token_id: params.token_id,
@@ -120,6 +143,7 @@ export default class ExecutorService extends WorkerEntrypoint<Env> {
             this.logger.error({
               event_type: 'json_parse_failed',
               message: 'Failed to parse JSON response',
+              trace_id: params.workflow_run_id,
               metadata: {
                 workflow_run_id: params.workflow_run_id,
                 token_id: params.token_id,
@@ -139,6 +163,7 @@ export default class ExecutorService extends WorkerEntrypoint<Env> {
       this.logger.info({
         event_type: 'llm_call_completed',
         message: 'LLM call completed successfully',
+        trace_id: params.workflow_run_id,
         metadata: {
           model: params.model_profile.model_id,
           provider: params.model_profile.provider,
@@ -161,6 +186,7 @@ export default class ExecutorService extends WorkerEntrypoint<Env> {
       this.logger.error({
         event_type: 'llm_call_failed',
         message: 'LLM call failed',
+        trace_id: params.workflow_run_id,
         metadata: {
           model: params.model_profile.model_id,
           provider: params.model_profile.provider,

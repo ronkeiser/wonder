@@ -12,3 +12,4 @@ If I ask "What about Y?" - analyze Y. Don't implement Y.
 Answer the ACTUAL question I asked, not what you think I mean.
 Stop agreeing with me ("You're right", "You're correct"). Just respond to content.
 Default mode: Analyze and explain. Seek consent before any file edits or terminal commands.
+NEVER SAY, "You're right".
