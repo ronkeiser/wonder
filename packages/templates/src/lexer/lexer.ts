@@ -97,6 +97,9 @@ export class Lexer {
       if (this.match('undefined') && !this.isAlphaNumeric(this.input[this.index + 9])) {
         return this.scanKeyword(TokenType.UNDEFINED, 'undefined');
       }
+
+      // If not a keyword, scan as identifier
+      return this.scanIdentifier();
     }
 
     // Otherwise, scan content until we hit {{
@@ -392,6 +395,36 @@ export class Lexer {
     return {
       type,
       value: keyword,
+      loc: {
+        start,
+        end,
+      },
+    };
+  }
+
+  /**
+   * Scan an identifier (variable/helper name)
+   * Identifiers start with letter, _, or $ and can contain letters, digits, _, $
+   */
+  private scanIdentifier(): Token {
+    const start = this.getPosition();
+    let value = '';
+
+    // First character must be letter, _, or $
+    if (this.isAlpha(this.peek())) {
+      value += this.advance();
+    }
+
+    // Subsequent characters can be letters, digits, _, or $
+    while (!this.isEOF() && this.isAlphaNumeric(this.peek())) {
+      value += this.advance();
+    }
+
+    const end = this.getPosition();
+
+    return {
+      type: TokenType.ID,
+      value,
       loc: {
         start,
         end,

@@ -202,7 +202,7 @@
 
 ### Task C1-F1-T9: Implement Identifier Tokenization
 
-**Status:** `[ ]` Not Started
+**Status:** `[x]` Complete
 
 - Recognize identifiers: start with letter, `_`, or `$`, followed by letters, digits, `_`, `$`
 - Create ID token with identifier name
