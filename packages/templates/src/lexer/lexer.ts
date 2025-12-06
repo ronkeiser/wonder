@@ -28,6 +28,7 @@ export class Lexer {
   private line: number = 1;
   private column: number = 0;
   private state: LexerState = STATE_CONTENT;
+  private tabWidth: number = 4; // Number of spaces a tab counts as
   // Track last token type to disambiguate dot notation (foo.bar vs . as identifier)
   private lastTokenType: TokenType | null = null;
   // Track which characters are escaped (set of indices)
@@ -479,6 +480,10 @@ export class Lexer {
 
   /**
    * Consume and return next character
+   * Updates position tracking: line, column, and index
+   * - Newlines increment line and reset column to 0
+   * - Tabs advance column by tabWidth (default 4)
+   * - Other characters advance column by 1
    */
   advance(): string {
     if (this.isEOF()) {
@@ -491,6 +496,8 @@ export class Lexer {
     if (char === '\n') {
       this.line++;
       this.column = 0;
+    } else if (char === '\t') {
+      this.column += this.tabWidth;
     } else {
       this.column++;
     }
