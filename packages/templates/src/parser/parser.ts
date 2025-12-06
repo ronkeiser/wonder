@@ -1,7 +1,7 @@
 import type { Lexer } from '../lexer/lexer';
 import type { SourceLocation, Token } from '../lexer/token';
 import { TokenType } from '../lexer/token-types';
-import type { ContentStatement, Node } from './ast-nodes';
+import type { CommentStatement, ContentStatement, Node } from './ast-nodes';
 import { ParserError } from './parser-error';
 
 /**
@@ -205,6 +205,40 @@ export class Parser {
     };
 
     this.advance(); // Move past CONTENT token
+    return this.finishNode(node);
+  }
+
+  /**
+   * Parse a comment statement
+   * Handles both {{! comment }} and {{!-- comment --}} syntax
+   *
+   * @returns CommentStatement node
+   * @throws {ParserError} If current token is not COMMENT
+   */
+  parseCommentStatement(): CommentStatement {
+    this.startNode();
+    const token = this.expect(TokenType.COMMENT);
+
+    // Extract comment text without delimiters
+    // COMMENT tokens include the full comment with {{! }} or {{!-- --}}
+    let value = token.value;
+
+    // Strip {{! and }}
+    if (value.startsWith('{{!--') && value.endsWith('--}}')) {
+      // Block comment: {{!-- text --}}
+      value = value.slice(5, -4);
+    } else if (value.startsWith('{{!') && value.endsWith('}}')) {
+      // Regular comment: {{! text }}
+      value = value.slice(3, -2);
+    }
+
+    const node: CommentStatement = {
+      type: 'CommentStatement',
+      value: value,
+      loc: null,
+    };
+
+    this.advance(); // Move past COMMENT token
     return this.finishNode(node);
   }
 }
