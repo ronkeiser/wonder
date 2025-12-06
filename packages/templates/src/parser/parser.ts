@@ -259,11 +259,9 @@ export class Parser {
     let depth = 0;
     let parts: string[] = [];
     let original = '';
-    let isDataVariable = false;
 
     // Check for data variable (@)
     if (this.currentToken && this.match(TokenType.DATA)) {
-      isDataVariable = true;
       original = '@';
       this.advance(); // Move past DATA token
 
@@ -450,5 +448,72 @@ export class Parser {
     };
 
     return this.finishNode(node);
+  }
+
+  /**
+   * Parse a mustache statement (variable output)
+   * Handles both escaped {{foo}} and unescaped {{{foo}}} syntax
+   *
+   * @returns MustacheStatement node
+   * @throws {ParserError} If mustache is malformed or has mismatched closing
+   */
+  parseMustacheStatement(): import('./ast-nodes').MustacheStatement {
+    /**
+     * Save the mustache opening token for location tracking.
+     * We can't use startNode()/finishNode() because parsePathExpression()
+     * calls finishNode() internally, which would clear this.startToken.
+     * This is a deliberate pattern for composite nodes that parse child nodes.
+     */
+    const mustacheStartToken = this.currentToken;
+
+    // Determine if this is escaped or unescaped output
+    let escaped: boolean;
+    if (this.match(TokenType.OPEN)) {
+      escaped = true;
+      this.advance(); // Move past OPEN token
+    } else if (this.match(TokenType.OPEN_UNESCAPED)) {
+      escaped = false;
+      this.advance(); // Move past OPEN_UNESCAPED token
+    } else {
+      throw ParserError.fromToken(
+        'Expected OPEN or OPEN_UNESCAPED token to start mustache statement',
+        this.currentToken!,
+        this.getErrorContext(),
+      );
+    }
+
+    // Parse the path expression inside the mustache
+    const path = this.parsePathExpression();
+
+    // Expect appropriate closing delimiter and capture the closing token
+    const closeToken = escaped
+      ? this.expect(TokenType.CLOSE, 'Expected }} to close mustache statement')
+      : this.expect(
+          TokenType.CLOSE_UNESCAPED,
+          'Expected }}} to close unescaped mustache statement',
+        );
+
+    // Create empty hash for V1 (no named parameters support)
+    const hash: import('./ast-nodes').Hash = {
+      type: 'Hash',
+      pairs: [],
+      loc: null,
+    };
+
+    // mustacheStartToken is guaranteed non-null because we checked at method entry
+    // closeToken is guaranteed non-null because expect() throws if token doesn't exist
+    const loc = mustacheStartToken ? this.getSourceLocation(mustacheStartToken, closeToken) : null;
+
+    const node: import('./ast-nodes').MustacheStatement = {
+      type: 'MustacheStatement',
+      path: path,
+      params: [], // Empty in V1 - no helper parameters support
+      hash: hash, // Empty in V1 - no named parameters support
+      escaped: escaped,
+      loc: loc,
+    };
+
+    this.advance(); // Move past CLOSE or CLOSE_UNESCAPED token
+    return node;
   }
 }
