@@ -15,6 +15,8 @@
 
 ### Task CN-FM-TK: [Task Name]
 
+**Status:** `[ ]` Not Started | `[x]` Complete
+
 [Bullets describing what to build]
 
 **Deliverable:** [The artifact this produces]

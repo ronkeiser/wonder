@@ -10,6 +10,8 @@
 
 ### Task C1-F1-T1: Define Token Type Enumerations
 
+**Status:** `[x]` Complete
+
 - Create TypeScript enum or const object for all token types
 - Include delimiters: `OPEN` (`{{`), `CLOSE` (`}}`), `OPEN_UNESCAPED` (`{{{`), `CLOSE_UNESCAPED` (`}}}`)
 - Include block tokens: `OPEN_BLOCK` (`{{#`), `OPEN_ENDBLOCK` (`{{/`), `OPEN_INVERSE` (`{{^`)
@@ -30,6 +32,8 @@
 - Token types are exported for use in parser
 
 ### Task C1-F1-T2: Create Token Interface
+
+**Status:** `[x]` Complete
 
 - Define Token interface with fields:
   - `type: TokenType` — The token type
@@ -52,6 +56,8 @@
 - Position properly typed
 
 ### Task C1-F1-T3: Implement Basic Lexer Class Structure
+
+**Status:** `[x]` Complete
 
 - Create Lexer class with state fields:
   - `input: string` — The template string
@@ -78,6 +84,8 @@
 
 ### Task C1-F1-T4: Implement Plain Text (CONTENT) Tokenization
 
+**Status:** `[x]` Complete
+
 - Scan characters until `{{` is encountered
 - Create CONTENT token with accumulated text
 - Handle empty content (two mustaches adjacent)
@@ -93,6 +101,8 @@
 - Empty content between mustaches handled gracefully
 
 ### Task C1-F1-T5: Implement Delimiter Tokenization
+
+**Status:** `[x]` Complete
 
 - Recognize `{{` → OPEN token
 - Recognize `}}` → CLOSE token
@@ -111,6 +121,8 @@
 - Position tracking accurate
 
 ### Task C1-F1-T6: Implement Block Delimiter Tokenization
+
+**Status:** `[x]` Complete
 
 - After OPEN (`{{`), check next character:
   - `#` → OPEN_BLOCK token
@@ -131,6 +143,8 @@
 
 ### Task C1-F1-T7: Implement Comment Tokenization
 
+**Status:** `[x]` Complete
+
 - Recognize `{{!` → Start of comment
 - Recognize `{{!--` → Start of block comment
 - For `{{!`, consume until `}}`
@@ -149,6 +163,8 @@
 - Nested braces in comment: `{{! has }} in it }}` (consumes at first `}}`)
 
 ### Task C1-F1-T8: Implement Literal Tokenization
+
+**Status:** `[x]` Complete
 
 - **String literals:**
   - Recognize `"` or `'` as string start
