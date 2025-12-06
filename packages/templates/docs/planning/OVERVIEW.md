@@ -10,6 +10,8 @@ Version 1 provides the core template rendering capabilities needed for LLM promp
 
 ## Capability 1: Lexical Analysis (Tokenization)
 
+**Status:** ✅ Completed
+
 **Goal:** Transform template strings into token streams following Handlebars tokenization rules
 
 ### Feature 1.1: Core Token Types
@@ -86,6 +88,8 @@ Implement backslash escaping before tokenization:
 ---
 
 ## Capability 2: Syntax Analysis (Parsing & AST)
+
+**Status:** 🔄 Not Started
 
 **Goal:** Build Abstract Syntax Tree from token stream following Handlebars AST structure
 
@@ -205,6 +209,8 @@ Parse block helpers with proper nesting:
 
 ## Capability 3: Runtime Utilities
 
+**Status:** 🔄 Not Started
+
 **Goal:** Implement core utility functions from Handlebars runtime for secure, correct evaluation
 
 ### Feature 3.1: lookupProperty
@@ -309,6 +315,8 @@ Falsy value detection for conditionals from Handlebars `utils.js`:
 
 ## Capability 4: Context Resolution & Interpreter
 
+**Status:** 🔄 Not Started
+
 **Goal:** Evaluate PathExpressions by traversing context scopes and data frames
 
 ### Feature 4.1: Simple Path Resolution
@@ -383,6 +391,8 @@ Maintain data frame stack for loop metadata:
 ---
 
 ## Capability 5: Built-in Block Helpers
+
+**Status:** 🔄 Not Started
 
 **Goal:** Implement #if, #unless, #each following Handlebars behavior exactly
 
@@ -500,6 +510,8 @@ Maintain data frame stack for loop metadata:
 
 ## Capability 6: Output Generation
 
+**Status:** 🔄 Not Started
+
 **Goal:** Walk AST and generate final string output
 
 ### Feature 6.1: Interpreter Main Loop
@@ -561,6 +573,8 @@ Maintain data frame stack for loop metadata:
 ---
 
 ## Capability 7: Public API
+
+**Status:** 🔄 Not Started
 
 **Goal:** Provide clean, simple API matching Handlebars conventions
 

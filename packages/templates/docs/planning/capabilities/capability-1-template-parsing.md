@@ -366,7 +366,7 @@
 
 ### Task C1-F4-T3: Implement Error Handling
 
-**Status:** `[ ]` Not Started
+**Status:** `[x]` Complete ✅
 
 - Create `LexerError` class extending `Error`
 - Include position information in errors
@@ -379,33 +379,33 @@
 
 **Deliverable:** `src/lexer/lexer-error.ts` with error class, error throwing in Lexer
 
-**Tests:**
+**Tests:** 26 tests in `src/lexer/error-handling.test.ts`
 
 - Unclosed comment error includes position
 - Unclosed string error includes position
 - Invalid character error clear and specific
-- Error messages formatted with line/column: `"Error at line 3, column 5: ..."`
+- Error messages formatted with line/column: `"Error at line 3, column 5: ..."` (1-indexed for user display)
 
 ### Task C1-F4-T4: Implement Lexer Public Interface
 
-**Status:** `[ ]` Not Started
+**Status:** `[x]` Complete ✅
 
 - `tokenize(template: string): Token[]` — Convenience method that calls setInput, then lex() until EOF
 - Returns array of all tokens
-- Excludes EOF token from returned array (internal use)
+- Includes EOF token in returned array
 
-**Deliverable:** Public tokenize method
+**Deliverable:** Public tokenize method in Lexer class
 
-**Tests:**
+**Tests:** 22 tests in `test/lexer/tokenize.test.ts`
 
 - `tokenize()` returns complete token array
 - Can tokenize same template multiple times (fresh state)
-- Empty template returns empty array
-- Template with only content returns single CONTENT token
+- Empty template returns EOF token only
+- Template with only content returns CONTENT and EOF tokens
 
 ### Task C1-F4-T5: Integration Testing
 
-**Status:** `[ ]` Not Started
+**Status:** `[x]` Complete ✅
 
 - Test complex real-world templates
 - Verify token sequences match expectations
@@ -413,15 +413,18 @@
 
 **Deliverable:** Comprehensive integration test suite
 
-**Tests:**
+**Tests:** 35 tests in `test/lexer/integration.test.ts`
 
-- Simple variable: `"Hello {{name}}"` → Expected token sequence
-- Block with content: `"{{#if foo}}yes{{/if}}"` → Expected tokens
-- Nested blocks: `"{{#if a}}{{#each items}}{{this}}{{/each}}{{/if}}"`
-- Comments ignored: `"{{! ignore me }}{{foo}}"` → COMMENT, then variable tokens
-- Mixed content: Plain text, variables, blocks, comments
-- Multi-line template with all features
-- Real prompt template example from requirements
+- Real-world HTML templates (email templates, inline styles, SVG)
+- Deeply nested structures (5+ nesting levels)
+- Complex expressions with helpers and multiple parameters
+- Path expressions and data variable access
+- Whitespace and formatting preservation
+- Comments in various contexts
+- Escaped sequences
+- Edge cases (empty mustaches, single characters, long identifiers, consecutive mustaches)
+- Performance with large templates (100+ mustaches, 10KB+ content blocks, deep path nesting)
+- Error recovery and position reporting in malformed templates
 
 ---
 
