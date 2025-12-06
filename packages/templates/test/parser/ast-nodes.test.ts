@@ -2,13 +2,20 @@ import { describe, expect, test } from 'vitest';
 import type { Position, SourceLocation } from '../../src/lexer/token';
 import type {
   BlockStatement,
+  BooleanLiteral,
   CommentStatement,
   ContentStatement,
+  Expression,
   MustacheStatement,
   Node,
+  NullLiteral,
+  NumberLiteral,
+  PathExpression,
   Program,
   Statement,
+  StringLiteral,
   StripFlags,
+  UndefinedLiteral,
 } from '../../src/parser/ast-nodes';
 
 describe('AST Base Node Types', () => {
@@ -708,6 +715,451 @@ describe('AST Base Node Types', () => {
 
       expect(flags.open).toBe(true);
       expect(flags.close).toBe(true);
+    });
+  });
+
+  describe('PathExpression', () => {
+    test('has type "PathExpression"', () => {
+      const expr: PathExpression = {
+        type: 'PathExpression',
+        data: false,
+        depth: 0,
+        parts: ['foo'],
+        original: 'foo',
+        loc: null,
+      };
+
+      expect(expr.type).toBe('PathExpression');
+    });
+
+    test('has data flag for @ variables', () => {
+      const dataVar: PathExpression = {
+        type: 'PathExpression',
+        data: true,
+        depth: 0,
+        parts: ['index'],
+        original: '@index',
+        loc: null,
+      };
+
+      const regularVar: PathExpression = {
+        type: 'PathExpression',
+        data: false,
+        depth: 0,
+        parts: ['foo'],
+        original: 'foo',
+        loc: null,
+      };
+
+      expect(dataVar.data).toBe(true);
+      expect(regularVar.data).toBe(false);
+    });
+
+    test('has depth field for parent references', () => {
+      const current: PathExpression = {
+        type: 'PathExpression',
+        data: false,
+        depth: 0,
+        parts: ['foo'],
+        original: 'foo',
+        loc: null,
+      };
+
+      const parent: PathExpression = {
+        type: 'PathExpression',
+        data: false,
+        depth: 1,
+        parts: ['parent'],
+        original: '../parent',
+        loc: null,
+      };
+
+      const grandparent: PathExpression = {
+        type: 'PathExpression',
+        data: false,
+        depth: 2,
+        parts: ['grand'],
+        original: '../../grand',
+        loc: null,
+      };
+
+      expect(current.depth).toBe(0);
+      expect(parent.depth).toBe(1);
+      expect(grandparent.depth).toBe(2);
+    });
+
+    test('has parts array for path segments', () => {
+      const simple: PathExpression = {
+        type: 'PathExpression',
+        data: false,
+        depth: 0,
+        parts: ['foo'],
+        original: 'foo',
+        loc: null,
+      };
+
+      const nested: PathExpression = {
+        type: 'PathExpression',
+        data: false,
+        depth: 0,
+        parts: ['foo', 'bar', 'baz'],
+        original: 'foo.bar.baz',
+        loc: null,
+      };
+
+      expect(simple.parts).toEqual(['foo']);
+      expect(nested.parts).toEqual(['foo', 'bar', 'baz']);
+    });
+
+    test('has original string', () => {
+      const expr: PathExpression = {
+        type: 'PathExpression',
+        data: false,
+        depth: 0,
+        parts: ['foo', 'bar'],
+        original: 'foo.bar',
+        loc: null,
+      };
+
+      expect(expr.original).toBe('foo.bar');
+    });
+
+    test('can have empty parts for {{this}}', () => {
+      const thisExpr: PathExpression = {
+        type: 'PathExpression',
+        data: false,
+        depth: 0,
+        parts: [],
+        original: 'this',
+        loc: null,
+      };
+
+      expect(thisExpr.parts).toEqual([]);
+    });
+
+    test('is an Expression', () => {
+      const expr: PathExpression = {
+        type: 'PathExpression',
+        data: false,
+        depth: 0,
+        parts: ['foo'],
+        original: 'foo',
+        loc: null,
+      };
+
+      const expression: Expression = expr;
+      expect(expression.type).toBe('PathExpression');
+    });
+  });
+
+  describe('StringLiteral', () => {
+    test('has type "StringLiteral"', () => {
+      const expr: StringLiteral = {
+        type: 'StringLiteral',
+        value: 'hello',
+        original: '"hello"',
+        loc: null,
+      };
+
+      expect(expr.type).toBe('StringLiteral');
+    });
+
+    test('has value field for unescaped string', () => {
+      const expr: StringLiteral = {
+        type: 'StringLiteral',
+        value: 'hello world',
+        original: '"hello world"',
+        loc: null,
+      };
+
+      expect(expr.value).toBe('hello world');
+    });
+
+    test('has original field with quotes', () => {
+      const doubleQuote: StringLiteral = {
+        type: 'StringLiteral',
+        value: 'text',
+        original: '"text"',
+        loc: null,
+      };
+
+      const singleQuote: StringLiteral = {
+        type: 'StringLiteral',
+        value: 'text',
+        original: "'text'",
+        loc: null,
+      };
+
+      expect(doubleQuote.original).toBe('"text"');
+      expect(singleQuote.original).toBe("'text'");
+    });
+
+    test('is an Expression', () => {
+      const expr: StringLiteral = {
+        type: 'StringLiteral',
+        value: 'test',
+        original: '"test"',
+        loc: null,
+      };
+
+      const expression: Expression = expr;
+      expect(expression.type).toBe('StringLiteral');
+    });
+  });
+
+  describe('NumberLiteral', () => {
+    test('has type "NumberLiteral"', () => {
+      const expr: NumberLiteral = {
+        type: 'NumberLiteral',
+        value: 42,
+        original: '42',
+        loc: null,
+      };
+
+      expect(expr.type).toBe('NumberLiteral');
+    });
+
+    test('has value field for parsed number', () => {
+      const integer: NumberLiteral = {
+        type: 'NumberLiteral',
+        value: 123,
+        original: '123',
+        loc: null,
+      };
+
+      const decimal: NumberLiteral = {
+        type: 'NumberLiteral',
+        value: 1.5,
+        original: '1.5',
+        loc: null,
+      };
+
+      const negative: NumberLiteral = {
+        type: 'NumberLiteral',
+        value: -42,
+        original: '-42',
+        loc: null,
+      };
+
+      expect(integer.value).toBe(123);
+      expect(decimal.value).toBe(1.5);
+      expect(negative.value).toBe(-42);
+    });
+
+    test('has original field preserving string format', () => {
+      const expr: NumberLiteral = {
+        type: 'NumberLiteral',
+        value: 123,
+        original: '123',
+        loc: null,
+      };
+
+      expect(expr.original).toBe('123');
+    });
+
+    test('is an Expression', () => {
+      const expr: NumberLiteral = {
+        type: 'NumberLiteral',
+        value: 42,
+        original: '42',
+        loc: null,
+      };
+
+      const expression: Expression = expr;
+      expect(expression.type).toBe('NumberLiteral');
+    });
+  });
+
+  describe('BooleanLiteral', () => {
+    test('has type "BooleanLiteral"', () => {
+      const expr: BooleanLiteral = {
+        type: 'BooleanLiteral',
+        value: true,
+        original: 'true',
+        loc: null,
+      };
+
+      expect(expr.type).toBe('BooleanLiteral');
+    });
+
+    test('has value field for boolean', () => {
+      const trueExpr: BooleanLiteral = {
+        type: 'BooleanLiteral',
+        value: true,
+        original: 'true',
+        loc: null,
+      };
+
+      const falseExpr: BooleanLiteral = {
+        type: 'BooleanLiteral',
+        value: false,
+        original: 'false',
+        loc: null,
+      };
+
+      expect(trueExpr.value).toBe(true);
+      expect(falseExpr.value).toBe(false);
+    });
+
+    test('has original field preserving string', () => {
+      const expr: BooleanLiteral = {
+        type: 'BooleanLiteral',
+        value: true,
+        original: 'true',
+        loc: null,
+      };
+
+      expect(expr.original).toBe('true');
+    });
+
+    test('is an Expression', () => {
+      const expr: BooleanLiteral = {
+        type: 'BooleanLiteral',
+        value: true,
+        original: 'true',
+        loc: null,
+      };
+
+      const expression: Expression = expr;
+      expect(expression.type).toBe('BooleanLiteral');
+    });
+  });
+
+  describe('NullLiteral', () => {
+    test('has type "NullLiteral"', () => {
+      const expr: NullLiteral = {
+        type: 'NullLiteral',
+        value: null,
+        original: 'null',
+        loc: null,
+      };
+
+      expect(expr.type).toBe('NullLiteral');
+    });
+
+    test('has value always null', () => {
+      const expr: NullLiteral = {
+        type: 'NullLiteral',
+        value: null,
+        original: 'null',
+        loc: null,
+      };
+
+      expect(expr.value).toBeNull();
+    });
+
+    test('has original field', () => {
+      const expr: NullLiteral = {
+        type: 'NullLiteral',
+        value: null,
+        original: 'null',
+        loc: null,
+      };
+
+      expect(expr.original).toBe('null');
+    });
+
+    test('is an Expression', () => {
+      const expr: NullLiteral = {
+        type: 'NullLiteral',
+        value: null,
+        original: 'null',
+        loc: null,
+      };
+
+      const expression: Expression = expr;
+      expect(expression.type).toBe('NullLiteral');
+    });
+  });
+
+  describe('UndefinedLiteral', () => {
+    test('has type "UndefinedLiteral"', () => {
+      const expr: UndefinedLiteral = {
+        type: 'UndefinedLiteral',
+        value: undefined,
+        original: 'undefined',
+        loc: null,
+      };
+
+      expect(expr.type).toBe('UndefinedLiteral');
+    });
+
+    test('has value always undefined', () => {
+      const expr: UndefinedLiteral = {
+        type: 'UndefinedLiteral',
+        value: undefined,
+        original: 'undefined',
+        loc: null,
+      };
+
+      expect(expr.value).toBeUndefined();
+    });
+
+    test('has original field', () => {
+      const expr: UndefinedLiteral = {
+        type: 'UndefinedLiteral',
+        value: undefined,
+        original: 'undefined',
+        loc: null,
+      };
+
+      expect(expr.original).toBe('undefined');
+    });
+
+    test('is an Expression', () => {
+      const expr: UndefinedLiteral = {
+        type: 'UndefinedLiteral',
+        value: undefined,
+        original: 'undefined',
+        loc: null,
+      };
+
+      const expression: Expression = expr;
+      expect(expression.type).toBe('UndefinedLiteral');
+    });
+  });
+
+  describe('Expression union type', () => {
+    test('includes all expression types', () => {
+      const expressions: Expression[] = [
+        {
+          type: 'PathExpression',
+          data: false,
+          depth: 0,
+          parts: ['foo'],
+          original: 'foo',
+          loc: null,
+        },
+        { type: 'StringLiteral', value: 'text', original: '"text"', loc: null },
+        { type: 'NumberLiteral', value: 42, original: '42', loc: null },
+        { type: 'BooleanLiteral', value: true, original: 'true', loc: null },
+        { type: 'NullLiteral', value: null, original: 'null', loc: null },
+        { type: 'UndefinedLiteral', value: undefined, original: 'undefined', loc: null },
+      ];
+
+      expect(expressions).toHaveLength(6);
+      expect(expressions[0].type).toBe('PathExpression');
+      expect(expressions[1].type).toBe('StringLiteral');
+      expect(expressions[2].type).toBe('NumberLiteral');
+      expect(expressions[3].type).toBe('BooleanLiteral');
+      expect(expressions[4].type).toBe('NullLiteral');
+      expect(expressions[5].type).toBe('UndefinedLiteral');
+    });
+
+    test('type discriminator works for narrowing', () => {
+      const expr: Expression = {
+        type: 'PathExpression',
+        data: false,
+        depth: 0,
+        parts: ['foo'],
+        original: 'foo',
+        loc: null,
+      };
+
+      if (expr.type === 'PathExpression') {
+        expect(expr.parts).toEqual(['foo']);
+        expect(expr.depth).toBe(0);
+      }
     });
   });
 });

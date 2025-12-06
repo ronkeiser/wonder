@@ -15,10 +15,8 @@ export interface Node {
 }
 
 /**
- * Forward declarations for types that will be defined in later tasks
+ * Forward declaration for Hash (will be defined in C2-F1-T5)
  */
-export type PathExpression = Node; // Placeholder - defined in C2-F1-T4
-export type Expression = Node; // Placeholder - defined in C2-F1-T4
 export type Hash = Node; // Placeholder - defined in C2-F1-T5
 
 /**
@@ -29,6 +27,87 @@ export interface StripFlags {
   open: boolean; // Strip whitespace before
   close: boolean; // Strip whitespace after
 }
+
+/**
+ * PathExpression - variable path with security-critical depth tracking
+ *
+ * Examples:
+ * - {{foo}} → depth: 0, parts: ['foo'], data: false
+ * - {{foo.bar}} → depth: 0, parts: ['foo', 'bar'], data: false
+ * - {{../parent}} → depth: 1, parts: ['parent'], data: false
+ * - {{../../grand}} → depth: 2, parts: ['grand'], data: false
+ * - {{@index}} → depth: 0, parts: ['index'], data: true
+ * - {{this}} → depth: 0, parts: [], data: false
+ */
+export interface PathExpression extends Node {
+  type: 'PathExpression';
+  data: boolean; // true if starts with @
+  depth: number; // 0=current, 1=../, 2=../../
+  parts: string[]; // Path segments (e.g., ['foo', 'bar'] for foo.bar)
+  original: string; // Raw path string
+  loc: SourceLocation | null;
+}
+
+/**
+ * StringLiteral - string literal expression
+ */
+export interface StringLiteral extends Node {
+  type: 'StringLiteral';
+  value: string; // Unescaped string value
+  original: string; // Original string with quotes
+  loc: SourceLocation | null;
+}
+
+/**
+ * NumberLiteral - numeric literal expression
+ */
+export interface NumberLiteral extends Node {
+  type: 'NumberLiteral';
+  value: number; // Parsed numeric value
+  original: string; // Original number string
+  loc: SourceLocation | null;
+}
+
+/**
+ * BooleanLiteral - boolean literal expression
+ */
+export interface BooleanLiteral extends Node {
+  type: 'BooleanLiteral';
+  value: boolean; // true or false
+  original: string; // "true" or "false"
+  loc: SourceLocation | null;
+}
+
+/**
+ * NullLiteral - null literal expression
+ */
+export interface NullLiteral extends Node {
+  type: 'NullLiteral';
+  value: null; // Always null
+  original: string; // "null"
+  loc: SourceLocation | null;
+}
+
+/**
+ * UndefinedLiteral - undefined literal expression
+ */
+export interface UndefinedLiteral extends Node {
+  type: 'UndefinedLiteral';
+  value: undefined; // Always undefined
+  original: string; // "undefined"
+  loc: SourceLocation | null;
+}
+
+/**
+ * Expression - union of all expression types
+ */
+export type Expression =
+  | PathExpression
+  | StringLiteral
+  | NumberLiteral
+  | BooleanLiteral
+  | NullLiteral
+  | UndefinedLiteral;
 
 /**
  * ContentStatement - plain text content between mustaches
