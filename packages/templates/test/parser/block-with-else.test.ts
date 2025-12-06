@@ -36,9 +36,9 @@ describe('Parser - Block Statements with Else', () => {
       const ast = parser.parseProgram();
 
       const block = ast.body[0] as BlockStatement;
-      expect(block.program.body).toHaveLength(1);
+      expect(block.program!.body).toHaveLength(1);
 
-      const mainContent = block.program.body[0] as ContentStatement;
+      const mainContent = block.program!.body[0] as ContentStatement;
       expect(mainContent.type).toBe('ContentStatement');
       expect(mainContent.value).toBe('yes');
     });
@@ -77,9 +77,9 @@ describe('Parser - Block Statements with Else', () => {
       const block = ast.body[0] as BlockStatement;
 
       // Main program should have: content "line1\nline2\n" + mustache {{foo}}
-      expect(block.program.body).toHaveLength(2);
-      expect(block.program.body[0].type).toBe('ContentStatement');
-      expect(block.program.body[1].type).toBe('MustacheStatement');
+      expect(block.program!.body).toHaveLength(2);
+      expect(block.program!.body[0].type).toBe('ContentStatement');
+      expect(block.program!.body[1].type).toBe('MustacheStatement');
     });
 
     it('should handle multiple statements after else', () => {
@@ -102,8 +102,8 @@ describe('Parser - Block Statements with Else', () => {
 
       const block = ast.body[0] as BlockStatement;
 
-      expect(block.program.body).toHaveLength(1);
-      const mainMustache = block.program.body[0] as MustacheStatement;
+      expect(block.program!.body).toHaveLength(1);
+      const mainMustache = block.program!.body[0] as MustacheStatement;
       expect(mainMustache.type).toBe('MustacheStatement');
       expect(mainMustache.path.original).toBe('foo');
 
@@ -122,7 +122,7 @@ describe('Parser - Block Statements with Else', () => {
 
       const block = ast.body[0] as BlockStatement;
 
-      const mainContent = block.program.body[0] as ContentStatement;
+      const mainContent = block.program!.body[0] as ContentStatement;
       expect(mainContent.value).toBe('  yes  ');
 
       const inverseContent = block.inverse!.body[0] as ContentStatement;
@@ -136,7 +136,7 @@ describe('Parser - Block Statements with Else', () => {
 
       const block = ast.body[0] as BlockStatement;
 
-      const mainContent = block.program.body[0] as ContentStatement;
+      const mainContent = block.program!.body[0] as ContentStatement;
       expect(mainContent.value).toBe('\nyes\n');
 
       const inverseContent = block.inverse!.body[0] as ContentStatement;
@@ -149,7 +149,7 @@ describe('Parser - Block Statements with Else', () => {
       const ast = parser.parseProgram();
 
       const block = ast.body[0] as BlockStatement;
-      expect(block.program.body).toHaveLength(0);
+      expect(block.program!.body).toHaveLength(0);
       expect(block.inverse!.body).toHaveLength(1);
     });
 
@@ -159,7 +159,7 @@ describe('Parser - Block Statements with Else', () => {
       const ast = parser.parseProgram();
 
       const block = ast.body[0] as BlockStatement;
-      expect(block.program.body).toHaveLength(1);
+      expect(block.program!.body).toHaveLength(1);
       expect(block.inverse!.body).toHaveLength(0);
     });
 
@@ -169,7 +169,7 @@ describe('Parser - Block Statements with Else', () => {
       const ast = parser.parseProgram();
 
       const block = ast.body[0] as BlockStatement;
-      expect(block.program.body).toHaveLength(0);
+      expect(block.program!.body).toHaveLength(0);
       expect(block.inverse!.body).toHaveLength(0);
     });
   });
@@ -182,7 +182,7 @@ describe('Parser - Block Statements with Else', () => {
 
       const block = ast.body[0] as BlockStatement;
       expect(block.path.original).toBe('each');
-      expect(block.program.body).toHaveLength(1);
+      expect(block.program!.body).toHaveLength(1);
       expect(block.inverse!.body).toHaveLength(1);
     });
 
@@ -193,7 +193,7 @@ describe('Parser - Block Statements with Else', () => {
 
       const block = ast.body[0] as BlockStatement;
       expect(block.path.original).toBe('unless');
-      expect(block.program.body).toHaveLength(1);
+      expect(block.program!.body).toHaveLength(1);
       expect(block.inverse!.body).toHaveLength(1);
     });
 
@@ -204,7 +204,7 @@ describe('Parser - Block Statements with Else', () => {
 
       const block = ast.body[0] as BlockStatement;
       expect(block.path.original).toBe('myHelper');
-      expect(block.program.body).toHaveLength(1);
+      expect(block.program!.body).toHaveLength(1);
       expect(block.inverse!.body).toHaveLength(1);
     });
   });
@@ -217,9 +217,9 @@ describe('Parser - Block Statements with Else', () => {
 
       const outerBlock = ast.body[0] as BlockStatement;
       expect(outerBlock.path.original).toBe('if');
-      expect(outerBlock.program.body).toHaveLength(1);
+      expect(outerBlock.program!.body).toHaveLength(1);
 
-      const innerBlock = outerBlock.program.body[0] as BlockStatement;
+      const innerBlock = outerBlock.program!.body[0] as BlockStatement;
       expect(innerBlock.type).toBe('BlockStatement');
       expect(innerBlock.path.original).toBe('if');
     });
@@ -247,7 +247,7 @@ describe('Parser - Block Statements with Else', () => {
       const outerBlock = ast.body[0] as BlockStatement;
 
       // Check main branch has nested block with else
-      const mainNested = outerBlock.program.body[0] as BlockStatement;
+      const mainNested = outerBlock.program!.body[0] as BlockStatement;
       expect(mainNested.path.original).toBe('if');
       expect(mainNested.inverse).toBeTruthy();
 
@@ -277,7 +277,7 @@ describe('Parser - Block Statements with Else', () => {
       const ast = parser.parseProgram();
 
       const block = ast.body[0] as BlockStatement;
-      expect(block.program.loc).toBeTruthy();
+      expect(block.program!.loc).toBeTruthy();
     });
 
     it('should track location for inverse program', () => {
@@ -343,7 +343,7 @@ describe('Parser - Block Statements with Else', () => {
       expect(block.path.original).toBe('if');
 
       // Main branch: content + mustache + content
-      expect(block.program.body.length).toBeGreaterThan(0);
+      expect(block.program!.body.length).toBeGreaterThan(0);
 
       // Inverse branch: content
       expect(block.inverse!.body.length).toBeGreaterThan(0);
@@ -360,7 +360,7 @@ describe('Parser - Block Statements with Else', () => {
 
       const block = ast.body[0] as BlockStatement;
       expect(block.path.original).toBe('each');
-      expect(block.program.body.length).toBeGreaterThan(0);
+      expect(block.program!.body.length).toBeGreaterThan(0);
       expect(block.inverse!.body.length).toBeGreaterThan(0);
     });
   });
