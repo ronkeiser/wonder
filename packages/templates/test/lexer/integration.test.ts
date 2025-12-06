@@ -565,4 +565,346 @@ Line 3 with {{! unclosed comment`;
       }
     });
   });
+
+  describe('Subexpression integration', () => {
+    test('tokenizes simple subexpression in block helper', () => {
+      const template = `{{#if (gt x 1)}}greater{{/if}}`;
+
+      const tokens = lexer.tokenize(template);
+
+      expect(tokens[0].type).toBe(TokenType.OPEN_BLOCK);
+      expect(tokens[1].type).toBe(TokenType.ID);
+      expect(tokens[1].value).toBe('if');
+      expect(tokens[2].type).toBe(TokenType.OPEN_SEXPR);
+      expect(tokens[3].type).toBe(TokenType.ID);
+      expect(tokens[3].value).toBe('gt');
+      expect(tokens[4].type).toBe(TokenType.ID);
+      expect(tokens[4].value).toBe('x');
+      expect(tokens[5].type).toBe(TokenType.NUMBER);
+      expect(tokens[5].value).toBe('1');
+      expect(tokens[6].type).toBe(TokenType.CLOSE_SEXPR);
+      expect(tokens[7].type).toBe(TokenType.CLOSE);
+    });
+
+    test('tokenizes nested subexpressions (2 levels)', () => {
+      const template = `{{#if (and (gt x 1) (lt x 10))}}in range{{/if}}`;
+
+      const tokens = lexer.tokenize(template);
+
+      const openSexpr = tokens.filter((t) => t.type === TokenType.OPEN_SEXPR);
+      const closeSexpr = tokens.filter((t) => t.type === TokenType.CLOSE_SEXPR);
+
+      expect(openSexpr.length).toBe(3); // Main and, gt, lt
+      expect(closeSexpr.length).toBe(3);
+      expect(openSexpr.length).toBe(closeSexpr.length);
+
+      // Verify structure: OPEN_BLOCK, ID(if), OPEN_SEXPR, ID(and), OPEN_SEXPR, ID(gt)...
+      expect(tokens[0].type).toBe(TokenType.OPEN_BLOCK);
+      expect(tokens[1].value).toBe('if');
+      expect(tokens[2].type).toBe(TokenType.OPEN_SEXPR);
+      expect(tokens[3].value).toBe('and');
+      expect(tokens[4].type).toBe(TokenType.OPEN_SEXPR);
+      expect(tokens[5].value).toBe('gt');
+    });
+
+    test('tokenizes deeply nested subexpressions (5+ levels)', () => {
+      const template = `{{#if (a (b (c (d (e x)))))}}deep{{/if}}`;
+
+      const tokens = lexer.tokenize(template);
+
+      const openSexpr = tokens.filter((t) => t.type === TokenType.OPEN_SEXPR);
+      const closeSexpr = tokens.filter((t) => t.type === TokenType.CLOSE_SEXPR);
+
+      expect(openSexpr.length).toBe(5);
+      expect(closeSexpr.length).toBe(5);
+
+      // Verify helper names in sequence
+      const ids = tokens.filter((t) => t.type === TokenType.ID).map((t) => t.value);
+      expect(ids).toContain('a');
+      expect(ids).toContain('b');
+      expect(ids).toContain('c');
+      expect(ids).toContain('d');
+      expect(ids).toContain('e');
+      expect(ids).toContain('x');
+    });
+
+    test('tokenizes subexpression with string literal', () => {
+      const template = `{{#if (eq status "active")}}active user{{/if}}`;
+
+      const tokens = lexer.tokenize(template);
+
+      expect(tokens[2].type).toBe(TokenType.OPEN_SEXPR);
+      expect(tokens[3].type).toBe(TokenType.ID);
+      expect(tokens[3].value).toBe('eq');
+      expect(tokens[4].type).toBe(TokenType.ID);
+      expect(tokens[4].value).toBe('status');
+      expect(tokens[5].type).toBe(TokenType.STRING);
+      expect(tokens[5].value).toBe('active');
+      expect(tokens[6].type).toBe(TokenType.CLOSE_SEXPR);
+    });
+
+    test('tokenizes subexpression with multiple parameters', () => {
+      const template = `{{#if (between value 1 100)}}in range{{/if}}`;
+
+      const tokens = lexer.tokenize(template);
+
+      const sexprStart = tokens.findIndex((t) => t.type === TokenType.OPEN_SEXPR);
+      expect(tokens[sexprStart + 1].value).toBe('between');
+      expect(tokens[sexprStart + 2].value).toBe('value');
+      expect(tokens[sexprStart + 3].type).toBe(TokenType.NUMBER);
+      expect(tokens[sexprStart + 3].value).toBe('1');
+      expect(tokens[sexprStart + 4].type).toBe(TokenType.NUMBER);
+      expect(tokens[sexprStart + 4].value).toBe('100');
+    });
+
+    test('tokenizes subexpression with all literal types', () => {
+      const template = `{{helper (sub "text" 42 true false null undefined)}}`;
+
+      const tokens = lexer.tokenize(template);
+
+      const sexprStart = tokens.findIndex((t) => t.type === TokenType.OPEN_SEXPR);
+      expect(tokens[sexprStart + 2].type).toBe(TokenType.STRING);
+      expect(tokens[sexprStart + 2].value).toBe('text');
+      expect(tokens[sexprStart + 3].type).toBe(TokenType.NUMBER);
+      expect(tokens[sexprStart + 3].value).toBe('42');
+      expect(tokens[sexprStart + 4].type).toBe(TokenType.BOOLEAN);
+      expect(tokens[sexprStart + 4].value).toBe('true');
+      expect(tokens[sexprStart + 5].type).toBe(TokenType.BOOLEAN);
+      expect(tokens[sexprStart + 5].value).toBe('false');
+      expect(tokens[sexprStart + 6].type).toBe(TokenType.NULL);
+      expect(tokens[sexprStart + 7].type).toBe(TokenType.UNDEFINED);
+    });
+
+    test('tokenizes subexpression in mustache statement', () => {
+      const template = `{{uppercase (concat firstName lastName)}}`;
+
+      const tokens = lexer.tokenize(template);
+
+      expect(tokens[0].type).toBe(TokenType.OPEN);
+      expect(tokens[1].type).toBe(TokenType.ID);
+      expect(tokens[1].value).toBe('uppercase');
+      expect(tokens[2].type).toBe(TokenType.OPEN_SEXPR);
+      expect(tokens[3].type).toBe(TokenType.ID);
+      expect(tokens[3].value).toBe('concat');
+      expect(tokens[4].type).toBe(TokenType.ID);
+      expect(tokens[4].value).toBe('firstName');
+      expect(tokens[5].type).toBe(TokenType.ID);
+      expect(tokens[5].value).toBe('lastName');
+      expect(tokens[6].type).toBe(TokenType.CLOSE_SEXPR);
+      expect(tokens[7].type).toBe(TokenType.CLOSE);
+    });
+
+    test('tokenizes empty subexpression', () => {
+      const template = `{{helper ()}}`;
+
+      const tokens = lexer.tokenize(template);
+
+      expect(tokens[2].type).toBe(TokenType.OPEN_SEXPR);
+      expect(tokens[3].type).toBe(TokenType.CLOSE_SEXPR);
+    });
+
+    test('tokenizes whitespace inside subexpressions', () => {
+      const template = `{{#if ( gt   x   1 )}}yes{{/if}}`;
+
+      const tokens = lexer.tokenize(template);
+
+      // Whitespace should be handled, parentheses should tokenize
+      const openSexpr = tokens.filter((t) => t.type === TokenType.OPEN_SEXPR);
+      const closeSexpr = tokens.filter((t) => t.type === TokenType.CLOSE_SEXPR);
+      expect(openSexpr.length).toBe(1);
+      expect(closeSexpr.length).toBe(1);
+
+      // IDs should still be recognized despite extra whitespace
+      const ids = tokens.filter((t) => t.type === TokenType.ID).map((t) => t.value);
+      expect(ids).toContain('gt');
+      expect(ids).toContain('x');
+    });
+
+    test('tokenizes unmatched parentheses (lexer should tokenize, parser will catch)', () => {
+      const template = `{{helper (sub x}}`;
+
+      const tokens = lexer.tokenize(template);
+
+      // Lexer should successfully tokenize, even with unmatched parens
+      expect(tokens[0].type).toBe(TokenType.OPEN);
+      expect(tokens[2].type).toBe(TokenType.OPEN_SEXPR);
+      // Parser will detect the mismatch later
+      const closeSexpr = tokens.filter((t) => t.type === TokenType.CLOSE_SEXPR);
+      expect(closeSexpr.length).toBe(0); // No closing paren
+    });
+
+    test('tokenizes parentheses in content (not subexpressions)', () => {
+      const template = `Text with (parentheses) {{value}}`;
+
+      const tokens = lexer.tokenize(template);
+
+      expect(tokens[0].type).toBe(TokenType.CONTENT);
+      expect(tokens[0].value).toContain('(parentheses)');
+      // No OPEN_SEXPR/CLOSE_SEXPR tokens since they're in CONTENT
+      const sexpr = tokens.filter(
+        (t) => t.type === TokenType.OPEN_SEXPR || t.type === TokenType.CLOSE_SEXPR,
+      );
+      expect(sexpr.length).toBe(0);
+    });
+
+    test('tokenizes real-world template with comparison helpers', () => {
+      const template = `
+<div class="items">
+  {{#each users}}
+    {{#if (and (gte age 18) (eq status "active"))}}
+      <div class="user">
+        <span>{{name}}</span>
+        {{#if (gt score 80)}}
+          <span class="badge">Top Performer</span>
+        {{/if}}
+      </div>
+    {{/if}}
+  {{/each}}
+</div>`;
+
+      const tokens = lexer.tokenize(template);
+
+      // Count subexpressions
+      const openSexpr = tokens.filter((t) => t.type === TokenType.OPEN_SEXPR);
+      const closeSexpr = tokens.filter((t) => t.type === TokenType.CLOSE_SEXPR);
+
+      expect(openSexpr.length).toBe(4); // and, gte, eq, gt
+      expect(closeSexpr.length).toBe(4);
+
+      // Verify comparison helpers are recognized
+      const ids = tokens.filter((t) => t.type === TokenType.ID).map((t) => t.value);
+      expect(ids).toContain('and');
+      expect(ids).toContain('gte');
+      expect(ids).toContain('eq');
+      expect(ids).toContain('gt');
+    });
+
+    test('tokenizes complex nested template with mixed blocks and subexpressions', () => {
+      const template = `
+{{#each items}}
+  {{#if (or (eq type "featured") (gt priority 5))}}
+    <div class="{{type}}">
+      {{#if (and available (not soldOut))}}
+        <button>{{formatPrice (multiply price quantity)}}</button>
+      {{else}}
+        <span class="unavailable">Out of Stock</span>
+      {{/if}}
+    </div>
+  {{/if}}
+{{/each}}`;
+
+      const tokens = lexer.tokenize(template);
+
+      // Should successfully tokenize
+      expect(tokens[tokens.length - 1].type).toBe(TokenType.EOF);
+
+      // Count structures
+      const openBlocks = tokens.filter((t) => t.type === TokenType.OPEN_BLOCK);
+      const endBlocks = tokens.filter((t) => t.type === TokenType.OPEN_ENDBLOCK);
+      const openSexpr = tokens.filter((t) => t.type === TokenType.OPEN_SEXPR);
+      const closeSexpr = tokens.filter((t) => t.type === TokenType.CLOSE_SEXPR);
+
+      expect(openBlocks.length).toBe(endBlocks.length); // Balanced blocks
+      expect(openSexpr.length).toBe(closeSexpr.length); // Balanced subexpressions
+      expect(openSexpr.length).toBe(6); // or, eq, gt, and, not, multiply
+
+      // Verify helper names
+      const ids = tokens.filter((t) => t.type === TokenType.ID).map((t) => t.value);
+      expect(ids).toContain('or');
+      expect(ids).toContain('eq');
+      expect(ids).toContain('gt');
+      expect(ids).toContain('and');
+      expect(ids).toContain('not');
+      expect(ids).toContain('multiply');
+      expect(ids).toContain('formatPrice');
+    });
+
+    test('tokenizes subexpressions with path expressions', () => {
+      const template = `{{#if (eq user.role "admin")}}Admin Panel{{/if}}`;
+
+      const tokens = lexer.tokenize(template);
+
+      const sexprStart = tokens.findIndex((t) => t.type === TokenType.OPEN_SEXPR);
+      expect(tokens[sexprStart + 1].value).toBe('eq');
+      expect(tokens[sexprStart + 2].value).toBe('user');
+      expect(tokens[sexprStart + 3].type).toBe(TokenType.SEP);
+      expect(tokens[sexprStart + 4].value).toBe('role');
+      expect(tokens[sexprStart + 5].type).toBe(TokenType.STRING);
+      expect(tokens[sexprStart + 5].value).toBe('admin');
+    });
+
+    test('tokenizes subexpressions with data variables', () => {
+      const template = `{{#if (eq @index 0)}}First Item{{/if}}`;
+
+      const tokens = lexer.tokenize(template);
+
+      const sexprStart = tokens.findIndex((t) => t.type === TokenType.OPEN_SEXPR);
+      expect(tokens[sexprStart + 1].value).toBe('eq');
+      expect(tokens[sexprStart + 2].type).toBe(TokenType.DATA);
+      expect(tokens[sexprStart + 3].value).toBe('index');
+      expect(tokens[sexprStart + 4].type).toBe(TokenType.NUMBER);
+      expect(tokens[sexprStart + 4].value).toBe('0');
+    });
+
+    test('tokenizes subexpressions with parent path access', () => {
+      const template = `{{#each items}}{{#if (eq name ../parentName)}}match{{/if}}{{/each}}`;
+
+      const tokens = lexer.tokenize(template);
+
+      const ids = tokens.filter((t) => t.type === TokenType.ID).map((t) => t.value);
+      expect(ids).toContain('..');
+      expect(ids).toContain('parentName');
+    });
+
+    test('tokenizes multiple subexpressions at same level', () => {
+      const template = `{{helper (sub1 a) (sub2 b) (sub3 c)}}`;
+
+      const tokens = lexer.tokenize(template);
+
+      const openSexpr = tokens.filter((t) => t.type === TokenType.OPEN_SEXPR);
+      const closeSexpr = tokens.filter((t) => t.type === TokenType.CLOSE_SEXPR);
+
+      expect(openSexpr.length).toBe(3);
+      expect(closeSexpr.length).toBe(3);
+
+      const ids = tokens.filter((t) => t.type === TokenType.ID).map((t) => t.value);
+      expect(ids).toContain('sub1');
+      expect(ids).toContain('sub2');
+      expect(ids).toContain('sub3');
+    });
+
+    test('tokenizes subexpressions with negative numbers', () => {
+      const template = `{{#if (gt value -5)}}positive{{/if}}`;
+
+      const tokens = lexer.tokenize(template);
+
+      const numbers = tokens.filter((t) => t.type === TokenType.NUMBER);
+      expect(numbers[0].value).toBe('-5');
+    });
+
+    test('tokenizes subexpressions with decimal numbers', () => {
+      const template = `{{#if (lte price 99.99)}}affordable{{/if}}`;
+
+      const tokens = lexer.tokenize(template);
+
+      const numbers = tokens.filter((t) => t.type === TokenType.NUMBER);
+      expect(numbers[0].value).toBe('99.99');
+    });
+
+    test('handles extremely deep nesting (10+ levels)', () => {
+      // b, c, d, e, f, g, h, i, j, k = 10 levels of subexpressions
+      // Each ( has a matching )
+      const template = `{{a (b (c (d (e (f (g (h (i (j (k x))))))))))}}`;
+
+      const tokens = lexer.tokenize(template);
+
+      const openSexpr = tokens.filter((t) => t.type === TokenType.OPEN_SEXPR);
+      const closeSexpr = tokens.filter((t) => t.type === TokenType.CLOSE_SEXPR);
+
+      expect(openSexpr.length).toBeGreaterThanOrEqual(10); // 10+ levels
+      expect(closeSexpr.length).toBeGreaterThanOrEqual(10);
+      expect(openSexpr.length).toBe(closeSexpr.length); // Balanced
+      expect(tokens[tokens.length - 1].type).toBe(TokenType.EOF);
+    });
+  });
 });

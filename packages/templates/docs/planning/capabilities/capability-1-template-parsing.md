@@ -474,7 +474,7 @@
 
 ### Task C1-F5-T3: Update Integration Tests
 
-**Status:** `[x]` Complete
+**Status:** `[x]` Complete ✅
 
 - Add subexpression examples to existing integration test suite
 - Verify complex templates with subexpressions tokenize correctly
@@ -485,12 +485,17 @@
 
 **Deliverable:** Enhanced integration tests including subexpressions
 
-**Tests:**
+**Tests:** 20 new tests in `test/lexer/integration.test.ts` (55 total, all passing)
 
 - Real-world templates with comparison helpers
-- Deeply nested subexpressions (5+ levels)
+- Deeply nested subexpressions (10+ levels)
 - Mixed content, mustaches, blocks, and subexpressions
-- Subexpressions with all literal types
+- Subexpressions with all literal types (string, number, boolean, null, undefined)
+- Subexpressions with path expressions and data variables
+- Multiple subexpressions at same level
+- Whitespace handling inside subexpressions
+- Unmatched parentheses (lexer tokenizes, parser validates)
+- Parentheses in content vs. subexpressions
 
 ---
 
