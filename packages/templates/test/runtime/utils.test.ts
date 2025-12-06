@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { lookupProperty } from '../../src/runtime/utils';
+import { escapeExpression, lookupProperty } from '../../src/runtime/utils';
 
 /**
  * Runtime Utilities Tests
@@ -245,6 +245,227 @@ describe('Runtime Utilities', () => {
         expect(lookupProperty(obj, 'prop50')).toBe(50);
         expect(lookupProperty(obj, 'prop99')).toBe(99);
         expect(lookupProperty(obj, 'prop100')).toBeUndefined();
+      });
+    });
+  });
+
+  describe('escapeExpression (Feature 3.2 - Task C3-F2-T1)', () => {
+    describe('Basic Escaping', () => {
+      it('escapes ampersand', () => {
+        expect(escapeExpression('foo & bar')).toBe('foo &amp; bar');
+        expect(escapeExpression('&')).toBe('&amp;');
+        expect(escapeExpression('&&')).toBe('&amp;&amp;');
+      });
+
+      it('escapes less than', () => {
+        expect(escapeExpression('foo < bar')).toBe('foo &lt; bar');
+        expect(escapeExpression('<')).toBe('&lt;');
+        expect(escapeExpression('<<')).toBe('&lt;&lt;');
+      });
+
+      it('escapes greater than', () => {
+        expect(escapeExpression('foo > bar')).toBe('foo &gt; bar');
+        expect(escapeExpression('>')).toBe('&gt;');
+        expect(escapeExpression('>>')).toBe('&gt;&gt;');
+      });
+
+      it('escapes double quote', () => {
+        expect(escapeExpression('foo "bar" baz')).toBe('foo &quot;bar&quot; baz');
+        expect(escapeExpression('"')).toBe('&quot;');
+        expect(escapeExpression('""')).toBe('&quot;&quot;');
+      });
+
+      it('escapes single quote', () => {
+        expect(escapeExpression("foo 'bar' baz")).toBe('foo &#x27;bar&#x27; baz');
+        expect(escapeExpression("'")).toBe('&#x27;');
+        expect(escapeExpression("''")).toBe('&#x27;&#x27;');
+      });
+
+      it('escapes backtick', () => {
+        expect(escapeExpression('foo `bar` baz')).toBe('foo &#x60;bar&#x60; baz');
+        expect(escapeExpression('`')).toBe('&#x60;');
+        expect(escapeExpression('``')).toBe('&#x60;&#x60;');
+      });
+
+      it('escapes equals sign', () => {
+        expect(escapeExpression('foo = bar')).toBe('foo &#x3D; bar');
+        expect(escapeExpression('=')).toBe('&#x3D;');
+        expect(escapeExpression('==')).toBe('&#x3D;&#x3D;');
+      });
+
+      it('escapes all 7 special characters together', () => {
+        const input = `&<>"'\`=`;
+        const expected = '&amp;&lt;&gt;&quot;&#x27;&#x60;&#x3D;';
+        expect(escapeExpression(input)).toBe(expected);
+      });
+    });
+
+    describe('HTML Tag Escaping', () => {
+      it('escapes script tags', () => {
+        const input = '<script>alert("xss")</script>';
+        const expected = '&lt;script&gt;alert(&quot;xss&quot;)&lt;/script&gt;';
+        expect(escapeExpression(input)).toBe(expected);
+      });
+
+      it('escapes HTML with attributes', () => {
+        const input = '<div class="danger" id=\'test\'>';
+        const expected = '&lt;div class&#x3D;&quot;danger&quot; id&#x3D;&#x27;test&#x27;&gt;';
+        expect(escapeExpression(input)).toBe(expected);
+      });
+
+      it('escapes img tags with onerror', () => {
+        const input = '<img src=x onerror="alert(1)">';
+        const expected = '&lt;img src&#x3D;x onerror&#x3D;&quot;alert(1)&quot;&gt;';
+        expect(escapeExpression(input)).toBe(expected);
+      });
+
+      it('escapes anchor tags', () => {
+        const input = '<a href="javascript:alert(\'xss\')">Click</a>';
+        const expected =
+          '&lt;a href&#x3D;&quot;javascript:alert(&#x27;xss&#x27;)&quot;&gt;Click&lt;/a&gt;';
+        expect(escapeExpression(input)).toBe(expected);
+      });
+    });
+
+    describe('Null and Undefined Handling', () => {
+      it('returns empty string for null', () => {
+        expect(escapeExpression(null)).toBe('');
+      });
+
+      it('returns empty string for undefined', () => {
+        expect(escapeExpression(undefined)).toBe('');
+      });
+    });
+
+    describe('Type Coercion', () => {
+      it('converts false to string', () => {
+        expect(escapeExpression(false)).toBe('false');
+      });
+
+      it('converts true to string', () => {
+        expect(escapeExpression(true)).toBe('true');
+      });
+
+      it('converts zero to string', () => {
+        expect(escapeExpression(0)).toBe('0');
+      });
+
+      it('converts numbers to string', () => {
+        expect(escapeExpression(42)).toBe('42');
+        expect(escapeExpression(-1)).toBe('-1');
+        expect(escapeExpression(3.14)).toBe('3.14');
+      });
+
+      it('converts objects to string', () => {
+        expect(escapeExpression({})).toBe('[object Object]');
+      });
+
+      it('converts arrays to string', () => {
+        expect(escapeExpression([1, 2, 3])).toBe('1,2,3');
+        expect(escapeExpression(['a', 'b'])).toBe('a,b');
+      });
+    });
+
+    describe('Fast Path (No Special Characters)', () => {
+      it('returns unchanged string with no special chars', () => {
+        const input = 'Hello World';
+        expect(escapeExpression(input)).toBe(input);
+      });
+
+      it('returns unchanged alphanumeric string', () => {
+        const input = 'abc123';
+        expect(escapeExpression(input)).toBe(input);
+      });
+
+      it('returns unchanged string with spaces', () => {
+        const input = 'foo bar baz';
+        expect(escapeExpression(input)).toBe(input);
+      });
+
+      it('returns unchanged string with punctuation', () => {
+        const input = 'Hello, World! How are you?';
+        expect(escapeExpression(input)).toBe(input);
+      });
+
+      it('returns unchanged empty string', () => {
+        expect(escapeExpression('')).toBe('');
+      });
+    });
+
+    describe('Mixed Content', () => {
+      it('escapes only special characters in mixed text', () => {
+        const input = 'Safe text & <dangerous> content';
+        const expected = 'Safe text &amp; &lt;dangerous&gt; content';
+        expect(escapeExpression(input)).toBe(expected);
+      });
+
+      it('preserves safe punctuation', () => {
+        const input = "Hello! How are you? I'm fine.";
+        const expected = 'Hello! How are you? I&#x27;m fine.';
+        expect(escapeExpression(input)).toBe(expected);
+      });
+
+      it('handles URLs with special characters', () => {
+        const input = 'http://example.com?foo=bar&baz=qux';
+        const expected = 'http://example.com?foo&#x3D;bar&amp;baz&#x3D;qux';
+        expect(escapeExpression(input)).toBe(expected);
+      });
+    });
+
+    describe('Edge Cases', () => {
+      it('handles very long strings', () => {
+        const input = '<script>'.repeat(1000);
+        const expected = '&lt;script&gt;'.repeat(1000);
+        expect(escapeExpression(input)).toBe(expected);
+      });
+
+      it('handles strings with only special characters', () => {
+        expect(escapeExpression('&&&')).toBe('&amp;&amp;&amp;');
+        expect(escapeExpression('<<<')).toBe('&lt;&lt;&lt;');
+      });
+
+      it('handles unicode characters', () => {
+        expect(escapeExpression('Hello 世界')).toBe('Hello 世界');
+        expect(escapeExpression('Emoji 😀')).toBe('Emoji 😀');
+      });
+
+      it('handles newlines and tabs', () => {
+        expect(escapeExpression('line1\nline2')).toBe('line1\nline2');
+        expect(escapeExpression('col1\tcol2')).toBe('col1\tcol2');
+      });
+
+      it('handles strings with multiple spaces', () => {
+        expect(escapeExpression('foo  bar   baz')).toBe('foo  bar   baz');
+      });
+    });
+
+    describe('Real-world XSS Scenarios', () => {
+      it('prevents XSS via script injection', () => {
+        const malicious = '<script>document.cookie</script>';
+        const escaped = escapeExpression(malicious);
+        expect(escaped).not.toContain('<script>');
+        expect(escaped).toContain('&lt;script&gt;');
+      });
+
+      it('prevents XSS via event handler', () => {
+        const malicious = 'Click <span onmouseover="alert(1)">here</span>';
+        const escaped = escapeExpression(malicious);
+        expect(escaped).not.toContain('onmouseover=');
+        expect(escaped).toContain('onmouseover&#x3D;');
+      });
+
+      it('prevents XSS via javascript: protocol', () => {
+        const malicious = '<a href="javascript:alert(\'XSS\')">Click</a>';
+        const escaped = escapeExpression(malicious);
+        expect(escaped).not.toContain('<a href');
+        expect(escaped).toContain('&lt;a href&#x3D;');
+      });
+
+      it('prevents XSS via data: URL', () => {
+        const malicious = '<img src="data:text/html,<script>alert(1)</script>">';
+        const escaped = escapeExpression(malicious);
+        expect(escaped).not.toContain('<img');
+        expect(escaped).toContain('&lt;img');
       });
     });
   });
