@@ -1,7 +1,7 @@
 {
-  "name": "@wonder/schema",
+  "name": "@wonder/templates",
   "version": "0.1.0",
-  "description": "Runtime schema validation and DDL generation for Wonder",
+  "description": "Handlebars-compatible template engine for Cloudflare Workers (no eval/Function)",
   "type": "module",
   "main": "./src/index.ts",
   "types": "./src/index.ts",
