@@ -67,6 +67,15 @@ export class TokenManager {
         updated_at TEXT NOT NULL
       )
     `);
+
+    // Add unique constraint for fan-in tokens to prevent duplicates
+    // A fan-in token is uniquely identified by: workflow_run + destination node + fan-in path
+    // The path_id for fan-in tokens ends with '.fanin' and is stable across all siblings
+    // NOTE: Must NOT use partial index (WHERE clause) because status changes during activation
+    this.sql.exec(`
+      CREATE UNIQUE INDEX IF NOT EXISTS idx_fan_in_token 
+      ON tokens(workflow_run_id, path_id)
+    `);
   }
 
   /**
@@ -204,5 +213,68 @@ export class TokenManager {
    */
   deleteToken(token_id: string): void {
     this.sql.exec(`DELETE FROM tokens WHERE id = ?`, token_id);
+  }
+
+  /**
+   * Atomically try to create a fan-in token
+   * Uses INSERT OR IGNORE to handle race conditions
+   * Returns the token_id if this call created it, or null if it already existed
+   */
+  tryCreateFanInToken(params: {
+    workflow_run_id: string;
+    node_id: string;
+    parent_token_id: string;
+    path_id: string;
+  }): string | null {
+    const token_id = ulid();
+    const now = new Date().toISOString();
+
+    try {
+      this.sql.exec(
+        `INSERT INTO tokens (
+          id, workflow_run_id, node_id, status, path_id,
+          parent_token_id, fan_out_transition_id, branch_index, branch_total,
+          state_data, state_updated_at, created_at, updated_at
+        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+        token_id,
+        params.workflow_run_id,
+        params.node_id,
+        'waiting_for_siblings',
+        params.path_id,
+        params.parent_token_id,
+        null, // fan_out_transition_id (this is a merge point, not a fan-out)
+        0, // branch_index
+        1, // branch_total
+        null, // state_data
+        now,
+        now,
+        now,
+      );
+      return token_id; // Successfully created
+    } catch (error: any) {
+      // UNIQUE constraint violation means token already exists
+      if (error.message?.includes('UNIQUE')) {
+        return null;
+      }
+      throw error;
+    }
+  }
+
+  /**
+   * Atomically try to activate a waiting token (CAS pattern)
+   * Returns true if this call activated it, false if already activated
+   */
+  tryActivateWaitingToken(token_id: string): boolean {
+    const now = new Date().toISOString();
+    const result = this.sql.exec(
+      `UPDATE tokens 
+       SET status = 'pending', updated_at = ?
+       WHERE id = ? AND status = 'waiting_for_siblings'`,
+      now,
+      token_id,
+    );
+
+    // rowsWritten will be 1 if we activated it, 0 if already activated
+    return result.rowsWritten > 0;
   }
 }

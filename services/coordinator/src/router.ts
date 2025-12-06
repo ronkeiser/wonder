@@ -336,92 +336,149 @@ export class Router {
       metadata: { joins_transition_id: joinsTransitionId },
     });
 
-    // Check for existing fan-in tokens
-    const existingFanInTokens = tokens.getTokensByNodeAndFanOut(
-      workflow_run_id,
-      transition.to_node_id,
-      joinsTransitionId,
-    );
+    // Check synchronization condition FIRST (before creating token)
+    const siblings = tokens.getSiblingsByFanOutTransition(workflow_run_id, joinsTransitionId);
+    const conditionMet = this.checkSynchronizationCondition(siblings, syncConfig.wait_for);
 
     this.logger.info({
-      event_type: 'SYNC_EXISTING_BEFORE_CREATE',
-      message: 'Found existing fan-in tokens',
+      event_type: 'SYNC_CONDITION_CHECK',
+      message: 'Condition check result',
       trace_id: workflow_run_id,
       metadata: {
-        existing_count: existingFanInTokens.length,
-        existing_tokens: existingFanInTokens.map((t) => ({ id: t.id, status: t.status })),
+        should_proceed: conditionMet.shouldProceed,
+        finished_count: conditionMet.finishedCount,
+        total_count: conditionMet.totalCount,
       },
     });
 
-    // If active token already exists, skip
-    if (existingFanInTokens.length > 0) {
-      const activeTokens = existingFanInTokens.filter((t) => t.status !== 'waiting_for_siblings');
-      if (activeTokens.length > 0) {
+    // Try to atomically create a fan-in token
+    // Use the sibling group's common path prefix to create a stable fan-in path
+    // Extract parent path by removing the last segment (branch index)
+    const pathSegments = (tokenRow.path_id as string).split('.');
+    const parentPath = pathSegments.slice(0, -1).join('.');
+    const fanInPath = `${parentPath}.fanin`;
+
+    const createdTokenId = tokens.tryCreateFanInToken({
+      workflow_run_id,
+      node_id: transition.to_node_id,
+      parent_token_id: tokenRow.id as string, // Doesn't matter which sibling
+      path_id: fanInPath,
+    });
+
+    if (createdTokenId === null) {
+      // Token already exists - someone else is handling it
+      this.logger.info({
+        event_type: 'SYNC_TOKEN_ALREADY_EXISTS',
+        message: 'Fan-in token already created by another sibling',
+        trace_id: workflow_run_id,
+      });
+
+      // If condition is met, try to activate the existing token
+      if (conditionMet.shouldProceed) {
+        const existingTokens = tokens.getTokensByNodeAndFanOut(
+          workflow_run_id,
+          transition.to_node_id,
+          joinsTransitionId,
+        );
+
+        if (existingTokens.length > 0) {
+          const waitingToken = existingTokens[0];
+          const activated = tokens.tryActivateWaitingToken(waitingToken.id as string);
+
+          if (activated) {
+            this.logger.info({
+              event_type: 'fan_in_condition_met',
+              message: 'Won race to activate waiting token',
+              trace_id: workflow_run_id,
+              metadata: {
+                activated_token_id: waitingToken.id,
+                finished_count: conditionMet.finishedCount,
+                total_count: conditionMet.totalCount,
+              },
+            });
+
+            // Merge branch outputs if configured
+            if (syncConfig.merge) {
+              this.mergeBranchOutputs(sql, node.ref, syncConfig.merge, workflow_run_id);
+            }
+
+            tokensToDispatch.push(waitingToken.id as string);
+
+            this.logger.info({
+              event_type: 'ROUTER_TOKEN_DISPATCHED',
+              message: 'Token added to dispatch queue',
+              trace_id: workflow_run_id,
+              metadata: { token_id: waitingToken.id, dispatch_queue_size: tokensToDispatch.length },
+            });
+          } else {
+            this.logger.info({
+              event_type: 'SYNC_LOST_ACTIVATION_RACE',
+              message: 'Lost race to activate - another sibling won',
+              trace_id: workflow_run_id,
+            });
+          }
+        }
+      } else {
         this.logger.info({
-          event_type: 'SYNC_SKIP_ACTIVE_EXISTS',
-          message: 'Skipping - active token exists',
+          event_type: 'SYNC_CONDITION_NOT_MET',
+          message: 'Condition not met yet, waiting',
           trace_id: workflow_run_id,
-          metadata: { existing_active_token: activeTokens[0].id },
         });
-        return true;
       }
 
-      // Check if synchronization condition is now met
-      const siblings = tokens.getSiblingsByFanOutTransition(workflow_run_id, joinsTransitionId);
-      const conditionMet = this.checkSynchronizationCondition(siblings, syncConfig.wait_for);
+      return true; // Skip normal token creation
+    }
 
+    // We created the token - log it
+    this.logger.info({
+      event_type: 'SYNC_TOKEN_CREATED',
+      message: 'Created new fan-in waiting token',
+      trace_id: workflow_run_id,
+      metadata: { token_id: createdTokenId },
+    });
+
+    // If condition is already met, activate immediately
+    if (conditionMet.shouldProceed) {
       this.logger.info({
-        event_type: 'SYNC_CONDITION_CHECK',
-        message: 'Condition check result',
+        event_type: 'fan_in_condition_met',
+        message: 'Condition already met, activating immediately',
         trace_id: workflow_run_id,
         metadata: {
-          should_proceed: conditionMet.shouldProceed,
+          token_id: createdTokenId,
           finished_count: conditionMet.finishedCount,
           total_count: conditionMet.totalCount,
         },
       });
 
-      if (conditionMet.shouldProceed) {
-        // Activate waiting token
-        const waitingToken = existingFanInTokens[0];
-        this.logger.info({
-          event_type: 'fan_in_condition_met',
-          message: 'Activating existing waiting token',
-          trace_id: workflow_run_id,
-          metadata: {
-            activated_token_id: waitingToken.id,
-            finished_count: conditionMet.finishedCount,
-            total_count: conditionMet.totalCount,
-          },
-        });
+      // Merge branch outputs if configured
+      if (syncConfig.merge) {
+        this.mergeBranchOutputs(sql, node.ref, syncConfig.merge, workflow_run_id);
+      }
 
-        // Merge branch outputs if configured
-        if (syncConfig.merge) {
-          this.mergeBranchOutputs(sql, node.ref, syncConfig.merge, workflow_run_id);
-        }
-
-        // Activate and dispatch
-        tokens.updateTokenStatus(waitingToken.id as string, 'pending');
-        tokensToDispatch.push(waitingToken.id as string);
-
+      const activated = tokens.tryActivateWaitingToken(createdTokenId);
+      if (activated) {
+        tokensToDispatch.push(createdTokenId);
         this.logger.info({
           event_type: 'ROUTER_TOKEN_DISPATCHED',
           message: 'Token added to dispatch queue',
           trace_id: workflow_run_id,
-          metadata: { token_id: waitingToken.id, dispatch_queue_size: tokensToDispatch.length },
-        });
-      } else {
-        this.logger.info({
-          event_type: 'SYNC_SKIP_ALREADY_WAITING',
-          message: 'Skipping - already waiting',
-          trace_id: workflow_run_id,
-          metadata: { existing_waiting_token: existingFanInTokens[0].id },
+          metadata: { token_id: createdTokenId, dispatch_queue_size: tokensToDispatch.length },
         });
       }
-      return true;
+    } else {
+      this.logger.info({
+        event_type: 'SYNC_WAITING',
+        message: 'Token waiting for more siblings',
+        trace_id: workflow_run_id,
+        metadata: {
+          token_id: createdTokenId,
+          finished_count: conditionMet.finishedCount,
+          total_count: conditionMet.totalCount,
+        },
+      });
     }
 
-    return false; // No existing tokens, proceed with creation
+    return true; // Skip normal token creation
   }
 
   /**

@@ -132,10 +132,10 @@ export class WorkflowCoordinator extends DurableObject {
       emitter: this.emitter,
     });
 
-    // Dispatch all tokens from routing decision
-    for (const nextTokenId of decision.tokensToDispatch) {
-      await this.dispatchToken(nextTokenId);
-    }
+    // Dispatch all tokens in parallel
+    await Promise.all(
+      decision.tokensToDispatch.map((nextTokenId) => this.dispatchToken(nextTokenId)),
+    );
 
     // If workflow is complete, finalize
     if (decision.workflowComplete) {
