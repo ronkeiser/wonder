@@ -7,6 +7,7 @@ import type {
   CommentStatement,
   ContentStatement,
   Expression,
+  Hash,
   MustacheStatement,
   Node,
   NullLiteral,
@@ -15,6 +16,7 @@ import type {
   Program,
   Statement,
   StringLiteral,
+  SubExpression,
   UndefinedLiteral,
 } from './ast-nodes';
 import { ParserError } from './parser-error';
@@ -576,6 +578,8 @@ export class Parser {
       case TokenType.ID:
       case TokenType.DATA:
         return this.parsePathExpression();
+      case TokenType.OPEN_SEXPR:
+        return this.parseSubExpression();
       default:
         throw ParserError.fromToken(
           `Unexpected token ${this.currentToken.type} while parsing expression`,
@@ -661,6 +665,108 @@ export class Parser {
       type: 'UndefinedLiteral',
       value: undefined,
       original: 'undefined',
+      loc,
+    };
+  }
+
+  /**
+   * Parse a SubExpression (nested helper call)
+   * Syntax: (helperName param1 param2 ...)
+   *
+   * SubExpressions allow helper calls to be nested within other expressions.
+   * For example: {{#if (gt score 80)}}...{{/if}}
+   * Here (gt score 80) is a SubExpression that calls the 'gt' helper.
+   *
+   * @returns SubExpression node
+   * @throws {ParserError} If SubExpression is malformed or unclosed
+   */
+  parseSubExpression(): SubExpression {
+    // Save start token for location tracking
+    const startToken = this.currentToken;
+
+    // Expect opening parenthesis
+    this.expect(TokenType.OPEN_SEXPR, 'Expected opening parenthesis for subexpression');
+    this.advance();
+
+    // Parse helper name (must be a path expression)
+    if (!this.currentToken) {
+      throw ParserError.fromToken(
+        'Unexpected end of input while parsing subexpression helper name',
+        startToken,
+        this.getErrorContext(),
+      );
+    }
+
+    if (!this.match(TokenType.ID) && !this.match(TokenType.DATA)) {
+      throw ParserError.fromToken(
+        `Expected helper name in subexpression, got ${this.currentToken?.type}`,
+        this.currentToken,
+        this.getErrorContext(),
+      );
+    }
+
+    const path = this.parsePathExpression();
+
+    // Parse parameters (can include literals, paths, or nested subexpressions)
+    const params: Expression[] = [];
+    while (this.currentToken && !this.match(TokenType.CLOSE_SEXPR)) {
+      // Check for valid expression token
+      const validTypes = [
+        TokenType.STRING,
+        TokenType.NUMBER,
+        TokenType.BOOLEAN,
+        TokenType.NULL,
+        TokenType.UNDEFINED,
+        TokenType.ID,
+        TokenType.DATA,
+        TokenType.OPEN_SEXPR,
+      ];
+
+      const isValidToken = validTypes.some((type) => this.match(type));
+      if (!isValidToken) {
+        // If we hit a block-ending token, the subexpression is likely unclosed
+        const isBlockEnd =
+          this.match(TokenType.CLOSE) ||
+          this.match(TokenType.INVERSE) ||
+          this.match(TokenType.OPEN_ENDBLOCK);
+        const message = isBlockEnd
+          ? `Unclosed subexpression for helper '${path.original}' - expected closing parenthesis`
+          : `Unexpected token ${this.currentToken.type} in subexpression parameters`;
+        throw ParserError.fromToken(message, this.currentToken, this.getErrorContext());
+      }
+
+      params.push(this.parseExpression());
+    }
+
+    // Expect closing parenthesis
+    if (!this.currentToken) {
+      throw ParserError.fromToken(
+        `Unclosed subexpression for helper '${path.original}'`,
+        startToken,
+        this.getErrorContext(),
+      );
+    }
+
+    const endToken = this.expect(
+      TokenType.CLOSE_SEXPR,
+      'Expected closing parenthesis for subexpression',
+    );
+    this.advance();
+
+    // Create empty hash (V1 doesn't support named parameters in subexpressions)
+    const hash: Hash = {
+      type: 'Hash',
+      pairs: [],
+      loc: null,
+    };
+
+    const loc = startToken ? this.getSourceLocation(startToken, endToken) : null;
+
+    return {
+      type: 'SubExpression',
+      path,
+      params,
+      hash,
       loc,
     };
   }

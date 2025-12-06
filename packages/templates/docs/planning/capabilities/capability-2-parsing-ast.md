@@ -795,7 +795,7 @@
 
 ### Task C2-F10-T1: Parse SubExpression Structure
 
-**Status:** `[ ]` Not Started
+**Status:** `[x]` Complete ✅
 
 - When current token is OPEN_SEXPR (`(`):
   - Parse helper name as path expression
@@ -818,11 +818,11 @@
 - `(gt x 1)` → SubExpression with 2 params
 - `(eq status "active")` → SubExpression with string literal
 - Simple subexpression in if: `{{#if (gt score 80)}}...{{/if}}`
-- Location spans parentheses
+- Location spans parentheses ✅
 
 ### Task C2-F10-T2: Parse Nested SubExpressions
 
-**Status:** `[ ]` Not Started
+**Status:** `[x]` Complete ✅
 
 - Handle SubExpression as parameter to another SubExpression
 - Recursive descent: when parsing params, check for OPEN_SEXPR
@@ -837,11 +837,11 @@
 - `(and (gt x 1) (lt x 10))` → SubExpression with 2 SubExpression params
 - Triple nested: `(or (and a b) (and c d))`
 - Mixed literals and subexpressions: `(add (mul x 2) 5)`
-- Location information correct for all levels
+- Location information correct for all levels ✅
 
 ### Task C2-F10-T3: Integrate with Expression Parsing
 
-**Status:** `[ ]` Not Started
+**Status:** `[x]` Complete ✅
 
 - Update `parseExpression()` method to handle OPEN_SEXPR
 - When parsing params for MustacheStatement:
@@ -859,11 +859,11 @@
 - `{{#if (gt score 80)}}` → BlockStatement with SubExpression param
 - `{{uppercase (concat first " " last)}}` → MustacheStatement with SubExpression
 - Multiple subexpressions: `{{#if (and (gt x 1) (lt x 10))}}`
-- Subexpressions work in both mustaches and blocks
+- Subexpressions work in both mustaches and blocks ✅
 
 ### Task C2-F10-T4: Validate SubExpression Closing
 
-**Status:** `[ ]` Not Started
+**Status:** `[x]` Complete ✅
 
 - After OPEN_SEXPR, must find matching CLOSE_SEXPR
 - Track nesting depth for error messages
@@ -878,7 +878,61 @@
 - `(gt x 1` → Error: unclosed subexpression
 - `gt x 1)` → Error: unexpected closing parenthesis
 - `(gt (lt x 5) 1` → Error identifies which subexpression unclosed
-- Error includes line/column information
+- Error includes line/column information ✅
+
+**Test Coverage:**
+
+- Basic SubExpression Structure (9 tests):
+  - Simple subexpression with two params ✅
+  - Subexpression with string literal ✅
+  - Subexpression with boolean literals ✅
+  - Subexpression with null and undefined ✅
+  - Subexpression with no parameters ✅
+  - Subexpression with multiple parameters ✅
+  - Location tracking ✅
+  - Subexpression with dotted path ✅
+  - Subexpression with data variable ✅
+
+- Nested SubExpressions (6 tests):
+  - Subexpression with one nested subexpression ✅
+  - Triple nested subexpressions ✅
+  - Mixed literals and nested subexpressions ✅
+  - Deeply nested subexpressions (4 levels) ✅
+  - Complex nested expression with multiple params ✅
+  - Location tracking for nested subexpressions ✅
+
+- Integration with Block Helpers (7 tests):
+  - Works in if block ✅
+  - Works in unless block ✅
+  - Works in each block ✅
+  - Works in with block ✅
+  - Multiple subexpressions in block params ✅
+  - Mixing subexpressions with literals ✅
+  - Works in block with else ✅
+
+- Error Conditions (9 tests):
+  - Throws on unclosed subexpression ✅
+  - Throws on unexpected closing parenthesis ✅
+  - Throws on unclosed nested subexpression ✅
+  - Throws on missing helper name ✅
+  - Throws on invalid token in subexpression ✅
+  - Includes helper name in unclosed error ✅
+  - Throws on unexpected EOF in subexpression ✅
+  - Throws on deeply nested unclosed subexpression ✅
+  - Provides position information in errors ✅
+
+- Edge Cases (5 tests):
+  - Handles whitespace inside subexpression ✅
+  - Parses subexpression with parent path ✅
+  - Parses subexpression with this reference ✅
+  - Handles multiple subexpressions in complex template ✅
+  - Parses empty parameter subexpression ✅
+
+**Total Tests for Feature 2.10:** 36 tests (all passing)
+
+**Implementation:** `src/parser/parser.ts` - `parseSubExpression()` method with recursive support, integrated into `parseExpression()` dispatcher
+
+**Test File:** `test/parser/subexpression.test.ts`
 
 ---
 
