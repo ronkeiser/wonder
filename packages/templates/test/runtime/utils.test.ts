@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { escapeExpression, lookupProperty } from '../../src/runtime/utils';
+import { SafeString, escapeExpression, lookupProperty } from '../../src/runtime/utils';
 
 /**
  * Runtime Utilities Tests
@@ -466,6 +466,85 @@ describe('Runtime Utilities', () => {
         const escaped = escapeExpression(malicious);
         expect(escaped).not.toContain('<img');
         expect(escaped).toContain('&lt;img');
+      });
+    });
+  });
+
+  describe('SafeString (Feature 3.2 - Task C3-F2-T3)', () => {
+    describe('SafeString Class', () => {
+      it('creates SafeString instance', () => {
+        const safe = new SafeString('<b>Bold</b>');
+        expect(safe).toBeInstanceOf(SafeString);
+      });
+
+      it('toString() returns string', () => {
+        const safe = new SafeString('<b>Bold</b>');
+        expect(safe.toString()).toBe('<b>Bold</b>');
+      });
+
+      it('toHTML() returns string', () => {
+        const safe = new SafeString('<b>Bold</b>');
+        expect(safe.toHTML()).toBe('<b>Bold</b>');
+      });
+
+      it('preserves HTML content', () => {
+        const html = '<div class="alert">Warning!</div>';
+        const safe = new SafeString(html);
+        expect(safe.toString()).toBe(html);
+        expect(safe.toHTML()).toBe(html);
+      });
+
+      it('handles empty string', () => {
+        const safe = new SafeString('');
+        expect(safe.toString()).toBe('');
+        expect(safe.toHTML()).toBe('');
+      });
+    });
+
+    describe('SafeString Integration with escapeExpression', () => {
+      it('bypasses escaping for SafeString instances', () => {
+        const html = '<b>Bold</b>';
+        const safe = new SafeString(html);
+        expect(escapeExpression(safe)).toBe(html);
+      });
+
+      it('preserves HTML entities in SafeString', () => {
+        const html = '&lt;&gt;&amp;&quot;';
+        const safe = new SafeString(html);
+        expect(escapeExpression(safe)).toBe(html);
+      });
+
+      it('preserves dangerous HTML in SafeString', () => {
+        const html = '<script>alert("XSS")</script>';
+        const safe = new SafeString(html);
+        expect(escapeExpression(safe)).toBe(html);
+      });
+
+      it('still escapes regular strings', () => {
+        const regular = '<b>Bold</b>';
+        expect(escapeExpression(regular)).toBe('&lt;b&gt;Bold&lt;/b&gt;');
+      });
+
+      it('handles mixed usage', () => {
+        const safe = new SafeString('<b>Safe HTML</b>');
+        const unsafe = '<i>Unsafe HTML</i>';
+
+        expect(escapeExpression(safe)).toBe('<b>Safe HTML</b>');
+        expect(escapeExpression(unsafe)).toBe('&lt;i&gt;Unsafe HTML&lt;/i&gt;');
+      });
+
+      it('SafeString takes precedence over null check', () => {
+        const safe = new SafeString('');
+        // Empty string should be returned, not converted to ''
+        expect(escapeExpression(safe)).toBe('');
+      });
+
+      it('SafeString with special characters bypasses escaping', () => {
+        const html = '&<>"\'`=';
+        const safe = new SafeString(html);
+        expect(escapeExpression(safe)).toBe(html);
+        // Regular string would be escaped
+        expect(escapeExpression(html)).toBe('&amp;&lt;&gt;&quot;&#x27;&#x60;&#x3D;');
       });
     });
   });
