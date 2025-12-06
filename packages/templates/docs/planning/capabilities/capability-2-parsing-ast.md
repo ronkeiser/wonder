@@ -371,7 +371,7 @@
 
 ### Task C2-F4-T4: Parse Special Paths
 
-**Status:** `[ ]` Not Started
+**Status:** `[x]` Complete
 
 - Handle `{{this}}` → PathExpression with empty parts
 - Handle `{{this.foo}}` → PathExpression with parts ['foo'], scoped

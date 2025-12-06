@@ -248,7 +248,7 @@ export class Parser {
    * - Simple: foo, foo.bar, foo.bar.baz
    * - Parent: ../parent, ../../grandparent, ../foo.bar
    * - Data: @index, @root.user
-   * - Special: this, this.foo, ./foo (handled in future task)
+   * - Special: this, this.foo, ./foo, .
    *
    * @returns PathExpression node
    * @throws {ParserError} If path is invalid or malformed
@@ -300,6 +300,90 @@ export class Parser {
 
     // Expect at least one identifier to start the path
     const firstToken = this.expect(TokenType.ID, 'Expected identifier to start path expression');
+
+    // Check for special path: {{this}} or {{this.foo}}
+    if (firstToken.value === 'this') {
+      original = 'this';
+      this.advance(); // Move past 'this'
+
+      // Check if there's a path after 'this'
+      if (this.currentToken && this.match(TokenType.SEP)) {
+        this.advance(); // Move past SEP
+
+        const segmentToken = this.expect(TokenType.ID, 'Expected identifier after path separator');
+        parts.push(segmentToken.value);
+        original += '.' + segmentToken.value;
+        this.advance();
+
+        // Parse additional segments
+        while (this.currentToken && this.match(TokenType.SEP)) {
+          this.advance(); // Move past SEP
+
+          const segmentToken = this.expect(
+            TokenType.ID,
+            'Expected identifier after path separator',
+          );
+
+          parts.push(segmentToken.value);
+          original += '.' + segmentToken.value;
+          this.advance();
+        }
+      }
+      // else: {{this}} alone - parts remains empty
+
+      const node: import('./ast-nodes').PathExpression = {
+        type: 'PathExpression',
+        data: false,
+        depth: 0,
+        parts: parts, // Empty for {{this}}, or ['foo'] for {{this.foo}}
+        original: original,
+        loc: null,
+      };
+
+      return this.finishNode(node);
+    }
+
+    // Check for special path: {{.}} or {{./foo}}
+    if (firstToken.value === '.') {
+      original = '.';
+      this.advance(); // Move past '.'
+
+      // Check if there's a path after '.'
+      if (this.currentToken && this.match(TokenType.SEP)) {
+        this.advance(); // Move past SEP
+
+        const segmentToken = this.expect(TokenType.ID, 'Expected identifier after path separator');
+        parts.push(segmentToken.value);
+        original += '/' + segmentToken.value; // Use slash for ./ syntax
+        this.advance();
+
+        // Parse additional segments
+        while (this.currentToken && this.match(TokenType.SEP)) {
+          this.advance(); // Move past SEP
+
+          const segmentToken = this.expect(
+            TokenType.ID,
+            'Expected identifier after path separator',
+          );
+
+          parts.push(segmentToken.value);
+          original += '.' + segmentToken.value; // Use dot for subsequent segments
+          this.advance();
+        }
+      }
+      // else: {{.}} alone - parts remains empty
+
+      const node: import('./ast-nodes').PathExpression = {
+        type: 'PathExpression',
+        data: false,
+        depth: 0,
+        parts: parts, // Empty for {{.}}, or ['foo'] for {{./foo}}
+        original: original,
+        loc: null,
+      };
+
+      return this.finishNode(node);
+    }
 
     // Check for parent references (..)
     if (firstToken.value === '..') {
