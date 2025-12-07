@@ -50,7 +50,6 @@ export class Lexer {
     this.state = STATE_CONTENT;
     this.lastTokenType = null;
     this.lastTokenValue = null;
-    this.lastTokenValue = null;
   }
 
   /**
@@ -662,6 +661,7 @@ export class Lexer {
 
   /**
    * Scan a number literal (123, -42, 1.5)
+   * In path contexts (foo.0.1), dots separate segments, not decimals
    */
   private scanNumber(): Token {
     const start = this.getPosition();
@@ -677,8 +677,10 @@ export class Lexer {
       value += this.advance();
     }
 
-    // Scan decimal part
-    if (this.peek() === '.' && this.isDigit(this.peekAt(1))) {
+    // Scan decimal part if present and not in path context
+    // Paths: {{matrix.0.1}} → ["matrix", "0", "1"]
+    // Params: {{helper count=3.14}} → count=3.14
+    if (this.shouldScanDecimal() && this.peek() === '.' && this.isDigit(this.peekAt(1))) {
       value += this.advance(); // Consume '.'
       while (!this.isEOF() && this.isDigit(this.peek())) {
         value += this.advance();
@@ -695,6 +697,14 @@ export class Lexer {
         end,
       },
     };
+  }
+
+  /**
+   * Determine if we should scan a decimal point as part of a number
+   * Returns false when in path context (after a separator)
+   */
+  private shouldScanDecimal(): boolean {
+    return this.lastTokenType !== TokenType.SEP;
   }
 
   /**

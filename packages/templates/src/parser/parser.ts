@@ -180,6 +180,23 @@ export class Parser {
   }
 
   /**
+   * Parse a path segment, which can be an identifier or a numeric literal
+   * This allows both {{obj.prop}} and {{array.0}}
+   *
+   * @returns The segment token (ID or NUMBER)
+   */
+  private parsePathSegment(): Token {
+    if (this.match(TokenType.ID) || this.match(TokenType.NUMBER)) {
+      return this.currentToken!;
+    }
+    throw ParserError.fromToken(
+      'Expected identifier or number after path separator',
+      this.currentToken!,
+      this.getErrorContext(),
+    );
+  }
+
+  /**
    * Assert that the current token matches the expected type
    *
    * @param type - Expected token type
@@ -346,10 +363,10 @@ export class Parser {
     while (this.currentToken && this.match(TokenType.SEP)) {
       this.advance(); // Move past SEP token
 
-      const segmentToken = this.expect(TokenType.ID, 'Expected identifier after path separator');
+      const segmentToken = this.parsePathSegment();
       parts.push(segmentToken.value);
       original += '.' + segmentToken.value;
-      this.advance(); // Move past ID token
+      this.advance(); // Move past segment token
     }
 
     return { parts, original };
@@ -403,7 +420,7 @@ export class Parser {
     if (this.currentToken && this.match(TokenType.SEP)) {
       this.advance(); // Move past SEP
 
-      const segmentToken = this.expect(TokenType.ID, 'Expected identifier after path separator');
+      const segmentToken = this.parsePathSegment();
       parts.push(segmentToken.value);
       original += '.' + segmentToken.value;
       this.advance();
@@ -441,7 +458,7 @@ export class Parser {
     if (this.currentToken && this.match(TokenType.SEP)) {
       this.advance(); // Move past SEP
 
-      const segmentToken = this.expect(TokenType.ID, 'Expected identifier after path separator');
+      const segmentToken = this.parsePathSegment();
       parts.push(segmentToken.value);
       original += '/' + segmentToken.value; // Use slash for ./ syntax
       this.advance();
