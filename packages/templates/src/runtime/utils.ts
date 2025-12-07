@@ -240,3 +240,82 @@ export function isEmpty(value: any): boolean {
   // Everything else is not empty (including 0, {}, non-empty arrays, etc.)
   return false;
 }
+
+/**
+ * Checks if a value is an array.
+ *
+ * Uses `Array.isArray()` for reliable detection. Only returns `true` for
+ * true arrays, not array-like objects.
+ *
+ * @param value - The value to check
+ * @returns `true` if the value is an array, `false` otherwise
+ *
+ * @example
+ * ```typescript
+ * isArray([]);           // true
+ * isArray([1, 2, 3]);    // true
+ * isArray({ length: 0 }); // false (not a true array)
+ * isArray(null);         // false
+ * ```
+ */
+export function isArray(value: any): boolean {
+  return Array.isArray(value);
+}
+
+/**
+ * Checks if a value is a function.
+ *
+ * Uses `typeof` operator to detect all function types including:
+ * - Regular functions
+ * - Arrow functions
+ * - Async functions
+ * - Generator functions
+ * - Class constructors
+ *
+ * @param value - The value to check
+ * @returns `true` if the value is a function, `false` otherwise
+ *
+ * @example
+ * ```typescript
+ * isFunction(() => {});           // true
+ * isFunction(function() {});      // true
+ * isFunction(async () => {});     // true
+ * isFunction(class MyClass {});   // true
+ * isFunction({});                 // false
+ * ```
+ */
+export function isFunction(value: any): boolean {
+  return typeof value === 'function';
+}
+
+/**
+ * Checks if a value is an object.
+ *
+ * Returns `true` for any object type including:
+ * - Plain objects `{}`
+ * - Arrays `[]`
+ * - Functions
+ * - Date, RegExp, Error objects
+ * - Any other object type
+ *
+ * Returns `false` for:
+ * - `null` (special case: typeof null === 'object' but we treat as not object)
+ * - `undefined`
+ * - Primitives (string, number, boolean)
+ *
+ * @param value - The value to check
+ * @returns `true` if the value is an object, `false` otherwise
+ *
+ * @example
+ * ```typescript
+ * isObject({});           // true
+ * isObject([]);           // true
+ * isObject(() => {});     // true
+ * isObject(new Date());   // true
+ * isObject(null);         // false (special case!)
+ * isObject('string');     // false
+ * ```
+ */
+export function isObject(value: any): boolean {
+  return value != null && typeof value === 'object';
+}

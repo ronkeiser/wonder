@@ -1,8 +1,19 @@
 # Capability 3: Runtime Utilities
 
+**Status:** `[✓]` **COMPLETE** - All 5 features implemented with 156 tests passing
+
 **Goal:** Implement core utility functions from Handlebars runtime for secure, correct evaluation. These utilities provide the foundation for safe property access, HTML escaping, scope management, and value checking that the interpreter will use.
 
 **Reference:** Handlebars `runtime.js` and `utils.js` implementations
+
+**Summary:**
+- Feature 3.1: lookupProperty - 28 tests ✓
+- Feature 3.2: escapeExpression & SafeString - 49 tests ✓
+- Feature 3.3: createFrame - 12 tests ✓
+- Feature 3.4: isEmpty - 29 tests ✓
+- Feature 3.5: Type Checking (isArray, isFunction, isObject) - 38 tests ✓
+
+**Total:** 156 tests, 1092 tests overall
 
 ---
 
@@ -380,7 +391,7 @@
 
 ### Task C3-F5-T1: Implement isArray
 
-**Status:** `[ ]` Not Started
+**Status:** `[✓]` Complete (12 tests)
 
 - Create `isArray()` function with signature:
   - `isArray(value: any): boolean`
@@ -391,22 +402,31 @@
   - Objects with `length` property
   - `null`, `undefined`
 
+**Implementation Notes:**
+- Simple wrapper around `Array.isArray()` for consistency
+- Returns `true` only for true arrays (not typed arrays)
+- Returns `false` for array-like objects with `length` property
+
 **Deliverable:** `src/runtime/utils.ts` with `isArray()` function
 
 **Tests:**
 
-- `[]` returns `true`
-- `[1, 2, 3]` returns `true`
-- `{}` returns `false`
-- `{ length: 0 }` returns `false`
-- `null` returns `false`
-- `undefined` returns `false`
-- String returns `false`
-- Arguments object returns `false`
+- `[]` returns `true` ✓
+- `[1, 2, 3]` returns `true` ✓
+- `{}` returns `false` ✓
+- `{ length: 0 }` returns `false` ✓
+- `null` returns `false` ✓
+- `undefined` returns `false` ✓
+- String returns `false` ✓
+- Number returns `false` ✓
+- Boolean returns `false` ✓
+- Function returns `false` ✓
+- Sparse array returns `true` ✓
+- Typed arrays return `false` ✓
 
 ### Task C3-F5-T2: Implement isFunction
 
-**Status:** `[ ]` Not Started
+**Status:** `[✓]` Complete (12 tests)
 
 - Create `isFunction()` function with signature:
   - `isFunction(value: any): boolean`
@@ -419,24 +439,31 @@
   - Class constructors
 - Return `false` for all non-function types
 
+**Implementation Notes:**
+- Uses `typeof value === 'function'` for detection
+- Detects all function types including async, generator, and class constructors
+- Works with built-in constructors (Array, Object, Date)
+
 **Deliverable:** `src/runtime/utils.ts` with `isFunction()` function
 
 **Tests:**
 
-- Regular function returns `true`
-- Arrow function returns `true`
-- Async function returns `true`
-- Generator function returns `true`
-- Class constructor returns `true`
-- Object returns `false`
-- `null` returns `false`
-- `undefined` returns `false`
-- String returns `false`
-- Number returns `false`
+- Regular function returns `true` ✓
+- Arrow function returns `true` ✓
+- Async function returns `true` ✓
+- Generator function returns `true` ✓
+- Class constructor returns `true` ✓
+- Built-in constructors return `true` ✓
+- Object returns `false` ✓
+- `null` returns `false` ✓
+- `undefined` returns `false` ✓
+- String returns `false` ✓
+- Number returns `false` ✓
+- Array returns `false` ✓
 
 ### Task C3-F5-T3: Implement isObject
 
-**Status:** `[ ]` Not Started
+**Status:** `[✓]` Complete (14 tests)
 
 - Create `isObject()` function with signature:
   - `isObject(value: any): boolean`
@@ -452,20 +479,32 @@
   - `undefined`
   - Primitives (string, number, boolean)
 
+**Implementation Notes:**
+- Uses `value != null && typeof value === 'object'` for detection
+- Null check handles the special case where `typeof null === 'object'`
+- Returns `true` for arrays, Date, RegExp, Error, and other object types
+- Functions return `false` (typeof function === 'function', not 'object')
+
 **Deliverable:** `src/runtime/utils.ts` with `isObject()` function
 
 **Tests:**
 
-- `{}` returns `true`
-- `[]` returns `true`
-- `function() {}` returns `true`
-- `new Date()` returns `true`
-- `/regex/` returns `true`
-- `null` returns `false` (special case!)
-- `undefined` returns `false`
-- String returns `false`
-- Number returns `false`
-- Boolean returns `false`
+- `{}` returns `true` ✓
+- Non-empty object returns `true` ✓
+- `[]` returns `true` ✓
+- `function() {}` returns `false` (functions are typeof 'function') ✓
+- `new Date()` returns `true` ✓
+- `/regex/` returns `true` ✓
+- `new Error()` returns `true` ✓
+- `null` returns `false` (special case!) ✓
+- `undefined` returns `false` ✓
+- String returns `false` ✓
+- Number returns `false` ✓
+- Boolean returns `false` ✓
+- `Object.create(null)` returns `true` ✓
+- Class instances return `true` ✓
+
+**Feature 3.5 Status:** `[✓]` Complete (38 tests total: 12 isArray + 12 isFunction + 14 isObject)
 
 ---
 

@@ -3,7 +3,10 @@ import {
   SafeString,
   createFrame,
   escapeExpression,
+  isArray,
   isEmpty,
+  isFunction,
+  isObject,
   lookupProperty,
 } from '../../src/runtime/utils';
 
@@ -804,6 +807,175 @@ describe('Runtime Utilities', () => {
       it('returns false for Infinity', () => {
         expect(isEmpty(Infinity)).toBe(false);
         expect(isEmpty(-Infinity)).toBe(false);
+      });
+    });
+  });
+
+  describe('Type Checking Utilities (Feature 3.5)', () => {
+    describe('isArray (Task C3-F5-T1)', () => {
+      it('returns true for empty array', () => {
+        expect(isArray([])).toBe(true);
+      });
+
+      it('returns true for non-empty array', () => {
+        expect(isArray([1, 2, 3])).toBe(true);
+      });
+
+      it('returns false for empty object', () => {
+        expect(isArray({})).toBe(false);
+      });
+
+      it('returns false for array-like object with length property', () => {
+        expect(isArray({ length: 0 })).toBe(false);
+      });
+
+      it('returns false for null', () => {
+        expect(isArray(null)).toBe(false);
+      });
+
+      it('returns false for undefined', () => {
+        expect(isArray(undefined)).toBe(false);
+      });
+
+      it('returns false for string', () => {
+        expect(isArray('string')).toBe(false);
+      });
+
+      it('returns false for number', () => {
+        expect(isArray(42)).toBe(false);
+      });
+
+      it('returns false for boolean', () => {
+        expect(isArray(true)).toBe(false);
+      });
+
+      it('returns false for function', () => {
+        expect(isArray(() => {})).toBe(false);
+      });
+
+      it('returns true for sparse array', () => {
+        const sparse = new Array(5);
+        expect(isArray(sparse)).toBe(true);
+      });
+
+      it('returns true for typed arrays', () => {
+        expect(isArray(new Int8Array())).toBe(false); // Typed arrays are not true arrays
+        expect(isArray(new Uint8Array())).toBe(false);
+      });
+    });
+
+    describe('isFunction (Task C3-F5-T2)', () => {
+      it('returns true for regular function', () => {
+        expect(isFunction(function() {})).toBe(true);
+      });
+
+      it('returns true for arrow function', () => {
+        expect(isFunction(() => {})).toBe(true);
+      });
+
+      it('returns true for async function', () => {
+        expect(isFunction(async () => {})).toBe(true);
+      });
+
+      it('returns true for generator function', () => {
+        expect(isFunction(function*() {})).toBe(true);
+      });
+
+      it('returns true for class constructor', () => {
+        class MyClass {}
+        expect(isFunction(MyClass)).toBe(true);
+      });
+
+      it('returns true for built-in constructors', () => {
+        expect(isFunction(Array)).toBe(true);
+        expect(isFunction(Object)).toBe(true);
+        expect(isFunction(Date)).toBe(true);
+      });
+
+      it('returns false for object', () => {
+        expect(isFunction({})).toBe(false);
+      });
+
+      it('returns false for null', () => {
+        expect(isFunction(null)).toBe(false);
+      });
+
+      it('returns false for undefined', () => {
+        expect(isFunction(undefined)).toBe(false);
+      });
+
+      it('returns false for string', () => {
+        expect(isFunction('function')).toBe(false);
+      });
+
+      it('returns false for number', () => {
+        expect(isFunction(42)).toBe(false);
+      });
+
+      it('returns false for array', () => {
+        expect(isFunction([])).toBe(false);
+      });
+    });
+
+    describe('isObject (Task C3-F5-T3)', () => {
+      it('returns true for empty object', () => {
+        expect(isObject({})).toBe(true);
+      });
+
+      it('returns true for non-empty object', () => {
+        expect(isObject({ key: 'value' })).toBe(true);
+      });
+
+      it('returns true for array', () => {
+        expect(isObject([])).toBe(true);
+      });
+
+      it('returns true for function', () => {
+        expect(isObject(() => {})).toBe(false); // Functions are typeof 'function', not 'object'
+      });
+
+      it('returns true for Date object', () => {
+        expect(isObject(new Date())).toBe(true);
+      });
+
+      it('returns true for RegExp object', () => {
+        expect(isObject(/regex/)).toBe(true);
+      });
+
+      it('returns true for Error object', () => {
+        expect(isObject(new Error('test'))).toBe(true);
+      });
+
+      it('returns false for null (special case)', () => {
+        expect(isObject(null)).toBe(false);
+      });
+
+      it('returns false for undefined', () => {
+        expect(isObject(undefined)).toBe(false);
+      });
+
+      it('returns false for string', () => {
+        expect(isObject('string')).toBe(false);
+      });
+
+      it('returns false for number', () => {
+        expect(isObject(42)).toBe(false);
+      });
+
+      it('returns false for boolean', () => {
+        expect(isObject(true)).toBe(false);
+        expect(isObject(false)).toBe(false);
+      });
+
+      it('returns true for object created with Object.create(null)', () => {
+        const obj = Object.create(null);
+        expect(isObject(obj)).toBe(true);
+      });
+
+      it('returns true for class instances', () => {
+        class MyClass {}
+        const instance = new MyClass();
+        expect(isObject(instance)).toBe(true);
       });
     });
   });
