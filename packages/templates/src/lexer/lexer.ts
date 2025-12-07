@@ -214,6 +214,11 @@ export class Lexer {
         return this.scanDelimiter(TokenType.CLOSE_SEXPR, ')');
       }
 
+      // Check for equals sign (hash arguments)
+      if (char === '=') {
+        return this.scanDelimiter(TokenType.EQUALS, '=');
+      }
+
       // Check for bracket literals - scan content between [ and ] as a single token
       if (char === '[') {
         return this.scanBracketLiteral();

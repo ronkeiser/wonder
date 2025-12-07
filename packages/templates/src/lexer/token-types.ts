@@ -43,6 +43,9 @@ export const TokenType = {
   SEP: 'SEP', // . or / for dot notation
   DATA: 'DATA', // @ prefix for data variables
 
+  // Hash arguments
+  EQUALS: 'EQUALS', // = for key=value pairs
+
   // End of input
   EOF: 'EOF',
 } as const;

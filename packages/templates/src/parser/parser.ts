@@ -964,10 +964,33 @@ export class Parser {
       path = this.parsePathExpression();
     }
 
-    // Parse parameters until we hit closing delimiter
+    // Parse parameters and hash pairs until we hit closing delimiter
     const params: Expression[] = [];
+    const hashPairs: Array<{ type: 'HashPair'; key: string; value: Expression; loc: any }> = [];
 
     while (this.currentToken && !this.match(closeType)) {
+      // Check if this is a hash pair (ID = Expression)
+      if (this.match(TokenType.ID)) {
+        const nextToken = this.peek(1);
+        if (nextToken && nextToken.type === TokenType.EQUALS) {
+          // This is a hash pair
+          const keyToken = this.currentToken;
+          const key = keyToken.value;
+          this.advance(); // consume ID
+          this.advance(); // consume EQUALS
+          const value = this.parseExpression();
+          const valueEndToken = this.position > 0 ? this.tokens[this.position - 1] : keyToken;
+          hashPairs.push({
+            type: 'HashPair',
+            key,
+            value,
+            loc: this.getSourceLocation(keyToken, valueEndToken),
+          });
+          continue;
+        }
+      }
+
+      // Otherwise it's a regular parameter
       const param = this.parseExpression();
       params.push(param);
     }
@@ -978,11 +1001,11 @@ export class Parser {
       `Expected ${closeType === TokenType.CLOSE ? '}}' : '}}}'} to close mustache statement`,
     );
 
-    // Create empty hash for V1 (no named parameters support)
+    // Create hash node from pairs
     const hash = {
       type: 'Hash' as const,
-      pairs: [],
-      loc: null,
+      pairs: hashPairs,
+      loc: null, // Location tracking for hash parameters not critical
     };
 
     // mustacheStartToken is guaranteed non-null because we checked at method entry
@@ -1155,11 +1178,34 @@ export class Parser {
       helperName = this.parsePathExpression();
     }
 
-    // Parse parameters until we hit CLOSE token
+    // Parse parameters and hash pairs until we hit CLOSE token
     const params: Expression[] = [];
+    const hashPairs: Array<{ type: 'HashPair'; key: string; value: Expression; loc: any }> = [];
     let firstParam: string | null = null; // For error messages
 
     while (this.currentToken && !this.match(TokenType.CLOSE)) {
+      // Check if this is a hash pair (ID = Expression)
+      if (this.match(TokenType.ID)) {
+        const nextToken = this.peek(1);
+        if (nextToken && nextToken.type === TokenType.EQUALS) {
+          // This is a hash pair
+          const keyToken = this.currentToken;
+          const key = keyToken.value;
+          this.advance(); // consume ID
+          this.advance(); // consume EQUALS
+          const value = this.parseExpression();
+          const valueEndToken = this.position > 0 ? this.tokens[this.position - 1] : keyToken;
+          hashPairs.push({
+            type: 'HashPair',
+            key,
+            value,
+            loc: this.getSourceLocation(keyToken, valueEndToken),
+          });
+          continue;
+        }
+      }
+
+      // Otherwise it's a regular parameter
       const param = this.parseExpression();
       params.push(param);
 
@@ -1264,11 +1310,11 @@ export class Parser {
     const closeToken = this.expect(TokenType.CLOSE, 'Expected }} to close block end tag');
     this.advance();
 
-    // Create empty hash for V1 (no named parameters support)
+    // Create hash node from pairs
     const hash = {
       type: 'Hash' as const,
-      pairs: [],
-      loc: null,
+      pairs: hashPairs,
+      loc: null, // Location tracking for hash parameters not critical
     };
 
     // Create empty strip flags for V1 (no whitespace control support)

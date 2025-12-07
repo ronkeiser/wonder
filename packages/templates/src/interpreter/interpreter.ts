@@ -13,6 +13,7 @@ import type {
   CommentStatement,
   ContentStatement,
   Expression,
+  Hash,
   MustacheStatement,
   NullLiteral,
   NumberLiteral,
@@ -193,8 +194,10 @@ export class Interpreter {
         }
 
         const args = node.params.map((param) => this.evaluateExpression(param));
+        const hash = this.evaluateHash(node.hash);
+        const options = { hash };
         const context = this.contextStack.getCurrent();
-        value = helper.call(context, ...args);
+        value = helper.call(context, ...args, options);
       }
     } else {
       // Variable lookup
@@ -397,8 +400,9 @@ export class Interpreter {
   private evaluateCustomBlockHelper(node: BlockStatement, helper: (...args: any[]) => any): string {
     const context = this.contextStack.getCurrent();
     const params = node.params.map((param) => this.evaluateExpression(param));
+    const hash = this.evaluateHash(node.hash);
 
-    // Create options object with fn and inverse closures
+    // Create options object with fn, inverse closures, and hash
     const options = {
       fn: (newContext?: any) => {
         if (newContext !== undefined) {
@@ -420,6 +424,7 @@ export class Interpreter {
         }
         return result;
       },
+      hash,
     };
 
     // Call helper with params + options as last argument
@@ -939,5 +944,19 @@ export class Interpreter {
     expr: StringLiteral | NumberLiteral | BooleanLiteral | NullLiteral | UndefinedLiteral,
   ): any {
     return expr.value;
+  }
+
+  /**
+   * Evaluates a Hash node into a plain object with evaluated values.
+   *
+   * @param hash - The Hash node from the AST
+   * @returns Object with key-value pairs
+   */
+  private evaluateHash(hash: Hash): Record<string, any> {
+    const result: Record<string, any> = {};
+    for (const pair of hash.pairs) {
+      result[pair.key] = this.evaluateExpression(pair.value);
+    }
+    return result;
   }
 }
