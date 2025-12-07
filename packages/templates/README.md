@@ -12,8 +12,9 @@ Cloudflare Workers don't allow `eval()` or `new Function()`, which breaks tradit
 - ✅ Pure interpretation via tree-walking
 - ✅ Handlebars V1 feature compatibility
 - ✅ Prototype pollution protection built-in
+- ✅ Small bundle size - <10KB gzipped
 
-**V1 Status:** ✅ Complete - All V1 features implemented and tested (192 passing tests)
+**V1 Status:** 🚀 Complete - All V1 features implemented and tested (192 passing tests)
 
 ## Features
 
