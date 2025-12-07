@@ -356,7 +356,7 @@
 
 ### Task C4-F4-T2: Implement ContentStatement Evaluation
 
-**Status:** `[ ]` Not Started
+**Status:** `[x]` Complete ✅
 
 - `evaluateContent(node: ContentStatement): string`:
   - Return `node.value` as-is
@@ -412,7 +412,7 @@
 
 ### Task C4-F4-T4: Implement Program Evaluation
 
-**Status:** `[ ]` Not Started
+**Status:** `[x]` Complete ✅
 
 - `evaluateProgram(program: Program | null): string`:
   - Handle `null` program → return `""`
@@ -437,7 +437,7 @@
 
 ### Task C4-F4-T5: Implement Expression Evaluation
 
-**Status:** `[ ]` Not Started
+**Status:** `[x]` Complete ✅
 
 - `evaluateExpression(expr: Expression): any`:
   - Check expression type using `expr.type`
