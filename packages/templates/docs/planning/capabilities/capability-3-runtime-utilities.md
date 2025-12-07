@@ -7,6 +7,7 @@
 **Reference:** Handlebars `runtime.js` and `utils.js` implementations
 
 **Summary:**
+
 - Feature 3.1: lookupProperty - 28 tests ✓
 - Feature 3.2: escapeExpression & SafeString - 49 tests ✓
 - Feature 3.3: createFrame - 12 tests ✓
@@ -403,6 +404,7 @@
   - `null`, `undefined`
 
 **Implementation Notes:**
+
 - Simple wrapper around `Array.isArray()` for consistency
 - Returns `true` only for true arrays (not typed arrays)
 - Returns `false` for array-like objects with `length` property
@@ -440,6 +442,7 @@
 - Return `false` for all non-function types
 
 **Implementation Notes:**
+
 - Uses `typeof value === 'function'` for detection
 - Detects all function types including async, generator, and class constructors
 - Works with built-in constructors (Array, Object, Date)
@@ -480,6 +483,7 @@
   - Primitives (string, number, boolean)
 
 **Implementation Notes:**
+
 - Uses `value != null && typeof value === 'object'` for detection
 - Null check handles the special case where `typeof null === 'object'`
 - Returns `true` for arrays, Date, RegExp, Error, and other object types

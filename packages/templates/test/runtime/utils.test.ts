@@ -866,7 +866,7 @@ describe('Runtime Utilities', () => {
 
     describe('isFunction (Task C3-F5-T2)', () => {
       it('returns true for regular function', () => {
-        expect(isFunction(function() {})).toBe(true);
+        expect(isFunction(function () {})).toBe(true);
       });
 
       it('returns true for arrow function', () => {
@@ -878,7 +878,7 @@ describe('Runtime Utilities', () => {
       });
 
       it('returns true for generator function', () => {
-        expect(isFunction(function*() {})).toBe(true);
+        expect(isFunction(function* () {})).toBe(true);
       });
 
       it('returns true for class constructor', () => {
