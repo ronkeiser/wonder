@@ -687,7 +687,14 @@ export class Interpreter {
     }
 
     const condition = this.unwrapValue(this.evaluateExpression(node.params[0]));
-    const renderInverse = invert ? !this.isFalsy(condition) : this.isFalsy(condition);
+
+    // Check for includeZero hash option
+    const hash = this.evaluateHash(node.hash);
+    const includeZero = hash.includeZero === true;
+
+    // When includeZero is true, treat 0 as truthy
+    const isFalsy = includeZero && condition === 0 ? false : this.isFalsy(condition);
+    const renderInverse = invert ? !isFalsy : isFalsy;
 
     // Detect if this is an inverse block statement ({{^if}} instead of {{#if}})
     // In inverse blocks, program.body is empty and content is in inverse
@@ -853,8 +860,11 @@ export class Interpreter {
    * @returns The concatenated output from all property iterations
    */
   private evaluateEachObject(node: BlockStatement, collection: object): string {
-    // Get object keys using Object.keys() for consistent iteration order
-    const keys = Object.keys(collection);
+    // Use Reflect.ownKeys() to preserve insertion order for all property types
+    // Filter to only enumerable own properties (like Object.keys() does)
+    const keys = Reflect.ownKeys(collection)
+      .filter((key) => Object.prototype.propertyIsEnumerable.call(collection, key))
+      .map((key) => String(key));
 
     // Empty objects render the inverse block ({{else}})
     if (keys.length === 0) {

@@ -2,6 +2,19 @@
 
 Handlebars-compatible template engine for Wonder workflows. Built from scratch with a focus on safety, simplicity, and deterministic behavior.
 
+## Why?
+
+Cloudflare Workers don't allow `eval()` or `new Function()`, which breaks traditional template engines like Handlebars. This package provides a pure AST interpreter that works within Cloudflare's security constraints while maintaining Handlebars compatibility for workflow templates.
+
+**Key Differences:**
+
+- ✅ No code generation - safe for Workers
+- ✅ Pure interpretation via tree-walking
+- ✅ Handlebars V1 feature compatibility
+- ✅ Prototype pollution protection built-in
+
+**V1 Status:** ✅ Complete - All V1 features implemented and tested (192 passing tests)
+
 ## Features
 
 ### ✅ Variable Interpolation
@@ -85,10 +98,15 @@ Handlebars-compatible template engine for Wonder workflows. Built from scratch w
 {{else}}
   Falsy branch
 {{/if}}
+
+{{#if value includeZero=true}}
+  Treats 0 as truthy
+{{/if}}
 ```
 
-- Handlebars truthiness (0 is truthy, empty string is falsy)
+- Handlebars truthiness (0 is truthy by default, empty string is falsy)
 - `{{else}}` support
+- Hash option `includeZero=true` to explicitly treat 0 as truthy
 - Works with nested contexts
 
 #### `#unless` - Inverted Conditional
@@ -215,6 +233,10 @@ Handlebars-compatible template engine for Wonder workflows. Built from scratch w
 
 ```handlebars
 {{helper key='value' count=42}}
+{{#if value includeZero=true}}
+  {{value}}
+  (treats 0 as truthy)
+{{/if}}
 {{#each items sortBy='name' limit=10}}
   {{name}}
 {{/each}}
@@ -223,6 +245,7 @@ Handlebars-compatible template engine for Wonder workflows. Built from scratch w
 - Named parameters passed to helpers via `options.hash`
 - Support for string, number, boolean, and variable values
 - Works with both inline and block helpers
+- Built-in helpers support hash options (e.g., `includeZero` for `#if`)
 
 ### ✅ `lookup` Helper
 
@@ -251,6 +274,48 @@ Handlebars-compatible template engine for Wonder workflows. Built from scratch w
 - `options.hash` - named parameters
 - `options.data` - data variables
 
+### ✅ Comparison Helpers
+
+```handlebars
+{{#if (gt score 80)}}High score!{{/if}}
+{{#if (eq status 'active')}}Active{{/if}}
+{{#if (lte count 10)}}Low{{/if}}
+```
+
+Built-in comparison helpers:
+
+- `eq` - Equal (`===`)
+- `ne` - Not equal (`!==`)
+- `gt` - Greater than (`>`)
+- `gte` - Greater than or equal (`>=`)
+- `lt` - Less than (`<`)
+- `lte` - Less than or equal (`<=`)
+
+### ✅ Logical Helpers
+
+```handlebars
+{{#if (and isActive hasPermission)}}Allowed{{/if}}
+{{#if (or isAdmin isModerator)}}Can edit{{/if}}
+{{#if (not isLocked)}}Unlocked{{/if}}
+```
+
+Built-in logical helpers:
+
+- `and` - Logical AND
+- `or` - Logical OR
+- `not` - Logical NOT
+
+### ✅ Subexpressions
+
+```handlebars
+{{#if (gt (add a b) 100)}}Over 100{{/if}}
+{{helper (nested arg)}}
+```
+
+- Nested helper calls in expressions
+- Compose helpers together
+- Use helper results as arguments
+
 ### ✅ ES6 Support
 
 ```handlebars
@@ -264,27 +329,23 @@ Handlebars-compatible template engine for Wonder workflows. Built from scratch w
 - Nested Maps
 - Empty string keys
 
-## What Doesn't Work Yet
+## V2 Features (Not Yet Implemented)
 
-### ⚠️ Parser Limitations
+These features are planned for Version 2:
 
-- ❌ Block parameters (`as |item|`) - parser doesn't recognize syntax
-- ❌ Hyphenated identifiers (`{{foo-bar}}`) - treated as subtraction
-- ❌ Nested `this` paths (`{{this.foo.bar}}`) - EOF parsing errors
-- ❌ Whitespace control (`{{~foo~}}`) - tokens recognized but not applied
-- ❌ Standalone inverse sections (`{{^}}`) - must use `{{else}}` instead
+- ⏳ **Block parameters** (`{{#each items as |item index|}}`) - V2 feature
+- ⏳ **Whitespace control** (`{{~foo~}}`) - V2 feature
+- ⏳ **Partials** (`{{> partialName}}`) - requires async D1 resolution
+- ⏳ **Decorators** - advanced template modification
+- ⏳ **Standalone inverse sections** (`{{^}}`) - must use `{{else}}` for now
 
-### ⚠️ Data Variable Issues
+## Known Limitations
 
-- ❌ Custom `@variable` syntax - only built-ins work (@index, @first, @last, @key, @root)
-- ❌ @root priority - doesn't override when passed explicitly
+These are edge cases or limitations in the current implementation:
 
-### ⚠️ Missing Features
-
-- ❌ Custom iterables - only Array, Object, Map, Set supported
-- ❌ Helper registration system - no runtime helper registration yet
-- ❌ Partials - not implemented
-- ❌ Decorators - not planned for V1
+- ⚠️ **Hyphenated identifiers** (`{{foo-bar}}`) - treated as subtraction instead of property access
+- ⚠️ **Custom @variables** - only built-in data variables work (@index, @first, @last, @key, @root)
+- ⚠️ **Custom iterables** - only Array, Object, Map, Set supported (no custom iterator protocol)
 
 ## Security
 

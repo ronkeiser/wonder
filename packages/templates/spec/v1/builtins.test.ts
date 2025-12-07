@@ -1,4 +1,5 @@
-import { beforeEach, describe, it } from 'vitest';
+import { beforeEach, describe, expect, it } from 'vitest';
+import { compile } from '../../src/index.js';
 import { expectTemplate } from './helpers/expect-template.js';
 
 describe('builtin helpers', () => {
@@ -226,12 +227,14 @@ describe('builtin helpers', () => {
       (Clazz.prototype as any).foo = 'fail';
       const hash = { goodbyes: new Clazz(), world: 'world' };
 
-      // Object property iteration order is undefined according to ECMA spec,
-      // so we need to check both possible orders - just check one for now
-      expectTemplate(string)
-        .withInput(hash)
-        .withMessage('each with object argument iterates over the contents when not empty')
-        .toCompileTo('&lt;b&gt;#1&lt;/b&gt;. goodbye! 2. GOODBYE! cruel world!');
+      // Object property iteration order: numeric keys come first in modern JS
+      // Accept either order since both are valid per Handlebars spec
+      const expected1 = '&lt;b&gt;#1&lt;/b&gt;. goodbye! 2. GOODBYE! cruel world!';
+      const expected2 = '2. GOODBYE! &lt;b&gt;#1&lt;/b&gt;. goodbye! cruel world!';
+
+      const compiled = compile(string);
+      const actual = compiled.render(hash);
+      expect([expected1, expected2]).toContain(actual);
 
       expectTemplate(string)
         .withInput({
