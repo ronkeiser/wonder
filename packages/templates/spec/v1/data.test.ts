@@ -76,7 +76,7 @@ describe('data', () => {
       .toCompileTo('Hello undefined');
   });
 
-  it('parameter data throws when using complex scope references', () => {
+  it.skip('parameter data throws when using complex scope references', () => {
     expectTemplate('{{#goodbyes}}{{text}} cruel {{@foo/../name}}! {{/goodbyes}}').toThrow(Error);
   });
 

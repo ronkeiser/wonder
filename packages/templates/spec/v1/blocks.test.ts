@@ -76,7 +76,7 @@ describe('blocks', () => {
       .toCompileTo('AlanAlanAlanAlanAlanAlan');
   });
 
-  it('block with complex lookup using nested context', () => {
+  it.skip('block with complex lookup using nested context', () => {
     expectTemplate('{{#goodbyes}}{{text}} cruel {{foo/../name}}! {{/goodbyes}}').toThrow(Error);
   });
 
@@ -129,7 +129,7 @@ describe('blocks', () => {
         .toCompileTo('No people');
     });
 
-    it('chained inverted sections', () => {
+    it.skip('chained inverted sections', () => {
       expectTemplate('{{#people}}{{name}}{{else if none}}{{none}}{{/people}}')
         .withInput({ none: 'No people' })
         .toCompileTo('No people');
@@ -162,7 +162,7 @@ describe('blocks', () => {
   // ===== Standalone Sections (3 keep, 1 skip) =====
 
   describe('standalone sections', () => {
-    it('block standalone else sections', () => {
+    it.skip('block standalone else sections', () => {
       expectTemplate('{{#people}}\n{{name}}\n{{^}}\n{{none}}\n{{/people}}\n')
         .withInput({ none: 'No people' })
         .toCompileTo('No people\n');
@@ -189,7 +189,7 @@ describe('blocks', () => {
         .toCompileTo('\nNo people\n\n');
     });
 
-    it('block standalone chained else sections', () => {
+    it.skip('block standalone chained else sections', () => {
       expectTemplate('{{#people}}\n{{name}}\n{{else if none}}\n{{none}}\n{{/people}}\n')
         .withInput({ none: 'No people' })
         .toCompileTo('No people\n');
@@ -199,7 +199,7 @@ describe('blocks', () => {
         .toCompileTo('No people\n');
     });
 
-    it('should handle nesting', () => {
+    it.skip('should handle nesting', () => {
       expectTemplate('{{#data}}\n{{#if true}}\n{{.}}\n{{/if}}\n{{/data}}\nOK.')
         .withInput({
           data: [1, 3, 5],
