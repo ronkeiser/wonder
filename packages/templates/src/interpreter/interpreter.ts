@@ -291,8 +291,7 @@ export class Interpreter {
 
     // Handle objects
     if (collection !== null && typeof collection === 'object') {
-      // TODO: Implement object iteration in Feature 5.4
-      throw new Error('#each helper: object iteration not yet implemented');
+      return this.evaluateEachObject(node, collection);
     }
 
     // For null, undefined, or other non-iterables, render inverse block
@@ -354,6 +353,49 @@ export class Interpreter {
       this.contextStack.pop();
       this.dataStack.pop();
     }
+
+    return output;
+  }
+
+  /**
+   * Evaluates #each for object iteration.
+   *
+   * @param node - The BlockStatement node
+   * @param collection - The object to iterate over
+   * @returns The concatenated output from all property iterations
+   */
+  private evaluateEachObject(node: BlockStatement, collection: object): string {
+    // Get object keys using Object.keys() for consistent iteration order
+    const keys = Object.keys(collection);
+
+    // Empty objects render the inverse block ({{else}})
+    if (keys.length === 0) {
+      return this.evaluateProgram(node.inverse);
+    }
+
+    let output = '';
+
+    // Iterate over keys with index
+    keys.forEach((key, index) => {
+      // Create data frame with loop variables
+      // Keys must be prefixed with @ for data variable access
+      this.dataStack.push({
+        '@key': key,
+        '@index': index,
+        '@first': index === 0,
+        '@last': index === keys.length - 1,
+      });
+
+      // Push property value as new context
+      this.contextStack.push((collection as any)[key]);
+
+      // Evaluate the program block with the current property value
+      output += this.evaluateProgram(node.program);
+
+      // Pop context and data stacks
+      this.contextStack.pop();
+      this.dataStack.pop();
+    });
 
     return output;
   }

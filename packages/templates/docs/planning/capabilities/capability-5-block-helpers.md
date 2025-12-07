@@ -214,33 +214,31 @@
 
 **Goal:** Iterate over object properties with key access
 
-**Status:** `[ ]` Not Started
+**Status:** `[x]` COMPLETE ✅
 
 ### Task C5-F4-T1: Implement Object Iteration
 
-- Detect parameter is object (not array)
-- Use `Object.keys()` for iteration order
-- Create data frame with:
-  - `@key` set to current property name
-  - `@index` set to iteration count (0-based)
-  - `@first` and `@last` for first/last properties
-- Push property value as new context
-- Evaluate `node.program` and accumulate
+**Status:** `[x]` COMPLETE
 
-**Implementation Note:** Need to detect @last before iteration completes:
+**Deliverable:** `evaluateEachObject()` method with full loop metadata support
 
-- Collect all keys first: `const keys = Object.keys(obj)`
-- Iterate with index: `keys.forEach((key, index) => ...)`
-- Calculate `@last = (index === keys.length - 1)`
+**Implementation:**
 
-**Tests:**
+- Uses `Object.keys()` for consistent iteration order (ES6+ insertion order)
+- Creates data frame with `@key` (property name), `@index`, `@first`, `@last`
+- Property value pushed as new context (becomes `this`)
+- Empty objects render inverse block
+- Supports parent context access via `../`
 
-- Basic iteration: `{{#each obj}}{{@key}}: {{this}}{{/each}}`
-- Access @index: `{{#each obj}}{{@index}} {{@key}}{{/each}}`
-- Access @first/@last: `{{#each obj}}{{#if @first}}First: {{/if}}{{@key}}{{/each}}`
-- Empty object: `{{#each obj}}Item{{else}}Empty{{/each}}` with `{obj: {}}`
-- Nested properties: `{{#each users}}{{@key}}: {{name}}{{/each}}`
-- Parent access: `{{#each obj}}{{../title}}: {{@key}}{{/each}}`
+**Tests:** 15 tests passing
+
+**Test Coverage:**
+
+- Basic iteration (3 tests): simple properties, single property, formatted output
+- @key access (3 tests): key output, key+index, key in nested content
+- Loop metadata (4 tests): @first detection, @last detection, combined metadata, single property edge case
+- Context access (3 tests): nested object values, parent access, nested properties
+- Else blocks (2 tests): empty object, else with context variables
 
 ---
 
@@ -326,8 +324,10 @@
 - **Test Coverage:**
   - Feature 5.1: 42 tests for #if and #unless
   - Feature 5.3: 35 tests for #each array iteration
+  - Feature 5.4: 15 tests for #each object iteration
+  - Total block helper tests: 92
 
-- **Data Frame Keys:** Must be prefixed with `@` (e.g., `'@index'`, `'@first'`) because path resolver adds prefix when `pathExpr.data` is true
+- **Data Frame Keys:** Must be prefixed with `@` (e.g., `'@index'`, `'@first'`, `'@key'`) because path resolver adds prefix when `pathExpr.data` is true
 
 - **Sparse Array Handling:** Pre-calculate first and last existing indices to correctly set `@first` and `@last` flags
 
@@ -339,10 +339,10 @@
 
 - [x] Feature 5.1: #if and #unless helpers (42 tests passing)
 - [x] Feature 5.3: #each for arrays (35 tests passing)
-- [ ] Feature 5.4: #each for objects (~10 tests)
+- [x] Feature 5.4: #each for objects (15 tests passing)
 - [ ] Feature 5.5: #with helper (~8 tests)
 - [ ] Feature 5.6: Nested block integration (~10 tests)
 - [x] All parser tests updated for numeric path support (8 test fixes)
-- [x] All tests passing (1434/1434 ✅)
+- [x] All tests passing (1449/1449 ✅)
 - [ ] Documentation complete
 - [ ] Ready for Capability 6 (Runtime Helpers)

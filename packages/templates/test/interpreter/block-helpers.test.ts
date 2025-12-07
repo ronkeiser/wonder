@@ -562,4 +562,120 @@ describe('Block Helpers - #each (Arrays)', () => {
       expect(result).toBe('Not array');
     });
   });
+
+  describe('#each - Object Iteration', () => {
+    describe('Basic iteration', () => {
+      test('iterates over object properties', () => {
+        const template = '{{#each user}}{{@key}}: {{this}}, {{/each}}';
+        const result = render(template, { user: { name: 'Alice', age: 30 } });
+        expect(result).toBe('name: Alice, age: 30, ');
+      });
+
+      test('handles single property', () => {
+        const template = '{{#each obj}}{{@key}}={{this}}{{/each}}';
+        const result = render(template, { obj: { x: 42 } });
+        expect(result).toBe('x=42');
+      });
+
+      test('handles multiple properties with formatting', () => {
+        const template = '{{#each data}}[{{@key}}={{this}}]{{/each}}';
+        const result = render(template, { data: { a: 1, b: 2, c: 3 } });
+        expect(result).toBe('[a=1][b=2][c=3]');
+      });
+    });
+
+    describe('@key access', () => {
+      test('provides property name via @key', () => {
+        const template = '{{#each obj}}{{@key}} {{/each}}';
+        const result = render(template, { obj: { x: 1, y: 2, z: 3 } });
+        expect(result).toBe('x y z ');
+      });
+
+      test('combines @key with @index', () => {
+        const template = '{{#each obj}}{{@index}}.{{@key}} {{/each}}';
+        const result = render(template, { obj: { a: 10, b: 20, c: 30 } });
+        expect(result).toBe('0.a 1.b 2.c ');
+      });
+
+      test('uses @key in nested content', () => {
+        const template = '{{#each items}}key={{@key}},value={{this}};{{/each}}';
+        const result = render(template, { items: { first: 'A', second: 'B' } });
+        expect(result).toBe('key=first,value=A;key=second,value=B;');
+      });
+    });
+
+    describe('Loop metadata', () => {
+      test('@first identifies first property', () => {
+        const template = '{{#each obj}}{{#if @first}}START:{{/if}}{{@key}} {{/each}}';
+        const result = render(template, { obj: { a: 1, b: 2, c: 3 } });
+        expect(result).toBe('START:a b c ');
+      });
+
+      test('@last identifies last property', () => {
+        const template = '{{#each obj}}{{@key}}{{#unless @last}}, {{/unless}}{{/each}}';
+        const result = render(template, { obj: { x: 1, y: 2, z: 3 } });
+        expect(result).toBe('x, y, z');
+      });
+
+      test('combines multiple metadata flags', () => {
+        const template =
+          '{{#each obj}}{{@index}}:{{@key}}={{this}}{{#unless @last}};{{/unless}}{{/each}}';
+        const result = render(template, { obj: { a: 10, b: 20 } });
+        expect(result).toBe('0:a=10;1:b=20');
+      });
+
+      test('@first and @last work with single property', () => {
+        const template = '{{#each obj}}{{#if @first}}F{{/if}}{{#if @last}}L{{/if}}{{/each}}';
+        const result = render(template, { obj: { only: 'one' } });
+        expect(result).toBe('FL');
+      });
+    });
+
+    describe('Context access', () => {
+      test('property value becomes this context', () => {
+        const template = '{{#each users}}{{name}} ({{email}}), {{/each}}';
+        const result = render(template, {
+          users: {
+            alice: { name: 'Alice', email: 'alice@example.com' },
+            bob: { name: 'Bob', email: 'bob@example.com' },
+          },
+        });
+        expect(result).toBe('Alice (alice@example.com), Bob (bob@example.com), ');
+      });
+
+      test('can access parent context', () => {
+        const template = '{{#each items}}{{@key}}: {{this}} from {{../title}}; {{/each}}';
+        const result = render(template, {
+          title: 'Report',
+          items: { a: 1, b: 2 },
+        });
+        expect(result).toBe('a: 1 from Report; b: 2 from Report; ');
+      });
+
+      test('nested object properties accessible', () => {
+        const template = '{{#each people}}{{@key}}: {{profile.age}}, {{/each}}';
+        const result = render(template, {
+          people: {
+            john: { profile: { age: 30 } },
+            jane: { profile: { age: 28 } },
+          },
+        });
+        expect(result).toBe('john: 30, jane: 28, ');
+      });
+    });
+
+    describe('Else blocks', () => {
+      test('empty object renders else block', () => {
+        const template = '{{#each obj}}{{@key}}{{else}}Empty{{/each}}';
+        const result = render(template, { obj: {} });
+        expect(result).toBe('Empty');
+      });
+
+      test('else block has access to context variables', () => {
+        const template = '{{#each data}}{{@key}}{{else}}No data for {{title}}{{/each}}';
+        const result = render(template, { title: 'Test', data: {} });
+        expect(result).toBe('No data for Test');
+      });
+    });
+  });
 });
