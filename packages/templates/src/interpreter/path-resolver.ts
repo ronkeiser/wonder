@@ -49,8 +49,14 @@ export function resolvePath(context: any, parts: string[], prefixFirstPart?: str
     // For the first part, prepend the prefix if provided
     const part = i === 0 && prefixFirstPart ? prefixFirstPart + parts[i] : parts[i];
 
-    // Use lookupProperty for security (prevents prototype pollution)
-    current = lookupProperty(current, part);
+    // Special case: Allow accessing 'length' on string primitives for Handlebars compatibility
+    // This is safe since length is just a number, not a method
+    if (typeof current === 'string' && part === 'length') {
+      current = current.length;
+    } else {
+      // Use lookupProperty for security (prevents prototype pollution)
+      current = lookupProperty(current, part);
+    }
 
     // If we got undefined, stop here
     // Note: null is a valid intermediate value and should continue
@@ -100,6 +106,15 @@ export function resolvePathExpression(
   contextStack: ContextStack,
   dataStack: DataStack,
 ): any {
+  // Data variables (@foo) cannot use parent scope references (../)
+  // This is a Handlebars security/consistency restriction
+  // Check both depth > 0 and ".." in parts (parser may leave .. as a part)
+  if (pathExpr.data && (pathExpr.depth > 0 || pathExpr.parts.includes('..'))) {
+    throw new Error(
+      `Data variables cannot access parent scopes. Invalid path: ${pathExpr.original}`,
+    );
+  }
+
   // Determine which stack to use based on data flag
   const stack = pathExpr.data ? dataStack : contextStack;
 

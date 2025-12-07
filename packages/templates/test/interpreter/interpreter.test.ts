@@ -764,7 +764,7 @@ describe('Interpreter', () => {
           };
 
           const interpreter = new Interpreter(ast);
-          expect(() => interpreter.evaluate({})).toThrow('Helper calls not yet implemented');
+          expect(() => interpreter.evaluate({})).toThrow('Unknown helper: helper');
         });
       });
     });

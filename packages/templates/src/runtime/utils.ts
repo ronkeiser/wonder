@@ -8,6 +8,11 @@
  * Reference: Handlebars lib/handlebars/runtime.js and lib/handlebars/utils.js
  */
 
+import { SafeString } from './safe-string.js';
+
+// Re-export SafeString for backwards compatibility (tests import it from utils)
+export { SafeString };
+
 // Cache hasOwnProperty reference for performance
 const hasOwnProperty = Object.prototype.hasOwnProperty;
 
@@ -35,6 +40,30 @@ export function lookupProperty(parent: any, propertyName: string): any {
     return undefined;
   }
 
+  // Security: Block dangerous properties to prevent prototype pollution
+  // and code execution attacks (GH-1495, GH-1595)
+  const dangerousProperties = [
+    'constructor',
+    '__proto__',
+    '__defineGetter__',
+    '__defineSetter__',
+    '__lookupGetter__',
+    '__lookupSetter__',
+  ];
+
+  if (dangerousProperties.includes(propertyName)) {
+    // Exception: Allow 'constructor' if it's an own property
+    if (propertyName === 'constructor' && Object.hasOwn(parent, 'constructor')) {
+      return parent[propertyName];
+    }
+    return undefined;
+  }
+
+  // Feature 7.8: Handle Map objects
+  if (parent instanceof Map) {
+    return parent.get(propertyName);
+  }
+
   // Handle primitives - they don't have own properties
   // We need to return undefined for primitives to be secure
   const type = typeof parent;
@@ -49,46 +78,6 @@ export function lookupProperty(parent: any, propertyName: string): any {
 
   // Property doesn't exist or is inherited
   return undefined;
-}
-
-/**
- * SafeString class for pre-escaped HTML content.
- *
- * Wraps a string to indicate it has already been escaped and should not
- * be escaped again by escapeExpression(). This is used by helpers that
- * generate HTML content.
- *
- * Reference: Handlebars lib/handlebars/safe-string.js
- *
- * @example
- * ```typescript
- * const html = new SafeString('<b>Bold</b>');
- * escapeExpression(html); // '<b>Bold</b>' (not escaped)
- * ```
- */
-export class SafeString {
-  private string: string;
-
-  constructor(string: string) {
-    this.string = string;
-  }
-
-  /**
-   * Returns the stored string value.
-   * @returns The unescaped string
-   */
-  toString(): string {
-    return this.string;
-  }
-
-  /**
-   * Returns the stored string value as HTML.
-   * Alias for toString() for Handlebars compatibility.
-   * @returns The unescaped string
-   */
-  toHTML(): string {
-    return this.string;
-  }
 }
 
 /**
@@ -222,22 +211,22 @@ export function createFrame(data: any): any {
  * ```
  */
 export function isEmpty(value: any): boolean {
-  // null, undefined, and false are empty
-  if (value == null || value === false) {
+  // Match Handlebars isEmpty logic exactly: (!value && value !== 0) || empty array
+  // Special case: NaN is falsy but should not be empty (typeof NaN === 'number')
+  if (!value && value !== 0) {
+    // NaN check: typeof NaN === 'number', so exclude it
+    if (typeof value === 'number') {
+      return false; // NaN is not empty
+    }
     return true;
   }
 
-  // Empty string is empty
-  if (value === '') {
-    return true;
-  }
-
-  // Empty array is empty (but 0 and {} are NOT empty)
+  // Empty array is empty
   if (Array.isArray(value) && value.length === 0) {
     return true;
   }
 
-  // Everything else is not empty (including 0, {}, non-empty arrays, etc.)
+  // Everything else is not empty
   return false;
 }
 

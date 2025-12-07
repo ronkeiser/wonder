@@ -35,10 +35,10 @@ describe('Block Helpers - #if', () => {
       expect(render(template, { count: -1 })).toBe('Count: -1');
     });
 
-    it('should render main block for zero (truthy in Handlebars)', () => {
+    it('should NOT render main block for zero (falsy in Handlebars)', () => {
       const template = '{{#if value}}Value is {{value}}{{/if}}';
       const result = render(template, { value: 0 });
-      expect(result).toBe('Value is 0');
+      expect(result).toBe('');
     });
 
     it('should render main block for true', () => {
@@ -135,10 +135,10 @@ describe('Block Helpers - #if', () => {
       expect(result).toBe('No items');
     });
 
-    it('should render main block for zero with else', () => {
+    it('should render else block for zero', () => {
       const template = '{{#if count}}Count: {{count}}{{else}}No count{{/if}}';
       const result = render(template, { count: 0 });
-      expect(result).toBe('Count: 0');
+      expect(result).toBe('No count');
     });
 
     it('should render main block for empty object with else', () => {
@@ -191,7 +191,7 @@ describe('Block Helpers - #if', () => {
       const template = '{{#if this}}Yes{{else}}No{{/if}}';
       expect(render(template, 'string')).toBe('Yes');
       expect(render(template, '')).toBe('No');
-      expect(render(template, 0)).toBe('Yes'); // 0 is truthy in Handlebars
+      expect(render(template, 0)).toBe('No'); // 0 is falsy in Handlebars
       expect(render(template, false)).toBe('No');
     });
   });
@@ -211,10 +211,10 @@ describe('Block Helpers - #unless', () => {
       expect(result).toBe('');
     });
 
-    it('should not render main block for zero (truthy in Handlebars)', () => {
+    it('should render main block for zero (falsy in Handlebars)', () => {
       const template = '{{#unless value}}No value{{/unless}}';
       const result = render(template, { value: 0 });
-      expect(result).toBe('');
+      expect(result).toBe('No value');
     });
 
     it('should not render main block for empty object (truthy)', () => {
@@ -269,10 +269,10 @@ describe('Block Helpers - #unless', () => {
       expect(result).toBe('Inactive');
     });
 
-    it('should render else block for zero (truthy)', () => {
+    it('should render main block for zero (falsy)', () => {
       const template = '{{#unless count}}No count{{else}}Count: {{count}}{{/unless}}';
       const result = render(template, { count: 0 });
-      expect(result).toBe('Count: 0');
+      expect(result).toBe('No count');
     });
   });
 
@@ -775,10 +775,10 @@ describe('Block Helpers - #each (Arrays)', () => {
         expect(result).toBe('False');
       });
 
-      it('zero value renders main block (0 is truthy in Handlebars)', () => {
+      it('zero value renders else block (0 is falsy in Handlebars)', () => {
         const template = '{{#with count}}Count: {{this}}{{else}}No count{{/with}}';
         const result = render(template, { count: 0 });
-        expect(result).toBe('Count: 0');
+        expect(result).toBe('No count');
       });
 
       it('empty string renders else block', () => {

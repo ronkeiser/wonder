@@ -155,6 +155,7 @@ export interface MustacheStatement extends Node {
   params: Expression[]; // Helper arguments (empty in V1)
   hash: Hash; // Named parameters (empty in V1)
   escaped: boolean; // true for {{}}, false for {{{}}}
+  strip: StripFlags; // Whitespace control ({{~foo~}} syntax)
   loc: SourceLocation | null;
 }
 
@@ -171,6 +172,7 @@ export interface BlockStatement extends Node {
   openStrip: StripFlags; // Whitespace control at opening tag (V2)
   inverseStrip: StripFlags; // Whitespace control at {{else}} (V2)
   closeStrip: StripFlags; // Whitespace control at closing tag (V2)
+  blockParams?: string[]; // Block parameter names (e.g., ["item", "index"] from {{#each items as |item index|}})
   loc: SourceLocation | null;
 }
 
