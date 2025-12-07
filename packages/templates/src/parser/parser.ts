@@ -8,6 +8,7 @@ import type {
   ContentStatement,
   Expression,
   Hash,
+  HashPair,
   MustacheStatement,
   Node,
   NullLiteral,
@@ -20,6 +21,36 @@ import type {
   UndefinedLiteral,
 } from './ast-nodes';
 import { ParserError } from './parser-error';
+
+/**
+ * Literal expression types that can be converted to PathExpression
+ */
+type LiteralExpression = StringLiteral | NumberLiteral | BooleanLiteral;
+
+/**
+ * Token types that can start an expression
+ * Used for validating expression contexts in subexpressions and parameters
+ */
+const EXPRESSION_START_TOKENS: readonly TokenType[] = [
+  TokenType.STRING,
+  TokenType.NUMBER,
+  TokenType.BOOLEAN,
+  TokenType.NULL,
+  TokenType.UNDEFINED,
+  TokenType.ID,
+  TokenType.DATA,
+  TokenType.OPEN_SEXPR,
+  TokenType.BRACKET_LITERAL,
+] as const;
+
+/**
+ * Token types for literal values that can be used as paths
+ */
+const LITERAL_PATH_TOKENS: readonly TokenType[] = [
+  TokenType.STRING,
+  TokenType.NUMBER,
+  TokenType.BOOLEAN,
+] as const;
 
 /**
  * Parser for Handlebars-compatible templates
@@ -598,21 +629,15 @@ export class Parser {
   }
 
   /**
-   * Parse a path expression (variable path)
-   * Handles simple paths, parent references, data variables, and special paths:
-   * - Simple: foo, foo.bar, foo.bar.baz
-   * - Parent: ../parent, ../../grandparent, ../foo.bar
-   * - Data: @index, @root.user
-   * - Special: this, this.foo, ./foo, .
-   *
-   * @returns PathExpression node
-   * @throws {ParserError} If path is invalid or malformed
-   */
-  /**
-   * Parse an expression (can be a literal or a path)
+   * Parse an expression (can be a literal, path, or subexpression)
    * Used for parsing block parameters and mustache arguments
    *
-   * @returns Expression node (literal or path)
+   * Handles:
+   * - Literals: strings, numbers, booleans, null, undefined
+   * - Paths: simple (foo.bar), parent (../foo), data (@index)
+   * - Subexpressions: nested helper calls (helper arg1 arg2)
+   *
+   * @returns Expression node (literal, path, or subexpression)
    * @throws {ParserError} If expression is invalid
    */
   parseExpression(): Expression {
@@ -645,6 +670,90 @@ export class Parser {
           this.getErrorContext(),
         );
     }
+  }
+
+  /**
+   * Check if the current token can start a literal that can be used as a path
+   * @returns True if current token is STRING, NUMBER, or BOOLEAN
+   */
+  private isLiteralPathToken(): boolean {
+    return this.currentToken !== null && LITERAL_PATH_TOKENS.includes(this.currentToken.type);
+  }
+
+  /**
+   * Check if the current token can start an expression
+   * @returns True if current token can begin an expression
+   */
+  private isExpressionStartToken(): boolean {
+    return this.currentToken !== null && EXPRESSION_START_TOKENS.includes(this.currentToken.type);
+  }
+
+  /**
+   * Parse a literal and convert it to a PathExpression
+   * Used for Feature 7.4: Support literal values as paths (e.g., {{"foo"}} or {{12}})
+   *
+   * @returns PathExpression representing the literal value
+   */
+  private parseLiteralAsPath(): PathExpression {
+    const literal = this.parseExpression() as LiteralExpression;
+    const literalValue = String(literal.value);
+    return {
+      type: 'PathExpression',
+      data: false,
+      depth: 0,
+      parts: [literalValue],
+      original: literalValue,
+      loc: literal.loc,
+    };
+  }
+
+  /**
+   * Parse parameters and hash pairs until a terminating token is encountered
+   * Extracts common logic from parseMustacheStatement and parseBlockStatement
+   *
+   * @param terminatingToken - The token type that ends parameter parsing (e.g., CLOSE)
+   * @returns Object containing parsed params and hash
+   */
+  private parseParamsAndHash(terminatingToken: TokenType): {
+    params: Expression[];
+    hash: Hash;
+  } {
+    const params: Expression[] = [];
+    const hashPairs: HashPair[] = [];
+
+    while (this.currentToken && !this.match(terminatingToken)) {
+      // Check if this is a hash pair (ID = Expression)
+      if (this.match(TokenType.ID)) {
+        const nextToken = this.peek(1);
+        if (nextToken && nextToken.type === TokenType.EQUALS) {
+          // This is a hash pair
+          const keyToken = this.currentToken;
+          const key = keyToken.value;
+          this.advance(); // consume ID
+          this.advance(); // consume EQUALS
+          const value = this.parseExpression();
+          const valueEndToken = this.position > 0 ? this.tokens[this.position - 1] : keyToken;
+          hashPairs.push({
+            type: 'HashPair',
+            key,
+            value,
+            loc: this.getSourceLocation(keyToken, valueEndToken),
+          });
+          continue;
+        }
+      }
+
+      // Otherwise it's a regular parameter
+      params.push(this.parseExpression());
+    }
+
+    const hash: Hash = {
+      type: 'Hash',
+      pairs: hashPairs,
+      loc: null,
+    };
+
+    return { params, hash };
   }
 
   /**
@@ -757,22 +866,8 @@ export class Parser {
 
     // Feature 7.4: Support literal values in subexpressions
     let path: PathExpression;
-    if (
-      this.match(TokenType.STRING) ||
-      this.match(TokenType.NUMBER) ||
-      this.match(TokenType.BOOLEAN)
-    ) {
-      // Parse literal and convert to PathExpression
-      const literal = this.parseExpression();
-      const literalValue = String((literal as any).value);
-      path = {
-        type: 'PathExpression',
-        data: false,
-        depth: 0,
-        parts: [literalValue],
-        original: literalValue,
-        loc: literal.loc,
-      };
+    if (this.isLiteralPathToken()) {
+      path = this.parseLiteralAsPath();
     } else if (this.match(TokenType.ID) || this.match(TokenType.DATA)) {
       path = this.parsePathExpression();
     } else {
@@ -787,19 +882,7 @@ export class Parser {
     const params: Expression[] = [];
     while (this.currentToken && !this.match(TokenType.CLOSE_SEXPR)) {
       // Check for valid expression token
-      const validTypes = [
-        TokenType.STRING,
-        TokenType.NUMBER,
-        TokenType.BOOLEAN,
-        TokenType.NULL,
-        TokenType.UNDEFINED,
-        TokenType.ID,
-        TokenType.DATA,
-        TokenType.OPEN_SEXPR,
-      ];
-
-      const isValidToken = validTypes.some((type) => this.match(type));
-      if (!isValidToken) {
+      if (!this.isExpressionStartToken()) {
         // If we hit a block-ending token, the subexpression is likely unclosed
         const isBlockEnd =
           this.match(TokenType.CLOSE) ||
@@ -942,58 +1025,12 @@ export class Parser {
 
     // Parse the path expression inside the mustache
     // Feature 7.4: Support literal values as paths (e.g., {{"foo"}} or {{12}})
-    let path: PathExpression;
-    if (
-      this.currentToken &&
-      (this.match(TokenType.STRING) ||
-        this.match(TokenType.NUMBER) ||
-        this.match(TokenType.BOOLEAN))
-    ) {
-      // Parse literal and convert to PathExpression
-      const literal = this.parseExpression();
-      const literalValue = String((literal as any).value);
-      path = {
-        type: 'PathExpression',
-        data: false,
-        depth: 0,
-        parts: [literalValue],
-        original: literalValue,
-        loc: literal.loc,
-      };
-    } else {
-      path = this.parsePathExpression();
-    }
+    const path: PathExpression = this.isLiteralPathToken()
+      ? this.parseLiteralAsPath()
+      : this.parsePathExpression();
 
     // Parse parameters and hash pairs until we hit closing delimiter
-    const params: Expression[] = [];
-    const hashPairs: Array<{ type: 'HashPair'; key: string; value: Expression; loc: any }> = [];
-
-    while (this.currentToken && !this.match(closeType)) {
-      // Check if this is a hash pair (ID = Expression)
-      if (this.match(TokenType.ID)) {
-        const nextToken = this.peek(1);
-        if (nextToken && nextToken.type === TokenType.EQUALS) {
-          // This is a hash pair
-          const keyToken = this.currentToken;
-          const key = keyToken.value;
-          this.advance(); // consume ID
-          this.advance(); // consume EQUALS
-          const value = this.parseExpression();
-          const valueEndToken = this.position > 0 ? this.tokens[this.position - 1] : keyToken;
-          hashPairs.push({
-            type: 'HashPair',
-            key,
-            value,
-            loc: this.getSourceLocation(keyToken, valueEndToken),
-          });
-          continue;
-        }
-      }
-
-      // Otherwise it's a regular parameter
-      const param = this.parseExpression();
-      params.push(param);
-    }
+    const { params, hash } = this.parseParamsAndHash(closeType);
 
     // Expect appropriate closing delimiter and capture the closing token
     const closeToken = this.expect(
@@ -1001,24 +1038,17 @@ export class Parser {
       `Expected ${closeType === TokenType.CLOSE ? '}}' : '}}}'} to close mustache statement`,
     );
 
-    // Create hash node from pairs
-    const hash = {
-      type: 'Hash' as const,
-      pairs: hashPairs,
-      loc: null, // Location tracking for hash parameters not critical
-    };
-
     // mustacheStartToken is guaranteed non-null because we checked at method entry
     // closeToken is guaranteed non-null because expect() throws if token doesn't exist
     const loc = mustacheStartToken ? this.getSourceLocation(mustacheStartToken, closeToken) : null;
 
     const node: MustacheStatement = {
       type: 'MustacheStatement',
-      path: path,
-      params: params,
-      hash: hash, // Empty in V1 - no named parameters support
-      escaped: escaped,
-      loc: loc,
+      path,
+      params,
+      hash,
+      escaped,
+      loc,
     };
 
     this.advance(); // Move past CLOSE or CLOSE_UNESCAPED token
@@ -1156,68 +1186,15 @@ export class Parser {
 
     // Parse the helper name (path expression)
     // Feature 7.4: Support literal values as paths (e.g., {{#"foo"}} or {{#12}})
-    let helperName: PathExpression;
-    if (
-      this.currentToken &&
-      (this.match(TokenType.STRING) ||
-        this.match(TokenType.NUMBER) ||
-        this.match(TokenType.BOOLEAN))
-    ) {
-      // Parse literal and convert to PathExpression
-      const literal = this.parseExpression();
-      const literalValue = String((literal as any).value);
-      helperName = {
-        type: 'PathExpression',
-        data: false,
-        depth: 0,
-        parts: [literalValue],
-        original: literalValue,
-        loc: literal.loc,
-      };
-    } else {
-      helperName = this.parsePathExpression();
-    }
+    const helperName: PathExpression = this.isLiteralPathToken()
+      ? this.parseLiteralAsPath()
+      : this.parsePathExpression();
 
     // Parse parameters and hash pairs until we hit CLOSE token
-    const params: Expression[] = [];
-    const hashPairs: Array<{ type: 'HashPair'; key: string; value: Expression; loc: any }> = [];
-    let firstParam: string | null = null; // For error messages
+    const { params, hash } = this.parseParamsAndHash(TokenType.CLOSE);
 
-    while (this.currentToken && !this.match(TokenType.CLOSE)) {
-      // Check if this is a hash pair (ID = Expression)
-      if (this.match(TokenType.ID)) {
-        const nextToken = this.peek(1);
-        if (nextToken && nextToken.type === TokenType.EQUALS) {
-          // This is a hash pair
-          const keyToken = this.currentToken;
-          const key = keyToken.value;
-          this.advance(); // consume ID
-          this.advance(); // consume EQUALS
-          const value = this.parseExpression();
-          const valueEndToken = this.position > 0 ? this.tokens[this.position - 1] : keyToken;
-          hashPairs.push({
-            type: 'HashPair',
-            key,
-            value,
-            loc: this.getSourceLocation(keyToken, valueEndToken),
-          });
-          continue;
-        }
-      }
-
-      // Otherwise it's a regular parameter
-      const param = this.parseExpression();
-      params.push(param);
-
-      // Capture first parameter for error messages
-      if (firstParam === null) {
-        if (param.type === 'PathExpression') {
-          firstParam = param.original;
-        } else if ('original' in param) {
-          firstParam = param.original;
-        }
-      }
-    }
+    // Get first parameter for error messages
+    const firstParam = params.length > 0 && 'original' in params[0] ? params[0].original : null;
 
     // Expect CLOSE token (}})
     this.expect(TokenType.CLOSE, 'Expected }} after block helper name');
@@ -1268,27 +1245,9 @@ export class Parser {
     // Parse the closing helper name
     const closingNameToken = this.currentToken; // Save for error reporting
     // Feature 7.4: Support literal values in closing tags (e.g., {{/"foo"}})
-    let closingName: PathExpression;
-    if (
-      this.currentToken &&
-      (this.match(TokenType.STRING) ||
-        this.match(TokenType.NUMBER) ||
-        this.match(TokenType.BOOLEAN))
-    ) {
-      // Parse literal and convert to PathExpression
-      const literal = this.parseExpression();
-      const literalValue = String((literal as any).value);
-      closingName = {
-        type: 'PathExpression',
-        data: false,
-        depth: 0,
-        parts: [literalValue],
-        original: literalValue,
-        loc: literal.loc,
-      };
-    } else {
-      closingName = this.parsePathExpression();
-    }
+    const closingName: PathExpression = this.isLiteralPathToken()
+      ? this.parseLiteralAsPath()
+      : this.parsePathExpression();
 
     // V1: Skip any parameters in closing tag (shouldn't be any, but be safe)
     while (this.currentToken && !this.match(TokenType.CLOSE)) {
@@ -1310,13 +1269,6 @@ export class Parser {
     const closeToken = this.expect(TokenType.CLOSE, 'Expected }} to close block end tag');
     this.advance();
 
-    // Create hash node from pairs
-    const hash = {
-      type: 'Hash' as const,
-      pairs: hashPairs,
-      loc: null, // Location tracking for hash parameters not critical
-    };
-
     // Create empty strip flags for V1 (no whitespace control support)
     const stripFlags = {
       open: false,
@@ -1329,14 +1281,14 @@ export class Parser {
     const node: BlockStatement = {
       type: 'BlockStatement',
       path: helperName,
-      params: params,
-      hash: hash, // Empty in V1 - no named parameters support
-      program: program,
-      inverse: inverse, // Set to parsed inverse block if {{else}} was present
-      openStrip: stripFlags, // V2 feature
-      inverseStrip: stripFlags, // V2 feature
-      closeStrip: stripFlags, // V2 feature
-      loc: loc,
+      params,
+      hash,
+      program,
+      inverse,
+      openStrip: stripFlags,
+      inverseStrip: stripFlags,
+      closeStrip: stripFlags,
+      loc,
     };
 
     return node;
