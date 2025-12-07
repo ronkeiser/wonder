@@ -222,22 +222,22 @@ export function createFrame(data: any): any {
  * ```
  */
 export function isEmpty(value: any): boolean {
-  // null, undefined, and false are empty
-  if (value == null || value === false) {
+  // Match Handlebars isEmpty logic exactly: (!value && value !== 0) || empty array
+  // Special case: NaN is falsy but should not be empty (typeof NaN === 'number')
+  if (!value && value !== 0) {
+    // NaN check: typeof NaN === 'number', so exclude it
+    if (typeof value === 'number') {
+      return false; // NaN is not empty
+    }
     return true;
   }
 
-  // Empty string is empty
-  if (value === '') {
-    return true;
-  }
-
-  // Empty array is empty (but 0 and {} are NOT empty)
+  // Empty array is empty
   if (Array.isArray(value) && value.length === 0) {
     return true;
   }
 
-  // Everything else is not empty (including 0, {}, non-empty arrays, etc.)
+  // Everything else is not empty
   return false;
 }
 

@@ -221,8 +221,8 @@ export class Interpreter {
   /**
    * Evaluates the #if block helper.
    *
-   * Renders the main block if the condition is truthy (using Handlebars isEmpty),
-   * otherwise renders the inverse block ({{else}}) if present.
+   * Matches Handlebars logic: (!condition) || isEmpty(condition)
+   * This treats 0 as falsy (like JavaScript) while treating {} as truthy.
    *
    * @param node - The BlockStatement node for #if
    * @returns The rendered output based on the condition
@@ -236,15 +236,16 @@ export class Interpreter {
     // Evaluate the condition
     const condition = this.evaluateExpression(node.params[0]);
 
-    // Use Handlebars truthiness: isEmpty() returns true for falsy values
-    const isTruthy = !isEmpty(condition);
+    // Match Handlebars #if logic: (!conditional) || isEmpty(conditional)
+    // This makes 0 falsy (standard JS) while keeping {} truthy
+    const isFalsy = !condition || isEmpty(condition);
 
-    if (isTruthy) {
-      // Render the main block
-      return this.evaluateProgram(node.program);
-    } else {
+    if (isFalsy) {
       // Render the inverse block ({{else}}) if present
       return this.evaluateProgram(node.inverse);
+    } else {
+      // Render the main block
+      return this.evaluateProgram(node.program);
     }
   }
 
@@ -266,8 +267,8 @@ export class Interpreter {
     // Evaluate the condition
     const condition = this.evaluateExpression(node.params[0]);
 
-    // Invert the condition: render main block if falsy
-    const isFalsy = isEmpty(condition);
+    // #unless is inverse of #if: match same logic (!conditional) || isEmpty(conditional)
+    const isFalsy = !condition || isEmpty(condition);
 
     if (isFalsy) {
       // Render the main block
@@ -435,8 +436,10 @@ export class Interpreter {
     // Evaluate the parameter to get the value
     const value = this.evaluateExpression(node.params[0]);
 
-    // If value is empty/falsy (using Handlebars truthiness), render else block
-    if (isEmpty(value)) {
+    // Match #if logic: (!value) || isEmpty(value) for falsy check
+    const isFalsy = !value || isEmpty(value);
+
+    if (isFalsy) {
       return this.evaluateProgram(node.inverse);
     }
 

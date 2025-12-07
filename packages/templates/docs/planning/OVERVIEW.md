@@ -537,7 +537,7 @@ Maintain data frame stack for loop metadata:
 
 ## Capability 6: Helpers & Subexpressions
 
-**Status:** 🔄 Not Started
+**Status:** ✅ Completed
 
 **Goal:** Support runtime helper functions and nested helper calls in expressions
 
@@ -671,7 +671,7 @@ Distinguish between variable lookups and helper calls:
 
 ## Capability 7: Output Generation
 
-**Status:** 🔄 Not Started
+**Status:** ✅ Completed
 
 **Goal:** Walk AST and generate final string output
 
@@ -735,7 +735,7 @@ Distinguish between variable lookups and helper calls:
 
 ## Capability 8: Public API
 
-**Status:** 🔄 Not Started
+**Status:** ✅ Completed
 
 **Goal:** Provide clean, simple API matching Handlebars conventions
 
