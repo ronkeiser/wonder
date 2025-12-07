@@ -5,6 +5,7 @@ Total: **520 test cases** across 20 spec files (7,338 lines)
 ## Relevance Grouping for Wonder
 
 ### Group A: Critical (Must Have for V1)
+
 **Use case**: Core prompt template features - variables, paths, loops, conditionals
 
 - **basic.js** (39 tests) - Variables, paths, escaping, literals
@@ -15,16 +16,19 @@ Total: **520 test cases** across 20 spec files (7,338 lines)
 **Subtotal: 135 tests** | **Current status: 34/39 basic.js passing (87%)**
 
 ### Group B: Important (Needed for Robust V1)
+
 **Use case**: Proper helper system, error handling, whitespace control
 
 - **helpers.js** (~40 of 81 tests) - Helper invocation, params, hash, options object
 - **blocks.js** (~20 of 34 tests) - Inverted sections, basic block params
 - **tokenizer.js** (55 tests) - Lexer validation
 - **whitespace-control.js** (6 tests) - Clean prompt output
+- **utils.js** (12 tests) - SafeString, escapeExpression, isEmpty validation
 
-**Subtotal: ~120 tests**
+**Subtotal: ~132 tests**
 
 ### Group C: Nice to Have (Post-V1)
+
 **Use case**: Advanced features, edge cases
 
 - **subexpressions.js** (12 tests) - Nested helper calls
@@ -36,6 +40,7 @@ Total: **520 test cases** across 20 spec files (7,338 lines)
 **Subtotal: ~100 tests**
 
 ### Group D: Skip (Not Relevant)
+
 **Use case**: Features we won't implement or are internal
 
 - **partials.js** (60 tests) - Not in requirements
@@ -45,18 +50,18 @@ Total: **520 test cases** across 20 spec files (7,338 lines)
 - **javascript-compiler.js** (7 tests) - We don't generate JS code
 - **runtime.js** (3 tests) - Internal runtime
 - **source-map.js** (2 tests) - Not needed
-- **utils.js** (12 tests) - Internal utilities
 - **spec.js** (1 test) - Meta testing
 - **require.js** (2 tests) - Module loading
 - **regressions.js** (~19 tests) - Irrelevant edge cases
 
-**Subtotal: ~165 tests to skip**
+**Subtotal: ~153 tests to skip**
 
 ---
 
 ## Recommended Triage Order
 
 ### Phase 1: Complete Group A (Critical - 135 tests)
+
 1. ✅ **basic.js** - Fix remaining 5 failures (comments, options hash, hyphens, bracket literals)
 2. **builtins.js** - Import all 42 tests (#if, #each, #with, #lookup)
 3. **data.js** - Import all 21 tests (@root, @index, @first, @last, @key)
@@ -64,16 +69,14 @@ Total: **520 test cases** across 20 spec files (7,338 lines)
 
 **Target: 135/135 Group A tests passing**
 
-### Phase 2: Add Group B (Important - ~120 tests)
-Focus on tests that improve robustness:
-5. **helpers.js** - Import ~40 core tests (skip advanced features)
-6. **tokenizer.js** - Import all 55 tests (validate lexer)
-7. **blocks.js** - Import ~20 core tests (inverted sections, basic block params)
-8. **whitespace-control.js** - Import all 6 tests (clean output)
+### Phase 2: Add Group B (Important - ~132 tests)
 
-**Target: 255/255 Group A+B tests passing**
+Focus on tests that improve robustness: 5. **helpers.js** - Import ~40 core tests (skip advanced features) 6. **tokenizer.js** - Import all 55 tests (validate lexer) 7. **blocks.js** - Import ~20 core tests (inverted sections, basic block params) 8. **whitespace-control.js** - Import all 6 tests (clean output) 9. **utils.js** - Import all 12 tests (SafeString, escapeExpression, isEmpty)
+
+**Target: 267/267 Group A+B tests passing**
 
 ### Phase 3: Evaluate Group C (Post-V1)
+
 Defer until Groups A & B are solid
 
 ---
@@ -83,6 +86,7 @@ Defer until Groups A & B are solid
 ### basic.js (39 tests) - STATUS: 34/39 passing
 
 **Essential for prompts:**
+
 - ✅ Variables: `{{foo}}`, `{{foo.bar}}`
 - ✅ Paths: dot notation, slash notation, parent paths
 - ✅ Escaping: `\{{`, literal braces in prompts
@@ -100,6 +104,7 @@ Defer until Groups A & B are solid
 ### builtins.js (42 tests) - STATUS: Not yet imported
 
 **Essential helpers:**
+
 - `#if` / `#unless` - Conditional prompt sections
 - `#each` - Loop over arrays/objects (multi-shot examples, iterating context)
 - `#with` - Change context (nested data structures)
@@ -112,6 +117,7 @@ Defer until Groups A & B are solid
 ### data.js (21 tests) - STATUS: Not yet imported
 
 **Essential data variables:**
+
 - `@root` - Access root context from nested blocks
 - `@index` - Current iteration index (numbering examples)
 - `@first` / `@last` - Special handling for first/last items
@@ -124,6 +130,7 @@ Defer until Groups A & B are solid
 ### security.js (33 tests) - STATUS: Not yet imported
 
 **Security features:**
+
 - Prototype pollution protection
 - `__proto__` access prevention
 - Constructor access prevention
@@ -341,10 +348,22 @@ Defer until Groups A & B are solid
 
 #### **utils.js** (12 tests, 106 lines)
 
-- Utility function tests
-- Internal helper tests
+**Core utilities (V1 relevant - 12 tests):**
 
-**Relevance**: LOW - Internal implementation
+- SafeString construction and type checking (2 tests)
+- escapeExpression HTML escaping (4 tests)
+- isEmpty falsy value detection (2 tests)
+- extend prototype safety (1 test)
+- isArray/isMap/isSet type checking (3 tests)
+
+**Why we need this:**
+
+- SafeString is critical for unescaped output `{{{foo}}}`
+- escapeExpression validates HTML escaping for `{{foo}}`
+- isEmpty used by built-in helpers (#if, #each)
+- Type checking used by runtime for iteration
+
+**Relevance**: HIGH - Core runtime utilities used throughout
 
 ---
 
@@ -400,8 +419,9 @@ Defer until Groups A & B are solid
 - **blocks.js** (partial: ~20 tests) - Inverted sections, block params
 - **helpers.js** (remaining: ~40 tests) - Advanced helper features
 - **whitespace-control.js** (6 tests) - Clean output
+- **utils.js** (12 tests) - SafeString, escapeExpression, isEmpty
 
-**Subtotal: ~120 tests**
+**Subtotal: ~132 tests**
 
 ### P2 - Nice to Have (Advanced Features)
 
@@ -418,16 +438,16 @@ Defer until Groups A & B are solid
 - **compiler.js** (13 tests) - Internal
 - **ast.js** (13 tests) - Internal
 - **javascript-compiler.js** (7 tests) - Not using
-- **runtime.js**, **utils.js**, **source-map.js**, **spec.js**, **require.js** - Internal/meta
+- **runtime.js**, **source-map.js**, **spec.js**, **require.js** - Internal/meta
 
-**Subtotal: ~175 tests to skip**
+**Subtotal: ~163 tests to skip**
 
 ## Recommended Approach
 
 1. **Start with P0**: Import and adapt ~175 critical tests
 2. **Fix systematically**: Get all P0 passing before moving to P1
 3. **Document deviations**: When we intentionally differ from Handlebars
-4. **Add P1 gradually**: Only after P0 is solid
+4. **Add P1 gradually**: Only after P0 is solid (adds ~132 tests)
 5. **Skip P3 entirely**: Not relevant to our use case
 
 ## Current Status

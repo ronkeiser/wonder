@@ -187,11 +187,193 @@
 
 ## tokenizer.js (55 tests)
 
-### All Tests - DEFER
+### Core Tokenization (11 tests) - KEEP
 
-**Why**: Lexer/tokenizer validation - useful but not user-facing
+**Why**: Validates basic mustache syntax parsing
 
-**Status**: DEFER to internal validation - run manually when lexer changes
+1. ✅ **tokenizes a simple mustache as "OPEN ID CLOSE"** - `{{foo}}`
+2. ✅ **supports unescaping with &** - `{{&bar}}`
+3. ✅ **supports unescaping with {{{** - `{{{bar}}}`
+4. ✅ **supports escaping delimiters** - `\{{bar}}`
+5. ✅ **supports escaping multiple delimiters** - Multiple escapes
+6. ✅ **supports escaping a triple stash** - `\{{{bar}}}`
+7. ✅ **supports escaping escape character** - `\\{{bar}}`
+8. ✅ **supports escaping multiple escape characters** - Multiple backslashes
+9. ✅ **supports escaped mustaches after escaped escape characters** - Complex escaping
+10. ✅ **supports escaped escape characters after escaped mustaches** - Order matters
+11. ✅ **supports escaped escape character on a triple stash** - `\\{{{bar}}}`
+
+**Status**: KEEP (11) - Essential for escape handling
+
+---
+
+### Path Notation (9 tests) - KEEP
+
+**Why**: V1 requires dot notation and parent context access
+
+1. ✅ **tokenizes a simple path** - `{{foo/bar}}`
+2. ✅ **allows dot notation** - `{{foo.bar}}`, `{{foo.bar.baz}}`
+3. ✅ **allows path literals with []** - `{{foo.[bar]}}`
+4. ✅ **allows multiple path literals on a line with []** - Multiple brackets
+5. ✅ **allows escaped literals in []** - `{{foo.[bar\]]}}`
+6. ✅ **tokenizes {{.}} as OPEN ID CLOSE** - Current context
+7. ✅ **tokenizes a path as "OPEN (ID SEP)\* ID CLOSE"** - `{{../foo/bar}}`
+8. ✅ **tokenizes a path with .. as a parent path** - `{{../foo.bar}}`
+9. ✅ **tokenizes a path with this/foo as OPEN ID SEP ID CLOSE** - Explicit context
+
+**Status**: KEEP (9) - Critical for nested data access
+
+---
+
+### Basic Mustache Features (4 tests) - KEEP
+
+**Why**: Core template syntax
+
+1. ✅ **tokenizes a simple mustache with spaces as "OPEN ID CLOSE"** - `{{  foo  }}`
+2. ✅ **tokenizes a simple mustache with line breaks as "OPEN ID ID CLOSE"** - Whitespace handling
+3. ✅ **tokenizes raw content as "CONTENT"** - `foo {{ bar }} baz`
+4. ✅ **tokenizes special @ identifiers** - `{{@index}}`, `{{@first}}`, `{{@last}}`, `{{@key}}`
+
+**Status**: KEEP (4) - Loop metadata support
+
+---
+
+### Comments (3 tests) - KEEP
+
+**Why**: V1 includes comment syntax
+
+1. ✅ **tokenizes a comment as "COMMENT"** - `{{! comment }}`
+2. ✅ **tokenizes a block comment as "COMMENT"** - `{{!-- comment --}}`
+3. ✅ **tokenizes a block comment with whitespace as "COMMENT"** - Multiline comments
+
+**Status**: KEEP (3) - Required for V1
+
+---
+
+### Block Helpers (2 tests) - KEEP
+
+**Why**: V1 has #if, #each, #with, #unless
+
+1. ✅ **tokenizes open and closing blocks** - `{{#foo}}{{/foo}}`
+2. ✅ **tokenizes inverse sections as "INVERSE"** - `{{^}}`, `{{else}}`, `{{ else }}`
+
+**Status**: KEEP (2) - Core block syntax
+
+---
+
+### Inverse Sections (2 tests) - KEEP
+
+**Why**: V1 has {{else}} and {{^unless}}
+
+1. ✅ **tokenizes inverse sections with ID as "OPEN_INVERSE ID CLOSE"** - `{{^foo}}`
+2. ✅ **tokenizes inverse sections with ID and spaces** - `{{^ foo  }}`
+
+**Status**: KEEP (2) - Inverted conditionals
+
+---
+
+### Helper Parameters (5 tests) - KEEP
+
+**Why**: V1 runtime helpers accept params
+
+1. ✅ **tokenizes mustaches with params as "OPEN ID ID ID CLOSE"** - `{{foo bar baz}}`
+2. ✅ **tokenizes mustaches with String params** - `{{foo "bar"}}`
+3. ✅ **tokenizes mustaches with String params using single quotes** - `{{foo 'bar'}}`
+4. ✅ **tokenizes String params with spaces inside as "STRING"** - `{{foo "bar baz"}}`
+5. ✅ **tokenizes String params with escaped quotes as STRING** - `{{foo "bar\"baz"}}`
+
+**Status**: KEEP (5) - Helper invocation
+
+---
+
+### Literals (3 tests) - KEEP
+
+**Why**: V1 supports number/boolean literals in helpers
+
+1. ✅ **tokenizes numbers** - Integers, decimals, negatives
+2. ✅ **tokenizes booleans** - `true`, `false`
+3. ✅ **tokenizes undefined and null** - `undefined`, `null`
+
+**Status**: KEEP (3) - Literal values
+
+---
+
+### Hash Parameters (1 test) - KEEP
+
+**Why**: V1 helpers accept hash arguments
+
+1. ✅ **tokenizes hash arguments** - `{{foo bar=baz}}`, `{{foo bar=1}}`, `{{foo bar=true}}`
+
+**Status**: KEEP (1) - Named parameters
+
+---
+
+### Subexpressions (3 tests) - KEEP
+
+**Why**: V1 requires subexpressions for nested helpers
+
+1. ✅ **tokenizes subexpressions** - `{{foo (bar)}}`
+2. ✅ **tokenizes nested subexpressions** - `{{foo (bar (lol rofl)) (baz)}}`
+3. ✅ **tokenizes nested subexpressions: literals** - `{{foo (bar true) (baz 1)}}`
+
+**Status**: KEEP (3) - Required for `{{#if (gt score 80)}}`
+
+---
+
+### Partials (6 tests) - SKIP
+
+**Why**: V2 feature (async partials from D1)
+
+1. ❌ **tokenizes a partial as "OPEN_PARTIAL ID CLOSE"** - SKIP (V2)
+2. ❌ **tokenizes a partial with context** - SKIP
+3. ❌ **tokenizes a partial without spaces** - SKIP
+4. ❌ **tokenizes a partial space at the })** - SKIP
+5. ❌ **tokenizes a partial space at the })** (duplicate) - SKIP
+6. ❌ **tokenizes partial block declarations** - SKIP
+
+**Status**: SKIP (6) - V2 only
+
+---
+
+### Decorators (1 test) - SKIP
+
+**Why**: Not in V1 or V2 requirements
+
+1. ❌ **tokenizes directives** - SKIP (`{{*foo}}`, `{{#*foo}}` decorator syntax)
+
+**Status**: SKIP (1) - Not in requirements
+
+---
+
+### Block Params (1 test) - SKIP
+
+**Why**: V2 feature
+
+1. ❌ **tokenizes block params** - SKIP (`{{#foo as |bar|}}` explicitly V2)
+
+**Status**: SKIP (1) - V2 only
+
+---
+
+### Raw Blocks (1 test) - SKIP
+
+**Why**: Not in requirements
+
+1. ❌ **tokenizes raw blocks** - SKIP (`{{{{a}}}}` not mentioned in requirements)
+
+**Status**: SKIP (1) - Not required
+
+---
+
+### Edge Cases (3 tests) - SKIP
+
+**Why**: Parser robustness, not feature validation
+
+1. ❌ **does not time out in a mustache with a single } followed by EOF** - SKIP (robustness)
+2. ❌ **does not time out with invalid ID characters** - SKIP (robustness)
+3. ❌ **tokenizes String params using single quotes with escaped quotes** - SKIP (duplicate)
+
+**Status**: SKIP (3) - Internal validation only
 
 ---
 
@@ -229,6 +411,24 @@
 - Compat mode: 0 keep, 3 skip
 - Decorators: 0 keep, 11 skip
 
+### tokenizer.js: 43 keep, 12 skip
+
+- Core tokenization: 11 keep
+- Path notation: 9 keep
+- Basic mustache: 4 keep
+- Comments: 3 keep
+- Block helpers: 2 keep
+- Inverse sections: 2 keep
+- Helper parameters: 5 keep
+- Literals: 3 keep
+- Hash parameters: 1 keep
+- Subexpressions: 3 keep
+- Partials: 0 keep, 6 skip
+- Decorators: 0 keep, 1 skip
+- Block params: 0 keep, 1 skip
+- Raw blocks: 0 keep, 1 skip
+- Edge cases: 0 keep, 3 skip
+
 ### tokenizer.js: 0 keep (defer), 55 skip
 
 - All deferred to manual validation
@@ -237,22 +437,18 @@
 
 - All critical for clean output
 
-### **Group B Total: 87 tests to migrate**
+### **Group B Total: 130 tests to migrate**
 
 - helpers.js: 61 tests
 - blocks.js: 20 tests
+- tokenizer.js: 43 tests
 - whitespace-control.js: 6 tests
 
-### **Tests to skip: 89**
+### **Tests to skip: 46**
 
-- Raw blocks: 7
-- knownHelpers: 8
-- name field debug: 8
-- lookupProperty: 1
-- Compat mode: 3
-- Decorators: 11
-- standalone compile option: 1
-- tokenizer (defer): 55
+- helpers.js: Raw blocks (7), knownHelpers (8), name field debug (8), lookupProperty (1)
+- blocks.js: Compat mode (3), decorators (11), standalone compile option (1)
+- tokenizer.js: Partials (6), decorators (1), block params (1), raw blocks (1), edge cases (3)
 
 ---
 
@@ -278,6 +474,12 @@
 
 ### 4. helpers.js - Phase 2-4 (43 tests)
 
-**Why last**: Advanced features, some deferred
+**Why fourth**: Advanced features, some deferred
 **Depends on**: Phase 1 complete
 **Estimated time**: 3 hours
+
+### 5. tokenizer.js (43 tests)
+
+**Why last**: Internal validation, useful for lexer debugging
+**Depends on**: Access to internal lexer API
+**Estimated time**: 2 hours (requires test adapter for lexer API)
