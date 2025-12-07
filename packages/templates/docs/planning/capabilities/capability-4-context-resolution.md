@@ -59,7 +59,7 @@
 
 ### Task C4-F1-T2: Handle Array Index Access
 
-**Status:** `[ ]` Not Started
+**Status:** `[x]` Complete ✅
 
 - Array indices as string keys:
   - `['items', '0']` accesses `items[0]`
@@ -85,7 +85,7 @@
 
 ### Task C4-F1-T3: Handle Edge Cases
 
-**Status:** `[ ]` Not Started
+**Status:** `[x]` Complete ✅
 
 - Primitive context values:
   - String, number, boolean primitives → return `undefined` for any path
@@ -121,7 +121,7 @@
 
 ### Task C4-F2-T1: Implement Context Stack
 
-**Status:** `[ ]` Not Started
+**Status:** `[x]` Complete ✅
 
 - Create context stack structure:
   - Array of context objects: `[rootContext, level1Context, currentContext]`
