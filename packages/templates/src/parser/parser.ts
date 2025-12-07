@@ -53,6 +53,16 @@ const LITERAL_PATH_TOKENS: readonly TokenType[] = [
 ] as const;
 
 /**
+ * Maps mustache opening token types to their corresponding closing types and escape behavior
+ */
+const MUSTACHE_OPEN_CLOSE_MAP: ReadonlyMap<TokenType, { closeType: TokenType; escaped: boolean }> =
+  new Map([
+    [TokenType.OPEN, { closeType: TokenType.CLOSE, escaped: true }],
+    [TokenType.OPEN_UNESCAPED, { closeType: TokenType.CLOSE_UNESCAPED, escaped: false }],
+    [TokenType.OPEN_RAW, { closeType: TokenType.CLOSE, escaped: false }],
+  ]);
+
+/**
  * Parser for Handlebars-compatible templates
  *
  * Transforms token streams from the lexer into an Abstract Syntax Tree (AST)
@@ -607,9 +617,20 @@ export class Parser {
    * @returns PathExpression node for simple path
    */
   private parseSimplePath(firstToken: Token): PathExpression {
+    this.advance(); // Move past first ID
+    return this.parseSimplePathFromToken(firstToken);
+  }
+
+  /**
+   * Parse a simple path from an already-consumed first token
+   * Used when the first token has already been advanced past (e.g., bracket literals)
+   *
+   * @param firstToken - The first token of the path (already consumed)
+   * @returns PathExpression node for simple path
+   */
+  private parseSimplePathFromToken(firstToken: Token): PathExpression {
     let parts: string[] = [firstToken.value];
     let original = firstToken.value;
-    this.advance(); // Move past first ID
 
     // Parse additional path segments (dot/slash notation)
     const result = this.parsePathSegments(parts, original, firstToken);
@@ -705,6 +726,46 @@ export class Parser {
       original: literalValue,
       loc: literal.loc,
     };
+  }
+
+  /**
+   * Parse a path expression, supporting literal values as paths
+   * Consolidates the repeated pattern: isLiteralPathToken() ? parseLiteralAsPath() : parsePathExpression()
+   *
+   * @returns PathExpression node
+   */
+  private parsePathOrLiteralAsPath(): PathExpression {
+    return this.isLiteralPathToken() ? this.parseLiteralAsPath() : this.parsePathExpression();
+  }
+
+  /**
+   * Check if the current token is a block terminator
+   * Block terminators end program parsing: {{/...}}, {{^}}, or {{else}}
+   *
+   * @returns True if current token terminates a block
+   */
+  private isBlockTerminator(): boolean {
+    return this.match(TokenType.OPEN_ENDBLOCK) || this.match(TokenType.INVERSE) || this.isAtElse();
+  }
+
+  /**
+   * Build a block context object for error messages
+   *
+   * @param helperName - The helper path expression
+   * @param params - The parsed parameters
+   * @param openToken - The opening token of the block
+   * @returns Block context object with identifier and open token
+   */
+  private buildBlockContext(
+    helperName: PathExpression,
+    params: Expression[],
+    openToken: Token,
+  ): { helperName: string; openToken: Token } {
+    const firstParam = params.length > 0 && 'original' in params[0] ? params[0].original : null;
+    const blockIdentifier = firstParam
+      ? `{{#${helperName.original} ${firstParam}}}`
+      : `{{#${helperName.original}}}`;
+    return { helperName: blockIdentifier, openToken };
   }
 
   /**
@@ -938,49 +999,26 @@ export class Parser {
       return this.parseDataVariablePath();
     }
 
-    // Check for bracket literal at start
+    // Check for bracket literal at start - convert to synthetic ID token and use parseSimplePath
     if (this.currentToken && this.match(TokenType.BRACKET_LITERAL)) {
       const bracketToken = this.parseBracketLiteral();
-      // Don't call parseSimplePath because we've already advanced
-      // Instead, build the path directly
-      let parts: string[] = [bracketToken.value];
-      let original = bracketToken.value;
-
-      // Parse additional path segments (dot/slash notation)
-      const result = this.parsePathSegments(parts, original, bracketToken);
-      parts = result.parts;
-      original = result.original;
-
-      const node: PathExpression = {
-        type: 'PathExpression',
-        data: false,
-        depth: 0,
-        parts: parts,
-        original: original,
-        loc: null,
-      };
-
-      return this.finishNode(node);
+      return this.parseSimplePathFromToken(bracketToken);
     }
 
     // Expect at least one identifier to start the path
     const firstToken = this.expect(TokenType.ID, 'Expected identifier to start path expression');
 
     // Dispatch to specialized parsers based on first token
-    if (firstToken.value === 'this') {
-      return this.parseThisPath();
+    switch (firstToken.value) {
+      case 'this':
+        return this.parseThisPath();
+      case '.':
+        return this.parseCurrentContextPath();
+      case '..':
+        return this.parseParentPath();
+      default:
+        return this.parseSimplePath(firstToken);
     }
-
-    if (firstToken.value === '.') {
-      return this.parseCurrentContextPath();
-    }
-
-    if (firstToken.value === '..') {
-      return this.parseParentPath();
-    }
-
-    // Simple path (no special syntax)
-    return this.parseSimplePath(firstToken);
   }
 
   /**
@@ -999,23 +1037,12 @@ export class Parser {
      */
     const mustacheStartToken = this.currentToken;
 
-    // Determine if this is escaped or unescaped output
-    let escaped: boolean;
-    let closeType: (typeof TokenType)[keyof typeof TokenType];
+    // Look up opening token type to determine closing type and escape behavior
+    const openConfig = this.currentToken
+      ? MUSTACHE_OPEN_CLOSE_MAP.get(this.currentToken.type)
+      : undefined;
 
-    if (this.match(TokenType.OPEN)) {
-      escaped = true;
-      closeType = TokenType.CLOSE;
-      this.advance(); // Move past OPEN token
-    } else if (this.match(TokenType.OPEN_UNESCAPED)) {
-      escaped = false;
-      closeType = TokenType.CLOSE_UNESCAPED;
-      this.advance(); // Move past OPEN_UNESCAPED token
-    } else if (this.match(TokenType.OPEN_RAW)) {
-      escaped = false;
-      closeType = TokenType.CLOSE;
-      this.advance(); // Move past OPEN_RAW token
-    } else {
+    if (!openConfig) {
       throw ParserError.fromToken(
         'Expected OPEN, OPEN_UNESCAPED, or OPEN_RAW token to start mustache statement',
         this.currentToken!,
@@ -1023,11 +1050,11 @@ export class Parser {
       );
     }
 
-    // Parse the path expression inside the mustache
-    // Feature 7.4: Support literal values as paths (e.g., {{"foo"}} or {{12}})
-    const path: PathExpression = this.isLiteralPathToken()
-      ? this.parseLiteralAsPath()
-      : this.parsePathExpression();
+    const { closeType, escaped } = openConfig;
+    this.advance(); // Move past opening token
+
+    // Parse the path expression inside the mustache (supports literals as paths)
+    const path = this.parsePathOrLiteralAsPath();
 
     // Parse parameters and hash pairs until we hit closing delimiter
     const { params, hash } = this.parseParamsAndHash(closeType);
@@ -1068,7 +1095,7 @@ export class Parser {
     // Parse statements until we hit EOF or a block terminator
     while (this.currentToken && this.currentToken.type !== TokenType.EOF) {
       // Check for block terminators: {{/...}}, {{^...}}, or {{else}}
-      if (this.match(TokenType.OPEN_ENDBLOCK) || this.match(TokenType.INVERSE) || this.isAtElse()) {
+      if (this.isBlockTerminator()) {
         break;
       }
 
@@ -1178,38 +1205,27 @@ export class Parser {
    */
   parseBlockStatement(): BlockStatement {
     // Save the opening token for location tracking
-    const blockStartToken = this.currentToken;
+    const blockStartToken = this.currentToken!;
 
     // Expect and consume OPEN_BLOCK token ({{#)
     this.expect(TokenType.OPEN_BLOCK, 'Expected {{# to start block statement');
     this.advance();
 
-    // Parse the helper name (path expression)
-    // Feature 7.4: Support literal values as paths (e.g., {{#"foo"}} or {{#12}})
-    const helperName: PathExpression = this.isLiteralPathToken()
-      ? this.parseLiteralAsPath()
-      : this.parsePathExpression();
+    // Parse the helper name (path expression, supports literals as paths)
+    const helperName = this.parsePathOrLiteralAsPath();
 
     // Parse parameters and hash pairs until we hit CLOSE token
     const { params, hash } = this.parseParamsAndHash(TokenType.CLOSE);
-
-    // Get first parameter for error messages
-    const firstParam = params.length > 0 && 'original' in params[0] ? params[0].original : null;
 
     // Expect CLOSE token (}})
     this.expect(TokenType.CLOSE, 'Expected }} after block helper name');
     this.advance();
 
-    // Build block identifier for error messages
-    const blockIdentifier = firstParam
-      ? `{{#${helperName.original} ${firstParam}}}`
-      : `{{#${helperName.original}}}`;
+    // Build block context for error messages
+    const blockContext = this.buildBlockContext(helperName, params, blockStartToken);
 
     // Parse the main block content
-    const program = this.parseProgram({
-      helperName: blockIdentifier,
-      openToken: blockStartToken!,
-    });
+    const program = this.parseProgram(blockContext);
 
     // Check if there's an else block
     // {{else}} is tokenized as OPEN + ID("else") + CLOSE
@@ -1220,34 +1236,25 @@ export class Parser {
       this.consumeElse();
 
       // Parse the inverse block content
-      inverse = this.parseProgram({
-        helperName: blockIdentifier,
-        openToken: blockStartToken!,
-      });
+      inverse = this.parseProgram(blockContext);
     } else if (this.match(TokenType.INVERSE)) {
       // Consume the INVERSE token ({{^}})
       this.advance();
 
       // Parse the inverse block content
-      inverse = this.parseProgram({
-        helperName: blockIdentifier,
-        openToken: blockStartToken!,
-      });
+      inverse = this.parseProgram(blockContext);
     }
 
     // Expect OPEN_ENDBLOCK token ({{/)
     this.expect(
       TokenType.OPEN_ENDBLOCK,
-      `Expected {{/ to close block started at line ${blockStartToken?.loc?.start.line || '?'}`,
+      `Expected {{/ to close block started at line ${blockStartToken.loc?.start.line || '?'}`,
     );
     this.advance();
 
-    // Parse the closing helper name
+    // Parse the closing helper name (supports literals as paths)
     const closingNameToken = this.currentToken; // Save for error reporting
-    // Feature 7.4: Support literal values in closing tags (e.g., {{/"foo"}})
-    const closingName: PathExpression = this.isLiteralPathToken()
-      ? this.parseLiteralAsPath()
-      : this.parsePathExpression();
+    const closingName = this.parsePathOrLiteralAsPath();
 
     // V1: Skip any parameters in closing tag (shouldn't be any, but be safe)
     while (this.currentToken && !this.match(TokenType.CLOSE)) {
@@ -1256,7 +1263,7 @@ export class Parser {
 
     // Validate that closing name matches opening name
     if (helperName.original !== closingName.original) {
-      const openLine = blockStartToken?.loc?.start.line || '?';
+      const openLine = blockStartToken.loc?.start.line || '?';
       const closeToken = closingNameToken || this.currentToken;
       throw ParserError.fromToken(
         `Block closing tag mismatch: expected {{/${helperName.original}}} but found {{/${closingName.original}}} (block opened at line ${openLine})`,
