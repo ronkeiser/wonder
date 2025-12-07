@@ -20,6 +20,7 @@ import type {
   StringLiteral,
   UndefinedLiteral,
 } from '../parser/ast-nodes.js';
+import { escapeExpression } from '../runtime/utils.js';
 import { ContextStack } from './context-stack.js';
 import { createDataFrame } from './data-frame.js';
 import { DataStack } from './data-stack.js';
@@ -142,14 +143,38 @@ export class Interpreter {
   /**
    * Evaluates a MustacheStatement (variable output).
    *
-   * Stub implementation - will be completed in Task C4-F4-T3.
+   * Resolves the path, converts to string, and applies HTML escaping if needed.
    *
-   * @param _node - The MustacheStatement node
-   * @returns Empty string (stub)
+   * @param node - The MustacheStatement node
+   * @returns The output string (escaped or unescaped)
    */
-  private evaluateMustache(_node: MustacheStatement): string {
-    // TODO: Implement in Task C4-F4-T3
-    throw new Error('MustacheStatement evaluation not yet implemented');
+  private evaluateMustache(node: MustacheStatement): string {
+    // V1: No helper calls - params must be empty
+    if (node.params.length > 0) {
+      throw new Error(
+        'Helper calls not yet implemented (Capability 6). Use simple variables only.',
+      );
+    }
+
+    // Resolve the path to get the value
+    const value = this.evaluatePathExpression(node.path);
+
+    // Handle null/undefined - return empty string
+    if (value == null) {
+      return '';
+    }
+
+    // Convert to string
+    const stringValue = String(value);
+
+    // Apply escaping based on node.escaped
+    if (node.escaped) {
+      // {{foo}} - escaped output
+      return escapeExpression(stringValue);
+    } else {
+      // {{{foo}}} - unescaped output
+      return stringValue;
+    }
   }
 
   /**
