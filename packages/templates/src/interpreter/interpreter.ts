@@ -47,7 +47,6 @@ export interface InterpreterOptions {
  */
 export class Interpreter {
   private ast: Program;
-  private options: InterpreterOptions;
   private helpers: HelperRegistry;
   private contextStack!: ContextStack;
   private dataStack!: DataStack;
@@ -60,7 +59,6 @@ export class Interpreter {
    */
   constructor(ast: Program, options: InterpreterOptions = {}) {
     this.ast = ast;
-    this.options = options;
     // Merge user helpers with built-in helpers (user helpers override built-ins)
     this.helpers = {
       ...builtInHelpers,
