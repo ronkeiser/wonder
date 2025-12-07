@@ -22,7 +22,7 @@ The coordinator enhances this with a **Decision Layer** where decision logic is 
 ```
 coordinator/src/
 ├── index.ts                    # DO class (Actor) - thin orchestrator
-├── decisions.ts                # Decision type definitions
+├── types.ts                    # Decision type definitions
 ├── decisions/                  # Pure logic - returns Decision[]
 │   ├── routing.ts              # Transition evaluation
 │   ├── synchronization.ts      # Fan-in logic
@@ -34,34 +34,34 @@ coordinator/src/
 │   ├── context.ts              # Context CRUD + snapshots
 │   ├── artifacts.ts            # Artifact staging
 │   └── workflows.ts            # Load workflow defs (with caching)
-└── application/                # Decision execution (convert to actor messages)
-    ├── apply.ts                # Main decision executor
+└── dispatch/                   # Decision dispatch (convert to operations)
+    ├── apply.ts                # Main decision dispatcher
     ├── batch.ts                # Decision batching optimization
     └── cache.ts                # DO-level caching
 ```
 
-## Decision Types
+## Decision Types (types.ts)
 
-Decisions are pure data describing state changes to make (converted to actor messages during execution):
+Decisions are pure data describing state changes to make (converted to operations during dispatch):
 
 ```typescript
 type Decision =
   // Token operations
-  | { type: "CREATE_TOKEN"; params: CreateTokenParams }
-  | { type: "CREATE_FAN_IN_TOKEN"; params: CreateFanInParams }
-  | { type: "UPDATE_TOKEN_STATUS"; tokenId: string; status: TokenStatus }
+  | { type: 'CREATE_TOKEN'; params: CreateTokenParams }
+  | { type: 'CREATE_FAN_IN_TOKEN'; params: CreateFanInParams }
+  | { type: 'UPDATE_TOKEN_STATUS'; tokenId: string; status: TokenStatus }
   | {
-      type: "ACTIVATE_FAN_IN_TOKEN";
+      type: 'ACTIVATE_FAN_IN_TOKEN';
       workflow_run_id: string;
       node_id: string;
       fanInPath: string;
     }
-  | { type: "MARK_FOR_DISPATCH"; tokenId: string }
+  | { type: 'MARK_FOR_DISPATCH'; tokenId: string }
 
   // Context operations
-  | { type: "SET_CONTEXT"; path: string; value: unknown }
+  | { type: 'SET_CONTEXT'; path: string; value: unknown }
   | {
-      type: "APPLY_NODE_OUTPUT";
+      type: 'APPLY_NODE_OUTPUT';
       nodeRef: string;
       output: Record<string, unknown>;
       tokenId?: string;
@@ -69,15 +69,15 @@ type Decision =
 
   // Synchronization (triggers recursive decision generation)
   | {
-      type: "CHECK_SYNCHRONIZATION";
+      type: 'CHECK_SYNCHRONIZATION';
       tokenId: string;
       transition: TransitionDef;
     }
 
   // Batched operations (optimization)
-  | { type: "BATCH_CREATE_TOKENS"; allParams: CreateTokenParams[] }
+  | { type: 'BATCH_CREATE_TOKENS'; allParams: CreateTokenParams[] }
   | {
-      type: "BATCH_UPDATE_STATUS";
+      type: 'BATCH_UPDATE_STATUS';
       updates: Array<{ tokenId: string; status: TokenStatus }>;
     };
 ```
@@ -94,7 +94,7 @@ Evaluates transitions and determines next tokens.
 function decide(
   completedToken: TokenRow,
   workflow: WorkflowDef,
-  contextData: ContextSnapshot
+  contextData: ContextSnapshot,
 ): Decision[];
 ```
 
@@ -121,7 +121,7 @@ function decide(
   token: TokenRow,
   transition: TransitionDef,
   siblings: TokenRow[],
-  workflow: WorkflowDef
+  workflow: WorkflowDef,
 ): Decision[];
 ```
 
@@ -150,7 +150,7 @@ Determines workflow completion and extracts final output.
 ```typescript
 function extractFinalOutput(
   workflow: WorkflowDef,
-  contextData: ContextSnapshot
+  contextData: ContextSnapshot,
 ): Record<string, unknown>;
 ```
 
@@ -212,11 +212,11 @@ load(env, workflowRunId) → Promise<WorkflowDef>
 // Caching handled in DO, not here
 ```
 
-## Application Layer
+## Dispatch Layer
 
-### application/apply.ts
+### dispatch/apply.ts
 
-Executes decisions by converting them to actor messages (SQL mutations, RPC calls).
+Dispatches decisions by converting them to operations (SQL mutations, RPC calls).
 
 ```typescript
 async applyDecisions(
@@ -236,7 +236,7 @@ async applyDecisions(
 5. Emits events after successful execution
 6. Logs errors if execution fails
 
-### application/batch.ts
+### dispatch/batch.ts
 
 Decision batching optimizations.
 
@@ -246,7 +246,7 @@ batchDecisions(decisions: Decision[]) → Decision[]
 
 Groups consecutive CREATE_TOKEN decisions into BATCH_CREATE_TOKENS for single SQL transaction.
 
-### application/cache.ts
+### dispatch/cache.ts
 
 Actor-level caching utilities.
 
@@ -264,10 +264,7 @@ The DO class (Actor). Thin orchestration layer that coordinates decision logic a
 class WorkflowCoordinator extends DurableObject {
   private workflowCache: Map<string, WorkflowDef>; // Actor instance cache
 
-  async start(
-    workflowRunId: string,
-    input: Record<string, unknown>
-  ): Promise<void>;
+  async start(workflowRunId: string, input: Record<string, unknown>): Promise<void>;
   async handleTaskResult(tokenId: string, result: TaskResult): Promise<void>;
 }
 ```
@@ -328,8 +325,8 @@ async handleTaskResult(tokenId: string, result: TaskResult) {
   // 3. Run decision logic (pure - returns data)
   const routingDecisions = decisions.routing.decide(token, workflow, contextData);
 
-  // 4. Apply decisions (converts to actor messages, handles synchronization recursively)
-  const tokensToDispatch = await application.applyDecisions(
+  // 4. Dispatch decisions (converts to operations, handles synchronization recursively)
+  const tokensToDispatch = await dispatch.applyDecisions(
     routingDecisions,
     sql,
     this.env,
@@ -385,8 +382,8 @@ handleTaskResult(tokenId, result)  [Actor message received]
   ├─► Decision logic (pure, returns Decision[] data)
   │   └─► decisions = decisions.routing.decide(token, workflow, contextData)
   │
-  ├─► Apply decisions (convert to actor messages)
-  │   └─► tokensToDispatch = application.applyDecisions(decisions, ...)
+  ├─► Dispatch decisions (convert to operations)
+  │   └─► tokensToDispatch = dispatch.applyDecisions(decisions, ...)
   │         │
   │         ├─► Batch decisions (optimization)
   │         │
@@ -441,11 +438,11 @@ The application layer optimizes decision execution:
 ]
 ```
 
-Single SQL transaction instead of three separate actor state mutations.
+Single SQL transaction instead of three separate operations.
 
 ### Recursive Synchronization
 
-`CHECK_SYNCHRONIZATION` decisions trigger recursive decision generation:
+`CHECK_SYNCHRONIZATION` decisions trigger recursive decision generation during dispatch:
 
 1. Load siblings from SQL
 2. Call `decisions.synchronization.decide()` → returns sub-decisions
@@ -505,11 +502,11 @@ test('synchronization waits when not all siblings complete', () => {
 Test decision application with real SQL (actor state mutations):
 
 ```typescript
-test("tryActivate handles race condition", async () => {
+test('tryActivate handles race condition', async () => {
   const sql = miniflare.getDurableObjectStorage();
 
   // Create waiting token
-  operations.tokens.create(sql, { ...params, status: "waiting_for_siblings" });
+  operations.tokens.create(sql, { ...params, status: 'waiting_for_siblings' });
 
   // Two concurrent activations
   const [result1, result2] = await Promise.all([
