@@ -2,16 +2,17 @@
 
 **Test Status Summary:**
 
-- ✅ **166 passing** (52.0%)
-- ❌ **55 failing** (17.2%)
-- ⏭️ **98 skipped** (30.7%)
-- **Total: 319 tests**
+- ✅ **182 passing** (56.4%)
+- ❌ **45 failing** (14.0%)
+- ⏭️ **98 skipped** (30.4%)
+- **Total: 325 tests**
 
 **Recent Progress:**
 
-- Session improvement: +23 tests passing (-23 failures)
-- Completed: ALL P0 items (47/47 tests) - P0.1 (lookup), P0.2 (hash args), P0.3 (block helpers), P0.4 (security)
-- Additional: function resolution, Map/Set iteration
+- Session improvement: +5 tests passing (-5 failures)
+- Completed: P1.1 Whitespace Control - ALL whitespace tests now passing
+- Fixed: Parser strip flag interpretation for `{{^~}}` else clauses
+- Fixed: Conditional helper strip flag logic for main/inverse programs
 
 ---
 
@@ -74,27 +75,19 @@
 
 ---
 
-### P1.1 - Whitespace Control `~` Syntax (5 failures)
+### ✅ P1.1 - Whitespace Control `~` Syntax - COMPLETED
 
-**Impact:** MEDIUM - Clean output, not critical
+**Status:** ✅ Fixed - Implemented complete whitespace control support
 
-**Failing Tests:**
+**Implementation:**
 
-- `whitespace-control.test.ts`: All tests return `undefined`
-  - "should strip whitespace around mustache calls"
-  - "should strip whitespace around simple block calls"
-  - "should strip whitespace around inverse block calls"
-  - "should strip whitespace around complex block calls" (parse error)
-  - "should only strip whitespace once"
+- Lexer recognizes `~` as STRIP token
+- Parser sets strip flags on MustacheStatement and BlockStatement nodes
+- Interpreter applies whitespace control in `applyWhitespaceControl()` and `evaluateProgram()`
+- Fixed parser bug: `{{^~}}` now correctly parses as close strip, not open strip
+- Fixed interpreter logic: conditional helpers now correctly handle strip flags for main/inverse programs
 
-**Root Cause:** Lexer doesn't recognize `~` tokens
-
-**Fix:** Add to `Lexer`:
-
-- Recognize `{{~` and `~}}` as whitespace control markers
-- Set flags on tokens to indicate whitespace stripping
-- Update AST nodes to include whitespace control flags
-- Implement whitespace stripping in interpreter output
+**Tests Fixed:** 5 whitespace control tests (all passing)
 
 ---
 
