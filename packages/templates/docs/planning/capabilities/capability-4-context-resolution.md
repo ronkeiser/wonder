@@ -1,6 +1,6 @@
 # Capability 4: Context Resolution & Interpreter
 
-**Status:** `[ ]` **NOT STARTED**
+**Status:** `[~]` **IN PROGRESS**
 
 **Goal:** Evaluate PathExpressions by traversing context scopes and data frames. This capability implements the core interpreter logic that resolves variables and navigates the context/data stacks.
 
@@ -184,7 +184,7 @@
 
 ### Task C4-F2-T3: Implement resolvePathExpression Function
 
-**Status:** `[ ]` Not Started
+**Status:** `[x]` Complete ✅
 
 - Create `resolvePathExpression()` function with signature:
   - `resolvePathExpression(pathExpr: PathExpression, contextStack: ContextStack, dataStack: DataStack): any`
