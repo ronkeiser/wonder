@@ -565,19 +565,19 @@ describe('Block Helpers - #each (Arrays)', () => {
 
   describe('#each - Object Iteration', () => {
     describe('Basic iteration', () => {
-      test('iterates over object properties', () => {
+      it('iterates over object properties', () => {
         const template = '{{#each user}}{{@key}}: {{this}}, {{/each}}';
         const result = render(template, { user: { name: 'Alice', age: 30 } });
         expect(result).toBe('name: Alice, age: 30, ');
       });
 
-      test('handles single property', () => {
+      it('handles single property', () => {
         const template = '{{#each obj}}{{@key}}={{this}}{{/each}}';
         const result = render(template, { obj: { x: 42 } });
         expect(result).toBe('x=42');
       });
 
-      test('handles multiple properties with formatting', () => {
+      it('handles multiple properties with formatting', () => {
         const template = '{{#each data}}[{{@key}}={{this}}]{{/each}}';
         const result = render(template, { data: { a: 1, b: 2, c: 3 } });
         expect(result).toBe('[a=1][b=2][c=3]');
@@ -585,19 +585,19 @@ describe('Block Helpers - #each (Arrays)', () => {
     });
 
     describe('@key access', () => {
-      test('provides property name via @key', () => {
+      it('provides property name via @key', () => {
         const template = '{{#each obj}}{{@key}} {{/each}}';
         const result = render(template, { obj: { x: 1, y: 2, z: 3 } });
         expect(result).toBe('x y z ');
       });
 
-      test('combines @key with @index', () => {
+      it('combines @key with @index', () => {
         const template = '{{#each obj}}{{@index}}.{{@key}} {{/each}}';
         const result = render(template, { obj: { a: 10, b: 20, c: 30 } });
         expect(result).toBe('0.a 1.b 2.c ');
       });
 
-      test('uses @key in nested content', () => {
+      it('uses @key in nested content', () => {
         const template = '{{#each items}}key={{@key}},value={{this}};{{/each}}';
         const result = render(template, { items: { first: 'A', second: 'B' } });
         expect(result).toBe('key=first,value=A;key=second,value=B;');
@@ -605,26 +605,26 @@ describe('Block Helpers - #each (Arrays)', () => {
     });
 
     describe('Loop metadata', () => {
-      test('@first identifies first property', () => {
+      it('@first identifies first property', () => {
         const template = '{{#each obj}}{{#if @first}}START:{{/if}}{{@key}} {{/each}}';
         const result = render(template, { obj: { a: 1, b: 2, c: 3 } });
         expect(result).toBe('START:a b c ');
       });
 
-      test('@last identifies last property', () => {
+      it('@last identifies last property', () => {
         const template = '{{#each obj}}{{@key}}{{#unless @last}}, {{/unless}}{{/each}}';
         const result = render(template, { obj: { x: 1, y: 2, z: 3 } });
         expect(result).toBe('x, y, z');
       });
 
-      test('combines multiple metadata flags', () => {
+      it('combines multiple metadata flags', () => {
         const template =
           '{{#each obj}}{{@index}}:{{@key}}={{this}}{{#unless @last}};{{/unless}}{{/each}}';
         const result = render(template, { obj: { a: 10, b: 20 } });
         expect(result).toBe('0:a=10;1:b=20');
       });
 
-      test('@first and @last work with single property', () => {
+      it('@first and @last work with single property', () => {
         const template = '{{#each obj}}{{#if @first}}F{{/if}}{{#if @last}}L{{/if}}{{/each}}';
         const result = render(template, { obj: { only: 'one' } });
         expect(result).toBe('FL');
@@ -632,7 +632,7 @@ describe('Block Helpers - #each (Arrays)', () => {
     });
 
     describe('Context access', () => {
-      test('property value becomes this context', () => {
+      it('property value becomes this context', () => {
         const template = '{{#each users}}{{name}} ({{email}}), {{/each}}';
         const result = render(template, {
           users: {
@@ -643,7 +643,7 @@ describe('Block Helpers - #each (Arrays)', () => {
         expect(result).toBe('Alice (alice@example.com), Bob (bob@example.com), ');
       });
 
-      test('can access parent context', () => {
+      it('can access parent context', () => {
         const template = '{{#each items}}{{@key}}: {{this}} from {{../title}}; {{/each}}';
         const result = render(template, {
           title: 'Report',
@@ -652,7 +652,7 @@ describe('Block Helpers - #each (Arrays)', () => {
         expect(result).toBe('a: 1 from Report; b: 2 from Report; ');
       });
 
-      test('nested object properties accessible', () => {
+      it('nested object properties accessible', () => {
         const template = '{{#each people}}{{@key}}: {{profile.age}}, {{/each}}';
         const result = render(template, {
           people: {
@@ -665,16 +665,138 @@ describe('Block Helpers - #each (Arrays)', () => {
     });
 
     describe('Else blocks', () => {
-      test('empty object renders else block', () => {
+      it('empty object renders else block', () => {
         const template = '{{#each obj}}{{@key}}{{else}}Empty{{/each}}';
         const result = render(template, { obj: {} });
         expect(result).toBe('Empty');
       });
 
-      test('else block has access to context variables', () => {
+      it('else block has access to context variables', () => {
         const template = '{{#each data}}{{@key}}{{else}}No data for {{title}}{{/each}}';
         const result = render(template, { title: 'Test', data: {} });
         expect(result).toBe('No data for Test');
+      });
+    });
+  });
+
+  describe('#with Helper', () => {
+    describe('Basic usage', () => {
+      it('changes context to nested object', () => {
+        const template = '{{#with user}}{{name}} - {{email}}{{/with}}';
+        const result = render(template, {
+          user: { name: 'Alice', email: 'alice@example.com' },
+        });
+        expect(result).toBe('Alice - alice@example.com');
+      });
+
+      it('accesses deeply nested properties', () => {
+        const template = '{{#with company.address}}{{city}}, {{state}}{{/with}}';
+        const result = render(template, {
+          company: { address: { city: 'Seattle', state: 'WA' } },
+        });
+        expect(result).toBe('Seattle, WA');
+      });
+
+      it('works with single property access', () => {
+        const template = '{{#with config}}Value: {{timeout}}{{/with}}';
+        const result = render(template, {
+          config: { timeout: 5000 },
+        });
+        expect(result).toBe('Value: 5000');
+      });
+    });
+
+    describe('Context access', () => {
+      it('parent context accessible via ../', () => {
+        const template = '{{#with settings}}{{title}}: {{../user.name}}{{/with}}';
+        const result = render(template, {
+          user: { name: 'Bob' },
+          settings: { title: 'Config' },
+        });
+        expect(result).toBe('Config: Bob');
+      });
+
+      it('this keyword references new context', () => {
+        const template = '{{#with user}}Name: {{this.name}}, Age: {{this.age}}{{/with}}';
+        const result = render(template, {
+          user: { name: 'Charlie', age: 35 },
+        });
+        expect(result).toBe('Name: Charlie, Age: 35');
+      });
+
+      it('deep parent access through multiple levels', () => {
+        const template = '{{#with a}}{{#with b}}{{../../root}}{{/with}}{{/with}}';
+        const result = render(template, {
+          root: 'TOP',
+          a: { b: { value: 'nested' } },
+        });
+        expect(result).toBe('TOP');
+      });
+
+      it('can access array indices in nested context', () => {
+        const template = '{{#with data}}{{items.0}} and {{items.1}}{{/with}}';
+        const result = render(template, {
+          data: { items: ['first', 'second', 'third'] },
+        });
+        expect(result).toBe('first and second');
+      });
+    });
+
+    describe('Else blocks', () => {
+      it('renders else block for missing property', () => {
+        const template = '{{#with missing}}Has value{{else}}No value{{/with}}';
+        const result = render(template, {});
+        expect(result).toBe('No value');
+      });
+
+      it('renders else block for null value', () => {
+        const template = '{{#with data}}Content{{else}}Null data{{/with}}';
+        const result = render(template, { data: null });
+        expect(result).toBe('Null data');
+      });
+
+      it('renders else block for undefined', () => {
+        const template = '{{#with value}}Has value{{else}}Undefined{{/with}}';
+        const result = render(template, { value: undefined });
+        expect(result).toBe('Undefined');
+      });
+
+      it('else block can access parent context', () => {
+        const template = '{{#with data}}Content{{else}}Missing: {{title}}{{/with}}';
+        const result = render(template, { title: 'Report' });
+        expect(result).toBe('Missing: Report');
+      });
+    });
+
+    describe('Edge cases', () => {
+      it('false value renders else block', () => {
+        const template = '{{#with flag}}True{{else}}False{{/with}}';
+        const result = render(template, { flag: false });
+        expect(result).toBe('False');
+      });
+
+      it('zero value renders main block (0 is truthy in Handlebars)', () => {
+        const template = '{{#with count}}Count: {{this}}{{else}}No count{{/with}}';
+        const result = render(template, { count: 0 });
+        expect(result).toBe('Count: 0');
+      });
+
+      it('empty string renders else block', () => {
+        const template = '{{#with text}}Has text{{else}}Empty{{/with}}';
+        const result = render(template, { text: '' });
+        expect(result).toBe('Empty');
+      });
+
+      it('empty array renders else block', () => {
+        const template = '{{#with items}}Has items{{else}}Empty array{{/with}}';
+        const result = render(template, { items: [] });
+        expect(result).toBe('Empty array');
+      });
+
+      it('non-empty object renders main block', () => {
+        const template = '{{#with obj}}Has: {{x}}{{else}}Empty{{/with}}';
+        const result = render(template, { obj: { x: 1 } });
+        expect(result).toBe('Has: 1');
       });
     });
   });

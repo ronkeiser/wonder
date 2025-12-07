@@ -246,29 +246,32 @@
 
 **Goal:** Push new context from path resolution
 
-**Status:** `[ ]` Not Started
+**Status:** `[x]` COMPLETE ✅
 
 ### Task C5-F5-T1: Implement Context Pushing
 
-- Create `evaluateWithHelper()` method:
-  - Validate exactly 1 parameter
-  - Evaluate parameter expression (resolve path)
-  - If result is empty/null:
-    - Render `node.inverse` (else block)
-  - Otherwise:
-    - Push result as new context
-    - Create new data frame
-    - Evaluate `node.program`
-    - Pop context
+**Status:** `[x]` COMPLETE
 
-**Tests:**
+**Deliverable:** `evaluateWithHelper()` method with context scope management
 
-- Basic usage: `{{#with user}}{{name}}{{/with}}`
-- Nested properties: `{{#with user.profile}}{{bio}}{{/with}}`
-- Parent access: `{{#with settings}}{{name}}: {{../user.name}}{{/with}}`
-- Empty/null: `{{#with missing}}Content{{else}}Empty{{/with}}`
-- Null value: `{{#with value}}Content{{else}}Null{{/with}}` with `{value: null}`
-- This context: `{{#with user}}{{this.name}}{{/with}}`
+**Implementation:**
+
+- Validates exactly 1 parameter (the path to establish as context)
+- Evaluates parameter to resolve the value
+- Uses `isEmpty()` for Handlebars truthiness semantics
+- Pushes value as new context, empty data frame (no loop variables)
+- Renders else block for falsy values (null, undefined, false, "", [])
+- Supports parent context access via `../`
+- Important: `0` is truthy in Handlebars (renders main block, not else)
+
+**Tests:** 16 tests passing
+
+**Test Coverage:**
+
+- Basic usage (3 tests): simple properties, nested properties, single property
+- Context access (4 tests): parent via `../`, `this` keyword, deep parent, array indices
+- Else blocks (4 tests): missing property, null, undefined, parent context in else
+- Edge cases (5 tests): false, zero (truthy!), empty string, empty array, non-empty object
 
 ---
 
@@ -325,7 +328,8 @@
   - Feature 5.1: 42 tests for #if and #unless
   - Feature 5.3: 35 tests for #each array iteration
   - Feature 5.4: 15 tests for #each object iteration
-  - Total block helper tests: 92
+  - Feature 5.5: 16 tests for #with helper
+  - Total block helper tests: 108
 
 - **Data Frame Keys:** Must be prefixed with `@` (e.g., `'@index'`, `'@first'`, `'@key'`) because path resolver adds prefix when `pathExpr.data` is true
 
@@ -340,9 +344,9 @@
 - [x] Feature 5.1: #if and #unless helpers (42 tests passing)
 - [x] Feature 5.3: #each for arrays (35 tests passing)
 - [x] Feature 5.4: #each for objects (15 tests passing)
-- [ ] Feature 5.5: #with helper (~8 tests)
+- [x] Feature 5.5: #with helper (16 tests passing)
 - [ ] Feature 5.6: Nested block integration (~10 tests)
 - [x] All parser tests updated for numeric path support (8 test fixes)
-- [x] All tests passing (1449/1449 ✅)
+- [x] All tests passing (1465/1465 ✅)
 - [ ] Documentation complete
 - [ ] Ready for Capability 6 (Runtime Helpers)

@@ -401,15 +401,40 @@ export class Interpreter {
   }
 
   /**
-   * Evaluates the #with block helper (stub).
+   * Evaluates the #with block helper.
    *
-   * TODO: Implement in Feature 5.5
+   * Changes the current context to the resolved value, allowing cleaner
+   * access to nested properties. Renders else block if value is falsy.
    *
-   * @param _node - The BlockStatement node for #with
-   * @returns Empty string (stub)
+   * @param node - The BlockStatement node for #with
+   * @returns The rendered output from the block, or inverse block if falsy
    */
-  private evaluateWithHelper(_node: BlockStatement): string {
-    throw new Error('#with helper not yet implemented');
+  private evaluateWithHelper(node: BlockStatement): string {
+    // #with requires exactly 1 parameter (the path to establish as context)
+    if (node.params.length !== 1) {
+      throw new Error(`#with helper requires exactly 1 parameter, got ${node.params.length}`);
+    }
+
+    // Evaluate the parameter to get the value
+    const value = this.evaluateExpression(node.params[0]);
+
+    // If value is empty/falsy (using Handlebars truthiness), render else block
+    if (isEmpty(value)) {
+      return this.evaluateProgram(node.inverse);
+    }
+
+    // Push value as new context and empty data frame (no loop variables)
+    this.contextStack.push(value);
+    this.dataStack.push({});
+
+    // Evaluate the program block with the new context
+    const output = this.evaluateProgram(node.program);
+
+    // Pop context and data stacks
+    this.dataStack.pop();
+    this.contextStack.pop();
+
+    return output;
   }
 
   /**
