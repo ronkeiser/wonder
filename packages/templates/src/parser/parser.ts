@@ -705,7 +705,7 @@ export class Parser {
     this.expect(TokenType.OPEN_SEXPR, 'Expected opening parenthesis for subexpression');
     this.advance();
 
-    // Parse helper name (must be a path expression)
+    // Parse helper name (path expression or literal)
     if (!this.currentToken) {
       throw ParserError.fromToken(
         'Unexpected end of input while parsing subexpression helper name',
@@ -714,15 +714,33 @@ export class Parser {
       );
     }
 
-    if (!this.match(TokenType.ID) && !this.match(TokenType.DATA)) {
+    // Feature 7.4: Support literal values in subexpressions
+    let path: PathExpression;
+    if (
+      this.match(TokenType.STRING) ||
+      this.match(TokenType.NUMBER) ||
+      this.match(TokenType.BOOLEAN)
+    ) {
+      // Parse literal and convert to PathExpression
+      const literal = this.parseExpression();
+      const literalValue = String((literal as any).value);
+      path = {
+        type: 'PathExpression',
+        data: false,
+        depth: 0,
+        parts: [literalValue],
+        original: literalValue,
+        loc: literal.loc,
+      };
+    } else if (this.match(TokenType.ID) || this.match(TokenType.DATA)) {
+      path = this.parsePathExpression();
+    } else {
       throw ParserError.fromToken(
         `Expected helper name in subexpression, got ${this.currentToken?.type}`,
         this.currentToken,
         this.getErrorContext(),
       );
     }
-
-    const path = this.parsePathExpression();
 
     // Parse parameters (can include literals, paths, or nested subexpressions)
     const params: Expression[] = [];
@@ -835,7 +853,7 @@ export class Parser {
     // Determine if this is escaped or unescaped output
     let escaped: boolean;
     let closeType: (typeof TokenType)[keyof typeof TokenType];
-    
+
     if (this.match(TokenType.OPEN)) {
       escaped = true;
       closeType = TokenType.CLOSE;
@@ -857,7 +875,28 @@ export class Parser {
     }
 
     // Parse the path expression inside the mustache
-    const path = this.parsePathExpression();
+    // Feature 7.4: Support literal values as paths (e.g., {{"foo"}} or {{12}})
+    let path: PathExpression;
+    if (
+      this.currentToken &&
+      (this.match(TokenType.STRING) ||
+        this.match(TokenType.NUMBER) ||
+        this.match(TokenType.BOOLEAN))
+    ) {
+      // Parse literal and convert to PathExpression
+      const literal = this.parseExpression();
+      const literalValue = String((literal as any).value);
+      path = {
+        type: 'PathExpression',
+        data: false,
+        depth: 0,
+        parts: [literalValue],
+        original: literalValue,
+        loc: literal.loc,
+      };
+    } else {
+      path = this.parsePathExpression();
+    }
 
     // Parse parameters until we hit closing delimiter
     const params: Expression[] = [];
@@ -1027,7 +1066,28 @@ export class Parser {
     this.advance();
 
     // Parse the helper name (path expression)
-    const helperName = this.parsePathExpression();
+    // Feature 7.4: Support literal values as paths (e.g., {{#"foo"}} or {{#12}})
+    let helperName: PathExpression;
+    if (
+      this.currentToken &&
+      (this.match(TokenType.STRING) ||
+        this.match(TokenType.NUMBER) ||
+        this.match(TokenType.BOOLEAN))
+    ) {
+      // Parse literal and convert to PathExpression
+      const literal = this.parseExpression();
+      const literalValue = String((literal as any).value);
+      helperName = {
+        type: 'PathExpression',
+        data: false,
+        depth: 0,
+        parts: [literalValue],
+        original: literalValue,
+        loc: literal.loc,
+      };
+    } else {
+      helperName = this.parsePathExpression();
+    }
 
     // Parse parameters until we hit CLOSE token
     const params: Expression[] = [];
@@ -1095,7 +1155,28 @@ export class Parser {
 
     // Parse the closing helper name
     const closingNameToken = this.currentToken; // Save for error reporting
-    const closingName = this.parsePathExpression();
+    // Feature 7.4: Support literal values in closing tags (e.g., {{/"foo"}})
+    let closingName: PathExpression;
+    if (
+      this.currentToken &&
+      (this.match(TokenType.STRING) ||
+        this.match(TokenType.NUMBER) ||
+        this.match(TokenType.BOOLEAN))
+    ) {
+      // Parse literal and convert to PathExpression
+      const literal = this.parseExpression();
+      const literalValue = String((literal as any).value);
+      closingName = {
+        type: 'PathExpression',
+        data: false,
+        depth: 0,
+        parts: [literalValue],
+        original: literalValue,
+        loc: literal.loc,
+      };
+    } else {
+      closingName = this.parsePathExpression();
+    }
 
     // V1: Skip any parameters in closing tag (shouldn't be any, but be safe)
     while (this.currentToken && !this.match(TokenType.CLOSE)) {

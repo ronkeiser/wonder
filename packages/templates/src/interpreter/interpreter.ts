@@ -700,6 +700,15 @@ export class Interpreter {
     // Look up helper in registry
     const helper = this.lookupHelper(helperName);
     if (!helper) {
+      // Fallback: try to resolve as context value (Feature 7.4)
+      const value = this.evaluatePathExpression(expr.path);
+      if (typeof value === 'function') {
+        // Call the context function with parameters
+        const args = expr.params.map((param) => this.evaluateExpression(param));
+        const context = this.contextStack.getCurrent();
+        return value.call(context, ...args);
+      }
+      // Not a function, throw error
       throw new Error(`Unknown helper: ${helperName}`);
     }
 
