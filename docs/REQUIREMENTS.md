@@ -23,23 +23,31 @@
 
 - Workflows are directed graphs of nodes connected by transitions
 - Nodes execute actions: llm_call, mcp_tool, http_request, human_input, update_context, write_artifact, workflow_call, vector_search
-- Transitions route execution; conditions built via structured UI (CEL fallback)
+- Transitions control all routing logic: conditions, parallelism, synchronization
+- Priority tiers on transitions: same priority = parallel dispatch, different priority = sequential fallback
+- Tokens track execution position; fan-out creates tokens, fan-in merges them
 - Workflows composable: workflow_call invokes sub-workflows
 - Triggers: UI, API, or schedule (schedule less common)
 - Workflows auto-version on change between runs (max 1 increment per run)
 
 ## Parallelism
 
-- Nodes have fan_out (first_match|all) + fan_in (any|all|m_of_n)
-- Fan-out spawns parallel tokens; fan-in waits and merges
+- Transitions specify spawn_count (static) or foreach (dynamic over collection)
+- Fan-out spawns sibling tokens with shared fan_out_transition_id
+- Tokens track lineage: parent_token_id, path_id, branch_index, branch_total
+- Synchronization on transitions: wait_for (any|all|m_of_n) + joins_transition ref
 - Merge strategies: append, merge, keyed, last_wins
+- Branch isolation: each token writes to separate SQL tables (branch*output*{token_id})
 - Deep nesting supported (5-6+ layers of fan-out/sub-workflows)
 
 ## Execution & State
 
-- Each workflow run maintains isolated context: input, state, output, artifacts
+- Each workflow run coordinated by single Durable Object (Actor Model)
+- Context stored as schema-driven SQL tables in DO SQLite (input, state, output, artifacts)
+- Branch isolation: fan-out tokens write to separate branch*output*{token_id} tables
+- Merge at fan-in: read sibling branch tables, apply merge strategy, write to main context
+- Decision logic is pure (returns Decision[] data); dispatch converts to operations (SQL/RPC)
 - Sub-workflows execute with isolated context; explicit input/output mapping only
-- Context schema enforced: scalars, arrays, objects all validated
 - State updates atomic and transactional
 - Full event log for replay and time-travel debugging via dedicated event service (DO + RPC)
 - Events persisted to D1 for querying; metrics to Analytics Engine
@@ -55,6 +63,14 @@
 - All entity IDs use ULID format (sortable, timestamp-prefixed, 26 chars)
 - `@wonder/schema` handles all validation, DDL/DML generation (no duplication)
 
+## Templates
+
+- PromptSpec stores Handlebars templates for LLM prompts
+- `@wonder/templates` provides Handlebars syntax via AST interpretation (no eval, CF Workers compatible)
+- Templates render workflow context (input/state) into natural language prompts
+- Compiled templates cached by (prompt_spec_id, version)
+- Executor handles: load PromptSpec → compile → render with input_mapping → send to LLM
+
 ## Error Handling
 
 - Infrastructure errors (retries, timeouts) invisible; auto-handled per retry config
@@ -69,6 +85,8 @@
 ## Observability
 
 - Full run tree observable via path_id + parent_run_id
+- Token state machine: pending → dispatched → executing → completed/failed/timed_out/cancelled
+- Decision logic outputs logged as data (inspect what coordinator decided before execution)
 - Live UI: tree view, node inspector, metrics (tokens, LLM calls, spend)
 - Event log enables replay and time-travel debugging
 
@@ -101,6 +119,8 @@
 ## Scaling Validation
 
 - DO coordination: single DO handling 1k+ concurrent tokens
+- Branch table management: CREATE/DROP hundreds of branch*output*{token_id} tables per run
 - Event throughput: 50k+ events per run with compaction/batching
 - Error propagation: failures bubbling through 5-6 nested layers
+- Synchronization: race-safe fan-in via SQL unique constraints (tryCreateFanIn, tryActivate)
 - Stuck workflow detection: human input timeouts surfaced and recoverable

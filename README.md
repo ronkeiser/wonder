@@ -78,18 +78,30 @@ LLM Call (fan_out: all, 5 judges)
 
 ### Unified Node Model
 
-Every node has the same structure: an **action** to execute, plus **fan-out** and **fan-in** semantics for parallelism.
+Every node executes an **action**. Parallelism is controlled by transitions, not nodes.
 
 ```typescript
 NodeDef {
   action_id: string           // what to execute
-  fan_out: 'first_match' | 'all'
-  fan_in: 'any' | 'all' | { m_of_n: number }
-  merge?: { strategy, target }
+  input_mapping?: { ... }     // map context to action inputs
+  output_mapping?: { ... }    // map action outputs to context
 }
 ```
 
-**Parallelism is a property of nodes, not a separate node type.** A node with `fan_out: 'all'` spawns multiple tokens. A node with `fan_in: 'all'` waits for sibling tokens and merges them.
+**Transitions control routing, parallelism, and synchronization:**
+
+```typescript
+TransitionDef {
+  from_node_id: string
+  to_node_id: string
+  priority: number            // same priority = parallel, different = fallback
+  spawn_count?: number        // static fan-out
+  foreach?: string            // dynamic fan-out over collection
+  wait_for?: 'any' | 'all' | { m_of_n: number }  // synchronization
+  joins_transition?: string   // which fan-out this joins
+  condition?: { ... }         // routing logic
+}
+```
 
 ### Action Types
 
@@ -123,17 +135,18 @@ Each token tracks its lineage:
 ```typescript
 Token {
   id: string
-  path_id: string             // execution path for tracing
-  parent_token_id?: string    // which token spawned this
-  fan_out_node_id?: string    // which node created this
-  branch_index: number        // position (0 to N-1)
-  branch_total: number        // total siblings
+  path_id: string                    // execution path for tracing
+  parent_token_id?: string           // which token spawned this
+  fan_out_transition_id?: string     // which transition created this
+  branch_index: number               // position (0 to N-1)
+  branch_total: number               // total siblings
+  status: 'pending' | 'dispatched' | 'executing' | 'completed' | 'failed'
 }
 ```
 
 ### Context Carries State
 
-Every workflow run has a Context stored relationally in DO's SQLite:
+Every workflow run has a Context stored as SQL tables in the DO's SQLite database:
 
 ```typescript
 Context {
@@ -141,48 +154,47 @@ Context {
   state: { ... }      // Mutable accumulator for results
   output?: { ... }    // Final output (set before completion)
   artifacts: { ... }  // References to persisted outputs
-  _branch?: { ... }   // Present during fan-out execution
 }
 ```
 
-Scalar fields become columns, arrays become tables—SQLite validates types and constraints natively.
+**Schema-driven storage via `@wonder/schema`:**
+
+- Single JSONSchema drives validation, DDL generation, and DML generation
+- Scalar fields → columns, arrays → separate tables with foreign keys
+- SQLite validates types, constraints, and referential integrity natively
+- No JSON blobs, no manual SQL—schema is source of truth
 
 ### Parallel Execution: Branch Isolation
 
-During parallel execution, each branch writes to isolated storage. No shared state mutation.
+During parallel execution (fan-out), each token writes to its own SQL tables. No shared state mutation.
 
-```typescript
-_branch: {
-  id: "tok_123"            // token id
-  index: 2                 // 0-indexed position
-  total: 5                 // sibling count
-  fan_out_node_id: "judge_node"
-  output: { ... }          // isolated output space
-  parent?: { ... }         // for nested fan-outs
-}
+**Branch table naming:** `branch_output_{token_id}`
+
+When a transition spawns 5 tokens:
+
+```sql
+CREATE TABLE branch_output_tok_001 (key TEXT, value TEXT);
+CREATE TABLE branch_output_tok_002 (key TEXT, value TEXT);
+CREATE TABLE branch_output_tok_003 (key TEXT, value TEXT);
+-- etc.
 ```
 
-At fan-in, the merge strategy combines branch outputs:
+Each token writes to its isolated table—no locking, no race conditions.
 
-```typescript
-// On the fan-in node:
-merge: {
-  source: '*',              // all of _branch.output
-  target: 'state.votes',    // where to put it
-  strategy: 'append'        // how to combine
-}
-```
+**At fan-in (synchronization transition):**
 
-Result:
+1. Wait for all sibling tokens (via `wait_for: 'all'`)
+2. Read all sibling branch tables
+3. Apply merge strategy (append, merge, keyed, last_wins)
+4. Write merged result to main context
+5. Drop branch tables
 
-```typescript
-context.state.votes = [
-  { _branch_id: 'tok_1', choice: 'A', rationale: '...' },
-  { _branch_id: 'tok_2', choice: 'B', rationale: '...' },
-  { _branch_id: 'tok_3', choice: 'A', rationale: '...' },
-  // ...
-];
-```
+Merge strategies:
+
+- **append**: Concatenate all branch outputs into an array
+- **merge**: Deep merge objects
+- **keyed**: Index by key field, preserve all values
+- **last_wins**: Take the last completed branch's output
 
 ### Artifacts Persist Beyond Workflows
 
@@ -198,6 +210,31 @@ Artifact {
   created_by_workflow_run_id?: string
 }
 ```
+
+### Templates Drive LLM Prompts
+
+**PromptSpec** stores versioned Handlebars templates for LLM prompts:
+
+```typescript
+PromptSpec {
+  id: string
+  version: number
+  template: string           // Handlebars template
+  requires_schema: { ... }   // Input schema
+  produces_schema?: { ... }  // Expected output schema (for structured output)
+}
+```
+
+**Rendering flow:**
+
+1. Executor receives `llm_call` action with `prompt_spec_id` + `version`
+2. Load PromptSpec from Resources service
+3. Compile template using `@wonder/templates` (Handlebars, CF Workers compatible)
+4. Cache compiled template by (id, version)
+5. Render with `input_mapping` data from context
+6. Send rendered prompt to LLM
+
+**Why `@wonder/templates`?** Cloudflare Workers don't allow `eval()` or `new Function()`. Standard Handlebars uses compilation. Our implementation uses AST parsing + tree-walking interpretation.
 
 ## Sub-Workflow Invocation
 
@@ -267,14 +304,28 @@ condition: {
 
 ### Durable Object Coordination
 
-Every workflow run gets its own Cloudflare Durable Object:
+Every workflow run gets its own Cloudflare Durable Object implementing the Actor Model:
+
+**Architecture: Decision Pattern**
+
+- **decisions/**: Pure logic returning `Decision[]` data structures
+- **dispatch/**: Converts decisions into SQL/RPC operations
+- **operations/**: Primitive functions (SQL queries, RPC calls)
+
+**Responsibilities:**
 
 - Context mapped to relational schema in SQLite (scalars as columns, arrays as tables)
 - SQLite validates types, constraints, and referential integrity natively
 - Maintains authoritative state (context, tokens)
 - Tracks fan-in synchronization (waiting for all branches)
+- Creates/manages branch tables during fan-out
 - Emits events for observability
 - Sub-workflows: separate DO instances with isolated storage, part of parent run
+
+**Entry points:**
+
+- `start(workflow_run_id)`: Initialize run
+- `handleTaskResult(result)`: Process executor results, advance tokens
 
 ### Worker Execution
 
@@ -304,22 +355,19 @@ WorkflowTaskResult {
 ### Multi-Judge Consensus
 
 ```
-Node (fan_out: all, 5 judges)
-  → LLM call (evaluate candidates)
-  → Node (fan_in: all, merge: collect)
-→ Compute (tally winner)
+Node: evaluate_candidate (llm_call)
+  → Transition (spawn_count: 5) → Node: judge_vote (llm_call)
+  → Transition (wait_for: all, merge: append) → Node: tally_winner (update_context)
 ```
 
 ### Two-Phase: Ideation + Judging
 
 ```
-Node (fan_out: all, 3 ideators)
-  → LLM call (generate solution)
-  → Node (fan_in: all, collect candidates)
-→ Node (fan_out: all, 5 judges)
-  → Human input (judge votes on candidates)
-  → Node (fan_in: all, collect votes)
-→ Compute (determine winner)
+Node: ideation_prompt (llm_call)
+  → Transition (spawn_count: 3) → Node: generate_solution (llm_call)
+  → Transition (wait_for: all, merge: append) → Node: collect_ideas (update_context)
+  → Transition (spawn_count: 5) → Node: judge_solutions (llm_call)
+  → Transition (wait_for: all, merge: append) → Node: determine_winner (update_context)
 ```
 
 ### Research Pipeline with Reasoning
