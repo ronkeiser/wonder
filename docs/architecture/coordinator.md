@@ -1,217 +1,540 @@
 # Coordinator Architecture
 
-The coordinator is a Durable Object that manages the lifecycle of a single workflow run. All state lives in DO SQLite until workflow completion, when results are committed to RESOURCES.
+The coordinator is a **Durable Object (Actor)** that manages the lifecycle of a single workflow run. All state lives in DO SQLite until workflow completion, when results are committed to RESOURCES.
+
+## Architecture: Decision Pattern on Actor Model
+
+Cloudflare Durable Objects implement the **Actor Model**:
+
+- **Isolated state** (SQLite per DO)
+- **Single-threaded execution** (no race conditions)
+- **Message passing** (RPC between actors)
+
+The coordinator enhances this with a **Decision Layer** where decision logic is pure (returns decisions as data) and execution converts decisions to actor messages (SQL/RPC). This enables:
+
+- **Testability**: Decision logic tested without spinning up actors, SQL, or RPC
+- **Debuggability**: Decisions are data - log them, replay them, inspect them
+- **Performance**: Optimize decision execution (batching, caching) without touching business logic
+- **Scalability**: Add features (CEL conditions, priority tiers) without breaking existing code
 
 ## Components
 
 ```
 coordinator/src/
-├── coordinator.ts   # DO class - entry point, wires services
-├── tokens.ts        # Repository - token state and queries
-├── context.ts       # Repository - workflow data flow
-├── artifacts.ts     # Repository - staged artifacts
-├── routing.ts       # Service - decides what happens next
-├── tasks.ts         # Service - builds executor payloads
+├── index.ts                    # DO class (Actor) - thin orchestrator
+├── decisions.ts                # Decision type definitions
+├── decisions/                  # Pure logic - returns Decision[]
+│   ├── routing.ts              # Transition evaluation
+│   ├── synchronization.ts      # Fan-in logic
+│   ├── spawning.ts             # Token creation logic
+│   ├── completion.ts           # Workflow finalization
+│   └── conditions.ts           # Condition evaluation (CEL future)
+├── operations/                 # Actor operations - SQL and RPC
+│   ├── tokens.ts               # Token CRUD + queries
+│   ├── context.ts              # Context CRUD + snapshots
+│   ├── artifacts.ts            # Artifact staging
+│   └── workflows.ts            # Load workflow defs (with caching)
+└── application/                # Decision execution (convert to actor messages)
+    ├── apply.ts                # Main decision executor
+    ├── batch.ts                # Decision batching optimization
+    └── cache.ts                # DO-level caching
 ```
 
-## Repositories
+## Decision Types
 
-Repositories are pure data access layers. No business logic.
-
-### tokens.ts
-
-Token state machine and queries.
+Decisions are pure data describing state changes to make (converted to actor messages during execution):
 
 ```typescript
-createToken(sql, params) → token_id
-getToken(sql, token_id) → TokenRow
-updateTokenState(sql, token_id, state, state_data?) → void
-getSiblingsByPathPrefix(sql, workflow_run_id, path_prefix) → TokenRow[]
-getTokensByState(sql, workflow_run_id, state) → TokenRow[]
-getActiveTokenCount(sql, workflow_run_id) → number
+type Decision =
+  // Token operations
+  | { type: "CREATE_TOKEN"; params: CreateTokenParams }
+  | { type: "CREATE_FAN_IN_TOKEN"; params: CreateFanInParams }
+  | { type: "UPDATE_TOKEN_STATUS"; tokenId: string; status: TokenStatus }
+  | {
+      type: "ACTIVATE_FAN_IN_TOKEN";
+      workflow_run_id: string;
+      node_id: string;
+      fanInPath: string;
+    }
+  | { type: "MARK_FOR_DISPATCH"; tokenId: string }
+
+  // Context operations
+  | { type: "SET_CONTEXT"; path: string; value: unknown }
+  | {
+      type: "APPLY_NODE_OUTPUT";
+      nodeRef: string;
+      output: Record<string, unknown>;
+      tokenId?: string;
+    }
+
+  // Synchronization (triggers recursive decision generation)
+  | {
+      type: "CHECK_SYNCHRONIZATION";
+      tokenId: string;
+      transition: TransitionDef;
+    }
+
+  // Batched operations (optimization)
+  | { type: "BATCH_CREATE_TOKENS"; allParams: CreateTokenParams[] }
+  | {
+      type: "BATCH_UPDATE_STATUS";
+      updates: Array<{ tokenId: string; status: TokenStatus }>;
+    };
 ```
 
-### context.ts
+## Decision Modules (Pure)
 
-Key-value store for workflow data flow between nodes.
+### decisions/routing.ts
+
+Evaluates transitions and determines next tokens.
+
+**Signature:**
 
 ```typescript
-initializeContextTable(sql) → void
-initializeContextWithInput(sql, input) → void
-getContextValue(sql, path) → unknown
-setContextValue(sql, path, value) → void
-setNodeOutput(sql, nodeRef, output) → void
+function decide(
+  completedToken: TokenRow,
+  workflow: WorkflowDef,
+  contextData: ContextSnapshot
+): Decision[];
 ```
-
-### artifacts.ts
-
-Staged artifacts - stored in DO SQLite during workflow, committed to RESOURCES on completion.
-
-```typescript
-initializeArtifactsTable(sql) → void
-stageArtifact(sql, artifact) → void
-getStagedArtifacts(sql) → Artifact[]
-commitArtifacts(env, sql) → void  // writes to RESOURCES
-```
-
-## Services
-
-Services contain business logic. They call repositories to read and write state.
-
-### routing.ts
-
-Decides what happens after a token completes.
-
-**Input:**
-
-- Completed token
-- Workflow def (nodes, transitions)
-- sql handle
 
 **Does:**
 
-1. Evaluates transitions from completed node (priority tiers, conditions)
-2. For each selected transition, determines spawn count (static or foreach)
-3. Creates tokens with correct path_id, fan_out_transition_id, branch_index, branch_total
-4. For each new token, checks sync config:
-   - No sync → mark for dispatch
-   - Sync condition met → merge outputs, mark for dispatch
-   - Sync condition not met → set state to waiting_for_siblings
-5. Checks if completed token wakes any waiting tokens (same path prefix)
-6. Checks if workflow is complete (no active tokens)
-7. If complete, extracts final output from context
+1. Gets outgoing transitions from completed node
+2. Evaluates conditions against context (CEL in future)
+3. Groups by priority tier (sequential evaluation in future)
+4. For each matching transition:
+   - Determines spawn count (static or foreach)
+   - Generates CREATE_TOKEN decisions with proper lineage
+   - Generates CHECK_SYNCHRONIZATION or MARK_FOR_DISPATCH decisions
 
-**Output:**
+**Returns:** Array of decisions describing token creation and dispatch (pure data, no execution).
+
+### decisions/synchronization.ts
+
+Handles fan-in logic and merge strategies.
+
+**Signature:**
 
 ```typescript
-type RoutingDecision = {
-  tokensToDispatch: string[]; // token ids ready to execute
-  workflowComplete: boolean;
-  finalOutput?: Record<string, unknown>;
-};
+function decide(
+  token: TokenRow,
+  transition: TransitionDef,
+  siblings: TokenRow[],
+  workflow: WorkflowDef
+): Decision[];
 ```
-
-### tasks.ts
-
-Builds executor payloads for a token.
-
-**Input:**
-
-- Token to dispatch
-- Workflow def
-- env (for RESOURCES binding)
 
 **Does:**
 
-1. Fetches node from workflow def
-2. Fetches action, prompt spec, model profile from RESOURCES
-3. Evaluates input_mapping against context
-4. Renders template with resolved inputs
+1. Resolves joins_transition ref to ID
+2. Checks if token is in sibling group
+3. Evaluates synchronization condition (any/all/m_of_n)
+4. If not met: returns CREATE_FAN_IN_TOKEN decision (waiting)
+5. If met: returns SET_CONTEXT (merge) + ACTIVATE_FAN_IN_TOKEN decisions
 
-**Output:**
+**Returns:** Array of decisions describing synchronization behavior (pure data, no execution).
+
+**Pure helpers:**
+
+- `evaluateSyncCondition(siblings, waitFor)` - Check if condition met
+- `mergeOutputs(siblings, mergeConfig)` - Apply merge strategy (append, merge, keyed)
+- `buildFanInPath(tokenPath)` - Compute stable fan-in path
+
+### decisions/completion.ts
+
+Determines workflow completion and extracts final output.
+
+**Signature:**
 
 ```typescript
-type ExecutorPayload = {
-  model_profile: ModelProfile;
-  prompt: string;
-  json_schema?: object;
-  workflow_run_id: string;
-  token_id: string;
-};
+function extractFinalOutput(
+  workflow: WorkflowDef,
+  contextData: ContextSnapshot
+): Record<string, unknown>;
+```
+
+**Does:**
+
+1. Evaluates output_mapping against context
+2. Handles branch collections (.\_branches paths)
+3. Returns final output object
+
+**Returns:** Final output for workflow run.
+
+## Operations (Imperative)
+
+### operations/tokens.ts
+
+Direct SQL operations for token state.
+
+```typescript
+get(sql, tokenId) → TokenRow
+create(sql, params) → tokenId
+tryCreateFanIn(sql, params) → tokenId | null  // handles unique constraint
+tryActivate(sql, workflowRunId, nodeId, path) → boolean  // atomic CAS
+updateStatus(sql, tokenId, status) → void
+getSiblings(sql, workflowRunId, fanOutTransitionId) → TokenRow[]
+getActiveCount(sql, workflowRunId) → number
+```
+
+### operations/context.ts
+
+Key-value store for workflow data flow.
+
+```typescript
+initializeTable(sql) → void
+initializeWithInput(sql, input) → void
+get(sql, path) → unknown
+set(sql, path, value) → void
+applyNodeOutput(sql, nodeRef, output, tokenId?) → void
+getSnapshot(sql) → ContextSnapshot  // read-only view for decisions
+getBranchOutputs(sql, nodeRef) → Array<Record<string, unknown>>
+```
+
+### operations/artifacts.ts
+
+Artifact staging in DO SQLite.
+
+```typescript
+initializeTable(sql) → void
+stage(sql, artifact) → void
+getStaged(sql) → Artifact[]
+commitAll(env, sql) → void  // writes to RESOURCES
+```
+
+### operations/workflows.ts
+
+Load workflow definitions with caching.
+
+```typescript
+load(env, workflowRunId) → Promise<WorkflowDef>
+// Caching handled in DO, not here
+```
+
+## Application Layer
+
+### application/apply.ts
+
+Executes decisions by converting them to actor messages (SQL mutations, RPC calls).
+
+```typescript
+async applyDecisions(
+  decisions: Decision[],
+  sql: SqlStorage,
+  env: Env,
+  logger: Logger,
+): Promise<string[]>  // returns tokensToDispatch
+```
+
+**Does:**
+
+1. Batches decisions (multiple CREATE_TOKEN → BATCH_CREATE_TOKENS)
+2. Handles race conditions (tryCreateFanIn, tryActivate)
+3. Handles CHECK_SYNCHRONIZATION recursively (loads state, calls decision function, applies sub-decisions)
+4. Collects MARK_FOR_DISPATCH decisions into return value
+5. Emits events after successful execution
+6. Logs errors if execution fails
+
+### application/batch.ts
+
+Decision batching optimizations.
+
+```typescript
+batchDecisions(decisions: Decision[]) → Decision[]
+```
+
+Groups consecutive CREATE_TOKEN decisions into BATCH_CREATE_TOKENS for single SQL transaction.
+
+### application/cache.ts
+
+Actor-level caching utilities.
+
+```typescript
+// Workflow definitions cached per workflow_run_id (actor instance cache)
+// Context snapshots cached and invalidated on SET_CONTEXT
+// Avoids repeated SQL reads during decision execution
 ```
 
 ## Coordinator (Entry Point)
 
-The DO class. Thin orchestration layer that wires services together.
-
-### RPC Methods
-
-Only two external entry points:
-
-- `start(workflow_run_id, input)` - called by HTTP service to begin workflow
-- `handleTaskResult(token_id, result)` - called by executor when task completes
-
-### Executor Callback Contract
-
-The executor returns a structured result:
+The DO class (Actor). Thin orchestration layer that coordinates decision logic and execution.
 
 ```typescript
-type TaskResult = {
-  context_updates: Record<string, unknown>; // output data for context
-  staged_artifacts: Artifact[]; // artifacts to stage
-};
-```
+class WorkflowCoordinator extends DurableObject {
+  private workflowCache: Map<string, WorkflowDef>; // Actor instance cache
 
-Coordinator doesn't need to know action kinds. It just applies what executor tells it:
-
-```typescript
-if (result.context_updates) {
-  context.setNodeOutput(sql, nodeRef, result.context_updates);
-}
-
-for (const artifact of result.staged_artifacts) {
-  artifacts.stageArtifact(sql, artifact);
+  async start(
+    workflowRunId: string,
+    input: Record<string, unknown>
+  ): Promise<void>;
+  async handleTaskResult(tokenId: string, result: TaskResult): Promise<void>;
 }
 ```
+
+### RPC Methods (Actor Messages)
+
+Only two external entry points (messages this actor can receive):
+
+- `start(workflow_run_id, input)` - Initialize and begin workflow
+- `handleTaskResult(token_id, result)` - Process completed task
 
 ### start(workflow_run_id, input)
 
-1. Fetch workflow def from RESOURCES
-2. Initialize tables (context, tokens, artifacts)
-3. Store input in context
-4. Create initial token (state: pending)
-5. Call routing to get decision
-6. For each token to dispatch, call dispatchToken()
+```typescript
+async start(workflowRunId: string, input: Record<string, unknown>) {
+  // Initialize storage
+  operations.tokens.initializeTable(this.sql);
+  operations.context.initializeTable(this.sql);
+  operations.artifacts.initializeTable(this.sql);
+
+  // Store input
+  operations.context.initializeWithInput(this.sql, input);
+
+  // Load workflow (fetch from RESOURCES, cache in DO)
+  const workflow = await this.getWorkflow(workflowRunId);
+
+  // Create initial token
+  const tokenId = operations.tokens.create(this.sql, {
+    workflow_run_id: workflowRunId,
+    node_id: workflow.initial_node_id,
+    parent_token_id: null,
+    path_id: 'root',
+    fan_out_transition_id: null,
+    branch_index: 0,
+    branch_total: 1,
+  });
+
+  // Dispatch
+  await this.dispatchToken(tokenId);
+}
+```
 
 ### handleTaskResult(token_id, result)
 
-1. Update token state to completed (terminal)
-2. Apply context_updates via context.setNodeOutput()
-3. Stage any artifacts via artifacts.stageArtifact()
-4. Call routing to get decision
-5. For each token to dispatch, call dispatchToken()
-6. If workflowComplete:
-   - Commit staged artifacts to RESOURCES
-   - Emit completion event
-   - Store final output
+```typescript
+async handleTaskResult(tokenId: string, result: TaskResult) {
+  const sql = this.ctx.storage.sql;
+
+  // 1. Mark complete and apply result
+  operations.tokens.updateStatus(sql, tokenId, 'completed');
+  const token = operations.tokens.get(sql, tokenId);
+  operations.context.applyNodeOutput(sql, token.node_id, result.output_data, tokenId);
+
+  // 2. Load workflow and context (cached)
+  const workflow = await this.getWorkflow(token.workflow_run_id);
+  const contextData = operations.context.getSnapshot(sql);
+
+  // 3. Run decision logic (pure - returns data)
+  const routingDecisions = decisions.routing.decide(token, workflow, contextData);
+
+  // 4. Apply decisions (converts to actor messages, handles synchronization recursively)
+  const tokensToDispatch = await application.applyDecisions(
+    routingDecisions,
+    sql,
+    this.env,
+    this.logger,
+  );
+
+  // 5. Dispatch all
+  await Promise.all(tokensToDispatch.map(id => this.dispatchToken(id)));
+
+  // 6. Check completion
+  const activeCount = operations.tokens.getActiveCount(sql, token.workflow_run_id);
+  if (activeCount === 0) {
+    const markedComplete = operations.tokens.markWorkflowComplete(sql, token.workflow_run_id);
+    if (markedComplete) {
+      const finalOutput = decisions.completion.extractFinalOutput(workflow, contextData);
+      await this.finalizeWorkflow(token.workflow_run_id, finalOutput);
+    }
+  }
+}
+```
 
 ### dispatchToken(token_id) [private]
 
-1. Update token state to executing
-2. Call tasks to build executor payload
-3. Send payload to executor service
-4. Emit events, log
+```typescript
+private async dispatchToken(tokenId: string) {
+  operations.tokens.updateStatus(this.sql, tokenId, 'executing');
+
+  const payload = await buildExecutorPayload(this.sql, this.env, tokenId);
+
+  if (payload.completedSynchronously) {
+    // Node has no action - complete immediately
+    await this.handleTaskResult(tokenId, { output_data: {} });
+  } else {
+    // Fire-and-forget to executor
+    this.env.EXECUTOR.llmCall(payload);
+  }
+}
+```
 
 ## Data Flow
 
 ```
-start()
+handleTaskResult(tokenId, result)  [Actor message received]
   │
-  ├─► context.initializeContextWithInput()
-  ├─► tokens.createToken() [initial, pending]
-  ├─► routing.decide() → tokensToDispatch
-  └─► dispatchToken() for each
-        │
-        ├─► tokens.updateTokenState(executing)
-        ├─► tasks.buildPayload()
-        └─► executor.llmCall()
+  ├─► operations.tokens.updateStatus(tokenId, 'completed')  [Actor state mutation]
+  ├─► operations.context.applyNodeOutput(result.output_data)  [Actor state mutation]
+  │
+  ├─► Load state (read-only snapshot for decision logic)
+  │   ├─► token = operations.tokens.get(tokenId)
+  │   ├─► workflow = await getWorkflow(cached)
+  │   └─► contextData = operations.context.getSnapshot()
+  │
+  ├─► Decision logic (pure, returns Decision[] data)
+  │   └─► decisions = decisions.routing.decide(token, workflow, contextData)
+  │
+  ├─► Apply decisions (convert to actor messages)
+  │   └─► tokensToDispatch = application.applyDecisions(decisions, ...)
+  │         │
+  │         ├─► Batch decisions (optimization)
+  │         │
+  │         ├─► For each decision:
+  │         │   ├─► CREATE_TOKEN → operations.tokens.create()  [SQL mutation]
+  │         │   ├─► CHECK_SYNCHRONIZATION → recursive:
+  │         │   │     ├─► Load siblings
+  │         │   │     ├─► decisions.synchronization.decide() → subDecisions
+  │         │   │     └─► applyDecisions(subDecisions)
+  │         │   ├─► CREATE_FAN_IN_TOKEN → operations.tokens.tryCreateFanIn()  [SQL mutation]
+  │         │   ├─► ACTIVATE_FAN_IN_TOKEN → operations.tokens.tryActivate()  [SQL mutation]
+  │         │   └─► MARK_FOR_DISPATCH → add to return array
+  │         │
+  │         └─► Return tokensToDispatch[]
+  │
+  ├─► Dispatch all tokens
+  │   └─► Promise.all(tokensToDispatch.map(id => dispatchToken(id)))
+  │
+  └─► Check workflow completion
+      └─► if activeCount === 0:
+          ├─► finalOutput = decisions.completion.extractFinalOutput()
+          └─► finalizeWorkflow()
+```
 
-handleTaskResult()
-  │
-  ├─► tokens.updateTokenState(completed)
-  ├─► context.setNodeOutput(result.context_updates)
-  ├─► artifacts.stageArtifact() for each in result.staged_artifacts
-  ├─► routing.decide()
-  │     │
-  │     ├─► evaluate transitions (priority, conditions)
-  │     ├─► tokens.createToken() for each spawn
-  │     ├─► check sync conditions
-  │     ├─► tokens.updateTokenState(waiting_for_siblings) if blocked
-  │     ├─► check for woken waiters
-  │     └─► check workflow completion
-  │
-  ├─► dispatchToken() for each in tokensToDispatch
-  └─► if workflowComplete:
-        ├─► artifacts.commitArtifacts()
-        └─► finalize workflow
+## Key Characteristics
+
+### Pure Decision Logic
+
+All routing and synchronization logic is **pure** - no side effects, no SQL, no RPC, no actor interactions. This enables:
+
+- **Unit testing without mocks**: Test with plain data, no actors needed
+- **Deterministic behavior**: Same inputs → same decisions (data)
+- **Replay production failures**: Re-run decision functions with captured state
+- **Property-based testing**: Generate random scenarios
+- **Actor Model benefit**: Decision layer separates business logic from actor mechanics
+
+### Decision Batching
+
+The application layer optimizes decision execution:
+
+```typescript
+// Before batching
+[
+  { type: 'CREATE_TOKEN', params: {...} },
+  { type: 'CREATE_TOKEN', params: {...} },
+  { type: 'CREATE_TOKEN', params: {...} },
+]
+
+// After batching (optimization)
+[
+  { type: 'BATCH_CREATE_TOKENS', allParams: [{...}, {...}, {...}] }
+]
+```
+
+Single SQL transaction instead of three separate actor state mutations.
+
+### Recursive Synchronization
+
+`CHECK_SYNCHRONIZATION` decisions trigger recursive decision generation:
+
+1. Load siblings from SQL
+2. Call `decisions.synchronization.decide()` → returns sub-decisions
+3. Apply sub-decisions (which may generate more decisions)
+4. Collect all `MARK_FOR_DISPATCH` results
+
+This keeps synchronization logic isolated, testable, and independent of actor mechanics.
+
+### Actor-Level Caching
+
+Workflow definitions cached in coordinator actor instance:
+
+```typescript
+private workflowCache: Map<string, WorkflowDef> = new Map();
+```
+
+Loaded once per workflow_run_id, reused for all token completions. Invalidated on actor restart (acceptable - cold start penalty only).
+
+## Testing Strategy
+
+### Unit Tests (Fast - No Actors Needed)
+
+```typescript
+test('routing spawns tokens for matching transitions', () => {
+  const token = { node_id: 'node_a', ... };
+  const workflow = { nodes: [...], transitions: [...] };
+  const context = { approved: true };
+
+  const decisions = decisions.routing.decide(token, workflow, context);
+
+  expect(decisions).toContainEqual({
+    type: 'CREATE_TOKEN',
+    params: expect.objectContaining({ node_id: 'node_b' })
+  });
+});
+
+test('synchronization waits when not all siblings complete', () => {
+  const token = { ... };
+  const siblings = [
+    { status: 'completed' },
+    { status: 'executing' },  // Not done
+    { status: 'completed' },
+  ];
+  const transition = { synchronization: { wait_for: 'all', ... } };
+
+  const decisions = decisions.synchronization.decide(token, transition, siblings, workflow);
+
+  expect(decisions).toContainEqual({
+    type: 'CREATE_FAN_IN_TOKEN',
+    params: expect.objectContaining({ status: 'waiting_for_siblings' })
+  });
+});
+```
+
+### Integration Tests (Medium - Actor Operations)
+
+Test decision application with real SQL (actor state mutations):
+
+```typescript
+test("tryActivate handles race condition", async () => {
+  const sql = miniflare.getDurableObjectStorage();
+
+  // Create waiting token
+  operations.tokens.create(sql, { ...params, status: "waiting_for_siblings" });
+
+  // Two concurrent activations
+  const [result1, result2] = await Promise.all([
+    operations.tokens.tryActivate(sql, workflowRunId, nodeId, path),
+    operations.tokens.tryActivate(sql, workflowRunId, nodeId, path),
+  ]);
+
+  expect([result1, result2]).toEqual([true, false]); // Only one succeeds
+});
+```
+
+### E2E Tests (Slow)
+
+Full workflow execution with real DO:
+
+```typescript
+test('complex fan-out fan-in workflow', async () => {
+  const coordinator = await env.COORDINATOR.get(id);
+  await coordinator.start(workflowRunId, { items: [1, 2, 3, 4, 5] });
+
+  // Wait for completion
+  const result = await waitForWorkflowComplete(workflowRunId);
+
+  expect(result.finalOutput).toMatchObject({
+    merged_results: expect.arrayContaining([...])
+  });
+});
 ```
