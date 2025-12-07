@@ -2,8 +2,12 @@
  * Tests for path resolution functions
  */
 
-import { describe, expect, it } from 'vitest';
-import { resolvePath } from '../../src/interpreter/path-resolver.js';
+import { beforeEach, describe, expect, it } from 'vitest';
+import { ContextStack } from '../../src/interpreter/context-stack.js';
+import { DataStack } from '../../src/interpreter/data-stack.js';
+import { resolvePath, resolvePathExpression } from '../../src/interpreter/path-resolver.js';
+import type { PathExpression } from '../../src/parser/ast-nodes.js';
+import { createFrame } from '../../src/runtime/utils.js';
 
 describe('resolvePath', () => {
   describe('basic property access', () => {
@@ -268,6 +272,351 @@ describe('resolvePath', () => {
       const context = { 你好: 'hello', '🎉': 'party' };
       expect(resolvePath(context, ['你好'])).toBe('hello');
       expect(resolvePath(context, ['🎉'])).toBe('party');
+    });
+  });
+});
+
+describe('resolvePathExpression', () => {
+  let contextStack: ContextStack;
+  let dataStack: DataStack;
+
+  beforeEach(() => {
+    contextStack = new ContextStack();
+    dataStack = new DataStack();
+  });
+
+  describe('simple variables (depth 0)', () => {
+    it('should resolve simple variable from current context', () => {
+      contextStack.push({ foo: 'bar' });
+      dataStack.push({ '@root': {} });
+
+      const pathExpr: PathExpression = {
+        type: 'PathExpression',
+        data: false,
+        depth: 0,
+        parts: ['foo'],
+        original: 'foo',
+        loc: null,
+      };
+
+      expect(resolvePathExpression(pathExpr, contextStack, dataStack)).toBe('bar');
+    });
+
+    it('should resolve nested property from current context', () => {
+      contextStack.push({ user: { name: 'Alice' } });
+      dataStack.push({ '@root': {} });
+
+      const pathExpr: PathExpression = {
+        type: 'PathExpression',
+        data: false,
+        depth: 0,
+        parts: ['user', 'name'],
+        original: 'user.name',
+        loc: null,
+      };
+
+      expect(resolvePathExpression(pathExpr, contextStack, dataStack)).toBe('Alice');
+    });
+
+    it('should return undefined for missing property', () => {
+      contextStack.push({ foo: 'bar' });
+      dataStack.push({ '@root': {} });
+
+      const pathExpr: PathExpression = {
+        type: 'PathExpression',
+        data: false,
+        depth: 0,
+        parts: ['missing'],
+        original: 'missing',
+        loc: null,
+      };
+
+      expect(resolvePathExpression(pathExpr, contextStack, dataStack)).toBe(undefined);
+    });
+  });
+
+  describe('parent scope access (depth > 0)', () => {
+    beforeEach(() => {
+      // Build context stack: root -> level1 -> level2
+      contextStack.push({ name: 'root', value: 'rootValue' });
+      contextStack.push({ name: 'level1', value: 'level1Value' });
+      contextStack.push({ name: 'level2', value: 'level2Value' });
+
+      // Build data stack
+      const rootData = { '@root': { name: 'root' } };
+      dataStack.push(rootData);
+      dataStack.push(createFrame(rootData));
+      dataStack.push(createFrame(dataStack.getCurrent()));
+    });
+
+    it('should resolve parent variable (../, depth 1)', () => {
+      const pathExpr: PathExpression = {
+        type: 'PathExpression',
+        data: false,
+        depth: 1,
+        parts: ['value'],
+        original: '../value',
+        loc: null,
+      };
+
+      expect(resolvePathExpression(pathExpr, contextStack, dataStack)).toBe('level1Value');
+    });
+
+    it('should resolve grandparent variable (../../, depth 2)', () => {
+      const pathExpr: PathExpression = {
+        type: 'PathExpression',
+        data: false,
+        depth: 2,
+        parts: ['value'],
+        original: '../../value',
+        loc: null,
+      };
+
+      expect(resolvePathExpression(pathExpr, contextStack, dataStack)).toBe('rootValue');
+    });
+
+    it('should resolve nested property from parent', () => {
+      contextStack.pop();
+      contextStack.pop();
+      contextStack.pop();
+      contextStack.push({ user: { name: 'Parent' } });
+      contextStack.push({ value: 'current' });
+
+      const pathExpr: PathExpression = {
+        type: 'PathExpression',
+        data: false,
+        depth: 1,
+        parts: ['user', 'name'],
+        original: '../user.name',
+        loc: null,
+      };
+
+      expect(resolvePathExpression(pathExpr, contextStack, dataStack)).toBe('Parent');
+    });
+
+    it('should return root context for out-of-bounds depth', () => {
+      const pathExpr: PathExpression = {
+        type: 'PathExpression',
+        data: false,
+        depth: 99,
+        parts: ['value'],
+        original: '../../../../../value',
+        loc: null,
+      };
+
+      expect(resolvePathExpression(pathExpr, contextStack, dataStack)).toBe('rootValue');
+    });
+  });
+
+  describe('data variables (@-prefixed)', () => {
+    beforeEach(() => {
+      const rootContext = { items: ['a', 'b', 'c'] };
+      contextStack.push(rootContext);
+
+      const rootData = { '@root': rootContext };
+      dataStack.push(rootData);
+
+      // Simulate #each loop iteration
+      const loopFrame = createFrame(rootData);
+      loopFrame['@index'] = 0;
+      loopFrame['@first'] = true;
+      loopFrame['@last'] = false;
+      dataStack.push(loopFrame);
+    });
+
+    it('should resolve @index from current data frame', () => {
+      const pathExpr: PathExpression = {
+        type: 'PathExpression',
+        data: true,
+        depth: 0,
+        parts: ['index'],
+        original: '@index',
+        loc: null,
+      };
+
+      expect(resolvePathExpression(pathExpr, contextStack, dataStack)).toBe(0);
+    });
+
+    it('should resolve @first from current data frame', () => {
+      const pathExpr: PathExpression = {
+        type: 'PathExpression',
+        data: true,
+        depth: 0,
+        parts: ['first'],
+        original: '@first',
+        loc: null,
+      };
+
+      expect(resolvePathExpression(pathExpr, contextStack, dataStack)).toBe(true);
+    });
+
+    it('should resolve @root from data frame', () => {
+      const pathExpr: PathExpression = {
+        type: 'PathExpression',
+        data: true,
+        depth: 0,
+        parts: ['root'],
+        original: '@root',
+        loc: null,
+      };
+
+      const result = resolvePathExpression(pathExpr, contextStack, dataStack);
+      expect(result).toEqual({ items: ['a', 'b', 'c'] });
+    });
+
+    it('should resolve nested property via @root', () => {
+      const pathExpr: PathExpression = {
+        type: 'PathExpression',
+        data: true,
+        depth: 0,
+        parts: ['root', 'items', '0'],
+        original: '@root.items.0',
+        loc: null,
+      };
+
+      expect(resolvePathExpression(pathExpr, contextStack, dataStack)).toBe('a');
+    });
+  });
+
+  describe('empty parts ({{this}} and {{..}})', () => {
+    beforeEach(() => {
+      contextStack.push({ name: 'root', value: 1 });
+      contextStack.push({ name: 'child', value: 2 });
+
+      const rootData = { '@root': {} };
+      dataStack.push(rootData);
+      dataStack.push(createFrame(rootData));
+    });
+
+    it('should return current context for {{this}} (empty parts, depth 0)', () => {
+      const pathExpr: PathExpression = {
+        type: 'PathExpression',
+        data: false,
+        depth: 0,
+        parts: [],
+        original: 'this',
+        loc: null,
+      };
+
+      const result = resolvePathExpression(pathExpr, contextStack, dataStack);
+      expect(result).toEqual({ name: 'child', value: 2 });
+    });
+
+    it('should return parent context for {{..}} (empty parts, depth 1)', () => {
+      const pathExpr: PathExpression = {
+        type: 'PathExpression',
+        data: false,
+        depth: 1,
+        parts: [],
+        original: '..',
+        loc: null,
+      };
+
+      const result = resolvePathExpression(pathExpr, contextStack, dataStack);
+      expect(result).toEqual({ name: 'root', value: 1 });
+    });
+
+    it('should return current data frame for {{@}} (empty parts, depth 0)', () => {
+      const pathExpr: PathExpression = {
+        type: 'PathExpression',
+        data: true,
+        depth: 0,
+        parts: [],
+        original: '@',
+        loc: null,
+      };
+
+      const result = resolvePathExpression(pathExpr, contextStack, dataStack);
+      expect(result).toHaveProperty('_parent');
+      expect(result).toHaveProperty('@root');
+    });
+  });
+
+  describe('empty stacks', () => {
+    it('should return undefined when context stack is empty', () => {
+      const pathExpr: PathExpression = {
+        type: 'PathExpression',
+        data: false,
+        depth: 0,
+        parts: ['foo'],
+        original: 'foo',
+        loc: null,
+      };
+
+      expect(resolvePathExpression(pathExpr, contextStack, dataStack)).toBe(undefined);
+    });
+
+    it('should return undefined when data stack is empty', () => {
+      contextStack.push({ foo: 'bar' });
+
+      const pathExpr: PathExpression = {
+        type: 'PathExpression',
+        data: true,
+        depth: 0,
+        parts: ['index'],
+        original: '@index',
+        loc: null,
+      };
+
+      expect(resolvePathExpression(pathExpr, contextStack, dataStack)).toBe(undefined);
+    });
+  });
+
+  describe('complex nesting scenarios', () => {
+    it('should handle deeply nested contexts with depth', () => {
+      // Build 5-level deep context stack
+      for (let i = 0; i < 5; i++) {
+        contextStack.push({ level: i, value: `level${i}` });
+      }
+
+      const rootData = { '@root': {} };
+      dataStack.push(rootData);
+
+      const pathExpr: PathExpression = {
+        type: 'PathExpression',
+        data: false,
+        depth: 3,
+        parts: ['value'],
+        original: '../../../value',
+        loc: null,
+      };
+
+      expect(resolvePathExpression(pathExpr, contextStack, dataStack)).toBe('level1');
+    });
+
+    it('should handle data variables in nested loops', () => {
+      contextStack.push({
+        items: [
+          [1, 2],
+          [3, 4],
+        ],
+      });
+
+      const rootContext = contextStack.getCurrent();
+      const rootData = { '@root': rootContext };
+      dataStack.push(rootData);
+
+      // Outer loop
+      const outerFrame = createFrame(rootData);
+      outerFrame['@index'] = 0;
+      dataStack.push(outerFrame);
+
+      // Inner loop
+      const innerFrame = createFrame(outerFrame);
+      innerFrame['@index'] = 1;
+      dataStack.push(innerFrame);
+
+      const pathExpr: PathExpression = {
+        type: 'PathExpression',
+        data: true,
+        depth: 0,
+        parts: ['index'],
+        original: '@index',
+        loc: null,
+      };
+
+      // Should get inner loop's @index
+      expect(resolvePathExpression(pathExpr, contextStack, dataStack)).toBe(1);
     });
   });
 });
