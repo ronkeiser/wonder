@@ -45,6 +45,7 @@ export interface InterpreterOptions {
  */
 export class Interpreter {
   private ast: Program;
+  // @ts-expect-error - Reserved for future use (Capability 6: helpers, Capability 7: partials)
   private _options: InterpreterOptions;
   private contextStack!: ContextStack;
   private dataStack!: DataStack;
@@ -265,15 +266,96 @@ export class Interpreter {
   }
 
   /**
-   * Evaluates the #each block helper (stub).
+   * Evaluates the #each block helper.
    *
-   * TODO: Implement in Feature 5.3
+   * Iterates over arrays or objects, providing loop metadata via data variables.
+   * For arrays: provides @index, @first, @last
+   * For objects: provides @key, @index, @first, @last
    *
-   * @param _node - The BlockStatement node for #each
-   * @returns Empty string (stub)
+   * @param node - The BlockStatement node for #each
+   * @returns The rendered output from iterations, or inverse block if empty
    */
-  private evaluateEachHelper(_node: BlockStatement): string {
-    throw new Error('#each helper not yet implemented');
+  private evaluateEachHelper(node: BlockStatement): string {
+    // #each requires exactly 1 parameter (the collection)
+    if (node.params.length !== 1) {
+      throw new Error(`#each helper requires exactly 1 parameter, got ${node.params.length}`);
+    }
+
+    // Evaluate the collection parameter
+    const collection = this.evaluateExpression(node.params[0]);
+
+    // Handle arrays
+    if (Array.isArray(collection)) {
+      return this.evaluateEachArray(node, collection);
+    }
+
+    // Handle objects
+    if (collection !== null && typeof collection === 'object') {
+      // TODO: Implement object iteration in Feature 5.4
+      throw new Error('#each helper: object iteration not yet implemented');
+    }
+
+    // For null, undefined, or other non-iterables, render inverse block
+    return this.evaluateProgram(node.inverse);
+  }
+
+  /**
+   * Evaluates #each for array iteration.
+   *
+   * @param node - The BlockStatement node
+   * @param collection - The array to iterate over
+   * @returns The concatenated output from all iterations
+   */
+  private evaluateEachArray(node: BlockStatement, collection: any[]): string {
+    // Empty arrays render the inverse block ({{else}})
+    if (collection.length === 0) {
+      return this.evaluateProgram(node.inverse);
+    }
+
+    // For sparse arrays, we need to find the first and last actual indices
+    let firstIndex = -1;
+    let lastIndex = -1;
+
+    for (let i = 0; i < collection.length; i++) {
+      if (i in collection) {
+        if (firstIndex === -1) {
+          firstIndex = i;
+        }
+        lastIndex = i;
+      }
+    }
+
+    let output = '';
+
+    // Iterate over array indices
+    for (let i = 0; i < collection.length; i++) {
+      // Skip sparse array holes
+      if (!(i in collection)) {
+        continue;
+      }
+
+      const item = collection[i];
+
+      // Create data frame with loop variables
+      // Keys must be prefixed with @ for data variable access
+      this.dataStack.push({
+        '@index': i,
+        '@first': i === firstIndex,
+        '@last': i === lastIndex,
+      });
+
+      // Push array item as new context
+      this.contextStack.push(item);
+
+      // Evaluate the program block with the current item
+      output += this.evaluateProgram(node.program);
+
+      // Pop context and data stacks
+      this.contextStack.pop();
+      this.dataStack.pop();
+    }
+
+    return output;
   }
 
   /**

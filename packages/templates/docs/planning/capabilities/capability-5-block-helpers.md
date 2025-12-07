@@ -157,9 +157,11 @@
 
 **Goal:** Iterate over arrays with loop metadata
 
-**Status:** `[ ]` Not Started
+**Status:** `[x]` **COMPLETE** ✅
 
 ### Task C5-F3-T1: Implement Array Iteration
+
+**Status:** `[x]` Complete ✅
 
 - Create `evaluateEachHelper()` method:
   - Check parameter is array
@@ -173,7 +175,9 @@
   - Handle empty arrays:
     - Render `node.inverse` (else block)
 
-**Tests:**
+**Deliverable:** `evaluateEachHelper()` and `evaluateEachArray()` methods in `src/interpreter/interpreter.ts`
+
+**Tests:** 35 tests passing
 
 - Basic iteration: `{{#each items}}{{this}}{{/each}}`
 - Access @index: `{{#each items}}{{@index}}: {{this}}{{/each}}`
@@ -185,16 +189,24 @@
 
 ### Task C5-F3-T2: Handle Sparse Arrays
 
-- Skip holes in sparse arrays:
-  - Use `hasOwnProperty()` check before iteration
-  - Don't render program for missing indices
-- Update @index correctly:
-  - @index reflects actual array index, not iteration count
+**Status:** `[x]` Complete ✅
 
-**Tests:**
+- Skip holes in sparse arrays:
+  - Use `i in collection` check before iteration
+  - Don't render program for missing indices
+- Update @first/@last correctly:
+  - Find first and last existing indices before iteration
+  - @first and @last set based on actual existing elements
+- @index reflects actual array index, not iteration count
+
+**Deliverable:** Sparse array handling in `evaluateEachArray()`
+
+**Tests:** 4 tests passing
 
 - Sparse array: `{items: [1, , 3]}` skips middle item
 - Correct indices: Indices reflect array positions, not iteration count
+- @first correct for first existing element
+- @last correct for last existing element
 
 ---
 
@@ -311,20 +323,26 @@
 
 - **Block Helper Dispatcher:** Switch on `node.path.original` for routing
 
-- **Test Coverage:** 42 tests for Feature 5.1 (#if and #unless)
+- **Test Coverage:**
+  - Feature 5.1: 42 tests for #if and #unless
+  - Feature 5.3: 35 tests for #each array iteration
 
-- **Parser Test Fix:** Updated 8 parser tests to expect "Expected identifier or number after path separator" instead of "Expected identifier after path separator" (from Capability 4 numeric path enhancement)
+- **Data Frame Keys:** Must be prefixed with `@` (e.g., `'@index'`, `'@first'`) because path resolver adds prefix when `pathExpr.data` is true
+
+- **Sparse Array Handling:** Pre-calculate first and last existing indices to correctly set `@first` and `@last` flags
+
+- **Parser Test Fix:** Updated 8 parser tests to expect "Expected identifier or number after path separator" (from Capability 4 numeric path enhancement)
 
 ---
 
 ## Completion Checklist
 
 - [x] Feature 5.1: #if and #unless helpers (42 tests passing)
-- [ ] Feature 5.3: #each for arrays (~15 tests)
+- [x] Feature 5.3: #each for arrays (35 tests passing)
 - [ ] Feature 5.4: #each for objects (~10 tests)
 - [ ] Feature 5.5: #with helper (~8 tests)
 - [ ] Feature 5.6: Nested block integration (~10 tests)
 - [x] All parser tests updated for numeric path support (8 test fixes)
-- [x] All tests passing (1399/1399 ✅)
+- [x] All tests passing (1434/1434 ✅)
 - [ ] Documentation complete
 - [ ] Ready for Capability 6 (Runtime Helpers)

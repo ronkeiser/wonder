@@ -306,3 +306,260 @@ describe('Block Helpers - #unless', () => {
     });
   });
 });
+
+describe('Block Helpers - #each (Arrays)', () => {
+  describe('basic iteration', () => {
+    it('should iterate over array of strings', () => {
+      const template = '{{#each items}}{{this}}{{/each}}';
+      const result = render(template, { items: ['a', 'b', 'c'] });
+      expect(result).toBe('abc');
+    });
+
+    it('should iterate over array of numbers', () => {
+      const template = '{{#each nums}}{{this}}{{/each}}';
+      const result = render(template, { nums: [1, 2, 3] });
+      expect(result).toBe('123');
+    });
+
+    it('should iterate over single-item array', () => {
+      const template = '{{#each items}}Item: {{this}}{{/each}}';
+      const result = render(template, { items: ['only'] });
+      expect(result).toBe('Item: only');
+    });
+
+    it('should handle array with separators', () => {
+      const template = '{{#each items}}{{this}}, {{/each}}';
+      const result = render(template, { items: ['a', 'b', 'c'] });
+      expect(result).toBe('a, b, c, ');
+    });
+
+    it('should iterate over array of objects', () => {
+      const template = '{{#each users}}{{name}} {{/each}}';
+      const context = {
+        users: [{ name: 'Alice' }, { name: 'Bob' }, { name: 'Charlie' }],
+      };
+      const result = render(template, context);
+      expect(result).toBe('Alice Bob Charlie ');
+    });
+  });
+
+  describe('loop metadata - @index', () => {
+    it('should provide @index for each iteration', () => {
+      const template = '{{#each items}}{{@index}}{{/each}}';
+      const result = render(template, { items: ['a', 'b', 'c'] });
+      expect(result).toBe('012');
+    });
+
+    it('should use @index with content', () => {
+      const template = '{{#each items}}{{@index}}: {{this}} {{/each}}';
+      const result = render(template, { items: ['a', 'b', 'c'] });
+      expect(result).toBe('0: a 1: b 2: c ');
+    });
+
+    it('should provide correct @index for single item', () => {
+      const template = '{{#each items}}{{@index}}{{/each}}';
+      const result = render(template, { items: ['x'] });
+      expect(result).toBe('0');
+    });
+  });
+
+  describe('loop metadata - @first', () => {
+    it('should set @first to true for first iteration', () => {
+      const template = '{{#each items}}{{#if @first}}F{{/if}}{{this}}{{/each}}';
+      const result = render(template, { items: ['a', 'b', 'c'] });
+      expect(result).toBe('Fabc');
+    });
+
+    it('should only set @first for first item', () => {
+      const template = '{{#each items}}{{#if @first}}First: {{/if}}{{this}} {{/each}}';
+      const result = render(template, { items: ['a', 'b'] });
+      expect(result).toBe('First: a b ');
+    });
+
+    it('should handle @first with single item', () => {
+      const template = '{{#each items}}{{#if @first}}Y{{else}}N{{/if}}{{/each}}';
+      const result = render(template, { items: ['x'] });
+      expect(result).toBe('Y');
+    });
+  });
+
+  describe('loop metadata - @last', () => {
+    it('should set @last to true for last iteration', () => {
+      const template = '{{#each items}}{{this}}{{#if @last}}L{{/if}}{{/each}}';
+      const result = render(template, { items: ['a', 'b', 'c'] });
+      expect(result).toBe('abcL');
+    });
+
+    it('should only set @last for last item', () => {
+      const template = '{{#each items}}{{this}}{{#if @last}}.{{else}}, {{/if}}{{/each}}';
+      const result = render(template, { items: ['a', 'b', 'c'] });
+      expect(result).toBe('a, b, c.');
+    });
+
+    it('should handle @last with single item', () => {
+      const template = '{{#each items}}{{#if @last}}Y{{else}}N{{/if}}{{/each}}';
+      const result = render(template, { items: ['x'] });
+      expect(result).toBe('Y');
+    });
+  });
+
+  describe('combined loop metadata', () => {
+    it('should combine @index, @first, and @last', () => {
+      const template =
+        '{{#each items}}[{{@index}}{{#if @first}}F{{/if}}{{#if @last}}L{{/if}}]{{/each}}';
+      const result = render(template, { items: ['a', 'b', 'c'] });
+      expect(result).toBe('[0F][1][2L]');
+    });
+
+    it('should format list with proper punctuation', () => {
+      const template = '{{#each items}}{{this}}{{#if @last}}.{{else}}, {{/if}}{{/each}}';
+      const result = render(template, { items: ['Alice', 'Bob', 'Charlie'] });
+      expect(result).toBe('Alice, Bob, Charlie.');
+    });
+  });
+
+  describe('context access', () => {
+    it('should access nested properties in objects', () => {
+      const template = '{{#each users}}{{name}}: {{email}} {{/each}}';
+      const context = {
+        users: [
+          { name: 'Alice', email: 'alice@example.com' },
+          { name: 'Bob', email: 'bob@example.com' },
+        ],
+      };
+      const result = render(template, context);
+      expect(result).toBe('Alice: alice@example.com Bob: bob@example.com ');
+    });
+
+    it('should access parent context with ../', () => {
+      const template = '{{#each items}}{{../title}}: {{this}} {{/each}}';
+      const context = { title: 'List', items: ['a', 'b', 'c'] };
+      const result = render(template, context);
+      expect(result).toBe('List: a List: b List: c ');
+    });
+
+    it('should access deeply nested parent context', () => {
+      const template = '{{#each items}}{{../../grandparent}} > {{../parent}} > {{this}} {{/each}}';
+      const context = {
+        grandparent: 'GP',
+        parent: 'P',
+        items: ['a', 'b'],
+      };
+      const result = render(template, context);
+      expect(result).toBe('GP > P > a GP > P > b ');
+    });
+
+    it('should access this context explicitly', () => {
+      const template = '{{#each items}}{{this.name}}{{/each}}';
+      const context = { items: [{ name: 'A' }, { name: 'B' }] };
+      const result = render(template, context);
+      expect(result).toBe('AB');
+    });
+  });
+
+  describe('else block (inverse)', () => {
+    it('should render else block for empty array', () => {
+      const template = '{{#each items}}Item{{else}}Empty{{/each}}';
+      const result = render(template, { items: [] });
+      expect(result).toBe('Empty');
+    });
+
+    it('should render else block with content', () => {
+      const template = '{{#each items}}{{this}}{{else}}No items found{{/each}}';
+      const result = render(template, { items: [] });
+      expect(result).toBe('No items found');
+    });
+
+    it('should render else block with variables', () => {
+      const template = '{{#each items}}{{this}}{{else}}Count: {{count}}{{/each}}';
+      const result = render(template, { items: [], count: 0 });
+      expect(result).toBe('Count: 0');
+    });
+
+    it('should not render else block for non-empty array', () => {
+      const template = '{{#each items}}X{{else}}Empty{{/each}}';
+      const result = render(template, { items: [1] });
+      expect(result).toBe('X');
+    });
+  });
+
+  describe('edge cases', () => {
+    it('should handle array with mixed primitive types', () => {
+      const template = '{{#each items}}{{this}},{{/each}}';
+      const result = render(template, { items: [1, 'two', true, null] });
+      expect(result).toBe('1,two,true,,');
+    });
+
+    it('should handle array with boolean values', () => {
+      const template = '{{#each flags}}{{this}}{{/each}}';
+      const result = render(template, { flags: [true, false, true] });
+      expect(result).toBe('truefalsetrue');
+    });
+
+    it('should handle array with null and undefined', () => {
+      const template = '{{#each items}}[{{this}}]{{/each}}';
+      const result = render(template, { items: [null, undefined, 'value'] });
+      expect(result).toBe('[][][value]');
+    });
+  });
+
+  describe('sparse arrays', () => {
+    it('should skip holes in sparse arrays', () => {
+      const template = '{{#each items}}{{this}}{{/each}}';
+      // Create sparse array: [1, <empty>, 3]
+      const items = [1, , 3]; // eslint-disable-line no-sparse-arrays
+      const result = render(template, { items });
+      expect(result).toBe('13');
+    });
+
+    it('should maintain correct @index for sparse arrays', () => {
+      const template = '{{#each items}}{{@index}}:{{this}} {{/each}}';
+      // Create sparse array: ['a', <empty>, 'c']
+      const items = ['a', , 'c']; // eslint-disable-line no-sparse-arrays
+      const result = render(template, { items });
+      expect(result).toBe('0:a 2:c ');
+    });
+
+    it('should set @first correctly for sparse arrays', () => {
+      const template = '{{#each items}}{{#if @first}}F{{/if}}{{this}}{{/each}}';
+      // Create sparse array: [<empty>, 'b', 'c']
+      const items = [, 'b', 'c']; // eslint-disable-line no-sparse-arrays
+      const result = render(template, { items });
+      expect(result).toBe('Fbc');
+    });
+
+    it('should set @last correctly for sparse arrays', () => {
+      const template = '{{#each items}}{{this}}{{#if @last}}L{{/if}}{{/each}}';
+      // Create sparse array: ['a', 'b', <empty>]
+      const items = ['a', 'b', ,]; // eslint-disable-line no-sparse-arrays
+      const result = render(template, { items });
+      expect(result).toBe('abL');
+    });
+  });
+
+  describe('non-iterable values', () => {
+    it('should render else block for null', () => {
+      const template = '{{#each items}}X{{else}}Null{{/each}}';
+      const result = render(template, { items: null });
+      expect(result).toBe('Null');
+    });
+
+    it('should render else block for undefined', () => {
+      const template = '{{#each items}}X{{else}}Undefined{{/each}}';
+      const result = render(template, { items: undefined });
+      expect(result).toBe('Undefined');
+    });
+
+    it('should render else block for string (not iterable in this context)', () => {
+      const template = '{{#each items}}X{{else}}Not array{{/each}}';
+      const result = render(template, { items: 'string' });
+      expect(result).toBe('Not array');
+    });
+
+    it('should render else block for number', () => {
+      const template = '{{#each items}}X{{else}}Not array{{/each}}';
+      const result = render(template, { items: 42 });
+      expect(result).toBe('Not array');
+    });
+  });
+});
