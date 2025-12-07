@@ -2,7 +2,7 @@
 
 ## Summary
 
-Successfully implemented DDL (Data Definition Language) generation for `@wonder/schema`. The package now supports converting SchemaType definitions into SQLite CREATE TABLE statements.
+Successfully implemented DDL (Data Definition Language) generation for `@wonder/schemas`. The package now supports converting SchemaType definitions into SQLite CREATE TABLE statements.
 
 ## Completed Features
 
@@ -145,7 +145,7 @@ CREATE TABLE users_tags (
 
 ## Next Steps
 
-The `@wonder/schema` package now provides:
+The `@wonder/schemas` package now provides:
 
 - ✅ Runtime validation (Phase 1)
 - ✅ DDL generation (Phase 2)

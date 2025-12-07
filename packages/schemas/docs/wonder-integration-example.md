@@ -1,12 +1,12 @@
 # Wonder API Integration Example
 
-This document shows how the Wonder API would use `@wonder/schema` to validate workflow context data.
+This document shows how the Wonder API would use `@wonder/schemas` to validate workflow context data.
 
 ## 1. Define Custom Types in Wonder API
 
 ```typescript
 // services/api/src/domains/schema/custom-types.ts
-import { CustomTypeRegistry } from '@wonder/schema';
+import { CustomTypeRegistry } from '@wonder/schemas';
 
 export function createWonderRegistry(): CustomTypeRegistry {
   const registry = new CustomTypeRegistry();
@@ -31,7 +31,7 @@ export function createWonderRegistry(): CustomTypeRegistry {
 
 ```typescript
 // docs/architecture/primitives.ts
-import type { SchemaType } from '@wonder/schema';
+import type { SchemaType } from '@wonder/schemas';
 
 export type WorkflowContext = {
   input: Record<string, unknown>;
@@ -55,7 +55,7 @@ export type WorkflowDefinition = {
 
 ```typescript
 // services/api/src/domains/schema/validation.ts
-import { Validator, validateSchema, type SchemaType } from '@wonder/schema';
+import { Validator, validateSchema, type SchemaType } from '@wonder/schemas';
 import { createWonderRegistry } from './custom-types.js';
 
 // Create singleton registry
@@ -184,20 +184,17 @@ if (!result.valid) {
 
 ## Key Design Points
 
-1. **@wonder/schema is standalone**:
-
+1. **@wonder/schemas is standalone**:
    - Defines `SchemaType` and all validation logic
    - Has zero knowledge of Wonder-specific types
    - Works in any Cloudflare Workers environment
 
 2. **Wonder API is a consumer**:
-
-   - Imports `SchemaType` from `@wonder/schema`
+   - Imports `SchemaType` from `@wonder/schemas`
    - Registers custom types (`artifact_ref`, `workflow_ref`) at runtime
    - Uses the library's validators for context validation
 
 3. **Wonder's domain constraint**:
-
    - Context fields (input, state, output) are always objects with keyed values
    - Wonder wraps schemas as: `{ type: 'object', properties: {...}, required: [...] }`
    - The library's flexibility (accepting any SchemaType) allows this without artificial constraints

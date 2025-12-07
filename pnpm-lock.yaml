@@ -91,7 +91,7 @@ importers:
       '@wonder/logs':
         specifier: workspace:*
         version: link:../logs
-      '@wonder/schema':
+      '@wonder/schemas':
         specifier: workspace:*
         version: link:../../packages/schema
       ulid:
@@ -204,7 +204,7 @@ importers:
       '@wonder/logs':
         specifier: workspace:*
         version: link:../logs
-      '@wonder/schema':
+      '@wonder/schemas':
         specifier: workspace:*
         version: link:../../packages/schema
       drizzle-orm:

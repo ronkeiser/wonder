@@ -1,4 +1,4 @@
-# @wonder/schema
+# @wonder/schemas
 
 Complete schema-driven SQL toolkit: validation, DDL generation, and DML generation for SQLite/D1.
 
@@ -16,13 +16,13 @@ Complete schema-driven SQL toolkit: validation, DDL generation, and DML generati
 ## Installation
 
 ```bash
-pnpm add @wonder/schema
+pnpm add @wonder/schemas
 ```
 
 ## Quick Start
 
 ```typescript
-import { Validator, DDLGenerator, DMLGenerator, CustomTypeRegistry } from '@wonder/schema';
+import { Validator, DDLGenerator, DMLGenerator, CustomTypeRegistry } from '@wonder/schemas';
 
 // 1. Define your schema once
 const userSchema = {
@@ -67,7 +67,7 @@ await db
 ### Validation
 
 ```typescript
-import { Validator, validateSchema } from '@wonder/schema';
+import { Validator, validateSchema } from '@wonder/schemas';
 
 const schema = {
   type: 'object',
@@ -96,7 +96,7 @@ if (!result.valid) {
 ### DDL Generation
 
 ```typescript
-import { DDLGenerator, CustomTypeRegistry } from '@wonder/schema';
+import { DDLGenerator, CustomTypeRegistry } from '@wonder/schemas';
 
 // Define schema
 const schema = {
@@ -136,7 +136,7 @@ CREATE TABLE users_tags (
 ### Custom Types with SQL Mapping
 
 ```typescript
-import { CustomTypeRegistry, Validator, DDLGenerator } from '@wonder/schema';
+import { CustomTypeRegistry, Validator, DDLGenerator } from '@wonder/schemas';
 
 // Register custom type with validation and SQL mapping
 const registry = new CustomTypeRegistry();
@@ -167,7 +167,7 @@ const ddl = generator.generateDDL('events');
 ### DML Generation (INSERT/UPDATE/DELETE)
 
 ```typescript
-import { DMLGenerator } from '@wonder/schema';
+import { DMLGenerator } from '@wonder/schemas';
 
 const dmlGen = new DMLGenerator(schema, registry);
 

@@ -9,7 +9,7 @@ wonder/
 │   │   │   ├── schema.ts           # D1 schema for logs table
 │   │   │   └── index.ts
 │   │   └── package.json
-│   └── schema/                     # @wonder/schema
+│   └── schemas/                    # @wonder/schemas
 │       └── src/                    # Shared types, validation, DDL/DML
 ├── services/
 │   ├── http/                       # HTTP routing service
@@ -183,21 +183,18 @@ src/
 **Architecture principles:**
 
 1. **Service separation by responsibility**
-
    - Each service is independently deployable
    - Communication via RPC service bindings
    - No code sharing between services (use RPC)
    - Clear ownership boundaries
 
 2. **Resources = Data access only**
-
    - CRUD operations on entities
    - Repository pattern for D1 access
    - Schema validation and enforcement
    - Exposes RPC methods for other services
 
 3. **Coordinator = Workflow orchestration**
-
    - Durable Object per workflow run
    - Manages tokens, context, fan-out/fan-in
    - Calls executor via RPC for task execution
@@ -205,14 +202,12 @@ src/
    - Calls events via RPC for persistence
 
 4. **Executor = Action execution**
-
    - Stateless task processing
    - Provider integrations (LLMs, APIs)
    - Returns results synchronously via RPC
    - No direct data persistence
 
 5. **Events = Observability infrastructure**
-
    - Event persistence (D1 + Analytics Engine)
    - Event replay and time-travel debugging
    - Metrics collection and aggregation

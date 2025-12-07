@@ -1,8 +1,8 @@
-# Custom Types in @wonder/schema
+# Custom Types in @wonder/schemas
 
 ## Overview
 
-`@wonder/schema` is a combined validation and DDL generation library for runtime schemas. It supports **custom type extensions** that allow applications to define domain-specific types (like Wonder's `artifact_ref`) that work seamlessly across both validation and SQL generation.
+`@wonder/schemas` is a combined validation and DDL generation library for runtime schemas. It supports **custom type extensions** that allow applications to define domain-specific types (like Wonder's `artifact_ref`) that work seamlessly across both validation and SQL generation.
 
 ## Why Custom Types?
 
@@ -34,7 +34,7 @@ export type CustomTypeDefinition = {
 ## Registration
 
 ```typescript
-import { Schema } from '@wonder/schema';
+import { Schema } from '@wonder/schemas';
 
 const schema = new Schema(schemaDefinition);
 
@@ -133,7 +133,7 @@ const ddl = schema.generateDDL('context');
 
 ```typescript
 // services/api/src/domains/schema/wonder-schema.ts
-import { Schema, type CustomTypeDefinition } from '@wonder/schema';
+import { Schema, type CustomTypeDefinition } from '@wonder/schemas';
 
 export type SchemaType = {
   type:

@@ -1,10 +1,10 @@
-// Demo script for @wonder/schema
+// Demo script for @wonder/schemas
 
 import { CustomTypeRegistry, DDLGenerator, Validator } from '../src/index.js';
 import type { SchemaType } from '../src/types.js';
 
 console.log('='.repeat(60));
-console.log('🎯 @wonder/schema Demo');
+console.log('🎯 @wonder/schemas Demo');
 console.log('='.repeat(60));
 
 // Define a schema for a blog post

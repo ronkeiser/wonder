@@ -44,8 +44,8 @@ NodeDef {
 When a workflow run starts, the Coordinator:
 
 1. Loads the `WorkflowDef` from RESOURCES (including schema JSON, cached in DO)
-2. Passes `input_schema` and `state_schema` to `@wonder/schema`
-3. `@wonder/schema` generates DDL (CREATE TABLE statements)
+2. Passes `input_schema` and `state_schema` to `@wonder/schemas`
+3. `@wonder/schemas` generates DDL (CREATE TABLE statements)
 4. Coordinator executes DDL in DO SQLite via `operations.context.initializeTable()`
 5. Tables are created in the isolated DO instance for this workflow run
 6. Input data is validated against `input_schema` and inserted into context
@@ -78,7 +78,7 @@ When a workflow run starts, the Coordinator:
 }
 ```
 
-**Generated DDL (by @wonder/schema):**
+**Generated DDL (by @wonder/schemas):**
 
 ```sql
 CREATE TABLE context_state (
@@ -110,7 +110,7 @@ getSnapshot(sql) → ContextSnapshot       // Read-only view for decision logic
 getBranchOutputs(sql, nodeRef) → Array<Record<string, unknown>>
 ```
 
-`@wonder/schema` generates parameterized SQL:
+`@wonder/schemas` generates parameterized SQL:
 
 - **DDL** - CREATE TABLE statements from JSONSchema (with CHECK constraints)
 - **DML** - Parameterized INSERT/UPDATE/DELETE statements
@@ -147,7 +147,7 @@ During fan-out, each token writes to isolated branch storage. See `branch-storag
 **Storage approach:** Each branch gets separate SQL tables (e.g., `branch_output_tok_abc123`) generated from the node's `output_schema`. This provides:
 
 - True isolation (no shared state)
-- Schema validation via `@wonder/schema`
+- Schema validation via `@wonder/schemas`
 - Native SQL storage (not JSON blobs)
 
 **Branch metadata** tracked in token table:
@@ -177,7 +177,7 @@ Merged data is written to `context.state` via `SET_CONTEXT` decision → `dispat
 2. **Storage**: Schemas stored as JSON in D1 with `WorkflowDef`
 3. **Initialization**:
    - Coordinator loads `WorkflowDef` from RESOURCES (cached)
-   - `@wonder/schema` generates DDL from schemas
+   - `@wonder/schemas` generates DDL from schemas
    - Coordinator executes CREATE TABLE in DO SQLite
    - Input data validated and inserted
 4. **Execution**:
@@ -210,4 +210,4 @@ Separation of concerns:
 
 - **decisions/** - Pure logic, reads context via snapshots
 - **dispatch/** - Converts decisions to operations
-- **operations/context.ts** - SQL operations via `@wonder/schema`
+- **operations/context.ts** - SQL operations via `@wonder/schemas`

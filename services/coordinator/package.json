@@ -13,7 +13,7 @@
   "dependencies": {
     "@wonder/events": "workspace:*",
     "@wonder/logs": "workspace:*",
-    "@wonder/schema": "workspace:*",
+    "@wonder/schemas": "workspace:*",
     "ulid": "^3.0.2"
   },
   "devDependencies": {

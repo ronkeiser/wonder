@@ -1,4 +1,4 @@
-// @wonder/schema - Fast, CF Workers-compatible schema validator and DDL generator
+// @wonder/schemas - Fast, CF Workers-compatible schema validator and DDL generator
 
 export * from './constraints.js';
 export * from './custom-types.js';
