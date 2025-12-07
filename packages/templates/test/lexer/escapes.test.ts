@@ -284,13 +284,18 @@ describe('Lexer - Escape Handling (C1-F3-T1)', () => {
     it('should handle chain of backslashes before mustache', () => {
       lexer.setInput('\\\\\\{{foo}}');
 
-      // First \\ -> \, second \\ -> \, third \{{ -> {{foo}} escaped
-      // Result: \\ as content, then {{foo}} as content
+      // \\\{{foo}} = \\ followed by \{{foo}}
+      // Only \{{ right before mustache is escape sequence
+      // Result: \\ as content, then {{foo}} processed
       const content = lexer.lex();
       expect(content).toMatchObject({
         type: TokenType.CONTENT,
-        value: '\\{{foo}}',
+        value: '\\\\',
       });
+
+      expect(lexer.lex()).toMatchObject({ type: TokenType.OPEN });
+      expect(lexer.lex()).toMatchObject({ type: TokenType.ID, value: 'foo' });
+      expect(lexer.lex()).toMatchObject({ type: TokenType.CLOSE });
 
       expect(lexer.lex()).toMatchObject({ type: TokenType.EOF });
     });
@@ -298,13 +303,13 @@ describe('Lexer - Escape Handling (C1-F3-T1)', () => {
     it('should handle four backslashes before mustache', () => {
       lexer.setInput('\\\\\\\\{{foo}}');
 
-      // First pair: backslash escapes backslash -> single backslash
-      // Second pair: backslash escapes backslash -> single backslash
-      // Then normal mustache
+      // \\\\{{foo}} = \\\\ followed by \{{foo}}
+      // Only \{{ right before mustache is escape sequence
+      // Result: \\\\ as content (3 backslashes), then mustache processed
       const content = lexer.lex();
       expect(content).toMatchObject({
         type: TokenType.CONTENT,
-        value: '\\\\',
+        value: '\\\\\\',
       });
 
       expect(lexer.lex()).toMatchObject({ type: TokenType.OPEN });
@@ -387,7 +392,7 @@ describe('Lexer - Escape Handling (C1-F3-T1)', () => {
       const token = lexer.lex();
       expect(token).toMatchObject({
         type: TokenType.CONTENT,
-        value: '\\\\', // Four backslashes become two
+        value: '\\\\\\\\', // Backslashes not before mustaches stay as-is
       });
 
       expect(lexer.lex()).toMatchObject({ type: TokenType.EOF });
