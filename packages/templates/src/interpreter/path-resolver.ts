@@ -49,8 +49,14 @@ export function resolvePath(context: any, parts: string[], prefixFirstPart?: str
     // For the first part, prepend the prefix if provided
     const part = i === 0 && prefixFirstPart ? prefixFirstPart + parts[i] : parts[i];
 
-    // Use lookupProperty for security (prevents prototype pollution)
-    current = lookupProperty(current, part);
+    // Special case: Allow accessing 'length' on string primitives for Handlebars compatibility
+    // This is safe since length is just a number, not a method
+    if (typeof current === 'string' && part === 'length') {
+      current = current.length;
+    } else {
+      // Use lookupProperty for security (prevents prototype pollution)
+      current = lookupProperty(current, part);
+    }
 
     // If we got undefined, stop here
     // Note: null is a valid intermediate value and should continue

@@ -40,12 +40,7 @@ export function lookupProperty(parent: any, propertyName: string): any {
     return parent.get(propertyName);
   }
 
-  // Handle string primitives - allow access to length property
-  if (typeof parent === 'string' && propertyName === 'length') {
-    return parent.length;
-  }
-
-  // Handle other primitives - they don't have own properties
+  // Handle primitives - they don't have own properties
   // We need to return undefined for primitives to be secure
   const type = typeof parent;
   if (type === 'string' || type === 'number' || type === 'boolean') {
