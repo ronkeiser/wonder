@@ -11,13 +11,13 @@ Wonder implements a **3-layer timeout strategy** to prevent workflows from hangi
 Controls the maximum duration for an entire workflow execution, regardless of internal structure.
 
 ```typescript
-WorkflowDefinition {
-  timeout: string,         // Duration (e.g., '1h', '30m')
+WorkflowDef {
+  timeout_ms: number | null,     // Max duration in milliseconds
   on_timeout: 'cancel_all' | 'fail'
 }
 
 WorkflowRun {
-  timeout_at: timestamp,   // Computed from WorkflowDefinition.timeout
+  timeout_at: number | null,     // Unix timestamp when workflow times out
 }
 ```
 
@@ -46,31 +46,41 @@ When a workflow is invoked as a subworkflow, the parent node's timeout takes pre
 
 ```typescript
 // Child workflow definition
-WorkflowDefinition 'research-workflow' {
-  timeout: '10m'  // Typical duration
+WorkflowDef 'research-workflow' {
+  timeout_ms: 600000  // 10 minutes typical duration
 }
 
-// Parent invokes as subworkflow
+// Parent node invokes as subworkflow
 Node {
-  action: {
-    type: 'subworkflow',
+  action_id: 'research_action',  // ActionDef with kind: 'workflow_call'
+  timeout_ms: 1800000            // 30 minutes - override for this invocation
+}
+
+ActionDef 'research_action' {
+  kind: 'workflow_call',
+  implementation: {
     workflow_def_id: 'research-workflow'
-  },
-  timeout: '30m'  // Override: give this invocation more time
+  }
 }
 ```
 
-**Timeout hierarchy:** Node timeout > Workflow timeout. This maintains composability while providing sensible defaults.
+**Timeout hierarchy:** Node timeout > ActionDef timeout > Child WorkflowDef timeout. This maintains composability while providing sensible defaults.
 
-### 2. Node-Level Timeout (Execution Timeout)
+### 2. Execution Timeout (Action/Node Level)
 
-Controls how long an individual action can execute before being terminated.
+Controls how long an individual action can execute before being terminated. Timeouts defined on `ActionDef` can be overridden per-node.
 
 ```typescript
+ActionDef {
+  execution: {
+    timeout_ms: number | null,   // Default timeout for this action
+  }
+}
+
 Node {
-  action: Action,
-  timeout?: string,        // Duration (e.g., '2m', '30s', '1h')
-  on_timeout?: 'fail' | 'retry'
+  action_id: string,
+  timeout_ms?: number | null,    // Override ActionDef timeout
+  on_timeout?: 'fail' | 'retry'  // Override ActionDef policy
 }
 ```
 
@@ -87,13 +97,13 @@ Node {
 
 **Recommended Timeouts by Action Type:**
 
-| Action Type    | Recommended Timeout | Rationale                                           |
-| -------------- | ------------------- | --------------------------------------------------- |
-| LLM call       | 2-5 minutes         | Most complete in seconds, but allow for rate limits |
-| Subworkflow    | 30-60 minutes       | Depends on complexity of child workflow             |
-| Tool call      | 30s - 2 minutes     | Fast operations, but allow for network latency      |
-| File I/O       | 1-2 minutes         | Usually fast, but large files may take time         |
-| Code execution | 5-10 minutes        | Tests and builds can be slow                        |
+| Action Type    | Recommended Timeout (ms) | Human-Readable | Rationale                                           |
+| -------------- | ------------------------ | -------------- | --------------------------------------------------- |
+| LLM call       | 120000-300000            | 2-5 minutes    | Most complete in seconds, but allow for rate limits |
+| workflow_call  | 1800000-3600000          | 30-60 minutes  | Depends on complexity of child workflow             |
+| mcp_tool       | 30000-120000             | 30s-2 minutes  | Fast operations, but allow for network latency      |
+| http_request   | 30000-120000             | 30s-2 minutes  | External API calls with network latency             |
+| update_context | 5000-30000               | 5-30 seconds   | Pure computation, usually very fast                 |
 
 **Default Behavior:** No default timeout. Workflows must explicitly specify timeouts for long-running or external operations. This prevents accidental infinite hangs while avoiding premature termination of legitimate long-running work.
 
@@ -102,12 +112,17 @@ Node {
 Controls how long to wait for siblings to arrive at a synchronization point.
 
 ```typescript
+// On Transition
 synchronization: {
-  wait_for: 'all' | { m_of_n: number },
-  joins_transition: string,
-  timeout?: string,        // Duration to wait for siblings
+  strategy: 'all' | 'any' | { m_of_n: number },
+  sibling_group: string,   // fan_out_transition_id that spawned siblings
+  timeout_ms?: number,     // Duration to wait for siblings (milliseconds)
   on_timeout: 'proceed_with_available' | 'fail',
-  merge?: { ... }
+  merge: {
+    source: string,        // Path in branch context (e.g., "_branch.output")
+    target: string,        // Path in main context (e.g., "state.results")
+    strategy: 'append' | 'merge_object' | 'keyed_by_branch' | 'last_wins'
+  }
 }
 ```
 
@@ -125,14 +140,14 @@ synchronization: {
 **Computed Default Timeout:**
 
 ```typescript
-// If timeout not specified, compute from node timeout and spawn count
-const defaultSyncTimeout = Math.min(
-  maxNodeTimeout * spawnCount * 1.5, // Allow some serialization overhead
-  30 * 60 * 1000, // Cap at 30 minutes
+// If timeout_ms not specified, compute from action timeout and spawn count
+const defaultSyncTimeoutMs = Math.min(
+  maxActionTimeoutMs * spawnCount * 1.5, // Allow some serialization overhead
+  30 * 60 * 1000, // Cap at 30 minutes (1,800,000ms)
 );
 ```
 
-**Example:** If you spawn 10 tokens to a node with 2-minute timeout, default sync timeout is `2m × 10 × 1.5 = 30 minutes`.
+**Example:** If you spawn 10 tokens to an action with 120,000ms (2-minute) timeout, default sync timeout is `120000 × 10 × 1.5 = 1,800,000ms (30 minutes)`.
 
 **Critical Detail:** Synchronization timeout measures **wait time** (from first sibling arrival), not **total time** (from fan-out). This prevents double-counting execution time.
 
@@ -154,17 +169,17 @@ When multiple timeout layers apply, they enforce different constraints:
 
 ```typescript
 // Workflow with 1h timeout
-WorkflowDefinition {
-  timeout: '1h',
+WorkflowDef {
+  timeout_ms: 3600000,  // 1 hour
   nodes: [
-    { id: 'A', timeout: '5m' },       // Node times out after 5m
-    { id: 'B', timeout: '10m' },      // Node times out after 10m
-    { id: 'C' }                       // No node timeout
+    { id: 'A', action_id: 'act1', timeout_ms: 300000 },   // 5 minutes
+    { id: 'B', action_id: 'act2', timeout_ms: 600000 },   // 10 minutes
+    { id: 'C', action_id: 'act3' }                        // Uses ActionDef default
   ]
 }
 
 // If workflow hits 1h mark:
-// - All active tokens timeout regardless of node configuration
+// - All active tokens timeout regardless of node/action configuration
 // - Catches case where workflow loops through A→B→C repeatedly
 ```
 
@@ -175,12 +190,12 @@ WorkflowDefinition {
 ```typescript
 Token {
   // ... existing fields
-  state: TokenState,
-  timeout_at?: timestamp,   // When this token times out
+  status: 'pending' | 'dispatched' | 'executing' | 'completed' | 'failed' | 'timed_out' | 'cancelled',
+  timeout_at?: number,     // Unix timestamp when this token times out
+  fan_out_transition_id?: string,  // Which transition spawned this token
   state_data?: {
-    state: 'waiting_for_siblings',
-    arrived_at: timestamp,
-    sync_started_at?: timestamp  // When first sibling arrived
+    arrived_at: number,
+    sync_started_at?: number  // When first sibling arrived (for synchronization)
   }
 }
 ```
@@ -209,11 +224,11 @@ class WorkflowRunDO {
       return; // Workflow timed out, stop processing
     }
 
-    // 2. Check node execution timeouts
+    // 2. Check action execution timeouts
     const executingTokens = await this.db.query(
       `
       SELECT * FROM tokens 
-      WHERE state = 'executing' 
+      WHERE status = 'executing' 
       AND timeout_at IS NOT NULL 
       AND timeout_at < ?
     `,
@@ -227,7 +242,7 @@ class WorkflowRunDO {
     // 3. Check synchronization timeouts
     const waitingTokens = await this.db.query(`
       SELECT * FROM tokens 
-      WHERE state = 'waiting_for_siblings'
+      WHERE status = 'waiting_for_siblings'
     `);
 
     for (const token of waitingTokens) {
@@ -246,14 +261,17 @@ class WorkflowRunDO {
 
 ```typescript
 async function handleWorkflowTimeout(workflowRun: WorkflowRun) {
-  const definition = await getWorkflowDefinition(workflowRun.workflow_def_id);
+  const definition = await getWorkflowDef(
+    workflowRun.workflow_def_id,
+    workflowRun.workflow_def_version,
+  );
 
   // Get all active tokens
   const activeTokens = await this.db.query(
     `
     SELECT * FROM tokens
     WHERE workflow_run_id = ?
-    AND state NOT IN ('completed', 'failed', 'timed_out', 'cancelled')
+    AND status NOT IN ('completed', 'failed', 'timed_out', 'cancelled')
   `,
     [workflowRun.id],
   );
@@ -261,7 +279,7 @@ async function handleWorkflowTimeout(workflowRun: WorkflowRun) {
   // Transition all to timed_out
   for (const token of activeTokens) {
     await updateToken(token.id, {
-      state: 'timed_out',
+      status: 'timed_out',
       state_data: {
         timeout_at: workflowRun.timeout_at,
         reason: 'workflow_timeout',
@@ -287,17 +305,20 @@ async function handleWorkflowTimeout(workflowRun: WorkflowRun) {
 ### Node Timeout Handling
 
 ```typescript
-async function handleNodeTimeout(token: Token) {
+async function handleExecutionTimeout(token: Token) {
   const node = await getNode(token.node_id);
+  const action = await getActionDef(node.action_id, node.action_version);
 
-  if (node.on_timeout === 'retry') {
+  const onTimeout = node.on_timeout ?? action.execution.on_timeout ?? 'fail';
+
+  if (onTimeout === 'retry') {
     const retryCount = token.state_data?.retry_count ?? 0;
     const maxRetries = 3; // Configurable
 
     if (retryCount < maxRetries) {
       // Retry: reset to pending
       await updateToken(token.id, {
-        state: 'pending',
+        status: 'pending',
         state_data: { retry_count: retryCount + 1 },
         timeout_at: null,
       });
@@ -305,7 +326,7 @@ async function handleNodeTimeout(token: Token) {
     } else {
       // Max retries exceeded: fail
       await updateToken(token.id, {
-        state: 'timed_out',
+        status: 'timed_out',
         state_data: {
           timeout_at: token.timeout_at,
           retry_count: retryCount,
@@ -316,7 +337,7 @@ async function handleNodeTimeout(token: Token) {
   } else {
     // on_timeout = 'fail': mark as timed out
     await updateToken(token.id, {
-      state: 'timed_out',
+      status: 'timed_out',
       state_data: { timeout_at: token.timeout_at },
     });
     await handleTokenFailure(token);
@@ -328,13 +349,13 @@ async function handleNodeTimeout(token: Token) {
 
 ```typescript
 async function handleSynchronizationTimeout(token: Token) {
-  const transition = await getTransition(token.workflow_run_id, token.node_id);
+  const transition = await getTransition(token.workflow_run_id, token.current_node_id);
   const { on_timeout } = transition.synchronization;
 
   if (on_timeout === 'proceed_with_available') {
     // Merge completed siblings and continue
     const siblings = await getSiblings(token.workflow_run_id, token.fan_out_transition_id);
-    const completed = siblings.filter((s) => s.state === 'completed');
+    const completed = siblings.filter((s) => s.status === 'completed');
 
     if (completed.length > 0) {
       // Merge available results
@@ -345,10 +366,10 @@ async function handleSynchronizationTimeout(token: Token) {
       await dispatchToken(newToken);
 
       // Mark waiting siblings as timed out
-      const waiting = siblings.filter((s) => s.state === 'waiting_for_siblings');
+      const waiting = siblings.filter((s) => s.status === 'waiting_for_siblings');
       for (const sibling of waiting) {
         await updateToken(sibling.id, {
-          state: 'timed_out',
+          status: 'timed_out',
           state_data: { timeout_at: Date.now() },
         });
       }
@@ -375,11 +396,11 @@ When a subworkflow is invoked without an explicit node timeout, the child workfl
 
 ### Timeout during token creation
 
-If a token times out before being dispatched (stuck in `pending` state due to queue backlog), treat as node timeout with `on_timeout = 'fail'`.
+If a token times out before being dispatched (stuck in `pending` state due to queue backlog), treat as execution timeout with `on_timeout = 'fail'`.
 
 ### Synchronization without timeout
 
-If `synchronization.timeout` is omitted and no node timeout exists to compute from, use default 30-minute cap.
+If `synchronization.timeout_ms` is omitted and no action timeout exists to compute from, use default 30-minute cap (1,800,000ms).
 
 ### Partial synchronization timeout
 
@@ -395,11 +416,11 @@ Timeout events should be emitted for monitoring:
 
 ```typescript
 {
-  type: 'token.timed_out',
+  kind: 'token_timed_out',
   token_id: string,
   workflow_run_id: string,
   node_id: string,
-  timeout_type: 'workflow' | 'node_execution' | 'synchronization',
+  timeout_type: 'workflow' | 'execution' | 'synchronization',
   timeout_duration_ms: number,
   policy_applied: 'cancel_all' | 'fail' | 'retry' | 'proceed_with_available'
 }
@@ -408,7 +429,7 @@ Timeout events should be emitted for monitoring:
 This enables:
 
 - Alerting on frequent timeouts (may indicate under-provisioned timeouts or infrastructure issues)
-- Analysis of which nodes/transitions need timeout adjustments
+- Analysis of which actions/nodes/transitions need timeout adjustments
 - Debugging workflow hangs and performance issues
 
 ## Future Enhancements
