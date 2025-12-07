@@ -258,6 +258,12 @@ export class Interpreter {
       case 'with':
         return this.evaluateWithHelper(node);
       default:
+        // Check for registered custom block helper
+        const helper = this.lookupHelper(helperName);
+        if (helper && typeof helper === 'function') {
+          return this.evaluateCustomBlockHelper(node, helper);
+        }
+
         // Feature 7.2: Implicit block iteration - try context lookup
         return this.evaluateImplicitBlock(node);
     }
@@ -376,6 +382,51 @@ export class Interpreter {
 
     // Other truthy values: render main block
     return this.evaluateProgram(node.program);
+  }
+
+  /**
+   * Evaluates a custom registered block helper.
+   *
+   * Calls the helper function with parameters and an options object containing
+   * fn() and inverse() functions for rendering the block content.
+   *
+   * @param node - The BlockStatement node
+   * @param helper - The registered helper function
+   * @returns The rendered output from the helper
+   */
+  private evaluateCustomBlockHelper(node: BlockStatement, helper: (...args: any[]) => any): string {
+    const context = this.contextStack.getCurrent();
+    const params = node.params.map((param) => this.evaluateExpression(param));
+
+    // Create options object with fn and inverse closures
+    const options = {
+      fn: (newContext?: any) => {
+        if (newContext !== undefined) {
+          this.contextStack.push(newContext);
+        }
+        const result = this.evaluateProgram(node.program);
+        if (newContext !== undefined) {
+          this.contextStack.pop();
+        }
+        return result;
+      },
+      inverse: (newContext?: any) => {
+        if (newContext !== undefined) {
+          this.contextStack.push(newContext);
+        }
+        const result = this.evaluateProgram(node.inverse);
+        if (newContext !== undefined) {
+          this.contextStack.pop();
+        }
+        return result;
+      },
+    };
+
+    // Call helper with params + options as last argument
+    const result = helper.call(context, ...params, options);
+
+    // Return the result (helper is responsible for calling options.fn/inverse)
+    return result == null ? '' : String(result);
   }
 
   /**
