@@ -121,7 +121,7 @@ describe('Parser - Simple PathExpression', () => {
       parser.advance(); // Skip OPEN
 
       expect(() => parser.parsePathExpression()).toThrow(
-        'Expected identifier or number after path separator',
+        'Expected identifier, number, or bracket literal after path separator',
       );
     });
 
@@ -152,7 +152,7 @@ describe('Parser - Simple PathExpression', () => {
       parser.advance(); // Skip OPEN
 
       expect(() => parser.parsePathExpression()).toThrow(
-        'Expected identifier or number after path separator',
+        'Expected identifier, number, or bracket literal after path separator',
       );
     });
   });

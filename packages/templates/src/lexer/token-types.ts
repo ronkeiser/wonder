@@ -25,6 +25,9 @@ export const TokenType = {
   OPEN_SEXPR: 'OPEN_SEXPR', // (
   CLOSE_SEXPR: 'CLOSE_SEXPR', // )
 
+  // Bracket literals
+  BRACKET_LITERAL: 'BRACKET_LITERAL', // [literal content]
+
   // Content
   CONTENT: 'CONTENT', // Plain text between mustaches
 

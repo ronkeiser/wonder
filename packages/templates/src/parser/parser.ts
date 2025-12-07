@@ -180,6 +180,25 @@ export class Parser {
   }
 
   /**
+   * Parse a bracket literal [identifier] for paths with special characters
+   * Returns a synthetic token with the literal value
+   *
+   * @returns Token with the bracket literal content
+   */
+  private parseBracketLiteral(): Token {
+    const bracketToken = this.expect(TokenType.BRACKET_LITERAL, 'Expected bracket literal');
+    const value = bracketToken.value;
+    this.advance(); // Move past BRACKET_LITERAL token
+
+    // Return a synthetic ID token with the literal value
+    return {
+      type: TokenType.ID,
+      value,
+      loc: bracketToken.loc,
+    };
+  }
+
+  /**
    * Parse a path segment, which can be an identifier or a numeric literal
    * This allows both {{obj.prop}} and {{array.0}}
    *
@@ -189,8 +208,11 @@ export class Parser {
     if (this.match(TokenType.ID) || this.match(TokenType.NUMBER)) {
       return this.currentToken!;
     }
+    if (this.match(TokenType.BRACKET_LITERAL)) {
+      return this.parseBracketLiteral();
+    }
     throw ParserError.fromToken(
-      'Expected identifier or number after path separator',
+      'Expected identifier, number, or bracket literal after path separator',
       this.currentToken!,
       this.getErrorContext(),
     );
@@ -359,11 +381,25 @@ export class Parser {
   private parsePathSegments(
     parts: string[],
     original: string,
+    firstToken?: Token | null,
   ): { parts: string[]; original: string } {
     while (this.currentToken && this.match(TokenType.SEP)) {
       this.advance(); // Move past SEP token
 
+      // Check if this is a bracket literal before parsing
+      const isBracketLiteral = this.match(TokenType.BRACKET_LITERAL);
       const segmentToken = this.parsePathSegment();
+
+      // "this" keyword can only appear at the start of a path, not in the middle
+      // But bracket literals like [this] are allowed (they're literal identifiers)
+      if (segmentToken.value === 'this' && !isBracketLiteral) {
+        // Use the position of the first token of the path (where the error should point)
+        // Note: Keep column 0-indexed for Handlebars compatibility
+        const loc = firstToken?.loc?.start;
+        const position = loc ? `${loc.line}:${loc.column}` : '0:0';
+        throw new Error(`Invalid path: ${original}/this - ${position}`);
+      }
+
       parts.push(segmentToken.value);
       original += '.' + segmentToken.value;
       this.advance(); // Move past segment token
@@ -381,6 +417,7 @@ export class Parser {
   private parseDataVariablePath(): PathExpression {
     let parts: string[] = [];
     let original = '@';
+    const firstToken = this.currentToken; // Capture for error position
     this.advance(); // Move past DATA token
 
     // After @, we must have an identifier
@@ -390,7 +427,7 @@ export class Parser {
     this.advance(); // Move past ID token
 
     // Parse additional path segments (e.g., @root.user)
-    const result = this.parsePathSegments(parts, original);
+    const result = this.parsePathSegments(parts, original, firstToken);
     parts = result.parts;
     original = result.original;
 
@@ -414,6 +451,7 @@ export class Parser {
   private parseThisPath(): PathExpression {
     let parts: string[] = [];
     let original = 'this';
+    const firstToken = this.currentToken; // Capture for error position
     this.advance(); // Move past 'this'
 
     // Check if there's a path after 'this'
@@ -426,7 +464,7 @@ export class Parser {
       this.advance();
 
       // Parse additional segments
-      const result = this.parsePathSegments(parts, original);
+      const result = this.parsePathSegments(parts, original, firstToken);
       parts = result.parts;
       original = result.original;
     }
@@ -452,6 +490,7 @@ export class Parser {
   private parseCurrentContextPath(): PathExpression {
     let parts: string[] = [];
     let original = '.';
+    const firstToken = this.currentToken; // Capture for error position
     this.advance(); // Move past '.'
 
     // Check if there's a path after '.'
@@ -464,7 +503,7 @@ export class Parser {
       this.advance();
 
       // Parse additional segments
-      const result = this.parsePathSegments(parts, original);
+      const result = this.parsePathSegments(parts, original, firstToken);
       parts = result.parts;
       original = result.original;
     }
@@ -491,6 +530,7 @@ export class Parser {
     let depth = 0;
     let parts: string[] = [];
     let original = '';
+    const firstToken = this.currentToken; // Capture for error position
 
     // Count consecutive .. segments to calculate depth
     while (this.currentToken && this.match(TokenType.ID) && this.currentToken.value === '..') {
@@ -512,7 +552,7 @@ export class Parser {
       this.advance();
 
       // Parse additional segments
-      const result = this.parsePathSegments(parts, original);
+      const result = this.parsePathSegments(parts, original, firstToken);
       parts = result.parts;
       original = result.original;
     }
@@ -541,7 +581,7 @@ export class Parser {
     this.advance(); // Move past first ID
 
     // Parse additional path segments (dot/slash notation)
-    const result = this.parsePathSegments(parts, original);
+    const result = this.parsePathSegments(parts, original, firstToken);
     parts = result.parts;
     original = result.original;
 
@@ -594,6 +634,7 @@ export class Parser {
         return this.parseUndefinedLiteral();
       case TokenType.ID:
       case TokenType.DATA:
+      case TokenType.BRACKET_LITERAL:
         return this.parsePathExpression();
       case TokenType.OPEN_SEXPR:
         return this.parseSubExpression();
@@ -812,6 +853,31 @@ export class Parser {
     // Check for data variable (@)
     if (this.currentToken && this.match(TokenType.DATA)) {
       return this.parseDataVariablePath();
+    }
+
+    // Check for bracket literal at start
+    if (this.currentToken && this.match(TokenType.BRACKET_LITERAL)) {
+      const bracketToken = this.parseBracketLiteral();
+      // Don't call parseSimplePath because we've already advanced
+      // Instead, build the path directly
+      let parts: string[] = [bracketToken.value];
+      let original = bracketToken.value;
+
+      // Parse additional path segments (dot/slash notation)
+      const result = this.parsePathSegments(parts, original, bracketToken);
+      parts = result.parts;
+      original = result.original;
+
+      const node: PathExpression = {
+        type: 'PathExpression',
+        data: false,
+        depth: 0,
+        parts: parts,
+        original: original,
+        loc: null,
+      };
+
+      return this.finishNode(node);
     }
 
     // Expect at least one identifier to start the path

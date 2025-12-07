@@ -215,6 +215,11 @@ export class Lexer {
         return this.scanDelimiter(TokenType.CLOSE_SEXPR, ')');
       }
 
+      // Check for bracket literals - scan content between [ and ] as a single token
+      if (char === '[') {
+        return this.scanBracketLiteral();
+      }
+
       // Check for number literals
       if (this.isDigit(char) || (char === '-' && this.isDigit(this.peekAt(1)))) {
         return this.scanNumber();
@@ -618,6 +623,38 @@ export class Lexer {
   /**
    * Scan a string literal ("text" or 'text')
    */
+  /**
+   * Scan a bracket literal [content] - preserves all content including spaces
+   * Used for paths with special characters: {{[foo bar]}}, {{[@alan]}}
+   */
+  private scanBracketLiteral(): Token {
+    const start = this.getPosition();
+    this.advance(); // Consume opening [
+    let value = '';
+
+    // Scan everything until we hit the closing ]
+    while (!this.isEOF() && this.peek() !== ']') {
+      value += this.advance();
+    }
+
+    // Check for unclosed bracket
+    if (this.isEOF()) {
+      throw new LexerError('Unclosed bracket literal: expected closing ]', start);
+    }
+
+    this.advance(); // Consume closing ]
+    const end = this.getPosition();
+
+    return {
+      type: TokenType.BRACKET_LITERAL,
+      value,
+      loc: {
+        start,
+        end,
+      },
+    };
+  }
+
   private scanString(): Token {
     const start = this.getPosition();
     const quote = this.advance(); // Consume opening quote
