@@ -30,8 +30,8 @@ Transition {
     wait_for: 'any' | 'all' | { m_of_n: number },
     joins_transition: string, // Which transition's fan-out to synchronize on
     merge?: {
-      source: string,         // Path in _branch.output
-      target: string,         // Where to write merged result
+      source: string,         // Path in branch output (e.g., '*', 'choice', 'result.score')
+      target: string,         // Where to write merged result (e.g., 'state.votes')
       strategy: 'append' | 'merge' | 'keyed' | 'last_wins'
     }
   }
@@ -133,7 +133,8 @@ Transition:
   }
 
 // → 5 tokens spawned to Node B
-// → Each has context._branch.item = judges[i]
+// → Each token can access judges[i] via input mapping
+// → Each writes to isolated branch_output_tok_* table
 ```
 
 **Use case:** Process array items in parallel (dynamic fan-out count).
@@ -223,13 +224,15 @@ Transition {
     wait_for: 'all',              // Wait for all siblings
     joins_transition: 'trans_a',  // Which transition's fan-out to join
     merge: {
-      source: '*',                // Path in _branch.output
+      source: '*',                // All fields from branch output
       target: 'state.votes',      // Where to write merged result
       strategy: 'append'          // How to combine
     }
   }
 }
 ```
+
+**Storage:** Each sibling writes to `branch_output_{tokenId}` table. At fan-in, all sibling tables are read, merged per strategy, and written to `context_state.votes`. See `branch-storage.md` for details.
 
 **Sibling Identification:**
 
@@ -283,7 +286,9 @@ Transition: C → D, synchronization: {
 
 **Error Handling:**
 
-Failed nodes produce error objects in their `_branch.output`. These flow through merge strategies like any other output. Downstream nodes can inspect merged results (e.g., `state.group_a`) and route based on success/failure states. This keeps error handling in the application layer rather than the workflow engine.
+Failed nodes produce error objects in their branch output tables. These flow through merge strategies like any other output. Downstream nodes can inspect merged results (e.g., `state.votes`) and route based on success/failure states. This keeps error handling in the application layer rather than the workflow engine.
+
+**Note:** Branch outputs are stored in separate SQL tables per token (see `branch-storage.md`), not as flat `_branch.output` key-value pairs.
 
 ## Routing Algorithm
 

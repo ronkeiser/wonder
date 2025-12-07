@@ -180,17 +180,21 @@ getActiveCount(sql, workflowRunId) → number
 
 ### operations/context.ts
 
-Key-value store for workflow data flow.
+Schema-driven SQL operations for workflow context and branch storage.
 
 ```typescript
-initializeTable(sql) → void
-initializeWithInput(sql, input) → void
-get(sql, path) → unknown
-set(sql, path, value) → void
-applyNodeOutput(sql, nodeRef, output, tokenId?) → void
-getSnapshot(sql) → ContextSnapshot  // read-only view for decisions
-getBranchOutputs(sql, nodeRef) → Array<Record<string, unknown>>
+initializeTable(sql) → void              // Create tables from schema DDL
+initializeWithInput(sql, input) → void   // Populate initial context
+initializeBranchTable(sql, tokenId, schema) → void  // Create branch output table
+get(sql, path) → unknown                 // Read context value
+set(sql, path, value) → void             // Write context value
+applyNodeOutput(sql, tokenId, output, schema) → void  // Write to branch table
+getSnapshot(sql) → ContextSnapshot       // Read-only view for decision logic
+mergeBranches(sql, siblings, mergeConfig, schema) → void  // Merge at fan-in
+dropBranchTables(sql, tokenIds) → void   // Cleanup after merge
 ```
+
+See `branch-storage.md` for branch isolation design.
 
 ### operations/artifacts.ts
 

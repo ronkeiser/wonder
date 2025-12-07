@@ -142,16 +142,23 @@ Each workflow run gets its own isolated context in a dedicated DO instance. Sche
 
 ### Branch Context
 
-During fan-out, each token writes to isolated `_branch` storage:
+During fan-out, each token writes to isolated branch storage. See `branch-storage.md` for complete design.
+
+**Storage approach:** Each branch gets separate SQL tables (e.g., `branch_output_tok_abc123`) generated from the node's `output_schema`. This provides:
+
+- True isolation (no shared state)
+- Schema validation via `@wonder/schema`
+- Native SQL storage (not JSON blobs)
+
+**Branch metadata** tracked in token table:
 
 ```typescript
-_branch: {
+Token {
   id: string,              // Token ID
-  index: number,           // 0-indexed position in sibling group
-  total: number,           // Total sibling count
-  fan_out_node_id: string, // Node that spawned this branch
-  output: Record<string, unknown>,  // Isolated output space
-  parent?: { ... }         // For nested fan-outs
+  branch_index: number,    // 0-indexed position in sibling group
+  branch_total: number,    // Total siblings
+  fan_out_transition_id: string, // Transition that spawned this group
+  parent_token_id?: string // For nested fan-outs
 }
 ```
 
