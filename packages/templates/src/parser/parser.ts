@@ -1104,11 +1104,7 @@ export class Parser {
         body.push(this.parseContentStatement());
       } else if (this.match(TokenType.COMMENT)) {
         body.push(this.parseCommentStatement());
-      } else if (this.match(TokenType.OPEN)) {
-        body.push(this.parseMustacheStatement());
-      } else if (this.match(TokenType.OPEN_UNESCAPED)) {
-        body.push(this.parseMustacheStatement());
-      } else if (this.match(TokenType.OPEN_RAW)) {
+      } else if (this.currentToken && MUSTACHE_OPEN_CLOSE_MAP.has(this.currentToken.type)) {
         body.push(this.parseMustacheStatement());
       } else if (this.match(TokenType.OPEN_BLOCK)) {
         body.push(this.parseBlockStatement());
