@@ -10,10 +10,15 @@
   },
   "scripts": {
     "test": "vitest run",
-    "test:watch": "vitest --watch"
+    "test:watch": "vitest --watch",
+    "test:spec": "vitest run test/validation/handlebars-spec"
   },
   "devDependencies": {
+    "@types/mocha": "^10.0.10",
+    "dirty-chai": "^2.0.1",
     "handlebars": "^4.7.8",
+    "mocha": "^11.7.5",
+    "sinon": "^21.0.0",
     "typescript": "^5.9.3",
     "vitest": "^3.2.4"
   }
