@@ -651,17 +651,20 @@ export class Interpreter {
     // In inverse blocks, program.body is empty and content is in inverse
     const isInverseBlock = node.program?.body.length === 0 && node.inverse !== null;
 
+    // Determine if there's an else clause (not an inverse block)
+    const hasElseClause = !isInverseBlock && node.inverse !== null;
+
     if (renderInverse) {
       // When rendering inverse, use inverseStrip flags
       // UNLESS it's an inverse block statement, in which case use openStrip
       return this.evaluateProgram(node.inverse, {
-        stripStart: isInverseBlock ? node.openStrip?.close : node.inverseStrip?.open,
+        stripStart: isInverseBlock ? node.openStrip?.close : node.inverseStrip?.close,
         stripEnd: node.closeStrip?.open,
       });
     } else {
       return this.evaluateProgram(node.program, {
         stripStart: node.openStrip?.close,
-        stripEnd: isInverseBlock ? node.closeStrip?.open : node.inverseStrip?.close,
+        stripEnd: hasElseClause ? node.inverseStrip?.open : node.closeStrip?.open,
       });
     }
   }

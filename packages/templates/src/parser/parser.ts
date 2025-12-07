@@ -768,12 +768,25 @@ export class Parser {
    * @returns True if current token terminates a block
    */
   private isBlockTerminator(): boolean {
-    return (
-      this.match(TokenType.OPEN_ENDBLOCK) ||
-      this.match(TokenType.OPEN_INVERSE) ||
-      this.isAtBlockTerminatorWithStrip() ||
-      this.isAtElseWithStrip()
-    );
+    // Check for {{/...}}
+    if (this.match(TokenType.OPEN_ENDBLOCK)) {
+      return true;
+    }
+
+    // Check for {{^}} (else clause) vs {{^if}} (inverse block statement)
+    // {{^}} has STRIP or CLOSE next, whereas {{^if}} has ID next
+    if (this.match(TokenType.OPEN_INVERSE)) {
+      const next = this.peek(1);
+      if (!next) {
+        return false;
+      }
+      // If next is STRIP or CLOSE, it's an else clause
+      // If next is ID, it's an inverse block statement (not a terminator)
+      return next.type === TokenType.STRIP || next.type === TokenType.CLOSE;
+    }
+
+    // Check for {{~/...}} or {{~^}} patterns
+    return this.isAtBlockTerminatorWithStrip() || this.isAtElseWithStrip();
   }
 
   /**
@@ -1441,14 +1454,8 @@ export class Parser {
       // Consume the OPEN_INVERSE token ({{^)
       this.advance();
 
-      // Check for opening strip after {{^
-      inverseOpenStrip = this.match(TokenType.STRIP);
-      if (inverseOpenStrip) {
-        this.advance();
-      }
-
-      // {{^}} doesn't have any content between the opening and closing strip
-      // So if there's another STRIP token here, it's the closing strip
+      // Check for strip after {{^
+      // In {{^~}}, the ~ strips AFTER the else (close strip), not before (open strip)
       inverseCloseStrip = this.match(TokenType.STRIP);
       if (inverseCloseStrip) {
         this.advance();
