@@ -486,6 +486,16 @@ export class Interpreter {
   }
 
   /**
+   * Looks up a helper in the merged registry (built-in + user helpers).
+   *
+   * @param name - The helper name to look up
+   * @returns The helper function if found, undefined otherwise
+   */
+  private lookupHelper(name: string): ((...args: any[]) => any) | undefined {
+    return this.helpers[name];
+  }
+
+  /**
    * Evaluates a SubExpression (helper call) by recursively evaluating parameters
    * and calling the helper function.
    *
@@ -497,7 +507,7 @@ export class Interpreter {
     const helperName = expr.path.parts[0];
 
     // Look up helper in registry
-    const helper = this.helpers[helperName];
+    const helper = this.lookupHelper(helperName);
     if (!helper) {
       throw new Error(`Unknown helper: ${helperName}`);
     }

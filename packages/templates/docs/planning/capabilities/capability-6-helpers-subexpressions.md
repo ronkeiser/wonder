@@ -1,6 +1,6 @@
 # Capability 6: Helpers & Subexpressions
 
-**Status:** `[ ]` **NOT STARTED**
+**Status:** `[~]` **IN PROGRESS**
 
 **Goal:** Support runtime helper functions and nested helper calls (subexpressions) within template expressions, enabling complex logic like comparisons and custom transformations.
 
@@ -195,13 +195,13 @@ describe('Expression Parsing with SubExpressions', () => {
 
 **Goal:** Recursively evaluate subexpressions by calling helpers with evaluated arguments
 
-**Status:** `[ ]` Not Started
+**Status:** `[x]` **COMPLETE** ✅
 
 **Estimated LOC:** ~40 lines (evaluateSubExpression method with recursive logic)
 
 ### Task C6-F2-T1: Implement evaluateSubExpression()
 
-**Status:** `[ ]` Not Started
+**Status:** `[x]` Complete ✅
 
 **Goal:** Add method to evaluate SubExpression nodes
 
@@ -267,7 +267,7 @@ describe('SubExpression Evaluation', () => {
 
 **Goal:** Implement standard comparison and logical helpers for use in conditionals
 
-**Status:** `[ ]` Not Started
+**Status:** `[x]` **COMPLETE** ✅
 
 **Estimated LOC:** ~60 lines (comparison.ts ~25, logical.ts ~25, index.ts ~10)
 
@@ -292,7 +292,7 @@ Handlebars provides built-in helpers for comparisons that are commonly used with
 
 ### Task C6-F3-T1: Implement Comparison Helpers
 
-**Status:** `[ ]` Not Started
+**Status:** `[x]` Complete ✅
 
 **Requirements:**
 
@@ -363,7 +363,7 @@ describe('Comparison Helpers', () => {
 
 ### Task C6-F3-T2: Implement Logical Helpers
 
-**Status:** `[ ]` Not Started
+**Status:** `[x]` Complete ✅
 
 **Requirements:**
 
@@ -442,7 +442,7 @@ describe('Logical Helpers', () => {
 
 ### Task C6-F3-T3: Register Built-in Helpers
 
-**Status:** `[ ]` Not Started
+**Status:** `[x]` Complete ✅
 
 **Requirements:**
 
@@ -508,13 +508,13 @@ describe('Built-in Helper Registry', () => {
 
 **Goal:** Accept user-provided helpers at render time and merge with built-in helpers
 
-**Status:** `[ ]` Not Started
+**Status:** `[~]` **IN PROGRESS**
 
 **Estimated LOC:** ~50 lines (API updates ~15, helper lookup ~10, context binding ~25)
 
 ### Task C6-F4-T1: Add Helpers Option to API
 
-**Status:** `[ ]` Not Started
+**Status:** `[x]` Complete ✅
 
 **Requirements:**
 
@@ -662,7 +662,7 @@ describe('Helper Lookup', () => {
 
 ### Task C6-F4-T3: Call Helpers with Context Binding
 
-**Status:** `[ ]` Not Started
+**Status:** `[✓]` Complete
 
 **Requirements:**
 
