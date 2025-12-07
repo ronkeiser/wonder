@@ -5,7 +5,7 @@
  * Data frames contain special @ variables like @index, @first, @last, @key, @root.
  */
 
-import { createFrame } from '../runtime/utils.js';
+import { createFrame, lookupProperty } from '../runtime/utils.js';
 
 /**
  * Metadata stored in a data frame for loop iteration.
@@ -92,4 +92,47 @@ export function createDataFrame(parentFrame: any, metadata: Partial<DataFrameMet
   }
 
   return frame;
+}
+
+/**
+ * Gets a data variable from a frame using secure property access.
+ *
+ * Uses lookupProperty() for security to prevent prototype pollution.
+ * Only accesses own properties, not inherited ones.
+ *
+ * @param frame - The data frame to read from
+ * @param name - The property name to access (e.g., '@index', '@root')
+ * @returns The value of the property, or undefined if not found
+ *
+ * @example
+ * ```typescript
+ * const frame = createDataFrame(null, { '@index': 0, '@first': true });
+ * getDataVariable(frame, '@index'); // 0
+ * getDataVariable(frame, '@missing'); // undefined
+ * ```
+ */
+export function getDataVariable(frame: any, name: string): any {
+  return lookupProperty(frame, name);
+}
+
+/**
+ * Sets a data variable on a frame as an own property.
+ *
+ * Used when creating frames with metadata or updating frame properties.
+ *
+ * @param frame - The data frame to modify
+ * @param name - The property name to set (e.g., '@index', '@key')
+ * @param value - The value to set
+ *
+ * @example
+ * ```typescript
+ * const frame = createDataFrame(null, {});
+ * setDataVariable(frame, '@index', 5);
+ * console.log(frame['@index']); // 5
+ * ```
+ */
+export function setDataVariable(frame: any, name: string, value: any): void {
+  if (frame != null) {
+    frame[name] = value;
+  }
 }

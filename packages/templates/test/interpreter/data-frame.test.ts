@@ -3,7 +3,12 @@
  */
 
 import { describe, expect, it } from 'vitest';
-import { createDataFrame, type DataFrameMetadata } from '../../src/interpreter/data-frame.js';
+import {
+  createDataFrame,
+  getDataVariable,
+  setDataVariable,
+  type DataFrameMetadata,
+} from '../../src/interpreter/data-frame.js';
 
 describe('createDataFrame', () => {
   describe('basic frame creation', () => {
@@ -282,6 +287,244 @@ describe('createDataFrame', () => {
       // Both have access to @root
       expect(outerFrame['@root']).toBe(rootContext);
       expect(innerFrame['@root']).toBe(rootContext);
+    });
+  });
+});
+
+describe('getDataVariable', () => {
+  describe('basic access', () => {
+    it('should get existing data variable', () => {
+      const frame = createDataFrame(null, { '@index': 5 });
+      expect(getDataVariable(frame, '@index')).toBe(5);
+    });
+
+    it('should get multiple data variables', () => {
+      const frame = createDataFrame(null, {
+        '@index': 0,
+        '@first': true,
+        '@last': false,
+        '@key': 'name',
+      });
+
+      expect(getDataVariable(frame, '@index')).toBe(0);
+      expect(getDataVariable(frame, '@first')).toBe(true);
+      expect(getDataVariable(frame, '@last')).toBe(false);
+      expect(getDataVariable(frame, '@key')).toBe('name');
+    });
+
+    it('should return undefined for missing variable', () => {
+      const frame = createDataFrame(null, { '@index': 0 });
+      expect(getDataVariable(frame, '@missing')).toBeUndefined();
+    });
+
+    it('should return undefined for null frame', () => {
+      expect(getDataVariable(null, '@index')).toBeUndefined();
+    });
+
+    it('should return undefined for undefined frame', () => {
+      expect(getDataVariable(undefined, '@index')).toBeUndefined();
+    });
+  });
+
+  describe('@root access', () => {
+    it('should access @root from root frame', () => {
+      const rootContext = { name: 'Root' };
+      const frame = createDataFrame(null, { '@root': rootContext });
+      expect(getDataVariable(frame, '@root')).toBe(rootContext);
+    });
+
+    it('should access @root from child frame', () => {
+      const rootContext = { name: 'Root' };
+      const rootFrame = createDataFrame(null, { '@root': rootContext });
+      const childFrame = createDataFrame(rootFrame, { '@index': 0 });
+
+      // @root is inherited via createFrame's spread
+      expect(getDataVariable(childFrame, '@root')).toBe(rootContext);
+    });
+
+    it('should access @root from deeply nested frame', () => {
+      const rootContext = { name: 'Root' };
+      let frame = createDataFrame(null, { '@root': rootContext });
+
+      // Create 5 levels of nesting
+      for (let i = 0; i < 5; i++) {
+        frame = createDataFrame(frame, { '@index': i });
+      }
+
+      // @root still accessible at any depth
+      expect(getDataVariable(frame, '@root')).toBe(rootContext);
+    });
+  });
+
+  describe('custom data variables', () => {
+    it('should get custom data variable', () => {
+      const frame = createDataFrame(null, { '@custom': 'value' });
+      expect(getDataVariable(frame, '@custom')).toBe('value');
+    });
+
+    it('should get non-prefixed property', () => {
+      const frame = createDataFrame(null, { customProp: 42 });
+      expect(getDataVariable(frame, 'customProp')).toBe(42);
+    });
+  });
+
+  describe('security', () => {
+    it('should return undefined for __proto__', () => {
+      const frame = createDataFrame(null, { '@index': 0 });
+      expect(getDataVariable(frame, '__proto__')).toBeUndefined();
+    });
+
+    it('should return undefined for constructor', () => {
+      const frame = createDataFrame(null, { '@index': 0 });
+      expect(getDataVariable(frame, 'constructor')).toBeUndefined();
+    });
+
+    it('should return undefined for prototype', () => {
+      const frame = createDataFrame(null, { '@index': 0 });
+      expect(getDataVariable(frame, 'prototype')).toBeUndefined();
+    });
+
+    it('should not access inherited properties', () => {
+      const frame = createDataFrame(null, { '@index': 0 });
+      // toString is inherited, should return undefined
+      expect(getDataVariable(frame, 'toString')).toBeUndefined();
+    });
+  });
+
+  describe('edge cases', () => {
+    it('should handle undefined value', () => {
+      const frame = createDataFrame(null, { '@value': undefined });
+      expect(getDataVariable(frame, '@value')).toBeUndefined();
+    });
+
+    it('should handle null value', () => {
+      const frame = createDataFrame(null, { '@value': null });
+      expect(getDataVariable(frame, '@value')).toBe(null);
+    });
+
+    it('should handle zero value', () => {
+      const frame = createDataFrame(null, { '@index': 0 });
+      expect(getDataVariable(frame, '@index')).toBe(0);
+    });
+
+    it('should handle false value', () => {
+      const frame = createDataFrame(null, { '@first': false });
+      expect(getDataVariable(frame, '@first')).toBe(false);
+    });
+
+    it('should handle empty string value', () => {
+      const frame = createDataFrame(null, { '@key': '' });
+      expect(getDataVariable(frame, '@key')).toBe('');
+    });
+  });
+});
+
+describe('setDataVariable', () => {
+  describe('basic setting', () => {
+    it('should set data variable on frame', () => {
+      const frame = createDataFrame(null, {});
+      setDataVariable(frame, '@index', 5);
+      expect(frame['@index']).toBe(5);
+    });
+
+    it('should set multiple data variables', () => {
+      const frame = createDataFrame(null, {});
+      setDataVariable(frame, '@index', 0);
+      setDataVariable(frame, '@first', true);
+      setDataVariable(frame, '@key', 'name');
+
+      expect(frame['@index']).toBe(0);
+      expect(frame['@first']).toBe(true);
+      expect(frame['@key']).toBe('name');
+    });
+
+    it('should override existing value', () => {
+      const frame = createDataFrame(null, { '@index': 0 });
+      setDataVariable(frame, '@index', 5);
+      expect(frame['@index']).toBe(5);
+    });
+  });
+
+  describe('set and get roundtrip', () => {
+    it('should set and get data variable', () => {
+      const frame = createDataFrame(null, {});
+      setDataVariable(frame, '@custom', 'test');
+      expect(getDataVariable(frame, '@custom')).toBe('test');
+    });
+
+    it('should handle multiple set/get operations', () => {
+      const frame = createDataFrame(null, {});
+
+      setDataVariable(frame, '@index', 0);
+      expect(getDataVariable(frame, '@index')).toBe(0);
+
+      setDataVariable(frame, '@index', 1);
+      expect(getDataVariable(frame, '@index')).toBe(1);
+
+      setDataVariable(frame, '@first', false);
+      expect(getDataVariable(frame, '@first')).toBe(false);
+    });
+  });
+
+  describe('edge cases', () => {
+    it('should handle null frame gracefully', () => {
+      expect(() => setDataVariable(null, '@index', 0)).not.toThrow();
+    });
+
+    it('should handle undefined frame gracefully', () => {
+      expect(() => setDataVariable(undefined, '@index', 0)).not.toThrow();
+    });
+
+    it('should set undefined value', () => {
+      const frame = createDataFrame(null, {});
+      setDataVariable(frame, '@value', undefined);
+      expect(frame['@value']).toBeUndefined();
+    });
+
+    it('should set null value', () => {
+      const frame = createDataFrame(null, {});
+      setDataVariable(frame, '@value', null);
+      expect(frame['@value']).toBe(null);
+    });
+
+    it('should set zero value', () => {
+      const frame = createDataFrame(null, {});
+      setDataVariable(frame, '@index', 0);
+      expect(frame['@index']).toBe(0);
+    });
+
+    it('should set false value', () => {
+      const frame = createDataFrame(null, {});
+      setDataVariable(frame, '@first', false);
+      expect(frame['@first']).toBe(false);
+    });
+
+    it('should set empty string value', () => {
+      const frame = createDataFrame(null, {});
+      setDataVariable(frame, '@key', '');
+      expect(frame['@key']).toBe('');
+    });
+  });
+
+  describe('frame isolation', () => {
+    it('should not affect parent frame', () => {
+      const parentFrame = createDataFrame(null, { '@index': 0 });
+      const childFrame = createDataFrame(parentFrame, {});
+
+      setDataVariable(childFrame, '@index', 5);
+
+      expect(childFrame['@index']).toBe(5);
+      expect(parentFrame['@index']).toBe(0);
+    });
+
+    it('should set as own property, not inherited', () => {
+      const parentFrame = createDataFrame(null, { '@root': 'ROOT' });
+      const childFrame = createDataFrame(parentFrame, {});
+
+      setDataVariable(childFrame, '@custom', 'child-value');
+
+      expect(childFrame['@custom']).toBe('child-value');
+      expect(getDataVariable(parentFrame, '@custom')).toBeUndefined();
     });
   });
 });
