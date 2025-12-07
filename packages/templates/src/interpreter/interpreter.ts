@@ -445,7 +445,13 @@ export class Interpreter {
     }
 
     // Evaluate the condition
-    const condition = this.evaluateExpression(node.params[0]);
+    let condition = this.evaluateExpression(node.params[0]);
+
+    // If condition is a function, call it to get the actual value
+    if (typeof condition === 'function') {
+      const context = this.contextStack.getCurrent();
+      condition = condition.call(context);
+    }
 
     // Match Handlebars #if logic: (!conditional) || isEmpty(conditional)
     // This makes 0 falsy (standard JS) while keeping {} truthy
@@ -476,7 +482,13 @@ export class Interpreter {
     }
 
     // Evaluate the condition
-    const condition = this.evaluateExpression(node.params[0]);
+    let condition = this.evaluateExpression(node.params[0]);
+
+    // If condition is a function, call it to get the actual value
+    if (typeof condition === 'function') {
+      const context = this.contextStack.getCurrent();
+      condition = condition.call(context);
+    }
 
     // #unless is inverse of #if: match same logic (!conditional) || isEmpty(conditional)
     const isFalsy = !condition || isEmpty(condition);
@@ -507,11 +519,27 @@ export class Interpreter {
     }
 
     // Evaluate the collection parameter
-    const collection = this.evaluateExpression(node.params[0]);
+    let collection = this.evaluateExpression(node.params[0]);
+
+    // If collection is a function, call it to get the actual value
+    if (typeof collection === 'function') {
+      const context = this.contextStack.getCurrent();
+      collection = collection.call(context);
+    }
 
     // Handle arrays
     if (Array.isArray(collection)) {
       return this.evaluateEachArray(node, collection);
+    }
+
+    // Handle Map objects
+    if (collection instanceof Map) {
+      return this.evaluateEachMap(node, collection);
+    }
+
+    // Handle Set objects
+    if (collection instanceof Set) {
+      return this.evaluateEachSet(node, collection);
     }
 
     // Handle objects
@@ -630,6 +658,97 @@ export class Interpreter {
   }
 
   /**
+   * Evaluates #each for Map iteration.
+   *
+   * @param node - The BlockStatement node
+   * @param collection - The Map to iterate over
+   * @returns The concatenated output from all entry iterations
+   */
+  private evaluateEachMap(node: BlockStatement, collection: Map<any, any>): string {
+    // Empty maps render the inverse block ({{else}})
+    if (collection.size === 0) {
+      return this.evaluateProgram(node.inverse);
+    }
+
+    let output = '';
+    let index = 0;
+    const entries = Array.from(collection.entries());
+
+    // Iterate over Map entries
+    for (const [key, value] of entries) {
+      // Create data frame with loop variables
+      const parentFrame = this.dataStack.getCurrent();
+      const frame = createDataFrame(parentFrame, {
+        '@key': key,
+        '@index': index,
+        '@first': index === 0,
+        '@last': index === entries.length - 1,
+      });
+      this.dataStack.push(frame);
+
+      // Push value as new context
+      this.contextStack.push(value);
+
+      // Evaluate the program block with the current value
+      output += this.evaluateProgram(node.program);
+
+      // Pop context and data stacks
+      this.contextStack.pop();
+      this.dataStack.pop();
+
+      index++;
+    }
+
+    return output;
+  }
+
+  /**
+   * Evaluates #each for Set iteration.
+   *
+   * @param node - The BlockStatement node
+   * @param collection - The Set to iterate over
+   * @returns The concatenated output from all value iterations
+   */
+  private evaluateEachSet(node: BlockStatement, collection: Set<any>): string {
+    // Empty sets render the inverse block ({{else}})
+    if (collection.size === 0) {
+      return this.evaluateProgram(node.inverse);
+    }
+
+    let output = '';
+    let index = 0;
+    const values = Array.from(collection.values());
+
+    // Iterate over Set values
+    for (const value of values) {
+      // Create data frame with loop variables
+      // For Sets, @key is same as @index (but as string for consistency)
+      const parentFrame = this.dataStack.getCurrent();
+      const frame = createDataFrame(parentFrame, {
+        '@key': String(index),
+        '@index': index,
+        '@first': index === 0,
+        '@last': index === values.length - 1,
+      });
+      this.dataStack.push(frame);
+
+      // Push value as new context
+      this.contextStack.push(value);
+
+      // Evaluate the program block with the current value
+      output += this.evaluateProgram(node.program);
+
+      // Pop context and data stacks
+      this.contextStack.pop();
+      this.dataStack.pop();
+
+      index++;
+    }
+
+    return output;
+  }
+
+  /**
    * Evaluates the #with block helper.
    *
    * Changes the current context to the resolved value, allowing cleaner
@@ -645,7 +764,13 @@ export class Interpreter {
     }
 
     // Evaluate the parameter to get the value
-    const value = this.evaluateExpression(node.params[0]);
+    let value = this.evaluateExpression(node.params[0]);
+
+    // If value is a function, call it to get the actual value
+    if (typeof value === 'function') {
+      const context = this.contextStack.getCurrent();
+      value = value.call(context);
+    }
 
     // Match #if logic: (!value) || isEmpty(value) for falsy check
     const isFalsy = !value || isEmpty(value);
