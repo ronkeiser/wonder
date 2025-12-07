@@ -284,10 +284,10 @@ describe('Lexer - Escape Handling (C1-F3-T1)', () => {
     it('should handle chain of backslashes before mustache', () => {
       lexer.setInput('\\\\\\{{foo}}');
 
-      // First backslash escapes second -> produces single backslash
-      // Third backslash escapes opening brace -> produces {{foo}} literally
-      const token = lexer.lex();
-      expect(token).toMatchObject({
+      // First \\ -> \, second \\ -> \, third \{{ -> {{foo}} escaped
+      // Result: \\ as content, then {{foo}} as content
+      const content = lexer.lex();
+      expect(content).toMatchObject({
         type: TokenType.CONTENT,
         value: '\\{{foo}}',
       });
@@ -298,8 +298,8 @@ describe('Lexer - Escape Handling (C1-F3-T1)', () => {
     it('should handle four backslashes before mustache', () => {
       lexer.setInput('\\\\\\\\{{foo}}');
 
-      // First backslash escapes second -> single backslash in content
-      // Third backslash escapes fourth -> single backslash in content
+      // First pair: backslash escapes backslash -> single backslash
+      // Second pair: backslash escapes backslash -> single backslash
       // Then normal mustache
       const content = lexer.lex();
       expect(content).toMatchObject({
@@ -387,7 +387,7 @@ describe('Lexer - Escape Handling (C1-F3-T1)', () => {
       const token = lexer.lex();
       expect(token).toMatchObject({
         type: TokenType.CONTENT,
-        value: '\\\\',
+        value: '\\\\', // Four backslashes become two
       });
 
       expect(lexer.lex()).toMatchObject({ type: TokenType.EOF });

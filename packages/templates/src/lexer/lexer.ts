@@ -76,14 +76,8 @@ export class Lexer {
       if (char === '\\' && i + 1 < template.length) {
         const nextChar = template[i + 1];
 
-        // Handle backslash escaping another backslash
-        if (nextChar === '\\') {
-          // Two backslashes become one backslash in output
-          processedInput += '\\';
-          i += 2; // Skip both backslashes
-        }
         // Handle escaping of mustache delimiters
-        else if (nextChar === '{' || nextChar === '}') {
+        if (nextChar === '{' || nextChar === '}') {
           // Remove the backslash and mark the next character as escaped
           const escapedIndex = processedInput.length;
           escapedIndices.add(escapedIndex);
@@ -94,8 +88,13 @@ export class Lexer {
 
           processedInput += nextChar;
           i += 2; // Skip both backslash and the escaped character
+        }
+        // Handle backslash escaping another backslash
+        else if (nextChar === '\\') {
+          processedInput += '\\';
+          i += 2;
         } else {
-          // Not a brace or backslash escape - keep the backslash
+          // Not an escape sequence - keep the backslash as-is
           processedInput += char;
           i++;
         }
