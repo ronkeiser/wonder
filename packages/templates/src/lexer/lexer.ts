@@ -72,30 +72,31 @@ export class Lexer {
     while (i < template.length) {
       const char = template[i];
 
-      // Check for escape sequence
       if (char === '\\' && i + 1 < template.length) {
-        const nextChar = template[i + 1];
+        const next = template[i + 1];
 
-        // Handle escaping of mustache delimiters: \{{ or \}}
-        if (nextChar === '{' || nextChar === '}') {
-          // Remove the backslash and mark the next character as escaped
-          const escapedIndex = processedInput.length;
-          escapedIndices.add(escapedIndex);
-
-          // Mark positions for double and triple brace patterns
-          escapedIndices.add(escapedIndex + 1);
-          escapedIndices.add(escapedIndex + 2);
-
-          processedInput += nextChar;
-          i += 2; // Skip both backslash and the escaped character
+        // \{{ or \}} - escape mustache delimiters
+        if (next === '{' || next === '}') {
+          const startIndex = processedInput.length;
+          // Mark this and next two positions as escaped to handle {{, }}, {{{, }}}
+          for (let offset = 0; offset < 3; offset++) {
+            escapedIndices.add(startIndex + offset);
+          }
+          processedInput += next;
+          i += 2;
         }
-        // Handle backslash escaping another backslash ONLY if followed by {{
-        else if (nextChar === '\\' && i + 2 < template.length && template[i + 2] === '{') {
-          // \\{{ means: output one backslash, then process the mustache
+        // \\{{ - backslash before mustache (output \, then process {{)
+        else if (
+          next === '\\' &&
+          i + 3 < template.length &&
+          template[i + 2] === '{' &&
+          template[i + 3] === '{'
+        ) {
           processedInput += '\\';
-          i += 2; // Skip both backslashes, leave {{ to be lexed
-        } else {
-          // Not an escape sequence - keep the backslash as-is
+          i += 2;
+        }
+        // Not an escape sequence - keep backslash
+        else {
           processedInput += char;
           i++;
         }
