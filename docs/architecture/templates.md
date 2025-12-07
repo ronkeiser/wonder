@@ -79,6 +79,89 @@ Cloudflare Workers prohibit `eval()` and `new Function()`. Standard template eng
 - Compiled template caching (parse once, render many times)
 - Minimal bundle size
 
+## Requirements
+
+Templates must support:
+
+**Array iteration** — `{{#each items}}{{this}}{{/each}}` with nested loops for multi-level parallelism
+**Loop variables** — `{{@index}}`, `{{@first}}`, `{{@last}}` for position-aware rendering
+**Nested property access** — `{{item.property.nested}}` for complex context objects
+**Conditionals** — `{{#if}}`, `{{#unless}}` for dynamic prompt structure
+**Helpers** — Built-in comparison operators (`gt`, `eq`, etc.) for logic in templates
+
+## Concrete Example: Ideation + Judging
+
+A workflow that generates ideas in parallel, then judges them:
+
+```
+Node: ideation_prompt (llm_call)
+  → Transition (spawn_count: 10) → Node: generate_idea (llm_call)
+  → Transition (wait_for: all, merge: append) → Node: merge_ideas
+  → Transition (spawn_count: 5) → Node: judge_ideas (llm_call)
+  → Transition (wait_for: all, merge: append) → Node: merge_scores
+  → Node: determine_winner (llm_call)
+```
+
+**After ideation (10 parallel tokens):**
+
+```typescript
+// Branch outputs merged with append strategy
+context.state.all_ideas = [
+  { name: 'Idea1' }, // from token 1
+  { name: 'Idea2' }, // from token 2
+  // ... 10 total
+];
+```
+
+**Judging prompt template:**
+
+```handlebars
+You are a judge. Rate each idea from 1-10.
+
+{{#each ideas}}
+  {{@index}}.
+  {{this.name}}
+{{/each}}
+
+Return JSON: [{ name: "...", score: 8 }, ...]
+```
+
+**After judging (5 parallel tokens):**
+
+```typescript
+// Each judge scores all ideas
+context.state.all_scores = [
+  [{ name: "Idea1", score: 8 }, { name: "Idea2", score: 7 }, ...],  // Judge 0
+  [{ name: "Idea1", score: 9 }, { name: "Idea2", score: 6 }, ...],  // Judge 1
+  // ... 5 judges total
+]
+```
+
+**Ranking prompt template:**
+
+```handlebars
+Calculate average scores across judges.
+
+{{#each judge_scores}}
+  Judge
+  {{@index}}:
+  {{#each this}}
+    -
+    {{name}}:
+    {{score}}/10
+  {{/each}}
+{{/each}}
+
+Return ranked list with averages.
+```
+
+**Why this requires template complexity:**
+
+- Nested `{{#each}}` for judge → scores iteration
+- `{{@index}}` to label judges/ideas
+- Dot notation (`{{this.name}}`, `{{this.score}}`) for object properties
+- Dynamic array lengths (10 ideas, 5 judges — user-configurable via spawn_count)
+
 ## Syntax
 
 Handlebars-compatible. See `packages/templates/docs/REQUIREMENTS.md` for full spec.
