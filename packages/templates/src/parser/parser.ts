@@ -851,6 +851,15 @@ export class Parser {
     // Parse the path expression inside the mustache
     const path = this.parsePathExpression();
 
+    // Parse parameters until we hit closing delimiter
+    const params: Expression[] = [];
+    const closeType = escaped ? TokenType.CLOSE : TokenType.CLOSE_UNESCAPED;
+
+    while (this.currentToken && !this.match(closeType)) {
+      const param = this.parseExpression();
+      params.push(param);
+    }
+
     // Expect appropriate closing delimiter and capture the closing token
     const closeToken = escaped
       ? this.expect(TokenType.CLOSE, 'Expected }} to close mustache statement')
@@ -873,7 +882,7 @@ export class Parser {
     const node: MustacheStatement = {
       type: 'MustacheStatement',
       path: path,
-      params: [], // Empty in V1 - no helper parameters support
+      params: params,
       hash: hash, // Empty in V1 - no named parameters support
       escaped: escaped,
       loc: loc,

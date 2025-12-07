@@ -147,23 +147,31 @@ export class Interpreter {
   }
 
   /**
-   * Evaluates a MustacheStatement (variable output).
+   * Evaluates a MustacheStatement (variable output or helper call).
    *
-   * Resolves the path, converts to string, and applies HTML escaping if needed.
+   * Uses helper detection to determine if this is a helper call or variable lookup.
+   * Resolves the value, converts to string, and applies HTML escaping if needed.
    *
    * @param node - The MustacheStatement node
    * @returns The output string (escaped or unescaped)
    */
   private evaluateMustache(node: MustacheStatement): string {
-    // V1: No helper calls - params must be empty
-    if (node.params.length > 0) {
-      throw new Error(
-        'Helper calls not yet implemented (Capability 6). Use simple variables only.',
-      );
-    }
+    let value: any;
 
-    // Resolve the path to get the value
-    const value = this.evaluatePathExpression(node.path);
+    if (this.isHelperCall(node)) {
+      // Call helper
+      const helperName = node.path.parts[0];
+      const helper = this.lookupHelper(helperName);
+      if (!helper) {
+        throw new Error(`Unknown helper: ${helperName}`);
+      }
+      const args = node.params.map((param) => this.evaluateExpression(param));
+      const context = this.contextStack.getCurrent();
+      value = helper.call(context, ...args);
+    } else {
+      // Variable lookup
+      value = this.evaluatePathExpression(node.path);
+    }
 
     // Handle null/undefined - return empty string
     if (value == null) {
@@ -486,13 +494,54 @@ export class Interpreter {
   }
 
   /**
-   * Looks up a helper in the merged registry (built-in + user helpers).
+   * Looks up a helper function in the helper registry.
    *
    * @param name - The helper name to look up
    * @returns The helper function if found, undefined otherwise
    */
   private lookupHelper(name: string): ((...args: any[]) => any) | undefined {
     return this.helpers[name];
+  }
+
+  /**
+   * Determines if a MustacheStatement or BlockStatement should be treated as a helper call.
+   *
+   * Rules (from Handlebars):
+   * 1. If statement has params → always a helper call
+   * 2. If path is scoped (starts with ./ or this.) → always variable lookup
+   * 3. If helper exists in registry → helper call
+   * 4. Otherwise → variable lookup
+   *
+   * @param node - The MustacheStatement or BlockStatement to check
+   * @returns true if this should be treated as a helper call
+   */
+  private isHelperCall(node: MustacheStatement | BlockStatement): boolean {
+    // Has params? Always a helper call
+    if (node.params.length > 0) {
+      return true;
+    }
+
+    // Scoped path? Never a helper (always variable lookup)
+    if (this.isScopedPath(node.path)) {
+      return false;
+    }
+
+    // Check if helper exists in registry
+    const helperName = node.path.parts[0];
+    return this.lookupHelper(helperName) !== undefined;
+  }
+
+  /**
+   * Checks if a path expression is scoped (explicit context reference).
+   *
+   * Scoped paths start with ./ or this. and always refer to context variables,
+   * never helpers.
+   *
+   * @param path - The PathExpression to check
+   * @returns true if the path is scoped
+   */
+  private isScopedPath(path: PathExpression): boolean {
+    return path.original.startsWith('./') || path.original.startsWith('this.');
   }
 
   /**

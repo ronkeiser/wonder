@@ -1,6 +1,6 @@
 # Capability 6: Helpers & Subexpressions
 
-**Status:** `[~]` **IN PROGRESS**
+**Status:** `[x]` **COMPLETE** ✅
 
 **Goal:** Support runtime helper functions and nested helper calls (subexpressions) within template expressions, enabling complex logic like comparisons and custom transformations.
 
@@ -732,9 +732,10 @@ describe('Helper Context Binding', () => {
 
 **Goal:** Distinguish between variable lookups and helper calls during evaluation
 
-**Status:** `[ ]` Not Started
+**Status:** `[x]` **COMPLETE** ✅
 
 **Estimated LOC:** ~60 lines (isHelperCall ~20, isScopedPath ~10, evaluation integration ~30)
+**Actual LOC:** ~95 lines (parser param parsing ~12, isHelperCall ~24, isScopedPath ~13, evaluation integration ~14, tests ~32)
 
 ### Background
 
@@ -747,7 +748,7 @@ Handlebars uses specific rules to determine if a name refers to a helper or a va
 
 ### Task C6-F5-T1: Implement isHelperCall()
 
-**Status:** `[ ]` Not Started
+**Status:** `[✓]` Complete
 
 **Requirements:**
 
@@ -838,7 +839,7 @@ describe('Helper Detection', () => {
 
 ### Task C6-F5-T2: Integrate Helper Detection in Evaluation
 
-**Status:** `[ ]` Not Started
+**Status:** `[x]` Complete ✅
 
 **Requirements:**
 
