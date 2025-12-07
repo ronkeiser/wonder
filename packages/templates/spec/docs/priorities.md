@@ -55,37 +55,6 @@
 
 ---
 
-### ✅ P0.3 - Block Helper `options.fn()` Not Working - COMPLETED (moved up)
-
-**Status:** ✅ Fixed - See above for details
-**Tests Fixed:** 13 tests now passing
-
----
-
-### P0.4 - Dangerous Property Access (Security) (6 failures)
-
-**Impact:** HIGH - Security vulnerability
-
-**Failing Tests:**
-
-- `security.test.ts`: GH-1595 tests
-  - "access should be denied to {{constructor}}" - returns `[object Object]` instead of empty
-  - "access should be denied to {{__defineGetter__}}" - TypeError thrown
-  - "access should be denied to {{__defineSetter__}}" - TypeError thrown
-  - "access should be denied to {{__proto__}}" - TypeError: not a function
-  - "should throw an exception when calling {{helperMissing}}" - doesn't throw
-  - "should throw an exception when calling {{#helperMissing}}" - doesn't throw
-
-**Root Cause:**
-
-1. `lookupProperty()` not blocking dangerous properties
-2. Prototype methods being called as helpers
-3. `helperMissing` not preventing explicit calls
-
-**Fix:** Add hash parsing to `Parser.parseExpression()`
-
----
-
 ## Priority 1: Important Features (Needed for Robust V1)
 
 ### ✅ P1.0a - Built-in Helpers Function Resolution - COMPLETED
