@@ -216,7 +216,7 @@ Parse block helpers with proper nesting:
 
 ## Capability 3: Runtime Utilities
 
-**Status:** 🔄 Not Started
+**Status:** ✅ Completed
 
 **Goal:** Implement core utility functions from Handlebars runtime for secure, correct evaluation
 
