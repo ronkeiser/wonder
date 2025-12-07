@@ -24,7 +24,7 @@ import type {
   UndefinedLiteral,
 } from '../parser/ast-nodes.js';
 import { SafeString } from '../runtime/safe-string.js';
-import { escapeExpression, isEmpty } from '../runtime/utils.js';
+import { escapeExpression, isEmpty, lookupProperty } from '../runtime/utils.js';
 import { ContextStack } from './context-stack.js';
 import { createDataFrame } from './data-frame.js';
 import { DataStack } from './data-stack.js';
@@ -159,9 +159,18 @@ export class Interpreter {
   private evaluateMustache(node: MustacheStatement): string {
     let value: any;
 
+    // Security: Prevent explicit calls to helperMissing/blockHelperMissing (GH-1558)
+    // Check this BEFORE determining if it's a helper call, since these names
+    // might not be in the helper registry but should still be blocked
+    const name = node.path.parts[0];
+    if (name === 'helperMissing' || name === 'blockHelperMissing') {
+      throw new Error(`Calling '${name}' explicitly is not allowed for security reasons`);
+    }
+
     if (this.isHelperCall(node)) {
       // Call helper
       const helperName = node.path.parts[0];
+
       const helper = this.lookupHelper(helperName);
       if (!helper) {
         // Fallback: try to resolve as context function (Feature 7.1)
@@ -176,6 +185,13 @@ export class Interpreter {
           throw new Error(`Unknown helper: ${helperName}`);
         }
       } else {
+        // Security: Validate helper is actually a function (GH-1595)
+        if (typeof helper !== 'function') {
+          throw new Error(
+            `'${helperName}' is not a valid helper function (found: ${typeof helper})`,
+          );
+        }
+
         const args = node.params.map((param) => this.evaluateExpression(param));
         const context = this.contextStack.getCurrent();
         value = helper.call(context, ...args);
@@ -225,6 +241,11 @@ export class Interpreter {
   private evaluateBlock(node: BlockStatement): string {
     // Get the helper name from the path
     const helperName = node.path.original;
+
+    // Security: Prevent explicit calls to helperMissing/blockHelperMissing (GH-1558)
+    if (helperName === 'helperMissing' || helperName === 'blockHelperMissing') {
+      throw new Error(`Calling '${helperName}' explicitly is not allowed for security reasons`);
+    }
 
     // Dispatch to specific block helper
     switch (helperName) {
@@ -642,7 +663,9 @@ export class Interpreter {
    * @returns The helper function if found, undefined otherwise
    */
   private lookupHelper(name: string): ((...args: any[]) => any) | undefined {
-    return this.helpers[name];
+    // Security: Use lookupProperty to prevent accessing dangerous prototype properties
+    const helper = lookupProperty(this.helpers, name);
+    return typeof helper === 'function' ? helper : undefined;
   }
 
   /**

@@ -35,6 +35,25 @@ export function lookupProperty(parent: any, propertyName: string): any {
     return undefined;
   }
 
+  // Security: Block dangerous properties to prevent prototype pollution
+  // and code execution attacks (GH-1495, GH-1595)
+  const dangerousProperties = [
+    'constructor',
+    '__proto__',
+    '__defineGetter__',
+    '__defineSetter__',
+    '__lookupGetter__',
+    '__lookupSetter__',
+  ];
+
+  if (dangerousProperties.includes(propertyName)) {
+    // Exception: Allow 'constructor' if it's an own property
+    if (propertyName === 'constructor' && Object.hasOwn(parent, 'constructor')) {
+      return parent[propertyName];
+    }
+    return undefined;
+  }
+
   // Feature 7.8: Handle Map objects
   if (parent instanceof Map) {
     return parent.get(propertyName);
