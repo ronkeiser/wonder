@@ -337,11 +337,13 @@ export class Interpreter {
 
       // Create data frame with loop variables
       // Keys must be prefixed with @ for data variable access
-      this.dataStack.push({
+      const parentFrame = this.dataStack.getCurrent();
+      const frame = createDataFrame(parentFrame, {
         '@index': i,
         '@first': i === firstIndex,
         '@last': i === lastIndex,
       });
+      this.dataStack.push(frame);
 
       // Push array item as new context
       this.contextStack.push(item);
@@ -379,12 +381,14 @@ export class Interpreter {
     keys.forEach((key, index) => {
       // Create data frame with loop variables
       // Keys must be prefixed with @ for data variable access
-      this.dataStack.push({
+      const parentFrame = this.dataStack.getCurrent();
+      const frame = createDataFrame(parentFrame, {
         '@key': key,
         '@index': index,
         '@first': index === 0,
         '@last': index === keys.length - 1,
       });
+      this.dataStack.push(frame);
 
       // Push property value as new context
       this.contextStack.push((collection as any)[key]);
@@ -423,9 +427,11 @@ export class Interpreter {
       return this.evaluateProgram(node.inverse);
     }
 
-    // Push value as new context and empty data frame (no loop variables)
+    // Push value as new context and data frame (inherits @root but no new loop variables)
     this.contextStack.push(value);
-    this.dataStack.push({});
+    const parentFrame = this.dataStack.getCurrent();
+    const frame = createDataFrame(parentFrame, {});
+    this.dataStack.push(frame);
 
     // Evaluate the program block with the new context
     const output = this.evaluateProgram(node.program);

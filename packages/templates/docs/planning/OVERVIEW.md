@@ -94,7 +94,7 @@ Implement backslash escaping before tokenization:
 
 ## Capability 2: Syntax Analysis (Parsing & AST)
 
-**Status:** 🔄 In Progress
+**Status:** ✅ Completed
 
 **Goal:** Build Abstract Syntax Tree from token stream following Handlebars AST structure
 
@@ -322,7 +322,7 @@ Falsy value detection for conditionals from Handlebars `utils.js`:
 
 ## Capability 4: Context Resolution & Interpreter
 
-**Status:** 🔄 Not Started
+**Status:** ✅ Completed
 
 **Goal:** Evaluate PathExpressions by traversing context scopes and data frames
 
@@ -399,7 +399,7 @@ Maintain data frame stack for loop metadata:
 
 ## Capability 5: Built-in Block Helpers
 
-**Status:** 🔄 Not Started
+**Status:** ✅ Completed
 
 **Goal:** Implement #if, #unless, #each, #with following Handlebars behavior exactly
 
