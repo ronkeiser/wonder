@@ -125,6 +125,33 @@ export class Interpreter {
   }
 
   /**
+   * Checks if a value is falsy using Handlebars semantics.
+   *
+   * Matches Handlebars logic: (!value) || isEmpty(value)
+   * This treats 0 as falsy (like JavaScript) while treating {} as truthy.
+   *
+   * @param value - The value to check
+   * @returns true if the value is falsy
+   */
+  private isFalsy(value: any): boolean {
+    return !value || isEmpty(value);
+  }
+
+  /**
+   * Throws if the helper name is a blocked internal helper.
+   *
+   * Security: Prevent explicit calls to helperMissing/blockHelperMissing (GH-1558)
+   *
+   * @param name - The helper name to check
+   * @throws Error if the name is blocked
+   */
+  private assertNotBlockedHelper(name: string): void {
+    if (name === 'helperMissing' || name === 'blockHelperMissing') {
+      throw new Error(`Calling '${name}' explicitly is not allowed for security reasons`);
+    }
+  }
+
+  /**
    * Evaluates the template with the given context.
    *
    * Initializes stacks, traverses the AST, and returns the rendered output.
@@ -217,12 +244,7 @@ export class Interpreter {
     let value: any;
 
     // Security: Prevent explicit calls to helperMissing/blockHelperMissing (GH-1558)
-    // Check this BEFORE determining if it's a helper call, since these names
-    // might not be in the helper registry but should still be blocked
-    const name = node.path.parts[0];
-    if (name === 'helperMissing' || name === 'blockHelperMissing') {
-      throw new Error(`Calling '${name}' explicitly is not allowed for security reasons`);
-    }
+    this.assertNotBlockedHelper(node.path.parts[0]);
 
     if (this.isHelperCall(node)) {
       // Call helper
@@ -302,9 +324,7 @@ export class Interpreter {
     const helperName = node.path.original;
 
     // Security: Prevent explicit calls to helperMissing/blockHelperMissing (GH-1558)
-    if (helperName === 'helperMissing' || helperName === 'blockHelperMissing') {
-      throw new Error(`Calling '${helperName}' explicitly is not allowed for security reasons`);
-    }
+    this.assertNotBlockedHelper(helperName);
 
     // Dispatch to specific block helper
     switch (helperName) {
@@ -403,7 +423,7 @@ export class Interpreter {
 
       // Otherwise, use return value as context/condition
       // Falsy: render inverse
-      if (!result || isEmpty(result)) {
+      if (this.isFalsy(result)) {
         return this.evaluateProgram(node.inverse);
       }
 
@@ -417,7 +437,7 @@ export class Interpreter {
     }
 
     // Falsy or missing: render inverse block
-    if (!value || isEmpty(value)) {
+    if (this.isFalsy(value)) {
       return this.evaluateProgram(node.inverse);
     }
 
@@ -468,55 +488,36 @@ export class Interpreter {
    * @returns The rendered output based on the condition
    */
   private evaluateIfHelper(node: BlockStatement): string {
-    // #if requires exactly 1 parameter (the condition)
-    if (node.params.length !== 1) {
-      throw new Error(`#if helper requires exactly 1 parameter, got ${node.params.length}`);
-    }
+    return this.evaluateConditionalHelper(node, 'if', false);
+  }
 
-    // Evaluate the condition (unwrap if it's a function)
-    const condition = this.unwrapValue(this.evaluateExpression(node.params[0]));
-
-    // Match Handlebars #if logic: (!conditional) || isEmpty(conditional)
-    // This makes 0 falsy (standard JS) while keeping {} truthy
-    const isFalsy = !condition || isEmpty(condition);
-
-    if (isFalsy) {
-      // Render the inverse block ({{else}}) if present
-      return this.evaluateProgram(node.inverse);
-    } else {
-      // Render the main block
-      return this.evaluateProgram(node.program);
-    }
+  private evaluateUnlessHelper(node: BlockStatement): string {
+    return this.evaluateConditionalHelper(node, 'unless', true);
   }
 
   /**
-   * Evaluates the #unless block helper.
+   * Shared implementation for #if and #unless helpers.
    *
-   * Inverse of #if: renders the main block if the condition is falsy,
-   * otherwise renders the inverse block.
-   *
-   * @param node - The BlockStatement node for #unless
-   * @returns The rendered output based on the inverted condition
+   * @param node - The BlockStatement node
+   * @param helperName - The helper name for error messages
+   * @param invert - If true, inverts the condition (for #unless)
+   * @returns The rendered output based on the condition
    */
-  private evaluateUnlessHelper(node: BlockStatement): string {
-    // #unless requires exactly 1 parameter (the condition)
+  private evaluateConditionalHelper(
+    node: BlockStatement,
+    helperName: string,
+    invert: boolean,
+  ): string {
     if (node.params.length !== 1) {
-      throw new Error(`#unless helper requires exactly 1 parameter, got ${node.params.length}`);
+      throw new Error(
+        `#${helperName} helper requires exactly 1 parameter, got ${node.params.length}`,
+      );
     }
 
-    // Evaluate the condition (unwrap if it's a function)
     const condition = this.unwrapValue(this.evaluateExpression(node.params[0]));
+    const renderInverse = invert ? !this.isFalsy(condition) : this.isFalsy(condition);
 
-    // #unless is inverse of #if: match same logic (!conditional) || isEmpty(conditional)
-    const isFalsy = !condition || isEmpty(condition);
-
-    if (isFalsy) {
-      // Render the main block
-      return this.evaluateProgram(node.program);
-    } else {
-      // Render the inverse block ({{else}}) if present
-      return this.evaluateProgram(node.inverse);
-    }
+    return renderInverse ? this.evaluateProgram(node.inverse) : this.evaluateProgram(node.program);
   }
 
   /**
@@ -731,10 +732,7 @@ export class Interpreter {
     // Evaluate the parameter to get the value (unwrap if it's a function)
     const value = this.unwrapValue(this.evaluateExpression(node.params[0]));
 
-    // Match #if logic: (!value) || isEmpty(value) for falsy check
-    const isFalsy = !value || isEmpty(value);
-
-    if (isFalsy) {
+    if (this.isFalsy(value)) {
       return this.evaluateProgram(node.inverse);
     }
 
