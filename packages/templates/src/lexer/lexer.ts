@@ -72,38 +72,36 @@ export class Lexer {
     while (i < template.length) {
       const char = template[i];
 
-      if (char === '\\' && i + 1 < template.length) {
-        const next = template[i + 1];
-
-        // \{{ or \}} - escape mustache delimiters
-        if (next === '{' || next === '}') {
-          const startIndex = processedInput.length;
-          // Mark this and next two positions as escaped to handle {{, }}, {{{, }}}
-          for (let offset = 0; offset < 3; offset++) {
-            escapedIndices.add(startIndex + offset);
-          }
-          processedInput += next;
-          i += 2;
-        }
-        // \\{{ - backslash before mustache (output \, then process {{)
-        else if (
-          next === '\\' &&
-          i + 3 < template.length &&
-          template[i + 2] === '{' &&
-          template[i + 3] === '{'
-        ) {
-          processedInput += '\\';
-          i += 2;
-        }
-        // Not an escape sequence - keep backslash
-        else {
-          processedInput += char;
-          i++;
-        }
-      } else {
+      // Not a backslash or at end - copy as-is
+      if (char !== '\\' || i + 1 >= template.length) {
         processedInput += char;
         i++;
+        continue;
       }
+
+      const next = template[i + 1];
+
+      // \{{ or \}} - escape mustache delimiters
+      if (next === '{' || next === '}') {
+        const startIndex = processedInput.length;
+        for (let offset = 0; offset < 3; offset++) {
+          escapedIndices.add(startIndex + offset);
+        }
+        processedInput += next;
+        i += 2;
+        continue;
+      }
+
+      // \\{{ - backslash before mustache (output \, then process {{)
+      if (next === '\\' && i + 3 < template.length && template.slice(i + 2, i + 4) === '{{') {
+        processedInput += '\\';
+        i += 2;
+        continue;
+      }
+
+      // Not an escape sequence - keep backslash
+      processedInput += char;
+      i++;
     }
 
     return { processedInput, escapedIndices };
