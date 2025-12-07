@@ -8,6 +8,11 @@
  * Reference: Handlebars lib/handlebars/runtime.js and lib/handlebars/utils.js
  */
 
+import { SafeString } from './safe-string.js';
+
+// Re-export SafeString for backwards compatibility (tests import it from utils)
+export { SafeString };
+
 // Cache hasOwnProperty reference for performance
 const hasOwnProperty = Object.prototype.hasOwnProperty;
 
@@ -73,46 +78,6 @@ export function lookupProperty(parent: any, propertyName: string): any {
 
   // Property doesn't exist or is inherited
   return undefined;
-}
-
-/**
- * SafeString class for pre-escaped HTML content.
- *
- * Wraps a string to indicate it has already been escaped and should not
- * be escaped again by escapeExpression(). This is used by helpers that
- * generate HTML content.
- *
- * Reference: Handlebars lib/handlebars/safe-string.js
- *
- * @example
- * ```typescript
- * const html = new SafeString('<b>Bold</b>');
- * escapeExpression(html); // '<b>Bold</b>' (not escaped)
- * ```
- */
-export class SafeString {
-  private string: string;
-
-  constructor(string: string) {
-    this.string = string;
-  }
-
-  /**
-   * Returns the stored string value.
-   * @returns The unescaped string
-   */
-  toString(): string {
-    return this.string;
-  }
-
-  /**
-   * Returns the stored string value as HTML.
-   * Alias for toString() for Handlebars compatibility.
-   * @returns The unescaped string
-   */
-  toHTML(): string {
-    return this.string;
-  }
 }
 
 /**
