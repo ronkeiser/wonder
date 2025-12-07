@@ -20,7 +20,7 @@ import type {
   StringLiteral,
   UndefinedLiteral,
 } from '../parser/ast-nodes.js';
-import { escapeExpression } from '../runtime/utils.js';
+import { escapeExpression, isEmpty } from '../runtime/utils.js';
 import { ContextStack } from './context-stack.js';
 import { createDataFrame } from './data-frame.js';
 import { DataStack } from './data-stack.js';
@@ -180,14 +180,112 @@ export class Interpreter {
   /**
    * Evaluates a BlockStatement (block helper).
    *
-   * Stub implementation - will be completed in Capability 6.
+   * Dispatches to specific block helper implementations based on helper name.
    *
-   * @param _node - The BlockStatement node
+   * @param node - The BlockStatement node
+   * @returns The rendered output from the block helper
+   */
+  private evaluateBlock(node: BlockStatement): string {
+    // Get the helper name from the path
+    const helperName = node.path.original;
+
+    // Dispatch to specific block helper
+    switch (helperName) {
+      case 'if':
+        return this.evaluateIfHelper(node);
+      case 'unless':
+        return this.evaluateUnlessHelper(node);
+      case 'each':
+        return this.evaluateEachHelper(node);
+      case 'with':
+        return this.evaluateWithHelper(node);
+      default:
+        throw new Error(`Unknown block helper: ${helperName}`);
+    }
+  }
+
+  /**
+   * Evaluates the #if block helper.
+   *
+   * Renders the main block if the condition is truthy (using Handlebars isEmpty),
+   * otherwise renders the inverse block ({{else}}) if present.
+   *
+   * @param node - The BlockStatement node for #if
+   * @returns The rendered output based on the condition
+   */
+  private evaluateIfHelper(node: BlockStatement): string {
+    // #if requires exactly 1 parameter (the condition)
+    if (node.params.length !== 1) {
+      throw new Error(`#if helper requires exactly 1 parameter, got ${node.params.length}`);
+    }
+
+    // Evaluate the condition
+    const condition = this.evaluateExpression(node.params[0]);
+
+    // Use Handlebars truthiness: isEmpty() returns true for falsy values
+    const isTruthy = !isEmpty(condition);
+
+    if (isTruthy) {
+      // Render the main block
+      return this.evaluateProgram(node.program);
+    } else {
+      // Render the inverse block ({{else}}) if present
+      return this.evaluateProgram(node.inverse);
+    }
+  }
+
+  /**
+   * Evaluates the #unless block helper.
+   *
+   * Inverse of #if: renders the main block if the condition is falsy,
+   * otherwise renders the inverse block.
+   *
+   * @param node - The BlockStatement node for #unless
+   * @returns The rendered output based on the inverted condition
+   */
+  private evaluateUnlessHelper(node: BlockStatement): string {
+    // #unless requires exactly 1 parameter (the condition)
+    if (node.params.length !== 1) {
+      throw new Error(`#unless helper requires exactly 1 parameter, got ${node.params.length}`);
+    }
+
+    // Evaluate the condition
+    const condition = this.evaluateExpression(node.params[0]);
+
+    // Invert the condition: render main block if falsy
+    const isFalsy = isEmpty(condition);
+
+    if (isFalsy) {
+      // Render the main block
+      return this.evaluateProgram(node.program);
+    } else {
+      // Render the inverse block ({{else}}) if present
+      return this.evaluateProgram(node.inverse);
+    }
+  }
+
+  /**
+   * Evaluates the #each block helper (stub).
+   *
+   * TODO: Implement in Feature 5.3
+   *
+   * @param _node - The BlockStatement node for #each
    * @returns Empty string (stub)
    */
-  private evaluateBlock(_node: BlockStatement): string {
-    // TODO: Implement in Capability 6 (Block Helpers)
-    throw new Error('BlockStatement evaluation not yet implemented');
+  private evaluateEachHelper(_node: BlockStatement): string {
+    throw new Error('#each helper not yet implemented');
+  }
+
+  /**
+   * Evaluates the #with block helper (stub).
+   *
+   * TODO: Implement in Feature 5.5
+   *
+   * @param _node - The BlockStatement node for #with
+   * @returns Empty string (stub)
+   */
+  private evaluateWithHelper(_node: BlockStatement): string {
+    throw new Error('#with helper not yet implemented');
   }
 
   /**

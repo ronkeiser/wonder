@@ -215,7 +215,7 @@ describe('Parser - Special PathExpression', () => {
       parser.advance(); // Skip OPEN
 
       expect(() => parser.parsePathExpression()).toThrow(
-        'Expected identifier after path separator',
+        'Expected identifier or number after path separator',
       );
     });
 
@@ -225,7 +225,7 @@ describe('Parser - Special PathExpression', () => {
       parser.advance(); // Skip OPEN
 
       expect(() => parser.parsePathExpression()).toThrow(
-        'Expected identifier after path separator',
+        'Expected identifier or number after path separator',
       );
     });
 
@@ -235,7 +235,7 @@ describe('Parser - Special PathExpression', () => {
       parser.advance(); // Skip OPEN
 
       expect(() => parser.parsePathExpression()).toThrow(
-        'Expected identifier after path separator',
+        'Expected identifier or number after path separator',
       );
     });
 
@@ -245,7 +245,7 @@ describe('Parser - Special PathExpression', () => {
       parser.advance(); // Skip OPEN
 
       expect(() => parser.parsePathExpression()).toThrow(
-        'Expected identifier after path separator',
+        'Expected identifier or number after path separator',
       );
     });
   });
