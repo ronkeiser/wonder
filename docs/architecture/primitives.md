@@ -409,7 +409,6 @@ Versioned, reusable action implementation. Executed by Executor service.
 
   system_prompt: string | null;
   template: string;         // Message template
-  template_language: "handlebars" | "jinja2";
 
   requires: JSONSchema;     // Template variables schema
   produces: JSONSchema;     // Expected output schema
