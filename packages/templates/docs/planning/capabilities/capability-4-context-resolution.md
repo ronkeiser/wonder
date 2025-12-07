@@ -1,6 +1,6 @@
 # Capability 4: Context Resolution & Interpreter
 
-**Status:** `[~]` **IN PROGRESS**
+**Status:** `[X]` **COMPLETE** ✅
 
 **Goal:** Evaluate PathExpressions by traversing context scopes and data frames. This capability implements the core interpreter logic that resolves variables and navigates the context/data stacks.
 
@@ -472,7 +472,7 @@
 
 ### Task C4-IT-T1: Simple Variable Resolution
 
-**Status:** `[ ]` Not Started
+**Status:** `[X]` Complete
 
 **Tests:**
 
@@ -483,7 +483,7 @@
 
 ### Task C4-IT-T2: Nested Property Access
 
-**Status:** `[ ]` Not Started
+**Status:** `[X]` Complete
 
 **Tests:**
 
@@ -494,7 +494,7 @@
 
 ### Task C4-IT-T3: Array Index Access
 
-**Status:** `[ ]` Not Started
+**Status:** `[X]` Complete
 
 **Tests:**
 
@@ -502,10 +502,11 @@
 - Context: `{items: ['first', 'second']}`
 - Expected: `"first and second"`
 - Verify: Array indices resolve correctly
+- **Note:** Required lexer enhancement to prevent decimal scanning in path context
 
 ### Task C4-IT-T4: Mixed Content and Variables
 
-**Status:** `[ ]` Not Started
+**Status:** `[X]` Complete
 
 **Tests:**
 
@@ -516,7 +517,7 @@
 
 ### Task C4-IT-T5: HTML Escaping
 
-**Status:** `[ ]` Not Started
+**Status:** `[X]` Complete
 
 **Tests:**
 
@@ -527,7 +528,7 @@
 
 ### Task C4-IT-T6: Missing Variables
 
-**Status:** `[ ]` Not Started
+**Status:** `[X]` Complete
 
 **Tests:**
 
@@ -538,7 +539,7 @@
 
 ### Task C4-IT-T7: Null and Undefined Values
 
-**Status:** `[ ]` Not Started
+**Status:** `[X]` Complete
 
 **Tests:**
 
