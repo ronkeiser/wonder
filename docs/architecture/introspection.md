@@ -2,6 +2,51 @@
 
 Introspection provides line-by-line visibility into coordinator execution without cluttering code with logs. Events are structured data that flow through a separate observability channel.
 
+## Storage Architecture
+
+**Primary storage: Events Service (D1)**
+
+- Queryable immediately after workflow completion
+- Structured storage per workflow_run_id
+- Used by SDK for testing and debugging
+- Separate table from workflow events
+
+**Secondary storage: Analytics Engine (optional)**
+
+- Aggregate metrics and dashboards
+- Performance trends over time
+- Not used for individual workflow debugging
+
+**Events Service expands to handle introspection:**
+
+```sql
+-- services/events/schema.sql
+
+-- Existing workflow events table
+CREATE TABLE workflow_events (
+  id TEXT PRIMARY KEY,
+  workflow_run_id TEXT NOT NULL,
+  kind TEXT NOT NULL,
+  timestamp INTEGER NOT NULL,
+  actor_id TEXT,
+  data TEXT NOT NULL,
+
+  INDEX idx_workflow_events (workflow_run_id, timestamp)
+);
+
+-- NEW: Introspection events table
+CREATE TABLE introspection_events (
+  id TEXT PRIMARY KEY,
+  workflow_run_id TEXT NOT NULL,
+  sequence INTEGER NOT NULL,
+  timestamp INTEGER NOT NULL,
+  type TEXT NOT NULL,
+  payload TEXT NOT NULL,
+
+  INDEX idx_introspection_events (workflow_run_id, sequence)
+);
+```
+
 ## Strategy: Event-Driven Introspection
 
 **Key principle:** Events are data, not logs. They're emitted by pure functions, collected by the coordinator, and stored separately for analysis.
@@ -86,16 +131,36 @@ export class IntrospectionEmitter {
   async flush(env: Env): Promise<void> {
     if (this.events.length === 0) return;
 
-    // Send to Analytics Engine for analysis
-    await env.ANALYTICS.writeDataPoint({
-      blobs: [JSON.stringify(this.events)],
-      indexes: [this.workflowRunId],
+    const batch = this.events.map((event) => ({
+      id: crypto.randomUUID(),
+      workflow_run_id: this.workflowRunId,
+      sequence: event.sequence,
+      timestamp: event.timestamp,
+      type: event.type,
+      payload: JSON.stringify(event),
+    }));
+
+    // Write to Events Service (D1) for immediate querying
+    const response = await fetch(`${env.EVENTS_URL}/introspection/write`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(batch),
     });
 
-    this.events = [];
-  }
+    if (!response.ok) {
+      console.error('Failed to write introspection events:', await response.text());
+    }
 
-  // For testing: return events instead of flushing
+    // Optional: Also write to Analytics Engine for dashboards
+    if (env.ANALYTICS) {
+      await env.ANALYTICS.writeDataPoint({
+        blobs: [JSON.stringify(this.events)],
+        indexes: [this.workflowRunId],
+      });
+    }
+
+    this.events = [];
+  } // For testing: return events instead of flushing
   getEvents(): IntrospectionEvent[] {
     return [...this.events];
   }
@@ -319,12 +384,16 @@ class WorkflowCoordinator extends DurableObject {
 ### Enable Introspection
 
 ```typescript
-// Enable via header
-const { workflow_run_id } = await sdk.workflows.start(workflow_id, input, {
-  headers: { 'X-Introspection': 'true' },
+// Enable via header for specific workflow run
+const { data } = await client.POST('/api/workflows/{id}/start', {
+  params: { path: { id: workflowId } },
+  body: {},
+  headers: {
+    'X-Introspection-Enabled': 'true',
+  },
 });
 
-// Or via env var (all workflows)
+// Or via env var (all workflows in environment)
 env.INTROSPECTION_ENABLED = 'true';
 ```
 
@@ -378,12 +447,16 @@ test('trace full execution path', async () => {
 
 ```typescript
 test('verify synchronization decision flow', async () => {
-  const { workflow_run_id } = await sdk.workflows.start(workflow_id, {});
-  await waitForCompletion(workflow_run_id);
+  const { data } = await client.POST('/api/workflows/{id}/start', {
+    params: { path: { id: workflowId } },
+    body: {},
+    headers: { 'X-Introspection-Enabled': 'true' },
+  });
+  const workflowRunId = data!.workflow_run_id;
 
-  const events = await getIntrospectionEvents(workflow_run_id);
+  await waitForCompletion(workflowRunId);
 
-  // Find synchronization check
+  const events = await client.introspection.getEvents(workflowRunId); // Find synchronization check
   const syncStart = events.find((e) => e.type === 'decision.sync.start');
   expect(syncStart).toBeDefined();
   expect(syncStart.sibling_count).toBe(10);
@@ -412,12 +485,16 @@ test('verify synchronization decision flow', async () => {
 
 ```typescript
 test('identify slow SQL queries', async () => {
-  const { workflow_run_id } = await sdk.workflows.start(workflow_id, {});
-  await waitForCompletion(workflow_run_id);
+  const { data } = await client.POST('/api/workflows/{id}/start', {
+    params: { path: { id: workflowId } },
+    body: {},
+    headers: { 'X-Introspection-Enabled': 'true' },
+  });
+  const workflowRunId = data!.workflow_run_id;
 
-  const events = await getIntrospectionEvents(workflow_run_id);
+  await waitForCompletion(workflowRunId);
 
-  // Find slow queries
+  const events = await client.introspection.getEvents(workflowRunId); // Find slow queries
   const sqlEvents = events.filter((e) => e.type === 'operation.sql.query');
   const slowQueries = sqlEvents.filter((e) => e.duration_ms > 10);
 
@@ -485,12 +562,16 @@ test('replay production failure', async () => {
 
 ```typescript
 test('branch tables created and cleaned up correctly', async () => {
-  const { workflow_run_id } = await sdk.workflows.start(workflow_id, {});
-  await waitForCompletion(workflow_run_id);
+  const { data } = await client.POST('/api/workflows/{id}/start', {
+    params: { path: { id: workflowId } },
+    body: {},
+    headers: { 'X-Introspection-Enabled': 'true' },
+  });
+  const workflowRunId = data!.workflow_run_id;
 
-  const events = await getIntrospectionEvents(workflow_run_id);
+  await waitForCompletion(workflowRunId);
 
-  // Get all branch table operations
+  const events = await client.introspection.getEvents(workflowRunId); // Get all branch table operations
   const branchOps = events.filter(
     (e) =>
       e.type === 'operation.context.branch_table.create' ||
@@ -521,19 +602,157 @@ test('branch tables created and cleaned up correctly', async () => {
 });
 ```
 
-## Production Usage
+## Events Service API
 
-### Analytics Engine Storage
-
-Events are written to Analytics Engine for efficient storage and querying:
+The Events Service expands to handle introspection events:
 
 ```typescript
-// Query events for a workflow run
-const events = await env.ANALYTICS.query(`
-  SELECT * FROM introspection_events
-  WHERE workflow_run_id = '${workflow_run_id}'
-  ORDER BY timestamp ASC
-`);
+// services/events/src/index.ts
+
+export default {
+  async fetch(request: Request, env: Env): Promise<Response> {
+    const url = new URL(request.url);
+
+    // Existing workflow events endpoints
+    if (url.pathname === '/events') {
+      // ... existing code ...
+    }
+
+    // NEW: Introspection endpoints
+    if (url.pathname === '/introspection/events') {
+      const workflowRunId = url.searchParams.get('workflow_run_id');
+      if (!workflowRunId) {
+        return Response.json({ error: 'workflow_run_id required' }, { status: 400 });
+      }
+
+      const events = await env.DB.prepare(
+        `
+        SELECT * FROM introspection_events
+        WHERE workflow_run_id = ?
+        ORDER BY sequence ASC
+      `,
+      )
+        .bind(workflowRunId)
+        .all();
+
+      return Response.json({
+        events: events.results.map((row) => ({
+          ...row,
+          payload: JSON.parse(row.payload as string),
+        })),
+      });
+    }
+
+    if (url.pathname === '/introspection/write' && request.method === 'POST') {
+      const batch: IntrospectionEventRow[] = await request.json();
+
+      if (!Array.isArray(batch) || batch.length === 0) {
+        return Response.json({ error: 'batch must be non-empty array' }, { status: 400 });
+      }
+
+      const stmt = env.DB.prepare(`
+        INSERT INTO introspection_events (id, workflow_run_id, sequence, timestamp, type, payload)
+        VALUES (?, ?, ?, ?, ?, ?)
+      `);
+
+      await env.DB.batch(
+        batch.map((e) =>
+          stmt.bind(e.id, e.workflow_run_id, e.sequence, e.timestamp, e.type, e.payload),
+        ),
+      );
+
+      return Response.json({ success: true, count: batch.length });
+    }
+
+    return Response.json({ error: 'Not found' }, { status: 404 });
+  },
+};
+
+interface IntrospectionEventRow {
+  id: string;
+  workflow_run_id: string;
+  sequence: number;
+  timestamp: number;
+  type: string;
+  payload: string; // JSON
+}
+```
+
+## SDK Integration
+
+The SDK provides introspection methods:
+
+```typescript
+// packages/sdk/src/client.ts
+
+export function createWonderClient(options: { baseUrl: string }) {
+  const client = createClient<paths>({ baseUrl: options.baseUrl });
+
+  return {
+    ...client,
+
+    // Introspection methods
+    introspection: {
+      async getEvents(workflowRunId: string): Promise<IntrospectionEvent[]> {
+        const response = await fetch(
+          `${options.baseUrl}/events/introspection/events?workflow_run_id=${workflowRunId}`,
+        );
+
+        if (!response.ok) {
+          throw new Error(`Failed to fetch introspection events: ${response.statusText}`);
+        }
+
+        const data = (await response.json()) as { events: Array<{ payload: IntrospectionEvent }> };
+        return data.events.map((e) => e.payload);
+      },
+
+      async filterEvents(
+        workflowRunId: string,
+        predicate: (event: IntrospectionEvent) => boolean,
+      ): Promise<IntrospectionEvent[]> {
+        const events = await this.getEvents(workflowRunId);
+        return events.filter(predicate);
+      },
+
+      async waitForEvent(
+        workflowRunId: string,
+        predicate: (event: IntrospectionEvent) => boolean,
+        options?: { timeout?: number; pollInterval?: number },
+      ): Promise<IntrospectionEvent> {
+        const timeout = options?.timeout ?? 30000;
+        const pollInterval = options?.pollInterval ?? 500;
+        const startTime = Date.now();
+
+        while (Date.now() - startTime < timeout) {
+          const events = await this.getEvents(workflowRunId);
+          const found = events.find(predicate);
+          if (found) return found;
+
+          await new Promise((resolve) => setTimeout(resolve, pollInterval));
+        }
+
+        throw new Error(`Timeout waiting for introspection event after ${timeout}ms`);
+      },
+    },
+  };
+}
+```
+
+## Production Usage
+
+### Events Service Storage
+
+Introspection events are stored in the Events Service D1 database and can be queried immediately:
+
+```typescript
+// Query events for a workflow run via SDK
+const events = await sdk.introspection.getEvents(workflow_run_id);
+
+// Or directly via Events Service API
+const response = await fetch(
+  `${EVENTS_URL}/introspection/events?workflow_run_id=${workflow_run_id}`,
+);
+const { events } = await response.json();
 ```
 
 ### Performance Monitoring
