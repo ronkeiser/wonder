@@ -26,7 +26,7 @@ coordinator/src/
 ├── planning/                   # Pure logic - returns Decision[]
 │   ├── routing.ts              # Transition evaluation
 │   ├── synchronization.ts      # Fan-in logic
-│   ├── spawning.ts             # Token creation logic
+│   ├── branching.ts            # Branch creation logic
 │   ├── completion.ts           # Workflow finalization
 │   └── conditions.ts           # Condition evaluation (CEL future)
 ├── operations/                 # Actor operations - SQL and RPC
