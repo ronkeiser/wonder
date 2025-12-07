@@ -2,6 +2,137 @@
 
 Total: **520 test cases** across 20 spec files (7,338 lines)
 
+## Relevance Grouping for Wonder
+
+### Group A: Critical (Must Have for V1)
+**Use case**: Core prompt template features - variables, paths, loops, conditionals
+
+- **basic.js** (39 tests) - Variables, paths, escaping, literals
+- **builtins.js** (42 tests) - #if, #each, #with, #lookup
+- **data.js** (21 tests) - @root, @index, @first, @last, @key
+- **security.js** (33 tests) - Prototype pollution protection
+
+**Subtotal: 135 tests** | **Current status: 34/39 basic.js passing (87%)**
+
+### Group B: Important (Needed for Robust V1)
+**Use case**: Proper helper system, error handling, whitespace control
+
+- **helpers.js** (~40 of 81 tests) - Helper invocation, params, hash, options object
+- **blocks.js** (~20 of 34 tests) - Inverted sections, basic block params
+- **tokenizer.js** (55 tests) - Lexer validation
+- **whitespace-control.js** (6 tests) - Clean prompt output
+
+**Subtotal: ~120 tests**
+
+### Group C: Nice to Have (Post-V1)
+**Use case**: Advanced features, edge cases
+
+- **subexpressions.js** (12 tests) - Nested helper calls
+- **helpers.js** (~40 remaining tests) - Advanced helper features
+- **strict.js** (18 tests) - Development mode validation
+- **regressions.js** (~15 relevant tests) - Known edge cases
+- **blocks.js** (~14 remaining tests) - Advanced block features
+
+**Subtotal: ~100 tests**
+
+### Group D: Skip (Not Relevant)
+**Use case**: Features we won't implement or are internal
+
+- **partials.js** (60 tests) - Not in requirements
+- **precompiler.js** (33 tests) - We use interpreter
+- **compiler.js** (13 tests) - Internal compiler details
+- **ast.js** (13 tests) - Internal parser details
+- **javascript-compiler.js** (7 tests) - We don't generate JS code
+- **runtime.js** (3 tests) - Internal runtime
+- **source-map.js** (2 tests) - Not needed
+- **utils.js** (12 tests) - Internal utilities
+- **spec.js** (1 test) - Meta testing
+- **require.js** (2 tests) - Module loading
+- **regressions.js** (~19 tests) - Irrelevant edge cases
+
+**Subtotal: ~165 tests to skip**
+
+---
+
+## Recommended Triage Order
+
+### Phase 1: Complete Group A (Critical - 135 tests)
+1. ✅ **basic.js** - Fix remaining 5 failures (comments, options hash, hyphens, bracket literals)
+2. **builtins.js** - Import all 42 tests (#if, #each, #with, #lookup)
+3. **data.js** - Import all 21 tests (@root, @index, @first, @last, @key)
+4. **security.js** - Import all 33 tests (prototype protection)
+
+**Target: 135/135 Group A tests passing**
+
+### Phase 2: Add Group B (Important - ~120 tests)
+Focus on tests that improve robustness:
+5. **helpers.js** - Import ~40 core tests (skip advanced features)
+6. **tokenizer.js** - Import all 55 tests (validate lexer)
+7. **blocks.js** - Import ~20 core tests (inverted sections, basic block params)
+8. **whitespace-control.js** - Import all 6 tests (clean output)
+
+**Target: 255/255 Group A+B tests passing**
+
+### Phase 3: Evaluate Group C (Post-V1)
+Defer until Groups A & B are solid
+
+---
+
+## Group A: Critical Files - Detailed Breakdown
+
+### basic.js (39 tests) - STATUS: 34/39 passing
+
+**Essential for prompts:**
+- ✅ Variables: `{{foo}}`, `{{foo.bar}}`
+- ✅ Paths: dot notation, slash notation, parent paths
+- ✅ Escaping: `\{{`, literal braces in prompts
+- ✅ Boolean/null/undefined handling
+- ✅ Literal values: strings, numbers, booleans
+- ❌ Comments with whitespace control: `{{~! comment ~}}`
+- ❌ Helper options hash (missing in our implementation)
+- ❌ Hyphenated identifiers: `{{foo-bar}}`
+- ❌ Bracket literals for reserved words: `{{[this]}}`
+
+**Why we need this:** Every prompt needs variables and paths
+
+---
+
+### builtins.js (42 tests) - STATUS: Not yet imported
+
+**Essential helpers:**
+- `#if` / `#unless` - Conditional prompt sections
+- `#each` - Loop over arrays/objects (multi-shot examples, iterating context)
+- `#with` - Change context (nested data structures)
+- `#lookup` - Dynamic property access
+
+**Why we need this:** Prompts need conditionals and loops for dynamic content
+
+---
+
+### data.js (21 tests) - STATUS: Not yet imported
+
+**Essential data variables:**
+- `@root` - Access root context from nested blocks
+- `@index` - Current iteration index (numbering examples)
+- `@first` / `@last` - Special handling for first/last items
+- `@key` - Object property names when iterating
+
+**Why we need this:** Critical for loops - numbering examples, handling first/last differently
+
+---
+
+### security.js (33 tests) - STATUS: Not yet imported
+
+**Security features:**
+- Prototype pollution protection
+- `__proto__` access prevention
+- Constructor access prevention
+- Dangerous property blocking
+
+**Why we need this:** Users will provide context data - must protect against injection
+
+---
+
 ## Test Files by Category
 
 ### Core Template Execution
