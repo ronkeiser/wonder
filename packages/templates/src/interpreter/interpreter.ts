@@ -5,6 +5,8 @@
  * Implements Handlebars-compatible template evaluation without code generation.
  */
 
+import type { HelperRegistry } from '../helpers/index.js';
+import { builtInHelpers } from '../helpers/index.js';
 import type {
   BlockStatement,
   BooleanLiteral,
@@ -18,6 +20,7 @@ import type {
   Program,
   Statement,
   StringLiteral,
+  SubExpression,
   UndefinedLiteral,
 } from '../parser/ast-nodes.js';
 import { escapeExpression, isEmpty } from '../runtime/utils.js';
@@ -28,11 +31,10 @@ import { resolvePathExpression } from './path-resolver.js';
 
 /**
  * Options for configuring the interpreter.
- * Reserved for future capabilities (helpers, partials, etc.)
  */
 export interface InterpreterOptions {
-  // Reserved for Capability 6: Built-in helpers
-  helpers?: Record<string, Function>;
+  // Capability 6: User-provided helpers (merged with built-ins)
+  helpers?: HelperRegistry;
   // Reserved for Capability 7: Partials
   partials?: Record<string, Program>;
 }
@@ -45,8 +47,8 @@ export interface InterpreterOptions {
  */
 export class Interpreter {
   private ast: Program;
-  // @ts-expect-error - Reserved for future use (Capability 6: helpers, Capability 7: partials)
-  private _options: InterpreterOptions;
+  private options: InterpreterOptions;
+  private helpers: HelperRegistry;
   private contextStack!: ContextStack;
   private dataStack!: DataStack;
 
@@ -58,7 +60,12 @@ export class Interpreter {
    */
   constructor(ast: Program, options: InterpreterOptions = {}) {
     this.ast = ast;
-    this._options = options;
+    this.options = options;
+    // Merge user helpers with built-in helpers (user helpers override built-ins)
+    this.helpers = {
+      ...builtInHelpers,
+      ...options.helpers,
+    };
   }
 
   /**
@@ -474,11 +481,35 @@ export class Interpreter {
       case 'UndefinedLiteral':
         return this.evaluateLiteral(expr);
       case 'SubExpression':
-        // TODO: Implement in Capability 6 (SubExpressions for helper calls)
-        throw new Error('SubExpression evaluation not yet implemented');
+        return this.evaluateSubExpression(expr);
       default:
         throw new Error(`Unknown expression type: ${(expr as any).type}`);
     }
+  }
+
+  /**
+   * Evaluates a SubExpression (helper call) by recursively evaluating parameters
+   * and calling the helper function.
+   *
+   * @param expr - The SubExpression to evaluate
+   * @returns The result from the helper function
+   */
+  private evaluateSubExpression(expr: SubExpression): any {
+    // Get helper name from path
+    const helperName = expr.path.parts[0];
+
+    // Look up helper in registry
+    const helper = this.helpers[helperName];
+    if (!helper) {
+      throw new Error(`Unknown helper: ${helperName}`);
+    }
+
+    // Evaluate all parameters recursively
+    const args = expr.params.map((param) => this.evaluateExpression(param));
+
+    // Call helper with current context as 'this' binding
+    const context = this.contextStack.getCurrent();
+    return helper.call(context, ...args);
   }
 
   /**

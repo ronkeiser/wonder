@@ -28,7 +28,7 @@
 
 **Goal:** Extend parser to recognize and build SubExpression AST nodes for nested helper calls
 
-**Status:** `[ ]` Not Started
+**Status:** `[x]` **COMPLETE** ✅
 
 **Estimated LOC:** ~80 lines (lexer updates ~10, parser ~60, expression parsing ~10)
 
@@ -54,7 +54,7 @@ interface SubExpression extends Node {
 
 ### Task C6-F1-T1: Add SubExpression Token Recognition
 
-**Status:** `[ ]` Not Started
+**Status:** `[x]` Complete ✅
 
 **Goal:** Ensure lexer produces `OPEN_SEXPR` and `CLOSE_SEXPR` tokens for parentheses
 
@@ -91,7 +91,7 @@ describe('SubExpression Tokenization', () => {
 
 ### Task C6-F1-T2: Implement SubExpression Parser
 
-**Status:** `[ ]` Not Started
+**Status:** `[x]` Complete ✅
 
 **Goal:** Build SubExpression nodes in parser when encountering `OPEN_SEXPR`
 
@@ -155,7 +155,7 @@ describe('SubExpression Parsing', () => {
 
 ### Task C6-F1-T3: Extend Expression Parsing
 
-**Status:** `[ ]` Not Started
+**Status:** `[x]` Complete ✅
 
 **Goal:** Update `parseExpression()` to handle SubExpression nodes as valid expressions
 
