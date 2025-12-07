@@ -136,12 +136,23 @@ Handlebars-compatible template engine for Wonder workflows. Built from scratch w
   {{@key}}:
   {{this}}
 {{/each}}
+
+{{#each myMap}}
+  {{@key}}:
+  {{this}}
+{{/each}}
+
+{{#each mySet}}
+  {{this}}
+{{/each}}
 ```
 
 - Array iteration
 - Object iteration
+- ES6 Map iteration (with `@key` for map keys)
+- ES6 Set iteration
 - Access to `@index` (zero-based)
-- Access to `@key` (object property names)
+- Access to `@key` (object property names, or Map keys)
 - Access to `@first` and `@last` booleans
 - Nested iteration support
 - `{{else}}` for empty arrays/objects
@@ -200,13 +211,56 @@ Handlebars-compatible template engine for Wonder workflows. Built from scratch w
 - Parent access with `..`
 - Context stack maintained correctly
 
+### ✅ Hash Arguments
+
+```handlebars
+{{helper key='value' count=42}}
+{{#each items sortBy='name' limit=10}}
+  {{name}}
+{{/each}}
+```
+
+- Named parameters passed to helpers via `options.hash`
+- Support for string, number, boolean, and variable values
+- Works with both inline and block helpers
+
+### ✅ `lookup` Helper
+
+```handlebars
+{{lookup user "name"}}
+{{lookup items @index}}
+{{lookup . key}}
+```
+
+- Dynamic property access
+- Access properties by variable name
+- Works with objects and arrays
+- Safe - blocks prototype property access
+
+### ✅ Custom Block Helpers
+
+```handlebars
+{{#myHelper data}}
+  Content rendered by helper
+{{/myHelper}}
+```
+
+- Full `options` object support
+- `options.fn(context)` - render block content
+- `options.inverse(context)` - render else block
+- `options.hash` - named parameters
+- `options.data` - data variables
+
 ### ✅ ES6 Support
 
 ```handlebars
 {{map.get('key')}}  <!-- ES6 Maps work -->
+{{#each myMap}}{{@key}}: {{this}}{{/each}}
+{{#each mySet}}{{this}}{{/each}}
 ```
 
 - ES6 Map property access
+- ES6 Map/Set iteration in `#each`
 - Nested Maps
 - Empty string keys
 
@@ -215,34 +269,40 @@ Handlebars-compatible template engine for Wonder workflows. Built from scratch w
 ### ⚠️ Parser Limitations
 
 - ❌ Block parameters (`as |item|`) - parser doesn't recognize syntax
-- ❌ Hash parameters (`helper key=value`) - not implemented
 - ❌ Hyphenated identifiers (`{{foo-bar}}`) - treated as subtraction
 - ❌ Nested `this` paths (`{{this.foo.bar}}`) - EOF parsing errors
 - ❌ Whitespace control (`{{~foo~}}`) - tokens recognized but not applied
+- ❌ Standalone inverse sections (`{{^}}`) - must use `{{else}}` instead
 
 ### ⚠️ Data Variable Issues
 
 - ❌ Custom `@variable` syntax - only built-ins work (@index, @first, @last, @key, @root)
-- ❌ Data functions - functions in data context treated as missing helpers
 - ❌ @root priority - doesn't override when passed explicitly
-
-### ⚠️ Security Gaps (CRITICAL)
-
-- ❌ Prototype properties accessible (`{{constructor}}`, `{{__proto__}}`)
-- ❌ Dangerous methods not blocked (`__defineGetter__`, etc.)
-- ❌ `helperMissing` not protected from explicit calls
-- ❌ Nested property access broken (`{{obj.prop}}` returns `[object Object]`)
-
-**DO NOT use in production until security issues are fixed.**
 
 ### ⚠️ Missing Features
 
-- ❌ `lookup` helper - dynamic property access
-- ❌ Map/Set iteration - ES6 Map/Set don't work in `#each`
-- ❌ Custom iterables - only Array and Object supported
+- ❌ Custom iterables - only Array, Object, Map, Set supported
 - ❌ Helper registration system - no runtime helper registration yet
 - ❌ Partials - not implemented
 - ❌ Decorators - not planned for V1
+
+## Security
+
+✅ **Prototype pollution protection** - The following are blocked:
+
+- `constructor` property access (unless it's an own property)
+- `__proto__` property access
+- `__defineGetter__`, `__defineSetter__`, `__lookupGetter__`, `__lookupSetter__`
+- Explicit `helperMissing`/`blockHelperMissing` calls
+
+```handlebars
+{{constructor}}
+<!-- Returns empty, not Function -->
+{{__proto__}}
+<!-- Returns empty -->
+{{lookup this '__proto__'}}
+<!-- Returns undefined -->
+```
 
 ## Usage
 
