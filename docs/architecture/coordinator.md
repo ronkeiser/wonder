@@ -23,7 +23,7 @@ The coordinator enhances this with a **Decision Layer** where decision logic is 
 coordinator/src/
 ├── index.ts                    # DO class (Actor) - thin orchestrator
 ├── types.ts                    # Decision type definitions
-├── decisions/                  # Pure logic - returns Decision[]
+├── command/                    # Pure logic - returns Decision[]
 │   ├── routing.ts              # Transition evaluation
 │   ├── synchronization.ts      # Fan-in logic
 │   ├── spawning.ts             # Token creation logic
@@ -82,9 +82,9 @@ type Decision =
     };
 ```
 
-## Decision Modules (Pure)
+## Command Modules (Pure)
 
-### decisions/routing.ts
+### command/routing.ts
 
 Evaluates transitions and determines next tokens.
 
@@ -110,7 +110,7 @@ function decide(
 
 **Returns:** Array of decisions describing token creation and dispatch (pure data, no execution).
 
-### decisions/synchronization.ts
+### command/synchronization.ts
 
 Handles fan-in logic and merge strategies.
 
@@ -141,7 +141,7 @@ function decide(
 - `mergeOutputs(siblings, mergeConfig)` - Apply merge strategy (append, merge, keyed)
 - `buildFanInPath(tokenPath)` - Compute stable fan-in path
 
-### decisions/completion.ts
+### command/completion.ts
 
 Determines workflow completion and extracts final output.
 
@@ -327,7 +327,7 @@ async handleTaskResult(tokenId: string, result: TaskResult) {
   const contextData = operations.context.getSnapshot(sql);
 
   // 3. Run decision logic (pure - returns data)
-  const routingDecisions = decisions.routing.decide(token, workflow, contextData);
+  const routingDecisions = command.routing.decide(token, workflow, contextData);
 
   // 4. Dispatch decisions (converts to operations, handles synchronization recursively)
   const tokensToDispatch = await dispatch.applyDecisions(
@@ -384,7 +384,7 @@ handleTaskResult(tokenId, result)  [Actor message received]
   │   └─► contextData = operations.context.getSnapshot()
   │
   ├─► Decision logic (pure, returns Decision[] data)
-  │   └─► decisions = decisions.routing.decide(token, workflow, contextData)
+  │   └─► decisions = command.routing.decide(token, workflow, contextData)
   │
   ├─► Dispatch decisions (convert to operations)
   │   └─► tokensToDispatch = dispatch.applyDecisions(decisions, ...)
@@ -395,7 +395,7 @@ handleTaskResult(tokenId, result)  [Actor message received]
   │         │   ├─► CREATE_TOKEN → operations.tokens.create()  [SQL mutation]
   │         │   ├─► CHECK_SYNCHRONIZATION → recursive:
   │         │   │     ├─► Load siblings
-  │         │   │     ├─► decisions.synchronization.decide() → subDecisions
+  │         │   │     ├─► command.synchronization.decide() → subDecisions
   │         │   │     └─► applyDecisions(subDecisions)
   │         │   ├─► CREATE_FAN_IN_TOKEN → operations.tokens.tryCreateFanIn()  [SQL mutation]
   │         │   ├─► ACTIVATE_FAN_IN_TOKEN → operations.tokens.tryActivate()  [SQL mutation]
@@ -408,7 +408,7 @@ handleTaskResult(tokenId, result)  [Actor message received]
   │
   └─► Check workflow completion
       └─► if activeCount === 0:
-          ├─► finalOutput = decisions.completion.extractFinalOutput()
+          ├─► finalOutput = command.completion.extractFinalOutput()
           └─► finalizeWorkflow()
 ```
 
@@ -449,7 +449,7 @@ Single SQL transaction instead of three separate operations.
 `CHECK_SYNCHRONIZATION` decisions trigger recursive decision generation during dispatch:
 
 1. Load siblings from SQL
-2. Call `decisions.synchronization.decide()` → returns sub-decisions
+2. Call `command.synchronization.decide()` → returns sub-decisions
 3. Apply sub-decisions (which may generate more decisions)
 4. Collect all `MARK_FOR_DISPATCH` results
 
@@ -475,7 +475,7 @@ test('routing spawns tokens for matching transitions', () => {
   const workflow = { nodes: [...], transitions: [...] };
   const context = { approved: true };
 
-  const decisions = decisions.routing.decide(token, workflow, context);
+  const decisions = command.routing.decide(token, workflow, context);
 
   expect(decisions).toContainEqual({
     type: 'CREATE_TOKEN',
@@ -492,7 +492,7 @@ test('synchronization waits when not all siblings complete', () => {
   ];
   const transition = { synchronization: { wait_for: 'all', ... } };
 
-  const decisions = decisions.synchronization.decide(token, transition, siblings, workflow);
+  const decisions = command.synchronization.decide(token, transition, siblings, workflow);
 
   expect(decisions).toContainEqual({
     type: 'CREATE_FAN_IN_TOKEN',
