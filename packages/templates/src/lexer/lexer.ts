@@ -8,6 +8,12 @@ import { TokenType } from './token-types';
 const STATE_CONTENT = 0; // Scanning plain text content
 const STATE_MUSTACHE = 1; // Inside mustache delimiters ({{...}})
 
+/**
+ * Number of characters to mark as escaped when processing \{{ or \}}
+ * This covers the backslash escape plus the two delimiter chars
+ */
+const ESCAPED_CHARS_COUNT = 3;
+
 type LexerState = typeof STATE_CONTENT | typeof STATE_MUSTACHE;
 
 /**
@@ -83,17 +89,14 @@ export class Lexer {
 
       // \{{ or \}} - escape mustache delimiters
       if (next === '{' || next === '}') {
-        const startIndex = processedInput.length;
-        for (let offset = 0; offset < 3; offset++) {
-          escapedIndices.add(startIndex + offset);
-        }
+        this.markEscapedSequence(escapedIndices, processedInput.length);
         processedInput += next;
         i += 2;
         continue;
       }
 
       // \\{{ - backslash before mustache (output \, then process {{)
-      if (next === '\\' && i + 3 < template.length && template.slice(i + 2, i + 4) === '{{') {
+      if (this.isBackslashBeforeMustache(template, i, next)) {
         processedInput += '\\';
         i += 2;
         continue;
@@ -105,6 +108,22 @@ export class Lexer {
     }
 
     return { processedInput, escapedIndices };
+  }
+
+  /**
+   * Mark a sequence of characters as escaped in the indices set
+   */
+  private markEscapedSequence(escapedIndices: Set<number>, startIndex: number): void {
+    for (let offset = 0; offset < ESCAPED_CHARS_COUNT; offset++) {
+      escapedIndices.add(startIndex + offset);
+    }
+  }
+
+  /**
+   * Check if we have a backslash before mustache pattern: \\{{
+   */
+  private isBackslashBeforeMustache(template: string, i: number, next: string): boolean {
+    return next === '\\' && i + 3 < template.length && template.slice(i + 2, i + 4) === '{{';
   }
 
   /**
@@ -128,127 +147,21 @@ export class Lexer {
       return this.createEOFToken();
     }
 
-    // Check for mustache opening - need to check triple braces before double
-    // Skip if the opening brace is escaped
-    if (this.match('{{{') && !this.isEscaped(this.index)) {
-      this.state = STATE_MUSTACHE;
-      return this.scanDelimiter(TokenType.OPEN_UNESCAPED, '{{{');
+    // Try to scan opening mustache delimiters
+    const openingToken = this.tryScanOpeningMustache();
+    if (openingToken) {
+      return openingToken;
     }
 
-    if (this.match('{{') && !this.isEscaped(this.index)) {
-      // Check for comments first
-      const nextChar = this.peekAt(2);
-
-      if (nextChar === '!') {
-        return this.scanComment();
-      }
-
-      // Check for & unescaped syntax {{&
-      if (nextChar === '&') {
-        this.state = STATE_MUSTACHE;
-        return this.scanDelimiter(TokenType.OPEN_RAW, '{{&');
-      }
-
-      // Check for block delimiters after {{
-      if (nextChar === '#') {
-        this.state = STATE_MUSTACHE;
-        return this.scanDelimiter(TokenType.OPEN_BLOCK, '{{#');
-      }
-
-      if (nextChar === '/') {
-        this.state = STATE_MUSTACHE;
-        return this.scanDelimiter(TokenType.OPEN_ENDBLOCK, '{{/');
-      }
-
-      if (nextChar === '^') {
-        this.state = STATE_MUSTACHE;
-        return this.scanDelimiter(TokenType.OPEN_INVERSE, '{{^');
-      }
-
-      this.state = STATE_MUSTACHE;
-      return this.scanDelimiter(TokenType.OPEN, '{{');
+    // Try to scan closing mustache delimiters
+    const closingToken = this.tryScanClosingMustache();
+    if (closingToken) {
+      return closingToken;
     }
 
-    // Check for mustache closing - need to check triple braces before double
-    // Skip if the closing brace is escaped
-    if (this.match('}}}') && !this.isEscaped(this.index)) {
-      this.state = STATE_CONTENT;
-      return this.scanDelimiter(TokenType.CLOSE_UNESCAPED, '}}}');
-    }
-
-    if (this.match('}}') && !this.isEscaped(this.index)) {
-      this.state = STATE_CONTENT;
-      return this.scanDelimiter(TokenType.CLOSE, '}}');
-    }
-
-    // If we're inside a mustache, check for mustache-specific tokens
+    // If we're inside a mustache, scan mustache-specific tokens
     if (this.state === STATE_MUSTACHE) {
-      const char = this.peek();
-
-      // Check for string literals
-      if (char === '"' || char === "'") {
-        return this.scanString();
-      }
-
-      // Check for data prefix (@)
-      if (char === '@') {
-        return this.scanData();
-      }
-
-      // Check for special dot identifiers (. or ..) before treating as separator
-      if (char === '.') {
-        return this.handleDot();
-      }
-
-      // Check for slash separator
-      if (char === '/') {
-        return this.scanSeparator();
-      }
-
-      // Check for subexpression delimiters (parentheses)
-      if (char === '(') {
-        return this.scanDelimiter(TokenType.OPEN_SEXPR, '(');
-      }
-
-      if (char === ')') {
-        return this.scanDelimiter(TokenType.CLOSE_SEXPR, ')');
-      }
-
-      // Check for equals sign (hash arguments)
-      if (char === '=') {
-        return this.scanDelimiter(TokenType.EQUALS, '=');
-      }
-
-      // Check for bracket literals - scan content between [ and ] as a single token
-      if (char === '[') {
-        return this.scanBracketLiteral();
-      }
-
-      // Check for number literals
-      if (this.isDigit(char) || (char === '-' && this.isDigit(this.peekAt(1)))) {
-        return this.scanNumber();
-      }
-
-      // Check for boolean, null, undefined literals (keywords)
-      if (this.isAlpha(char)) {
-        // Check if it's a keyword
-        const keyword = this.tryMatchKeyword();
-        if (keyword) {
-          return keyword;
-        }
-
-        // If not a keyword, scan as identifier
-        return this.scanIdentifier();
-      }
-
-      // Skip whitespace in mustache context
-      if (this.isWhitespace(char)) {
-        while (!this.isEOF() && this.isWhitespace(this.peek())) {
-          this.advance();
-        }
-        this.lastTokenType = null;
-        return this.lexInternal();
-      }
+      return this.scanMustacheToken();
     }
 
     // Otherwise, scan content until we hit {{
@@ -262,26 +175,175 @@ export class Lexer {
   }
 
   /**
+   * Try to scan an opening mustache delimiter ({{{, {{#, {{/, {{^, {{&, {{!, {{)
+   * Returns the token if matched, null otherwise
+   */
+  private tryScanOpeningMustache(): Token | null {
+    // Check for triple braces first (more specific)
+    if (this.match('{{{') && !this.isEscaped(this.index)) {
+      this.state = STATE_MUSTACHE;
+      return this.scanDelimiter(TokenType.OPEN_UNESCAPED, '{{{');
+    }
+
+    // Check for double braces
+    if (this.match('{{') && !this.isEscaped(this.index)) {
+      const nextChar = this.peekAt(2);
+
+      // Comments are handled specially (they don't enter mustache state the same way)
+      if (nextChar === '!') {
+        return this.scanComment();
+      }
+
+      this.state = STATE_MUSTACHE;
+
+      // Map next character to token type and delimiter
+      switch (nextChar) {
+        case '&':
+          return this.scanDelimiter(TokenType.OPEN_RAW, '{{&');
+        case '#':
+          return this.scanDelimiter(TokenType.OPEN_BLOCK, '{{#');
+        case '/':
+          return this.scanDelimiter(TokenType.OPEN_ENDBLOCK, '{{/');
+        case '^':
+          return this.scanDelimiter(TokenType.OPEN_INVERSE, '{{^');
+        default:
+          return this.scanDelimiter(TokenType.OPEN, '{{');
+      }
+    }
+
+    return null;
+  }
+
+  /**
+   * Try to scan a closing mustache delimiter (}}} or }})
+   * Returns the token if matched, null otherwise
+   */
+  private tryScanClosingMustache(): Token | null {
+    // Check for triple braces first (more specific)
+    if (this.match('}}}') && !this.isEscaped(this.index)) {
+      this.state = STATE_CONTENT;
+      return this.scanDelimiter(TokenType.CLOSE_UNESCAPED, '}}}');
+    }
+
+    if (this.match('}}') && !this.isEscaped(this.index)) {
+      this.state = STATE_CONTENT;
+      return this.scanDelimiter(TokenType.CLOSE, '}}');
+    }
+
+    return null;
+  }
+
+  /**
+   * Scan a token inside mustache context
+   * Handles strings, data, paths, subexpressions, numbers, keywords, and identifiers
+   */
+  private scanMustacheToken(): Token {
+    const char = this.peek();
+
+    // String literals
+    if (char === '"' || char === "'") {
+      return this.scanString();
+    }
+
+    // Data prefix (@)
+    if (char === '@') {
+      return this.scanData();
+    }
+
+    // Dot handling (. or .. as identifier, or . as separator)
+    if (char === '.') {
+      return this.handleDot();
+    }
+
+    // Slash separator
+    if (char === '/') {
+      return this.scanSeparator();
+    }
+
+    // Subexpression delimiters
+    if (char === '(') {
+      return this.scanDelimiter(TokenType.OPEN_SEXPR, '(');
+    }
+    if (char === ')') {
+      return this.scanDelimiter(TokenType.CLOSE_SEXPR, ')');
+    }
+
+    // Equals sign (hash arguments)
+    if (char === '=') {
+      return this.scanDelimiter(TokenType.EQUALS, '=');
+    }
+
+    // Bracket literals [content]
+    if (char === '[') {
+      return this.scanBracketLiteral();
+    }
+
+    // Number literals
+    if (this.isDigit(char) || (char === '-' && this.isDigit(this.peekAt(1)))) {
+      return this.scanNumber();
+    }
+
+    // Keywords (true, false, null, undefined) or identifiers
+    if (this.isAlpha(char)) {
+      const keyword = this.tryMatchKeyword();
+      if (keyword) {
+        return keyword;
+      }
+      return this.scanIdentifier();
+    }
+
+    // Whitespace - skip and continue
+    if (this.isWhitespace(char)) {
+      this.skipWhitespace();
+      return this.lexInternal();
+    }
+
+    // Unknown character in mustache - advance and try again
+    // This handles edge cases like stray characters
+    this.advance();
+    return this.lexInternal();
+  }
+
+  /**
+   * Skip whitespace characters and reset token tracking
+   */
+  private skipWhitespace(): void {
+    while (!this.isEOF() && this.isWhitespace(this.peek())) {
+      this.advance();
+    }
+    this.lastTokenType = null;
+  }
+
+  /**
    * Scan a delimiter token ({{, }}, {{{, }}}, {{#, {{/, {{^)
    */
   private scanDelimiter(type: TokenType, delimiter: string): Token {
     const start = this.getPosition();
+    this.consumeChars(delimiter.length);
+    return this.createToken(type, delimiter, start);
+  }
 
-    // Consume the delimiter characters
-    for (let i = 0; i < delimiter.length; i++) {
-      this.advance();
-    }
-
-    const end = this.getPosition();
-
+  /**
+   * Create a token with the given type, value, and location
+   */
+  private createToken(type: TokenType, value: string, start: Position): Token {
     return {
       type,
-      value: delimiter,
+      value,
       loc: {
         start,
-        end,
+        end: this.getPosition(),
       },
     };
+  }
+
+  /**
+   * Consume a specific number of characters (used for delimiters)
+   */
+  private consumeChars(count: number): void {
+    for (let i = 0; i < count; i++) {
+      this.advance();
+    }
   }
 
   /**
@@ -356,17 +418,7 @@ export class Lexer {
   private scanSeparator(): Token {
     const start = this.getPosition();
     const value = this.advance(); // Consume . or /
-
-    const end = this.getPosition();
-
-    return {
-      type: TokenType.SEP,
-      value,
-      loc: {
-        start,
-        end,
-      },
-    };
+    return this.createToken(TokenType.SEP, value, start);
   }
 
   /**
@@ -375,17 +427,7 @@ export class Lexer {
   private scanData(): Token {
     const start = this.getPosition();
     const value = this.advance(); // Consume @
-
-    const end = this.getPosition();
-
-    return {
-      type: TokenType.DATA,
-      value,
-      loc: {
-        start,
-        end,
-      },
-    };
+    return this.createToken(TokenType.DATA, value, start);
   }
 
   /**
@@ -394,23 +436,8 @@ export class Lexer {
    */
   private scanSpecialIdentifier(expected: string): Token {
     const start = this.getPosition();
-    let value = '';
-
-    // Consume the expected characters
-    for (let i = 0; i < expected.length; i++) {
-      value += this.advance();
-    }
-
-    const end = this.getPosition();
-
-    return {
-      type: TokenType.ID,
-      value,
-      loc: {
-        start,
-        end,
-      },
-    };
+    this.consumeChars(expected.length);
+    return this.createToken(TokenType.ID, expected, start);
   }
 
   /**
@@ -428,62 +455,17 @@ export class Lexer {
 
     // Scan until we hit a non-escaped delimiter
     while (!this.isEOF()) {
-      // Check for escaped opening delimiters - these consume through closing
+      // Check for escaped delimiters - these become literal content
       if (this.isEscaped(this.index)) {
-        if (this.match('{{{')) {
-          // Escaped triple brace - include it and find matching }}}
-          value += this.advance(); // First {
-          value += this.advance(); // Second {
-          value += this.advance(); // Third {
-
-          // Scan until we find }}}
-          while (!this.isEOF() && !this.match('}}}')) {
-            value += this.advance();
-          }
-
-          // Include the closing }}}
-          if (this.match('}}}')) {
-            value += this.advance(); // First }
-            value += this.advance(); // Second }
-            value += this.advance(); // Third }
-          }
-          continue;
-        } else if (this.match('{{')) {
-          // Escaped double brace - include it and find matching }}
-          value += this.advance(); // First {
-          value += this.advance(); // Second {
-
-          // Scan until we find }}
-          while (!this.isEOF() && !this.match('}}')) {
-            value += this.advance();
-          }
-
-          // Include the closing }}
-          if (this.match('}}')) {
-            value += this.advance(); // First }
-            value += this.advance(); // Second }
-          }
-          continue;
-        } else if (this.match('}}}') || this.match('}}')) {
-          // Escaped closing brace - just include it
-          value += this.advance();
-          if (this.peek() === '}') {
-            value += this.advance();
-            if (this.peek() === '}') {
-              value += this.advance();
-            }
-          }
+        const escapedContent = this.scanEscapedDelimiter();
+        if (escapedContent) {
+          value += escapedContent;
           continue;
         }
       }
 
       // Check for non-escaped delimiters (these end content)
-      const isOpenDelimiter =
-        (this.match('{{{') || this.match('{{')) && !this.isEscaped(this.index);
-      const isCloseDelimiter =
-        (this.match('}}}') || this.match('}}')) && !this.isEscaped(this.index);
-
-      if (isOpenDelimiter || isCloseDelimiter) {
+      if (this.isUnescapedDelimiter()) {
         break;
       }
 
@@ -496,16 +478,82 @@ export class Lexer {
       return null;
     }
 
-    const end = this.getPosition();
+    return this.createToken(TokenType.CONTENT, value, start);
+  }
 
-    return {
-      type: TokenType.CONTENT,
-      value,
-      loc: {
-        start,
-        end,
-      },
-    };
+  /**
+   * Scan an escaped delimiter sequence and return it as literal content
+   * Handles \{{{...}}}, \{{...}}, \}}}, \}}
+   * Returns the content string or null if not at an escaped delimiter
+   */
+  private scanEscapedDelimiter(): string | null {
+    // Escaped triple opening brace - include through closing
+    if (this.match('{{{')) {
+      return this.consumeEscapedMustache('{{{', '}}}');
+    }
+
+    // Escaped double opening brace - include through closing
+    if (this.match('{{')) {
+      return this.consumeEscapedMustache('{{', '}}');
+    }
+
+    // Escaped closing braces - just include them
+    if (this.match('}}}')) {
+      return this.consumeDelimiterChars(3);
+    }
+
+    if (this.match('}}')) {
+      return this.consumeDelimiterChars(2);
+    }
+
+    return null;
+  }
+
+  /**
+   * Consume an escaped mustache expression including its closing delimiter
+   * Used for \{{...}} and \{{{...}}} patterns
+   */
+  private consumeEscapedMustache(openDelim: string, closeDelim: string): string {
+    let content = '';
+
+    // Consume opening delimiter
+    for (let i = 0; i < openDelim.length; i++) {
+      content += this.advance();
+    }
+
+    // Scan until we find closing delimiter
+    while (!this.isEOF() && !this.match(closeDelim)) {
+      content += this.advance();
+    }
+
+    // Consume closing delimiter
+    if (this.match(closeDelim)) {
+      for (let i = 0; i < closeDelim.length; i++) {
+        content += this.advance();
+      }
+    }
+
+    return content;
+  }
+
+  /**
+   * Consume a specific number of delimiter characters
+   */
+  private consumeDelimiterChars(count: number): string {
+    let content = '';
+    for (let i = 0; i < count && this.peek() === '}'; i++) {
+      content += this.advance();
+    }
+    return content;
+  }
+
+  /**
+   * Check if we're at a non-escaped delimiter ({{ or }})
+   */
+  private isUnescapedDelimiter(): boolean {
+    const isOpen = (this.match('{{{') || this.match('{{')) && !this.isEscaped(this.index);
+    const isClose = (this.match('}}}') || this.match('}}')) && !this.isEscaped(this.index);
+    return isOpen || isClose;
   }
 
   /**
@@ -583,24 +631,16 @@ export class Lexer {
     const start = this.getPosition();
 
     // Consume {{!
-    this.advance(); // {
-    this.advance(); // {
-    this.advance(); // !
+    this.consumeChars(3);
 
     // Check if it's a block comment {{!--
     const isBlockComment = this.match('--');
     if (isBlockComment) {
-      this.advance(); // -
-      this.advance(); // -
+      this.consumeChars(2);
     }
 
-    let value = '';
     const endSequence = isBlockComment ? '--}}' : '}}';
-
-    // Scan until we find the closing sequence
-    while (!this.isEOF() && !this.match(endSequence)) {
-      value += this.advance();
-    }
+    const value = this.scanUntilMatch(endSequence);
 
     // Check for unclosed comment
     if (this.isEOF() && !this.match(endSequence)) {
@@ -608,25 +648,22 @@ export class Lexer {
     }
 
     // Consume the closing sequence
-    for (let i = 0; i < endSequence.length; i++) {
-      this.advance();
-    }
+    this.consumeChars(endSequence.length);
 
-    const end = this.getPosition();
-
-    return {
-      type: TokenType.COMMENT,
-      value,
-      loc: {
-        start,
-        end,
-      },
-    };
+    return this.createToken(TokenType.COMMENT, value, start);
   }
 
   /**
-   * Scan a string literal ("text" or 'text')
+   * Scan characters until a match is found (does not consume the match)
    */
+  private scanUntilMatch(endSequence: string): string {
+    let value = '';
+    while (!this.isEOF() && !this.match(endSequence)) {
+      value += this.advance();
+    }
+    return value;
+  }
+
   /**
    * Scan a bracket literal [content] - preserves all content including spaces
    * Used for paths with special characters: {{[foo bar]}}, {{[@alan]}}
@@ -634,12 +671,8 @@ export class Lexer {
   private scanBracketLiteral(): Token {
     const start = this.getPosition();
     this.advance(); // Consume opening [
-    let value = '';
 
-    // Scan everything until we hit the closing ]
-    while (!this.isEOF() && this.peek() !== ']') {
-      value += this.advance();
-    }
+    const value = this.scanUntilChar(']');
 
     // Check for unclosed bracket
     if (this.isEOF()) {
@@ -647,21 +680,41 @@ export class Lexer {
     }
 
     this.advance(); // Consume closing ]
-    const end = this.getPosition();
-
-    return {
-      type: TokenType.BRACKET_LITERAL,
-      value,
-      loc: {
-        start,
-        end,
-      },
-    };
+    return this.createToken(TokenType.BRACKET_LITERAL, value, start);
   }
 
+  /**
+   * Scan characters until a specific character is found (does not consume it)
+   */
+  private scanUntilChar(endChar: string): string {
+    let value = '';
+    while (!this.isEOF() && this.peek() !== endChar) {
+      value += this.advance();
+    }
+    return value;
+  }
+
+  /**
+   * Scan a string literal ("text" or 'text')
+   */
   private scanString(): Token {
     const start = this.getPosition();
     const quote = this.advance(); // Consume opening quote
+    const value = this.scanStringContent(quote);
+
+    // Check for unclosed string
+    if (this.isEOF()) {
+      throw new LexerError(`Unclosed string: expected closing ${quote}`, start);
+    }
+
+    this.advance(); // Consume closing quote
+    return this.createToken(TokenType.STRING, value, start);
+  }
+
+  /**
+   * Scan string content handling escape sequences
+   */
+  private scanStringContent(quote: string): string {
     let value = '';
 
     while (!this.isEOF() && this.peek() !== quote) {
@@ -688,22 +741,7 @@ export class Lexer {
       }
     }
 
-    // Check for unclosed string
-    if (this.isEOF()) {
-      throw new LexerError(`Unclosed string: expected closing ${quote}`, start);
-    }
-
-    this.advance(); // Consume closing quote
-    const end = this.getPosition();
-
-    return {
-      type: TokenType.STRING,
-      value,
-      loc: {
-        start,
-        end,
-      },
-    };
+    return value;
   }
 
   /**
@@ -720,30 +758,28 @@ export class Lexer {
     }
 
     // Scan integer part
-    while (!this.isEOF() && this.isDigit(this.peek())) {
-      value += this.advance();
-    }
+    value += this.scanDigits();
 
     // Scan decimal part if present and not in path context
     // Paths: {{matrix.0.1}} → ["matrix", "0", "1"]
     // Params: {{helper count=3.14}} → count=3.14
     if (this.shouldScanDecimal() && this.peek() === '.' && this.isDigit(this.peekAt(1))) {
       value += this.advance(); // Consume '.'
-      while (!this.isEOF() && this.isDigit(this.peek())) {
-        value += this.advance();
-      }
+      value += this.scanDigits();
     }
 
-    const end = this.getPosition();
+    return this.createToken(TokenType.NUMBER, value, start);
+  }
 
-    return {
-      type: TokenType.NUMBER,
-      value,
-      loc: {
-        start,
-        end,
-      },
-    };
+  /**
+   * Scan consecutive digit characters
+   */
+  private scanDigits(): string {
+    let digits = '';
+    while (!this.isEOF() && this.isDigit(this.peek())) {
+      digits += this.advance();
+    }
+    return digits;
   }
 
   /**
@@ -772,22 +808,8 @@ export class Lexer {
    */
   private scanKeyword(type: TokenType, keyword: string): Token {
     const start = this.getPosition();
-
-    // Consume the keyword characters
-    for (let i = 0; i < keyword.length; i++) {
-      this.advance();
-    }
-
-    const end = this.getPosition();
-
-    return {
-      type,
-      value: keyword,
-      loc: {
-        start,
-        end,
-      },
-    };
+    this.consumeChars(keyword.length);
+    return this.createToken(type, keyword, start);
   }
 
   /**
@@ -808,16 +830,7 @@ export class Lexer {
       value += this.advance();
     }
 
-    const end = this.getPosition();
-
-    return {
-      type: TokenType.ID,
-      value,
-      loc: {
-        start,
-        end,
-      },
-    };
+    return this.createToken(TokenType.ID, value, start);
   }
 
   /**
