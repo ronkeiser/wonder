@@ -56,6 +56,9 @@ export const TokenType = {
   // Hash arguments
   EQUALS: 'EQUALS', // = for key=value pairs
 
+  // Block parameters
+  PIPE: 'PIPE', // | for block params (as |foo bar|)
+
   // Whitespace control
   STRIP: 'STRIP', // ~ for whitespace stripping
 

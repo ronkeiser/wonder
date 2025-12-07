@@ -172,6 +172,7 @@ export interface BlockStatement extends Node {
   openStrip: StripFlags; // Whitespace control at opening tag (V2)
   inverseStrip: StripFlags; // Whitespace control at {{else}} (V2)
   closeStrip: StripFlags; // Whitespace control at closing tag (V2)
+  blockParams?: string[]; // Block parameter names (e.g., ["item", "index"] from {{#each items as |item index|}})
   loc: SourceLocation | null;
 }
 

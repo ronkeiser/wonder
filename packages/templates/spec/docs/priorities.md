@@ -2,18 +2,19 @@
 
 **Test Status Summary:**
 
-- ✅ **183 passing** (57.0%)
-- ❌ **40 failing** (12.5%)
+- ✅ **189 passing** (58.9%)
+- ❌ **34 failing** (10.6%)
 - ⏭️ **98 skipped** (30.5%)
 - **Total: 321 tests**
 
 **Recent Progress:**
 
-- Session improvement: +4 tests passing (-4 failures)
-- Completed: Data variables (@foo, @root, @index, @key, @first, @last)
-- Fixed: RenderOptions now accepts data parameter
-- Fixed: Data variables properly merged into root data frame
-- Fixed: Validation to prevent @foo/../name (parent scope access)
+- Session improvement: +6 tests passing (-6 failures)
+- Completed: Block parameters (as |param1 param2|) - P1.6
+- Fixed: Parser supports `as |param|` syntax with PIPE tokens
+- Fixed: Interpreter binds block params to shadow context/helpers
+- Fixed: Block params work with #each (item, index), #with, custom helpers
+- Note: 1 edge case remaining (chained helper in else clause with block params)
 
 ---
 
@@ -188,6 +189,58 @@
 - Data variables can be functions (called on access like regular helpers)
 
 **Tests Fixed:** 5 data variable tests (6 total - 1 has test harness issue)
+
+---
+
+### ✅ P1.6 - Block Parameters (as |param1 param2|) - COMPLETED
+
+**Status:** ✅ Fixed - Implemented block parameter support (6 of 7 tests passing)
+
+**Implementation:**
+
+**Lexer:**
+
+- Added PIPE token type (`|`) for block parameter delimiters
+- Tokenizes `as |foo bar|` correctly
+
+**Parser:**
+
+- Updated BlockStatement AST node to include optional `blockParams?: string[]` field
+- Modified `parseParamsAndHash()` to stop before "as" keyword
+- Added block parameter parsing: `as |param1 param2|` after params/hash
+- Stores parameter names in `blockParams` array on BlockStatement
+- Supports block params on both regular and inverse block statements
+
+**Interpreter:**
+
+- Added `blockParamsStack` to track nested block parameter scopes
+- Block params shadow simple identifiers (not pathed with ./ or @)
+- Block params shadow both context values AND helpers
+- Pathed lookups like `{{./value}}` explicitly skip block params
+- Multi-part paths like `{{foo.bar}}` can start with block param `foo`
+- Updated `evaluatePathExpression()` to check block params before context/helpers
+- Updated `isHelperCall()` to check block params before helpers
+- Updated built-in helpers to support block params:
+  - `#with person as |foo|` - binds person to foo
+  - `#each items as |item index|` - binds item and index
+- Custom helpers receive `options.fn.blockParams` (count) and pass values via `options.fn(ctx, { blockParams: [val1, val2] })`
+
+**Scoping Rules:**
+
+- Block params shadow: context values, helpers (for simple identifiers)
+- Block params DON'T shadow: pathed values (`./foo`), parent values (`../foo`), data variables (`@foo`)
+- Inner block params shadow outer block params (proper nesting)
+- Block params work with multi-part paths: `{{foo.bar}}` where `foo` is block param
+
+**Tests Fixed:** 6 tests passing
+
+- ✅ should take precedence over context values
+- ✅ should take precedence over helper values
+- ✅ should not take precedence over pathed values (./value)
+- ✅ should take precedence over parent block params
+- ✅ #with provides block parameter
+- ✅ #each with block params
+- ❌ should allow block params on chained helpers (edge case: else clause with helper + block params)
 
 ---
 

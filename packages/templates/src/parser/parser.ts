@@ -916,12 +916,14 @@ export class Parser {
     const params: Expression[] = [];
     const hashPairs: HashPair[] = [];
 
-    // Stop at terminating token, STRIP token (which precedes close), or CLOSE_BRACE (for {{~{foo}~}})
+    // Stop at terminating token, STRIP token (which precedes close), CLOSE_BRACE (for {{~{foo}~}}),
+    // or "as" keyword (which introduces block params)
     while (
       this.currentToken &&
       !this.match(terminatingToken) &&
       !this.match(TokenType.STRIP) &&
-      !this.match(TokenType.CLOSE_BRACE)
+      !this.match(TokenType.CLOSE_BRACE) &&
+      !(this.match(TokenType.ID) && this.currentToken.value === 'as')
     ) {
       // Check if this is a hash pair (ID = Expression)
       if (this.match(TokenType.ID)) {
@@ -1420,6 +1422,30 @@ export class Parser {
     // Parse parameters and hash pairs until we hit CLOSE token (or STRIP before CLOSE)
     const { params, hash } = this.parseParamsAndHash(TokenType.CLOSE);
 
+    // Parse block parameters if present (as |param1 param2|)
+    let blockParams: string[] | undefined;
+    if (this.match(TokenType.ID) && this.currentToken?.value === 'as') {
+      this.advance(); // consume 'as'
+      this.expect(TokenType.PIPE, 'Expected | after "as" keyword');
+      this.advance(); // consume opening |
+
+      blockParams = [];
+      while (!this.match(TokenType.PIPE)) {
+        if (!this.match(TokenType.ID)) {
+          throw ParserError.fromToken(
+            'Expected identifier in block params',
+            this.currentToken!,
+            this.getErrorContext(),
+          );
+        }
+        blockParams.push(this.currentToken!.value as string);
+        this.advance();
+      }
+
+      this.expect(TokenType.PIPE, 'Expected closing | for block params');
+      this.advance(); // consume closing |
+    }
+
     // Check for closing strip marker on open tag (~)
     const openTagCloseStrip = this.match(TokenType.STRIP);
     if (openTagCloseStrip) {
@@ -1563,6 +1589,7 @@ export class Parser {
       openStrip: { open: openTagOpenStrip, close: openTagCloseStrip },
       inverseStrip: { open: inverseOpenStrip, close: inverseCloseStrip },
       closeStrip: { open: closeTagOpenStrip, close: closeTagCloseStrip },
+      ...(blockParams && { blockParams }),
       loc,
     };
 
@@ -1624,6 +1651,30 @@ export class Parser {
 
     // Parse parameters and hash pairs until we hit CLOSE token (or STRIP before CLOSE)
     const { params, hash } = this.parseParamsAndHash(TokenType.CLOSE);
+
+    // Parse block parameters if present (as |param1 param2|)
+    let blockParams: string[] | undefined;
+    if (this.match(TokenType.ID) && this.currentToken?.value === 'as') {
+      this.advance(); // consume 'as'
+      this.expect(TokenType.PIPE, 'Expected | after "as" keyword');
+      this.advance(); // consume opening |
+
+      blockParams = [];
+      while (!this.match(TokenType.PIPE)) {
+        if (!this.match(TokenType.ID)) {
+          throw ParserError.fromToken(
+            'Expected identifier in block params',
+            this.currentToken!,
+            this.getErrorContext(),
+          );
+        }
+        blockParams.push(this.currentToken!.value as string);
+        this.advance();
+      }
+
+      this.expect(TokenType.PIPE, 'Expected closing | for block params');
+      this.advance(); // consume closing |
+    }
 
     // Check for closing strip marker on open tag (~)
     const openTagCloseStrip = this.match(TokenType.STRIP);
@@ -1715,6 +1766,7 @@ export class Parser {
       openStrip: { open: openTagOpenStrip, close: openTagCloseStrip },
       inverseStrip: { open: false, close: false }, // No inverse strip for standalone inverse blocks
       closeStrip: { open: closeTagOpenStrip, close: closeTagCloseStrip },
+      ...(blockParams && { blockParams }),
       loc,
     };
 

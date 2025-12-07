@@ -228,6 +228,9 @@ export class Lexer {
     if (char === '{') return this.scanDelimiter(TokenType.OPEN_BRACE, '{');
     if (char === '}') return this.scanDelimiter(TokenType.CLOSE_BRACE, '}');
 
+    // Pipe (block parameters)
+    if (char === '|') return this.scanDelimiter(TokenType.PIPE, '|');
+
     // Equals sign (hash arguments)
     if (char === '=') return this.scanDelimiter(TokenType.EQUALS, '=');
 

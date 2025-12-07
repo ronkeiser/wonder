@@ -52,6 +52,7 @@ export class Interpreter {
   private helpers: HelperRegistry;
   private contextStack!: ContextStack;
   private dataStack!: DataStack;
+  private blockParamsStack: Array<Record<string, any>> = [];
 
   /**
    * Creates a new interpreter for the given AST.
@@ -592,16 +593,45 @@ export class Interpreter {
     const params = node.params.map((param) => this.evaluateExpression(param));
     const hash = this.evaluateHash(node.hash);
 
+    // Create fn closure that accepts optional context and options with blockParams
+    const fn = (newContext?: any, opts?: { blockParams?: any[] }) => {
+      return this.withScope(newContext, null, () => {
+        // If block params are provided by the helper, store them on the block params stack
+        if (opts?.blockParams && node.blockParams) {
+          const blockParamBindings: Record<string, any> = {};
+          node.blockParams.forEach((paramName, i) => {
+            if (i < opts.blockParams!.length) {
+              blockParamBindings[paramName] = opts.blockParams![i];
+            }
+          });
+          // Push block param bindings before evaluating program
+          this.blockParamsStack.push(blockParamBindings);
+          try {
+            return this.evaluateProgram(node.program, {
+              stripStart: node.openStrip?.close,
+              stripEnd: node.closeStrip?.open,
+            });
+          } finally {
+            this.blockParamsStack.pop();
+          }
+        }
+
+        // No block params, just evaluate normally
+        return this.evaluateProgram(node.program, {
+          stripStart: node.openStrip?.close,
+          stripEnd: node.closeStrip?.open,
+        });
+      });
+    };
+
+    // Add blockParams property to fn (tells helper how many block params are expected)
+    if (node.blockParams) {
+      (fn as any).blockParams = node.blockParams.length;
+    }
+
     // Create options object with fn, inverse closures, and hash
     const options = {
-      fn: (newContext?: any) => {
-        return this.withScope(newContext, null, () =>
-          this.evaluateProgram(node.program, {
-            stripStart: node.openStrip?.close,
-            stripEnd: node.closeStrip?.open,
-          }),
-        );
-      },
+      fn,
       inverse: (newContext?: any) => {
         return this.withScope(newContext, null, () =>
           this.evaluateProgram(node.inverse, {
@@ -765,19 +795,51 @@ export class Interpreter {
         continue;
       }
 
-      output += this.withScope(
-        collection[i],
-        {
-          '@index': i,
-          '@first': i === firstIndex,
-          '@last': i === lastIndex,
-        },
-        () =>
-          this.evaluateProgram(node.program, {
-            stripStart: node.openStrip?.close,
-            stripEnd: node.closeStrip?.open,
-          }),
-      );
+      // If block params are defined, use them
+      if (node.blockParams && node.blockParams.length > 0) {
+        const blockParamBindings: Record<string, any> = {
+          [node.blockParams[0]]: collection[i],
+        };
+        if (node.blockParams.length > 1) {
+          blockParamBindings[node.blockParams[1]] = i;
+        }
+
+        this.blockParamsStack.push(blockParamBindings);
+        try {
+          const dataVars = {
+            '@index': i,
+            '@first': i === firstIndex,
+            '@last': i === lastIndex,
+          };
+          // Push data frame for @index, @first, @last
+          this.dataStack.push(createDataFrame(this.dataStack.getCurrent(), dataVars));
+          try {
+            output += this.evaluateProgram(node.program, {
+              stripStart: node.openStrip?.close,
+              stripEnd: node.closeStrip?.open,
+            });
+          } finally {
+            this.dataStack.pop();
+          }
+        } finally {
+          this.blockParamsStack.pop();
+        }
+      } else {
+        // No block params - standard behavior (change context)
+        output += this.withScope(
+          collection[i],
+          {
+            '@index': i,
+            '@first': i === firstIndex,
+            '@last': i === lastIndex,
+          },
+          () =>
+            this.evaluateProgram(node.program, {
+              stripStart: node.openStrip?.close,
+              stripEnd: node.closeStrip?.open,
+            }),
+        );
+      }
     }
 
     return output;
@@ -931,7 +993,26 @@ export class Interpreter {
       });
     }
 
-    // Push value as new context and data frame (inherits @root but no new loop variables)
+    // If block params are defined, bind them AND still push the value as context
+    if (node.blockParams && node.blockParams.length > 0) {
+      const blockParamBindings: Record<string, any> = {
+        [node.blockParams[0]]: value,
+      };
+      this.blockParamsStack.push(blockParamBindings);
+      try {
+        // Still push value as context so unbound names resolve from it
+        return this.withScope(value, {}, () =>
+          this.evaluateProgram(node.program, {
+            stripStart: node.openStrip?.close,
+            stripEnd: node.closeStrip?.open,
+          }),
+        );
+      } finally {
+        this.blockParamsStack.pop();
+      }
+    }
+
+    // No block params - push value as new context and data frame (inherits @root but no new loop variables)
     return this.withScope(value, {}, () =>
       this.evaluateProgram(node.program, {
         stripStart: node.openStrip?.close,
@@ -1012,8 +1093,28 @@ export class Interpreter {
       return false;
     }
 
-    // Check if helper exists in registry
     const helperName = node.path.parts[0];
+
+    // Block params shadow helpers for simple identifiers
+    // Check if this is a simple identifier that's in block params
+    const isSimpleIdentifier =
+      !node.path.data &&
+      node.path.depth === 0 &&
+      node.path.parts.length === 1 &&
+      !node.path.original.startsWith('./') &&
+      !node.path.original.startsWith('../');
+
+    if (isSimpleIdentifier && this.blockParamsStack.length > 0) {
+      // Check if this identifier is in block params (from inner to outer scope)
+      for (let i = this.blockParamsStack.length - 1; i >= 0; i--) {
+        if (helperName in this.blockParamsStack[i]) {
+          // It's a block param, not a helper
+          return false;
+        }
+      }
+    }
+
+    // Check if helper exists in registry
     return this.lookupHelper(helperName) !== undefined;
   }
 
@@ -1065,12 +1166,51 @@ export class Interpreter {
   }
 
   /**
-   * Evaluates a PathExpression using the context and data stacks.
+   * Evaluates a PathExpression using block params, context, and data stacks.
+   *
+   * Block params shadow the first part of paths (not starting with ./ or ../), so:
+   * - {{foo}} checks block params first for 'foo'
+   * - {{foo.bar}} checks block params first for 'foo', then accesses .bar
+   * - {{./foo}} skips block params (explicit context reference)
+   * - {{../foo}} skips block params (parent context)
+   * - {{@foo}} skips block params (data variable)
    *
    * @param expr - The PathExpression to evaluate
-   * @returns The resolved value from context or data
+   * @returns The resolved value from block params, context, or data
    */
   private evaluatePathExpression(expr: PathExpression): any {
+    // Check if the first part of the path can be shadowed by block params
+    // Block params can shadow the first segment of any path, not just single identifiers
+    const canUsesBlockParams =
+      !expr.data &&
+      expr.depth === 0 &&
+      !expr.original.startsWith('./') &&
+      !expr.original.startsWith('../');
+
+    if (canUsesBlockParams && this.blockParamsStack.length > 0 && expr.parts.length > 0) {
+      const firstPart = expr.parts[0];
+
+      // Check block params from most recent to oldest (inner to outer scope)
+      for (let i = this.blockParamsStack.length - 1; i >= 0; i--) {
+        const blockParams = this.blockParamsStack[i];
+        if (firstPart in blockParams) {
+          // Found block param - resolve the first part from block params
+          let value = blockParams[firstPart];
+
+          // If there are additional parts (e.g., foo.bar.baz), resolve them
+          for (let j = 1; j < expr.parts.length; j++) {
+            if (value == null) {
+              return undefined;
+            }
+            value = lookupProperty(value, expr.parts[j]);
+          }
+
+          return value;
+        }
+      }
+    }
+
+    // Fall back to normal resolution (context or data stack)
     return resolvePathExpression(expr, this.contextStack, this.dataStack);
   }
 
