@@ -69,6 +69,62 @@ export class Interpreter {
   }
 
   /**
+   * Unwraps a value if it's a function by calling it with the current context.
+   *
+   * This pattern is used throughout the interpreter where a value might be
+   * a function that needs to be called to get the actual value.
+   *
+   * @param value - The value to potentially unwrap
+   * @returns The value, or the result of calling it if it's a function
+   */
+  private unwrapValue(value: any): any {
+    if (typeof value === 'function') {
+      const context = this.contextStack.getCurrent();
+      return value.call(context);
+    }
+    return value;
+  }
+
+  /**
+   * Executes a callback with a new context and optional data frame pushed onto the stacks.
+   *
+   * Handles the push/pop pattern that's used throughout the interpreter.
+   *
+   * @param newContext - The context to push (or undefined to skip context push)
+   * @param dataVars - Optional data variables for the new frame
+   * @param callback - The function to execute with the new scope
+   * @returns The result of the callback
+   */
+  private withScope<T>(
+    newContext: any | undefined,
+    dataVars: Record<string, any> | null,
+    callback: () => T,
+  ): T {
+    const pushContext = newContext !== undefined;
+    const pushData = dataVars !== null;
+
+    if (pushContext) {
+      this.contextStack.push(newContext);
+    }
+    if (pushData) {
+      const parentFrame = this.dataStack.getCurrent();
+      const frame = createDataFrame(parentFrame, dataVars);
+      this.dataStack.push(frame);
+    }
+
+    try {
+      return callback();
+    } finally {
+      if (pushData) {
+        this.dataStack.pop();
+      }
+      if (pushContext) {
+        this.contextStack.pop();
+      }
+    }
+  }
+
+  /**
    * Evaluates the template with the given context.
    *
    * Initializes stacks, traverses the AST, and returns the rendered output.
@@ -295,25 +351,17 @@ export class Interpreter {
 
       const results: string[] = [];
       for (let i = 0; i < value.length; i++) {
-        const item = value[i];
-
-        // Create data frame with loop metadata
-        const dataFrame = createDataFrame(this.dataStack.getCurrent(), {
-          '@index': i,
-          '@first': i === 0,
-          '@last': i === value.length - 1,
-        });
-
-        // Push item as context and data frame
-        this.contextStack.push(item);
-        this.dataStack.push(dataFrame);
-
-        // Evaluate the block
-        results.push(this.evaluateProgram(node.program));
-
-        // Pop stacks
-        this.dataStack.pop();
-        this.contextStack.pop();
+        results.push(
+          this.withScope(
+            value[i],
+            {
+              '@index': i,
+              '@first': i === 0,
+              '@last': i === value.length - 1,
+            },
+            () => this.evaluateProgram(node.program),
+          ),
+        );
       }
 
       return results.join('');
@@ -336,14 +384,7 @@ export class Interpreter {
       // Create options object with fn and inverse closures
       const options = {
         fn: (newContext?: any) => {
-          if (newContext !== undefined) {
-            this.contextStack.push(newContext);
-          }
-          const result = this.evaluateProgram(node.program);
-          if (newContext !== undefined) {
-            this.contextStack.pop();
-          }
-          return result;
+          return this.withScope(newContext, null, () => this.evaluateProgram(node.program));
         },
         inverse: () => {
           return this.evaluateProgram(node.inverse);
@@ -368,10 +409,7 @@ export class Interpreter {
 
       // Truthy: render main block with result as new context (if object/array)
       if (typeof result === 'object') {
-        this.contextStack.push(result);
-        const output = this.evaluateProgram(node.program);
-        this.contextStack.pop();
-        return output;
+        return this.withScope(result, null, () => this.evaluateProgram(node.program));
       }
 
       // Other truthy primitives: just render the block
@@ -405,24 +443,10 @@ export class Interpreter {
     // Create options object with fn, inverse closures, and hash
     const options = {
       fn: (newContext?: any) => {
-        if (newContext !== undefined) {
-          this.contextStack.push(newContext);
-        }
-        const result = this.evaluateProgram(node.program);
-        if (newContext !== undefined) {
-          this.contextStack.pop();
-        }
-        return result;
+        return this.withScope(newContext, null, () => this.evaluateProgram(node.program));
       },
       inverse: (newContext?: any) => {
-        if (newContext !== undefined) {
-          this.contextStack.push(newContext);
-        }
-        const result = this.evaluateProgram(node.inverse);
-        if (newContext !== undefined) {
-          this.contextStack.pop();
-        }
-        return result;
+        return this.withScope(newContext, null, () => this.evaluateProgram(node.inverse));
       },
       hash,
     };
@@ -449,14 +473,8 @@ export class Interpreter {
       throw new Error(`#if helper requires exactly 1 parameter, got ${node.params.length}`);
     }
 
-    // Evaluate the condition
-    let condition = this.evaluateExpression(node.params[0]);
-
-    // If condition is a function, call it to get the actual value
-    if (typeof condition === 'function') {
-      const context = this.contextStack.getCurrent();
-      condition = condition.call(context);
-    }
+    // Evaluate the condition (unwrap if it's a function)
+    const condition = this.unwrapValue(this.evaluateExpression(node.params[0]));
 
     // Match Handlebars #if logic: (!conditional) || isEmpty(conditional)
     // This makes 0 falsy (standard JS) while keeping {} truthy
@@ -486,14 +504,8 @@ export class Interpreter {
       throw new Error(`#unless helper requires exactly 1 parameter, got ${node.params.length}`);
     }
 
-    // Evaluate the condition
-    let condition = this.evaluateExpression(node.params[0]);
-
-    // If condition is a function, call it to get the actual value
-    if (typeof condition === 'function') {
-      const context = this.contextStack.getCurrent();
-      condition = condition.call(context);
-    }
+    // Evaluate the condition (unwrap if it's a function)
+    const condition = this.unwrapValue(this.evaluateExpression(node.params[0]));
 
     // #unless is inverse of #if: match same logic (!conditional) || isEmpty(conditional)
     const isFalsy = !condition || isEmpty(condition);
@@ -523,14 +535,8 @@ export class Interpreter {
       throw new Error(`#each helper requires exactly 1 parameter, got ${node.params.length}`);
     }
 
-    // Evaluate the collection parameter
-    let collection = this.evaluateExpression(node.params[0]);
-
-    // If collection is a function, call it to get the actual value
-    if (typeof collection === 'function') {
-      const context = this.contextStack.getCurrent();
-      collection = collection.call(context);
-    }
+    // Evaluate the collection parameter (unwrap if it's a function)
+    const collection = this.unwrapValue(this.evaluateExpression(node.params[0]));
 
     // Handle arrays
     if (Array.isArray(collection)) {
@@ -591,27 +597,15 @@ export class Interpreter {
         continue;
       }
 
-      const item = collection[i];
-
-      // Create data frame with loop variables
-      // Keys must be prefixed with @ for data variable access
-      const parentFrame = this.dataStack.getCurrent();
-      const frame = createDataFrame(parentFrame, {
-        '@index': i,
-        '@first': i === firstIndex,
-        '@last': i === lastIndex,
-      });
-      this.dataStack.push(frame);
-
-      // Push array item as new context
-      this.contextStack.push(item);
-
-      // Evaluate the program block with the current item
-      output += this.evaluateProgram(node.program);
-
-      // Pop context and data stacks
-      this.contextStack.pop();
-      this.dataStack.pop();
+      output += this.withScope(
+        collection[i],
+        {
+          '@index': i,
+          '@first': i === firstIndex,
+          '@last': i === lastIndex,
+        },
+        () => this.evaluateProgram(node.program),
+      );
     }
 
     return output;
@@ -637,26 +631,16 @@ export class Interpreter {
 
     // Iterate over keys with index
     keys.forEach((key, index) => {
-      // Create data frame with loop variables
-      // Keys must be prefixed with @ for data variable access
-      const parentFrame = this.dataStack.getCurrent();
-      const frame = createDataFrame(parentFrame, {
-        '@key': key,
-        '@index': index,
-        '@first': index === 0,
-        '@last': index === keys.length - 1,
-      });
-      this.dataStack.push(frame);
-
-      // Push property value as new context
-      this.contextStack.push((collection as any)[key]);
-
-      // Evaluate the program block with the current property value
-      output += this.evaluateProgram(node.program);
-
-      // Pop context and data stacks
-      this.contextStack.pop();
-      this.dataStack.pop();
+      output += this.withScope(
+        (collection as any)[key],
+        {
+          '@key': key,
+          '@index': index,
+          '@first': index === 0,
+          '@last': index === keys.length - 1,
+        },
+        () => this.evaluateProgram(node.program),
+      );
     });
 
     return output;
@@ -676,33 +660,21 @@ export class Interpreter {
     }
 
     let output = '';
-    let index = 0;
     const entries = Array.from(collection.entries());
 
     // Iterate over Map entries
-    for (const [key, value] of entries) {
-      // Create data frame with loop variables
-      const parentFrame = this.dataStack.getCurrent();
-      const frame = createDataFrame(parentFrame, {
-        '@key': key,
-        '@index': index,
-        '@first': index === 0,
-        '@last': index === entries.length - 1,
-      });
-      this.dataStack.push(frame);
-
-      // Push value as new context
-      this.contextStack.push(value);
-
-      // Evaluate the program block with the current value
-      output += this.evaluateProgram(node.program);
-
-      // Pop context and data stacks
-      this.contextStack.pop();
-      this.dataStack.pop();
-
-      index++;
-    }
+    entries.forEach(([key, value], index) => {
+      output += this.withScope(
+        value,
+        {
+          '@key': key,
+          '@index': index,
+          '@first': index === 0,
+          '@last': index === entries.length - 1,
+        },
+        () => this.evaluateProgram(node.program),
+      );
+    });
 
     return output;
   }
@@ -721,34 +693,22 @@ export class Interpreter {
     }
 
     let output = '';
-    let index = 0;
     const values = Array.from(collection.values());
 
     // Iterate over Set values
-    for (const value of values) {
-      // Create data frame with loop variables
-      // For Sets, @key is same as @index (but as string for consistency)
-      const parentFrame = this.dataStack.getCurrent();
-      const frame = createDataFrame(parentFrame, {
-        '@key': String(index),
-        '@index': index,
-        '@first': index === 0,
-        '@last': index === values.length - 1,
-      });
-      this.dataStack.push(frame);
-
-      // Push value as new context
-      this.contextStack.push(value);
-
-      // Evaluate the program block with the current value
-      output += this.evaluateProgram(node.program);
-
-      // Pop context and data stacks
-      this.contextStack.pop();
-      this.dataStack.pop();
-
-      index++;
-    }
+    values.forEach((value, index) => {
+      output += this.withScope(
+        value,
+        {
+          // For Sets, @key is same as @index (but as string for consistency)
+          '@key': String(index),
+          '@index': index,
+          '@first': index === 0,
+          '@last': index === values.length - 1,
+        },
+        () => this.evaluateProgram(node.program),
+      );
+    });
 
     return output;
   }
@@ -768,14 +728,8 @@ export class Interpreter {
       throw new Error(`#with helper requires exactly 1 parameter, got ${node.params.length}`);
     }
 
-    // Evaluate the parameter to get the value
-    let value = this.evaluateExpression(node.params[0]);
-
-    // If value is a function, call it to get the actual value
-    if (typeof value === 'function') {
-      const context = this.contextStack.getCurrent();
-      value = value.call(context);
-    }
+    // Evaluate the parameter to get the value (unwrap if it's a function)
+    const value = this.unwrapValue(this.evaluateExpression(node.params[0]));
 
     // Match #if logic: (!value) || isEmpty(value) for falsy check
     const isFalsy = !value || isEmpty(value);
@@ -785,19 +739,7 @@ export class Interpreter {
     }
 
     // Push value as new context and data frame (inherits @root but no new loop variables)
-    this.contextStack.push(value);
-    const parentFrame = this.dataStack.getCurrent();
-    const frame = createDataFrame(parentFrame, {});
-    this.dataStack.push(frame);
-
-    // Evaluate the program block with the new context
-    const output = this.evaluateProgram(node.program);
-
-    // Pop context and data stacks
-    this.dataStack.pop();
-    this.contextStack.pop();
-
-    return output;
+    return this.withScope(value, {}, () => this.evaluateProgram(node.program));
   }
 
   /**
