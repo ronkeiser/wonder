@@ -389,6 +389,7 @@
 **Deliverable:** SafeString detection in interpreter
 
 **Tests:**
+
 ### Task C7-F7-T3: Export SafeString from Template Engine
 
 **Status:** `[ ]` Not Started
@@ -533,6 +534,7 @@
 - Test interaction with other features:
   - Backslashes + whitespace control
   - Backslashes + comments
+
 ---
 
 ## Feature 7.10: This Keyword Validation
@@ -590,6 +592,7 @@
 **Tests:**
 
 - All invalid patterns throw correct errors
+
 ## Completion Criteria
 
 Capability 7 is complete when:
@@ -602,7 +605,7 @@ Capability 7 is complete when:
 - [ ] Examples added for advanced features
 - [ ] Block function `options` object matches Handlebars structure
 - [ ] This keyword validation matches Handlebars error messages
-The features should be implemented in this order for maximum efficiency:
+      The features should be implemented in this order for maximum efficiency:
 
 1. **Feature 7.10** (This Validation) - Parser validation, prevents bad paths early
 2. **Feature 7.1** (Context Functions) - Fastest win, modifies interpreter only
@@ -615,13 +618,13 @@ The features should be implemented in this order for maximum efficiency:
 9. **Feature 7.6** (Whitespace Control) - Lexer + interpreter changes
 10. **Feature 7.9** (Backslash Escaping) - Complex lexer changesficiency:
 
-1. **Feature 7.1** (Context Functions) - Fastest win, modifies interpreter only
-2. **Feature 7.2** (Implicit Blocks) - Interpreter changes, builds on 7.1
-3. **Feature 7.4** (Literal Value Keys) - Parser changes for literals
-4. **Feature 7.5** (Hyphenated IDs) - Lexer/parser changes
-5. **Feature 7.8** (Map Support) - Simple path resolver change
-6. **Feature 7.7** (SafeString) - New class + interpreter changes
-**Parallel work possible:**
+11. **Feature 7.1** (Context Functions) - Fastest win, modifies interpreter only
+12. **Feature 7.2** (Implicit Blocks) - Interpreter changes, builds on 7.1
+13. **Feature 7.4** (Literal Value Keys) - Parser changes for literals
+14. **Feature 7.5** (Hyphenated IDs) - Lexer/parser changes
+15. **Feature 7.8** (Map Support) - Simple path resolver change
+16. **Feature 7.7** (SafeString) - New class + interpreter changes
+    **Parallel work possible:**
 
 - Features 7.1, 7.2, 7.7, 7.8 can be worked on in parallel (interpreter changes)
 - Features 7.3, 7.4, 7.5, 7.6, 7.9, 7.10 can be worked on in parallel (lexer/parser changes)
@@ -632,6 +635,7 @@ The features should be implemented in this order for maximum efficiency:
 2. **Boolean Literals (7.4-T3)**: `{{true}}` looks up STRING key `"true"`, not boolean - verify lookup behavior
 3. **SafeString Export (7.7-T3)**: Ensure test harness provides `Handlebars.SafeString` compatibility
 4. **This Validation (7.10)**: Error messages must match format: `Invalid path: {path} - {line}:{column}`
+
 ### Testing Strategy
 
 After each feature:

@@ -144,6 +144,12 @@ export class Lexer {
         return this.scanComment();
       }
 
+      // Check for & unescaped syntax {{&
+      if (nextChar === '&') {
+        this.state = STATE_MUSTACHE;
+        return this.scanDelimiter(TokenType.OPEN_RAW, '{{&');
+      }
+
       // Check for block delimiters after {{
       if (nextChar === '#') {
         this.state = STATE_MUSTACHE;

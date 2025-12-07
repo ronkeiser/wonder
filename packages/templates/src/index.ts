@@ -113,3 +113,6 @@ export function render(template: string, context: any, options?: RenderOptions):
 // Re-export types for convenience
 export type { Helper, HelperRegistry } from './helpers/index.js';
 export type { Program } from './parser/ast-nodes.js';
+
+// Re-export SafeString for user code
+export { SafeString } from './runtime/safe-string.js';

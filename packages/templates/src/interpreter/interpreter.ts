@@ -23,6 +23,7 @@ import type {
   SubExpression,
   UndefinedLiteral,
 } from '../parser/ast-nodes.js';
+import { SafeString } from '../runtime/safe-string.js';
 import { escapeExpression, isEmpty } from '../runtime/utils.js';
 import { ContextStack } from './context-stack.js';
 import { createDataFrame } from './data-frame.js';
@@ -163,19 +164,41 @@ export class Interpreter {
       const helperName = node.path.parts[0];
       const helper = this.lookupHelper(helperName);
       if (!helper) {
-        throw new Error(`Unknown helper: ${helperName}`);
+        // Fallback: try to resolve as context function (Feature 7.1)
+        value = this.evaluatePathExpression(node.path);
+        if (typeof value === 'function') {
+          // Call the context function with parameters
+          const args = node.params.map((param) => this.evaluateExpression(param));
+          const context = this.contextStack.getCurrent();
+          value = value.call(context, ...args);
+        } else {
+          // Not a function, error
+          throw new Error(`Unknown helper: ${helperName}`);
+        }
+      } else {
+        const args = node.params.map((param) => this.evaluateExpression(param));
+        const context = this.contextStack.getCurrent();
+        value = helper.call(context, ...args);
       }
-      const args = node.params.map((param) => this.evaluateExpression(param));
-      const context = this.contextStack.getCurrent();
-      value = helper.call(context, ...args);
     } else {
       // Variable lookup
       value = this.evaluatePathExpression(node.path);
+
+      // Feature 7.1: If value is a function, call it automatically
+      if (typeof value === 'function') {
+        const context = this.contextStack.getCurrent();
+        value = value.call(context);
+      }
     }
 
     // Handle null/undefined - return empty string
     if (value == null) {
       return '';
+    }
+
+    // Feature 7.7: SafeString bypasses escaping even in escaped context
+    if (value instanceof SafeString) {
+      return value.toString();
     }
 
     // Convert to string
@@ -214,8 +237,124 @@ export class Interpreter {
       case 'with':
         return this.evaluateWithHelper(node);
       default:
-        throw new Error(`Unknown block helper: ${helperName}`);
+        // Feature 7.2: Implicit block iteration - try context lookup
+        return this.evaluateImplicitBlock(node);
     }
+  }
+
+  /**
+   * Evaluates an implicit block (Feature 7.2).
+   *
+   * When a block helper name doesn't match a built-in helper, try to resolve it
+   * as a context value. If it's an array, iterate. If it's a boolean, use as condition.
+   * If it's a function, call it with an options object.
+   *
+   * @param node - The BlockStatement node
+   * @returns The rendered output from the implicit block
+   */
+  private evaluateImplicitBlock(node: BlockStatement): string {
+    // Resolve the path as a context value
+    const value = this.evaluatePathExpression(node.path);
+
+    // Array: iterate like #each
+    if (Array.isArray(value)) {
+      if (value.length === 0) {
+        // Empty array renders inverse block
+        return this.evaluateProgram(node.inverse);
+      }
+
+      const results: string[] = [];
+      for (let i = 0; i < value.length; i++) {
+        const item = value[i];
+
+        // Create data frame with loop metadata
+        const dataFrame = createDataFrame(this.dataStack.getCurrent(), {
+          '@index': i,
+          '@first': i === 0,
+          '@last': i === value.length - 1,
+        });
+
+        // Push item as context and data frame
+        this.contextStack.push(item);
+        this.dataStack.push(dataFrame);
+
+        // Evaluate the block
+        results.push(this.evaluateProgram(node.program));
+
+        // Pop stacks
+        this.dataStack.pop();
+        this.contextStack.pop();
+      }
+
+      return results.join('');
+    }
+
+    // Boolean: use as condition
+    if (typeof value === 'boolean') {
+      if (value) {
+        return this.evaluateProgram(node.program);
+      } else {
+        return this.evaluateProgram(node.inverse);
+      }
+    }
+
+    // Function: call with options object
+    if (typeof value === 'function') {
+      const context = this.contextStack.getCurrent();
+      const params = node.params.map((param) => this.evaluateExpression(param));
+
+      // Create options object with fn and inverse closures
+      const options = {
+        fn: (newContext?: any) => {
+          if (newContext !== undefined) {
+            this.contextStack.push(newContext);
+          }
+          const result = this.evaluateProgram(node.program);
+          if (newContext !== undefined) {
+            this.contextStack.pop();
+          }
+          return result;
+        },
+        inverse: () => {
+          return this.evaluateProgram(node.inverse);
+        },
+        data: this.dataStack.getCurrent(),
+        hash: {},
+      };
+
+      // Call the function with params and options
+      const result = value.call(context, ...params, options);
+
+      // If function returned a string, use it as the output
+      if (typeof result === 'string') {
+        return result;
+      }
+
+      // Otherwise, use return value as context/condition
+      // Falsy: render inverse
+      if (!result || isEmpty(result)) {
+        return this.evaluateProgram(node.inverse);
+      }
+
+      // Truthy: render main block with result as new context (if object/array)
+      if (typeof result === 'object') {
+        this.contextStack.push(result);
+        const output = this.evaluateProgram(node.program);
+        this.contextStack.pop();
+        return output;
+      }
+
+      // Other truthy primitives: just render the block
+      return this.evaluateProgram(node.program);
+    }
+
+    // Falsy or missing: render inverse block
+    if (!value || isEmpty(value)) {
+      return this.evaluateProgram(node.inverse);
+    }
+
+    // Other truthy values: render main block
+    return this.evaluateProgram(node.program);
   }
 
   /**

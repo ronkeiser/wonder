@@ -1,5 +1,9 @@
 import { beforeEach, describe, it } from 'vitest';
+import { SafeString } from '../../../src/index.js';
 import { expectTemplate } from '../helpers/expect-template.js';
+
+// Make SafeString available as Handlebars.SafeString for test compatibility
+const Handlebars = { SafeString };
 
 describe('basic context', () => {
   it('most basic', () => {

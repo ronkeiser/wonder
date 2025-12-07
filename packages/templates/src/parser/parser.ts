@@ -834,15 +834,23 @@ export class Parser {
 
     // Determine if this is escaped or unescaped output
     let escaped: boolean;
+    let closeType: (typeof TokenType)[keyof typeof TokenType];
+    
     if (this.match(TokenType.OPEN)) {
       escaped = true;
+      closeType = TokenType.CLOSE;
       this.advance(); // Move past OPEN token
     } else if (this.match(TokenType.OPEN_UNESCAPED)) {
       escaped = false;
+      closeType = TokenType.CLOSE_UNESCAPED;
       this.advance(); // Move past OPEN_UNESCAPED token
+    } else if (this.match(TokenType.OPEN_RAW)) {
+      escaped = false;
+      closeType = TokenType.CLOSE;
+      this.advance(); // Move past OPEN_RAW token
     } else {
       throw ParserError.fromToken(
-        'Expected OPEN or OPEN_UNESCAPED token to start mustache statement',
+        'Expected OPEN, OPEN_UNESCAPED, or OPEN_RAW token to start mustache statement',
         this.currentToken!,
         this.getErrorContext(),
       );
@@ -853,7 +861,6 @@ export class Parser {
 
     // Parse parameters until we hit closing delimiter
     const params: Expression[] = [];
-    const closeType = escaped ? TokenType.CLOSE : TokenType.CLOSE_UNESCAPED;
 
     while (this.currentToken && !this.match(closeType)) {
       const param = this.parseExpression();
@@ -861,12 +868,10 @@ export class Parser {
     }
 
     // Expect appropriate closing delimiter and capture the closing token
-    const closeToken = escaped
-      ? this.expect(TokenType.CLOSE, 'Expected }} to close mustache statement')
-      : this.expect(
-          TokenType.CLOSE_UNESCAPED,
-          'Expected }}} to close unescaped mustache statement',
-        );
+    const closeToken = this.expect(
+      closeType,
+      `Expected ${closeType === TokenType.CLOSE ? '}}' : '}}}'} to close mustache statement`,
+    );
 
     // Create empty hash for V1 (no named parameters support)
     const hash = {
@@ -917,6 +922,8 @@ export class Parser {
       } else if (this.match(TokenType.OPEN)) {
         body.push(this.parseMustacheStatement());
       } else if (this.match(TokenType.OPEN_UNESCAPED)) {
+        body.push(this.parseMustacheStatement());
+      } else if (this.match(TokenType.OPEN_RAW)) {
         body.push(this.parseMustacheStatement());
       } else if (this.match(TokenType.OPEN_BLOCK)) {
         body.push(this.parseBlockStatement());

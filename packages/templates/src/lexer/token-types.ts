@@ -10,6 +10,7 @@ export const TokenType = {
   CLOSE: 'CLOSE', // }}
   OPEN_UNESCAPED: 'OPEN_UNESCAPED', // {{{
   CLOSE_UNESCAPED: 'CLOSE_UNESCAPED', // }}}
+  OPEN_RAW: 'OPEN_RAW', // {{&
 
   // Block tokens
   OPEN_BLOCK: 'OPEN_BLOCK', // {{#

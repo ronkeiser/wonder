@@ -16,7 +16,6 @@
  *   .toThrow(ErrorType, /pattern/)
  */
 
-import Handlebars from 'handlebars';
 import { expect } from 'vitest';
 import { compile, type Helper } from '../../../src/index.js';
 
@@ -158,43 +157,4 @@ export class HandlebarsTestBench {
  */
 export function expectTemplate(templateAsString: string): HandlebarsTestBench {
   return new HandlebarsTestBench(templateAsString);
-}
-
-/**
- * Utility to compare our output with Handlebars output
- * Useful for debugging test failures
- */
-export function compareWithHandlebars(
-  template: string,
-  input: any,
-  helpers?: Record<string, Helper>,
-): { ours: string; theirs: string; match: boolean } {
-  // Our output
-  const compiled = compile(template);
-  const ours = compiled.render(input, { helpers: helpers as any });
-
-  // Handlebars output
-  const hbsTemplate = Handlebars.compile(template);
-
-  // Register helpers with Handlebars
-  if (helpers) {
-    for (const [name, fn] of Object.entries(helpers)) {
-      Handlebars.registerHelper(name, fn);
-    }
-  }
-
-  const theirs = hbsTemplate(input, { helpers });
-
-  // Unregister helpers
-  if (helpers) {
-    for (const name of Object.keys(helpers)) {
-      Handlebars.unregisterHelper(name);
-    }
-  }
-
-  return {
-    ours,
-    theirs,
-    match: ours === theirs,
-  };
 }
