@@ -183,21 +183,135 @@ export class Interpreter {
 
   /**
    * Evaluates a Program node by processing its statements.
+   * Also applies whitespace control based on strip flags.
    *
    * @param program - The Program node to evaluate (or null)
+   * @param stripFlags - Optional strip flags for block boundaries
    * @returns The concatenated output from all statements
    */
-  private evaluateProgram(program: Program | null): string {
+  private evaluateProgram(
+    program: Program | null,
+    stripFlags?: { stripStart?: boolean; stripEnd?: boolean },
+  ): string {
     if (program === null) {
       return '';
     }
 
+    // Apply whitespace stripping based on strip flags
+    let strippedBody = this.applyWhitespaceControl(program.body);
+
+    // Apply boundary stripping if specified
+    if (stripFlags) {
+      // Strip leading whitespace from first statement if stripStart is true
+      if (stripFlags.stripStart && strippedBody.length > 0) {
+        const first = strippedBody[0];
+        if (first.type === 'ContentStatement') {
+          strippedBody = [
+            {
+              ...first,
+              value: first.value.replace(/^\s+/, ''),
+            },
+            ...strippedBody.slice(1),
+          ];
+        }
+      }
+
+      // Strip trailing whitespace from last statement if stripEnd is true
+      if (stripFlags.stripEnd && strippedBody.length > 0) {
+        const lastIndex = strippedBody.length - 1;
+        const last = strippedBody[lastIndex];
+        if (last.type === 'ContentStatement') {
+          strippedBody = [
+            ...strippedBody.slice(0, lastIndex),
+            {
+              ...last,
+              value: last.value.replace(/\s+$/, ''),
+            },
+          ];
+        }
+      }
+    }
+
     const results: string[] = [];
-    for (const statement of program.body) {
+    for (const statement of strippedBody) {
       results.push(this.evaluateStatement(statement));
     }
 
     return results.join('');
+  }
+
+  /**
+   * Apply whitespace control by modifying ContentStatement values
+   * based on adjacent MustacheStatement/BlockStatement strip flags.
+   *
+   * @param body - Array of statements to process
+   * @returns Modified array with whitespace stripping applied
+   */
+  private applyWhitespaceControl(body: Statement[]): Statement[] {
+    if (body.length === 0) {
+      return body;
+    }
+
+    // Clone the array to avoid mutating the original AST
+    const result = [...body];
+
+    for (let i = 0; i < result.length; i++) {
+      const current = result[i];
+      const prev = i > 0 ? result[i - 1] : null;
+      const next = i < result.length - 1 ? result[i + 1] : null;
+
+      // If current is content and previous statement has close strip, strip leading whitespace
+      if (current.type === 'ContentStatement' && prev) {
+        const prevStripClose = this.getCloseStripFlag(prev);
+        if (prevStripClose) {
+          result[i] = {
+            ...current,
+            value: current.value.replace(/^\s+/, ''),
+          };
+        }
+      }
+
+      // If current is content and next statement has open strip, strip trailing whitespace
+      if (current.type === 'ContentStatement' && next) {
+        const nextStripOpen = this.getOpenStripFlag(next);
+        if (nextStripOpen) {
+          // Need to re-read current in case it was modified above
+          const currentContent = result[i] as ContentStatement;
+          result[i] = {
+            ...currentContent,
+            value: currentContent.value.replace(/\s+$/, ''),
+          };
+        }
+      }
+    }
+
+    return result;
+  }
+
+  /**
+   * Get the "open strip" flag from a statement (strip whitespace before)
+   */
+  private getOpenStripFlag(statement: Statement): boolean {
+    if (statement.type === 'MustacheStatement') {
+      return statement.strip?.open ?? false;
+    }
+    if (statement.type === 'BlockStatement') {
+      return statement.openStrip?.open ?? false;
+    }
+    return false;
+  }
+
+  /**
+   * Get the "close strip" flag from a statement (strip whitespace after)
+   */
+  private getCloseStripFlag(statement: Statement): boolean {
+    if (statement.type === 'MustacheStatement') {
+      return statement.strip?.close ?? false;
+    }
+    if (statement.type === 'BlockStatement') {
+      return statement.closeStrip?.close ?? false;
+    }
+    return false;
   }
 
   /**
@@ -362,11 +476,15 @@ export class Interpreter {
     // Resolve the path as a context value
     const value = this.evaluatePathExpression(node.path);
 
+    // Define strip flags for reuse
+    const programStrip = { stripStart: node.openStrip?.close, stripEnd: node.closeStrip?.open };
+    const inverseStrip = { stripStart: node.inverseStrip?.open, stripEnd: node.closeStrip?.open };
+
     // Array: iterate like #each
     if (Array.isArray(value)) {
       if (value.length === 0) {
         // Empty array renders inverse block
-        return this.evaluateProgram(node.inverse);
+        return this.evaluateProgram(node.inverse, inverseStrip);
       }
 
       const results: string[] = [];
@@ -379,7 +497,7 @@ export class Interpreter {
               '@first': i === 0,
               '@last': i === value.length - 1,
             },
-            () => this.evaluateProgram(node.program),
+            () => this.evaluateProgram(node.program, programStrip),
           ),
         );
       }
@@ -390,9 +508,9 @@ export class Interpreter {
     // Boolean: use as condition
     if (typeof value === 'boolean') {
       if (value) {
-        return this.evaluateProgram(node.program);
+        return this.evaluateProgram(node.program, programStrip);
       } else {
-        return this.evaluateProgram(node.inverse);
+        return this.evaluateProgram(node.inverse, inverseStrip);
       }
     }
 
@@ -404,10 +522,12 @@ export class Interpreter {
       // Create options object with fn and inverse closures
       const options = {
         fn: (newContext?: any) => {
-          return this.withScope(newContext, null, () => this.evaluateProgram(node.program));
+          return this.withScope(newContext, null, () =>
+            this.evaluateProgram(node.program, programStrip),
+          );
         },
         inverse: () => {
-          return this.evaluateProgram(node.inverse);
+          return this.evaluateProgram(node.inverse, inverseStrip);
         },
         data: this.dataStack.getCurrent(),
         hash: {},
@@ -424,25 +544,25 @@ export class Interpreter {
       // Otherwise, use return value as context/condition
       // Falsy: render inverse
       if (this.isFalsy(result)) {
-        return this.evaluateProgram(node.inverse);
+        return this.evaluateProgram(node.inverse, inverseStrip);
       }
 
       // Truthy: render main block with result as new context (if object/array)
       if (typeof result === 'object') {
-        return this.withScope(result, null, () => this.evaluateProgram(node.program));
+        return this.withScope(result, null, () => this.evaluateProgram(node.program, programStrip));
       }
 
       // Other truthy primitives: just render the block
-      return this.evaluateProgram(node.program);
+      return this.evaluateProgram(node.program, programStrip);
     }
 
     // Falsy or missing: render inverse block
     if (this.isFalsy(value)) {
-      return this.evaluateProgram(node.inverse);
+      return this.evaluateProgram(node.inverse, inverseStrip);
     }
 
     // Other truthy values: render main block
-    return this.evaluateProgram(node.program);
+    return this.evaluateProgram(node.program, programStrip);
   }
 
   /**
@@ -463,10 +583,20 @@ export class Interpreter {
     // Create options object with fn, inverse closures, and hash
     const options = {
       fn: (newContext?: any) => {
-        return this.withScope(newContext, null, () => this.evaluateProgram(node.program));
+        return this.withScope(newContext, null, () =>
+          this.evaluateProgram(node.program, {
+            stripStart: node.openStrip?.close,
+            stripEnd: node.closeStrip?.open,
+          }),
+        );
       },
       inverse: (newContext?: any) => {
-        return this.withScope(newContext, null, () => this.evaluateProgram(node.inverse));
+        return this.withScope(newContext, null, () =>
+          this.evaluateProgram(node.inverse, {
+            stripStart: node.inverseStrip?.open,
+            stripEnd: node.closeStrip?.open,
+          }),
+        );
       },
       hash,
     };
@@ -517,7 +647,23 @@ export class Interpreter {
     const condition = this.unwrapValue(this.evaluateExpression(node.params[0]));
     const renderInverse = invert ? !this.isFalsy(condition) : this.isFalsy(condition);
 
-    return renderInverse ? this.evaluateProgram(node.inverse) : this.evaluateProgram(node.program);
+    // Detect if this is an inverse block statement ({{^if}} instead of {{#if}})
+    // In inverse blocks, program.body is empty and content is in inverse
+    const isInverseBlock = node.program?.body.length === 0 && node.inverse !== null;
+
+    if (renderInverse) {
+      // When rendering inverse, use inverseStrip flags
+      // UNLESS it's an inverse block statement, in which case use openStrip
+      return this.evaluateProgram(node.inverse, {
+        stripStart: isInverseBlock ? node.openStrip?.close : node.inverseStrip?.open,
+        stripEnd: node.closeStrip?.open,
+      });
+    } else {
+      return this.evaluateProgram(node.program, {
+        stripStart: node.openStrip?.close,
+        stripEnd: isInverseBlock ? node.closeStrip?.open : node.inverseStrip?.close,
+      });
+    }
   }
 
   /**
@@ -560,7 +706,10 @@ export class Interpreter {
     }
 
     // For null, undefined, or other non-iterables, render inverse block
-    return this.evaluateProgram(node.inverse);
+    return this.evaluateProgram(node.inverse, {
+      stripStart: node.inverseStrip?.open,
+      stripEnd: node.closeStrip?.open,
+    });
   }
 
   /**
@@ -573,7 +722,10 @@ export class Interpreter {
   private evaluateEachArray(node: BlockStatement, collection: any[]): string {
     // Empty arrays render the inverse block ({{else}})
     if (collection.length === 0) {
-      return this.evaluateProgram(node.inverse);
+      return this.evaluateProgram(node.inverse, {
+        stripStart: node.inverseStrip?.open,
+        stripEnd: node.closeStrip?.open,
+      });
     }
 
     // For sparse arrays, we need to find the first and last actual indices
@@ -605,7 +757,11 @@ export class Interpreter {
           '@first': i === firstIndex,
           '@last': i === lastIndex,
         },
-        () => this.evaluateProgram(node.program),
+        () =>
+          this.evaluateProgram(node.program, {
+            stripStart: node.openStrip?.close,
+            stripEnd: node.closeStrip?.open,
+          }),
       );
     }
 
@@ -625,7 +781,10 @@ export class Interpreter {
 
     // Empty objects render the inverse block ({{else}})
     if (keys.length === 0) {
-      return this.evaluateProgram(node.inverse);
+      return this.evaluateProgram(node.inverse, {
+        stripStart: node.inverseStrip?.open,
+        stripEnd: node.closeStrip?.open,
+      });
     }
 
     let output = '';
@@ -640,7 +799,11 @@ export class Interpreter {
           '@first': index === 0,
           '@last': index === keys.length - 1,
         },
-        () => this.evaluateProgram(node.program),
+        () =>
+          this.evaluateProgram(node.program, {
+            stripStart: node.openStrip?.close,
+            stripEnd: node.closeStrip?.open,
+          }),
       );
     });
 
@@ -657,7 +820,10 @@ export class Interpreter {
   private evaluateEachMap(node: BlockStatement, collection: Map<any, any>): string {
     // Empty maps render the inverse block ({{else}})
     if (collection.size === 0) {
-      return this.evaluateProgram(node.inverse);
+      return this.evaluateProgram(node.inverse, {
+        stripStart: node.inverseStrip?.open,
+        stripEnd: node.closeStrip?.open,
+      });
     }
 
     let output = '';
@@ -673,7 +839,11 @@ export class Interpreter {
           '@first': index === 0,
           '@last': index === entries.length - 1,
         },
-        () => this.evaluateProgram(node.program),
+        () =>
+          this.evaluateProgram(node.program, {
+            stripStart: node.openStrip?.close,
+            stripEnd: node.closeStrip?.open,
+          }),
       );
     });
 
@@ -690,7 +860,10 @@ export class Interpreter {
   private evaluateEachSet(node: BlockStatement, collection: Set<any>): string {
     // Empty sets render the inverse block ({{else}})
     if (collection.size === 0) {
-      return this.evaluateProgram(node.inverse);
+      return this.evaluateProgram(node.inverse, {
+        stripStart: node.inverseStrip?.open,
+        stripEnd: node.closeStrip?.open,
+      });
     }
 
     let output = '';
@@ -707,7 +880,11 @@ export class Interpreter {
           '@first': index === 0,
           '@last': index === values.length - 1,
         },
-        () => this.evaluateProgram(node.program),
+        () =>
+          this.evaluateProgram(node.program, {
+            stripStart: node.openStrip?.close,
+            stripEnd: node.closeStrip?.open,
+          }),
       );
     });
 
@@ -733,11 +910,19 @@ export class Interpreter {
     const value = this.unwrapValue(this.evaluateExpression(node.params[0]));
 
     if (this.isFalsy(value)) {
-      return this.evaluateProgram(node.inverse);
+      return this.evaluateProgram(node.inverse, {
+        stripStart: node.inverseStrip?.open,
+        stripEnd: node.closeStrip?.open,
+      });
     }
 
     // Push value as new context and data frame (inherits @root but no new loop variables)
-    return this.withScope(value, {}, () => this.evaluateProgram(node.program));
+    return this.withScope(value, {}, () =>
+      this.evaluateProgram(node.program, {
+        stripStart: node.openStrip?.close,
+        stripEnd: node.closeStrip?.open,
+      }),
+    );
   }
 
   /**

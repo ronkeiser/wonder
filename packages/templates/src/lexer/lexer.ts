@@ -113,31 +113,57 @@ export class Lexer {
 
   /**
    * Try to scan an opening mustache delimiter ({{{, {{#, {{/, {{^, {{&, {{!, {{)
+   * Also handles whitespace control: {{~, {{~#, etc.
    */
   private tryScanOpeningMustache(): Token | null {
-    // Triple braces first (more specific)
+    // Triple braces first (more specific) - check for {{~ before {{{
     if (this.match('{{{') && !this.isEscaped(this.index)) {
       this.state = STATE_MUSTACHE;
       return this.scanDelimiter(TokenType.OPEN_UNESCAPED, '{{{');
     }
 
     if (this.match('{{') && !this.isEscaped(this.index)) {
-      const nextChar = this.peekAt(2);
+      // Check if there's a ~ for whitespace control
+      const hasStrip = this.peekAt(2) === '~';
+      const checkOffset = hasStrip ? 3 : 2;
+      const nextChar = this.peekAt(checkOffset);
 
-      if (nextChar === '!') {
+      // Handle comments before setting state (they don't support strip markers in the same way)
+      if (!hasStrip && nextChar === '!') {
         return this.scanComment();
+      }
+      // Handle {{~!
+      if (hasStrip && nextChar === '!') {
+        // Scan just {{~ and let the comment be handled next
+        this.state = STATE_MUSTACHE;
+        return this.scanDelimiter(TokenType.OPEN, '{{');
       }
 
       this.state = STATE_MUSTACHE;
 
+      // Determine the token type based on the character after {{ (and optional ~)
       switch (nextChar) {
         case '&':
+          if (hasStrip) {
+            // Return just {{, let ~ and & be handled separately
+            return this.scanDelimiter(TokenType.OPEN, '{{');
+          }
           return this.scanDelimiter(TokenType.OPEN_RAW, '{{&');
         case '#':
+          if (hasStrip) {
+            // Return just {{, let ~ and # be handled in mustache state
+            return this.scanDelimiter(TokenType.OPEN, '{{');
+          }
           return this.scanDelimiter(TokenType.OPEN_BLOCK, '{{#');
         case '/':
+          if (hasStrip) {
+            return this.scanDelimiter(TokenType.OPEN, '{{');
+          }
           return this.scanDelimiter(TokenType.OPEN_ENDBLOCK, '{{/');
         case '^':
+          if (hasStrip) {
+            return this.scanDelimiter(TokenType.OPEN, '{{');
+          }
           return this.scanDelimiter(TokenType.OPEN_INVERSE, '{{^');
         default:
           return this.scanDelimiter(TokenType.OPEN, '{{');
@@ -170,6 +196,14 @@ export class Lexer {
   private scanMustacheToken(): Token {
     const char = this.peek();
 
+    // Whitespace control strip marker (~)
+    if (char === '~') return this.scanDelimiter(TokenType.STRIP, '~');
+
+    // Block markers (used after ~ for whitespace control variants)
+    if (char === '#') return this.scanDelimiter(TokenType.BLOCK_START, '#');
+    if (char === '^') return this.scanDelimiter(TokenType.BLOCK_INVERSE, '^');
+    if (char === '&') return this.scanDelimiter(TokenType.RAW_MARKER, '&');
+
     if (char === '"' || char === "'") return this.scanString();
 
     // Data prefix (@)
@@ -177,10 +211,22 @@ export class Lexer {
 
     if (char === '.') return this.handleDot();
 
-    if (char === '/') return this.scanSeparator();
+    // / can be either a path separator or block end marker
+    if (char === '/') {
+      // Check if this is at start of expression (block end marker) vs path separator
+      // If we just saw STRIP or we're at start of mustache, it's a block end marker
+      if (this.lastTokenType === TokenType.STRIP || this.lastTokenType === TokenType.OPEN) {
+        return this.scanDelimiter(TokenType.BLOCK_END, '/');
+      }
+      return this.scanSeparator();
+    }
 
     if (char === '(') return this.scanDelimiter(TokenType.OPEN_SEXPR, '(');
     if (char === ')') return this.scanDelimiter(TokenType.CLOSE_SEXPR, ')');
+
+    // Braces (for {{~{foo}~}} unescaped syntax)
+    if (char === '{') return this.scanDelimiter(TokenType.OPEN_BRACE, '{');
+    if (char === '}') return this.scanDelimiter(TokenType.CLOSE_BRACE, '}');
 
     // Equals sign (hash arguments)
     if (char === '=') return this.scanDelimiter(TokenType.EQUALS, '=');

@@ -17,6 +17,12 @@ export const TokenType = {
   OPEN_ENDBLOCK: 'OPEN_ENDBLOCK', // {{/
   OPEN_INVERSE: 'OPEN_INVERSE', // {{^
 
+  // Block markers (used after ~ in whitespace control)
+  BLOCK_START: 'BLOCK_START', // # (after ~ in mustache)
+  BLOCK_END: 'BLOCK_END', // / (after ~ in mustache)
+  BLOCK_INVERSE: 'BLOCK_INVERSE', // ^ (after ~ in mustache)
+  RAW_MARKER: 'RAW_MARKER', // & (after ~ in mustache)
+
   // Special tokens
   INVERSE: 'INVERSE', // {{else}}
   COMMENT: 'COMMENT', // {{! ... }} or {{!-- ... --}}
@@ -24,6 +30,10 @@ export const TokenType = {
   // Subexpressions
   OPEN_SEXPR: 'OPEN_SEXPR', // (
   CLOSE_SEXPR: 'CLOSE_SEXPR', // )
+
+  // Braces (for {{~{foo}~}} unescaped syntax)
+  OPEN_BRACE: 'OPEN_BRACE', // {
+  CLOSE_BRACE: 'CLOSE_BRACE', // }
 
   // Bracket literals
   BRACKET_LITERAL: 'BRACKET_LITERAL', // [literal content]
@@ -45,6 +55,9 @@ export const TokenType = {
 
   // Hash arguments
   EQUALS: 'EQUALS', // = for key=value pairs
+
+  // Whitespace control
+  STRIP: 'STRIP', // ~ for whitespace stripping
 
   // End of input
   EOF: 'EOF',

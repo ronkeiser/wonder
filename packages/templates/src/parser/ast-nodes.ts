@@ -155,6 +155,7 @@ export interface MustacheStatement extends Node {
   params: Expression[]; // Helper arguments (empty in V1)
   hash: Hash; // Named parameters (empty in V1)
   escaped: boolean; // true for {{}}, false for {{{}}}
+  strip: StripFlags; // Whitespace control ({{~foo~}} syntax)
   loc: SourceLocation | null;
 }
 
