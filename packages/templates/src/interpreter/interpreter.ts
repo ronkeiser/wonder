@@ -157,24 +157,36 @@ export class Interpreter {
    * Initializes stacks, traverses the AST, and returns the rendered output.
    *
    * @param context - The root context object for template evaluation
+   * @param userData - Optional user-provided data variables (accessible via @)
    * @returns The rendered template as a string
    *
    * @example
    * ```typescript
    * const ast = parse('Hello {{name}}!');
    * const interpreter = new Interpreter(ast);
-   * const output = interpreter.evaluate({ name: 'World' });
-   * // output: "Hello World!"
+   * const output = interpreter.evaluate({ name: 'World' }, { timestamp: Date.now() });
+   * // Can use {{name}} and {{@timestamp}} in template
    * ```
    */
-  evaluate(context: any): string {
+  evaluate(context: any, userData?: Record<string, any>): string {
     // Initialize context stack with root context
     this.contextStack = new ContextStack();
     this.contextStack.push(context);
 
-    // Initialize data stack with root data frame containing @root
+    // Initialize data stack with root data frame containing @root and user data
     this.dataStack = new DataStack();
-    const rootFrame = createDataFrame(null, { '@root': context });
+    const rootData: Record<string, any> = { '@root': context };
+
+    // Merge user-provided data variables with @ prefix
+    if (userData) {
+      for (const key in userData) {
+        if (Object.prototype.hasOwnProperty.call(userData, key)) {
+          rootData['@' + key] = userData[key];
+        }
+      }
+    }
+
+    const rootFrame = createDataFrame(null, rootData);
     this.dataStack.push(rootFrame);
 
     // Evaluate the program

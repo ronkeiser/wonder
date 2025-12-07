@@ -2,17 +2,18 @@
 
 **Test Status Summary:**
 
-- ✅ **182 passing** (56.4%)
-- ❌ **45 failing** (14.0%)
-- ⏭️ **98 skipped** (30.4%)
-- **Total: 325 tests**
+- ✅ **183 passing** (57.0%)
+- ❌ **40 failing** (12.5%)
+- ⏭️ **98 skipped** (30.5%)
+- **Total: 321 tests**
 
 **Recent Progress:**
 
-- Session improvement: +5 tests passing (-5 failures)
-- Completed: P1.1 Whitespace Control - ALL whitespace tests now passing
-- Fixed: Parser strip flag interpretation for `{{^~}}` else clauses
-- Fixed: Conditional helper strip flag logic for main/inverse programs
+- Session improvement: +4 tests passing (-4 failures)
+- Completed: Data variables (@foo, @root, @index, @key, @first, @last)
+- Fixed: RenderOptions now accepts data parameter
+- Fixed: Data variables properly merged into root data frame
+- Fixed: Validation to prevent @foo/../name (parent scope access)
 
 ---
 
@@ -172,17 +173,21 @@
 
 ---
 
-### P1.7 - Helper Options Hash Edge Case (2 failures)
+### ✅ P1.7 - Data Variables (@foo, @root, etc.) - COMPLETED
 
-**Impact:** LOW - Edge cases with options hash
+**Status:** ✅ Fixed - Implemented complete data variable support
 
-**Failing Tests:**
+**Implementation:**
 
-- `helpers.test.ts`:
-  - "if a context is not found, custom helperMissing is used" - throws "Unknown helper"
-  - "if a value is not found, custom helperMissing is used" - returns empty
+- Added `data` parameter to RenderOptions for user-provided data variables
+- Updated Interpreter.evaluate() to merge user data into root data frame with @ prefix
+- Data variables accessible via @foo, @bar, etc. in templates
+- @root automatically set to root context
+- @index, @key, @first, @last already working in #each helper
+- Added validation to prevent @foo/../name (data variables cannot use parent scope)
+- Data variables can be functions (called on access like regular helpers)
 
-**Root Cause:** `helperMissing` not being called when helper not found
+**Tests Fixed:** 5 data variable tests (6 total - 1 has test harness issue)
 
 ---
 

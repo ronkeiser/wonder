@@ -29,6 +29,23 @@ export interface RenderOptions {
    * ```
    */
   helpers?: HelperRegistry;
+
+  /**
+   * Data variables accessible via @ prefix in templates.
+   * These are merged into the data frame and accessible as @foo, @bar, etc.
+   *
+   * @example
+   * ```typescript
+   * const options = {
+   *   data: {
+   *     timestamp: Date.now(),
+   *     user: 'admin'
+   *   }
+   * };
+   * // Template can use: {{@timestamp}} {{@user}}
+   * ```
+   */
+  data?: Record<string, any>;
 }
 
 /**
@@ -74,7 +91,7 @@ export function compile(template: string): CompiledTemplate {
       const interpreter = new Interpreter(ast, {
         helpers: options?.helpers,
       });
-      return interpreter.evaluate(context);
+      return interpreter.evaluate(context, options?.data);
     },
   };
 }

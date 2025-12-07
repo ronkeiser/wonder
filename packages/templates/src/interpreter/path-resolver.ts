@@ -106,6 +106,15 @@ export function resolvePathExpression(
   contextStack: ContextStack,
   dataStack: DataStack,
 ): any {
+  // Data variables (@foo) cannot use parent scope references (../)
+  // This is a Handlebars security/consistency restriction
+  // Check both depth > 0 and ".." in parts (parser may leave .. as a part)
+  if (pathExpr.data && (pathExpr.depth > 0 || pathExpr.parts.includes('..'))) {
+    throw new Error(
+      `Data variables cannot access parent scopes. Invalid path: ${pathExpr.original}`,
+    );
+  }
+
   // Determine which stack to use based on data flag
   const stack = pathExpr.data ? dataStack : contextStack;
 
