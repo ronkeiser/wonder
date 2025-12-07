@@ -219,28 +219,25 @@ export class Parser {
    * @returns StripFlags indicating which sides had ~ markers
    */
   private consumeElseWithStrip(): StripFlags {
-    // Consume OPEN token
-    this.advance();
-
-    // Check for and consume opening strip
-    const openStrip = this.match(TokenType.STRIP);
-    if (openStrip) {
-      this.advance();
-    }
-
-    // Consume ID("else") token
-    this.advance();
-
-    // Check for and consume closing strip
-    const closeStrip = this.match(TokenType.STRIP);
-    if (closeStrip) {
-      this.advance();
-    }
-
-    // Consume CLOSE token
-    this.advance();
-
+    this.advance(); // OPEN
+    const openStrip = this.consumeOptionalStrip();
+    this.advance(); // ID("else")
+    const closeStrip = this.consumeOptionalStrip();
+    this.advance(); // CLOSE
     return { open: openStrip, close: closeStrip };
+  }
+
+  /**
+   * Consume optional strip marker (~) and return whether it was present
+   *
+   * @returns true if strip marker was consumed, false otherwise
+   */
+  private consumeOptionalStrip(): boolean {
+    if (this.match(TokenType.STRIP)) {
+      this.advance();
+      return true;
+    }
+    return false;
   }
 
   /**
@@ -1374,226 +1371,7 @@ export class Parser {
    * @throws {ParserError} If block is malformed or has mismatched closing tag
    */
   parseBlockStatement(): BlockStatement {
-    // Save the opening token for location tracking
-    const blockStartToken = this.currentToken!;
-
-    // Handle two patterns for block opening:
-    // 1. OPEN_BLOCK ({{#) - traditional
-    // 2. OPEN + STRIP + BLOCK_START ({{~#) - with whitespace control
-    let openTagOpenStrip = false;
-
-    if (this.match(TokenType.OPEN_BLOCK)) {
-      // Traditional {{# pattern
-      this.advance();
-
-      // Check for opening strip marker on open tag (~)
-      openTagOpenStrip = this.match(TokenType.STRIP);
-      if (openTagOpenStrip) {
-        this.advance();
-      }
-    } else if (this.match(TokenType.OPEN)) {
-      // Check for {{~# pattern
-      this.advance(); // consume OPEN
-
-      if (this.match(TokenType.STRIP)) {
-        openTagOpenStrip = true;
-        this.advance(); // consume STRIP
-      }
-
-      if (!this.match(TokenType.BLOCK_START)) {
-        throw ParserError.fromToken(
-          'Expected # after {{~ to start block statement',
-          this.currentToken!,
-          this.getErrorContext(),
-        );
-      }
-      this.advance(); // consume BLOCK_START (#)
-    } else {
-      throw ParserError.fromToken(
-        'Expected {{# or {{~# to start block statement',
-        this.currentToken!,
-        this.getErrorContext(),
-      );
-    }
-
-    // Parse the helper name (path expression, supports literals as paths)
-    const helperName = this.parsePathOrLiteralAsPath();
-
-    // Parse parameters and hash pairs until we hit CLOSE token (or STRIP before CLOSE)
-    const { params, hash } = this.parseParamsAndHash(TokenType.CLOSE);
-
-    // Parse block parameters if present (as |param1 param2|)
-    let blockParams: string[] | undefined;
-    if (this.match(TokenType.ID) && this.currentToken?.value === 'as') {
-      this.advance(); // consume 'as'
-      this.expect(TokenType.PIPE, 'Expected | after "as" keyword');
-      this.advance(); // consume opening |
-
-      blockParams = [];
-      while (!this.match(TokenType.PIPE)) {
-        if (!this.match(TokenType.ID)) {
-          throw ParserError.fromToken(
-            'Expected identifier in block params',
-            this.currentToken!,
-            this.getErrorContext(),
-          );
-        }
-        blockParams.push(this.currentToken!.value as string);
-        this.advance();
-      }
-
-      this.expect(TokenType.PIPE, 'Expected closing | for block params');
-      this.advance(); // consume closing |
-    }
-
-    // Check for closing strip marker on open tag (~)
-    const openTagCloseStrip = this.match(TokenType.STRIP);
-    if (openTagCloseStrip) {
-      this.advance();
-    }
-
-    // Expect CLOSE token (}})
-    this.expect(TokenType.CLOSE, 'Expected }} after block helper name');
-    this.advance();
-
-    // Build block context for error messages
-    const blockContext = this.buildBlockContext(helperName, params, blockStartToken);
-
-    // Parse the main block content
-    const program = this.parseProgram(blockContext);
-
-    // Check if there's an else block
-    // {{else}} is tokenized as OPEN + ID("else") + CLOSE
-    // {{^}} is tokenized as OPEN_INVERSE (or OPEN + STRIP + BLOCK_INVERSE for {{~^}})
-    let inverse: Program | null = null;
-    let inverseOpenStrip = false;
-    let inverseCloseStrip = false;
-    if (this.isAtElseWithStrip()) {
-      // Consume the {{~else~}} tokens and track strip flags
-      const elseStrip = this.consumeElseWithStrip();
-      inverseOpenStrip = elseStrip.open;
-      inverseCloseStrip = elseStrip.close;
-
-      // Parse the inverse block content
-      inverse = this.parseProgram(blockContext);
-    } else if (this.match(TokenType.OPEN_INVERSE)) {
-      // Consume the OPEN_INVERSE token ({{^)
-      this.advance();
-
-      // Check for strip after {{^
-      // In {{^~}}, the ~ strips AFTER the else (close strip), not before (open strip)
-      inverseCloseStrip = this.match(TokenType.STRIP);
-      if (inverseCloseStrip) {
-        this.advance();
-      }
-
-      // Expect CLOSE token (}})
-      this.expect(TokenType.CLOSE, 'Expected }} after {{^');
-      this.advance();
-
-      // Parse the inverse block content
-      inverse = this.parseProgram(blockContext);
-    } else if (this.isAtInverseWithStrip()) {
-      // Handle {{~^~}} pattern
-      this.advance(); // consume OPEN
-
-      inverseOpenStrip = this.match(TokenType.STRIP);
-      if (inverseOpenStrip) {
-        this.advance(); // consume STRIP
-      }
-
-      this.advance(); // consume BLOCK_INVERSE (^)
-
-      inverseCloseStrip = this.match(TokenType.STRIP);
-      if (inverseCloseStrip) {
-        this.advance(); // consume STRIP
-      }
-
-      this.expect(TokenType.CLOSE, 'Expected }} after {{~^');
-      this.advance();
-
-      // Parse the inverse block content
-      inverse = this.parseProgram(blockContext);
-    }
-
-    // Handle block end tag: {{/helper}} or {{~/helper}}
-    let closeTagOpenStrip = false;
-
-    if (this.match(TokenType.OPEN_ENDBLOCK)) {
-      // Traditional {{/helper}} pattern
-      this.advance();
-
-      // Check for opening strip marker on close tag (~)
-      closeTagOpenStrip = this.match(TokenType.STRIP);
-      if (closeTagOpenStrip) {
-        this.advance();
-      }
-    } else if (this.isAtBlockEndWithStrip()) {
-      // Handle {{~/helper}} pattern
-      this.advance(); // consume OPEN
-
-      closeTagOpenStrip = this.match(TokenType.STRIP);
-      if (closeTagOpenStrip) {
-        this.advance(); // consume STRIP
-      }
-
-      this.advance(); // consume BLOCK_END (/)
-    } else {
-      throw ParserError.fromToken(
-        `Expected {{/ or {{~/ to close block started at line ${blockStartToken.loc?.start.line || '?'}`,
-        this.currentToken!,
-        this.getErrorContext(),
-      );
-    }
-
-    // Parse the closing helper name (supports literals as paths)
-    const closingNameToken = this.currentToken; // Save for error reporting
-    const closingName = this.parsePathOrLiteralAsPath();
-
-    // V1: Skip any parameters in closing tag (shouldn't be any, but be safe)
-    while (this.currentToken && !this.match(TokenType.CLOSE) && !this.match(TokenType.STRIP)) {
-      this.advance();
-    }
-
-    // Check for closing strip marker on close tag (~)
-    const closeTagCloseStrip = this.match(TokenType.STRIP);
-    if (closeTagCloseStrip) {
-      this.advance();
-    }
-
-    // Validate that closing name matches opening name
-    if (helperName.original !== closingName.original) {
-      const openLine = blockStartToken.loc?.start.line || '?';
-      const closeToken = closingNameToken || this.currentToken;
-      throw ParserError.fromToken(
-        `Block closing tag mismatch: expected {{/${helperName.original}}} but found {{/${closingName.original}}} (block opened at line ${openLine})`,
-        closeToken!,
-        this.getErrorContext(),
-      );
-    }
-
-    // Expect final CLOSE token (}})
-    const closeToken = this.expect(TokenType.CLOSE, 'Expected }} to close block end tag');
-    this.advance();
-
-    // Build location spanning entire block
-    const loc = blockStartToken ? this.getSourceLocation(blockStartToken, closeToken) : null;
-
-    const node: BlockStatement = {
-      type: 'BlockStatement',
-      path: helperName,
-      params,
-      hash,
-      program,
-      inverse,
-      openStrip: { open: openTagOpenStrip, close: openTagCloseStrip },
-      inverseStrip: { open: inverseOpenStrip, close: inverseCloseStrip },
-      closeStrip: { open: closeTagOpenStrip, close: closeTagCloseStrip },
-      ...(blockParams && { blockParams }),
-      loc,
-    };
-
-    return node;
+    return this.parseBlock(false);
   }
 
   /**
@@ -1604,60 +1382,54 @@ export class Parser {
    * @throws {ParserError} If block is malformed or has mismatched closing tag
    */
   parseInverseBlockStatement(): BlockStatement {
-    // Save the opening token for location tracking
+    return this.parseBlock(true);
+  }
+
+  /**
+   * Unified block parsing for both {{#helper}} and {{^helper}} blocks
+   *
+   * @param isInverse - true for {{^}}, false for {{#}}
+   * @returns BlockStatement node
+   * @throws {ParserError} If block is malformed or has mismatched closing tag
+   */
+  private parseBlock(isInverse: boolean): BlockStatement {
     const blockStartToken = this.currentToken!;
+    const openTokenType = isInverse ? TokenType.OPEN_INVERSE : TokenType.OPEN_BLOCK;
+    const blockMarker = isInverse ? TokenType.BLOCK_INVERSE : TokenType.BLOCK_START;
+    const symbol = isInverse ? '^' : '#';
 
-    // Handle two patterns for inverse block opening:
-    // 1. OPEN_INVERSE ({{^) - traditional
-    // 2. OPEN + STRIP + BLOCK_INVERSE ({{~^) - with whitespace control
     let openTagOpenStrip = false;
-
-    if (this.match(TokenType.OPEN_INVERSE)) {
-      // Traditional {{^ pattern
+    if (this.match(openTokenType)) {
       this.advance();
-
-      // Check for opening strip marker on open tag (~)
-      openTagOpenStrip = this.match(TokenType.STRIP);
-      if (openTagOpenStrip) {
-        this.advance();
-      }
+      openTagOpenStrip = this.consumeOptionalStrip();
     } else if (this.match(TokenType.OPEN)) {
-      // Check for {{~^ pattern
-      this.advance(); // consume OPEN
-
-      if (this.match(TokenType.STRIP)) {
-        openTagOpenStrip = true;
-        this.advance(); // consume STRIP
-      }
-
-      if (!this.match(TokenType.BLOCK_INVERSE)) {
+      this.advance();
+      openTagOpenStrip = this.consumeOptionalStrip();
+      if (!this.match(blockMarker)) {
         throw ParserError.fromToken(
-          'Expected ^ after {{~ to start inverse block statement',
+          `Expected ${symbol} after {{~ to start ${isInverse ? 'inverse ' : ''}block statement`,
           this.currentToken!,
           this.getErrorContext(),
         );
       }
-      this.advance(); // consume BLOCK_INVERSE (^)
+      this.advance();
     } else {
       throw ParserError.fromToken(
-        'Expected {{^ or {{~^ to start inverse block statement',
+        `Expected {{${symbol} or {{~${symbol} to start ${isInverse ? 'inverse ' : ''}block statement`,
         this.currentToken!,
         this.getErrorContext(),
       );
     }
 
-    // Parse the helper name (path expression, supports literals as paths)
     const helperName = this.parsePathOrLiteralAsPath();
-
-    // Parse parameters and hash pairs until we hit CLOSE token (or STRIP before CLOSE)
     const { params, hash } = this.parseParamsAndHash(TokenType.CLOSE);
 
     // Parse block parameters if present (as |param1 param2|)
     let blockParams: string[] | undefined;
     if (this.match(TokenType.ID) && this.currentToken?.value === 'as') {
-      this.advance(); // consume 'as'
+      this.advance();
       this.expect(TokenType.PIPE, 'Expected | after "as" keyword');
-      this.advance(); // consume opening |
+      this.advance();
 
       blockParams = [];
       while (!this.match(TokenType.PIPE)) {
@@ -1673,71 +1445,83 @@ export class Parser {
       }
 
       this.expect(TokenType.PIPE, 'Expected closing | for block params');
-      this.advance(); // consume closing |
-    }
-
-    // Check for closing strip marker on open tag (~)
-    const openTagCloseStrip = this.match(TokenType.STRIP);
-    if (openTagCloseStrip) {
       this.advance();
     }
 
-    // Expect CLOSE token (}})
-    this.expect(TokenType.CLOSE, 'Expected }} after inverse block helper name');
+    const openTagCloseStrip = this.consumeOptionalStrip();
+    this.expect(
+      TokenType.CLOSE,
+      `Expected }} after ${isInverse ? 'inverse ' : ''}block helper name`,
+    );
     this.advance();
 
-    // Build block context for error messages
     const blockContext = this.buildBlockContext(helperName, params, blockStartToken);
 
-    // Parse the inverse block content (the content goes in the inverse field for inverse blocks)
-    const inverse = this.parseProgram(blockContext);
+    // For inverse blocks ({{^}}), content goes in inverse field; for normal blocks ({{#}}), in program field
+    let program: Program;
+    let inverse: Program | null = null;
+    let inverseOpenStrip = false;
+    let inverseCloseStrip = false;
 
-    // Handle block end tag: {{/helper}} or {{~/helper}}
+    if (isInverse) {
+      // Inverse block: content goes in inverse, program is empty
+      program = { type: 'Program', body: [], loc: null };
+      inverse = this.parseProgram(blockContext);
+    } else {
+      // Normal block: parse main content, then check for else clause
+      program = this.parseProgram(blockContext);
+
+      if (this.isAtElseWithStrip()) {
+        const elseStrip = this.consumeElseWithStrip();
+        inverseOpenStrip = elseStrip.open;
+        inverseCloseStrip = elseStrip.close;
+        inverse = this.parseProgram(blockContext);
+      } else if (this.match(TokenType.OPEN_INVERSE)) {
+        this.advance();
+        inverseCloseStrip = this.consumeOptionalStrip();
+        this.expect(TokenType.CLOSE, 'Expected }} after {{^');
+        this.advance();
+        inverse = this.parseProgram(blockContext);
+      } else if (this.isAtInverseWithStrip()) {
+        this.advance();
+        inverseOpenStrip = this.consumeOptionalStrip();
+        this.advance(); // consume BLOCK_INVERSE
+        inverseCloseStrip = this.consumeOptionalStrip();
+        this.expect(TokenType.CLOSE, 'Expected }} after {{~^');
+        this.advance();
+        inverse = this.parseProgram(blockContext);
+      }
+    }
+
+    // Parse closing tag
     let closeTagOpenStrip = false;
 
     if (this.match(TokenType.OPEN_ENDBLOCK)) {
-      // Traditional {{/helper}} pattern
       this.advance();
-
-      // Check for opening strip marker on close tag (~)
-      closeTagOpenStrip = this.match(TokenType.STRIP);
-      if (closeTagOpenStrip) {
-        this.advance();
-      }
+      closeTagOpenStrip = this.consumeOptionalStrip();
     } else if (this.isAtBlockEndWithStrip()) {
-      // Handle {{~/helper}} pattern
-      this.advance(); // consume OPEN
-
-      closeTagOpenStrip = this.match(TokenType.STRIP);
-      if (closeTagOpenStrip) {
-        this.advance(); // consume STRIP
-      }
-
-      this.advance(); // consume BLOCK_END (/)
+      this.advance();
+      closeTagOpenStrip = this.consumeOptionalStrip();
+      this.advance(); // consume BLOCK_END
     } else {
       throw ParserError.fromToken(
-        `Expected {{/ or {{~/ to close inverse block started at line ${blockStartToken.loc?.start.line || '?'}`,
+        `Expected {{/ or {{~/ to close ${isInverse ? 'inverse ' : ''}block started at line ${blockStartToken.loc?.start.line || '?'}`,
         this.currentToken!,
         this.getErrorContext(),
       );
     }
 
-    // Parse the closing helper name (supports literals as paths)
-    const closingNameToken = this.currentToken; // Save for error reporting
+    const closingNameToken = this.currentToken;
     const closingName = this.parsePathOrLiteralAsPath();
 
-    // V1: Skip any parameters in closing tag (shouldn't be any, but be safe)
+    // Skip any parameters in closing tag
     while (this.currentToken && !this.match(TokenType.CLOSE) && !this.match(TokenType.STRIP)) {
       this.advance();
     }
 
-    // Check for closing strip marker on close tag (~)
-    const closeTagCloseStrip = this.match(TokenType.STRIP);
-    if (closeTagCloseStrip) {
-      this.advance();
-    }
+    const closeTagCloseStrip = this.consumeOptionalStrip();
 
-    // Validate that closing name matches opening name
+    // Validate closing name matches opening name
     if (helperName.original !== closingName.original) {
       const openLine = blockStartToken.loc?.start.line || '?';
       const closeToken = closingNameToken || this.currentToken;
@@ -1748,28 +1532,25 @@ export class Parser {
       );
     }
 
-    // Expect final CLOSE token (}})
     const closeToken = this.expect(TokenType.CLOSE, 'Expected }} to close block end tag');
     this.advance();
 
-    // Build location spanning entire block
     const loc = blockStartToken ? this.getSourceLocation(blockStartToken, closeToken) : null;
 
-    // For inverse blocks, the program field is null and the content goes in the inverse field
-    const node: BlockStatement = {
+    return {
       type: 'BlockStatement',
       path: helperName,
       params,
       hash,
-      program: { type: 'Program', body: [], loc: null }, // Empty program for inverse blocks
+      program,
       inverse,
       openStrip: { open: openTagOpenStrip, close: openTagCloseStrip },
-      inverseStrip: { open: false, close: false }, // No inverse strip for standalone inverse blocks
+      inverseStrip: isInverse
+        ? { open: false, close: false }
+        : { open: inverseOpenStrip, close: inverseCloseStrip },
       closeStrip: { open: closeTagOpenStrip, close: closeTagCloseStrip },
       ...(blockParams && { blockParams }),
       loc,
     };
-
-    return node;
   }
 }
