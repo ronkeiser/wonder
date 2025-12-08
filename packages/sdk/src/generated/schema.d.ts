@@ -1164,11 +1164,6 @@ export interface components {
             name: string;
             /** @example Generates and reviews content */
             description: string;
-            /**
-             * @default 1
-             * @example 1
-             */
-            version: number;
             /** @example 01ARZ3NDEKTSV4RRFFQ69G5FAV */
             project_id?: string;
             library_id?: string;

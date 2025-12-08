@@ -91,7 +91,7 @@ export const workflow_defs = sqliteTable(
     id: text('id').notNull(),
     name: text('name').notNull(),
     description: text('description').notNull(),
-    version: integer('version').notNull(),
+    version: integer('version').notNull().default(1),
 
     project_id: text('project_id').references(() => projects.id),
     library_id: text('library_id'),

@@ -9,7 +9,6 @@ export const CreateWorkflowDefSchema = z
   .object({
     name: z.string().min(1).max(255).openapi({ example: 'Content Generation Pipeline' }),
     description: z.string().min(1).openapi({ example: 'Generates and reviews content' }),
-    version: z.number().int().positive().default(1).openapi({ example: 1 }),
     project_id: ulid().optional().openapi({ example: '01ARZ3NDEKTSV4RRFFQ69G5FAV' }),
     library_id: ulid().optional(),
     tags: z.array(z.string()).optional(),
