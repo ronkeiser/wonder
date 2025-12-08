@@ -6,8 +6,7 @@
 
 const API_PREFIX = 'api/';
 const DEFAULT_SUCCESS_STATUS = '200';
-const PARAM_START_CHARS = ['{', ':'] as const;
-const PARAM_STRIP_CHARS = /^[{:]|[}]$/g;
+const PARAM_MARKERS = { start: ['{', ':'], strip: /^[{:]|[}]$/g } as const;
 
 /**
  * HTTP methods supported by the API
@@ -65,15 +64,11 @@ export interface RouteNode {
  * Strips /api/ prefix and splits by /.
  */
 export function parsePathSegments(path: string): string[] {
-  // Remove leading/trailing slashes
   const normalized = path.trim().replace(/^\/+|\/+$/g, '');
-
-  // Strip /api/ prefix if present
   const withoutPrefix = normalized.startsWith(API_PREFIX)
     ? normalized.substring(API_PREFIX.length)
     : normalized;
 
-  // Split by / and filter empty segments
   return withoutPrefix.split('/').filter((segment) => segment.length > 0);
 }
 
@@ -86,14 +81,9 @@ export function parsePathSegments(path: string): string[] {
  * - Everything else is a collection
  */
 export function classifySegment(segment: string): NodeType {
-  // Parameters start with { or :
-  if (PARAM_START_CHARS.some((char) => segment.startsWith(char))) {
-    return NodeType.Param;
-  }
-
-  // For now, everything else is a collection
-  // Action detection will be handled by the tree builder based on position
-  return NodeType.Collection;
+  return PARAM_MARKERS.start.some((char) => segment.startsWith(char))
+    ? NodeType.Param
+    : NodeType.Collection;
 }
 
 /**
@@ -110,7 +100,7 @@ export interface PathDefinition {
   path: string;
   method: HttpMethod;
   operationId?: string;
-  responses?: Record<string, any>;
+  responses?: Record<string, unknown>;
 }
 
 export function buildRouteTree(paths: PathDefinition[]): RouteNode[] {
@@ -124,49 +114,40 @@ export function buildRouteTree(paths: PathDefinition[]): RouteNode[] {
     for (let i = 0; i < segments.length; i++) {
       const segment = segments[i];
       const segmentType = classifySegment(segment);
+      const isLastSegment = i === segments.length - 1;
 
       // Normalize parameter names (strip braces/colons)
       const nodeName =
-        segmentType === NodeType.Param ? segment.replace(PARAM_STRIP_CHARS, '') : segment;
+        segmentType === NodeType.Param ? segment.replace(PARAM_MARKERS.strip, '') : segment;
 
-      // Find existing node by name (may be collection or action)
+      // Find existing node by name
       let node = currentLevel.find((n) => n.name === nodeName);
 
       if (!node) {
-        // Determine if this segment is an action
-        // Actions are terminal segments (last in path) that appear after parameters
-        const isLastSegment = i === segments.length - 1;
+        // Actions are terminal segments that appear after parameters
         const previousIsParam = i > 0 && classifySegment(segments[i - 1]) === NodeType.Param;
         const isAction = isLastSegment && previousIsParam && segmentType === NodeType.Collection;
-        const nodeType = isAction ? NodeType.Action : segmentType;
 
         node = {
-          type: nodeType,
+          type: isAction ? NodeType.Action : segmentType,
           name: nodeName,
           methods: [],
           children: [],
           parent,
         };
         currentLevel.push(node);
-      } else if (node.type === NodeType.Action && i < segments.length - 1) {
-        // If we previously classified this as an action, but it has children in this path,
-        // it's actually a collection
+      } else if (node.type === NodeType.Action && !isLastSegment) {
+        // If previously classified as action but has children, it's actually a collection
         node.type = NodeType.Collection;
       }
 
       // Add method if we're at the final segment
-      if (i === segments.length - 1) {
-        // Check if method already exists
-        const existingMethod = node.methods.find((m) => m.verb === method);
-        if (!existingMethod) {
-          // Extract first 2xx status code from responses
-          const responseCodes = responses || {};
-          const successStatusCode =
-            Object.keys(responseCodes).find((code) => code.startsWith('2')) ||
-            DEFAULT_SUCCESS_STATUS;
+      if (isLastSegment && !node.methods.some((m) => m.verb === method)) {
+        const successStatusCode =
+          Object.keys(responses || {}).find((code) => code.startsWith('2')) ||
+          DEFAULT_SUCCESS_STATUS;
 
-          node.methods.push({ verb: method, operationId, originalPath: path, successStatusCode });
-        }
+        node.methods.push({ verb: method, operationId, originalPath: path, successStatusCode });
       }
 
       // Move to next level
