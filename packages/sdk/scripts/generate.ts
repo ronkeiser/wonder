@@ -53,9 +53,11 @@ async function generate() {
 
       // Intercept schema fields and replace with SchemaType reference
       if (
-        path.endsWith('input_schema') ||
-        path.endsWith('output_schema') ||
-        path.endsWith('context_schema')
+        (path.includes('WorkflowDef') &&
+          (path.endsWith('input_schema') ||
+            path.endsWith('output_schema') ||
+            path.endsWith('context_schema'))) ||
+        (path.includes('PromptSpec') && path.endsWith('produces'))
       ) {
         return ts.factory.createTypeReferenceNode('SchemaType');
       }

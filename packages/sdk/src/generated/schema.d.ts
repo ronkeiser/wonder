@@ -1043,9 +1043,7 @@ export interface components {
             requires: {
                 [key: string]: unknown;
             };
-            produces: {
-                [key: string]: unknown;
-            };
+            produces: SchemaType;
             examples: unknown[] | null;
             tags: string[] | null;
             created_at: string;
@@ -1087,9 +1085,7 @@ export interface components {
              *       "summary": "string"
              *     }
              */
-            produces: {
-                [key: string]: unknown;
-            };
+            produces: SchemaType;
             examples?: unknown[];
             tags?: string[];
         };
