@@ -66,10 +66,10 @@ export interface RouteNode {
 export function parsePathSegments(path: string): string[] {
   const normalized = path.trim().replace(/^\/+|\/+$/g, '');
   const withoutPrefix = normalized.startsWith(API_PREFIX)
-    ? normalized.substring(API_PREFIX.length)
+    ? normalized.slice(API_PREFIX.length)
     : normalized;
 
-  return withoutPrefix.split('/').filter((segment) => segment.length > 0);
+  return withoutPrefix.split('/').filter(Boolean);
 }
 
 /**
@@ -81,7 +81,7 @@ export function parsePathSegments(path: string): string[] {
  * - Everything else is a collection
  */
 export function classifySegment(segment: string): NodeType {
-  return PARAM_MARKERS.start.some((char) => segment.startsWith(char))
+  return PARAM_MARKERS.start.some((marker) => segment.startsWith(marker))
     ? NodeType.Param
     : NodeType.Collection;
 }
@@ -108,49 +108,47 @@ export function buildRouteTree(paths: PathDefinition[]): RouteNode[] {
 
   for (const { path, method, operationId, responses } of paths) {
     const segments = parsePathSegments(path);
+    const segmentTypes = segments.map(classifySegment);
     let currentLevel = roots;
     let parent: RouteNode | null = null;
 
     for (let i = 0; i < segments.length; i++) {
       const segment = segments[i];
-      const segmentType = classifySegment(segment);
-      const isLastSegment = i === segments.length - 1;
+      const segmentType = segmentTypes[i];
+      const isLast = i === segments.length - 1;
+      const prevIsParam = i > 0 && segmentTypes[i - 1] === NodeType.Param;
 
       // Normalize parameter names (strip braces/colons)
-      const nodeName =
+      const name =
         segmentType === NodeType.Param ? segment.replace(PARAM_MARKERS.strip, '') : segment;
 
-      // Find existing node by name
-      let node = currentLevel.find((n) => n.name === nodeName);
+      // Find or create node
+      let node = currentLevel.find((n) => n.name === name);
 
       if (!node) {
-        // Actions are terminal segments that appear after parameters
-        const previousIsParam = i > 0 && classifySegment(segments[i - 1]) === NodeType.Param;
-        const isAction = isLastSegment && previousIsParam && segmentType === NodeType.Collection;
-
+        const isAction = isLast && prevIsParam && segmentType === NodeType.Collection;
         node = {
           type: isAction ? NodeType.Action : segmentType,
-          name: nodeName,
+          name,
           methods: [],
           children: [],
           parent,
         };
         currentLevel.push(node);
-      } else if (node.type === NodeType.Action && !isLastSegment) {
-        // If previously classified as action but has children, it's actually a collection
+      } else if (node.type === NodeType.Action && !isLast) {
+        // Reclassify as collection if it has children
         node.type = NodeType.Collection;
       }
 
-      // Add method if we're at the final segment
-      if (isLastSegment && !node.methods.some((m) => m.verb === method)) {
+      // Add method at final segment
+      if (isLast && !node.methods.some((m) => m.verb === method)) {
         const successStatusCode =
-          Object.keys(responses || {}).find((code) => code.startsWith('2')) ||
+          Object.keys(responses ?? {}).find((code) => code.startsWith('2')) ??
           DEFAULT_SUCCESS_STATUS;
 
         node.methods.push({ verb: method, operationId, originalPath: path, successStatusCode });
       }
 
-      // Move to next level
       parent = node;
       currentLevel = node.children;
     }

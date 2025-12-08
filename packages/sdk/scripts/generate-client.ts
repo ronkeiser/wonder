@@ -78,11 +78,7 @@ function collectPathParameters(node: RouteNode): string[] {
 /**
  * Generate method signature with proper parameter list
  */
-export function generateMethodSignature(
-  node: RouteNode,
-  verb: HttpMethod,
-  operationId?: string,
-): MethodSignature {
+export function generateMethodSignature(node: RouteNode, verb: HttpMethod): MethodSignature {
   const methodName = getMethodName(node, verb);
   const parameters: MethodParameter[] = [];
 
@@ -134,7 +130,7 @@ export interface ClientProperty {
 export function generateCollectionObject(node: RouteNode): ClientProperty {
   const methods = node.methods.map((method) => ({
     name: getMethodName(node, method.verb),
-    signature: generateMethodSignature(node, method.verb, method.operationId),
+    signature: generateMethodSignature(node, method.verb),
     path: buildPathTemplate(node),
     verb: method.verb,
     originalPath: method.originalPath ?? buildPathTemplate(node),
@@ -254,20 +250,17 @@ function formatProperty(prop: ClientProperty, indent: string): string {
     const excludeParams = new Set([prop.name]);
 
     // Collect all methods (instance + nested action methods)
-    const allMethods = [...(child.methods ?? [])];
-    if (child.children) {
-      const actionMethods = child.children.flatMap((nestedChild) => nestedChild.methods ?? []);
-      allMethods.push(...actionMethods);
-    }
+    const allMethods = [
+      ...(child.methods ?? []),
+      ...(child.children?.flatMap((c) => c.methods ?? []) ?? []),
+    ];
 
     // Add all methods with proper comma formatting
-    if (allMethods.length > 0) {
-      lines.push(
-        ...formatWithCommas(allMethods, (method) =>
-          formatMethod(method, indent + '    ', excludeParams),
-        ),
-      );
-    }
+    lines.push(
+      ...formatWithCommas(allMethods, (method) =>
+        formatMethod(method, indent + '    ', excludeParams),
+      ),
+    );
 
     lines.push(`${indent}  })`);
   } else {
@@ -285,21 +278,17 @@ function formatProperty(prop: ClientProperty, indent: string): string {
 
       // Generate the methods object part (for collection methods)
       lines.push(`${indent}  {`);
-      if (prop.methods && prop.methods.length > 0) {
-        lines.push(
-          ...formatWithCommas(prop.methods, (method) => formatMethod(method, indent + '    ')),
-        );
-      }
+      lines.push(
+        ...formatWithCommas(prop.methods ?? [], (method) => formatMethod(method, indent + '    ')),
+      );
       lines.push(`${indent}  }`);
       lines.push(`${indent})`);
     } else {
       // Simple collection with just methods
       lines.push(`${indent}${propertyName}: {`);
-      if (prop.methods && prop.methods.length > 0) {
-        lines.push(
-          ...formatWithCommas(prop.methods, (method) => formatMethod(method, indent + '  ')),
-        );
-      }
+      lines.push(
+        ...formatWithCommas(prop.methods ?? [], (method) => formatMethod(method, indent + '  ')),
+      );
       lines.push(`${indent}}`);
     }
   }
