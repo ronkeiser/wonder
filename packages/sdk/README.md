@@ -1,6 +1,13 @@
 # @wonder/sdk
 
-Type-safe client SDK for the Wonder workflow orchestration platform using `openapi-fetch`.
+Type-safe TypeScript SDK for the Wonder workflow orchestration platform.
+
+## Overview
+
+The SDK provides two layers:
+
+1. **Generated Client** (Layer 1) - Auto-generated type-safe HTTP client from OpenAPI spec
+2. **Builder Helpers** (Layer 2) - Ergonomic builders for creating workflow definitions, schemas, nodes, and transitions
 
 ## Installation
 
@@ -8,7 +15,9 @@ Type-safe client SDK for the Wonder workflow orchestration platform using `opena
 pnpm add @wonder/sdk
 ```
 
-## Usage
+## Quick Start
+
+### Using the HTTP Client
 
 ```typescript
 import { createClient } from '@wonder/sdk';
@@ -23,51 +32,230 @@ const { data, error } = await client.POST('/api/workspaces', {
   },
 });
 
-// Get a project
-const { data: project } = await client.GET('/api/projects/{id}', {
-  params: { path: { id: 'project-id' } },
+if (error) {
+  console.error('Failed:', error);
+  return;
+}
+
+console.log('Created workspace:', data.workspace);
+```
+
+### Using Workflow Builders
+
+```typescript
+import { schema, node, transition, workflowDef } from '@wonder/sdk';
+
+// Create a workflow definition using builders
+const myWorkflow = workflowDef({
+  name: 'Content Generator',
+  description: 'Generates content based on a topic',
+  input_schema: schema.object({
+    topic: schema.string({ minLength: 1 }),
+    tone: schema.enum(['formal', 'casual', 'technical']),
+  }),
+  output_schema: schema.object({
+    content: schema.string(),
+    wordCount: schema.integer({ min: 0 }),
+  }),
+  context_schema: schema.object({
+    apiKey: schema.string(),
+  }),
+  initial_node_ref: 'generate',
+  nodes: [
+    node({
+      ref: 'generate',
+      name: 'Generate Content',
+      action_id: 'llm-call',
+      action_version: 1,
+      input_mapping: {
+        prompt: '$.input.topic',
+        tone: '$.input.tone',
+        api_key: '$.context.apiKey',
+      },
+    }),
+    node({
+      ref: 'validate',
+      name: 'Validate Output',
+      action_id: 'validator',
+      input_mapping: {
+        content: '$.generate.output',
+      },
+    }),
+  ],
+  transitions: [
+    transition({
+      from_node_ref: 'generate',
+      to_node_ref: 'validate',
+      priority: 1,
+    }),
+  ],
+  output_mapping: {
+    content: '$.validate.content',
+    wordCount: '$.validate.wordCount',
+  },
 });
 
-// Start a workflow
-const { data: result } = await client.POST('/api/workflows/{id}/start', {
-  params: { path: { id: 'workflow-id' } },
-  body: { input: 'Hello, world!' },
-});
-
-// List model profiles with filters
-const { data: profiles } = await client.GET('/api/model-profiles', {
-  params: { query: { provider: 'anthropic' } },
+// Create the workflow via API
+const { data } = await client.POST('/api/workflow-defs', {
+  body: myWorkflow,
 });
 ```
+
+## Builder API
+
+### Schema Builders
+
+Create JSON Schema definitions with type safety:
+
+```typescript
+import { schema } from '@wonder/sdk';
+
+// Basic types
+const str = schema.string();
+const num = schema.integer({ min: 1, max: 100 });
+const bool = schema.boolean();
+const nullable = schema.null();
+
+// Complex types
+const obj = schema.object(
+  {
+    name: schema.string({ minLength: 1 }),
+    age: schema.integer({ min: 0 }),
+    email: schema.string({ pattern: '^[^@]+@[^@]+\\.[^@]+$' }),
+  },
+  { required: ['name', 'email'] },
+);
+
+const arr = schema.array(schema.string(), { minItems: 1, maxItems: 10, uniqueItems: true });
+
+// Enums
+const status = schema.enum(['pending', 'active', 'completed']);
+```
+
+### Node Builder
+
+Create workflow nodes:
+
+```typescript
+import { node } from '@wonder/sdk';
+
+const myNode = node({
+  ref: 'process_data',
+  name: 'Process Data',
+  action_id: 'data-processor',
+  action_version: 2,
+  input_mapping: {
+    data: '$.input.rawData',
+    config: '$.context.processorConfig',
+  },
+  output_mapping: {
+    result: '$.output.processed',
+  },
+});
+```
+
+### Transition Builder
+
+Create workflow transitions:
+
+```typescript
+import { transition } from '@wonder/sdk';
+
+// Simple transition
+const simple = transition({
+  from_node_ref: 'start',
+  to_node_ref: 'end',
+  priority: 1,
+});
+
+// Conditional transition
+const conditional = transition({
+  from_node_ref: 'check',
+  to_node_ref: 'process',
+  priority: 1,
+  condition: {
+    expression: '$.check.output.isValid === true',
+  },
+});
+
+// Parallel execution with spawn
+const parallel = transition({
+  from_node_ref: 'split',
+  to_node_ref: 'worker',
+  priority: 1,
+  spawn_count: 5,
+});
+
+// For-each transition
+const forEach = transition({
+  from_node_ref: 'start',
+  to_node_ref: 'process_item',
+  priority: 1,
+  foreach: {
+    items: '$.input.items',
+    item_var: 'current_item',
+  },
+});
+```
+
+### Workflow Definition Builder
+
+Combine everything into a complete workflow:
+
+```typescript
+import { workflowDef, schema, node, transition } from '@wonder/sdk';
+
+const workflow = workflowDef({
+  name: 'My Workflow',
+  description: 'Does something useful',
+  project_id: 'proj-123', // optional
+  tags: ['production', 'automated'], // optional
+  input_schema: schema.object({
+    /* ... */
+  }),
+  output_schema: schema.object({
+    /* ... */
+  }),
+  context_schema: schema.object({
+    /* ... */
+  }), // optional
+  initial_node_ref: 'start',
+  nodes: [
+    node({ ref: 'start', name: 'Start' /* ... */ }),
+    node({ ref: 'end', name: 'End' /* ... */ }),
+  ],
+  transitions: [transition({ from_node_ref: 'start', to_node_ref: 'end', priority: 1 })],
+  output_mapping: {
+    // optional
+    result: '$.end.output',
+  },
+});
+```
+
+The builder validates:
+
+- `initial_node_ref` exists in nodes
+- All transition refs (`from_node_ref`, `to_node_ref`) exist in nodes
+- Throws clear error messages if validation fails
 
 ## Type Safety
 
-The SDK uses `openapi-fetch` which provides:
+The SDK provides full TypeScript type safety:
 
-- Full TypeScript autocomplete for all API paths
-- Type-safe request bodies and parameters
-- Type-safe response types
-- Automatic type inference from OpenAPI spec
+- **HTTP Client**: Auto-generated types from OpenAPI spec via `openapi-fetch`
+  - Autocomplete for all API paths
+  - Type-safe request bodies and parameters
+  - Type-safe response types
+- **Builders**: Strongly typed builder functions
+  - Schema constraints validated at compile time
+  - Node and transition references type-checked
+  - Full IntelliSense support
 
-No generated code needed - just types!
+## HTTP Client Details
 
-## Code Generation
+### Response Format
 
-Generate TypeScript types from the OpenAPI specification:
-
-```bash
-pnpm generate
-```
-
-This fetches the OpenAPI spec and generates types to `src/generated/schema.d.ts`.
-
-### Environment Variables
-
-- `API_URL` - Base URL for the Wonder API (default: `https://wonder-http.ron-keiser.workers.dev`)
-
-## API Response Format
-
-All methods return:
+All API methods return:
 
 ```typescript
 {
@@ -77,7 +265,7 @@ All methods return:
 }
 ```
 
-Example error handling:
+### Error Handling
 
 ```typescript
 const { data, error } = await client.POST('/api/workspaces', {
@@ -85,25 +273,85 @@ const { data, error } = await client.POST('/api/workspaces', {
 });
 
 if (error) {
-  console.error('Failed:', error);
+  console.error('API error:', error);
   return;
 }
 
-console.log('Created:', data);
+// TypeScript knows data is defined here
+console.log('Success:', data.workspace);
+```
+
+### Common Operations
+
+```typescript
+// List resources with pagination
+const { data } = await client.GET('/api/workspaces', {
+  params: { query: { limit: 10, offset: 0 } },
+});
+
+// Get a specific resource
+const { data } = await client.GET('/api/workspaces/{id}', {
+  params: { path: { id: 'workspace-id' } },
+});
+
+// Update a resource
+const { data } = await client.PATCH('/api/workspaces/{id}', {
+  params: { path: { id: 'workspace-id' } },
+  body: { name: 'Updated Name' },
+});
+
+// Delete a resource
+const { data } = await client.DELETE('/api/workspaces/{id}', {
+  params: { path: { id: 'workspace-id' } },
+});
 ```
 
 ## Development
 
 ### Regenerate Types
 
-After HTTP service OpenAPI spec changes:
+After the HTTP service OpenAPI spec changes:
 
 ```bash
 pnpm generate
 ```
 
-TypeScript will automatically catch any breaking changes.
+This fetches the latest OpenAPI spec and regenerates `src/generated/schema.d.ts`. TypeScript will automatically catch any breaking changes.
 
-## License
+### Running Tests
 
-MIT
+```bash
+pnpm test
+```
+
+### Environment Variables
+
+- `API_URL` - Base URL for the Wonder API (default: `https://wonder-http.ron-keiser.workers.dev`)
+
+## Architecture
+
+The SDK uses a two-layer architecture:
+
+1. **Layer 1: Generated Client**
+   - Auto-generated from OpenAPI spec
+   - Uses `openapi-typescript` for type generation
+   - Uses `openapi-fetch` for runtime client
+   - Located in `src/generated/`
+
+2. **Layer 2: Builder Helpers**
+   - Hand-written ergonomic builders
+   - Built on top of generated types
+   - No runtime overhead (plain object construction)
+   - Located in `src/builders/`
+
+This separation ensures:
+
+- Generated types stay clean and maintainable
+- Builders can evolve independently
+- Users can choose their preferred level of abstraction
+
+## Examples
+
+See `demo/` directory for complete examples:
+
+- `workflow-def-schemas.ts` - Creating workflow definitions with schemas
