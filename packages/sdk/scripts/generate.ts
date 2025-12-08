@@ -1,20 +1,51 @@
 #!/usr/bin/env tsx
 /**
- * Generate TypeScript types from OpenAPI spec with custom transform hooks.
+ * Generate TypeScript types and client from OpenAPI spec.
  *
- * Transforms schema fields (input_schema, output_schema, context_schema)
- * from Record<string, any> to SchemaType imported from @wonder/context.
+ * Phase 1: Generate types with custom transform hooks
+ * Phase 2: Parse paths and generate client code
+ * Phase 3: Write both files to src/generated/
  */
 
-import { writeFile } from 'node:fs/promises';
+import { mkdir, writeFile } from 'node:fs/promises';
+import { dirname } from 'node:path';
 import openapiTS from 'openapi-typescript';
 import ts from 'typescript';
+import { formatClientCode, generateRootClient } from './generate-client.js';
+import { buildRouteTree, type HttpMethod, type PathDefinition } from './parse-paths.js';
 
 const API_URL = process.env.API_URL || 'https://wonder-http.ron-keiser.workers.dev';
+
+/**
+ * Convert OpenAPI paths object to PathDefinition array
+ */
+function convertOpenApiPaths(paths: Record<string, Record<string, any>>): PathDefinition[] {
+  const result: PathDefinition[] = [];
+
+  for (const [path, methods] of Object.entries(paths)) {
+    for (const [method, operation] of Object.entries(methods)) {
+      // Only include valid HTTP methods
+      if (['get', 'post', 'put', 'patch', 'delete'].includes(method)) {
+        result.push({
+          path,
+          method: method as HttpMethod,
+          operationId: operation?.operationId,
+        });
+      }
+    }
+  }
+
+  return result;
+}
 
 async function generate() {
   console.log(`Fetching OpenAPI spec from ${API_URL}/doc...`);
 
+  // Fetch OpenAPI spec as JSON for path parsing
+  const response = await fetch(`${API_URL}/doc`);
+  const spec = (await response.json()) as { paths: Record<string, Record<string, any>> };
+
+  // Generate TypeScript types
   const ast = await openapiTS(`${API_URL}/doc`, {
     transform(schemaObject, options) {
       const path = options.path || '';
@@ -76,13 +107,34 @@ async function generate() {
 
 `;
 
-  const output = header + importCode + '\n\n' + typesCode;
+  const schemaOutput = header + importCode + '\n\n' + typesCode;
 
-  // Write to file
-  const outputPath = 'src/generated/schema.d.ts';
-  await writeFile(outputPath, output, 'utf-8');
+  // Task 3.2: Parse routes into tree structure
+  console.log('Parsing API routes...');
+  const pathDefs = convertOpenApiPaths(spec.paths);
+  const routeTree = buildRouteTree(pathDefs);
 
-  console.log(`✓ Generated types written to ${outputPath}`);
+  // Task 3.3: Generate client structure
+  console.log('Generating client code...');
+  const clientStructure = generateRootClient(routeTree);
+
+  // Task 3.4: Format client code
+  const clientOutput = formatClientCode(clientStructure);
+
+  // Task 3.5: Write files
+  const schemaPath = 'src/generated/schema.d.ts';
+  const clientPath = 'src/generated/client.ts';
+
+  // Ensure directory exists
+  await mkdir(dirname(schemaPath), { recursive: true });
+
+  // Write schema types
+  await writeFile(schemaPath, schemaOutput, 'utf-8');
+  console.log(`✓ Generated types written to ${schemaPath}`);
+
+  // Write client code
+  await writeFile(clientPath, clientOutput, 'utf-8');
+  console.log(`✓ Generated client written to ${clientPath}`);
 }
 
 generate().catch((err) => {

@@ -86,3 +86,78 @@ export function classifySegment(segment: string): NodeType {
   // Action detection will be handled by the tree builder based on position
   return NodeType.Collection;
 }
+
+/**
+ * Task 1.4: Tree Builder
+ *
+ * Build a route tree from OpenAPI path definitions.
+ * Handles:
+ * - Creating nodes for each path segment
+ * - Merging duplicate paths (same structure, different HTTP methods)
+ * - Detecting action nodes (segments after parameters)
+ * - Building parent-child relationships
+ */
+export interface PathDefinition {
+  path: string;
+  method: HttpMethod;
+  operationId?: string;
+}
+
+export function buildRouteTree(paths: PathDefinition[]): RouteNode[] {
+  const roots: RouteNode[] = [];
+
+  for (const { path, method, operationId } of paths) {
+    const segments = parsePathSegments(path);
+    let currentLevel = roots;
+    let parent: RouteNode | null = null;
+
+    for (let i = 0; i < segments.length; i++) {
+      const segment = segments[i];
+      const segmentType = classifySegment(segment);
+
+      // Normalize parameter names (strip braces/colons)
+      const nodeName =
+        segmentType === NodeType.Param ? segment.replace(/^[{:]|[}]$/g, '') : segment;
+
+      // Find existing node by name (may be collection or action)
+      let node = currentLevel.find((n) => n.name === nodeName);
+
+      if (!node) {
+        // Determine if this segment is an action
+        // Actions are terminal segments (last in path) that appear after parameters
+        const isLastSegment = i === segments.length - 1;
+        const afterParam = i > 0 && classifySegment(segments[i - 1]) === NodeType.Param;
+        const isAction = isLastSegment && afterParam && segmentType === NodeType.Collection;
+        const nodeType = isAction ? NodeType.Action : segmentType;
+
+        node = {
+          type: nodeType,
+          name: nodeName,
+          methods: [],
+          children: [],
+          parent,
+        };
+        currentLevel.push(node);
+      } else if (node.type === NodeType.Action && i < segments.length - 1) {
+        // If we previously classified this as an action, but it has children in this path,
+        // it's actually a collection
+        node.type = NodeType.Collection;
+      }
+
+      // Add method if we're at the final segment
+      if (i === segments.length - 1) {
+        // Check if method already exists
+        const existingMethod = node.methods.find((m) => m.verb === method);
+        if (!existingMethod) {
+          node.methods.push({ verb: method, operationId });
+        }
+      }
+
+      // Move to next level
+      parent = node;
+      currentLevel = node.children;
+    }
+  }
+
+  return roots;
+}

@@ -170,13 +170,353 @@ Each method:
 - Use conditional types to extract request/response shapes
 - Preserve all type information from OpenAPI spec
 
-**Testing strategy:**
+#### Task 2.1: HTTP Verb Mapping (10 min)
 
-- Generate code for simple tree
-- Verify it compiles with `tsc`
-- Check method signatures match expectations
+Create mapping from HTTP verbs to JavaScript method names.
 
-**Time estimate:** 45 minutes
+**Logic:**
+
+- POST on collection → `create()`
+- POST on action → use action name (e.g., `start()`)
+- GET on collection → `list()`
+- GET on instance → `get()`
+- PUT → `update()`
+- DELETE → `delete()`
+- PATCH → `patch()`
+
+**Implementation:**
+
+```typescript
+function getMethodName(node: RouteNode, verb: HttpMethod): string {
+  if (verb === 'post') {
+    return node.type === NodeType.Action ? node.name : 'create';
+  }
+  if (verb === 'get') {
+    return node.type === NodeType.Collection ? 'list' : 'get';
+  }
+  return verb; // put, delete, patch
+}
+```
+
+**Test cases:**
+
+- Collection GET → `list`
+- Instance GET → `get`
+- Collection POST → `create`
+- Action POST → action name
+- PUT → `update`
+- DELETE → `delete`
+
+#### Task 2.2: Path Template Builder (15 min)
+
+Generate path template strings with parameter interpolation.
+
+**Logic:**
+
+- Walk from node to root, collecting segments
+- Reverse to get correct order
+- Replace params with `${paramName}` template literals
+- Prefix with `/api/`
+
+**Implementation:**
+
+```typescript
+function buildPathTemplate(node: RouteNode): string {
+  const segments: string[] = [];
+  let current: RouteNode | null = node;
+
+  while (current) {
+    if (current.type === NodeType.Param) {
+      segments.unshift(`\${${current.name}}`);
+    } else {
+      segments.unshift(current.name);
+    }
+    current = current.parent;
+  }
+
+  return `/api/${segments.join('/')}`;
+}
+```
+
+**Test cases:**
+
+- `/api/workspaces` → `"/api/workspaces"`
+- `/api/workspaces/{id}` → `"/api/workspaces/${id}"`
+- `/api/workflows/{id}/start` → `"/api/workflows/${id}/start"`
+- Verify correct parameter names used
+
+#### Task 2.3: Method Signature Generator (20 min)
+
+Generate TypeScript method signatures with proper parameter lists.
+
+**Logic:**
+
+- Extract path parameters from node ancestry
+- Add request body parameter for POST/PUT/PATCH
+- Add options parameter for query params, headers
+- Return type references OpenAPI types
+
+**Implementation:**
+
+```typescript
+interface MethodSignature {
+  name: string;
+  parameters: ts.ParameterDeclaration[];
+  returnType: ts.TypeNode;
+}
+
+function generateMethodSignature(
+  node: RouteNode,
+  verb: HttpMethod,
+  operationId?: string,
+): MethodSignature {
+  const methodName = getMethodName(node, verb);
+  const parameters: ts.ParameterDeclaration[] = [];
+
+  // Collect path parameters from ancestry
+  let current: RouteNode | null = node;
+  while (current) {
+    if (current.type === NodeType.Param) {
+      parameters.push(
+        ts.factory.createParameterDeclaration(
+          undefined,
+          undefined,
+          current.name,
+          undefined,
+          ts.factory.createKeywordTypeNode(ts.SyntaxKind.StringKeyword),
+        ),
+      );
+    }
+    current = current.parent;
+  }
+
+  // Add body parameter for mutation methods
+  if (['post', 'put', 'patch'].includes(verb)) {
+    parameters.push(
+      ts.factory.createParameterDeclaration(
+        undefined,
+        undefined,
+        'body',
+        undefined,
+        ts.factory.createTypeReferenceNode('RequestBody'),
+      ),
+    );
+  }
+
+  // Add options parameter
+  parameters.push(
+    ts.factory.createParameterDeclaration(
+      undefined,
+      undefined,
+      'options',
+      ts.factory.createToken(ts.SyntaxKind.QuestionToken),
+      ts.factory.createTypeReferenceNode('RequestOptions'),
+    ),
+  );
+
+  // Return type
+  const returnType = ts.factory.createTypeReferenceNode('Promise', [
+    ts.factory.createTypeReferenceNode('ResponseData'),
+  ]);
+
+  return { name: methodName, parameters, returnType };
+}
+```
+
+**Test cases:**
+
+- Collection method has no path params
+- Instance method has `id` parameter
+- POST methods have `body` parameter
+- All methods have optional `options` parameter
+- Nested resources have multiple path params in correct order
+- Return type is Promise<T>
+
+#### Task 2.4: Collection Object Generator (20 min)
+
+Generate object literal for collection nodes.
+
+**Logic:**
+
+- Create object with properties for each HTTP method
+- Properties are arrow functions with generated signatures
+- Functions return base client calls
+
+**Implementation:**
+
+```typescript
+function generateCollectionObject(node: RouteNode): ts.ObjectLiteralExpression {
+  const properties: ts.PropertyAssignment[] = [];
+
+  for (const method of node.methods) {
+    const sig = generateMethodSignature(node, method.verb, method.operationId);
+    const pathTemplate = buildPathTemplate(node);
+
+    // Create arrow function
+    const arrowFunc = ts.factory.createArrowFunction(
+      undefined,
+      undefined,
+      sig.parameters,
+      sig.returnType,
+      ts.factory.createToken(ts.SyntaxKind.EqualsGreaterThanToken),
+      // Body: baseClient[verb](path, body, options)
+      ts.factory.createCallExpression(
+        ts.factory.createPropertyAccessExpression(
+          ts.factory.createIdentifier('baseClient'),
+          method.verb.toUpperCase(),
+        ),
+        undefined,
+        [
+          /* path, body, options args */
+        ],
+      ),
+    );
+
+    properties.push(ts.factory.createPropertyAssignment(sig.name, arrowFunc));
+  }
+
+  // Add child resources/actions as nested properties
+  for (const child of node.children) {
+    if (child.type === NodeType.Param) {
+      properties.push(generateParameterProperty(child));
+    } else {
+      properties.push(
+        ts.factory.createPropertyAssignment(child.name, generateCollectionObject(child)),
+      );
+    }
+  }
+
+  return ts.factory.createObjectLiteralExpression(properties, true);
+}
+```
+
+**Test cases:**
+
+- Single method collection generates one property
+- Multiple methods generate multiple properties
+- Child collections added as nested properties
+- Parameter nodes generate functions (not objects)
+- Verify object structure compiles
+
+#### Task 2.5: Parameter Function Generator (20 min)
+
+Generate functions for parameter nodes.
+
+**Logic:**
+
+- Parameter nodes become functions that capture the ID
+- Return object with methods/children
+- ID is available in closure for path construction
+
+**Implementation:**
+
+```typescript
+function generateParameterProperty(node: RouteNode): ts.PropertyAssignment {
+  // Function parameter
+  const idParam = ts.factory.createParameterDeclaration(
+    undefined,
+    undefined,
+    node.name,
+    undefined,
+    ts.factory.createKeywordTypeNode(ts.SyntaxKind.StringKeyword),
+  );
+
+  // Function body: return object with methods/children
+  const returnObject = generateCollectionObject(node);
+
+  const arrowFunc = ts.factory.createArrowFunction(
+    undefined,
+    undefined,
+    [idParam],
+    undefined,
+    ts.factory.createToken(ts.SyntaxKind.EqualsGreaterThanToken),
+    returnObject,
+  );
+
+  return ts.factory.createPropertyAssignment(node.name, arrowFunc);
+}
+```
+
+**Test cases:**
+
+- Parameter function accepts string parameter
+- Returns object with instance methods
+- Captured ID used in path template
+- Child actions available on returned object
+- Verify function structure compiles
+
+#### Task 2.6: Root Client Generator (15 min)
+
+Generate the root client object and export.
+
+**Logic:**
+
+- Create `createClient()` factory function
+- Accepts base client as parameter
+- Returns object with all root collections
+- Export as default
+
+**Implementation:**
+
+```typescript
+function generateRootClient(roots: RouteNode[]): ts.SourceFile {
+  const properties = roots.map((node) =>
+    ts.factory.createPropertyAssignment(node.name, generateCollectionObject(node)),
+  );
+
+  const clientObject = ts.factory.createObjectLiteralExpression(properties, true);
+
+  // createClient function
+  const createClientFunc = ts.factory.createFunctionDeclaration(
+    [ts.factory.createModifier(ts.SyntaxKind.ExportKeyword)],
+    undefined,
+    'createClient',
+    undefined,
+    [
+      /* baseClient parameter */
+    ],
+    undefined,
+    ts.factory.createBlock([ts.factory.createReturnStatement(clientObject)]),
+  );
+
+  return ts.factory.createSourceFile(
+    [, /* imports */ createClientFunc],
+    ts.factory.createToken(ts.SyntaxKind.EndOfFileToken),
+    ts.NodeFlags.None,
+  );
+}
+```
+
+**Test cases:**
+
+- Multiple root collections all present
+- createClient function exported
+- Accepts baseClient parameter
+- Returns properly typed object
+- Verify complete file compiles
+
+#### Task 2.7: Integration Test (20 min)
+
+Generate complete client from Wonder API paths and verify.
+
+**Test:**
+
+- Use paths from Task 1.6
+- Generate complete client code
+- Write to temporary file
+- Compile with `tsc --noEmit`
+- Verify no errors
+- Check output structure matches expectations
+
+**Validation:**
+
+- All root resources present
+- Instance methods accept ID
+- Action methods have correct names
+- Path templates correct
+- Types reference OpenAPI schema
+
+**Time estimate:** 2 hours total
 
 ### Phase 3: Integration (Update generate.ts)
 
@@ -184,28 +524,289 @@ Each method:
 
 **Purpose:** Orchestrate the complete generation process.
 
-**Steps:**
+**Implementation tasks:**
 
-1. Fetch OpenAPI spec from HTTP service
-2. Generate TypeScript types with transform hook (already implemented)
-3. Parse routes into tree structure (Phase 1)
-4. Generate client code from tree (Phase 2)
-5. Write types to `src/generated/schema.d.ts`
-6. Write client to `src/generated/client.ts`
+#### Task 3.1: OpenAPI Spec Extraction (10 min)
 
-**Output files:**
+Extract paths object from OpenAPI spec after type generation.
 
-- `schema.d.ts` - OpenAPI types with `SchemaType` transforms
-- `client.ts` - Generated client with nested resource methods
+**Implementation:**
 
-**Testing strategy:**
+- Import `buildRouteTree` from parse-paths
+- Import `generateRootClient` from generate-client
+- After `astToString(ast)` completes, extract paths from ast
+- Store paths in variable for next step
 
-- Run full generation pipeline
-- Verify both files are created
-- Check types and client work together
-- Import in test file and verify autocomplete
+**Test:**
 
-**Time estimate:** 15 minutes
+```typescript
+import { describe, it, expect } from 'vitest';
+import openapiTS from 'openapi-typescript';
+
+describe('OpenAPI spec extraction', () => {
+  it('should extract paths from OpenAPI spec', async () => {
+    const ast = await openapiTS(new URL('...'));
+    const paths = extractPaths(ast);
+
+    expect(paths).toBeDefined();
+    expect(typeof paths).toBe('object');
+    expect(Object.keys(paths).length).toBeGreaterThan(0);
+  });
+
+  it('should have expected Wonder API paths', async () => {
+    const ast = await openapiTS(new URL('...'));
+    const paths = extractPaths(ast);
+
+    expect(paths).toHaveProperty('/workspaces');
+    expect(paths).toHaveProperty('/workspaces/{workspaceId}');
+  });
+});
+```
+
+**Validation:**
+
+- Paths object contains all routes
+- Routes have methods (get, post, etc.)
+- Structure matches OpenAPI spec
+
+#### Task 3.2: Route Tree Generation (10 min)
+
+Use Phase 1 parser to build route tree from extracted paths.
+
+**Implementation:**
+
+- Call `buildRouteTree(paths)` with extracted paths
+- Store resulting tree for next step
+
+**Test:**
+
+```typescript
+import { describe, it, expect } from 'vitest';
+import { buildRouteTree } from '../scripts/parse-paths.js';
+
+describe('Route tree generation in pipeline', () => {
+  it('should build tree from OpenAPI paths', () => {
+    const mockPaths = {
+      '/workspaces': { get: {}, post: {} },
+      '/workspaces/{workspaceId}': { get: {}, patch: {}, delete: {} },
+    };
+
+    const tree = buildRouteTree(mockPaths);
+
+    expect(tree.children).toHaveProperty('workspaces');
+    expect(tree.children.workspaces.type).toBe('collection');
+  });
+});
+```
+
+**Validation:**
+
+- Tree structure is valid
+- All paths represented
+- Hierarchy preserved
+
+#### Task 3.3: Client Code Generation (10 min)
+
+Use Phase 2 generator to create client code from route tree.
+
+**Implementation:**
+
+- Call `generateRootClient(tree)` with route tree
+- Get back client structure object
+
+**Test:**
+
+```typescript
+import { describe, it, expect } from 'vitest';
+import { buildRouteTree } from '../scripts/parse-paths.js';
+import { generateRootClient } from '../scripts/generate-client.js';
+
+describe('Client code generation in pipeline', () => {
+  it('should generate client from route tree', () => {
+    const mockPaths = {
+      '/workspaces': { get: {}, post: {} },
+      '/workspaces/{workspaceId}': { get: {}, patch: {}, delete: {} },
+    };
+
+    const tree = buildRouteTree(mockPaths);
+    const client = generateRootClient(tree);
+
+    expect(client).toHaveProperty('workspaces');
+    expect(client.workspaces).toHaveProperty('code');
+    expect(client.workspaces.code).toContain('workspaces(id: string)');
+  });
+});
+```
+
+**Validation:**
+
+- Client structure complete
+- All collections present
+- Methods properly generated
+
+#### Task 3.4: Client Code Formatting (15 min)
+
+Convert client structure to formatted TypeScript code.
+
+**Implementation:**
+
+- Create `formatClientCode(structure: ClientStructure): string` function
+- Generate imports section
+- Generate type exports
+- Generate client function
+- Add JSDoc comments
+- Format with proper indentation
+
+**Test:**
+
+```typescript
+import { describe, it, expect } from 'vitest';
+import { ClientStructure } from '../scripts/generate-client.js';
+
+describe('Client code formatting', () => {
+  it('should format client structure as TypeScript code', () => {
+    const mockStructure: ClientStructure = {
+      workspaces: {
+        code: 'workspaces(id: string) { return {...}; }',
+        type: 'collection',
+        methods: [],
+      },
+    };
+
+    const code = formatClientCode(mockStructure);
+
+    expect(code).toContain('export function createClient');
+    expect(code).toContain('workspaces(id: string)');
+    expect(code).toMatch(/import.*SchemaType/);
+  });
+
+  it('should include proper imports', () => {
+    const code = formatClientCode({});
+
+    expect(code).toContain('import type { paths }');
+    expect(code).toContain('import type { SchemaType }');
+  });
+
+  it('should add JSDoc comments', () => {
+    const code = formatClientCode({});
+
+    expect(code).toMatch(/\/\*\*/);
+    expect(code).toContain('Generated client');
+  });
+});
+```
+
+**Validation:**
+
+- Valid TypeScript syntax
+- All imports present
+- Proper formatting
+- JSDoc comments included
+
+#### Task 3.5: File Writing (10 min)
+
+Write generated code to output files.
+
+**Implementation:**
+
+- Write schema types to `src/generated/schema.d.ts` (already done)
+- Write client code to `src/generated/client.ts`
+- Ensure directories exist
+- Handle file write errors
+
+**Test:**
+
+```typescript
+import { describe, it, expect } from 'vitest';
+import { existsSync, readFileSync } from 'fs';
+import { join } from 'path';
+
+describe('File writing', () => {
+  it('should write client.ts to generated directory', async () => {
+    await runGeneration();
+
+    const clientPath = join(process.cwd(), 'src/generated/client.ts');
+    expect(existsSync(clientPath)).toBe(true);
+  });
+
+  it('should write valid TypeScript', async () => {
+    await runGeneration();
+
+    const clientPath = join(process.cwd(), 'src/generated/client.ts');
+    const content = readFileSync(clientPath, 'utf-8');
+
+    expect(content).toContain('export function createClient');
+    expect(content).toMatch(/import.*SchemaType/);
+  });
+});
+```
+
+**Validation:**
+
+- Files created in correct location
+- Content matches expected format
+- No write errors
+
+#### Task 3.6: End-to-End Integration Test (20 min)
+
+Run complete generation and verify output compiles and works.
+
+**Test:**
+
+```typescript
+import { describe, it, expect } from 'vitest';
+import { exec } from 'child_process';
+import { promisify } from 'util';
+
+const execAsync = promisify(exec);
+
+describe('End-to-end generation', () => {
+  it('should generate complete SDK without errors', async () => {
+    const { stdout, stderr } = await execAsync('pnpm generate');
+
+    expect(stderr).toBe('');
+    expect(stdout).toContain('Generated');
+  });
+
+  it('should produce code that compiles', async () => {
+    await execAsync('pnpm generate');
+    const { stderr } = await execAsync('pnpm tsc --noEmit');
+
+    expect(stderr).toBe('');
+  });
+
+  it('should export createClient function', async () => {
+    await execAsync('pnpm generate');
+
+    // Dynamic import to test the generated code
+    const { createClient } = await import('../src/generated/client.js');
+
+    expect(typeof createClient).toBe('function');
+  });
+
+  it('should have proper TypeScript types', async () => {
+    await execAsync('pnpm generate');
+
+    const { createClient } = await import('../src/generated/client.js');
+    const mockBaseClient = {} as any;
+    const client = createClient(mockBaseClient);
+
+    // Type assertions - these will fail at compile time if types are wrong
+    expect(client).toHaveProperty('workspaces');
+    expect(typeof client.workspaces).toBe('function');
+  });
+});
+```
+
+**Validation:**
+
+- Generation script runs without errors
+- Both files created
+- TypeScript compilation succeeds
+- Generated client exports expected interface
+- Types provide proper autocomplete
+
+**Time estimate:** 1.5 hours total
 
 ### Phase 4: Runtime Client Base
 
