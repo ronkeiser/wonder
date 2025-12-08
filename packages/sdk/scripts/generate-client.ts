@@ -6,6 +6,11 @@
 
 import { HttpMethod, NodeType, RouteNode } from './parse-paths';
 
+const API_PREFIX = '/api/';
+const CONTENT_TYPE = 'application/json';
+const MUTATION_VERBS = ['post', 'put', 'patch'] as const;
+const DEFAULT_STATUS_CODE = '200';
+
 /**
  * Map HTTP verb to JavaScript method name
  *
@@ -19,20 +24,10 @@ import { HttpMethod, NodeType, RouteNode } from './parse-paths';
  * - PATCH → patch()
  */
 export function getMethodName(node: RouteNode, verb: HttpMethod): string {
-  if (verb === 'post') {
-    return node.type === NodeType.Action ? node.name : 'create';
-  }
-
-  if (verb === 'get') {
-    return node.type === NodeType.Collection ? 'list' : 'get';
-  }
-
-  if (verb === 'put') {
-    return 'update';
-  }
-
-  // delete, patch map directly
-  return verb;
+  if (verb === 'post') return node.type === NodeType.Action ? node.name : 'create';
+  if (verb === 'get') return node.type === NodeType.Collection ? 'list' : 'get';
+  if (verb === 'put') return 'update';
+  return verb; // delete, patch map directly
 }
 
 /**
@@ -46,15 +41,12 @@ export function buildPathTemplate(node: RouteNode): string {
   let current: RouteNode | null = node;
 
   while (current) {
-    if (current.type === NodeType.Param) {
-      segments.unshift(`\${${current.name}}`);
-    } else {
-      segments.unshift(current.name);
-    }
+    const segment = current.type === NodeType.Param ? `\${${current.name}}` : current.name;
+    segments.unshift(segment);
     current = current.parent;
   }
 
-  return `/api/${segments.join('/')}`;
+  return API_PREFIX + segments.join('/');
 }
 
 /**
@@ -113,7 +105,7 @@ export function generateMethodSignature(
   }
 
   // Add body parameter for mutation methods
-  if (['post', 'put', 'patch'].includes(verb)) {
+  if (MUTATION_VERBS.includes(verb as any)) {
     parameters.push({
       name: 'body',
       type: 'body',
@@ -170,7 +162,7 @@ export function generateCollectionObject(node: RouteNode): ClientProperty {
       path: buildPathTemplate(node),
       verb: method.verb,
       originalPath: method.originalPath || buildPathTemplate(node),
-      successStatusCode: method.successStatusCode || '200',
+      successStatusCode: method.successStatusCode || DEFAULT_STATUS_CODE,
     });
   }
 
@@ -229,13 +221,11 @@ export function generateRootClient(roots: RouteNode[]): ClientStructure {
  */
 function buildRequestBodyType(originalPath: string, verb: HttpMethod): string {
   // RequestBody is optional, so we use NonNullable to unwrap it
-  // Structure: requestBody?.content['application/json']
-  return `NonNullable<paths['${originalPath}']['${verb}']['requestBody']>['content']['application/json']`;
+  return `NonNullable<paths['${originalPath}']['${verb}']['requestBody']>['content']['${CONTENT_TYPE}']`;
 }
 
 function buildResponseType(originalPath: string, verb: HttpMethod, statusCode: string): string {
-  // Use the actual status code extracted from the OpenAPI spec
-  return `paths['${originalPath}']['${verb}']['responses']['${statusCode}']['content']['application/json']`;
+  return `paths['${originalPath}']['${verb}']['responses']['${statusCode}']['content']['${CONTENT_TYPE}']`;
 }
 
 /**
@@ -243,23 +233,16 @@ function buildResponseType(originalPath: string, verb: HttpMethod, statusCode: s
  * @param excludeParams - Path parameters to exclude (already captured in closure)
  */
 function formatMethod(method: ClientMethod, indent: string, excludeParams: string[] = []): string {
+  const getParamType = (p: MethodParameter): string => {
+    if (p.type === 'body') return buildRequestBodyType(method.originalPath, method.verb);
+    if (p.type === 'options') return 'any';
+    return 'string';
+  };
+
   // Filter out parameters that are already captured
   const params = method.signature.parameters
     .filter((p) => !excludeParams.includes(p.name))
-    .map((p) => {
-      const optional = p.optional ? '?' : '';
-      let type: string;
-
-      if (p.type === 'body') {
-        type = buildRequestBodyType(method.originalPath, method.verb);
-      } else if (p.type === 'options') {
-        type = 'any';
-      } else {
-        type = 'string';
-      }
-
-      return `${p.name}${optional}: ${type}`;
-    });
+    .map((p) => `${p.name}${p.optional ? '?' : ''}: ${getParamType(p)}`);
 
   const paramNames = method.signature.parameters.map((p) => p.name);
   const bodyParam = paramNames.includes('body') ? '{ body }' : '{}';
