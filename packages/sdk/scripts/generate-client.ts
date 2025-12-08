@@ -142,6 +142,10 @@ export interface ClientMethod {
   signature: MethodSignature;
   path: string;
   verb: HttpMethod;
+  /** Original OpenAPI path for type generation (e.g., "/api/workspaces/{id}") */
+  originalPath: string;
+  /** Success status code from OpenAPI spec (e.g., '200', '201', '204') */
+  successStatusCode: string;
 }
 
 export interface ClientProperty {
@@ -165,6 +169,8 @@ export function generateCollectionObject(node: RouteNode): ClientProperty {
       signature: generateMethodSignature(node, method.verb, method.operationId),
       path: buildPathTemplate(node),
       verb: method.verb,
+      originalPath: method.originalPath || buildPathTemplate(node),
+      successStatusCode: method.successStatusCode || '200',
     });
   }
 
@@ -217,6 +223,144 @@ export function generateRootClient(roots: RouteNode[]): ClientStructure {
  *
  * Format client structure as complete TypeScript module
  */
+
+/**
+ * Build type reference for OpenAPI paths
+ */
+function buildRequestBodyType(originalPath: string, verb: HttpMethod): string {
+  // RequestBody is optional, so we use NonNullable to unwrap it
+  // Structure: requestBody?.content['application/json']
+  return `NonNullable<paths['${originalPath}']['${verb}']['requestBody']>['content']['application/json']`;
+}
+
+function buildResponseType(originalPath: string, verb: HttpMethod, statusCode: string): string {
+  // Use the actual status code extracted from the OpenAPI spec
+  return `paths['${originalPath}']['${verb}']['responses']['${statusCode}']['content']['application/json']`;
+}
+
+/**
+ * Generate code for a single method
+ * @param excludeParams - Path parameters to exclude (already captured in closure)
+ */
+function formatMethod(method: ClientMethod, indent: string, excludeParams: string[] = []): string {
+  // Filter out parameters that are already captured
+  const params = method.signature.parameters
+    .filter((p) => !excludeParams.includes(p.name))
+    .map((p) => {
+      const optional = p.optional ? '?' : '';
+      let type: string;
+
+      if (p.type === 'body') {
+        type = buildRequestBodyType(method.originalPath, method.verb);
+      } else if (p.type === 'options') {
+        type = 'any';
+      } else {
+        type = 'string';
+      }
+
+      return `${p.name}${optional}: ${type}`;
+    });
+
+  const paramNames = method.signature.parameters.map((p) => p.name);
+  const bodyParam = paramNames.includes('body') ? '{ body }' : '{}';
+  const returnType = buildResponseType(method.originalPath, method.verb, method.successStatusCode);
+
+  return `${indent}${method.name}: async (${params.join(', ')}): Promise<${returnType}> => {
+${indent}  const response = await baseClient.${method.verb.toUpperCase()}(\`${method.path}\`, ${bodyParam});
+${indent}  return response.data;
+${indent}}`;
+}
+
+/**
+ * Generate code for a property (collection or parameter)
+ */
+function formatProperty(prop: ClientProperty, indent: string): string {
+  const lines: string[] = [];
+  const propertyName = /^[a-zA-Z_$][a-zA-Z0-9_$]*$/.test(prop.name) ? prop.name : `"${prop.name}"`;
+
+  if (prop.type === 'parameter') {
+    // Parameter nodes become functions that return objects with instance methods
+    const child = prop.children?.[0];
+    if (!child) {
+      throw new Error(`Parameter ${prop.name} has no children`);
+    }
+
+    lines.push(`${indent}(${prop.name}: string) => ({`);
+
+    // The parameter is captured, so exclude it from method signatures
+    const excludeParams = [prop.name];
+
+    // Add instance methods
+    if (child.methods) {
+      for (let i = 0; i < child.methods.length; i++) {
+        const method = child.methods[i];
+        const isLast =
+          i === child.methods.length - 1 && (!child.children || child.children.length === 0);
+        lines.push(formatMethod(method, indent + '    ', excludeParams) + (isLast ? '' : ','));
+      }
+    }
+
+    // Add nested children (like actions)
+    if (child.children) {
+      for (let i = 0; i < child.children.length; i++) {
+        const nestedChild = child.children[i];
+        const isLast = i === child.children.length - 1;
+
+        if (nestedChild.methods && nestedChild.methods.length > 0) {
+          // This is an action with methods
+          for (let j = 0; j < nestedChild.methods.length; j++) {
+            const method = nestedChild.methods[j];
+            const isLastMethod = j === nestedChild.methods.length - 1 && isLast;
+            lines.push(
+              formatMethod(method, indent + '    ', excludeParams) + (isLastMethod ? '' : ','),
+            );
+          }
+        }
+      }
+    }
+
+    lines.push(`${indent}  })`);
+  } else {
+    // Collection nodes - check if they have param children (need callable pattern)
+    const hasParamChild = prop.children?.some((c) => c.type === 'parameter');
+
+    if (hasParamChild) {
+      // Generate Object.assign pattern for callable collections
+      lines.push(`${indent}${propertyName}: Object.assign(`);
+
+      // Generate the function part (for instance access)
+      const paramChild = prop.children!.find((c) => c.type === 'parameter')!;
+      lines.push(`${indent}  ` + formatProperty(paramChild, '').replace(/^  /, ''));
+      lines.push(`${indent}  ,`);
+
+      // Generate the methods object part (for collection methods)
+      lines.push(`${indent}  {`);
+      if (prop.methods) {
+        for (let i = 0; i < prop.methods.length; i++) {
+          const method = prop.methods[i];
+          const isLast = i === prop.methods.length - 1;
+          lines.push(formatMethod(method, indent + '    ') + (isLast ? '' : ','));
+        }
+      }
+      lines.push(`${indent}  }`);
+      lines.push(`${indent})`);
+    } else {
+      // Simple collection with just methods
+      lines.push(`${indent}${propertyName}: {`);
+      if (prop.methods) {
+        for (let i = 0; i < prop.methods.length; i++) {
+          const method = prop.methods[i];
+          const isLast = i === prop.methods.length - 1;
+          lines.push(formatMethod(method, indent + '  ') + (isLast ? '' : ','));
+        }
+      }
+      lines.push(`${indent}}`);
+    }
+  }
+
+  return lines.join('\n');
+}
+
 export function formatClientCode(structure: ClientStructure): string {
   const lines: string[] = [];
 
@@ -230,7 +374,6 @@ export function formatClientCode(structure: ClientStructure): string {
   // Imports
   lines.push("import type { paths } from './schema.js';");
   lines.push("import type { SchemaType } from '@wonder/context';");
-  lines.push("import { createCollection } from '../client-base.js';");
   lines.push('');
 
   // Create client function
@@ -246,12 +389,8 @@ export function formatClientCode(structure: ClientStructure): string {
     const collection = structure.collections[i];
     const isLast = i === structure.collections.length - 1;
 
-    // Quote property names that aren't valid identifiers
-    const propertyName = /^[a-zA-Z_$][a-zA-Z0-9_$]*$/.test(collection.name)
-      ? collection.name
-      : `"${collection.name}"`;
-
-    lines.push(`    ${propertyName}: createCollection(baseClient, '/api/${collection.name}')${isLast ? '' : ','}`);
+    const propCode = formatProperty(collection, '    ');
+    lines.push(propCode + (isLast ? '' : ','));
   }
 
   lines.push('  };');

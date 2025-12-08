@@ -30,6 +30,7 @@ function convertOpenApiPaths(paths: Record<string, Record<string, any>>): PathDe
           path,
           method: method as HttpMethod,
           operationId: operation?.operationId,
+          responses: operation?.responses,
         });
       }
     }

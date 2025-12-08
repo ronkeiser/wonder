@@ -13,6 +13,6 @@
     "skipLibCheck": true,
     "moduleResolution": "bundler"
   },
-  "include": ["src/**/*", "scripts/**/*"],
+  "include": ["src/**/*", "scripts/**/*", "debug/**/*", "demo/**/*"],
   "exclude": ["node_modules", "dist"]
 }

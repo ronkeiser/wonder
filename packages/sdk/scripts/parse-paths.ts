@@ -27,6 +27,10 @@ export enum NodeType {
 export interface RouteMethod {
   verb: HttpMethod;
   operationId?: string;
+  /** Original OpenAPI path for type generation (e.g., "/api/workspaces/{id}") */
+  originalPath?: string;
+  /** Success status code from OpenAPI spec (e.g., 200, 201, 204) */
+  successStatusCode?: string;
 }
 
 /**
@@ -101,12 +105,13 @@ export interface PathDefinition {
   path: string;
   method: HttpMethod;
   operationId?: string;
+  responses?: Record<string, any>;
 }
 
 export function buildRouteTree(paths: PathDefinition[]): RouteNode[] {
   const roots: RouteNode[] = [];
 
-  for (const { path, method, operationId } of paths) {
+  for (const { path, method, operationId, responses } of paths) {
     const segments = parsePathSegments(path);
     let currentLevel = roots;
     let parent: RouteNode | null = null;
@@ -149,7 +154,12 @@ export function buildRouteTree(paths: PathDefinition[]): RouteNode[] {
         // Check if method already exists
         const existingMethod = node.methods.find((m) => m.verb === method);
         if (!existingMethod) {
-          node.methods.push({ verb: method, operationId });
+          // Extract first 2xx status code from responses
+          const responseCodes = responses || {};
+          const successStatusCode =
+            Object.keys(responseCodes).find((code) => code.startsWith('2')) || '200';
+
+          node.methods.push({ verb: method, operationId, originalPath: path, successStatusCode });
         }
       }
 
