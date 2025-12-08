@@ -1,4 +1,4 @@
-<!DOCTYPE html>
+<!doctype html>
 <html lang="en">
   <head>
     <meta charset="UTF-8" />
@@ -12,8 +12,9 @@
       }
 
       body {
-        font-family: ui-monospace, 'Cascadia Code', 'Source Code Pro', Menlo, Consolas,
-          'DejaVu Sans Mono', monospace;
+        font-family:
+          ui-monospace, 'Cascadia Code', 'Source Code Pro', Menlo, Consolas, 'DejaVu Sans Mono',
+          monospace;
         background: #0d1117;
         color: #c9d1d9;
         height: 100vh;
@@ -135,7 +136,9 @@
         cursor: pointer;
         font-size: 0.875rem;
         font-family: inherit;
-        transition: background 0.1s, transform 0.1s;
+        transition:
+          background 0.1s,
+          transform 0.1s;
         display: flex;
         align-items: center;
         gap: 0.375rem;
@@ -160,6 +163,38 @@
       .refresh-btn svg {
         width: 14px;
         height: 14px;
+      }
+
+      .pretty-print-toggle {
+        padding: 0.375rem 0.75rem;
+        background: #21262d;
+        border: none;
+        border-radius: 6px;
+        color: #c9d1d9;
+        cursor: pointer;
+        font-size: 0.875rem;
+        font-family: inherit;
+        transition: background 0.1s;
+        display: flex;
+        align-items: center;
+        gap: 0.375rem;
+      }
+
+      .pretty-print-toggle:hover {
+        background: #30363d;
+      }
+
+      .pretty-print-toggle:focus {
+        outline: none;
+      }
+
+      .pretty-print-toggle:focus-visible {
+        box-shadow: 0 0 0 2px #58a6ff80;
+      }
+
+      .pretty-print-toggle.active {
+        background: #58a6ff;
+        color: #000;
       }
 
       /* Alternative color options (uncomment to use):
@@ -254,7 +289,10 @@
         cursor: pointer;
         flex-shrink: 0;
         margin-top: 0.125rem;
-        transition: background 0.2s, color 0.2s, border-color 0.2s;
+        transition:
+          background 0.2s,
+          color 0.2s,
+          border-color 0.2s;
       }
 
       .copy-btn:hover {
@@ -392,7 +430,17 @@
         color: #8b949e;
         font-size: 0.75rem;
         margin-top: 0.25rem;
-        margin-left: 1rem;
+        margin-left: 0.75rem;
+        white-space: pre-wrap;
+        cursor: pointer;
+        padding: 0.25rem;
+        border-radius: 3px;
+        transition: background 0.1s;
+        display: block;
+      }
+
+      .log-metadata:hover {
+        background: #21262d;
       }
     </style>
   </head>
@@ -406,6 +454,14 @@
           <option value="executor">Executor</option>
           <option value="resources">Resources</option>
         </select>
+        <button id="pretty-print-toggle" class="pretty-print-toggle" title="Toggle pretty print">
+          <svg viewBox="0 0 16 16" fill="currentColor" width="14" height="14">
+            <path
+              d="M0 3.75C0 2.784.784 2 1.75 2h12.5c.966 0 1.75.784 1.75 1.75v8.5A1.75 1.75 0 0 1 14.25 14H1.75A1.75 1.75 0 0 1 0 12.25Zm1.75-.25a.25.25 0 0 0-.25.25v8.5c0 .138.112.25.25.25h12.5a.25.25 0 0 0 .25-.25v-8.5a.25.25 0 0 0-.25-.25ZM3.5 6.25a.75.75 0 0 1 .75-.75h7a.75.75 0 0 1 0 1.5h-7a.75.75 0 0 1-.75-.75Zm.75 2.25h4a.75.75 0 0 1 0 1.5h-4a.75.75 0 0 1 0-1.5Z"
+            ></path>
+          </svg>
+          Pretty
+        </button>
         <div class="time-filters">
           <button class="time-filter-btn" data-minutes="1">1m</button>
           <button class="time-filter-btn active" data-minutes="5">5m</button>
@@ -434,6 +490,18 @@
       let lastLogId = '';
       let currentFilter = null;
       let currentService = '';
+      let prettyPrintEnabled = false;
+
+      // Helper to format JSON with unescaped newlines when pretty printing
+      function formatJsonPretty(obj) {
+        const json = JSON.stringify(obj, null, 2);
+        // Replace escaped \n with actual newlines in string values
+        return json.replace(/"((?:[^"\\]|\\.)*)"/g, (match, content) => {
+          // Only unescape \n within the string content
+          const unescaped = content.replace(/\\n/g, '\n').replace(/\\t/g, '\t');
+          return '"' + unescaped + '"';
+        });
+      }
 
       function setStatus(state) {
         statusEl.className = `status ${state}`;
@@ -441,8 +509,8 @@
           state === 'connected'
             ? 'Connected'
             : state === 'disconnected'
-            ? 'Disconnected'
-            : 'Connecting...';
+              ? 'Disconnected'
+              : 'Connecting...';
       }
 
       async function filterLogsByTime(minutes) {
@@ -595,7 +663,33 @@
           try {
             const parsed = JSON.parse(log.metadata);
             if (Object.keys(parsed).length > 0) {
-              metadata.textContent = JSON.stringify(parsed, null, 2);
+              // Store parsed JSON and formatting state on the element
+              metadata.classList.add('json-data');
+              metadata._jsonData = parsed;
+              metadata._prettyPrint = null; // null means "use global default"
+
+              // Render using global default
+              metadata.textContent = prettyPrintEnabled
+                ? formatJsonPretty(parsed)
+                : JSON.stringify(parsed);
+
+              // Add click handler for individual toggle
+              metadata.addEventListener('click', (e) => {
+                e.stopPropagation();
+                // Determine current visual state
+                const currentPretty =
+                  metadata._prettyPrint !== null ? metadata._prettyPrint : prettyPrintEnabled;
+                // Toggle to opposite
+                const newPretty = !currentPretty;
+                // Store as override
+                metadata._prettyPrint = newPretty;
+
+                // Render with new state
+                metadata.textContent = newPretty
+                  ? formatJsonPretty(metadata._jsonData)
+                  : JSON.stringify(metadata._jsonData);
+              });
+
               content.appendChild(metadata);
             }
           } catch (e) {
@@ -701,15 +795,46 @@
         };
       }
 
+      // Pretty print toggle
+      document.getElementById('pretty-print-toggle').addEventListener('click', (e) => {
+        prettyPrintEnabled = !prettyPrintEnabled;
+        e.target.classList.toggle('active', prettyPrintEnabled);
+
+        // Update URL params
+        const url = new URL(window.location);
+        if (prettyPrintEnabled) {
+          url.searchParams.set('pretty', '1');
+        } else {
+          url.searchParams.delete('pretty');
+        }
+        window.history.pushState({}, '', url);
+
+        // Re-render all metadata elements that are using the global default
+        document.querySelectorAll('.log-metadata.json-data').forEach((metadataEl) => {
+          // Only update if using global default (no individual override)
+          if (metadataEl._prettyPrint === null && metadataEl._jsonData) {
+            metadataEl.textContent = prettyPrintEnabled
+              ? formatJsonPretty(metadataEl._jsonData)
+              : JSON.stringify(metadataEl._jsonData);
+          }
+        });
+      });
+
       // Load filters from URL params or defaults
       const urlParams = new URLSearchParams(window.location.search);
       const savedMinutes = urlParams.get('m');
       const initialMinutes = savedMinutes ? parseInt(savedMinutes) : 5;
       const savedService = urlParams.get('service');
+      const savedPretty = urlParams.get('pretty');
 
       if (savedService) {
         currentService = savedService;
         document.getElementById('service-filter').value = savedService;
+      }
+
+      if (savedPretty === '1') {
+        prettyPrintEnabled = true;
+        document.getElementById('pretty-print-toggle').classList.add('active');
       }
 
       // Update active button to match initial filter

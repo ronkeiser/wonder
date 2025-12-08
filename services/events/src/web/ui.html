@@ -430,21 +430,17 @@
         color: var(--text-secondary);
         font-size: 0.75rem;
         margin-top: 0.25rem;
-        margin-left: 1rem;
+        margin-left: 0.75rem;
         white-space: pre-wrap;
         cursor: pointer;
         padding: 0.25rem;
-        margin-left: 0.75rem;
         border-radius: 3px;
         transition: background 0.1s;
+        display: block;
       }
 
       .event-metadata:hover {
         background: var(--bg-tertiary);
-      }
-
-      .event-metadata.json-data {
-        /* Indicates this metadata contains JSON and can be toggled */
       }
     </style>
   </head>
@@ -707,19 +703,16 @@
               // Add click handler for individual toggle
               metadata.addEventListener('click', (e) => {
                 e.stopPropagation();
-                // Toggle: null -> opposite of global -> back to global
-                if (metadata._prettyPrint === null) {
-                  metadata._prettyPrint = !prettyPrintEnabled;
-                } else if (metadata._prettyPrint === prettyPrintEnabled) {
-                  metadata._prettyPrint = null;
-                } else {
-                  metadata._prettyPrint = prettyPrintEnabled;
-                }
-
-                // Render with individual override or global default
-                const usePretty =
+                // Determine current visual state
+                const currentPretty =
                   metadata._prettyPrint !== null ? metadata._prettyPrint : prettyPrintEnabled;
-                metadata.textContent = usePretty
+                // Toggle to opposite
+                const newPretty = !currentPretty;
+                // Store as override
+                metadata._prettyPrint = newPretty;
+
+                // Render with new state
+                metadata.textContent = newPretty
                   ? formatJsonPretty(metadata._jsonData)
                   : JSON.stringify(metadata._jsonData);
               });
