@@ -7,12 +7,13 @@ import { beforeAll, describe, expect, it } from 'vitest';
 const execAsync = promisify(exec);
 
 /**
- * Task 3.6: End-to-End Integration Test
+ * Smoke Test
  *
- * Run complete generation and verify output compiles and works.
+ * Basic sanity checks that generation runs and produces valid output.
+ * Does not verify semantic correctness - see generator.integration.test.ts for that.
  */
 
-describe('End-to-end generation', () => {
+describe('Generator smoke test', () => {
   beforeAll(async () => {
     // Ensure we start with a clean generation
     try {

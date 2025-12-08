@@ -43,6 +43,9 @@ export interface RouteNode {
   /** Name of the segment (e.g., 'workspaces', 'id', 'start') */
   name: string;
 
+  /** Alias for name (for backwards compatibility with tests) */
+  segment?: string;
+
   /** HTTP methods available at this node */
   methods: RouteMethod[];
 
@@ -138,6 +141,7 @@ export function buildRouteTree(paths: PathDefinition[]): RouteNode[] {
         node = {
           type: nodeType,
           name: nodeName,
+          segment: nodeName, // Alias for backwards compatibility
           methods: [],
           children: [],
           parent,

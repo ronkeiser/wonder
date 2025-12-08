@@ -19,7 +19,7 @@ const API_URL = process.env.API_URL || 'https://wonder-http.ron-keiser.workers.d
 /**
  * Convert OpenAPI paths object to PathDefinition array
  */
-function convertOpenApiPaths(paths: Record<string, Record<string, any>>): PathDefinition[] {
+export function convertOpenApiPaths(paths: Record<string, Record<string, any>>): PathDefinition[] {
   const result: PathDefinition[] = [];
 
   for (const [path, methods] of Object.entries(paths)) {
