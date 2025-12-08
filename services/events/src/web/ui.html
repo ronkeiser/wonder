@@ -468,7 +468,7 @@
         </select>
         <button
           id="pretty-print-toggle"
-          class="pretty-print-toggle active"
+          class="pretty-print-toggle"
           title="Toggle pretty print"
         >
           <svg viewBox="0 0 16 16" fill="currentColor" width="14" height="14">
@@ -506,7 +506,7 @@
       let lastEventId = '';
       let currentFilter = null;
       let currentEventType = '';
-      let prettyPrintEnabled = true;
+      let prettyPrintEnabled = false;
 
       function setStatus(state) {
         statusEl.className = `status ${state}`;
@@ -833,6 +833,15 @@
         prettyPrintEnabled = !prettyPrintEnabled;
         e.target.classList.toggle('active', prettyPrintEnabled);
 
+        // Update URL params
+        const url = new URL(window.location);
+        if (prettyPrintEnabled) {
+          url.searchParams.set('pretty', '1');
+        } else {
+          url.searchParams.delete('pretty');
+        }
+        window.history.pushState({}, '', url);
+
         // Re-render all metadata elements that are using the global default
         document.querySelectorAll('.event-metadata.json-data').forEach((metadataEl) => {
           // Only update if using global default (no individual override)
@@ -849,10 +858,16 @@
       const savedMinutes = urlParams.get('m');
       const initialMinutes = savedMinutes ? parseInt(savedMinutes) : 5;
       const savedEventType = urlParams.get('event_type');
+      const savedPretty = urlParams.get('pretty');
 
       if (savedEventType) {
         currentEventType = savedEventType;
         document.getElementById('event-type-filter').value = savedEventType;
+      }
+
+      if (savedPretty === '1') {
+        prettyPrintEnabled = true;
+        document.getElementById('pretty-print-toggle').classList.add('active');
       }
 
       // Update active button to match initial filter
