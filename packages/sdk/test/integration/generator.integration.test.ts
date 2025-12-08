@@ -12,7 +12,7 @@ describe('SDK Generator Integration', () => {
       const paths = convertOpenApiPaths(minimalSpec.paths);
       const tree = buildRouteTree(paths);
 
-      const workspacesNode = tree.find((n) => n.segment === 'workspaces');
+      const workspacesNode = tree.find((n) => n.name === 'workspaces');
       const postMethod = workspacesNode?.methods?.find((m) => m.verb === 'post');
 
       expect(postMethod?.successStatusCode).toBe('201');
@@ -22,9 +22,9 @@ describe('SDK Generator Integration', () => {
       const paths = convertOpenApiPaths(minimalSpec.paths);
       const tree = buildRouteTree(paths);
 
-      const workflowsNode = tree.find((n) => n.segment === 'workflows');
-      const idNode = workflowsNode?.children?.find((n) => n.segment === 'id');
-      const startNode = idNode?.children?.find((n) => n.segment === 'start');
+      const workflowsNode = tree.find((n) => n.name === 'workflows');
+      const idNode = workflowsNode?.children?.find((n) => n.name === 'id');
+      const startNode = idNode?.children?.find((n) => n.name === 'start');
       const postMethod = startNode?.methods?.find((m) => m.verb === 'post');
 
       expect(postMethod?.successStatusCode).toBe('200');
@@ -34,7 +34,7 @@ describe('SDK Generator Integration', () => {
       const paths = convertOpenApiPaths(minimalSpec.paths);
       const tree = buildRouteTree(paths);
 
-      const tasksNode = tree.find((n) => n.segment === 'tasks');
+      const tasksNode = tree.find((n) => n.name === 'tasks');
       const postMethod = tasksNode?.methods?.find((m) => m.verb === 'post');
 
       expect(postMethod?.successStatusCode).toBe('204');
@@ -54,7 +54,7 @@ describe('SDK Generator Integration', () => {
       });
       const tree = buildRouteTree(pathsWithoutSuccess);
 
-      const testNode = tree.find((n) => n.segment === 'test');
+      const testNode = tree.find((n) => n.name === 'test');
       const getMethod = testNode?.methods?.find((m) => m.verb === 'get');
 
       expect(getMethod?.successStatusCode).toBe('200');
@@ -137,8 +137,8 @@ describe('SDK Generator Integration', () => {
       const paths = convertOpenApiPaths(minimalSpec.paths);
       const tree = buildRouteTree(paths);
 
-      const workspacesNode = tree.find((n) => n.segment === 'workspaces');
-      const idNode = workspacesNode?.children?.find((n) => n.segment === 'id');
+      const workspacesNode = tree.find((n) => n.name === 'workspaces');
+      const idNode = workspacesNode?.children?.find((n) => n.name === 'id');
       const getMethod = idNode?.methods?.find((m) => m.verb === 'get');
 
       // Should preserve the OpenAPI path format
@@ -183,7 +183,7 @@ describe('SDK Generator Integration', () => {
       });
       const tree = buildRouteTree(pathsWithMultiple);
 
-      const multiNode = tree.find((n) => n.segment === 'multi');
+      const multiNode = tree.find((n) => n.name === 'multi');
       const postMethod = multiNode?.methods?.find((m) => m.verb === 'post');
 
       // Should pick the first 2xx code (200)

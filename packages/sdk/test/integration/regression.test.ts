@@ -19,7 +19,7 @@ describe('Regression Prevention', () => {
       const tree = buildRouteTree(paths);
 
       // Check that originalPath is present on methods
-      const workspacesNode = tree.find((n) => n.segment === 'workspaces');
+      const workspacesNode = tree.find((n) => n.name === 'workspaces');
       const postMethod = workspacesNode?.methods?.find((m) => m.verb === 'post');
 
       // If this fails, types would be 'any' because we can't build proper type paths
@@ -63,14 +63,14 @@ describe('Regression Prevention', () => {
       const tree = buildRouteTree(paths);
 
       // Collection POST should be 201 (from spec, not hardcoded)
-      const workspacesNode = tree.find((n) => n.segment === 'workspaces');
+      const workspacesNode = tree.find((n) => n.name === 'workspaces');
       const postMethod = workspacesNode?.methods?.find((m) => m.verb === 'post');
       expect(postMethod?.successStatusCode).toBe('201');
 
       // Action POST should be 200 (from spec, not hardcoded assumption)
-      const workflowsNode = tree.find((n) => n.segment === 'workflows');
-      const idNode = workflowsNode?.children?.find((n) => n.segment === 'id');
-      const startNode = idNode?.children?.find((n) => n.segment === 'start');
+      const workflowsNode = tree.find((n) => n.name === 'workflows');
+      const idNode = workflowsNode?.children?.find((n) => n.name === 'id');
+      const startNode = idNode?.children?.find((n) => n.name === 'start');
       const actionMethod = startNode?.methods?.find((m) => m.verb === 'post');
       expect(actionMethod?.successStatusCode).toBe('200');
     });

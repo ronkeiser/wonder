@@ -4,6 +4,11 @@
  * Task 1.1: Define Types
  */
 
+const API_PREFIX = 'api/';
+const DEFAULT_SUCCESS_STATUS = '200';
+const PARAM_START_CHARS = ['{', ':'] as const;
+const PARAM_STRIP_CHARS = /^[{:]|[}]$/g;
+
 /**
  * HTTP methods supported by the API
  */
@@ -43,9 +48,6 @@ export interface RouteNode {
   /** Name of the segment (e.g., 'workspaces', 'id', 'start') */
   name: string;
 
-  /** Alias for name (for backwards compatibility with tests) */
-  segment?: string;
-
   /** HTTP methods available at this node */
   methods: RouteMethod[];
 
@@ -64,15 +66,15 @@ export interface RouteNode {
  */
 export function parsePathSegments(path: string): string[] {
   // Remove leading/trailing slashes
-  let normalized = path.trim().replace(/^\/+|\/+$/g, '');
+  const normalized = path.trim().replace(/^\/+|\/+$/g, '');
 
   // Strip /api/ prefix if present
-  if (normalized.startsWith('api/')) {
-    normalized = normalized.substring(4);
-  }
+  const withoutPrefix = normalized.startsWith(API_PREFIX)
+    ? normalized.substring(API_PREFIX.length)
+    : normalized;
 
   // Split by / and filter empty segments
-  return normalized.split('/').filter((segment) => segment.length > 0);
+  return withoutPrefix.split('/').filter((segment) => segment.length > 0);
 }
 
 /**
@@ -85,7 +87,7 @@ export function parsePathSegments(path: string): string[] {
  */
 export function classifySegment(segment: string): NodeType {
   // Parameters start with { or :
-  if (segment.startsWith('{') || segment.startsWith(':')) {
+  if (PARAM_START_CHARS.some((char) => segment.startsWith(char))) {
     return NodeType.Param;
   }
 
@@ -125,7 +127,7 @@ export function buildRouteTree(paths: PathDefinition[]): RouteNode[] {
 
       // Normalize parameter names (strip braces/colons)
       const nodeName =
-        segmentType === NodeType.Param ? segment.replace(/^[{:]|[}]$/g, '') : segment;
+        segmentType === NodeType.Param ? segment.replace(PARAM_STRIP_CHARS, '') : segment;
 
       // Find existing node by name (may be collection or action)
       let node = currentLevel.find((n) => n.name === nodeName);
@@ -134,14 +136,13 @@ export function buildRouteTree(paths: PathDefinition[]): RouteNode[] {
         // Determine if this segment is an action
         // Actions are terminal segments (last in path) that appear after parameters
         const isLastSegment = i === segments.length - 1;
-        const afterParam = i > 0 && classifySegment(segments[i - 1]) === NodeType.Param;
-        const isAction = isLastSegment && afterParam && segmentType === NodeType.Collection;
+        const previousIsParam = i > 0 && classifySegment(segments[i - 1]) === NodeType.Param;
+        const isAction = isLastSegment && previousIsParam && segmentType === NodeType.Collection;
         const nodeType = isAction ? NodeType.Action : segmentType;
 
         node = {
           type: nodeType,
           name: nodeName,
-          segment: nodeName, // Alias for backwards compatibility
           methods: [],
           children: [],
           parent,
@@ -161,7 +162,8 @@ export function buildRouteTree(paths: PathDefinition[]): RouteNode[] {
           // Extract first 2xx status code from responses
           const responseCodes = responses || {};
           const successStatusCode =
-            Object.keys(responseCodes).find((code) => code.startsWith('2')) || '200';
+            Object.keys(responseCodes).find((code) => code.startsWith('2')) ||
+            DEFAULT_SUCCESS_STATUS;
 
           node.methods.push({ verb: method, operationId, originalPath: path, successStatusCode });
         }
