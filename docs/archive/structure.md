@@ -9,7 +9,7 @@ wonder/
 │   │   │   ├── schema.ts           # D1 schema for logs table
 │   │   │   └── index.ts
 │   │   └── package.json
-│   └── schemas/                    # @wonder/schemas
+│   └── context/                    # @wonder/context
 │       └── src/                    # Shared types, validation, DDL/DML
 ├── services/
 │   ├── http/                       # HTTP routing service

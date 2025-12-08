@@ -6,7 +6,7 @@ During parallel execution (fan-out), multiple tokens execute simultaneously and 
 
 1. **Isolated** - No shared state mutation between branches
 2. **Mergeable** - Collected at fan-in points
-3. **Schema-validated** - Type-safe via `@wonder/schemas`
+3. **Schema-validated** - Type-safe via `@wonder/context`
 4. **SQL-native** - Stored in DO SQLite, not JSON blobs
 
 The challenge: How do we store branch-isolated data in schema-driven SQL tables?
@@ -345,7 +345,7 @@ output_schema: {
 }
 ```
 
-Branch table structure (flattened by `@wonder/schemas`):
+Branch table structure (flattened by `@wonder/context`):
 
 ```sql
 CREATE TABLE branch_output_tok_abc123 (
@@ -448,7 +448,7 @@ Target paths are standard JSONPath into main context:
 **Branch isolation via table namespacing:**
 
 - Each token gets `branch_output_{tokenId}` table(s) during fan-out
-- Node outputs write to isolated branch tables via `@wonder/schemas` DML
+- Node outputs write to isolated branch tables via `@wonder/context` DML
 - Fan-in reads all sibling branch tables, merges, writes to main context
 - Branch tables dropped after merge (cleanup)
 

@@ -18,7 +18,7 @@ importers:
         specifier: ^3.7.4
         version: 3.7.4
 
-  packages/schemas:
+  packages/context:
     devDependencies:
       typescript:
         specifier: ^5.9.3
@@ -97,15 +97,15 @@ importers:
 
   services/coordinator:
     dependencies:
+      '@wonder/context':
+        specifier: workspace:*
+        version: link:../../packages/context
       '@wonder/events':
         specifier: workspace:*
         version: link:../events
       '@wonder/logs':
         specifier: workspace:*
         version: link:../logs
-      '@wonder/schemas':
-        specifier: workspace:*
-        version: link:../../packages/schemas
       '@wonder/templates':
         specifier: workspace:*
         version: link:../../packages/templates
@@ -216,12 +216,12 @@ importers:
 
   services/resources:
     dependencies:
+      '@wonder/context':
+        specifier: workspace:*
+        version: link:../../packages/context
       '@wonder/logs':
         specifier: workspace:*
         version: link:../logs
-      '@wonder/schemas':
-        specifier: workspace:*
-        version: link:../../packages/schemas
       drizzle-orm:
         specifier: ^0.44.7
         version: 0.44.7(@cloudflare/workers-types@4.20251127.0)

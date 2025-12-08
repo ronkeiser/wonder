@@ -61,7 +61,7 @@
 - Artifacts are typed, versioned, project-scoped, searchable via Vectorize
 - Artifacts persist until explicit user delete
 - All entity IDs use ULID format (sortable, timestamp-prefixed, 26 chars)
-- `@wonder/schemas` handles all validation, DDL/DML generation (no duplication)
+- `@wonder/context` handles all validation, DDL/DML generation (no duplication)
 
 ## Templates
 

@@ -157,7 +157,7 @@ Context {
 }
 ```
 
-**Schema-driven storage via `@wonder/schemas`:**
+**Schema-driven storage via `@wonder/context`:**
 
 - Single JSONSchema drives validation, DDL generation, and DML generation
 - Scalar fields → columns, arrays → separate tables with foreign keys

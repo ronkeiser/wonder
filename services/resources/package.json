@@ -21,7 +21,7 @@
   },
   "dependencies": {
     "@wonder/logs": "workspace:*",
-    "@wonder/schemas": "workspace:*",
+    "@wonder/context": "workspace:*",
     "drizzle-orm": "^0.44.7",
     "ulid": "^3.0.1"
   },

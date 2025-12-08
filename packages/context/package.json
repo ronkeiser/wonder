@@ -1,6 +1,6 @@
 {
-  "name": "@wonder/schemas",
-  "version": "0.1.0",
+  "name": "@wonder/context",
+  "version": "0.0.1",
   "description": "Runtime schema validation and DDL generation for Wonder",
   "type": "module",
   "main": "./src/index.ts",
