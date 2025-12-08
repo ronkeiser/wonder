@@ -467,75 +467,40 @@ Loaded once per workflow_run_id, reused for all token completions. Invalidated o
 
 ## Testing Strategy
 
-### Unit Tests (Fast - No Actors Needed)
+Wonder uses a **3-layer testing strategy** that leverages the Decision Pattern for comprehensive coverage without mocks. See `docs/architecture/testing.md` for detailed examples and patterns.
 
-```typescript
-test('routing spawns tokens for matching transitions', () => {
-  const token = { node_id: 'node_a', ... };
-  const workflow = { nodes: [...], transitions: [...] };
-  const context = { approved: true };
+### Layer 1: Unit Tests (Fast - No Infrastructure)
 
-  const decisions = planning.routing.decide(token, workflow, context);
+Test pure decision functions (`planning/routing.ts`, `planning/synchronization.ts`, etc.) with plain data objects. Runs in milliseconds with no database, DO, or RPC.
 
-  expect(decisions).toContainEqual({
-    type: 'CREATE_TOKEN',
-    params: expect.objectContaining({ node_id: 'node_b' })
-  });
-});
+**Benefits:**
 
-test('synchronization waits when not all siblings complete', () => {
-  const token = { ... };
-  const siblings = [
-    { status: 'completed' },
-    { status: 'executing' },  // Not done
-    { status: 'completed' },
-  ];
-  const transition = { synchronization: { wait_for: 'all', ... } };
+- Exhaustive edge case coverage
+- Property-based testing for invariants
+- Regression tests from production state captures
+- Fast CI feedback (< 1 second)
 
-  const decisions = planning.synchronization.decide(token, transition, siblings, workflow);
+### Layer 2: SDK Introspection Tests (Medium - Live Architecture)
 
-  expect(decisions).toContainEqual({
-    type: 'CREATE_FAN_IN_TOKEN',
-    params: expect.objectContaining({ status: 'waiting_for_siblings' })
-  });
-});
-```
+Test decision functions with real workflow definitions and context from deployed infrastructure. New coordinator RPC methods (`introspectTokens()`, `simulateRouting()`, `simulateSynchronization()`) enable safe, read-only testing against live architecture.
 
-### Integration Tests (Medium - Actor Operations)
+**Benefits:**
 
-Test decision application with real SQL (actor state mutations):
+- Realistic workflow structures and schemas
+- Debug production issues by replaying captured state
+- No mocks for workflow/context data
+- Medium speed (hundreds of ms)
 
-```typescript
-test('tryActivate handles race condition', async () => {
-  const sql = miniflare.getDurableObjectStorage();
+### Layer 3: E2E Tests (Primary - Full Stack)
 
-  // Create waiting token
-  operations.tokens.create(sql, { ...params, status: 'waiting_for_siblings' });
+**This is the ultimate source of truth** - E2E tests prove the architecture works end-to-end. Execute complete workflows with real Cloudflare services (DO, D1, Workers AI) via Miniflare locally and deployed services in CI.
 
-  // Two concurrent activations
-  const [result1, result2] = await Promise.all([
-    operations.tokens.tryActivate(sql, workflowRunId, nodeId, path),
-    operations.tokens.tryActivate(sql, workflowRunId, nodeId, path),
-  ]);
+**Benefits:**
 
-  expect([result1, result2]).toEqual([true, false]); // Only one succeeds
-});
-```
+- Definitive validation of entire system
+- Tests actual production code paths
+- Validates all integration points together
+- Fast enough for frequent runs (Miniflare is quick)
+- Reference implementations for complex patterns
 
-### E2E Tests (Slow)
-
-Full workflow execution with real DO:
-
-```typescript
-test('complex fan-out fan-in workflow', async () => {
-  const coordinator = await env.COORDINATOR.get(id);
-  await coordinator.start(workflowRunId, { items: [1, 2, 3, 4, 5] });
-
-  // Wait for completion
-  const result = await waitForWorkflowComplete(workflowRunId);
-
-  expect(result.finalOutput).toMatchObject({
-    merged_results: expect.arrayContaining([...])
-  });
-});
-```
+**Core Advantage:** The Decision Pattern makes business logic testable without mocks while maintaining Actor Model benefits (isolated state, single-threaded execution, message passing).

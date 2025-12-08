@@ -4,3 +4,5 @@ Read these docs in order:
 2. `docs/REQUIREMENTS.md`
 3. `docs/architecture/primitives.md`
 4. `docs/architecture/coordinator.md`
+
+Briefly summarize to demonstrate understanding.
