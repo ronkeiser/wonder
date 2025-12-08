@@ -15,15 +15,19 @@ const DEFAULT_STATUS_CODE = '200';
  * POST on action uses action name, otherwise follows REST conventions
  */
 export function getMethodName(node: RouteNode, verb: HttpMethod): string {
-  if (verb === 'post' && node.type === NodeType.Action) return node.name;
+  if (verb === 'post' && node.type === NodeType.Action) {
+    return node.name;
+  }
 
-  const methodMap: Record<string, string> = {
+  const methodMap: Record<HttpMethod, string> = {
     post: 'create',
     get: node.type === NodeType.Collection ? 'list' : 'get',
     put: 'update',
+    patch: 'patch',
+    delete: 'delete',
   };
 
-  return methodMap[verb] || verb;
+  return methodMap[verb] ?? verb;
 }
 
 /**
@@ -84,30 +88,18 @@ export function generateMethodSignature(
 
   // Add path parameters
   const pathParams = collectPathParameters(node);
-  for (const param of pathParams) {
-    parameters.push({
-      name: param,
-      type: 'string',
-      optional: false,
-    });
-  }
+  parameters.push(
+    ...pathParams.map((param) => ({ name: param, type: 'string' as const, optional: false })),
+  );
 
   // Add body parameter for mutation methods
-  const isMutation = verb === 'post' || verb === 'put' || verb === 'patch';
+  const isMutation = ['post', 'put', 'patch'].includes(verb);
   if (isMutation) {
-    parameters.push({
-      name: 'body',
-      type: 'body',
-      optional: false,
-    });
+    parameters.push({ name: 'body', type: 'body' as const, optional: false });
   }
 
   // Add options parameter (always optional)
-  parameters.push({
-    name: 'options',
-    type: 'options',
-    optional: true,
-  });
+  parameters.push({ name: 'options', type: 'options' as const, optional: true });
 
   return { name: methodName, parameters };
 }
@@ -145,8 +137,8 @@ export function generateCollectionObject(node: RouteNode): ClientProperty {
     signature: generateMethodSignature(node, method.verb, method.operationId),
     path: buildPathTemplate(node),
     verb: method.verb,
-    originalPath: method.originalPath || buildPathTemplate(node),
-    successStatusCode: method.successStatusCode || DEFAULT_STATUS_CODE,
+    originalPath: method.originalPath ?? buildPathTemplate(node),
+    successStatusCode: method.successStatusCode ?? DEFAULT_STATUS_CODE,
   }));
 
   const properties = node.children.map((child) =>
@@ -232,10 +224,14 @@ ${indent}}`;
 }
 
 /**
- * Helper to join array items with proper comma placement
+ * Format array items with trailing commas except for the last
  */
-function joinWithCommas<T>(items: T[], formatter: (item: T) => string): string[] {
-  return items.map((item, i) => formatter(item) + (i < items.length - 1 ? ',' : ''));
+function formatWithCommas<T>(items: T[], formatter: (item: T) => string): string[] {
+  if (items.length === 0) return [];
+  return [
+    ...items.slice(0, -1).map((item) => formatter(item) + ','),
+    formatter(items[items.length - 1]),
+  ];
 }
 
 /**
@@ -257,26 +253,20 @@ function formatProperty(prop: ClientProperty, indent: string): string {
     // The parameter is captured, so exclude it from method signatures
     const excludeParams = new Set([prop.name]);
 
-    // Add instance methods
-    if (child.methods) {
-      const methods = child.methods;
-      const hasChildren = child.children && child.children.length > 0;
-      const methodLines = methods.map((method, i) => {
-        const isLast = i === methods.length - 1 && !hasChildren;
-        return formatMethod(method, indent + '    ', excludeParams) + (isLast ? '' : ',');
-      });
-      lines.push(...methodLines);
+    // Collect all methods (instance + nested action methods)
+    const allMethods = [...(child.methods ?? [])];
+    if (child.children) {
+      const actionMethods = child.children.flatMap((nestedChild) => nestedChild.methods ?? []);
+      allMethods.push(...actionMethods);
     }
 
-    // Add nested children (like actions)
-    if (child.children) {
-      const allActionMethods = child.children.flatMap((nestedChild) => nestedChild.methods || []);
-      if (allActionMethods.length > 0) {
-        const actionLines = joinWithCommas(allActionMethods, (method) =>
+    // Add all methods with proper comma formatting
+    if (allMethods.length > 0) {
+      lines.push(
+        ...formatWithCommas(allMethods, (method) =>
           formatMethod(method, indent + '    ', excludeParams),
-        );
-        lines.push(...actionLines);
-      }
+        ),
+      );
     }
 
     lines.push(`${indent}  })`);
@@ -295,22 +285,20 @@ function formatProperty(prop: ClientProperty, indent: string): string {
 
       // Generate the methods object part (for collection methods)
       lines.push(`${indent}  {`);
-      if (prop.methods) {
-        const methodLines = joinWithCommas(prop.methods, (method) =>
-          formatMethod(method, indent + '    '),
+      if (prop.methods && prop.methods.length > 0) {
+        lines.push(
+          ...formatWithCommas(prop.methods, (method) => formatMethod(method, indent + '    ')),
         );
-        lines.push(...methodLines);
       }
       lines.push(`${indent}  }`);
       lines.push(`${indent})`);
     } else {
       // Simple collection with just methods
       lines.push(`${indent}${propertyName}: {`);
-      if (prop.methods) {
-        const methodLines = joinWithCommas(prop.methods, (method) =>
-          formatMethod(method, indent + '  '),
+      if (prop.methods && prop.methods.length > 0) {
+        lines.push(
+          ...formatWithCommas(prop.methods, (method) => formatMethod(method, indent + '  ')),
         );
-        lines.push(...methodLines);
       }
       lines.push(`${indent}}`);
     }
@@ -343,10 +331,9 @@ export function formatClientCode(structure: ClientStructure): string {
   lines.push('  return {');
 
   // Add collection properties
-  const collectionLines = joinWithCommas(structure.collections, (collection) =>
-    formatProperty(collection, '    '),
+  lines.push(
+    ...formatWithCommas(structure.collections, (collection) => formatProperty(collection, '    ')),
   );
-  lines.push(...collectionLines);
 
   lines.push('  };');
   lines.push('}');
