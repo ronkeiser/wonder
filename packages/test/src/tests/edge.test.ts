@@ -1,8 +1,8 @@
 import { describe, expect, it } from 'vitest';
 import { client } from '~/client';
 
-const IDEATION_COUNT = 3;
-const JUDGE_COUNT = 3;
+const IDEATION_COUNT = 5;
+const JUDGE_COUNT = 5;
 
 describe('Edge Test - Branching Architecture', () => {
   it('fan-out → merge → fan-out → merge → rank', async () => {
@@ -44,7 +44,7 @@ describe('Edge Test - Branching Architecture', () => {
         provider: 'cloudflare',
         model_id: '@cf/meta/llama-3.1-8b-instruct',
         parameters: {
-          max_tokens: 2048,
+          max_tokens: 512,
           temperature: 1.2,
         },
         cost_per_1k_input_tokens: 0.0,
@@ -65,8 +65,7 @@ describe('Edge Test - Branching Architecture', () => {
         version: 1,
         name: 'Dog Name Ideation',
         description: 'Generate creative dog name ideas',
-        template:
-          'Suggest a fun and friendly name for my dog. Make it just a little quirky! Respond in the format: { "name": "[SUGGESTED_NAME]" }',
+        template: 'Suggest a fun and friendly name for my dog. Make it just a little quirky!',
         template_language: 'handlebars',
         requires: {},
         produces: {
@@ -93,7 +92,7 @@ describe('Edge Test - Branching Architecture', () => {
         name: 'Dog Name Judge',
         description: 'Judge dog names and score them',
         template:
-          'You are a dog name expert. Rate these dog names from 1-10 based on creativity, friendliness, and memorability:\n\n{{#each names}}\n- {{this}}\n{{/each}}\n\nRespond in JSON format: { "scores": [{"name": "...", "score": 8}] }',
+          'You are a dog name expert. Rate these dog names from 1-10 based on creativity, friendliness, and memorability:\n\n{{#each names}}\n- {{this}}\n{{/each}}',
         template_language: 'handlebars',
         requires: {
           names: 'array',
@@ -133,7 +132,7 @@ describe('Edge Test - Branching Architecture', () => {
         name: 'Dog Name Ranker',
         description: 'Aggregate judge scores and create final ranking',
         template:
-          'Aggregate these judge scores and create a final ranking. Each judge scored the same set of names:\n\n{{#each judge_scores}}\nJudge {{@index}}:\n{{#each this}}\n- {{this.name}}: {{this.score}}/10\n{{/each}}\n{{/each}}\n\nCalculate average scores and rank the names. Respond in JSON format: { "ranking": [{"name": "...", "average_score": 8.5, "rank": 1}] }',
+          'Aggregate these judge scores and create a final ranking. Each judge scored the same set of names:\n\n{{#each judge_scores}}\nJudge {{@index}}:\n{{#each this}}\n- {{this.name}}: {{this.score}}/10\n{{/each}}\n{{/each}}\n\nCalculate average scores and rank the names.',
         template_language: 'handlebars',
         requires: {
           judge_scores: 'array',
