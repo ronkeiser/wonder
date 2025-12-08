@@ -466,11 +466,7 @@
           <option value="llm_call_completed">llm_call_completed</option>
           <option value="llm_call_failed">llm_call_failed</option>
         </select>
-        <button
-          id="pretty-print-toggle"
-          class="pretty-print-toggle"
-          title="Toggle pretty print"
-        >
+        <button id="pretty-print-toggle" class="pretty-print-toggle" title="Toggle pretty print">
           <svg viewBox="0 0 16 16" fill="currentColor" width="14" height="14">
             <path
               d="M0 3.75C0 2.784.784 2 1.75 2h12.5c.966 0 1.75.784 1.75 1.75v8.5A1.75 1.75 0 0 1 14.25 14H1.75A1.75 1.75 0 0 1 0 12.25Zm1.75-.25a.25.25 0 0 0-.25.25v8.5c0 .138.112.25.25.25h12.5a.25.25 0 0 0 .25-.25v-8.5a.25.25 0 0 0-.25-.25ZM3.5 6.25a.75.75 0 0 1 .75-.75h7a.75.75 0 0 1 0 1.5h-7a.75.75 0 0 1-.75-.75Zm.75 2.25h4a.75.75 0 0 1 0 1.5h-4a.75.75 0 0 1 0-1.5Z"
@@ -507,6 +503,17 @@
       let currentFilter = null;
       let currentEventType = '';
       let prettyPrintEnabled = false;
+
+      // Helper to format JSON with unescaped newlines when pretty printing
+      function formatJsonPretty(obj) {
+        const json = JSON.stringify(obj, null, 2);
+        // Replace escaped \n with actual newlines in string values
+        return json.replace(/"((?:[^"\\]|\\.)*)"/g, (match, content) => {
+          // Only unescape \n within the string content
+          const unescaped = content.replace(/\\n/g, '\n').replace(/\\t/g, '\t');
+          return '"' + unescaped + '"';
+        });
+      }
 
       function setStatus(state) {
         statusEl.className = `status ${state}`;
@@ -694,7 +701,7 @@
 
               // Render using global default
               metadata.textContent = prettyPrintEnabled
-                ? JSON.stringify(parsed, null, 2)
+                ? formatJsonPretty(parsed)
                 : JSON.stringify(parsed);
 
               // Add click handler for individual toggle
@@ -713,7 +720,7 @@
                 const usePretty =
                   metadata._prettyPrint !== null ? metadata._prettyPrint : prettyPrintEnabled;
                 metadata.textContent = usePretty
-                  ? JSON.stringify(metadata._jsonData, null, 2)
+                  ? formatJsonPretty(metadata._jsonData)
                   : JSON.stringify(metadata._jsonData);
               });
 
@@ -847,7 +854,7 @@
           // Only update if using global default (no individual override)
           if (metadataEl._prettyPrint === null && metadataEl._jsonData) {
             metadataEl.textContent = prettyPrintEnabled
-              ? JSON.stringify(metadataEl._jsonData, null, 2)
+              ? formatJsonPretty(metadataEl._jsonData)
               : JSON.stringify(metadataEl._jsonData);
           }
         });
