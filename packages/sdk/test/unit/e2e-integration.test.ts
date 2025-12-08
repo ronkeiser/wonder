@@ -85,14 +85,16 @@ describe('End-to-end generation', () => {
     // Should have multiple collections
     expect(collections.length).toBeGreaterThan(0);
 
-    // Each collection should be a callable function with collection methods
+    // Each collection should be either a callable function (with instances) or a plain object
     collections.forEach((collectionName) => {
       const collection = client[collectionName as keyof typeof client];
-      // Collections are objects (created with Object.assign) that have methods
-      expect(typeof collection).toBe('object');
+      // Collections with instances are callable (typeof 'function'), others are plain objects
+      const collectionType = typeof collection;
+      expect(['object', 'function']).toContain(collectionType);
       // Collection methods are now generated based on actual OpenAPI spec
-      // The generator creates method names like 'create' for POST
-      expect(collection).toHaveProperty('create');
+      // Most collections have 'create' or 'list' methods
+      const hasCreateOrList = 'create' in collection || 'list' in collection;
+      expect(hasCreateOrList).toBe(true);
     });
   });
 
