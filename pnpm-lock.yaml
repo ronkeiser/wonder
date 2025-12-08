@@ -18,7 +18,7 @@ importers:
         specifier: ^3.7.4
         version: 3.7.4
 
-  packages/schema:
+  packages/schemas:
     devDependencies:
       typescript:
         specifier: ^5.9.3
@@ -105,7 +105,10 @@ importers:
         version: link:../logs
       '@wonder/schemas':
         specifier: workspace:*
-        version: link:../../packages/schema
+        version: link:../../packages/schemas
+      '@wonder/templates':
+        specifier: workspace:*
+        version: link:../../packages/templates
       ulid:
         specifier: ^3.0.2
         version: 3.0.2
@@ -218,7 +221,7 @@ importers:
         version: link:../logs
       '@wonder/schemas':
         specifier: workspace:*
-        version: link:../../packages/schema
+        version: link:../../packages/schemas
       drizzle-orm:
         specifier: ^0.44.7
         version: 0.44.7(@cloudflare/workers-types@4.20251127.0)

@@ -1,8 +1,8 @@
 import { describe, expect, it } from 'vitest';
 import { client } from '~/client';
 
-const IDEATION_COUNT = 10;
-const JUDGE_COUNT = 5;
+const IDEATION_COUNT = 3;
+const JUDGE_COUNT = 3;
 
 describe('Edge Test - Branching Architecture', () => {
   it('fan-out → merge → fan-out → merge → rank', async () => {

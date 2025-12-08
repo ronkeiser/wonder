@@ -7,8 +7,8 @@
 
 import type { Emitter, EventContext } from '@wonder/events';
 import type { Logger } from '@wonder/logs';
+import { render } from '@wonder/templates';
 import { evaluateInputMapping } from './mapping';
-import { renderTemplate } from './template';
 
 export interface BuildPayloadParams {
   token_id: string;
@@ -35,7 +35,7 @@ export class TaskManager {
    *
    * Fetches node, action, prompt spec, model profile from RESOURCES,
    * evaluates input_mapping, and renders template.
-   * 
+   *
    * Returns whether the task completed synchronously (nodes without actions)
    * or was dispatched asynchronously (nodes with actions).
    */
@@ -155,7 +155,18 @@ export class TaskManager {
         });
 
         // Render template with context
-        const prompt = renderTemplate(promptSpecResult.prompt_spec.template, templateContext);
+        const prompt = render(promptSpecResult.prompt_spec.template, templateContext);
+
+        this.logger.info({
+          event_type: 'template_rendered',
+          message: 'Template rendered',
+          trace_id: workflow_run_id,
+          metadata: {
+            template: promptSpecResult.prompt_spec.template,
+            context: templateContext,
+            rendered_prompt: prompt,
+          },
+        });
 
         // Build event context
         const eventContext: EventContext = {
