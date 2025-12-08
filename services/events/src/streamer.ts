@@ -1,7 +1,7 @@
 import { DurableObject } from 'cloudflare:workers';
 import { and, desc, eq, gte } from 'drizzle-orm';
 import { drizzle } from 'drizzle-orm/d1';
-import { events } from './db/schema.js';
+import { workflowEvents } from './db/schema.js';
 import uiHTML from './web/ui.html';
 
 /**
@@ -55,9 +55,9 @@ export class Streamer extends DurableObject {
 
     const recentEvents = await this.db
       .select()
-      .from(events)
-      .where(gte(events.timestamp, fiveMinutesAgo))
-      .orderBy(desc(events.timestamp))
+      .from(workflowEvents)
+      .where(gte(workflowEvents.timestamp, fiveMinutesAgo))
+      .orderBy(desc(workflowEvents.timestamp))
       .limit(100);
 
     if (recentEvents.length > 0) {

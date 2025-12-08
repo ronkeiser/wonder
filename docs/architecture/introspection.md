@@ -25,26 +25,149 @@ Introspection provides line-by-line visibility into coordinator execution withou
 -- Existing workflow events table
 CREATE TABLE workflow_events (
   id TEXT PRIMARY KEY,
-  workflow_run_id TEXT NOT NULL,
-  kind TEXT NOT NULL,
-  timestamp INTEGER NOT NULL,
-  actor_id TEXT,
-  data TEXT NOT NULL,
 
-  INDEX idx_workflow_events (workflow_run_id, timestamp)
+  -- Ordering & timing
+  timestamp INTEGER NOT NULL,
+  sequence_number INTEGER NOT NULL,
+
+  -- Event classification
+  event_type TEXT NOT NULL,      -- 'workflow_started', 'token_spawned', 'node_completed', etc.
+
+  -- Execution context
+  workflow_run_id TEXT NOT NULL,
+  parent_run_id TEXT,
+  workflow_def_id TEXT NOT NULL,
+  node_id TEXT,
+  token_id TEXT,
+  path_id TEXT,
+
+  -- Tenant context
+  workspace_id TEXT NOT NULL,
+  project_id TEXT NOT NULL,
+
+  -- Cost tracking
+  tokens INTEGER,                -- LLM token count
+  cost_usd REAL,                 -- USD cost
+
+  -- Payload
+  message TEXT,
+  metadata TEXT NOT NULL,        -- JSON blob (event-specific data)
+
+  -- Indexes for common query patterns
+  INDEX idx_workflow_events_run_sequence (workflow_run_id, sequence_number),
+  INDEX idx_workflow_events_workspace (workspace_id),
+  INDEX idx_workflow_events_project (project_id),
+  INDEX idx_workflow_events_type (event_type),
+  INDEX idx_workflow_events_timestamp (timestamp),
+  INDEX idx_workflow_events_node (node_id),
+  INDEX idx_workflow_events_token (token_id)
 );
 
 -- NEW: Introspection events table
 CREATE TABLE introspection_events (
   id TEXT PRIMARY KEY,
-  workflow_run_id TEXT NOT NULL,
+
+  -- Ordering & timing
   sequence INTEGER NOT NULL,
   timestamp INTEGER NOT NULL,
-  type TEXT NOT NULL,
-  payload TEXT NOT NULL,
 
-  INDEX idx_introspection_events (workflow_run_id, sequence)
+  -- Event classification
+  type TEXT NOT NULL,        -- 'decision.routing.start', 'operation.context.read', etc.
+  category TEXT NOT NULL,    -- 'decision', 'operation', 'dispatch', 'sql'
+
+  -- Execution context (enables deep querying)
+  workflow_run_id TEXT NOT NULL,
+  token_id TEXT,             -- Most events relate to specific token
+  node_id TEXT,              -- Many events happen at specific node
+
+  -- Tenant context (multi-workspace isolation & billing attribution)
+  workspace_id TEXT NOT NULL,
+  project_id TEXT NOT NULL,
+
+  -- Performance tracking
+  duration_ms REAL,          -- For SQL queries, operation timing
+
+  -- Payload (structured data specific to event type)
+  payload TEXT NOT NULL,     -- JSON blob with type-specific data
+
+  -- Indexes for common query patterns
+  INDEX idx_introspection_workflow_sequence (workflow_run_id, sequence),
+  INDEX idx_introspection_type (type),
+  INDEX idx_introspection_category (category),
+  INDEX idx_introspection_token (token_id),
+  INDEX idx_introspection_workspace (workspace_id, timestamp),
+  INDEX idx_introspection_duration (duration_ms)
 );
+```
+
+## Schema Design
+
+### Promoted Fields vs Payload
+
+**Promoted to columns** (frequently queried, indexed):
+
+- `category` - Fast filtering by layer (decision/operation/dispatch/sql) without parsing `type`
+- `token_id`, `node_id` - Execution path tracing without JSON parsing
+- `workspace_id`, `project_id` - Tenant isolation and billing attribution
+- `duration_ms` - Performance monitoring and alerting
+
+**Stays in payload** (event-specific, rarely queried standalone):
+
+- `transition_id`, `condition`, `spawn_count` (routing events)
+- `path`, `value` (context operations)
+- `table_name` (branch table events)
+- `sql`, `params` (SQL query events)
+- `strategy`, `sibling_count` (synchronization events)
+- `decision_count`, `batch_type` (dispatch events)
+
+### Query Examples
+
+```sql
+-- All introspection events for a workflow (ordered execution trace)
+SELECT * FROM introspection_events
+WHERE workflow_run_id = ?
+ORDER BY sequence;
+
+-- SQL performance issues in workspace
+SELECT type, COUNT(*) as count, AVG(duration_ms) as avg_duration
+FROM introspection_events
+WHERE workspace_id = ?
+  AND category = 'sql'
+  AND duration_ms > 50
+GROUP BY type
+ORDER BY avg_duration DESC;
+
+-- Token execution trace (debug specific branch)
+SELECT sequence, type, node_id, duration_ms, payload
+FROM introspection_events
+WHERE token_id = ?
+ORDER BY sequence;
+
+-- Decision layer events only (routing and synchronization logic)
+SELECT * FROM introspection_events
+WHERE workflow_run_id = ?
+  AND category = 'decision'
+ORDER BY sequence;
+
+-- Slow operations across project (performance dashboard)
+SELECT type, AVG(duration_ms) as avg_duration, MAX(duration_ms) as max_duration
+FROM introspection_events
+WHERE project_id = ?
+  AND duration_ms IS NOT NULL
+  AND timestamp > ?  -- Last 24 hours
+GROUP BY type
+HAVING avg_duration > 10
+ORDER BY avg_duration DESC;
+
+-- Find workflows with slow SQL queries
+SELECT workflow_run_id, COUNT(*) as slow_query_count
+FROM introspection_events
+WHERE workspace_id = ?
+  AND category = 'sql'
+  AND duration_ms > 100
+GROUP BY workflow_run_id
+ORDER BY slow_query_count DESC
+LIMIT 10;
 ```
 
 ## Strategy: Event-Driven Introspection
@@ -128,7 +251,7 @@ export class IntrospectionEmitter {
     });
   }
 
-  async flush(env: Env): Promise<void> {
+  async flush(env: Env, context: { workspace_id: string; project_id: string }): Promise<void> {
     if (this.events.length === 0) return;
 
     const batch = this.events.map((event) => ({
@@ -137,6 +260,12 @@ export class IntrospectionEmitter {
       sequence: event.sequence,
       timestamp: event.timestamp,
       type: event.type,
+      category: event.type.split('.')[0], // Extract 'decision', 'operation', 'dispatch', 'sql'
+      token_id: event.token_id ?? null,
+      node_id: event.node_id ?? null,
+      workspace_id: context.workspace_id,
+      project_id: context.project_id,
+      duration_ms: event.duration_ms ?? null,
       payload: JSON.stringify(event),
     }));
 
@@ -361,7 +490,10 @@ class WorkflowCoordinator extends DurableObject {
 
     // Flush events periodically
     if (this.emitter.getEvents().length > 100) {
-      await this.emitter.flush(this.env);
+      await this.emitter.flush(this.env, {
+        workspace_id: workflow.workspace_id,
+        project_id: workflow.project_id,
+      });
     }
   }
 
@@ -369,7 +501,11 @@ class WorkflowCoordinator extends DurableObject {
     // ... finalization logic
 
     // Flush remaining events on completion
-    await this.emitter.flush(this.env);
+    const workflow = await this.getWorkflow(workflowRunId);
+    await this.emitter.flush(this.env, {
+      workspace_id: workflow.workspace_id,
+      project_id: workflow.project_id,
+    });
   }
 
   // For testing: expose events
@@ -651,13 +787,29 @@ export default {
       }
 
       const stmt = env.DB.prepare(`
-        INSERT INTO introspection_events (id, workflow_run_id, sequence, timestamp, type, payload)
-        VALUES (?, ?, ?, ?, ?, ?)
+        INSERT INTO introspection_events (
+          id, workflow_run_id, sequence, timestamp, type, category,
+          token_id, node_id, workspace_id, project_id, duration_ms, payload
+        )
+        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
       `);
 
       await env.DB.batch(
         batch.map((e) =>
-          stmt.bind(e.id, e.workflow_run_id, e.sequence, e.timestamp, e.type, e.payload),
+          stmt.bind(
+            e.id,
+            e.workflow_run_id,
+            e.sequence,
+            e.timestamp,
+            e.type,
+            e.category,
+            e.token_id,
+            e.node_id,
+            e.workspace_id,
+            e.project_id,
+            e.duration_ms,
+            e.payload,
+          ),
         ),
       );
 
@@ -674,6 +826,12 @@ interface IntrospectionEventRow {
   sequence: number;
   timestamp: number;
   type: string;
+  category: string;
+  token_id: string | null;
+  node_id: string | null;
+  workspace_id: string;
+  project_id: string;
+  duration_ms: number | null;
   payload: string; // JSON
 }
 ```

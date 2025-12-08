@@ -2,7 +2,7 @@ import { WorkerEntrypoint } from 'cloudflare:workers';
 import { and, desc, eq } from 'drizzle-orm';
 import { drizzle } from 'drizzle-orm/d1';
 import { ulid } from 'ulid';
-import { events } from './db/schema.js';
+import { workflowEvents } from './db/schema.js';
 import type {
   Emitter,
   EventContext,
@@ -80,7 +80,7 @@ export class EventsService extends WorkerEntrypoint<Env> {
             metadata: JSON.stringify(input.metadata || {}),
           };
 
-          await this.db.insert(events).values(eventEntry);
+          await this.db.insert(workflowEvents).values(eventEntry);
 
           // Broadcast to connected WebSocket clients
           try {
@@ -104,21 +104,23 @@ export class EventsService extends WorkerEntrypoint<Env> {
     const conditions = [];
 
     if (options.workflow_run_id)
-      conditions.push(eq(events.workflow_run_id, options.workflow_run_id));
-    if (options.parent_run_id) conditions.push(eq(events.parent_run_id, options.parent_run_id));
-    if (options.workspace_id) conditions.push(eq(events.workspace_id, options.workspace_id));
-    if (options.project_id) conditions.push(eq(events.project_id, options.project_id));
-    if (options.event_type) conditions.push(eq(events.event_type, options.event_type));
-    if (options.node_id) conditions.push(eq(events.node_id, options.node_id));
-    if (options.token_id) conditions.push(eq(events.token_id, options.token_id));
+      conditions.push(eq(workflowEvents.workflow_run_id, options.workflow_run_id));
+    if (options.parent_run_id)
+      conditions.push(eq(workflowEvents.parent_run_id, options.parent_run_id));
+    if (options.workspace_id)
+      conditions.push(eq(workflowEvents.workspace_id, options.workspace_id));
+    if (options.project_id) conditions.push(eq(workflowEvents.project_id, options.project_id));
+    if (options.event_type) conditions.push(eq(workflowEvents.event_type, options.event_type));
+    if (options.node_id) conditions.push(eq(workflowEvents.node_id, options.node_id));
+    if (options.token_id) conditions.push(eq(workflowEvents.token_id, options.token_id));
 
     const limit = options.limit || 100;
 
     const results = await this.db
       .select()
-      .from(events)
+      .from(workflowEvents)
       .where(conditions.length > 0 ? and(...conditions) : undefined)
-      .orderBy(desc(events.timestamp))
+      .orderBy(desc(workflowEvents.timestamp))
       .limit(limit);
 
     return { events: [...results] };

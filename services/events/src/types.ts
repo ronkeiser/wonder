@@ -37,8 +37,8 @@ export interface EventContext {
   workflow_run_id: string;
   workspace_id: string;
   project_id: string;
+  workflow_def_id: string;
   parent_run_id?: string;
-  workflow_def_id?: string;
 }
 
 /**
