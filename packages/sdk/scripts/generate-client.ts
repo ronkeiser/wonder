@@ -8,26 +8,22 @@ import { HttpMethod, NodeType, RouteNode } from './parse-paths';
 
 const API_PREFIX = '/api/';
 const CONTENT_TYPE = 'application/json';
-const MUTATION_VERBS = ['post', 'put', 'patch'] as const;
 const DEFAULT_STATUS_CODE = '200';
 
 /**
  * Map HTTP verb to JavaScript method name
- *
- * Rules:
- * - POST on collection → create()
- * - POST on action → use action name (e.g., start())
- * - GET on collection → list()
- * - GET on instance (param) → get()
- * - PUT → update()
- * - DELETE → delete()
- * - PATCH → patch()
+ * POST on action uses action name, otherwise follows REST conventions
  */
 export function getMethodName(node: RouteNode, verb: HttpMethod): string {
-  if (verb === 'post') return node.type === NodeType.Action ? node.name : 'create';
-  if (verb === 'get') return node.type === NodeType.Collection ? 'list' : 'get';
-  if (verb === 'put') return 'update';
-  return verb; // delete, patch map directly
+  if (verb === 'post' && node.type === NodeType.Action) return node.name;
+
+  const methodMap: Record<string, string> = {
+    post: 'create',
+    get: node.type === NodeType.Collection ? 'list' : 'get',
+    put: 'update',
+  };
+
+  return methodMap[verb] || verb;
 }
 
 /**
@@ -38,14 +34,10 @@ export function getMethodName(node: RouteNode, verb: HttpMethod): string {
  */
 export function buildPathTemplate(node: RouteNode): string {
   const segments: string[] = [];
-  let current: RouteNode | null = node;
-
-  while (current) {
+  for (let current: RouteNode | null = node; current; current = current.parent) {
     const segment = current.type === NodeType.Param ? `\${${current.name}}` : current.name;
     segments.unshift(segment);
-    current = current.parent;
   }
-
   return API_PREFIX + segments.join('/');
 }
 
@@ -71,15 +63,11 @@ export interface MethodSignature {
  */
 function collectPathParameters(node: RouteNode): string[] {
   const params: string[] = [];
-  let current: RouteNode | null = node;
-
-  while (current) {
+  for (let current: RouteNode | null = node; current; current = current.parent) {
     if (current.type === NodeType.Param) {
       params.unshift(current.name);
     }
-    current = current.parent;
   }
-
   return params;
 }
 
@@ -105,7 +93,8 @@ export function generateMethodSignature(
   }
 
   // Add body parameter for mutation methods
-  if (MUTATION_VERBS.includes(verb as any)) {
+  const isMutation = verb === 'post' || verb === 'put' || verb === 'patch';
+  if (isMutation) {
     parameters.push({
       name: 'body',
       type: 'body',
@@ -151,33 +140,24 @@ export interface ClientProperty {
  * Generate collection object structure with methods and nested resources
  */
 export function generateCollectionObject(node: RouteNode): ClientProperty {
-  const properties: ClientProperty[] = [];
+  const methods = node.methods.map((method) => ({
+    name: getMethodName(node, method.verb),
+    signature: generateMethodSignature(node, method.verb, method.operationId),
+    path: buildPathTemplate(node),
+    verb: method.verb,
+    originalPath: method.originalPath || buildPathTemplate(node),
+    successStatusCode: method.successStatusCode || DEFAULT_STATUS_CODE,
+  }));
 
-  // Add methods for this node
-  const methods: ClientMethod[] = [];
-  for (const method of node.methods) {
-    methods.push({
-      name: getMethodName(node, method.verb),
-      signature: generateMethodSignature(node, method.verb, method.operationId),
-      path: buildPathTemplate(node),
-      verb: method.verb,
-      originalPath: method.originalPath || buildPathTemplate(node),
-      successStatusCode: method.successStatusCode || DEFAULT_STATUS_CODE,
-    });
-  }
-
-  // Add child resources/actions as nested properties
-  for (const child of node.children) {
-    if (child.type === NodeType.Param) {
-      properties.push({
-        name: child.name,
-        type: 'parameter',
-        children: [generateCollectionObject(child)],
-      });
-    } else {
-      properties.push(generateCollectionObject(child));
-    }
-  }
+  const properties = node.children.map((child) =>
+    child.type === NodeType.Param
+      ? {
+          name: child.name,
+          type: 'parameter' as const,
+          children: [generateCollectionObject(child)],
+        }
+      : generateCollectionObject(child),
+  );
 
   return {
     name: node.name,
@@ -201,13 +181,7 @@ export interface ClientStructure {
  * Generate complete client structure from route tree roots
  */
 export function generateRootClient(roots: RouteNode[]): ClientStructure {
-  const collections: ClientProperty[] = [];
-
-  for (const root of roots) {
-    collections.push(generateCollectionObject(root));
-  }
-
-  return { collections };
+  return { collections: roots.map(generateCollectionObject) };
 }
 
 /**
@@ -232,26 +206,36 @@ function buildResponseType(originalPath: string, verb: HttpMethod, statusCode: s
  * Generate code for a single method
  * @param excludeParams - Path parameters to exclude (already captured in closure)
  */
-function formatMethod(method: ClientMethod, indent: string, excludeParams: string[] = []): string {
+function formatMethod(
+  method: ClientMethod,
+  indent: string,
+  excludeParams: Set<string> = new Set(),
+): string {
   const getParamType = (p: MethodParameter): string => {
     if (p.type === 'body') return buildRequestBodyType(method.originalPath, method.verb);
     if (p.type === 'options') return 'any';
     return 'string';
   };
 
-  // Filter out parameters that are already captured
   const params = method.signature.parameters
-    .filter((p) => !excludeParams.includes(p.name))
+    .filter((p) => !excludeParams.has(p.name))
     .map((p) => `${p.name}${p.optional ? '?' : ''}: ${getParamType(p)}`);
 
-  const paramNames = method.signature.parameters.map((p) => p.name);
-  const bodyParam = paramNames.includes('body') ? '{ body }' : '{}';
+  const hasBody = method.signature.parameters.some((p) => p.name === 'body');
+  const bodyParam = hasBody ? '{ body }' : '{}';
   const returnType = buildResponseType(method.originalPath, method.verb, method.successStatusCode);
 
   return `${indent}${method.name}: async (${params.join(', ')}): Promise<${returnType}> => {
 ${indent}  const response = await baseClient.${method.verb.toUpperCase()}(\`${method.path}\`, ${bodyParam});
 ${indent}  return response.data;
 ${indent}}`;
+}
+
+/**
+ * Helper to join array items with proper comma placement
+ */
+function joinWithCommas<T>(items: T[], formatter: (item: T) => string): string[] {
+  return items.map((item, i) => formatter(item) + (i < items.length - 1 ? ',' : ''));
 }
 
 /**
@@ -271,34 +255,27 @@ function formatProperty(prop: ClientProperty, indent: string): string {
     lines.push(`${indent}(${prop.name}: string) => ({`);
 
     // The parameter is captured, so exclude it from method signatures
-    const excludeParams = [prop.name];
+    const excludeParams = new Set([prop.name]);
 
     // Add instance methods
     if (child.methods) {
-      for (let i = 0; i < child.methods.length; i++) {
-        const method = child.methods[i];
-        const isLast =
-          i === child.methods.length - 1 && (!child.children || child.children.length === 0);
-        lines.push(formatMethod(method, indent + '    ', excludeParams) + (isLast ? '' : ','));
-      }
+      const methods = child.methods;
+      const hasChildren = child.children && child.children.length > 0;
+      const methodLines = methods.map((method, i) => {
+        const isLast = i === methods.length - 1 && !hasChildren;
+        return formatMethod(method, indent + '    ', excludeParams) + (isLast ? '' : ',');
+      });
+      lines.push(...methodLines);
     }
 
     // Add nested children (like actions)
     if (child.children) {
-      for (let i = 0; i < child.children.length; i++) {
-        const nestedChild = child.children[i];
-        const isLast = i === child.children.length - 1;
-
-        if (nestedChild.methods && nestedChild.methods.length > 0) {
-          // This is an action with methods
-          for (let j = 0; j < nestedChild.methods.length; j++) {
-            const method = nestedChild.methods[j];
-            const isLastMethod = j === nestedChild.methods.length - 1 && isLast;
-            lines.push(
-              formatMethod(method, indent + '    ', excludeParams) + (isLastMethod ? '' : ','),
-            );
-          }
-        }
+      const allActionMethods = child.children.flatMap((nestedChild) => nestedChild.methods || []);
+      if (allActionMethods.length > 0) {
+        const actionLines = joinWithCommas(allActionMethods, (method) =>
+          formatMethod(method, indent + '    ', excludeParams),
+        );
+        lines.push(...actionLines);
       }
     }
 
@@ -319,11 +296,10 @@ function formatProperty(prop: ClientProperty, indent: string): string {
       // Generate the methods object part (for collection methods)
       lines.push(`${indent}  {`);
       if (prop.methods) {
-        for (let i = 0; i < prop.methods.length; i++) {
-          const method = prop.methods[i];
-          const isLast = i === prop.methods.length - 1;
-          lines.push(formatMethod(method, indent + '    ') + (isLast ? '' : ','));
-        }
+        const methodLines = joinWithCommas(prop.methods, (method) =>
+          formatMethod(method, indent + '    '),
+        );
+        lines.push(...methodLines);
       }
       lines.push(`${indent}  }`);
       lines.push(`${indent})`);
@@ -331,11 +307,10 @@ function formatProperty(prop: ClientProperty, indent: string): string {
       // Simple collection with just methods
       lines.push(`${indent}${propertyName}: {`);
       if (prop.methods) {
-        for (let i = 0; i < prop.methods.length; i++) {
-          const method = prop.methods[i];
-          const isLast = i === prop.methods.length - 1;
-          lines.push(formatMethod(method, indent + '  ') + (isLast ? '' : ','));
-        }
+        const methodLines = joinWithCommas(prop.methods, (method) =>
+          formatMethod(method, indent + '  '),
+        );
+        lines.push(...methodLines);
       }
       lines.push(`${indent}}`);
     }
@@ -368,13 +343,10 @@ export function formatClientCode(structure: ClientStructure): string {
   lines.push('  return {');
 
   // Add collection properties
-  for (let i = 0; i < structure.collections.length; i++) {
-    const collection = structure.collections[i];
-    const isLast = i === structure.collections.length - 1;
-
-    const propCode = formatProperty(collection, '    ');
-    lines.push(propCode + (isLast ? '' : ','));
-  }
+  const collectionLines = joinWithCommas(structure.collections, (collection) =>
+    formatProperty(collection, '    '),
+  );
+  lines.push(...collectionLines);
 
   lines.push('  };');
   lines.push('}');
