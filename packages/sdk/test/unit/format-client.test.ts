@@ -23,14 +23,13 @@ describe('Client code formatting', () => {
 
     expect(code).toContain('export function createClient');
     expect(code).toContain('workspaces:');
-    expect(code).toMatch(/import.*SchemaType/);
+    expect(code).toMatch(/import.*paths/);
   });
 
   it('should include proper imports', () => {
     const code = formatClientCode({ collections: [] });
 
     expect(code).toContain('import type { paths }');
-    expect(code).toContain('import type { SchemaType }');
   });
 
   it('should add JSDoc comments', () => {

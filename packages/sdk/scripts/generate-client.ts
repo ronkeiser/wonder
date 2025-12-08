@@ -269,14 +269,11 @@ function formatProperty(prop: ClientProperty, indent: string): string {
 
     if (hasParamChild) {
       // Generate Object.assign pattern for callable collections
-      lines.push(`${indent}${propertyName}: Object.assign(`);
-
-      // Generate the function part (for instance access)
       const paramChild = prop.children!.find((c) => c.type === 'parameter')!;
-      lines.push(`${indent}  ` + formatProperty(paramChild, '').replace(/^  /, ''));
-      lines.push(`${indent}  ,`);
+      const paramFn = formatProperty(paramChild, indent + '  ');
 
-      // Generate the methods object part (for collection methods)
+      lines.push(`${indent}${propertyName}: Object.assign(`);
+      lines.push(paramFn + ',');
       lines.push(`${indent}  {`);
       lines.push(
         ...formatWithCommas(prop.methods ?? [], (method) => formatMethod(method, indent + '    ')),
@@ -308,7 +305,6 @@ export function formatClientCode(structure: ClientStructure): string {
 
   // Imports
   lines.push("import type { paths } from './schema.js';");
-  lines.push("import type { SchemaType } from '@wonder/context';");
   lines.push('');
 
   // Create client function

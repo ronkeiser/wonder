@@ -40,7 +40,6 @@ describe('File writing', () => {
     const content = readFileSync(clientPath, 'utf-8');
 
     expect(content).toContain('export function createClient');
-    expect(content).toMatch(/import.*SchemaType/);
     expect(content).toMatch(/import.*paths/);
   });
 

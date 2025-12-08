@@ -4,7 +4,6 @@
  */
 
 import type { paths } from './schema.js';
-import type { SchemaType } from '@wonder/context';
 
 /**
  * Create a typed client for the Wonder API
@@ -14,20 +13,19 @@ export function createClient(baseClient: any) {
   return {
     workspaces: Object.assign(
       (id: string) => ({
-    get: async (options?: any): Promise<paths['/api/workspaces/{id}']['get']['responses']['200']['content']['application/json']> => {
-      const response = await baseClient.GET(`/api/workspaces/${id}`, {});
-      return response.data;
-    },
-    delete: async (options?: any): Promise<paths['/api/workspaces/{id}']['delete']['responses']['200']['content']['application/json']> => {
-      const response = await baseClient.DELETE(`/api/workspaces/${id}`, {});
-      return response.data;
-    },
-    patch: async (body: NonNullable<paths['/api/workspaces/{id}']['patch']['requestBody']>['content']['application/json'], options?: any): Promise<paths['/api/workspaces/{id}']['patch']['responses']['200']['content']['application/json']> => {
-      const response = await baseClient.PATCH(`/api/workspaces/${id}`, { body });
-      return response.data;
-    }
-  })
-      ,
+          get: async (options?: any): Promise<paths['/api/workspaces/{id}']['get']['responses']['200']['content']['application/json']> => {
+            const response = await baseClient.GET(`/api/workspaces/${id}`, {});
+            return response.data;
+          },
+          delete: async (options?: any): Promise<paths['/api/workspaces/{id}']['delete']['responses']['200']['content']['application/json']> => {
+            const response = await baseClient.DELETE(`/api/workspaces/${id}`, {});
+            return response.data;
+          },
+          patch: async (body: NonNullable<paths['/api/workspaces/{id}']['patch']['requestBody']>['content']['application/json'], options?: any): Promise<paths['/api/workspaces/{id}']['patch']['responses']['200']['content']['application/json']> => {
+            const response = await baseClient.PATCH(`/api/workspaces/${id}`, { body });
+            return response.data;
+          }
+        }),
       {
         list: async (options?: any): Promise<paths['/api/workspaces']['get']['responses']['200']['content']['application/json']> => {
           const response = await baseClient.GET(`/api/workspaces`, {});
@@ -41,16 +39,15 @@ export function createClient(baseClient: any) {
     ),
     projects: Object.assign(
       (id: string) => ({
-    get: async (options?: any): Promise<paths['/api/projects/{id}']['get']['responses']['200']['content']['application/json']> => {
-      const response = await baseClient.GET(`/api/projects/${id}`, {});
-      return response.data;
-    },
-    delete: async (options?: any): Promise<paths['/api/projects/{id}']['delete']['responses']['200']['content']['application/json']> => {
-      const response = await baseClient.DELETE(`/api/projects/${id}`, {});
-      return response.data;
-    }
-  })
-      ,
+          get: async (options?: any): Promise<paths['/api/projects/{id}']['get']['responses']['200']['content']['application/json']> => {
+            const response = await baseClient.GET(`/api/projects/${id}`, {});
+            return response.data;
+          },
+          delete: async (options?: any): Promise<paths['/api/projects/{id}']['delete']['responses']['200']['content']['application/json']> => {
+            const response = await baseClient.DELETE(`/api/projects/${id}`, {});
+            return response.data;
+          }
+        }),
       {
         create: async (body: NonNullable<paths['/api/projects']['post']['requestBody']>['content']['application/json'], options?: any): Promise<paths['/api/projects']['post']['responses']['201']['content']['application/json']> => {
           const response = await baseClient.POST(`/api/projects`, { body });
@@ -60,16 +57,15 @@ export function createClient(baseClient: any) {
     ),
     actions: Object.assign(
       (id: string) => ({
-    get: async (options?: any): Promise<paths['/api/actions/{id}']['get']['responses']['200']['content']['application/json']> => {
-      const response = await baseClient.GET(`/api/actions/${id}`, {});
-      return response.data;
-    },
-    delete: async (options?: any): Promise<paths['/api/actions/{id}']['delete']['responses']['200']['content']['application/json']> => {
-      const response = await baseClient.DELETE(`/api/actions/${id}`, {});
-      return response.data;
-    }
-  })
-      ,
+          get: async (options?: any): Promise<paths['/api/actions/{id}']['get']['responses']['200']['content']['application/json']> => {
+            const response = await baseClient.GET(`/api/actions/${id}`, {});
+            return response.data;
+          },
+          delete: async (options?: any): Promise<paths['/api/actions/{id}']['delete']['responses']['200']['content']['application/json']> => {
+            const response = await baseClient.DELETE(`/api/actions/${id}`, {});
+            return response.data;
+          }
+        }),
       {
         create: async (body: NonNullable<paths['/api/actions']['post']['requestBody']>['content']['application/json'], options?: any): Promise<paths['/api/actions']['post']['responses']['201']['content']['application/json']> => {
           const response = await baseClient.POST(`/api/actions`, { body });
@@ -79,16 +75,15 @@ export function createClient(baseClient: any) {
     ),
     "prompt-specs": Object.assign(
       (id: string) => ({
-    get: async (options?: any): Promise<paths['/api/prompt-specs/{id}']['get']['responses']['200']['content']['application/json']> => {
-      const response = await baseClient.GET(`/api/prompt-specs/${id}`, {});
-      return response.data;
-    },
-    delete: async (options?: any): Promise<paths['/api/prompt-specs/{id}']['delete']['responses']['200']['content']['application/json']> => {
-      const response = await baseClient.DELETE(`/api/prompt-specs/${id}`, {});
-      return response.data;
-    }
-  })
-      ,
+          get: async (options?: any): Promise<paths['/api/prompt-specs/{id}']['get']['responses']['200']['content']['application/json']> => {
+            const response = await baseClient.GET(`/api/prompt-specs/${id}`, {});
+            return response.data;
+          },
+          delete: async (options?: any): Promise<paths['/api/prompt-specs/{id}']['delete']['responses']['200']['content']['application/json']> => {
+            const response = await baseClient.DELETE(`/api/prompt-specs/${id}`, {});
+            return response.data;
+          }
+        }),
       {
         create: async (body: NonNullable<paths['/api/prompt-specs']['post']['requestBody']>['content']['application/json'], options?: any): Promise<paths['/api/prompt-specs']['post']['responses']['201']['content']['application/json']> => {
           const response = await baseClient.POST(`/api/prompt-specs`, { body });
@@ -98,16 +93,15 @@ export function createClient(baseClient: any) {
     ),
     "model-profiles": Object.assign(
       (id: string) => ({
-    get: async (options?: any): Promise<paths['/api/model-profiles/{id}']['get']['responses']['200']['content']['application/json']> => {
-      const response = await baseClient.GET(`/api/model-profiles/${id}`, {});
-      return response.data;
-    },
-    delete: async (options?: any): Promise<paths['/api/model-profiles/{id}']['delete']['responses']['200']['content']['application/json']> => {
-      const response = await baseClient.DELETE(`/api/model-profiles/${id}`, {});
-      return response.data;
-    }
-  })
-      ,
+          get: async (options?: any): Promise<paths['/api/model-profiles/{id}']['get']['responses']['200']['content']['application/json']> => {
+            const response = await baseClient.GET(`/api/model-profiles/${id}`, {});
+            return response.data;
+          },
+          delete: async (options?: any): Promise<paths['/api/model-profiles/{id}']['delete']['responses']['200']['content']['application/json']> => {
+            const response = await baseClient.DELETE(`/api/model-profiles/${id}`, {});
+            return response.data;
+          }
+        }),
       {
         list: async (options?: any): Promise<paths['/api/model-profiles']['get']['responses']['200']['content']['application/json']> => {
           const response = await baseClient.GET(`/api/model-profiles`, {});
@@ -121,16 +115,15 @@ export function createClient(baseClient: any) {
     ),
     "workflow-defs": Object.assign(
       (id: string) => ({
-    get: async (options?: any): Promise<paths['/api/workflow-defs/{id}']['get']['responses']['200']['content']['application/json']> => {
-      const response = await baseClient.GET(`/api/workflow-defs/${id}`, {});
-      return response.data;
-    },
-    delete: async (options?: any): Promise<paths['/api/workflow-defs/{id}']['delete']['responses']['200']['content']['application/json']> => {
-      const response = await baseClient.DELETE(`/api/workflow-defs/${id}`, {});
-      return response.data;
-    }
-  })
-      ,
+          get: async (options?: any): Promise<paths['/api/workflow-defs/{id}']['get']['responses']['200']['content']['application/json']> => {
+            const response = await baseClient.GET(`/api/workflow-defs/${id}`, {});
+            return response.data;
+          },
+          delete: async (options?: any): Promise<paths['/api/workflow-defs/{id}']['delete']['responses']['200']['content']['application/json']> => {
+            const response = await baseClient.DELETE(`/api/workflow-defs/${id}`, {});
+            return response.data;
+          }
+        }),
       {
         create: async (body: NonNullable<paths['/api/workflow-defs']['post']['requestBody']>['content']['application/json'], options?: any): Promise<paths['/api/workflow-defs']['post']['responses']['201']['content']['application/json']> => {
           const response = await baseClient.POST(`/api/workflow-defs`, { body });
@@ -140,20 +133,19 @@ export function createClient(baseClient: any) {
     ),
     workflows: Object.assign(
       (id: string) => ({
-    get: async (options?: any): Promise<paths['/api/workflows/{id}']['get']['responses']['200']['content']['application/json']> => {
-      const response = await baseClient.GET(`/api/workflows/${id}`, {});
-      return response.data;
-    },
-    delete: async (options?: any): Promise<paths['/api/workflows/{id}']['delete']['responses']['200']['content']['application/json']> => {
-      const response = await baseClient.DELETE(`/api/workflows/${id}`, {});
-      return response.data;
-    },
-    start: async (body: NonNullable<paths['/api/workflows/{id}/start']['post']['requestBody']>['content']['application/json'], options?: any): Promise<paths['/api/workflows/{id}/start']['post']['responses']['200']['content']['application/json']> => {
-      const response = await baseClient.POST(`/api/workflows/${id}/start`, { body });
-      return response.data;
-    }
-  })
-      ,
+          get: async (options?: any): Promise<paths['/api/workflows/{id}']['get']['responses']['200']['content']['application/json']> => {
+            const response = await baseClient.GET(`/api/workflows/${id}`, {});
+            return response.data;
+          },
+          delete: async (options?: any): Promise<paths['/api/workflows/{id}']['delete']['responses']['200']['content']['application/json']> => {
+            const response = await baseClient.DELETE(`/api/workflows/${id}`, {});
+            return response.data;
+          },
+          start: async (body: NonNullable<paths['/api/workflows/{id}/start']['post']['requestBody']>['content']['application/json'], options?: any): Promise<paths['/api/workflows/{id}/start']['post']['responses']['200']['content']['application/json']> => {
+            const response = await baseClient.POST(`/api/workflows/${id}/start`, { body });
+            return response.data;
+          }
+        }),
       {
         create: async (body: NonNullable<paths['/api/workflows']['post']['requestBody']>['content']['application/json'], options?: any): Promise<paths['/api/workflows']['post']['responses']['201']['content']['application/json']> => {
           const response = await baseClient.POST(`/api/workflows`, { body });

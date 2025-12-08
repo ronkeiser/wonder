@@ -106,9 +106,7 @@ describe('Generator smoke test', () => {
 
     // Check for required imports
     expect(content).toContain('import type { paths }');
-    expect(content).toContain('import type { SchemaType }');
     expect(content).toContain("from './schema.js'");
-    expect(content).toContain("from '@wonder/context'");
   });
 
   it('should have JSDoc documentation', async () => {
