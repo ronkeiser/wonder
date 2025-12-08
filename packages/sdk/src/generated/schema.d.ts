@@ -4,7 +4,6 @@
  */
 
 import type { SchemaType } from "@wonder/context";
-
 export interface paths {
     "/api/workspaces": {
         parameters: {
