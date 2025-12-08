@@ -1,3 +1,4 @@
+import { node, schema, transition, workflowDef } from '@wonder/sdk';
 import { describe, expect, it } from 'vitest';
 import { client } from '~/client';
 
@@ -68,14 +69,12 @@ describe('Edge Test - Branching Architecture', () => {
         template: 'Suggest a fun and friendly name for my dog. Make it just a little quirky!',
         template_language: 'handlebars',
         requires: {},
-        produces: {
-          type: 'object',
-          properties: {
-            name: { type: 'string' },
+        produces: schema.object(
+          {
+            name: schema.string(),
           },
-          required: ['name'],
-          additionalProperties: false,
-        },
+          { required: ['name'] },
+        ),
       },
     });
 
@@ -97,25 +96,20 @@ describe('Edge Test - Branching Architecture', () => {
         requires: {
           names: 'array',
         },
-        produces: {
-          type: 'object',
-          properties: {
-            scores: {
-              type: 'array',
-              items: {
-                type: 'object',
-                properties: {
-                  name: { type: 'string' },
-                  score: { type: 'number' },
+        produces: schema.object(
+          {
+            scores: schema.array(
+              schema.object(
+                {
+                  name: schema.string(),
+                  score: schema.number(),
                 },
-                required: ['name', 'score'],
-                additionalProperties: false,
-              },
-            },
+                { required: ['name', 'score'] },
+              ),
+            ),
           },
-          required: ['scores'],
-          additionalProperties: false,
-        },
+          { required: ['scores'] },
+        ),
       },
     });
 
@@ -137,26 +131,21 @@ describe('Edge Test - Branching Architecture', () => {
         requires: {
           judge_scores: 'array',
         },
-        produces: {
-          type: 'object',
-          properties: {
-            ranking: {
-              type: 'array',
-              items: {
-                type: 'object',
-                properties: {
-                  name: { type: 'string' },
-                  average_score: { type: 'number' },
-                  rank: { type: 'number' },
+        produces: schema.object(
+          {
+            ranking: schema.array(
+              schema.object(
+                {
+                  name: schema.string(),
+                  average_score: schema.number(),
+                  rank: schema.number(),
                 },
-                required: ['name', 'average_score', 'rank'],
-                additionalProperties: false,
-              },
-            },
+                { required: ['name', 'average_score', 'rank'] },
+              ),
+            ),
           },
-          required: ['ranking'],
-          additionalProperties: false,
-        },
+          { required: ['ranking'] },
+        ),
       },
     });
 
@@ -227,133 +216,127 @@ describe('Edge Test - Branching Architecture', () => {
     console.log('✓ Ranking action created:', rankingActionId);
 
     // Step 10: Create workflow definition with two-stage fan-out
+    const workflow = workflowDef({
+      name: `Dog Name Pipeline ${Date.now()}`,
+      description: 'Tests ideation → judging → ranking pipeline',
+      project_id: projectId,
+      input_schema: schema.object({}),
+      output_schema: schema.object(
+        {
+          ranking: schema.array(schema.object({})),
+        },
+        { required: ['ranking'] },
+      ),
+      output_mapping: {
+        ranking: '$.ranking_node_output.ranking',
+      },
+      initial_node_ref: 'start_node',
+      nodes: [
+        node({
+          ref: 'start_node',
+          name: 'Start',
+        }),
+        node({
+          ref: 'ideation_node',
+          name: 'Dog Name Ideation',
+          action_id: ideationActionId,
+          action_version: 1,
+          input_mapping: {},
+          output_mapping: {
+            name: '$.response.name',
+          },
+        }),
+        node({
+          ref: 'merge_names_node',
+          name: 'Merge Names',
+        }),
+        node({
+          ref: 'judging_node',
+          name: 'Judge Names',
+          action_id: judgingActionId,
+          action_version: 1,
+          input_mapping: {
+            names: '$.merge_names_node_output.all_names',
+          },
+          output_mapping: {
+            scores: '$.response.scores',
+          },
+        }),
+        node({
+          ref: 'merge_scores_node',
+          name: 'Merge Judge Scores',
+        }),
+        node({
+          ref: 'ranking_node',
+          name: 'Final Ranking',
+          action_id: rankingActionId,
+          action_version: 1,
+          input_mapping: {
+            judge_scores: '$.merge_scores_node_output.all_scores',
+          },
+          output_mapping: {
+            ranking: '$.response.ranking',
+          },
+        }),
+      ],
+      transitions: [
+        transition({
+          ref: 'start_to_ideation',
+          from_node_ref: 'start_node',
+          to_node_ref: 'ideation_node',
+          priority: 1,
+          spawn_count: IDEATION_COUNT,
+        }),
+        transition({
+          ref: 'ideation_to_merge',
+          from_node_ref: 'ideation_node',
+          to_node_ref: 'merge_names_node',
+          priority: 1,
+          synchronization: {
+            wait_for: 'all',
+            joins_transition: 'start_to_ideation',
+            merge: {
+              source: '*.name',
+              target: '$.merge_names_node_output.all_names',
+              strategy: 'array',
+            },
+          },
+        }),
+        transition({
+          ref: 'merge_to_judging',
+          from_node_ref: 'merge_names_node',
+          to_node_ref: 'judging_node',
+          priority: 1,
+          spawn_count: JUDGE_COUNT,
+        }),
+        transition({
+          ref: 'judging_to_merge',
+          from_node_ref: 'judging_node',
+          to_node_ref: 'merge_scores_node',
+          priority: 1,
+          synchronization: {
+            wait_for: 'all',
+            joins_transition: 'merge_to_judging',
+            merge: {
+              source: '*.scores',
+              target: '$.merge_scores_node_output.all_scores',
+              strategy: 'array',
+            },
+          },
+        }),
+        transition({
+          ref: 'merge_to_ranking',
+          from_node_ref: 'merge_scores_node',
+          to_node_ref: 'ranking_node',
+          priority: 1,
+        }),
+      ],
+    });
+
     const { data: workflowDefResponse, error: workflowDefError } = await client.POST(
       '/api/workflow-defs',
       {
-        body: {
-          name: `Dog Name Pipeline ${Date.now()}`,
-          description: 'Tests ideation → judging → ranking pipeline',
-          version: 1,
-          project_id: projectId,
-          input_schema: {
-            type: 'object',
-            properties: {},
-          },
-          output_schema: {
-            type: 'object',
-            properties: {
-              ranking: {
-                type: 'array',
-                items: { type: 'object' },
-              },
-            },
-            required: ['ranking'],
-          },
-          output_mapping: {
-            ranking: '$.ranking_node_output.ranking',
-          },
-          initial_node_ref: 'start_node',
-          nodes: [
-            {
-              ref: 'start_node',
-              name: 'Start',
-            },
-            {
-              ref: 'ideation_node',
-              name: 'Dog Name Ideation',
-              action_id: ideationActionId,
-              action_version: 1,
-              input_mapping: {},
-              output_mapping: {
-                name: '$.response.name',
-              },
-            },
-            {
-              ref: 'merge_names_node',
-              name: 'Merge Names',
-            },
-            {
-              ref: 'judging_node',
-              name: 'Judge Names',
-              action_id: judgingActionId,
-              action_version: 1,
-              input_mapping: {
-                names: '$.merge_names_node_output.all_names',
-              },
-              output_mapping: {
-                scores: '$.response.scores',
-              },
-            },
-            {
-              ref: 'merge_scores_node',
-              name: 'Merge Judge Scores',
-            },
-            {
-              ref: 'ranking_node',
-              name: 'Final Ranking',
-              action_id: rankingActionId,
-              action_version: 1,
-              input_mapping: {
-                judge_scores: '$.merge_scores_node_output.all_scores',
-              },
-              output_mapping: {
-                ranking: '$.response.ranking',
-              },
-            },
-          ],
-          transitions: [
-            {
-              ref: 'start_to_ideation',
-              from_node_ref: 'start_node',
-              to_node_ref: 'ideation_node',
-              priority: 1,
-              spawn_count: IDEATION_COUNT,
-            },
-            {
-              ref: 'ideation_to_merge',
-              from_node_ref: 'ideation_node',
-              to_node_ref: 'merge_names_node',
-              priority: 1,
-              synchronization: {
-                wait_for: 'all',
-                joins_transition: 'start_to_ideation',
-                merge: {
-                  source: '*.name',
-                  target: '$.merge_names_node_output.all_names',
-                  strategy: 'array',
-                },
-              },
-            },
-            {
-              ref: 'merge_to_judging',
-              from_node_ref: 'merge_names_node',
-              to_node_ref: 'judging_node',
-              priority: 1,
-              spawn_count: JUDGE_COUNT,
-            },
-            {
-              ref: 'judging_to_merge',
-              from_node_ref: 'judging_node',
-              to_node_ref: 'merge_scores_node',
-              priority: 1,
-              synchronization: {
-                wait_for: 'all',
-                joins_transition: 'merge_to_judging',
-                merge: {
-                  source: '*.scores',
-                  target: '$.merge_scores_node_output.all_scores',
-                  strategy: 'array',
-                },
-              },
-            },
-            {
-              ref: 'merge_to_ranking',
-              from_node_ref: 'merge_scores_node',
-              to_node_ref: 'ranking_node',
-              priority: 1,
-            },
-          ],
-        },
+        body: workflow,
       },
     );
 
