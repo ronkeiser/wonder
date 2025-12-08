@@ -100,7 +100,7 @@ describe('schema builders', () => {
   });
 
   describe('object()', () => {
-    it('creates object with properties', () => {
+    it('creates object with properties and additionalProperties false by default', () => {
       const result = object({
         name: string(),
         age: integer(),
@@ -112,6 +112,7 @@ describe('schema builders', () => {
           name: { type: 'string' },
           age: { type: 'integer' },
         },
+        additionalProperties: false,
       });
     });
 
@@ -130,6 +131,7 @@ describe('schema builders', () => {
           name: { type: 'string' },
           email: { type: 'string' },
         },
+        additionalProperties: false,
         required: ['name', 'email'],
       });
     });
@@ -142,6 +144,19 @@ describe('schema builders', () => {
         properties: {
           name: { type: 'string' },
         },
+        additionalProperties: false,
+      });
+    });
+
+    it('allows explicit additionalProperties true', () => {
+      const result = object({ name: string() }, { additionalProperties: true });
+
+      expect(result).toEqual({
+        type: 'object',
+        properties: {
+          name: { type: 'string' },
+        },
+        additionalProperties: true,
       });
     });
   });
@@ -217,6 +232,7 @@ describe('schema builders', () => {
           age: { type: 'integer', minimum: 0 },
           tags: { type: 'array', items: { type: 'string' } },
         },
+        additionalProperties: false,
         required: ['name'],
       });
     });
@@ -246,6 +262,7 @@ describe('schema builders', () => {
               name: { type: 'string' },
               email: { type: 'string', pattern: '^.+@.+$' },
             },
+            additionalProperties: false,
             required: ['name', 'email'],
           },
           settings: {
@@ -253,8 +270,10 @@ describe('schema builders', () => {
             properties: {
               theme: { type: 'string', enum: ['light', 'dark'] },
             },
+            additionalProperties: false,
           },
         },
+        additionalProperties: false,
       });
     });
 
@@ -273,6 +292,7 @@ describe('schema builders', () => {
         type: 'array',
         items: {
           type: 'object',
+          additionalProperties: false,
           properties: {
             id: { type: 'string' },
             value: { type: 'integer' },

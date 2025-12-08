@@ -33,12 +33,14 @@ describe('workflowDef()', () => {
         properties: {
           data: { type: 'string' },
         },
+        additionalProperties: false,
       },
       output_schema: {
         type: 'object',
         properties: {
           result: { type: 'string' },
         },
+        additionalProperties: false,
       },
       initial_node_ref: 'start',
       nodes: [

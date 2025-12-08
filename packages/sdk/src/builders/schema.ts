@@ -104,11 +104,13 @@ export function object(
   properties: Record<string, SchemaType>,
   options?: {
     required?: string[];
+    additionalProperties?: boolean;
   },
 ): SchemaType {
   return {
     type: 'object',
     properties,
+    additionalProperties: options?.additionalProperties ?? false,
     ...(options?.required && options.required.length > 0 && { required: options.required }),
   };
 }

@@ -5,6 +5,7 @@ export type SchemaType = {
   // Object validation
   properties?: Record<string, SchemaType>;
   required?: string[];
+  additionalProperties?: boolean;
 
   // Array validation
   items?: SchemaType;
