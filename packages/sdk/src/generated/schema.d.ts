@@ -3,6 +3,8 @@
  * Do not make direct changes to the file.
  */
 
+import type { SchemaType } from "@wonder/context";
+
 export interface paths {
     "/api/workspaces": {
         parameters: {
@@ -882,7 +884,9 @@ export interface paths {
         trace?: never;
     };
 }
+
 export type webhooks = Record<string, never>;
+
 export interface components {
     schemas: {
         Workspace: {
@@ -1144,15 +1148,9 @@ export interface components {
             project_id: string | null;
             library_id: string | null;
             tags: string[] | null;
-            input_schema: {
-                [key: string]: unknown;
-            };
-            output_schema: {
-                [key: string]: unknown;
-            };
-            context_schema: {
-                [key: string]: unknown;
-            } | null;
+            input_schema: SchemaType;
+            output_schema: SchemaType;
+            context_schema: SchemaType | null;
             initial_node_id: string | null;
             created_at: string;
             updated_at: string;
@@ -1180,17 +1178,13 @@ export interface components {
              *       "topic": "string"
              *     }
              */
-            input_schema: {
-                [key: string]: unknown;
-            };
+            input_schema: SchemaType;
             /**
              * @example {
              *       "content": "string"
              *     }
              */
-            output_schema: {
-                [key: string]: unknown;
-            };
+            output_schema: SchemaType;
             /**
              * @example {
              *       "result": "$.final_node_output.response"
@@ -1199,9 +1193,7 @@ export interface components {
             output_mapping?: {
                 [key: string]: string;
             };
-            context_schema?: {
-                [key: string]: unknown;
-            };
+            context_schema?: SchemaType;
             /** @example start_node */
             initial_node_ref: string;
             nodes: {
@@ -1324,5 +1316,7 @@ export interface components {
     headers: never;
     pathItems: never;
 }
+
 export type $defs = Record<string, never>;
+
 export type operations = Record<string, never>;
