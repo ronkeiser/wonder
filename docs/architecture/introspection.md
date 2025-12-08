@@ -2,6 +2,8 @@
 
 Introspection provides line-by-line visibility into coordinator execution without cluttering code with logs. Events are structured data that flow through a separate observability channel.
 
+**Introspection replaces logging for normal coordinator operations.** Execution traces, performance metrics, state changes, and debugging information are captured as introspection events. The coordinator only logs critical failures - errors indicating the coordinator itself is broken, not workflow execution issues.
+
 ## Storage Architecture
 
 **Primary storage: Events Service (D1)**
@@ -10,6 +12,7 @@ Introspection provides line-by-line visibility into coordinator execution withou
 - Structured storage per workflow_run_id
 - Used by SDK for testing and debugging
 - Separate table from workflow events
+- **Retention: 10 days** (deleted after 10 days, not archived)
 
 **Secondary storage: Analytics Engine (optional)**
 

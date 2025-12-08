@@ -23,10 +23,11 @@ The coordinator enhances this with a **Decision Layer** where decision logic is 
 coordinator/src/
 ├── index.ts                    # DO class (Actor) - thin orchestrator
 ├── types.ts                    # Decision type definitions
+├── events.ts                   # Event emission (workflow + introspection)
 ├── planning/                   # Pure logic - returns Decision[]
 │   ├── routing.ts              # Transition evaluation
 │   ├── synchronization.ts      # Fan-in logic
-│   ├── branching.ts            # Branch creation logic
+│   ├── branching.ts            # Branch control logic
 │   ├── completion.ts           # Workflow finalization
 │   └── conditions.ts           # Condition evaluation (CEL future)
 ├── operations/                 # Actor operations - SQL and RPC
@@ -259,6 +260,37 @@ Actor-level caching utilities.
 // Context snapshots cached and invalidated on SET_CONTEXT
 // Avoids repeated SQL reads during decision execution
 ```
+
+## Event Emission & Introspection
+
+### events.ts
+
+Handles event emission for observability and debugging. Emits two types of events:
+
+**Workflow events** (always on):
+
+- Business-level events: `workflow_started`, `node_completed`, `token_spawned`, etc.
+- Used for audit trails, replay, and user-facing observability
+- Written to Events Service (D1) for all workflow runs
+
+**Introspection events** (opt-in):
+
+- Debug-level events: `decision.routing.start`, `operation.sql.query`, `operation.context.read`, etc.
+- High-volume, detailed execution traces for debugging coordinator internals
+- Enabled via `X-Introspection-Enabled` header or env var
+- Written to separate `introspection_events` table in Events Service
+- **Replaces logging for normal operations** - only critical failures logged
+
+**Emitter lifecycle:**
+
+1. Created in `index.ts` during DO initialization
+2. Passed to `operations` and `dispatch` layers
+3. Batches events in memory (flush every 100 events or 30 seconds)
+4. Writes to Events Service via RPC
+
+**Event types imported from `@wonder/events` package** (Events Service owns the schema).
+
+See `docs/architecture/introspection.md` for detailed design.
 
 ## Coordinator (Entry Point)
 
