@@ -230,6 +230,7 @@ export function formatClientCode(structure: ClientStructure): string {
   // Imports
   lines.push("import type { paths } from './schema.js';");
   lines.push("import type { SchemaType } from '@wonder/context';");
+  lines.push("import { createCollection } from '../client-base.js';");
   lines.push('');
 
   // Create client function
@@ -250,9 +251,7 @@ export function formatClientCode(structure: ClientStructure): string {
       ? collection.name
       : `"${collection.name}"`;
 
-    lines.push(`    ${propertyName}: {`);
-    lines.push('      // Collection methods');
-    lines.push('    }' + (isLast ? '' : ','));
+    lines.push(`    ${propertyName}: createCollection(baseClient, '/api/${collection.name}')${isLast ? '' : ','}`);
   }
 
   lines.push('  };');

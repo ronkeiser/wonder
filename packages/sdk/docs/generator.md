@@ -814,38 +814,382 @@ describe('End-to-end generation', () => {
 
 **Purpose:** Provide runtime utilities that the generated client uses.
 
-**Core functions:**
+#### Task 4.1: Core Type Definitions (5 min)
 
-**`createCollection(baseClient, path)`**
+Define TypeScript interfaces for runtime client structures.
 
-- Returns object with collection methods (create, list, etc.)
-- Each method constructs full path and calls base client
-- Handles request body, query params, headers
+**Create:** `src/client-base.ts` with type definitions
 
-**`createInstance(baseClient, path, id)`**
+**Types:**
 
-- Returns object with instance methods (get, update, delete, etc.)
-- Injects ID into path
-- Supports nested resources via chaining
+- `CollectionMethods` - Interface for collection operations (create, list)
+- `InstanceMethods` - Interface for instance operations (get, update, delete)
+- `ActionMethod` - Generic action handler type
+- `ClientConfig` - Configuration for base client
 
-**`createAction(baseClient, path, method)`**
+**Test:**
 
-- Generic action handler for custom endpoints
-- Used for non-CRUD operations (start, cancel, etc.)
+```typescript
+import { describe, it, expect } from 'vitest';
+import type { CollectionMethods, InstanceMethods } from '../src/client-base';
 
-**Path construction:**
+describe('client-base types', () => {
+  it('should define CollectionMethods interface', () => {
+    const methods: CollectionMethods = {
+      create: expect.any(Function),
+      list: expect.any(Function),
+    };
+    expect(methods).toBeDefined();
+  });
 
-- Build paths dynamically from segments
-- Handle parameter substitution
-- Preserve type safety through generics
+  it('should define InstanceMethods interface', () => {
+    const methods: InstanceMethods = {
+      get: expect.any(Function),
+      update: expect.any(Function),
+      delete: expect.any(Function),
+    };
+    expect(methods).toBeDefined();
+  });
+});
+```
 
-**Testing strategy:**
+**Validation:**
 
-- Manual smoke test with generated client
-- Create workspace, project, workflow
-- Verify all methods work end-to-end
+- Types compile and export correctly
+- Interfaces define expected method signatures
 
-**Time estimate:** 30 minutes
+#### Task 4.2: Path Construction Utility (10 min)
+
+Create utility to build paths with parameter substitution.
+
+**Function:** `buildPath(segments: string[], params: Record<string, string>): string`
+
+**Logic:**
+
+- Join segments with `/`
+- Add `/api/` prefix
+- Replace `:param` placeholders with values from params object
+- Throw error if required parameter is missing
+
+**Test:**
+
+```typescript
+describe('buildPath', () => {
+  it('should build simple path', () => {
+    expect(buildPath(['workspaces'])).toBe('/api/workspaces');
+  });
+
+  it('should substitute path parameters', () => {
+    expect(buildPath(['workspaces', ':id'], { id: '123' })).toBe('/api/workspaces/123');
+  });
+
+  it('should handle nested parameters', () => {
+    expect(
+      buildPath(['projects', ':project_id', 'workflows', ':id'], {
+        project_id: 'p1',
+        id: 'w1',
+      }),
+    ).toBe('/api/projects/p1/workflows/w1');
+  });
+
+  it('should throw on missing parameter', () => {
+    expect(() => buildPath(['workspaces', ':id'], {})).toThrow('Missing parameter: id');
+  });
+});
+```
+
+**Validation:**
+
+- Correctly builds paths from segments
+- Substitutes all parameters
+- Errors on missing parameters
+
+#### Task 4.3: Collection Factory (15 min)
+
+Create function that returns collection methods (create, list).
+
+**Function:** `createCollection(baseClient: any, path: string): CollectionMethods`
+
+**Returns object with:**
+
+- `create(data)` - POST to collection with body
+- `list(query?)` - GET collection with optional query params
+
+**Logic:**
+
+- `create` calls `baseClient.POST(path, { body: data })`
+- `list` calls `baseClient.GET(path, { params: { query } })`
+
+**Test:**
+
+```typescript
+describe('createCollection', () => {
+  it('should create collection with create method', () => {
+    const mockClient = {
+      POST: vi.fn().mockResolvedValue({ data: { id: '1' } }),
+    };
+
+    const collection = createCollection(mockClient, '/api/workspaces');
+
+    expect(collection).toHaveProperty('create');
+    expect(typeof collection.create).toBe('function');
+  });
+
+  it('should call POST with correct path for create', async () => {
+    const mockClient = {
+      POST: vi.fn().mockResolvedValue({ data: { id: '1' } }),
+    };
+
+    const collection = createCollection(mockClient, '/api/workspaces');
+    await collection.create({ name: 'Test' });
+
+    expect(mockClient.POST).toHaveBeenCalledWith('/api/workspaces', {
+      body: { name: 'Test' },
+    });
+  });
+
+  it('should have list method', () => {
+    const mockClient = { GET: vi.fn() };
+    const collection = createCollection(mockClient, '/api/workspaces');
+
+    expect(collection).toHaveProperty('list');
+  });
+
+  it('should call GET for list', async () => {
+    const mockClient = {
+      GET: vi.fn().mockResolvedValue({ data: [] }),
+    };
+
+    const collection = createCollection(mockClient, '/api/workspaces');
+    await collection.list();
+
+    expect(mockClient.GET).toHaveBeenCalledWith('/api/workspaces', {});
+  });
+
+  it('should pass query params to list', async () => {
+    const mockClient = {
+      GET: vi.fn().mockResolvedValue({ data: [] }),
+    };
+
+    const collection = createCollection(mockClient, '/api/workspaces');
+    await collection.list({ limit: 10 });
+
+    expect(mockClient.GET).toHaveBeenCalledWith('/api/workspaces', {
+      params: { query: { limit: 10 } },
+    });
+  });
+});
+```
+
+**Validation:**
+
+- Collection has create and list methods
+- Methods call base client with correct paths
+- Query params passed through for list
+
+#### Task 4.4: Instance Factory (15 min)
+
+Create function that returns instance methods (get, update, delete).
+
+**Function:** `createInstance(baseClient: any, path: string, id: string): InstanceMethods`
+
+**Returns object with:**
+
+- `get()` - GET instance
+- `update(data)` - PUT instance with body
+- `delete()` - DELETE instance
+
+**Logic:**
+
+- Replace `:id` parameter in path with provided ID
+- Call appropriate HTTP method on base client
+
+**Test:**
+
+```typescript
+describe('createInstance', () => {
+  it('should inject ID into path for get', async () => {
+    const mockClient = {
+      GET: vi.fn().mockResolvedValue({ data: { id: '123' } }),
+    };
+
+    const instance = createInstance(mockClient, '/api/workspaces/:id', '123');
+    await instance.get();
+
+    expect(mockClient.GET).toHaveBeenCalledWith('/api/workspaces/123', {});
+  });
+
+  it('should inject ID for update', async () => {
+    const mockClient = {
+      PUT: vi.fn().mockResolvedValue({ data: { id: '123' } }),
+    };
+
+    const instance = createInstance(mockClient, '/api/workspaces/:id', '123');
+    await instance.update({ name: 'Updated' });
+
+    expect(mockClient.PUT).toHaveBeenCalledWith('/api/workspaces/123', {
+      body: { name: 'Updated' },
+    });
+  });
+
+  it('should inject ID for delete', async () => {
+    const mockClient = {
+      DELETE: vi.fn().mockResolvedValue({ data: null }),
+    };
+
+    const instance = createInstance(mockClient, '/api/workspaces/:id', '123');
+    await instance.delete();
+
+    expect(mockClient.DELETE).toHaveBeenCalledWith('/api/workspaces/123', {});
+  });
+
+  it('should support nested resource paths', async () => {
+    const mockClient = {
+      GET: vi.fn().mockResolvedValue({ data: {} }),
+    };
+
+    const instance = createInstance(mockClient, '/api/projects/:project_id/workflows/:id', 'w123');
+
+    // Note: parent ID should already be in path
+    await instance.get();
+
+    expect(mockClient.GET).toHaveBeenCalledWith('/api/projects/:project_id/workflows/w123', {});
+  });
+});
+```
+
+**Validation:**
+
+- ID correctly injected into path
+- All CRUD methods work
+- Supports nested resource paths
+
+#### Task 4.5: Action Factory (10 min)
+
+Create generic action handler for custom endpoints.
+
+**Function:** `createAction(baseClient: any, path: string, method: string): ActionMethod`
+
+**Returns function that:**
+
+- Accepts optional body/params
+- Calls specified HTTP method on path
+- Returns response
+
+**Logic:**
+
+- Return async function that calls `baseClient[method](path, options)`
+- Handle body for POST/PUT, empty options for GET/DELETE
+
+**Test:**
+
+```typescript
+describe('createAction', () => {
+  it('should create action that calls correct method', async () => {
+    const mockClient = {
+      POST: vi.fn().mockResolvedValue({ data: { status: 'started' } }),
+    };
+
+    const action = createAction(mockClient, '/api/workflows/:id/start', 'POST');
+    await action({ force: true });
+
+    expect(mockClient.POST).toHaveBeenCalledWith('/api/workflows/:id/start', {
+      body: { force: true },
+    });
+  });
+
+  it('should support GET actions', async () => {
+    const mockClient = {
+      GET: vi.fn().mockResolvedValue({ data: { status: 'healthy' } }),
+    };
+
+    const action = createAction(mockClient, '/api/health', 'GET');
+    await action();
+
+    expect(mockClient.GET).toHaveBeenCalledWith('/api/health', {});
+  });
+
+  it('should handle actions without body', async () => {
+    const mockClient = {
+      POST: vi.fn().mockResolvedValue({ data: {} }),
+    };
+
+    const action = createAction(mockClient, '/api/workflows/:id/cancel', 'POST');
+    await action();
+
+    expect(mockClient.POST).toHaveBeenCalledWith('/api/workflows/:id/cancel', {});
+  });
+});
+```
+
+**Validation:**
+
+- Action calls correct HTTP method
+- Body passed through when provided
+- Works with all HTTP methods
+
+#### Task 4.6: Collection with Instance Access (15 min)
+
+Extend collection to support callable syntax for accessing instances.
+
+**Pattern:** `client.workspaces('123')` returns instance methods
+
+**Implementation:**
+
+- Make collection object callable (function with properties)
+- When called with ID, return instance methods
+- Preserve collection methods as properties
+
+**Test:**
+
+```typescript
+describe('collection with instance access', () => {
+  it('should allow calling collection as function', () => {
+    const mockClient = { GET: vi.fn(), POST: vi.fn() };
+    const collection = createCollection(mockClient, '/api/workspaces');
+
+    expect(typeof collection).toBe('function');
+  });
+
+  it('should return instance methods when called with ID', () => {
+    const mockClient = { GET: vi.fn(), PUT: vi.fn(), DELETE: vi.fn() };
+    const collection = createCollection(mockClient, '/api/workspaces');
+
+    const instance = collection('123');
+
+    expect(instance).toHaveProperty('get');
+    expect(instance).toHaveProperty('update');
+    expect(instance).toHaveProperty('delete');
+  });
+
+  it('should have both collection and instance methods', async () => {
+    const mockClient = {
+      GET: vi.fn().mockResolvedValue({ data: [] }),
+      POST: vi.fn().mockResolvedValue({ data: { id: '1' } }),
+    };
+
+    const collection = createCollection(mockClient, '/api/workspaces');
+
+    // Collection methods
+    await collection.list();
+    expect(mockClient.GET).toHaveBeenCalled();
+
+    // Instance methods
+    const instance = collection('123');
+    await instance.get();
+    expect(mockClient.GET).toHaveBeenCalledWith('/api/workspaces/123', {});
+  });
+});
+```
+
+**Validation:**
+
+- Collection is callable as function
+- Returns instance methods when called with ID
+- Preserves collection methods as properties
+- Supports method chaining
+
+**Time estimate:** 1 hour 10 minutes total
 
 ## File Structure
 

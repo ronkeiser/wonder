@@ -67,7 +67,11 @@ describe('End-to-end generation', () => {
 
     // Should have workspaces collection
     expect(client).toHaveProperty('workspaces');
-    expect(typeof client.workspaces).toBe('object');
+    expect(typeof client.workspaces).toBe('function');
+    
+    // Collections should be callable and have collection methods
+    expect(client.workspaces).toHaveProperty('create');
+    expect(client.workspaces).toHaveProperty('list');
   });
 
   it('should have proper structure for all collections', async () => {
@@ -81,9 +85,12 @@ describe('End-to-end generation', () => {
     // Should have multiple collections
     expect(collections.length).toBeGreaterThan(0);
 
-    // Each collection should be an object
+    // Each collection should be a callable function with collection methods
     collections.forEach((collectionName) => {
-      expect(typeof client[collectionName as keyof typeof client]).toBe('object');
+      const collection = client[collectionName as keyof typeof client];
+      expect(typeof collection).toBe('function');
+      expect(collection).toHaveProperty('create');
+      expect(collection).toHaveProperty('list');
     });
   });
 

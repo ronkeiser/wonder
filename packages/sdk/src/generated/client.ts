@@ -5,6 +5,7 @@
 
 import type { paths } from './schema.js';
 import type { SchemaType } from '@wonder/context';
+import { createCollection } from '../client-base.js';
 
 /**
  * Create a typed client for the Wonder API
@@ -12,29 +13,13 @@ import type { SchemaType } from '@wonder/context';
  */
 export function createClient(baseClient: any) {
   return {
-    workspaces: {
-      // Collection methods
-    },
-    projects: {
-      // Collection methods
-    },
-    actions: {
-      // Collection methods
-    },
-    "prompt-specs": {
-      // Collection methods
-    },
-    "model-profiles": {
-      // Collection methods
-    },
-    "workflow-defs": {
-      // Collection methods
-    },
-    workflows: {
-      // Collection methods
-    },
-    logs: {
-      // Collection methods
-    }
+    workspaces: createCollection(baseClient, '/api/workspaces'),
+    projects: createCollection(baseClient, '/api/projects'),
+    actions: createCollection(baseClient, '/api/actions'),
+    "prompt-specs": createCollection(baseClient, '/api/prompt-specs'),
+    "model-profiles": createCollection(baseClient, '/api/model-profiles'),
+    "workflow-defs": createCollection(baseClient, '/api/workflow-defs'),
+    workflows: createCollection(baseClient, '/api/workflows'),
+    logs: createCollection(baseClient, '/api/logs')
   };
 }
