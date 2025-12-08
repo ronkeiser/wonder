@@ -6,7 +6,7 @@ Type-safe TypeScript SDK for the Wonder workflow orchestration platform.
 
 The SDK provides two layers:
 
-1. **Generated Client** (Layer 1) - Auto-generated type-safe HTTP client from OpenAPI spec
+1. **Resource Client** (Layer 1) - Auto-generated resource-specific methods from OpenAPI spec
 2. **Builder Helpers** (Layer 2) - Ergonomic builders for creating workflow definitions, schemas, nodes, and transitions
 
 ## Installation
@@ -17,27 +17,42 @@ pnpm add @wonder/sdk
 
 ## Quick Start
 
-### Using the HTTP Client
+### Using the Resource Client
 
 ```typescript
-import { createClient } from '@wonder/sdk';
+import createClient from 'openapi-fetch';
+import { createClient as createWonderClient } from '@wonder/sdk';
+import type { paths } from '@wonder/sdk/schema';
 
-const client = createClient('https://wonder-http.ron-keiser.workers.dev');
+const API_URL = 'https://wonder-http.ron-keiser.workers.dev';
+
+// Create base HTTP client
+const baseClient = createClient<paths>({ baseUrl: API_URL });
+
+// Create Wonder client with resource-specific methods
+const wonder = createWonderClient(baseClient);
+
+// List workspaces
+const workspacesResponse = await wonder.workspaces.list();
+console.log('Workspaces:', workspacesResponse?.workspaces);
 
 // Create a workspace
-const { data, error } = await client.POST('/api/workspaces', {
-  body: {
-    name: 'My Workspace',
-    description: 'A workspace for AI workflows',
-  },
+const createResponse = await wonder.workspaces.create({
+  name: 'My Workspace',
+  description: 'A workspace for AI workflows',
+});
+console.log('Created workspace:', createResponse?.workspace);
+
+// Get a specific workspace
+const workspace = await wonder.workspaces('workspace-id').get();
+
+// Update a workspace
+await wonder.workspaces('workspace-id').patch({
+  name: 'Updated Name',
 });
 
-if (error) {
-  console.error('Failed:', error);
-  return;
-}
-
-console.log('Created workspace:', data.workspace);
+// Delete a workspace
+await wonder.workspaces('workspace-id').delete();
 ```
 
 ### Using Workflow Builders
@@ -51,11 +66,11 @@ const myWorkflow = workflowDef({
   description: 'Generates content based on a topic',
   input_schema: schema.object({
     topic: schema.string({ minLength: 1 }),
-    tone: schema.enum(['formal', 'casual', 'technical']),
+    tone: schema.string({ enum: ['formal', 'casual', 'technical'] }),
   }),
   output_schema: schema.object({
     content: schema.string(),
-    wordCount: schema.integer({ min: 0 }),
+    wordCount: schema.integer({ minimum: 0 }),
   }),
   context_schema: schema.object({
     apiKey: schema.string(),
@@ -96,9 +111,8 @@ const myWorkflow = workflowDef({
 });
 
 // Create the workflow via API
-const { data } = await client.POST('/api/workflow-defs', {
-  body: myWorkflow,
-});
+const workflowDefResponse = await wonder['workflow-defs'].create(myWorkflow);
+console.log('Created workflow:', workflowDefResponse?.workflow_def);
 ```
 
 ## Builder API

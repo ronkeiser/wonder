@@ -1,6 +1,6 @@
 import { node, schema, transition, workflowDef } from '@wonder/sdk';
 import { describe, expect, it } from 'vitest';
-import { client } from '~/client';
+import { wonder } from '~/client';
 
 const IDEATION_COUNT = 5;
 const JUDGE_COUNT = 5;
@@ -8,209 +8,191 @@ const JUDGE_COUNT = 5;
 describe('Edge Test - Branching Architecture', () => {
   it('fan-out → merge → fan-out → merge → rank', async () => {
     // Step 1: Create workspace
-    const { data: workspaceResponse } = await client.POST('/api/workspaces', {
-      body: {
-        name: `Test Workspace ${Date.now()}`,
-      },
+    const workspaceResponse = await wonder.workspaces.create({
+      name: `Test Workspace ${Date.now()}`,
     });
 
     expect(workspaceResponse).toBeDefined();
-    expect(workspaceResponse!.workspace).toBeDefined();
-    expect(workspaceResponse!.workspace.id).toBeDefined();
+    expect(workspaceResponse?.workspace).toBeDefined();
+    expect(workspaceResponse?.workspace.id).toBeDefined();
 
     const workspaceId = workspaceResponse!.workspace.id;
     console.log('✓ Workspace created:', workspaceId);
 
     // Step 2: Create project
-    const { data: projectResponse } = await client.POST('/api/projects', {
-      body: {
-        workspace_id: workspaceId,
-        name: `Test Project ${Date.now()}`,
-        description: 'Test project for branching architecture',
-      },
+    const projectResponse = await wonder.projects.create({
+      workspace_id: workspaceId,
+      name: `Test Project ${Date.now()}`,
+      description: 'Test project for branching architecture',
     });
 
     expect(projectResponse).toBeDefined();
-    expect(projectResponse!.project).toBeDefined();
-    expect(projectResponse!.project.id).toBeDefined();
-    expect(projectResponse!.project.workspace_id).toBe(workspaceId);
+    expect(projectResponse?.project).toBeDefined();
+    expect(projectResponse?.project.id).toBeDefined();
+    expect(projectResponse?.project.workspace_id).toBe(workspaceId);
 
     const projectId = projectResponse!.project.id;
     console.log('✓ Project created:', projectId);
 
     // Step 3: Create model profile
-    const { data: modelProfileResponse } = await client.POST('/api/model-profiles', {
-      body: {
-        name: `Test Model Profile ${Date.now()}`,
-        provider: 'cloudflare',
-        model_id: '@cf/meta/llama-3.1-8b-instruct',
-        parameters: {
-          max_tokens: 512,
-          temperature: 1.2,
-        },
-        cost_per_1k_input_tokens: 0.0,
-        cost_per_1k_output_tokens: 0.0,
+    const modelProfileResponse = await wonder['model-profiles'].create({
+      name: `Test Model Profile ${Date.now()}`,
+      provider: 'cloudflare',
+      model_id: '@cf/meta/llama-3.1-8b-instruct',
+      parameters: {
+        max_tokens: 512,
+        temperature: 1.2,
       },
+      cost_per_1k_input_tokens: 0.0,
+      cost_per_1k_output_tokens: 0.0,
     });
 
     expect(modelProfileResponse).toBeDefined();
-    expect(modelProfileResponse!.model_profile).toBeDefined();
-    expect(modelProfileResponse!.model_profile.id).toBeDefined();
+    expect(modelProfileResponse?.model_profile).toBeDefined();
+    expect(modelProfileResponse?.model_profile.id).toBeDefined();
 
     const modelProfileId = modelProfileResponse!.model_profile.id;
     console.log('✓ Model profile created:', modelProfileId);
 
     // Step 4: Create ideation prompt spec
-    const { data: ideationPromptResponse } = await client.POST('/api/prompt-specs', {
-      body: {
-        version: 1,
-        name: 'Dog Name Ideation',
-        description: 'Generate creative dog name ideas',
-        template: 'Suggest a fun and friendly name for my dog. Make it just a little quirky!',
-        template_language: 'handlebars',
-        requires: {},
-        produces: schema.object(
-          {
-            name: schema.string(),
-          },
-          { required: ['name'] },
-        ),
-      },
+    const ideationPromptResponse = await wonder['prompt-specs'].create({
+      version: 1,
+      name: 'Dog Name Ideation',
+      description: 'Generate creative dog name ideas',
+      template: 'Suggest a fun and friendly name for my dog. Make it just a little quirky!',
+      template_language: 'handlebars',
+      requires: {},
+      produces: schema.object(
+        {
+          name: schema.string(),
+        },
+        { required: ['name'] },
+      ),
     });
 
     expect(ideationPromptResponse).toBeDefined();
-    expect(ideationPromptResponse!.prompt_spec.id).toBeDefined();
+    expect(ideationPromptResponse?.prompt_spec.id).toBeDefined();
 
     const ideationPromptId = ideationPromptResponse!.prompt_spec.id;
     console.log('✓ Ideation prompt spec created:', ideationPromptId);
 
     // Step 5: Create judging prompt spec
-    const { data: judgingPromptResponse } = await client.POST('/api/prompt-specs', {
-      body: {
-        version: 1,
-        name: 'Dog Name Judge',
-        description: 'Judge dog names and score them',
-        template:
-          'You are a dog name expert. Rate these dog names from 1-10 based on creativity, friendliness, and memorability:\n\n{{#each names}}\n- {{this}}\n{{/each}}',
-        template_language: 'handlebars',
-        requires: {
-          names: 'array',
-        },
-        produces: schema.object(
-          {
-            scores: schema.array(
-              schema.object(
-                {
-                  name: schema.string(),
-                  score: schema.number(),
-                },
-                { required: ['name', 'score'] },
-              ),
-            ),
-          },
-          { required: ['scores'] },
-        ),
+    const judgingPromptResponse = await wonder['prompt-specs'].create({
+      version: 1,
+      name: 'Dog Name Judge',
+      description: 'Judge dog names and score them',
+      template:
+        'You are a dog name expert. Rate these dog names from 1-10 based on creativity, friendliness, and memorability:\n\n{{#each names}}\n- {{this}}\n{{/each}}',
+      template_language: 'handlebars',
+      requires: {
+        names: 'array',
       },
+      produces: schema.object(
+        {
+          scores: schema.array(
+            schema.object(
+              {
+                name: schema.string(),
+                score: schema.number(),
+              },
+              { required: ['name', 'score'] },
+            ),
+          ),
+        },
+        { required: ['scores'] },
+      ),
     });
 
     expect(judgingPromptResponse).toBeDefined();
-    expect(judgingPromptResponse!.prompt_spec.id).toBeDefined();
+    expect(judgingPromptResponse?.prompt_spec.id).toBeDefined();
 
     const judgingPromptId = judgingPromptResponse!.prompt_spec.id;
     console.log('✓ Judging prompt spec created:', judgingPromptId);
 
     // Step 6: Create ranking prompt spec
-    const { data: rankingPromptResponse } = await client.POST('/api/prompt-specs', {
-      body: {
-        version: 1,
-        name: 'Dog Name Ranker',
-        description: 'Aggregate judge scores and create final ranking',
-        template:
-          'Aggregate these judge scores and create a final ranking. Each judge scored the same set of names:\n\n{{#each judge_scores}}\nJudge {{@index}}:\n{{#each this}}\n- {{this.name}}: {{this.score}}/10\n{{/each}}\n{{/each}}\n\nCalculate average scores and rank the names.',
-        template_language: 'handlebars',
-        requires: {
-          judge_scores: 'array',
-        },
-        produces: schema.object(
-          {
-            ranking: schema.array(
-              schema.object(
-                {
-                  name: schema.string(),
-                  average_score: schema.number(),
-                  rank: schema.number(),
-                },
-                { required: ['name', 'average_score', 'rank'] },
-              ),
-            ),
-          },
-          { required: ['ranking'] },
-        ),
+    const rankingPromptResponse = await wonder['prompt-specs'].create({
+      version: 1,
+      name: 'Dog Name Ranker',
+      description: 'Aggregate judge scores and create final ranking',
+      template:
+        'Aggregate these judge scores and create a final ranking. Each judge scored the same set of names:\n\n{{#each judge_scores}}\nJudge {{@index}}:\n{{#each this}}\n- {{this.name}}: {{this.score}}/10\n{{/each}}\n{{/each}}\n\nCalculate average scores and rank the names.',
+      template_language: 'handlebars',
+      requires: {
+        judge_scores: 'array',
       },
+      produces: schema.object(
+        {
+          ranking: schema.array(
+            schema.object(
+              {
+                name: schema.string(),
+                average_score: schema.number(),
+                rank: schema.number(),
+              },
+              { required: ['name', 'average_score', 'rank'] },
+            ),
+          ),
+        },
+        { required: ['ranking'] },
+      ),
     });
 
     expect(rankingPromptResponse).toBeDefined();
-    expect(rankingPromptResponse!.prompt_spec.id).toBeDefined();
+    expect(rankingPromptResponse?.prompt_spec.id).toBeDefined();
 
     const rankingPromptId = rankingPromptResponse!.prompt_spec.id;
     console.log('✓ Ranking prompt spec created:', rankingPromptId);
 
     // Step 7: Create ideation action
-    const { data: ideationActionResponse } = await client.POST('/api/actions', {
-      body: {
-        version: 1,
-        name: 'Ideation Action',
-        description: 'LLM action for generating ideas',
-        kind: 'llm_call',
-        implementation: {
-          prompt_spec_id: ideationPromptId,
-          model_profile_id: modelProfileId,
-        },
+    const ideationActionResponse = await wonder.actions.create({
+      version: 1,
+      name: 'Ideation Action',
+      description: 'LLM action for generating ideas',
+      kind: 'llm_call',
+      implementation: {
+        prompt_spec_id: ideationPromptId,
+        model_profile_id: modelProfileId,
       },
     });
 
     expect(ideationActionResponse).toBeDefined();
-    expect(ideationActionResponse!.action.id).toBeDefined();
+    expect(ideationActionResponse?.action.id).toBeDefined();
 
     const ideationActionId = ideationActionResponse!.action.id;
     console.log('✓ Ideation action created:', ideationActionId);
 
     // Step 8: Create judging action
-    const { data: judgingActionResponse } = await client.POST('/api/actions', {
-      body: {
-        version: 1,
-        name: 'Judging Action',
-        description: 'LLM action for judging names',
-        kind: 'llm_call',
-        implementation: {
-          prompt_spec_id: judgingPromptId,
-          model_profile_id: modelProfileId,
-        },
+    const judgingActionResponse = await wonder.actions.create({
+      version: 1,
+      name: 'Judging Action',
+      description: 'LLM action for judging names',
+      kind: 'llm_call',
+      implementation: {
+        prompt_spec_id: judgingPromptId,
+        model_profile_id: modelProfileId,
       },
     });
 
     expect(judgingActionResponse).toBeDefined();
-    expect(judgingActionResponse!.action.id).toBeDefined();
+    expect(judgingActionResponse?.action.id).toBeDefined();
 
     const judgingActionId = judgingActionResponse!.action.id;
     console.log('✓ Judging action created:', judgingActionId);
 
     // Step 9: Create ranking action
-    const { data: rankingActionResponse } = await client.POST('/api/actions', {
-      body: {
-        version: 1,
-        name: 'Ranking Action',
-        description: 'LLM action for final ranking',
-        kind: 'llm_call',
-        implementation: {
-          prompt_spec_id: rankingPromptId,
-          model_profile_id: modelProfileId,
-        },
+    const rankingActionResponse = await wonder.actions.create({
+      version: 1,
+      name: 'Ranking Action',
+      description: 'LLM action for final ranking',
+      kind: 'llm_call',
+      implementation: {
+        prompt_spec_id: rankingPromptId,
+        model_profile_id: modelProfileId,
       },
     });
 
     expect(rankingActionResponse).toBeDefined();
-    expect(rankingActionResponse!.action.id).toBeDefined();
+    expect(rankingActionResponse?.action.id).toBeDefined();
 
     const rankingActionId = rankingActionResponse!.action.id;
     console.log('✓ Ranking action created:', rankingActionId);
@@ -333,56 +315,40 @@ describe('Edge Test - Branching Architecture', () => {
       ],
     });
 
-    const { data: workflowDefResponse, error: workflowDefError } = await client.POST(
-      '/api/workflow-defs',
-      {
-        body: workflow,
-      },
-    );
+    const workflowDefResponse = await wonder['workflow-defs'].create(workflow);
 
-    if (workflowDefError) {
-      console.error('Workflow def creation error:', workflowDefError);
-      throw new Error(`Failed to create workflow def: ${JSON.stringify(workflowDefError)}`);
+    if (!workflowDefResponse) {
+      throw new Error('Failed to create workflow def');
     }
 
     expect(workflowDefResponse).toBeDefined();
-    expect(workflowDefResponse!.workflow_def_id).toBeDefined();
-    expect(workflowDefResponse!.workflow_def.initial_node_id).toBeDefined();
+    expect(workflowDefResponse.workflow_def_id).toBeDefined();
+    expect(workflowDefResponse.workflow_def.initial_node_id).toBeDefined();
 
-    const workflowDefId = workflowDefResponse!.workflow_def_id;
+    const workflowDefId = workflowDefResponse.workflow_def_id;
     console.log('✓ Workflow def created:', workflowDefId);
-    console.log('  Initial node ID:', workflowDefResponse!.workflow_def.initial_node_id);
+    console.log('  Initial node ID:', workflowDefResponse.workflow_def.initial_node_id);
 
     // Step 11: Create workflow (binds workflow_def to project)
-    const { data: workflowResponse, error: workflowError } = await client.POST('/api/workflows', {
-      body: {
-        project_id: projectId,
-        workflow_def_id: workflowDefId,
-        name: `Dog Name Pipeline ${Date.now()}`,
-        description: 'Tests ideation → judging → ranking with multiple fan-out/fan-in',
-      },
+    const workflowResponse = await wonder.workflows.create({
+      project_id: projectId,
+      workflow_def_id: workflowDefId,
+      name: `Dog Name Pipeline ${Date.now()}`,
+      description: 'Tests ideation → judging → ranking with multiple fan-out/fan-in',
     });
 
-    expect(workflowError).toBeUndefined();
     expect(workflowResponse).toBeDefined();
-    expect(workflowResponse!.workflow).toBeDefined();
-    expect(workflowResponse!.workflow.id).toBeDefined();
+    expect(workflowResponse?.workflow).toBeDefined();
+    expect(workflowResponse?.workflow.id).toBeDefined();
 
     const workflowId = workflowResponse!.workflow.id;
     console.log('✓ Workflow created:', workflowId);
 
     // Step 12: Start workflow execution
-    const { data: startResponse, error: startError } = await client.POST(
-      '/api/workflows/{id}/start',
-      {
-        params: { path: { id: workflowId } },
-        body: {},
-      },
-    );
+    const startResponse = await wonder.workflows(workflowId).start({});
 
-    expect(startError).toBeUndefined();
     expect(startResponse).toBeDefined();
-    expect(startResponse!.workflow_run_id).toBeDefined();
+    expect(startResponse?.workflow_run_id).toBeDefined();
 
     console.log('✓ Workflow started:', startResponse!.workflow_run_id);
     console.log(`  Flow: ${IDEATION_COUNT} names → ${JUDGE_COUNT} judges → final ranking`);
