@@ -1,0 +1,214 @@
+{
+  "openapi": "3.1.0",
+  "info": {
+    "title": "Test API",
+    "version": "1.0.0"
+  },
+  "paths": {
+    "/api/workspaces": {
+      "get": {
+        "operationId": "listWorkspaces",
+        "responses": {
+          "200": {
+            "description": "List of workspaces",
+            "content": {
+              "application/json": {
+                "type": "object",
+                "properties": {
+                  "workspaces": {
+                    "type": "array",
+                    "items": {
+                      "type": "object",
+                      "properties": {
+                        "id": { "type": "string" },
+                        "name": { "type": "string" }
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          }
+        }
+      },
+      "post": {
+        "operationId": "createWorkspace",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "type": "object",
+              "properties": {
+                "name": { "type": "string" },
+                "settings": { "type": "object" }
+              },
+              "required": ["name"]
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": "Workspace created",
+            "content": {
+              "application/json": {
+                "type": "object",
+                "properties": {
+                  "workspace_id": { "type": "string" },
+                  "workspace": {
+                    "type": "object",
+                    "properties": {
+                      "id": { "type": "string" },
+                      "name": { "type": "string" }
+                    }
+                  }
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/workspaces/{id}": {
+      "get": {
+        "operationId": "getWorkspace",
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": { "type": "string" }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Workspace retrieved",
+            "content": {
+              "application/json": {
+                "type": "object",
+                "properties": {
+                  "workspace": {
+                    "type": "object",
+                    "properties": {
+                      "id": { "type": "string" },
+                      "name": { "type": "string" }
+                    }
+                  }
+                }
+              }
+            }
+          }
+        }
+      },
+      "patch": {
+        "operationId": "updateWorkspace",
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": { "type": "string" }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "type": "object",
+              "properties": {
+                "name": { "type": "string" }
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Workspace updated",
+            "content": {
+              "application/json": {
+                "type": "object",
+                "properties": {
+                  "workspace": {
+                    "type": "object",
+                    "properties": {
+                      "id": { "type": "string" },
+                      "name": { "type": "string" }
+                    }
+                  }
+                }
+              }
+            }
+          }
+        }
+      },
+      "delete": {
+        "operationId": "deleteWorkspace",
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": { "type": "string" }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Workspace deleted",
+            "content": {
+              "application/json": {
+                "type": "object",
+                "properties": {
+                  "success": { "type": "boolean" }
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/workflows/{id}/start": {
+      "post": {
+        "operationId": "startWorkflow",
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": { "type": "string" }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "type": "object",
+              "properties": {
+                "force": { "type": "boolean" }
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Workflow started",
+            "content": {
+              "application/json": {
+                "type": "object",
+                "properties": {
+                  "workflow_run_id": { "type": "string" },
+                  "status": { "type": "string" }
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/tasks": {
+      "post": {
+        "operationId": "createTask",
+        "responses": {
+          "204": {
+            "description": "Task created with no content"
+          }
+        }
+      }
+    }
+  }
+}

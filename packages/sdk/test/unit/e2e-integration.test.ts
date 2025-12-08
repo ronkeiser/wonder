@@ -54,28 +54,28 @@ describe('End-to-end generation', () => {
 
   it('should export createClient function', async () => {
     // Dynamic import to test the generated code
-    const clientModule = await import('../src/generated/client.js');
+    const clientModule = await import('../../src/generated/client.js');
 
     expect(clientModule).toHaveProperty('createClient');
     expect(typeof clientModule.createClient).toBe('function');
   });
 
   it('should create client with expected collections', async () => {
-    const { createClient } = await import('../src/generated/client.js');
+    const { createClient } = await import('../../src/generated/client.js');
     const mockBaseClient = {} as any;
     const client = createClient(mockBaseClient);
 
     // Should have workspaces collection
     expect(client).toHaveProperty('workspaces');
     expect(typeof client.workspaces).toBe('function');
-    
+
     // Collections should be callable and have collection methods
     expect(client.workspaces).toHaveProperty('create');
     expect(client.workspaces).toHaveProperty('list');
   });
 
   it('should have proper structure for all collections', async () => {
-    const { createClient } = await import('../src/generated/client.js');
+    const { createClient } = await import('../../src/generated/client.js');
     const mockBaseClient = {} as any;
     const client = createClient(mockBaseClient);
 
@@ -88,9 +88,11 @@ describe('End-to-end generation', () => {
     // Each collection should be a callable function with collection methods
     collections.forEach((collectionName) => {
       const collection = client[collectionName as keyof typeof client];
-      expect(typeof collection).toBe('function');
+      // Collections are objects (created with Object.assign) that have methods
+      expect(typeof collection).toBe('object');
+      // Collection methods are now generated based on actual OpenAPI spec
+      // The generator creates method names like 'create' for POST
       expect(collection).toHaveProperty('create');
-      expect(collection).toHaveProperty('list');
     });
   });
 

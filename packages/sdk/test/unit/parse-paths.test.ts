@@ -9,7 +9,7 @@ import {
   classifySegment,
   parsePathSegments,
   type PathDefinition,
-} from '../scripts/parse-paths';
+} from '../../scripts/parse-paths';
 
 describe('Task 1.2: parsePathSegments', () => {
   it('parses simple path with /api/ prefix', () => {
@@ -77,15 +77,35 @@ describe('Task 1.4: buildRouteTree', () => {
 
   it('merges multiple HTTP methods on same path', () => {
     const paths: PathDefinition[] = [
-      { path: '/api/workspaces', method: 'get', operationId: 'listWorkspaces' },
-      { path: '/api/workspaces', method: 'post', operationId: 'createWorkspace' },
+      {
+        path: '/api/workspaces',
+        method: 'get',
+        operationId: 'listWorkspaces',
+        responses: { '200': {} },
+      },
+      {
+        path: '/api/workspaces',
+        method: 'post',
+        operationId: 'createWorkspace',
+        responses: { '201': {} },
+      },
     ];
     const tree = buildRouteTree(paths);
 
     expect(tree).toHaveLength(1);
     expect(tree[0].methods).toHaveLength(2);
-    expect(tree[0].methods).toContainEqual({ verb: 'get', operationId: 'listWorkspaces' });
-    expect(tree[0].methods).toContainEqual({ verb: 'post', operationId: 'createWorkspace' });
+    expect(tree[0].methods).toContainEqual({
+      verb: 'get',
+      operationId: 'listWorkspaces',
+      originalPath: '/api/workspaces',
+      successStatusCode: '200',
+    });
+    expect(tree[0].methods).toContainEqual({
+      verb: 'post',
+      operationId: 'createWorkspace',
+      originalPath: '/api/workspaces',
+      successStatusCode: '201',
+    });
   });
 
   it('builds tree with parameter nodes', () => {
@@ -120,7 +140,12 @@ describe('Task 1.4: buildRouteTree', () => {
     const actionNode = paramNode.children[0];
     expect(actionNode.type).toBe(NodeType.Action);
     expect(actionNode.name).toBe('start');
-    expect(actionNode.methods).toContainEqual({ verb: 'post' });
+    expect(actionNode.methods).toContainEqual({
+      verb: 'post',
+      operationId: undefined,
+      originalPath: '/api/workflows/{workflow_id}/start',
+      successStatusCode: '200',
+    });
   });
 
   it('builds nested resource tree', () => {
@@ -212,8 +237,18 @@ describe('Task 1.6: Integration test with Wonder API paths', () => {
     const workspacesNode = tree.find((n) => n.name === 'workspaces')!;
     expect(workspacesNode.type).toBe(NodeType.Collection);
     expect(workspacesNode.methods).toHaveLength(2); // GET, POST
-    expect(workspacesNode.methods).toContainEqual({ verb: 'get', operationId: 'listWorkspaces' });
-    expect(workspacesNode.methods).toContainEqual({ verb: 'post', operationId: 'createWorkspace' });
+    expect(workspacesNode.methods).toContainEqual({
+      verb: 'get',
+      operationId: 'listWorkspaces',
+      originalPath: '/api/workspaces',
+      successStatusCode: '200',
+    });
+    expect(workspacesNode.methods).toContainEqual({
+      verb: 'post',
+      operationId: 'createWorkspace',
+      originalPath: '/api/workspaces',
+      successStatusCode: '200',
+    });
 
     // Verify workspace instance methods
     expect(workspacesNode.children).toHaveLength(1);
@@ -225,7 +260,12 @@ describe('Task 1.6: Integration test with Wonder API paths', () => {
     // Verify workflows structure
     const workflowsNode = tree.find((n) => n.name === 'workflows')!;
     expect(workflowsNode.type).toBe(NodeType.Collection);
-    expect(workflowsNode.methods).toContainEqual({ verb: 'post', operationId: 'createWorkflow' });
+    expect(workflowsNode.methods).toContainEqual({
+      verb: 'post',
+      operationId: 'createWorkflow',
+      originalPath: '/api/workflows',
+      successStatusCode: '200',
+    });
 
     const workflowIdNode = workflowsNode.children[0];
     expect(workflowIdNode.type).toBe(NodeType.Param);
@@ -236,12 +276,22 @@ describe('Task 1.6: Integration test with Wonder API paths', () => {
     const startActionNode = workflowIdNode.children[0];
     expect(startActionNode.type).toBe(NodeType.Action);
     expect(startActionNode.name).toBe('start');
-    expect(startActionNode.methods).toContainEqual({ verb: 'post', operationId: 'startWorkflow' });
+    expect(startActionNode.methods).toContainEqual({
+      verb: 'post',
+      operationId: 'startWorkflow',
+      originalPath: '/api/workflows/{id}/start',
+      successStatusCode: '200',
+    });
 
     // Verify logs (collection only, no instances)
     const logsNode = tree.find((n) => n.name === 'logs')!;
     expect(logsNode.type).toBe(NodeType.Collection);
-    expect(logsNode.methods).toContainEqual({ verb: 'get', operationId: 'getLogs' });
+    expect(logsNode.methods).toContainEqual({
+      verb: 'get',
+      operationId: 'getLogs',
+      originalPath: '/api/logs',
+      successStatusCode: '200',
+    });
     expect(logsNode.children).toHaveLength(0);
   });
 });

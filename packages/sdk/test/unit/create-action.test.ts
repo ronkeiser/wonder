@@ -1,5 +1,5 @@
 import { describe, expect, it, vi } from 'vitest';
-import { createAction } from '../src/client-base';
+import { createAction } from '../../src/client-base';
 
 describe('createAction', () => {
   it('should create action that calls correct method', async () => {

@@ -9,13 +9,13 @@ import {
   generateMethodSignature,
   generateRootClient,
   getMethodName,
-} from '../scripts/generate-client';
+} from '../../scripts/generate-client';
 import {
   buildRouteTree,
   NodeType,
   type PathDefinition,
   type RouteNode,
-} from '../scripts/parse-paths';
+} from '../../scripts/parse-paths';
 
 describe('Task 2.1: getMethodName', () => {
   it('maps GET on collection to list', () => {

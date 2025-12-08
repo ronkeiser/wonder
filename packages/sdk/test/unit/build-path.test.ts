@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { buildPath } from '../src/client-base';
+import { buildPath } from '../../src/client-base';
 
 describe('buildPath', () => {
   it('should build simple path', () => {

@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { buildRouteTree, type HttpMethod, type PathDefinition } from '../scripts/parse-paths.js';
+import { buildRouteTree, type HttpMethod, type PathDefinition } from '../../scripts/parse-paths.js';
 
 /**
  * Task 3.2: Route Tree Generation in Pipeline

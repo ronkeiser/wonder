@@ -1,5 +1,5 @@
 import { describe, expect, it, vi } from 'vitest';
-import { createCollection } from '../src/client-base';
+import { createCollection } from '../../src/client-base';
 
 describe('createCollection', () => {
   it('should create collection with create method', () => {

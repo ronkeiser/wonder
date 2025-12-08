@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { formatClientCode, type ClientStructure } from '../scripts/generate-client.js';
+import { formatClientCode, type ClientStructure } from '../../scripts/generate-client.js';
 
 /**
  * Task 3.4: Client Code Formatting

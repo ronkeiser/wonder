@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
-import { generateRootClient, type ClientStructure } from '../scripts/generate-client.js';
-import { buildRouteTree, type HttpMethod, type PathDefinition } from '../scripts/parse-paths.js';
+import { generateRootClient, type ClientStructure } from '../../scripts/generate-client.js';
+import { buildRouteTree, type HttpMethod, type PathDefinition } from '../../scripts/parse-paths.js';
 
 /**
  * Task 3.3: Client Code Generation in Pipeline

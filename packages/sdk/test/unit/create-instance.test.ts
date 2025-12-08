@@ -1,5 +1,5 @@
 import { describe, expect, it, vi } from 'vitest';
-import { createInstance } from '../src/client-base';
+import { createInstance } from '../../src/client-base';
 
 describe('createInstance', () => {
   it('should inject ID into path for get', async () => {

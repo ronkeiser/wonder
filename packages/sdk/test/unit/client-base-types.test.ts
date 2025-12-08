@@ -4,7 +4,7 @@ import type {
   ClientConfig,
   CollectionMethods,
   InstanceMethods,
-} from '../src/client-base';
+} from '../../src/client-base';
 
 describe('client-base types', () => {
   it('should define CollectionMethods interface', () => {
