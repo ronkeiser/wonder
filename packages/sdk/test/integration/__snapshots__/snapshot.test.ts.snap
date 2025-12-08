@@ -1,0 +1,483 @@
+// Vitest Snapshot v1, https://vitest.dev/guide/snapshot.html
+
+exports[`Generator Snapshots > should generate consistent client code structure 1`] = `
+"/**
+ * Generated client for Wonder API
+ * This file was auto-generated. Do not edit manually.
+ */
+
+import type { paths } from './schema.js';
+import type { SchemaType } from '@wonder/context';
+
+/**
+ * Create a typed client for the Wonder API
+ * @param baseClient - The underlying HTTP client (from openapi-fetch)
+ */
+export function createClient(baseClient: any) {
+  return {
+    workspaces: Object.assign(
+      (id: string) => ({
+    get: async (options?: any): Promise<paths['/api/workspaces/{id}']['get']['responses']['200']['content']['application/json']> => {
+      const response = await baseClient.GET(\`/api/workspaces/\${id}\`, {});
+      return response.data;
+    },
+    patch: async (body: NonNullable<paths['/api/workspaces/{id}']['patch']['requestBody']>['content']['application/json'], options?: any): Promise<paths['/api/workspaces/{id}']['patch']['responses']['200']['content']['application/json']> => {
+      const response = await baseClient.PATCH(\`/api/workspaces/\${id}\`, { body });
+      return response.data;
+    },
+    delete: async (options?: any): Promise<paths['/api/workspaces/{id}']['delete']['responses']['200']['content']['application/json']> => {
+      const response = await baseClient.DELETE(\`/api/workspaces/\${id}\`, {});
+      return response.data;
+    }
+  })
+      ,
+      {
+        list: async (options?: any): Promise<paths['/api/workspaces']['get']['responses']['200']['content']['application/json']> => {
+          const response = await baseClient.GET(\`/api/workspaces\`, {});
+          return response.data;
+        },
+        create: async (body: NonNullable<paths['/api/workspaces']['post']['requestBody']>['content']['application/json'], options?: any): Promise<paths['/api/workspaces']['post']['responses']['201']['content']['application/json']> => {
+          const response = await baseClient.POST(\`/api/workspaces\`, { body });
+          return response.data;
+        }
+      }
+    ),
+    workflows: Object.assign(
+      (id: string) => ({
+    start: async (body: NonNullable<paths['/api/workflows/{id}/start']['post']['requestBody']>['content']['application/json'], options?: any): Promise<paths['/api/workflows/{id}/start']['post']['responses']['200']['content']['application/json']> => {
+      const response = await baseClient.POST(\`/api/workflows/\${id}/start\`, { body });
+      return response.data;
+    }
+  })
+      ,
+      {
+      }
+    ),
+    tasks: {
+      create: async (body: NonNullable<paths['/api/tasks']['post']['requestBody']>['content']['application/json'], options?: any): Promise<paths['/api/tasks']['post']['responses']['204']['content']['application/json']> => {
+        const response = await baseClient.POST(\`/api/tasks\`, { body });
+        return response.data;
+      }
+    }
+  };
+}
+"
+`;
+
+exports[`Generator Snapshots > should generate consistent collection structure for workspaces 1`] = `
+{
+  "children": [
+    {
+      "children": [
+        {
+          "children": [],
+          "methods": [
+            {
+              "name": "get",
+              "originalPath": "/api/workspaces/{id}",
+              "path": "/api/workspaces/\${id}",
+              "signature": {
+                "name": "get",
+                "parameters": [
+                  {
+                    "name": "id",
+                    "optional": false,
+                    "type": "string",
+                  },
+                  {
+                    "name": "options",
+                    "optional": true,
+                    "type": "options",
+                  },
+                ],
+              },
+              "successStatusCode": "200",
+              "verb": "get",
+            },
+            {
+              "name": "patch",
+              "originalPath": "/api/workspaces/{id}",
+              "path": "/api/workspaces/\${id}",
+              "signature": {
+                "name": "patch",
+                "parameters": [
+                  {
+                    "name": "id",
+                    "optional": false,
+                    "type": "string",
+                  },
+                  {
+                    "name": "body",
+                    "optional": false,
+                    "type": "body",
+                  },
+                  {
+                    "name": "options",
+                    "optional": true,
+                    "type": "options",
+                  },
+                ],
+              },
+              "successStatusCode": "200",
+              "verb": "patch",
+            },
+            {
+              "name": "delete",
+              "originalPath": "/api/workspaces/{id}",
+              "path": "/api/workspaces/\${id}",
+              "signature": {
+                "name": "delete",
+                "parameters": [
+                  {
+                    "name": "id",
+                    "optional": false,
+                    "type": "string",
+                  },
+                  {
+                    "name": "options",
+                    "optional": true,
+                    "type": "options",
+                  },
+                ],
+              },
+              "successStatusCode": "200",
+              "verb": "delete",
+            },
+          ],
+          "name": "id",
+          "type": "parameter",
+        },
+      ],
+      "name": "id",
+      "type": "parameter",
+    },
+  ],
+  "methods": [
+    {
+      "name": "list",
+      "originalPath": "/api/workspaces",
+      "path": "/api/workspaces",
+      "signature": {
+        "name": "list",
+        "parameters": [
+          {
+            "name": "options",
+            "optional": true,
+            "type": "options",
+          },
+        ],
+      },
+      "successStatusCode": "200",
+      "verb": "get",
+    },
+    {
+      "name": "create",
+      "originalPath": "/api/workspaces",
+      "path": "/api/workspaces",
+      "signature": {
+        "name": "create",
+        "parameters": [
+          {
+            "name": "body",
+            "optional": false,
+            "type": "body",
+          },
+          {
+            "name": "options",
+            "optional": true,
+            "type": "options",
+          },
+        ],
+      },
+      "successStatusCode": "201",
+      "verb": "post",
+    },
+  ],
+  "name": "workspaces",
+  "type": "collection",
+}
+`;
+
+exports[`Generator Snapshots > should generate consistent method signatures 1`] = `
+[
+  "get: async (options?: any): Promise<paths['/api/workspaces/{id}']['get']['responses']['200']['content']['application/json']>",
+  "patch: async (body: NonNullable<paths['/api/workspaces/{id}']['patch']['requestBody']>['content']['application/json'], options?: any): Promise<paths['/api/workspaces/{id}']['patch']['responses']['200']['content']['application/json']>",
+  "delete: async (options?: any): Promise<paths['/api/workspaces/{id}']['delete']['responses']['200']['content']['application/json']>",
+  "list: async (options?: any): Promise<paths['/api/workspaces']['get']['responses']['200']['content']['application/json']>",
+  "create: async (body: NonNullable<paths['/api/workspaces']['post']['requestBody']>['content']['application/json'], options?: any): Promise<paths['/api/workspaces']['post']['responses']['201']['content']['application/json']>",
+  "start: async (body: NonNullable<paths['/api/workflows/{id}/start']['post']['requestBody']>['content']['application/json'], options?: any): Promise<paths['/api/workflows/{id}/start']['post']['responses']['200']['content']['application/json']>",
+  "create: async (body: NonNullable<paths['/api/tasks']['post']['requestBody']>['content']['application/json'], options?: any): Promise<paths['/api/tasks']['post']['responses']['204']['content']['application/json']>",
+]
+`;
+
+exports[`Generator Snapshots > should generate consistent path definitions 1`] = `
+[
+  {
+    "method": "get",
+    "operationId": "listWorkspaces",
+    "path": "/api/workspaces",
+    "responses": {
+      "200": {
+        "content": {
+          "application/json": {
+            "properties": {
+              "workspaces": {
+                "items": {
+                  "properties": {
+                    "id": {
+                      "type": "string",
+                    },
+                    "name": {
+                      "type": "string",
+                    },
+                  },
+                  "type": "object",
+                },
+                "type": "array",
+              },
+            },
+            "type": "object",
+          },
+        },
+        "description": "List of workspaces",
+      },
+    },
+  },
+  {
+    "method": "post",
+    "operationId": "createWorkspace",
+    "path": "/api/workspaces",
+    "responses": {
+      "201": {
+        "content": {
+          "application/json": {
+            "properties": {
+              "workspace": {
+                "properties": {
+                  "id": {
+                    "type": "string",
+                  },
+                  "name": {
+                    "type": "string",
+                  },
+                },
+                "type": "object",
+              },
+              "workspace_id": {
+                "type": "string",
+              },
+            },
+            "type": "object",
+          },
+        },
+        "description": "Workspace created",
+      },
+    },
+  },
+  {
+    "method": "get",
+    "operationId": "getWorkspace",
+    "path": "/api/workspaces/{id}",
+    "responses": {
+      "200": {
+        "content": {
+          "application/json": {
+            "properties": {
+              "workspace": {
+                "properties": {
+                  "id": {
+                    "type": "string",
+                  },
+                  "name": {
+                    "type": "string",
+                  },
+                },
+                "type": "object",
+              },
+            },
+            "type": "object",
+          },
+        },
+        "description": "Workspace retrieved",
+      },
+    },
+  },
+  {
+    "method": "patch",
+    "operationId": "updateWorkspace",
+    "path": "/api/workspaces/{id}",
+    "responses": {
+      "200": {
+        "content": {
+          "application/json": {
+            "properties": {
+              "workspace": {
+                "properties": {
+                  "id": {
+                    "type": "string",
+                  },
+                  "name": {
+                    "type": "string",
+                  },
+                },
+                "type": "object",
+              },
+            },
+            "type": "object",
+          },
+        },
+        "description": "Workspace updated",
+      },
+    },
+  },
+  {
+    "method": "delete",
+    "operationId": "deleteWorkspace",
+    "path": "/api/workspaces/{id}",
+    "responses": {
+      "200": {
+        "content": {
+          "application/json": {
+            "properties": {
+              "success": {
+                "type": "boolean",
+              },
+            },
+            "type": "object",
+          },
+        },
+        "description": "Workspace deleted",
+      },
+    },
+  },
+  {
+    "method": "post",
+    "operationId": "startWorkflow",
+    "path": "/api/workflows/{id}/start",
+    "responses": {
+      "200": {
+        "content": {
+          "application/json": {
+            "properties": {
+              "status": {
+                "type": "string",
+              },
+              "workflow_run_id": {
+                "type": "string",
+              },
+            },
+            "type": "object",
+          },
+        },
+        "description": "Workflow started",
+      },
+    },
+  },
+  {
+    "method": "post",
+    "operationId": "createTask",
+    "path": "/api/tasks",
+    "responses": {
+      "204": {
+        "description": "Task created with no content",
+      },
+    },
+  },
+]
+`;
+
+exports[`Generator Snapshots > should generate consistent route tree structure 1`] = `
+[
+  {
+    "children": [
+      {
+        "children": [],
+        "methods": [
+          {
+            "operationId": "getWorkspace",
+            "originalPath": "/api/workspaces/{id}",
+            "successStatusCode": "200",
+            "verb": "get",
+          },
+          {
+            "operationId": "updateWorkspace",
+            "originalPath": "/api/workspaces/{id}",
+            "successStatusCode": "200",
+            "verb": "patch",
+          },
+          {
+            "operationId": "deleteWorkspace",
+            "originalPath": "/api/workspaces/{id}",
+            "successStatusCode": "200",
+            "verb": "delete",
+          },
+        ],
+        "name": "id",
+        "segment": "id",
+        "type": "param",
+      },
+    ],
+    "methods": [
+      {
+        "operationId": "listWorkspaces",
+        "originalPath": "/api/workspaces",
+        "successStatusCode": "200",
+        "verb": "get",
+      },
+      {
+        "operationId": "createWorkspace",
+        "originalPath": "/api/workspaces",
+        "successStatusCode": "201",
+        "verb": "post",
+      },
+    ],
+    "name": "workspaces",
+    "segment": "workspaces",
+    "type": "collection",
+  },
+  {
+    "children": [
+      {
+        "children": [
+          {
+            "children": [],
+            "methods": [
+              {
+                "operationId": "startWorkflow",
+                "originalPath": "/api/workflows/{id}/start",
+                "successStatusCode": "200",
+                "verb": "post",
+              },
+            ],
+            "name": "start",
+            "segment": "start",
+            "type": "action",
+          },
+        ],
+        "methods": [],
+        "name": "id",
+        "segment": "id",
+        "type": "param",
+      },
+    ],
+    "methods": [],
+    "name": "workflows",
+    "segment": "workflows",
+    "type": "collection",
+  },
+  {
+    "children": [],
+    "methods": [
+      {
+        "operationId": "createTask",
+        "originalPath": "/api/tasks",
+        "successStatusCode": "204",
+        "verb": "post",
+      },
+    ],
+    "name": "tasks",
+    "segment": "tasks",
+    "type": "collection",
+  },
+]
+`;
