@@ -72,7 +72,7 @@
 
 ## Containers
 
-- One ContainerDO per repo; container identity = repo identity
+- One ContainerDO per resource declaration per run
 - Linear ownership: single owner, explicit transfer via pass_resources, no parallel access
 - Ownership tracked via owner_run_id; claim/release/transfer operations
 - Shell access: Workers call containerStub.exec(run_id, command, timeout)

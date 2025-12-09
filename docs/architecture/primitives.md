@@ -144,6 +144,8 @@ Repository metadata. Each project has one or more code repos and exactly one art
   output_schema: JSONSchema;    // Workflow output validation
   context_schema: JSONSchema;   // Runtime context structure
 
+  resources: Record<string, ResourceDeclaration> | null;  // Container declarations
+
   initial_node_id: string;      // Starting node ULID
 
   created_at: string;
@@ -159,6 +161,21 @@ Immutable workflow graph definition. Changes create new versions. Context schema
 
 - `project_id` set: Project-local definition
 - `library_id` set: Reusable library definition
+
+**ResourceDeclaration:**
+
+```typescript
+type ResourceDeclaration = {
+  type: 'container';
+  image: string; // Container image (e.g., 'node:20')
+  repo_id: string; // FK → repos
+  base_branch: string; // Branch to create working branch from
+  merge_on_success: boolean; // Merge to base_branch on completion
+  merge_strategy: 'rebase' | 'fail' | 'force'; // Conflict resolution
+};
+```
+
+Each key in `resources` is a `resource_id` (e.g., `dev_env`, `lib_env`) used to reference the container in actions.
 
 ---
 
@@ -660,6 +677,48 @@ Metadata for single workflow execution. Each run gets its own Coordinator DO ins
 
 ---
 
+### Container
+
+**Storage:** DO SQLite (ContainerDO)  
+**Schema:**
+
+```typescript
+{
+  id: string; // DO ID (container instance ID)
+  resource_id: string; // Key from WorkflowDef.resources
+  workflow_run_id: string; // Run that created this container
+  owner_run_id: string; // Current owner (for sub-workflow transfer)
+
+  repo_id: string; // FK → repos
+  base_branch: string; // Branch created from
+  working_branch: string; // wonder/run-{run_id}
+  current_sha: string | null; // Latest commit SHA
+
+  status: 'provisioning' | 'active' | 'hibernated' | 'destroyed';
+
+  created_at: string;
+  last_accessed_at: string;
+}
+```
+
+Ephemeral container instance with linear ownership. One ContainerDO per resource declaration per run.
+
+**Ownership:**
+
+- Created with `owner_run_id = workflow_run_id`
+- Transfers to child run via `workflow_call` with `pass_resources`
+- Returns to parent when child completes
+- Only current owner can execute commands via `containerStub.exec(owner_run_id, command)`
+
+**Lifecycle:**
+
+- Provisioning: Container starting, cloning repo at working_branch
+- Active: Ready for command execution
+- Hibernated: Destroyed but working_branch preserved (resume from SHA)
+- Destroyed: Cleaned up after run completion
+
+---
+
 ### Token
 
 **Storage:** DO SQLite (Coordinator)  
@@ -1015,6 +1074,7 @@ Enables **testable coordination logic** without spinning up actors.
 | **ModelProfile**  | Resources      | D1                    | Persistent            |
 | **ArtifactType**  | Resources      | D1                    | Immutable (versioned) |
 | **WorkflowRun**   | Resources      | D1 → DO (run) → D1    | Persistent            |
+| **Container**     | Containers     | DO SQLite             | Per-run (ephemeral)   |
 | **Token**         | Coordinator    | DO SQLite             | Per-run (ephemeral)   |
 | **Context**       | Coordinator    | DO SQLite → D1        | Per-run → snapshot    |
 | **Decision**      | Coordinator    | None                  | Return value only     |

@@ -163,7 +163,7 @@ Actions are the atomic operations that steps execute:
 
 Workflows can provision containers for agents to execute shell commands—editing code, running tests, deploying. Containers are workflow-level resources with linear ownership.
 
-**One ContainerDO per repo.** Each repo has a dedicated Durable Object managing its container lifecycle.
+**One ContainerDO per resource declaration per run.** Each workflow run provisions its own container instance(s) based on WorkflowDef.resources declarations. Multiple runs can work on the same repo concurrently via branch isolation.
 
 **Ownership rules:**
 
