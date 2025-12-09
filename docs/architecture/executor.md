@@ -28,12 +28,16 @@ executor/src/
 │   └── retry-handler.ts        # Task-level retry logic
 ├── actions/
 │   ├── registry.ts             # Action handler registry
-│   ├── llm-call.ts             # LLM inference handler
-│   ├── mcp-tool.ts             # MCP tool invocation handler
-│   ├── http-request.ts         # HTTP API call handler
-│   ├── update-context.ts       # Context manipulation handler
-│   ├── workflow-call.ts        # Sub-workflow invocation handler
-│   └── [other-actions].ts      # Additional action handlers
+│   ├── llm.ts                  # LLM inference handler
+│   ├── mcp.ts                  # MCP tool invocation handler
+│   ├── http.ts                 # HTTP API call handler
+│   ├── tool.ts                 # Standard library tool handler
+│   ├── shell.ts                # Raw shell command handler
+│   ├── workflow.ts             # Sub-workflow invocation handler
+│   ├── context.ts              # Context manipulation handler
+│   ├── vector.ts               # Vector search handler
+│   ├── metric.ts               # Metrics emission handler
+│   └── human.ts                # Human input gate handler
 ├── context/
 │   ├── manager.ts              # Task context lifecycle
 │   └── mapping.ts              # Input/output mapping (JSONPath)
@@ -55,6 +59,11 @@ interface TaskPayload {
   task_id: string; // TaskDef to execute
   task_version: number;
   input: Record<string, unknown>; // Mapped from workflow context
+
+  // Resource mappings (generic_name → container_do_id)
+  // Resolved from Node.resource_bindings → WorkflowDef.resources
+  // e.g., { "container": "do-abc123", "build_env": "do-xyz789" }
+  resources?: Record<string, string>;
 
   // Execution config
   timeout_ms?: number;
@@ -105,7 +114,7 @@ async function executeTask(payload: TaskPayload): Promise<TaskResult> {
     validateInput(payload.input, taskDef.input_schema);
 
     // 3. Initialize task context
-    const context = initializeTaskContext(payload.input);
+    const context = initializeTaskContext(payload.input, payload);
 
     // 4. Execute steps sequentially
     for (const step of steps.sort((a, b) => a.ordinal - b.ordinal)) {
@@ -212,9 +221,14 @@ interface TaskContext {
   output: Record<string, unknown>; // Set by steps, returned to coordinator
 }
 
-function initializeTaskContext(input: Record<string, unknown>): TaskContext {
+function initializeTaskContext(input: Record<string, unknown>, payload: TaskPayload): TaskContext {
   return {
-    input,
+    input: {
+      ...input,
+      _workflow_run_id: payload.workflow_run_id,
+      _token_id: payload.token_id,
+      _resources: payload.resources || {},
+    },
     state: {},
     output: {},
   };
@@ -313,10 +327,10 @@ function isInfrastructureError(error: Error): boolean {
 
 Each action kind has a dedicated handler:
 
-#### llm_call
+#### llm
 
 ```typescript
-async function executeLLMCall(
+async function executeLLM(
   actionDef: ActionDef,
   input: Record<string, unknown>,
 ): Promise<Record<string, unknown>> {
@@ -352,10 +366,10 @@ async function executeLLMCall(
 }
 ```
 
-#### mcp_tool
+#### mcp
 
 ```typescript
-async function executeMCPTool(
+async function executeMCP(
   actionDef: ActionDef,
   input: Record<string, unknown>,
 ): Promise<Record<string, unknown>> {
@@ -374,10 +388,10 @@ async function executeMCPTool(
 }
 ```
 
-#### http_request
+#### http
 
 ```typescript
-async function executeHTTPRequest(
+async function executeHTTP(
   actionDef: ActionDef,
   input: Record<string, unknown>,
 ): Promise<Record<string, unknown>> {
@@ -405,10 +419,10 @@ async function executeHTTPRequest(
 }
 ```
 
-#### update_context
+#### context
 
 ```typescript
-async function executeUpdateContext(
+async function executeContext(
   actionDef: ActionDef,
   input: Record<string, unknown>,
 ): Promise<Record<string, unknown>> {
@@ -428,7 +442,169 @@ async function executeUpdateContext(
 }
 ```
 
-#### workflow_call
+#### tool
+
+```typescript
+async function executeTool(
+  actionDef: ActionDef,
+  input: Record<string, unknown>,
+): Promise<Record<string, unknown>> {
+  const { tool_name, tool_version } = actionDef.implementation;
+
+  // Load tool definition from standard library
+  const toolDef = await resources.getTool(tool_name, tool_version);
+
+  // Validate input against tool schema
+  validateInput(input, toolDef.input_schema);
+
+  // Get container if tool requires one
+  let containerStub = null;
+  if (toolDef.requires_resource) {
+    const containerId = input._resources[toolDef.requires_resource];
+    if (!containerId) {
+      throw new Error(
+        `Tool '${tool_name}' requires resource '${toolDef.requires_resource}' but it was not provided`,
+      );
+    }
+    containerStub = env.CONTAINERS.get(env.CONTAINERS.idFromString(containerId));
+  }
+
+  // Execute tool-specific handler
+  const handler = toolRegistry.get(tool_name);
+  if (!handler) {
+    throw new Error(`Unknown tool: ${tool_name}`);
+  }
+
+  const result = await handler.execute({
+    container: containerStub,
+    input,
+    toolDef,
+  });
+
+  // Validate output
+  validateOutput(result, toolDef.output_schema);
+
+  return result;
+}
+```
+
+**Standard Library Tools:**
+
+```typescript
+// Git operations
+- git_commit: { message: string, files?: string[], author?: string }
+- git_push: { remote?: string, branch?: string }
+- git_merge: { source_branch: string, strategy: 'rebase' | 'merge' | 'squash' }
+- git_status: { }
+
+// Artifact management
+- write_artifact: { path: string, content: string, artifact_type_id?: string, commit_message?: string }
+- read_artifact: { path: string }
+- list_artifacts: { pattern?: string, artifact_type_id?: string }
+
+// Testing
+- run_tests: { pattern?: string, framework?: string }
+- run_lint: { fix?: boolean }
+- run_build: { target?: string }
+
+// File operations
+- write_file: { path: string, content: string }
+- read_file: { path: string }
+- list_files: { pattern?: string }
+- delete_file: { path: string }
+
+// Package management
+- install_packages: { packages: string[] }
+- update_dependencies: { }
+```
+
+#### shell
+
+```typescript
+async function executeShell(
+  actionDef: ActionDef,
+  input: Record<string, unknown>,
+): Promise<Record<string, unknown>> {
+  const { command_template, working_dir, resource_name } = actionDef.implementation;
+
+  // Get container from resources using generic name
+  const containerId = input._resources[resource_name || 'container'];
+  if (!containerId) {
+    throw new Error(`Resource '${resource_name || 'container'}' not found in available resources`);
+  }
+
+  // Render command template with input
+  const renderedCommand = await templates.render(command_template, input);
+
+  // Call container DO to execute command
+  const containerStub = env.CONTAINERS.get(env.CONTAINERS.idFromString(containerId));
+  const result = await containerStub.exec(input._workflow_run_id, renderedCommand, {
+    cwd: working_dir || '/workspace',
+    timeout: actionDef.execution?.timeout_ms || 60000,
+  });
+
+  return {
+    stdout: result.stdout,
+    stderr: result.stderr,
+    exit_code: result.exit_code,
+  };
+}
+```
+
+**Note:** Container execution happens through the Containers service. Each container is a Durable Object that validates ownership and forwards commands to the container's shell server. See [Containers](./containers.md) for details.
+
+### Resource Resolution Flow
+
+Resources flow from workflow definition to action execution through multiple layers:
+
+1. **WorkflowDef** declares resources with IDs:
+
+   ```typescript
+   resources: {
+     "dev_env": { type: "container", image: "node:20", ... },
+     "build_env": { type: "container", image: "python:3.11", ... }
+   }
+   ```
+
+2. **Node** binds generic names to workflow resource IDs:
+
+   ```typescript
+   resource_bindings: {
+     "container": "dev_env",      // This node uses dev_env
+     "build_env": "build_env"     // Pass through if needed
+   }
+   ```
+
+3. **Coordinator** resolves to container DO IDs when dispatching:
+
+   ```typescript
+   // Look up Container DO ID for each resource
+   const containerDoId = await getContainerForResource(workflow_run_id, 'dev_env');
+
+   payload.resources = {
+     container: 'do-abc123...',
+     build_env: 'do-xyz789...',
+   };
+   ```
+
+4. **Action/Tool** uses generic name:
+
+   ```typescript
+   // shell action with resource_name: "container"
+   const containerId = input._resources['container'];
+
+   // git_commit tool with requires_resource: "container"
+   const containerId = input._resources[toolDef.requires_resource];
+   ```
+
+**Benefits:**
+
+- Actions and tools are reusable (no hardcoded resource IDs)
+- Node is the binding point (workflow-specific mapping)
+- Type safety (coordinator validates bindings exist)
+- Flexibility (same task can use different containers in different workflows)
+
+#### workflow
 
 ```typescript
 async function executeWorkflowCall(
@@ -456,6 +632,102 @@ async function executeWorkflowCall(
   }
 
   return result.output;
+}
+```
+
+#### human
+
+```typescript
+async function executeHuman(
+  actionDef: ActionDef,
+  input: Record<string, unknown>,
+): Promise<Record<string, unknown>> {
+  const { prompt_template, input_schema, timeout_ms } = actionDef.implementation;
+
+  // Render prompt template
+  const renderedPrompt = await templates.render(prompt_template, input);
+
+  // Create human gate via coordinator (async - doesn't wait for response)
+  const gateId = await coordinator.createHumanGate({
+    workflow_run_id: input._workflow_run_id,
+    token_id: input._token_id,
+    prompt: renderedPrompt,
+    input_schema,
+    timeout_ms,
+  });
+
+  // Return immediately - coordinator will pause token and resume when human responds
+  // The human's response will be available in workflow context when execution resumes
+  return {
+    gate_id: gateId,
+    status: 'awaiting_human_input',
+  };
+}
+```
+
+**Note:** Human input creates an async gate in the workflow. Unlike other actions that block until complete, the human action:
+
+1. Signals the coordinator to create a human gate
+2. Returns immediately with `gate_created` status
+3. Coordinator transitions token to `awaiting_human_input` state
+4. Task completes and worker is released
+5. When human responds, coordinator resumes workflow at next node with human's input
+
+This async behavior allows tasks with human actions to complete quickly while the workflow pauses. Primarily used for workflow-level approval gates, not inline task decisions that need immediate responses.
+
+#### vector
+
+```typescript
+async function executeVector(
+  actionDef: ActionDef,
+  input: Record<string, unknown>,
+): Promise<Record<string, unknown>> {
+  const { index_id, query_text, top_k, filter } = actionDef.implementation;
+
+  // Generate embedding for query
+  const embedding = await env.AI.run('@cf/baai/bge-base-en-v1.5', {
+    text: query_text,
+  });
+
+  // Query Vectorize index
+  const results = await env.VECTORIZE.query(index_id, {
+    vector: embedding.data[0],
+    topK: top_k || 10,
+    filter: filter || {},
+  });
+
+  return {
+    results: results.matches.map((match) => ({
+      id: match.id,
+      score: match.score,
+      metadata: match.metadata,
+    })),
+  };
+}
+```
+
+**Note:** Vector search uses Cloudflare Vectorize for semantic search over embeddings. Indexes are populated separately (e.g., during codebase ingestion). See context management in [Agent Environment](./agent-environment.md).
+
+#### metric
+
+```typescript
+async function executeMetric(
+  actionDef: ActionDef,
+  input: Record<string, unknown>,
+): Promise<Record<string, unknown>> {
+  const { metric_name, value, dimensions } = actionDef.implementation;
+
+  // Evaluate value (may be expression)
+  const metricValue = typeof value === 'number' ? value : evaluateExpression(value.expr, input);
+
+  // Write to Analytics Engine
+  await env.ANALYTICS_ENGINE.writeDataPoint({
+    blobs: [metric_name],
+    doubles: [metricValue],
+    indexes: dimensions ? Object.entries(dimensions) : [],
+  });
+
+  return { metric_name, value: metricValue };
 }
 ```
 
@@ -678,7 +950,7 @@ events.emit({
 
 // Action execution (for LLM calls)
 events.emit({
-  type: 'llm_call_completed',
+  type: 'llm_completed',
   token_id: payload.token_id,
   model: modelProfile.model_id,
   tokens: { input: usage.input, output: usage.output },

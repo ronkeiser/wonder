@@ -8,11 +8,11 @@ Different project types have different tools, conventions, and verification stra
 
 ## The Division
 
-| Layer               | Responsibility                                     | Examples                                           |
-| ------------------- | -------------------------------------------------- | -------------------------------------------------- |
-| **Wonder platform** | Container primitives, execution, ownership         | `shell_exec`, container lifecycle, context mapping |
-| **Libraries**       | Project-type intelligence, conventions, strategies | Edit strategies, test runners, verification loops  |
-| **Project**         | Configuration, overrides                           | Which library to use, custom scripts               |
+| Layer               | Responsibility                                     | Examples                                            |
+| ------------------- | -------------------------------------------------- | --------------------------------------------------- |
+| **Wonder platform** | Container primitives, execution, ownership         | `shell` action, `tool` action, container lifecycle  |
+| **Libraries**       | Project-type intelligence, conventions, strategies | Standard tools, edit strategies, verification loops |
+| **Project**         | Configuration, overrides                           | Which library to use, custom scripts                |
 
 Wonder doesn't know what `pnpm` is. It knows how to run a shell command and capture output. A library encodes that `pnpm test` runs tests, how to parse the output, and what to do when tests fail.
 
@@ -58,35 +58,44 @@ accepts_resources:
 
 nodes:
   - id: execute
-    action:
-      kind: shell_exec
+    task_id: run_tool_task
+    resource_bindings:
       container: dev_env
-      command: 'pnpm test --reporter=json'
-      timeout_ms: 300000
+    input_mapping:
+      tool_name: 'run_tests'
+      pattern: input.pattern
     output_mapping:
-      state.raw_output: stdout
-      state.exit_code: exit_code
+      state.raw_output: output.stdout
+      state.exit_code: output.exit_code
 
   - id: parse
-    action:
-      kind: update_context
-      operations:
-        - parse_test_output:
-            input: state.raw_output
-            format: jest_json
+    task_id: parse_context_task
+    input_mapping:
+      raw_output: state.raw_output
+      format: 'jest_json'
     output_mapping:
-      state.test_results: parsed
+      state.test_results: output.parsed
 
   - id: summarize
-    action:
-      kind: llm_call
-      prompt_spec: analyze_test_results
+    task_id: llm_task
     input_mapping:
+      prompt_spec_id: 'analyze_test_results'
       test_results: state.test_results
     output_mapping:
-      output.summary: response.summary
-      output.failures: response.failures
-      output.passed: response.passed
+      output.summary: output.response.summary
+      output.failures: output.response.failures
+      output.passed: output.response.passed
+```
+
+**Note:** Tasks contain steps with actions. This example shows Node-level configuration. The actual task definitions would have steps like:
+
+```yaml
+# TaskDef: run_tool_task
+steps:
+  - action:
+      kind: tool
+      implementation:
+        tool_name: '{{input.tool_name}}'
 ```
 
 ### Workflows
@@ -101,42 +110,45 @@ accepts_resources:
 
 nodes:
   - id: explore
-    action:
-      kind: workflow_call
-      workflow_def_id: explore_codebase
-      pass_resources: [dev_env]
+    task_id: workflow_task
+    resource_bindings:
+      container: dev_env
     input_mapping:
+      workflow_def_id: 'explore_codebase'
+      pass_resources: ['dev_env']
       task: input.feature_description
     output_mapping:
       state.relevant_files: output.relevant_files
       state.context: output.summary
 
   - id: plan
-    action:
-      kind: llm_call
-      prompt_spec: implementation_plan
+    task_id: llm_task
     input_mapping:
+      prompt_spec_id: 'implementation_plan'
       feature: input.feature_description
       codebase_context: state.context
       relevant_files: state.relevant_files
     output_mapping:
-      state.plan: response.plan
+      state.plan: output.response.plan
 
   - id: implement
-    action:
-      kind: workflow_call
-      workflow_def_id: execute_plan
-      pass_resources: [dev_env]
+    task_id: workflow_task
+    resource_bindings:
+      container: dev_env
     input_mapping:
+      workflow_def_id: 'execute_plan'
+      pass_resources: ['dev_env']
       plan: state.plan
     output_mapping:
       state.changes: output.changes
 
   - id: verify
-    action:
-      kind: workflow_call
-      workflow_def_id: verify_change
-      pass_resources: [dev_env]
+    task_id: workflow_task
+    resource_bindings:
+      container: dev_env
+    input_mapping:
+      workflow_def_id: 'verify_change'
+      pass_resources: ['dev_env']
     output_mapping:
       state.verification: output.result
 
@@ -215,51 +227,58 @@ conventions:
 
 ## File Editing Strategies
 
-Different libraries can encode different editing approaches:
+Different libraries can encode different editing approaches using standard tools or custom implementations.
 
-### Full File Replacement
+### Using Standard Library Tools (Recommended)
 
-Simple, reliable, but wasteful for large files:
+Wonder provides built-in file operation tools:
 
 ```yaml
-# routines/write-file-full.yaml
+# Using write_file tool
 nodes:
   - id: write
-    action:
-      kind: shell_exec
-      command: |
-        cat > {{path}} << 'WONDEREOF'
-        {{content}}
-        WONDEREOF
+    task_id: tool_task
+    resource_bindings:
+      container: dev_env
+    input_mapping:
+      tool_name: 'write_file'
+      path: input.path
+      content: input.content
+    output_mapping:
+      output.success: output.success
 ```
 
-### Line-Based Replacement
+### Custom Strategies with Shell (When Needed)
 
-Claude's `str_replace` pattern—find unique string, replace:
+For specialized editing patterns, use shell actions:
 
 ```yaml
 # routines/write-file-str-replace.yaml
 nodes:
   - id: read_current
-    action:
-      kind: shell_exec
-      command: 'cat {{path}}'
+    task_id: tool_task
+    resource_bindings:
+      container: dev_env
+    input_mapping:
+      tool_name: 'read_file'
+      path: input.path
     output_mapping:
-      state.current_content: stdout
+      state.current_content: output.content
 
   - id: validate_unique
-    action:
-      kind: update_context
-      operations:
-        - assert_unique:
-            haystack: state.current_content
-            needle: input.old_str
+    task_id: context_task
+    input_mapping:
+      operation: 'assert_unique'
+      haystack: state.current_content
+      needle: input.old_str
 
   - id: replace
-    action:
-      kind: shell_exec
-      command: |
-        sed -i 's/{{escape input.old_str}}/{{escape input.new_str}}/g' {{path}}
+    task_id: shell_task
+    resource_bindings:
+      container: dev_env
+    input_mapping:
+      command_template: |
+        sed -i 's/{{escape input.old_str}}/{{escape input.new_str}}/g' {{input.path}}
 ```
 
 ### Patch Application
@@ -267,18 +286,20 @@ nodes:
 For agents that produce diffs:
 
 ```yaml
-# routines/write-file-patch.yaml
+# routines/apply-patch.yaml
 nodes:
   - id: apply_patch
-    action:
-      kind: shell_exec
-      command: |
-        patch {{path}} << 'WONDEREOF'
-        {{patch}}
+    task_id: shell_task
+    resource_bindings:
+      container: dev_env
+    input_mapping:
+      command_template: |
+        patch {{input.path}} << 'WONDEREOF'
+        {{input.patch}}
         WONDEREOF
 ```
 
-A library chooses which strategy to expose. The `implement-feature` workflow calls `write-file` without knowing whether it's full replacement or str_replace underneath.
+A library chooses which strategy to expose. The `implement-feature` workflow calls `write-file` without knowing whether it uses the standard tool or a custom implementation underneath.
 
 ## Verification Loops
 
@@ -288,10 +309,12 @@ Libraries encode what "done" means:
 # routines/verify-change.yaml
 nodes:
   - id: typecheck
-    action:
-      kind: workflow_call
-      workflow_def_id: typecheck
-      pass_resources: [dev_env]
+    task_id: workflow_task
+    resource_bindings:
+      container: dev_env
+    input_mapping:
+      workflow_def_id: 'typecheck'
+      pass_resources: ['dev_env']
     output_mapping:
       state.typecheck_result: output
 
@@ -299,10 +322,12 @@ nodes:
     # transition to fix or continue
 
   - id: test
-    action:
-      kind: workflow_call
-      workflow_def_id: run_tests
-      pass_resources: [dev_env]
+    task_id: workflow_task
+    resource_bindings:
+      container: dev_env
+    input_mapping:
+      workflow_def_id: 'run_tests'
+      pass_resources: ['dev_env']
     output_mapping:
       state.test_result: output
 
@@ -310,23 +335,24 @@ nodes:
     # transition to fix or continue
 
   - id: lint
-    action:
-      kind: workflow_call
-      workflow_def_id: lint
-      pass_resources: [dev_env]
+    task_id: workflow_task
+    resource_bindings:
+      container: dev_env
+    input_mapping:
+      workflow_def_id: 'lint'
+      pass_resources: ['dev_env']
     output_mapping:
       state.lint_result: output
 
   - id: done
-    action:
-      kind: update_context
-      operations:
-        - set:
-            output.result:
-              typecheck: state.typecheck_result
-              tests: state.test_result
-              lint: state.lint_result
-              passed: '{{all_passed}}'
+    task_id: context_task
+    input_mapping:
+      operation: 'set'
+      output.result:
+        typecheck: state.typecheck_result
+        tests: state.test_result
+        lint: state.lint_result
+        passed: '{{all_passed}}'
 ```
 
 A Python library might run `pytest` → `mypy` → `ruff`. A Rust library might run `cargo test` → `cargo clippy`. The structure is the same; the commands differ.
@@ -339,39 +365,46 @@ Agents can't read entire codebases. Libraries encode discovery strategies:
 # routines/explore-codebase.yaml
 nodes:
   - id: get_structure
-    action:
-      kind: shell_exec
-      command: "find . -type f -name '*.ts' | head -100"
+    task_id: tool_task
+    resource_bindings:
+      container: dev_env
+    input_mapping:
+      tool_name: 'list_files'
+      pattern: '**/*.ts'
     output_mapping:
-      state.files: stdout
+      state.files: output.files
 
   - id: get_package_json
-    action:
-      kind: shell_exec
-      command: 'cat package.json'
+    task_id: tool_task
+    resource_bindings:
+      container: dev_env
+    input_mapping:
+      tool_name: 'read_file'
+      path: 'package.json'
     output_mapping:
-      state.package_json: stdout
+      state.package_json: output.content
 
   - id: search_relevant
-    action:
-      kind: shell_exec
-      command: "rg -l '{{input.search_term}}' --type ts | head -20"
+    task_id: shell_task # Using shell for ripgrep (tool library could add rg tool)
+    resource_bindings:
+      container: dev_env
+    input_mapping:
+      command_template: "rg -l '{{input.search_term}}' --type ts | head -20"
     output_mapping:
-      state.relevant_files: stdout
+      state.relevant_files: output.stdout
 
   - id: read_relevant
-    # fan-out over relevant files, read contents
+    # fan-out over relevant files using read_file tool
 
   - id: summarize
-    action:
-      kind: llm_call
-      prompt_spec: summarize_codebase
+    task_id: llm_task
     input_mapping:
+      prompt_spec_id: 'summarize_codebase'
       files: state.file_contents
       task: input.task
     output_mapping:
-      output.summary: response.summary
-      output.relevant_files: response.relevant_files
+      output.summary: output.response.summary
+      output.relevant_files: output.response.relevant_files
 ```
 
 Different strategies for different needs:

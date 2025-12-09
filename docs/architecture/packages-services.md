@@ -175,7 +175,7 @@ Every component in Wonder is either a **package** or a **service**:
 - Execute task steps sequentially (in-memory state)
 - Handle step-level conditionals and on_failure logic
 - Task-level retry (restart from step 0)
-- Call containers service for shell_exec steps
+- Call containers service for shell actions
 - Action execution (LLM calls, HTTP, MCP tools, etc.)
 - Result delivery to coordinator
 
@@ -299,7 +299,7 @@ Every component in Wonder is either a **package** or a **service**:
 const container = env.CONTAINERS.get(repoId);
 await container.claim(runId, baseBranch);
 
-// Executor calling Containers for shell_exec
+// Executor calling Containers for shell actions
 const container = env.CONTAINERS.get(repoId);
 const result = await container.exec(runId, command, timeoutMs);
 

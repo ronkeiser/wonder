@@ -107,7 +107,7 @@ Reusable collection of workflow definitions, task definitions, and actions. Libr
   id: string; // ULID
   project_id: string; // FK → projects
   name: string;
-  type: 'code' | 'artifacts';
+  type: 'code' | 'artifacts'; // Distinguishes source code from project documents
   default_branch: string; // Default: "main"
   created_at: string;
   updated_at: string;
@@ -116,7 +116,76 @@ Reusable collection of workflow definitions, task definitions, and actions. Libr
 
 Repository metadata. Each project has one or more code repos and exactly one artifacts repo (auto-created with project).
 
+**Type distinction:**
+
+- `code`: Source code repositories with working branches for workflow runs
+- `artifacts`: Project documents (decisions, research, reports) with artifact type validation
+
 **Content storage:** Git objects (blobs, trees, commits) in R2, refs (branches, tags) in D1. Managed by Source service. See [Source Hosting](./source-hosting.md).
+
+---
+
+### Ref
+
+**Storage:** D1 (Source Service)  
+**Schema:**
+
+```typescript
+{
+  id: string; // ULID
+  repo_id: string; // FK → repos
+  name: string; // e.g., "refs/heads/main", "refs/tags/v1.0.0"
+  target_sha: string; // Commit SHA this ref points to
+  type: 'branch' | 'tag';
+  updated_at: string;
+  created_at: string;
+}
+```
+
+Git references (branches and tags) stored in D1 for fast lookups. Updated on push operations.
+
+**Reference format:**
+
+- Branches: `refs/heads/{branch_name}` (e.g., `refs/heads/main`, `refs/heads/wonder/run-abc123`)
+- Tags: `refs/tags/{tag_name}` (e.g., `refs/tags/v1.0.0`)
+
+**Operations:**
+
+- `updateRef(repo_id, name, old_sha, new_sha)`: Optimistic concurrency via CAS (compare-and-swap)
+- `getRefs(repo_id, prefix)`: List all refs matching prefix
+- `deleteRef(repo_id, name)`: Remove ref (e.g., cleanup working branches)
+
+---
+
+### GitObject
+
+**Storage:** R2 (Source Service)  
+**Key:** `git-objects/{repo_id}/{sha}`  
+**Schema:**
+
+```typescript
+{
+  sha: string; // Git object hash (40-char hex)
+  type: 'blob' | 'tree' | 'commit'; // Git object type
+  size: number; // Bytes
+  data: Uint8Array; // Raw git object content (compressed)
+}
+```
+
+Git objects stored in R2 for durable, versioned content. Immutable once written (content-addressed storage).
+
+**Object types:**
+
+- `blob`: File content
+- `tree`: Directory listing (name → SHA mappings)
+- `commit`: Commit metadata (parent, tree, author, message)
+
+**Access patterns:**
+
+- `getObject(repo_id, sha)`: Fetch single object
+- `putObject(repo_id, sha, type, data)`: Write object (idempotent)
+- `fetch(repo_id, ref)`: Recursive fetch all objects reachable from ref
+- `push(repo_id, objects[])`: Batch write objects + update ref
 
 ---
 
@@ -145,6 +214,7 @@ Repository metadata. Each project has one or more code repos and exactly one art
   context_schema: JSONSchema;   // Runtime context structure
 
   resources: Record<string, ResourceDeclaration> | null;  // Container declarations
+  accepts_resources: Record<string, { type: 'container' }> | null;  // Required resources (for sub-workflows)
 
   initial_node_id: string;      // Starting node ULID
 
@@ -179,6 +249,14 @@ type ResourceDeclaration = {
 ```
 
 Each key in `resources` is a `resource_id` (e.g., `dev_env`, `lib_env`) used to reference the container in actions.
+
+**Accepts Resources:**
+
+- `accepts_resources`: Declares resource requirements for sub-workflows
+- Used by workflows that expect resources to be passed via `pass_resources` in workflow actions
+- Example: `{ "dev_env": { type: "container" } }` indicates this workflow requires a dev_env container
+- Enables design-time validation: calling workflow without passing required resources is an error
+- Only relevant for sub-workflows; top-level workflows declare `resources`, not `accepts_resources`
 
 ---
 
@@ -228,6 +306,8 @@ Version pinning enables stability (pin to v3) or live updates (null = latest).
 
   input_mapping: object | null; // Map workflow context → task input
   output_mapping: object | null; // Map task output → workflow context
+
+  resource_bindings: Record<string, string> | null; // Map generic resource names to workflow resource IDs
 }
 ```
 
@@ -244,6 +324,13 @@ All control flow (conditions, parallelism, synchronization) lives on **Transitio
 
 - `input_mapping`: JSONPath expressions mapping workflow context to task input
 - `output_mapping`: JSONPath expressions writing task output to workflow context
+
+**Resource Bindings:**
+
+- `resource_bindings`: Maps generic resource names (used by actions/tools) to workflow-specific resource IDs
+- Example: `{ "container": "dev_env", "build_env": "build_container" }` maps action's "container" reference to workflow's "dev_env" resource
+- At dispatch time, coordinator resolves these to actual container DO IDs for task execution
+- Actions and tools use generic names ("container", "build_env"), nodes provide the mapping
 
 ---
 
@@ -499,21 +586,21 @@ Versioned, reusable action implementation. Atomic operations executed by workers
 
 **ActionKind:**
 
-- `llm_call` - LLM inference (Anthropic, OpenAI, etc.)
-- `mcp_tool` - Model Context Protocol tool call
-- `http_request` - HTTP API call
-- `shell_exec` - Execute command in container
-- `human_input` - Human-in-the-loop approval/input
-- `update_context` - Pure context transformation
-- `write_artifact` - Write file to artifacts repo
-- `workflow_call` - Invoke sub-workflow
-- `vector_search` - Semantic search via Vectorize
-- `emit_metric` - Write to Analytics Engine
+- `llm` - LLM inference (Anthropic, OpenAI, etc.)
+- `mcp` - Model Context Protocol tool call
+- `http` - HTTP API call
+- `tool` - Standard library tool (git_commit, write_artifact, run_tests, etc.)
+- `shell` - Execute raw command in container (escape hatch)
+- `workflow` - Invoke sub-workflow
+- `context` - Pure context transformation
+- `vector` - Semantic search via Vectorize
+- `metric` - Write to Analytics Engine
+- `human` - Human-in-the-loop approval/input
 
 **Implementation schemas (kind-specific):**
 
 ```typescript
-// llm_call
+// llm
 {
   prompt_spec_id: string; // FK → prompt_specs
   model_profile_id: string; // FK → model_profiles
@@ -533,15 +620,21 @@ Versioned, reusable action implementation. Atomic operations executed by workers
   body_template: string | null;
 }
 
-// shell_exec
+// tool
+{
+  tool_name: string; // e.g., 'git_commit', 'write_artifact', 'run_tests'
+  tool_version: number | null; // null = latest
+  // Tools declare required resources in their ToolDef, not in action implementation
+}
+
+// shell
 {
   command_template: string; // Handlebars template
   working_dir: string | null;
-  timeout_ms: number | null;
-  capture_output: boolean; // Default: true
+  resource_name: string; // Generic resource name (e.g., "container", "build_env")
 }
 
-// workflow_call
+// workflow
 {
   workflow_def_id: string | { from_context: string };
   version: number | { from_context: string } | null; // null = latest
@@ -549,20 +642,12 @@ Versioned, reusable action implementation. Atomic operations executed by workers
   on_failure: 'propagate' | 'catch'; // default: propagate
 }
 
-// update_context
+// context
 {
   updates: Array<{
     path: string; // JSONPath to update
     expr: string; // SQL expression or value
   }>;
-}
-
-// write_artifact
-{
-  path_template: string; // Path in artifacts repo
-  content_template: string; // Handlebars template for content
-  artifact_type_id: string | null; // Optional type for validation
-  commit_message: string | null; // Default: auto-generated
 }
 
 // vector_search
@@ -579,6 +664,57 @@ Versioned, reusable action implementation. Atomic operations executed by workers
   dimensions: Record<string, string> | null;
 }
 ```
+
+---
+
+### ToolDef
+
+**Storage:** D1 (Resources)  
+**Schema:**
+
+```typescript
+{
+  id: string; // ULID
+  version: number;
+  name: string; // e.g., 'git_commit', 'write_artifact'
+  description: string;
+
+  category: 'git' | 'file' | 'artifact' | 'test' | 'package' | 'other';
+
+  requires_resource: string | null; // Generic resource requirement (e.g., "container")
+
+  input_schema: JSONSchema; // Tool input validation
+  output_schema: JSONSchema; // Tool output validation
+
+  implementation: {
+    handler: string; // Handler function name (e.g., 'executeGitCommit')
+    config: object; // Tool-specific configuration
+  }
+
+  created_at: string;
+  updated_at: string;
+}
+```
+
+**Primary Key:** `(id, version)`
+
+Standard library tool definition. Tools are pre-built, versioned operations that wrap common tasks:
+
+- **Git operations**: commit, push, merge, status
+- **Artifact management**: write, read, list artifacts
+- **Testing**: run tests, lint, build
+- **File operations**: read, write, delete files
+- **Package management**: install, update dependencies
+
+**Resource requirements:**
+
+- Tools declare generic resource needs via `requires_resource`
+- Node's `resource_bindings` map these to workflow-specific resources
+- Example: `git_commit` requires "container", node binds "container" → "dev_env" → DO ID
+
+**Implementation:**
+
+Tools are implemented as handlers in the Executor service. The `handler` field references the function name, and `config` provides tool-specific settings.
 
 ---
 
@@ -673,6 +809,21 @@ LLM configuration profile. Enables:
   parent_run_id: string | null;
   parent_node_id: string | null;
 
+  // Container resource tracking
+  container_resources: Record<string, string> | null; // resource_id → container_id (DO ID)
+
+  // Merge configuration per resource
+  merge_config: Record<
+    string,
+    {
+      repo_id: string;
+      base_branch: string;
+      working_branch: string;
+      merge_on_success: boolean;
+      merge_strategy: 'rebase' | 'fail' | 'force';
+    }
+  > | null;
+
   durable_object_id: string; // DO stub ID
 
   created_at: string;
@@ -681,6 +832,18 @@ LLM configuration profile. Enables:
 ```
 
 Metadata for single workflow execution. Each run gets its own Coordinator DO instance. Run metadata stored in D1 for querying across all runs.
+
+**Container resource tracking:**
+
+- `container_resources`: Maps resource_id (from WorkflowDef.resources) to ContainerDO ID
+- Enables container ownership validation and cleanup
+- Example: `{ "dev_env": "container_abc123", "test_env": "container_def456" }`
+
+**Merge configuration:**
+
+- Copied from WorkflowDef.resources on run creation
+- Used by Coordinator to merge working branches on completion
+- One entry per container resource
 
 ---
 
@@ -700,6 +863,7 @@ Metadata for single workflow execution. Each run gets its own Coordinator DO ins
   base_branch: string; // Branch created from
   working_branch: string; // wonder/run-{run_id}
   current_sha: string | null; // Latest commit SHA
+  image: string; // Container image (e.g., 'node:20')
 
   status: 'provisioning' | 'active' | 'hibernated' | 'destroyed';
 
@@ -723,6 +887,56 @@ Ephemeral container instance with linear ownership. One ContainerDO per resource
 - Active: Ready for command execution
 - Hibernated: Destroyed but working_branch preserved (resume from SHA)
 - Destroyed: Cleaned up after run completion
+
+**RPC Operations (Containers Service):**
+
+```typescript
+// Claim ownership of container for workflow run
+claim(run_id: string, base_branch: string): Promise<{
+  working_branch: string;
+  current_sha: string;
+}>;
+
+// Release ownership (cleanup or transfer preparation)
+release(run_id: string): Promise<void>;
+
+// Transfer ownership to another run (for sub-workflows)
+transfer(from_run_id: string, to_run_id: string): Promise<void>;
+
+// Execute shell command (validates ownership)
+exec(run_id: string, command: string, timeout_ms?: number): Promise<{
+  stdout: string;
+  stderr: string;
+  exit_code: number;
+}>;
+
+// Hibernate container (commit working state, destroy instance)
+hibernate(run_id: string): Promise<{
+  sha: string; // Final commit SHA
+}>;
+
+// Resume from hibernation (restore working branch)
+resume(run_id: string, sha: string): Promise<void>;
+```
+
+**Provisioning flow:**
+
+1. `claim(run_id, base_branch)` → creates working_branch, clones repo from Source service
+2. Container provisions: pulls image, sets up filesystem, installs dependencies from Cache service
+3. Status transitions: `provisioning` → `active`
+
+**Command execution:**
+
+1. Executor calls `exec(run_id, command)`
+2. ContainerDO validates `run_id === owner_run_id`
+3. Executes command via Cloudflare Containers platform
+4. Returns stdout/stderr/exit_code
+
+**Git operations:**
+
+- Container filesystem has git remote helper configured
+- `git push wonder <branch>` → HTTP POST to Source service → R2/D1 write
+- Source service translates git protocol to R2 object writes + D1 ref updates
 
 ---
 
@@ -1071,6 +1285,8 @@ Enables **testable coordination logic** without spinning up actors.
 | **Project**       | Resources      | D1                    | Persistent            |
 | **Library**       | Resources      | D1                    | Persistent            |
 | **Repo**          | Resources      | D1 (metadata)         | Persistent            |
+| **Ref**           | Source         | D1                    | Persistent (mutable)  |
+| **GitObject**     | Source         | R2                    | Immutable             |
 | **WorkflowDef**   | Resources      | D1                    | Immutable (versioned) |
 | **Workflow**      | Resources      | D1                    | Persistent            |
 | **Node**          | Resources      | D1                    | Immutable (versioned) |

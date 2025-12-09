@@ -73,17 +73,17 @@ The worker runs all three steps in memory. Same result, one-third the overhead.
 
 ## Comparison
 
-| Aspect        | Workflow                         | Task                             |
-| ------------- | -------------------------------- | -------------------------------- |
-| Execution     | Coordinator orchestrates workers | Single worker runs to completion |
-| State         | DO SQLite (durable)              | In-memory (ephemeral)            |
-| Parallelism   | Fan-out/fan-in                   | None                             |
-| Branching     | Full graph routing               | Simple if/else                   |
-| Human gates   | Yes                              | No                               |
-| Sub-workflows | Yes                              | No                               |
-| Sub-tasks     | Yes (nodes execute tasks)        | No (flat sequence)               |
-| Retry scope   | Per-node                         | Whole task                       |
-| Duration      | Seconds to days                  | Milliseconds to minutes          |
+| Aspect        | Workflow                         | Task                                   |
+| ------------- | -------------------------------- | -------------------------------------- |
+| Execution     | Coordinator orchestrates workers | Single worker runs to completion       |
+| State         | DO SQLite (durable)              | In-memory (ephemeral)                  |
+| Parallelism   | Fan-out/fan-in                   | None                                   |
+| Branching     | Full graph routing               | Simple if/else                         |
+| Human gates   | Yes (token pauses)               | Yes (via async action, task completes) |
+| Sub-workflows | Yes                              | No                                     |
+| Sub-tasks     | Yes (nodes execute tasks)        | No (flat sequence)                     |
+| Retry scope   | Per-node                         | Whole task                             |
+| Duration      | Seconds to days                  | Milliseconds to minutes                |
 
 ## When to Use Each
 

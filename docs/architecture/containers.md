@@ -10,7 +10,7 @@ For how containers interact with repos and artifacts, see [Project Resources](./
 
 ## The Problem
 
-Actions in Wonder are atomic and stateless. An `llm_call` executes, returns output, and completes. But implementing a feature might involve dozens of sequential actions—clone, edit, test, fix, commit—all operating on the same filesystem state.
+Actions in Wonder are atomic and stateless. An `llm` action executes, returns output, and completes. But implementing a feature might involve dozens of sequential actions—clone, edit, test, fix, commit—all operating on the same filesystem state.
 
 Container lifecycle must therefore be scoped higher than individual nodes. A container is a _resource_ owned at the workflow level, accessible to nodes within that scope, and cleaned up when the scope ends.
 
@@ -40,8 +40,8 @@ WorkflowDef {
     dev_env: {
       type: 'container',
       image: 'node:20',
-      repo: 'api-service',
-      branch: 'main'
+      repo_id: 'repo_01HXYZ...',
+      base_branch: 'main'
     }
   }
 }
@@ -71,13 +71,13 @@ WorkflowDef {
 
 This is validated at design time. Calling a workflow that requires `dev_env` without passing it is an error.
 
-### Transfer via workflow_call
+### Transfer via workflow action
 
 Ownership transfers explicitly:
 
 ```typescript
 {
-  kind: 'workflow_call',
+  kind: 'workflow',
   implementation: {
     workflow_def_id: 'react_coding_v1',
     pass_resources: ['dev_env']
@@ -112,21 +112,21 @@ If a node attempts to access a container it doesn't own, that's either a design-
 When judges need to review code, they receive extracted data via `input_mapping`, not container access:
 
 ```
-Node: run_tests (shell_exec, owns container)
+Node: run_tests (tool: run_tests, owns container)
   → output: { test_output, failed_files }
 
-Node: extract_context (shell_exec, owns container)
+Node: extract_context (shell action, owns container)
   → output: { relevant_code: "...200 lines..." }
 
 Transition: fan_out (spawn_count: 5)
 
-Node: judge_code (llm_call, NO container access)
+Node: judge_code (llm action, NO container access)
   → input: state.relevant_code, state.test_output
   → output: { verdict, rationale }
 
 Transition: fan_in (wait_for: all, merge: append)
 
-Node: apply_fix (shell_exec, owns container)
+Node: apply_fix (shell action, owns container)
 ```
 
 The container sits idle during fan-out. Ownership remains with the main execution line. Judges operate on strings in context—code snippets, diffs, test output—not live filesystem access.
@@ -167,10 +167,10 @@ On resume:
 Workflows with human gates must include a commit node before the gate:
 
 ```
-Node: implement_changes (shell_exec)
-Node: commit_checkpoint (shell_exec)
-  → command: "git add -A && git commit -m 'checkpoint: before review'"
-Node: human_review (human_input)  // safe to hibernate here
+Node: implement_changes (shell action)
+Node: commit_checkpoint (tool: git_commit)
+  → input: { message: 'checkpoint: before review', files: ['.'] }
+Node: human_review (human action)  // safe to hibernate here
 ```
 
 This is a validation rule. Workflows that declare containers and include human gates must ensure clean git state before any gate. The "data loss risk" of git-based hibernation disappears by construction.
@@ -191,49 +191,114 @@ Hibernation updates status and releases the container. Resume provisions a new c
 
 ## Shell Execution
 
-Nodes execute shell commands via the `shell_exec` action:
+Nodes execute shell commands via the `shell` action or standard library tools.
+
+### Using Standard Library Tools
+
+For common operations, use tools:
 
 ```typescript
+// Node configuration
 {
   id: 'run_tests',
-  action: {
-    kind: 'shell_exec',
-    container: 'dev_env',
-    command: 'pnpm test',
-    timeout_ms: 300000
+  task_id: 'run_tool_task',
+  resource_bindings: {
+    'container': 'dev_env'  // Map generic name to workflow resource
   },
   output_mapping: {
     'state.test_output': 'stdout',
     'state.test_exit_code': 'exit_code'
   }
 }
+
+// Task with tool action
+{
+  steps: [{
+    action: {
+      kind: 'tool',
+      implementation: {
+        tool_name: 'run_tests',
+        tool_version: null  // latest
+      }
+    }
+  }]
+}
+```
+
+### Using Shell Actions (Escape Hatch)
+
+For custom commands:
+
+```typescript
+// Node configuration
+{
+  id: 'custom_command',
+  task_id: 'shell_task',
+  resource_bindings: {
+    'container': 'dev_env'
+  },
+  output_mapping: {
+    'state.output': 'stdout'
+  }
+}
+
+// Task with shell action
+{
+  steps: [{
+    action: {
+      kind: 'shell',
+      implementation: {
+        command_template: 'pnpm test --coverage',
+        working_dir: null,
+        resource_name: 'container'  // Uses Node's resource_bindings
+      },
+      execution: {
+        timeout_ms: 300000
+      }
+    }
+  }]
+}
 ```
 
 The executor:
 
-1. Validates the current workflow owns the referenced container
-2. Dispatches command to container
-3. Captures stdout, stderr, exit_code
-4. Returns result to coordinator
+1. Resolves resource_name via Node's resource_bindings to container DO ID
+2. Validates the current workflow owns the referenced container
+3. Dispatches command to container
+4. Captures stdout, stderr, exit_code
+5. Returns result to coordinator
 
-### Common Commands
+### Common Operations
+
+**Using Standard Library Tools (Recommended):**
+
+```typescript
+// Git operations
+tool: 'git_commit' → { message: string, files?: string[] }
+tool: 'git_push' → { remote?: string, branch?: string }
+tool: 'git_status' → {}
+
+// Testing and build
+tool: 'run_tests' → { pattern?: string, framework?: string }
+tool: 'run_lint' → { fix?: boolean }
+tool: 'run_build' → { target?: string }
+
+// File operations
+tool: 'read_file' → { path: string }
+tool: 'write_file' → { path: string, content: string }
+tool: 'list_files' → { pattern?: string }
+```
+
+**Using Shell Actions (For Custom Commands):**
 
 ```bash
-# Code modification
-git add -A && git commit -m "message"
-
-# Testing
-pnpm test
-pnpm typecheck
-pnpm lint
-
-# Build
-pnpm build
-
 # Exploration
 find src -name "*.ts" | head -20
 grep -r "pattern" src/
 cat src/index.ts
+
+# Custom build steps
+pnpm run custom-script --arg
 ```
 
 ### Timeouts
@@ -242,10 +307,14 @@ Long-running commands need appropriate timeouts:
 
 ```typescript
 {
-  kind: 'shell_exec',
-  container: 'dev_env',
-  command: 'pnpm test',
-  timeout_ms: 300000  // 5 minutes for test suite
+  kind: 'shell',
+  implementation: {
+    command_template: 'pnpm test',
+    resource_name: 'container'
+  },
+  execution: {
+    timeout_ms: 300000  // 5 minutes for test suite
+  }
 }
 ```
 
@@ -261,14 +330,14 @@ WorkflowDef {
     api_env: {
       type: 'container',
       image: 'node:20',
-      repo: 'api-service',
-      branch: 'main'
+      repo_id: 'repo_01HXYZ...',
+      base_branch: 'main'
     },
     worker_env: {
       type: 'container',
       image: 'node:20',
-      repo: 'worker-jobs',
-      branch: 'main'
+      repo_id: 'repo_01HABC...',
+      base_branch: 'main'
     }
   }
 }
@@ -334,10 +403,10 @@ Workflow completes
 | --------------- | ------------------------------------------------- |
 | Scope           | Workflow-level resource                           |
 | Ownership       | Linear, single owner, explicit transfer           |
-| Transfer        | `pass_resources` on `workflow_call`               |
+| Transfer        | `pass_resources` on `workflow` action             |
 | Parallel access | Not supported. Extract data to context.           |
 | Hibernation     | Git-based. Commit before gates, rebuild from SHA. |
 | State tracking  | Branch + SHA in workflow context                  |
-| Execution       | `shell_exec` action with ownership validation     |
+| Execution       | Tools or `shell` action with ownership validation |
 
 The model is simple: one owner, explicit handoff, git is the checkpoint mechanism. This covers deep sub-workflow composition, long-running workflows with human gates, and multi-step agent coding tasks—without locks, shared state, or complex capability systems.

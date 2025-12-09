@@ -25,7 +25,7 @@
 - Every node executes exactly one task; every step executes exactly one action
 - Workflows: graphs, parallelism, durable state (DO SQLite), coordinated by Durable Object
 - Tasks: linear sequences, in-memory state, single worker execution, atomic retries
-- Actions: atomic operations (llm_call, shell_exec, mcp_tool, http_request, human_input, update_context, write_artifact, workflow_call, vector_search)
+- Actions: atomic operations (llm, mcp, http, tool, shell, workflow, context, vector, metric, human)
 
 ## Workflows
 
@@ -33,7 +33,7 @@
 - Transitions control all routing logic: conditions, parallelism, synchronization
 - Priority tiers on transitions: same priority = parallel dispatch, different priority = sequential fallback
 - Tokens track execution position; fan-out creates tokens, fan-in merges them
-- Workflows composable: workflow_call invokes sub-workflows with context isolation
+- Workflows composable: workflow action invokes sub-workflows with context isolation
 - Triggers: UI, API, or schedule (schedule less common)
 - Workflows auto-version on change between runs (max 1 increment per run)
 
