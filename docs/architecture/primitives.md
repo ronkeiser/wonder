@@ -4,11 +4,12 @@ Core data types in the Wonder workflow system, organized by storage layer and ma
 
 ## Storage Architecture
 
-**D1 (Resources Service)** - Tenant-scoped metadata, workflow definitions, versioned across workspace
+**D1 (Resources Service)** - Tenant-scoped metadata, workflow definitions, versioned across workspace  
+**D1 (Source Service)** - Git refs, artifact index  
 **DO SQLite (Coordinator)** - Per-run execution state, isolated per workflow_run_id  
 **Events Service** - Observability layer (D1 + Analytics Engine), permanent audit trail  
 **Logs Service** - Operational logs (D1 → R2 archive), ephemeral debugging  
-**R2** - Large binary artifacts, files  
+**R2** - Git objects, dependency cache, large files  
 **Vectorize** - Semantic search indexes
 
 ## Hierarchy & Tenant Isolation
@@ -59,6 +60,7 @@ Execution context for workflows. Projects provide:
 - Runtime environment (model profiles, rate limits)
 - Workflow runs (execution instances)
 - State storage (DO coordination per run)
+- Repos (code and artifacts)
 
 **Settings** (stored in `project_settings` table):
 
@@ -86,11 +88,35 @@ Execution context for workflows. Projects provide:
 }
 ```
 
-Reusable collection of workflow definitions and actions. Libraries enable:
+Reusable collection of workflow definitions, task definitions, and actions. Libraries enable:
 
 - Sharing workflows across projects
 - Versioned, immutable definitions
 - Public libraries (when `workspace_id` is null)
+- Project-type conventions (e.g., typescript-pnpm-monorepo)
+
+---
+
+### Repo
+
+**Storage:** D1 (Resources) for metadata; R2 + D1 (Source Service) for content  
+**Schema:**
+
+```typescript
+{
+  id: string; // ULID
+  project_id: string; // FK → projects
+  name: string;
+  type: 'code' | 'artifacts';
+  default_branch: string; // Default: "main"
+  created_at: string;
+  updated_at: string;
+}
+```
+
+Repository metadata. Each project has one or more code repos and exactly one artifacts repo (auto-created with project).
+
+**Content storage:** Git objects (blobs, trees, commits) in R2, refs (branches, tags) in D1. Managed by Source service. See [Source Hosting](./source-hosting.md).
 
 ---
 
@@ -299,6 +325,8 @@ Edge in workflow graph. **All branching logic lives here:**
   input_schema: JSONSchema;     // Task input validation
   output_schema: JSONSchema;    // Task output validation
 
+  steps: Step[];                // Embedded step definitions (ordered)
+
   retry: {
     max_attempts: number;
     backoff: "none" | "linear" | "exponential";
@@ -328,21 +356,18 @@ Linear sequence of steps executed by a single worker. Task state is in-memory on
 
 Individual step failures can abort the task, signal task retry, or continue to the next step based on `on_failure`.
 
-See `docs/architecture/execution-model.md` for design rationale and retry model details.
+See [Execution Model](./execution-model.md) for design rationale.
 
 ---
 
 ### Step
 
-**Storage:** D1 (Resources)  
+**Storage:** Embedded in TaskDef (not a separate table)  
 **Schema:**
 
 ```typescript
 {
   id: string;                   // ULID
-  task_def_id: string;          // Composite FK
-  task_def_version: number;
-
   ref: string;                  // Human-readable identifier (unique per task)
   ordinal: number;              // Execution order (0-indexed)
 
@@ -361,8 +386,6 @@ See `docs/architecture/execution-model.md` for design rationale and retry model 
   } | null;
 }
 ```
-
-**Primary Key:** `(task_def_id, task_def_version, id)`
 
 Single action execution within a task. Steps execute in `ordinal` order.
 
@@ -455,9 +478,10 @@ Versioned, reusable action implementation. Atomic operations executed by workers
 - `llm_call` - LLM inference (Anthropic, OpenAI, etc.)
 - `mcp_tool` - Model Context Protocol tool call
 - `http_request` - HTTP API call
+- `shell_exec` - Execute command in container
 - `human_input` - Human-in-the-loop approval/input
 - `update_context` - Pure context transformation
-- `write_artifact` - Store large output to R2
+- `write_artifact` - Write file to artifacts repo
 - `workflow_call` - Invoke sub-workflow
 - `vector_search` - Semantic search via Vectorize
 - `emit_metric` - Write to Analytics Engine
@@ -485,6 +509,14 @@ Versioned, reusable action implementation. Atomic operations executed by workers
   body_template: string | null;
 }
 
+// shell_exec
+{
+  command_template: string; // Handlebars template
+  working_dir: string | null;
+  timeout_ms: number | null;
+  capture_output: boolean; // Default: true
+}
+
 // workflow_call
 {
   workflow_def_id: string | { from_context: string };
@@ -503,8 +535,10 @@ Versioned, reusable action implementation. Atomic operations executed by workers
 
 // write_artifact
 {
-  artifact_type_id: string;
-  content_mapping: Record<string, string>; // Map action output → artifact schema
+  path_template: string; // Path in artifacts repo
+  content_template: string; // Handlebars template for content
+  artifact_type_id: string | null; // Optional type for validation
+  commit_message: string | null; // Default: auto-generated
 }
 
 // vector_search
@@ -747,6 +781,98 @@ CREATE TABLE workflow_context_results (
 
 ---
 
+## Artifacts & Search
+
+### ArtifactType
+
+**Storage:** D1 (Resources)  
+**Schema:**
+
+```typescript
+{
+  id: string;                   // ULID
+  version: number;              // Incremental version
+  project_id: string;           // FK → projects
+  name: string;                 // e.g., "decision", "research", "report"
+  description: string;
+
+  path_pattern: string;         // Glob pattern, e.g., "decisions/**/*.md"
+  schema: JSONSchema;           // Frontmatter/content validation
+
+  index_config: {
+    extract_fields: string[];   // Fields to extract to D1 for queries
+    embed_fields: string[];     // Fields to embed in Vectorize
+  } | null;
+
+  created_at: string;
+  updated_at: string;
+}
+```
+
+**Primary Key:** `(id, version)`
+
+Defines artifact types within a project. Artifacts themselves are files in the project's artifacts repo—ArtifactType defines validation and indexing rules applied on commit.
+
+**Validation:** When files matching `path_pattern` are committed, Source service validates against `schema`. Invalid commits are rejected.
+
+**Indexing:** On commit, `extract_fields` are written to ArtifactIndex for structured queries. `embed_fields` are embedded and stored in Vectorize for semantic search.
+
+---
+
+### ArtifactIndex
+
+**Storage:** D1 (Source Service)  
+**Schema:**
+
+```typescript
+{
+  id: string; // ULID
+  repo_id: string; // FK → repos (artifacts repo)
+  path: string; // File path in repo
+  artifact_type_id: string; // FK → artifact_types
+
+  commit_sha: string; // Latest commit affecting this file
+  branch: string; // Branch where indexed
+
+  extracted_data: string; // JSON (fields from extract_fields)
+
+  created_at: string;
+  updated_at: string;
+}
+```
+
+Denormalized index of artifact files for querying. Updated on commit by Source service. Content lives in git—this enables queries without tree traversal.
+
+---
+
+### VectorIndex
+
+**Storage:** Vectorize (embeddings) + D1 (Resources)  
+**Schema (D1):**
+
+```typescript
+{
+  id: string;
+  project_id: string;
+  name: string;
+  vectorize_index_id: string;   // Cloudflare Vectorize index ID
+
+  artifact_type_ids: string[];  // Which artifact types to index
+
+  embedding_provider: "openai" | "cloudflare_ai";
+  embedding_model: string;
+  dimensions: number;
+
+  auto_index: boolean;          // Automatically index on commit?
+
+  created_at: string;
+}
+```
+
+Semantic search over artifacts. Configured per project, indexes artifacts matching specified types.
+
+---
+
 ## Observability
 
 ### Event
@@ -853,7 +979,7 @@ Logs are **ephemeral operational data** for debugging services, not workflow exe
 type Decision =
   | { type: 'CREATE_TOKEN'; workflow_run_id: string; node_id: string /* ... */ }
   | { type: 'UPDATE_CONTEXT'; workflow_run_id: string; updates: object }
-  | { type: 'DISPATCH_TASK'; token_id: string; action_id: string /* ... */ }
+  | { type: 'DISPATCH_TASK'; token_id: string; task_id: string /* ... */ }
   | { type: 'COMPLETE_WORKFLOW'; workflow_run_id: string }
   | { type: 'CANCEL_TOKENS'; token_ids: string[] }
   | { type: 'WAIT' /* ... */ };
@@ -871,111 +997,39 @@ Enables **testable coordination logic** without spinning up actors.
 
 ---
 
-## Artifacts & Search
-
-### Artifact
-
-**Storage:** R2 (binary content) + D1 (metadata)  
-**Schema (D1 metadata):**
-
-```typescript
-{
-  id: string; // ULID
-  workflow_run_id: string;
-  node_id: string;
-  artifact_type_id: string;
-
-  storage_key: string; // R2 object key
-  content_type: string;
-  size_bytes: number;
-
-  schema_data: string; // JSON (validated against ArtifactType.schema)
-
-  created_at: string;
-}
-```
-
-Large outputs (files, documents, images) stored in R2. Metadata in D1 enables querying without loading content.
-
-**ArtifactType** (D1):
-
-```typescript
-{
-  id: string;
-  name: string;
-  description: string;
-  schema: JSONSchema; // Structure validation
-  version: number;
-}
-```
-
----
-
-### VectorIndex
-
-**Storage:** Vectorize (embeddings) + D1 (metadata)  
-**Schema (D1):**
-
-```typescript
-{
-  id: string;
-  name: string;
-  vectorize_index_id: string;  // Cloudflare Vectorize index ID
-
-  artifact_type_ids: string[];  // Which artifact types to index
-
-  embedding_provider: "openai" | "cloudflare_ai";
-  embedding_model: string;
-  dimensions: number;
-
-  content_fields: string[];     // Which artifact schema fields to embed
-  auto_index: boolean;          // Automatically index new artifacts?
-
-  created_at: string;
-}
-```
-
-Semantic search over artifacts. Vectorize stores embeddings, D1 stores configuration.
-
----
-
 ## Summary: Primitive Storage Map
 
-| Primitive        | Managed By    | Storage                | Lifecycle             |
-| ---------------- | ------------- | ---------------------- | --------------------- |
-| **Workspace**    | Resources     | D1                     | Persistent            |
-| **Project**      | Resources     | D1                     | Persistent            |
-| **Library**      | Resources     | D1                     | Persistent            |
-| **WorkflowDef**  | Resources     | D1                     | Immutable (versioned) |
-| **Workflow**     | Resources     | D1                     | Persistent            |
-| **Node**         | Resources     | D1                     | Immutable (versioned) |
-| **Transition**   | Resources     | D1                     | Immutable (versioned) |
-| **TaskDef**      | Resources     | D1                     | Immutable (versioned) |
-| **Step**         | Resources     | D1                     | Immutable (versioned) |
-| **ActionDef**    | Resources     | D1                     | Immutable (versioned) |
-| **PromptSpec**   | Resources     | D1                     | Immutable (versioned) |
-| **ModelProfile** | Resources     | D1                     | Persistent            |
-| **WorkflowRun**  | Resources     | D1 → DO (run) → D1     | Persistent\*          |
-| **Token**        | Coordinator   | DO SQLite              | Per-run (ephemeral)   |
-| **Context**      | Coordinator   | DO SQLite → D1         | Per-run → snapshot\*  |
-| **Decision**     | Coordinator   | None                   | Return value only     |
-| **Event**        | Event Service | D1 + Analytics Engine  | Permanent (90+ days)  |
-| **Log**          | Logs Service  | D1 → R2                | 30 days → archive     |
-| **Artifact**     | Coordinator   | D1 → DO SQLite → D1/R2 | Persistent\*          |
-| **VectorIndex**  | Resources     | D1 + Vectorize         | Persistent            |
-
-**\* Storage lifecycle notes:**
-
-- **WorkflowRun**: Created in D1 (`status: running`) → Coordinator works with DO copy → Updated in D1 at completion (via Resources RPC)
-- **Context**: Built incrementally in DO SQLite during execution → Final state optionally persisted to D1 for debugging/queries
-- **Artifact**: Metadata created in D1 → Content buffered in DO SQLite during execution → Persisted to D1 (metadata) + R2 (binary content) at completion
+| Primitive         | Managed By     | Storage               | Lifecycle             |
+| ----------------- | -------------- | --------------------- | --------------------- |
+| **Workspace**     | Resources      | D1                    | Persistent            |
+| **Project**       | Resources      | D1                    | Persistent            |
+| **Library**       | Resources      | D1                    | Persistent            |
+| **Repo**          | Resources      | D1 (metadata)         | Persistent            |
+| **WorkflowDef**   | Resources      | D1                    | Immutable (versioned) |
+| **Workflow**      | Resources      | D1                    | Persistent            |
+| **Node**          | Resources      | D1                    | Immutable (versioned) |
+| **Transition**    | Resources      | D1                    | Immutable (versioned) |
+| **TaskDef**       | Resources      | D1                    | Immutable (versioned) |
+| **ActionDef**     | Resources      | D1                    | Immutable (versioned) |
+| **PromptSpec**    | Resources      | D1                    | Immutable (versioned) |
+| **ModelProfile**  | Resources      | D1                    | Persistent            |
+| **ArtifactType**  | Resources      | D1                    | Immutable (versioned) |
+| **WorkflowRun**   | Resources      | D1 → DO (run) → D1    | Persistent            |
+| **Token**         | Coordinator    | DO SQLite             | Per-run (ephemeral)   |
+| **Context**       | Coordinator    | DO SQLite → D1        | Per-run → snapshot    |
+| **Decision**      | Coordinator    | None                  | Return value only     |
+| **ArtifactIndex** | Source         | D1                    | Derived (on commit)   |
+| **VectorIndex**   | Resources      | D1 + Vectorize        | Persistent            |
+| **Event**         | Events Service | D1 + Analytics Engine | Permanent (90+ days)  |
+| **Log**           | Logs Service   | D1 → R2               | 30 days → archive     |
 
 **Storage patterns:**
 
-- **D1 via Resources**: Shared metadata (workflow defs, actions, projects)
+- **D1 via Resources**: Shared metadata (workflow defs, actions, projects, repos)
+- **D1 via Source**: Git refs, artifact index
 - **DO SQLite**: Isolated execution state (one DO per workflow run)
+- **R2**: Git objects, dependency cache, large files
 - **Events**: Observability (workflow state changes, permanent record)
 - **Logs**: Operations (service debugging, ephemeral)
-- **R2**: Large files (artifacts, log archives)
 - **Vectorize**: Semantic search (embeddings)
 - **Analytics Engine**: Metrics (time-series aggregations)
