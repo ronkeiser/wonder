@@ -312,6 +312,22 @@ Workflow completes
   → Working branch retained for history
 ```
 
+## Cloudflare Containers Integration
+
+Wonder containers are built on Cloudflare's Container platform. Each repo gets a dedicated ContainerDO—a Durable Object extending Cloudflare's `Container` class.
+
+**Identity:** Container identity is repo identity. `env.CONTAINER_DO.getByName(repo_id)` returns the same ContainerDO globally, regardless of which workflow or worker calls it.
+
+**Ownership:** ContainerDO tracks `owner_run_id`. Workflows call `claim()` to take ownership, `release()` on completion, and `transfer()` when passing to sub-workflows. Shell commands include the caller's run ID; ContainerDO rejects unauthorized callers.
+
+**Provisioning:** On claim, the container starts with environment variables pointing to the repo and branch. An init script clones from R2-backed git, checks out the working branch, installs dependencies via pnpm (store mounted from R2), and starts a shell server.
+
+**Shell access:** The container runs an HTTP server accepting commands. Workers call `containerStub.exec(run_id, command, timeout)`. ContainerDO validates ownership, forwards to the shell server, returns stdout/stderr/exit_code.
+
+**Hibernation:** When idle timeout triggers, ContainerDO records the current SHA, then shuts down. On next claim, the container resumes from that SHA.
+
+**Transfer:** Sub-workflow handoff updates `owner_run_id` without restarting the container. The filesystem persists across the transfer.
+
 ## Summary
 
 | Concept         | Design Decision                                   |
