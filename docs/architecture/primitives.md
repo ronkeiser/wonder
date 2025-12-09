@@ -177,27 +177,27 @@ Version pinning enables stability (pin to v3) or live updates (null = latest).
   workflow_def_version: number;
   name: string;
 
-  action_id: string; // References ActionDef
-  action_version: number; // Action version to execute
+  task_id: string; // References TaskDef
+  task_version: number; // Task version to execute
 
-  input_mapping: object | null; // Map context → action input
-  output_mapping: object | null; // Map action output → context
+  input_mapping: object | null; // Map workflow context → task input
+  output_mapping: object | null; // Map task output → workflow context
 }
 ```
 
 **Primary Key:** `(workflow_def_id, workflow_def_version, id)`
 
-Action execution point in workflow graph. **No branching logic** - nodes only:
+Task execution point in workflow graph. **No branching logic** - nodes only:
 
-1. Execute actions via Executor service
-2. Map data (context ↔ action I/O)
+1. Execute tasks via worker
+2. Map data (workflow context ↔ task I/O)
 
 All control flow (conditions, parallelism, synchronization) lives on **Transitions**.
 
 **Mappings:**
 
-- `input_mapping`: JSONPath expressions mapping context state to action input
-- `output_mapping`: JSONPath expressions writing action output to context
+- `input_mapping`: JSONPath expressions mapping workflow context to task input
+- `output_mapping`: JSONPath expressions writing task output to workflow context
 
 ---
 
@@ -276,7 +276,130 @@ Edge in workflow graph. **All branching logic lives here:**
 
 ---
 
-## Actions
+## Execution
+
+### TaskDef
+
+**Storage:** D1 (Resources)  
+**Schema:**
+
+```typescript
+{
+  id: string;                   // ULID
+  version: number;              // Incremental version
+  name: string;
+  description: string;
+
+  // Ownership (exactly one)
+  project_id: string | null;    // Local to project
+  library_id: string | null;    // In reusable library
+
+  tags: string[];               // Discovery/categorization
+
+  input_schema: JSONSchema;     // Task input validation
+  output_schema: JSONSchema;    // Task output validation
+
+  retry: {
+    max_attempts: number;
+    backoff: "none" | "linear" | "exponential";
+    initial_delay_ms: number;
+    max_delay_ms: number | null;
+  } | null;
+
+  timeout_ms: number | null;    // Whole-task timeout
+
+  created_at: string;
+  updated_at: string;
+}
+```
+
+**Primary Key:** `(id, version)`
+
+Linear sequence of steps executed by a single worker. Task state is in-memory only—no durable coordination.
+
+**Constraints:**
+
+- No parallelism (steps execute sequentially)
+- No sub-tasks (flat sequence only)
+- No human gates (fully automated)
+- Simple branching only (if/else, on_failure)
+
+**Retry scope:** Entire task restarts from step 0 on retry. Individual step failures can abort, retry the task, or continue based on `on_failure`.
+
+See `docs/architecture/execution-model.md` for design rationale.
+
+---
+
+### Step
+
+**Storage:** D1 (Resources)  
+**Schema:**
+
+```typescript
+{
+  id: string;                   // ULID
+  task_def_id: string;          // Composite FK
+  task_def_version: number;
+
+  ref: string;                  // Human-readable identifier (unique per task)
+  ordinal: number;              // Execution order (0-indexed)
+
+  action_id: string;            // FK → ActionDef
+  action_version: number;
+
+  input_mapping: object | null;   // Map task context → action input
+  output_mapping: object | null;  // Map action output → task context
+
+  on_failure: "abort" | "retry" | "continue";  // Default: abort
+
+  condition: {
+    if: string;                 // Expression evaluated against task context
+    then: "continue" | "skip" | "succeed" | "fail";
+    else: "continue" | "skip" | "succeed" | "fail";
+  } | null;
+}
+```
+
+**Primary Key:** `(task_def_id, task_def_version, id)`
+
+Single action execution within a task. Steps execute in `ordinal` order.
+
+**Task context:**
+
+Steps read from and write to an in-memory context object:
+
+```typescript
+{
+  input: { ... },       // Immutable, from Node's input_mapping
+  state: { ... },       // Mutable, accumulates step outputs
+  output: { ... }       // Set by final step(s), returned to Node
+}
+```
+
+**Mappings:**
+
+- `input_mapping`: Paths from task context → action input
+- `output_mapping`: Paths from action output → task context
+
+**on_failure behavior:**
+
+| Value      | Behavior                                                     |
+| ---------- | ------------------------------------------------------------ |
+| `abort`    | Task fails immediately, returns error                        |
+| `retry`    | Task restarts from step 0 (respects task-level retry config) |
+| `continue` | Ignore failure, proceed to next step                         |
+
+**Conditional execution:**
+
+```typescript
+condition: {
+  if: "input.auto_format == true",
+  then: "continue",
+  else: "skip"
+}
+```
+
+---
 
 ### ActionDef
 
@@ -319,7 +442,7 @@ Edge in workflow graph. **All branching logic lives here:**
 
 **Primary Key:** `(id, version)`
 
-Versioned, reusable action implementation. Executed by Executor service.
+Versioned, reusable action implementation. Atomic operations executed by workers.
 
 **ActionKind:**
 
@@ -821,6 +944,8 @@ Semantic search over artifacts. Vectorize stores embeddings, D1 stores configura
 | **Workflow**     | Resources     | D1                     | Persistent            |
 | **Node**         | Resources     | D1                     | Immutable (versioned) |
 | **Transition**   | Resources     | D1                     | Immutable (versioned) |
+| **TaskDef**      | Resources     | D1                     | Immutable (versioned) |
+| **Step**         | Resources     | D1                     | Immutable (versioned) |
 | **ActionDef**    | Resources     | D1                     | Immutable (versioned) |
 | **PromptSpec**   | Resources     | D1                     | Immutable (versioned) |
 | **ModelProfile** | Resources     | D1                     | Persistent            |
