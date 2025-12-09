@@ -27,12 +27,14 @@ Transition {
     item_var: string
   },
   synchronization?: {         // Fan-in behavior for tokens arriving via this transition
-    wait_for: 'any' | 'all' | { m_of_n: number },
-    joins_transition: string, // Which transition's fan-out to synchronize on
+    strategy: 'any' | 'all' | { m_of_n: number },
+    sibling_group: string,  // Which fan_out_transition_id to synchronize on
+    timeout_ms?: number,    // Max wait time for siblings (null = no timeout)
+    on_timeout?: 'proceed_with_available' | 'fail',  // Default: 'fail'
     merge?: {
-      source: string,         // Path in branch output (e.g., '*', 'choice', 'result.score')
+      source: string,         // Path in branch output (e.g., '_branch.output', '_branch.output.choice')
       target: string,         // Where to write merged result (e.g., 'state.votes')
-      strategy: 'append' | 'merge' | 'keyed' | 'last_wins'
+      strategy: 'append' | 'merge_object' | 'keyed_by_branch' | 'last_wins'
     }
   }
 }
@@ -221,12 +223,14 @@ Transition {
   from_node_id: 'B',
   to_node_id: 'C',
   synchronization: {
-    wait_for: 'all',              // Wait for all siblings
-    joins_transition: 'trans_a',  // Which transition's fan-out to join
+    strategy: 'all',                    // Wait for all siblings
+    sibling_group: 'trans_a',           // Which fan_out_transition_id to synchronize on
+    timeout_ms: null,                   // No timeout
+    on_timeout: 'fail',                 // Fail if timeout occurs
     merge: {
-      source: '*',                // All fields from branch output
-      target: 'state.votes',      // Where to write merged result
-      strategy: 'append'          // How to combine
+      source: '_branch.output',         // All fields from branch output
+      target: 'state.votes',            // Where to write merged result
+      strategy: 'append'                // How to combine
     }
   }
 }
@@ -236,7 +240,7 @@ Transition {
 
 **Sibling Identification:**
 
-Tokens are siblings if they share a common `fan_out_transition_id` (the transition specified in `joins_transition`).
+Tokens are siblings if they share a common `fan_out_transition_id` (the transition specified in `sibling_group`).
 
 ```sql
 -- Find all siblings from transition 'trans_a'
@@ -249,19 +253,19 @@ AND fan_out_transition_id = 'trans_a'
 
 When a token arrives at a node via a transition with synchronization:
 
-1. Check if token belongs to the specified sibling group (`fan_out_transition_id` matches `joins_transition`)
+1. Check if token belongs to the specified sibling group (`fan_out_transition_id` matches `sibling_group`)
 2. If yes: query all siblings and check their states
 3. Count siblings in terminal states (`completed`, `failed`, `timed_out`, `cancelled`)
-4. Determine if synchronization condition is met based on `wait_for` mode
+4. Determine if synchronization condition is met based on `strategy` mode
 5. If condition met: merge outputs and create new token in `pending` state
 6. If not met: transition current token to `waiting_for_siblings` state
 7. If token doesn't belong to sibling group: pass through as `dispatched`
 
-**Synchronization Modes:**
+**Synchronization Strategies:**
 
 - `any`: First arrival proceeds immediately; remaining siblings continue independently (no cancellation, no coordination). This is the default when no synchronization is specified.
 - `all`: Wait for all siblings from the specified transition; one merged token proceeds
-- `m_of_n`: Wait for M siblings (partial quorum); one merged token proceeds after M arrive; remaining siblings continue independently
+- `{ m_of_n: number }`: Wait for M siblings (partial quorum); one merged token proceeds after M arrive; remaining siblings continue independently
 
 **Example: Multiple fan-out groups converging**
 
@@ -272,15 +276,15 @@ Transition: id: 'trans_a2', A → C, spawn_count: 5
 
 // Node D receives from both paths with separate synchronization
 Transition: B → D, synchronization: {
-  joins_transition: 'trans_a1',
-  wait_for: 'all',
-  merge: { target: 'state.group_a', strategy: 'append' }
+  sibling_group: 'trans_a1',
+  strategy: 'all',
+  merge: { source: '_branch.output', target: 'state.group_a', strategy: 'append' }
 }
 
 Transition: C → D, synchronization: {
-  joins_transition: 'trans_a2',
-  wait_for: 'all',
-  merge: { target: 'state.group_b', strategy: 'append' }
+  sibling_group: 'trans_a2',
+  strategy: 'all',
+  merge: { source: '_branch.output', target: 'state.group_b', strategy: 'append' }
 }
 ```
 
@@ -350,20 +354,20 @@ async function handleTaskResult(token, result) {
 
       // Check if this transition requires synchronization
       if (transition.synchronization) {
-        const joinsTransitionId = transition.synchronization.joins_transition;
+        const siblingGroupId = transition.synchronization.sibling_group;
 
         // Verify this token belongs to the specified sibling group
-        if (newToken.fan_out_transition_id === joinsTransitionId) {
+        if (newToken.fan_out_transition_id === siblingGroupId) {
           // Token is part of this sibling group - apply synchronization
-          if (transition.synchronization.wait_for !== 'any') {
+          if (transition.synchronization.strategy !== 'any') {
             // Check if synchronization condition is met
-            const siblings = getSiblings(newToken.workflow_run_id, joinsTransitionId);
+            const siblings = getSiblings(newToken.workflow_run_id, siblingGroupId);
             const terminalStates = ['completed', 'failed', 'timed_out', 'cancelled'];
             const finishedCount =
               siblings.filter((s) => terminalStates.includes(s.state)).length + 1; // +1 for current token
 
             if (
-              shouldProceedWithFanIn(finishedCount, spawnCount, transition.synchronization.wait_for)
+              shouldProceedWithFanIn(finishedCount, spawnCount, transition.synchronization.strategy)
             ) {
               // Condition met: merge and dispatch
               mergeAndDispatch(siblings, newToken, transition);
@@ -548,7 +552,7 @@ Each transition creates its own sibling group via `fan_out_transition_id`. Synch
 
 ### Synchronization Pass-Through Behavior
 
-- **Potential confusion**: Token with `fan_out_transition_id='A'` hits fan-in for `joins_transition='B'`
+- **Potential confusion**: Token with `fan_out_transition_id='A'` hits fan-in for `sibling_group='B'`
 - Doc says "pass through" but this could silently skip synchronization when intended
 - Should system warn/error on mismatched synchronization attempts?
 - Validation at graph authoring time vs runtime?
@@ -563,10 +567,10 @@ Add timeout handling to synchronization config:
 
 ```typescript
 synchronization: {
-  wait_for: 'all',
-  joins_transition: 'trans_judges',
-  timeout?: string,              // Duration (e.g., '5m', '1h')
-  on_timeout?: 'proceed' | 'fail',  // Default: 'fail'
+  strategy: 'all',
+  sibling_group: 'trans_judges',
+  timeout_ms: 300000,            // 5 minutes in milliseconds
+  on_timeout: 'proceed_with_available' | 'fail',  // Default: 'fail'
   merge: { ... }
 }
 ```
@@ -584,8 +588,8 @@ Add success threshold to synchronization:
 
 ```typescript
 synchronization: {
-  wait_for: 'all',
-  joins_transition: 'trans_judges',
+  strategy: 'all',
+  sibling_group: 'trans_judges',
   min_success_count?: number,  // Minimum successful siblings required
   merge: { ... }
 }

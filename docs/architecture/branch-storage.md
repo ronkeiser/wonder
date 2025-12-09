@@ -21,10 +21,11 @@ Each branch writes to **separate ephemeral tables** prefixed by token ID. At fan
 
 ### Example: 5-way fan-out for voting
 
-**Workflow state schema:**
+**Workflow context schema:**
 
 ```typescript
-state_schema: {
+// WorkflowDef.context_schema
+context_schema: {
   type: 'object',
   properties: {
     votes: {
@@ -41,9 +42,10 @@ state_schema: {
 }
 ```
 
-**Node output schema (each judge):**
+**Task output schema (each judge task):**
 
 ```typescript
+// TaskDef.output_schema (referenced by Node via task_id)
 output_schema: {
   type: 'object',
   properties: {
@@ -146,10 +148,13 @@ When a token is created during fan-out:
 const token = operations.tokens.create(sql, params);
 
 // Create isolated branch output table
-const nodeOutputSchema = workflow.nodes.find((n) => n.id === params.node_id)?.output_schema;
+// Get output schema from the node's TaskDef
+const node = workflow.nodes.find((n) => n.id === params.node_id);
+const taskDef = await resources.getTaskDef(node.task_id, node.task_version);
+const taskOutputSchema = taskDef.output_schema;
 
-if (nodeOutputSchema) {
-  operations.context.initializeBranchTable(sql, token.id, nodeOutputSchema);
+if (taskOutputSchema) {
+  operations.context.initializeBranchTable(sql, token.id, taskOutputSchema);
 }
 
 dispatch(token.id);
@@ -172,7 +177,9 @@ When executor returns a result:
 
 ```typescript
 // In coordinator handleTaskResult()
-operations.context.applyNodeOutput(sql, tokenId, result.output_data, node.output_schema);
+// Output schema comes from TaskDef, not Node
+const taskDef = await resources.getTaskDef(node.task_id, node.task_version);
+operations.context.applyNodeOutput(sql, tokenId, result.output_data, taskDef.output_schema);
 ```
 
 Implementation:
@@ -204,12 +211,16 @@ When synchronization condition is met:
 ```typescript
 // In decisions/synchronization.ts
 if (syncConditionMet) {
+  // Get TaskDef output schema for merge validation
+  const node = workflow.nodes.find((n) => n.id === token.node_id);
+  const taskDef = await resources.getTaskDef(node.task_id, node.task_version);
+
   return [
     {
       type: 'MERGE_BRANCHES',
       siblings: siblingTokens,
       mergeConfig: transition.synchronization.merge,
-      outputSchema: node.output_schema,
+      outputSchema: taskDef.output_schema,
     },
     {
       type: 'ACTIVATE_FAN_IN_TOKEN',
@@ -274,14 +285,14 @@ function mergeBranches(
   // Result: [{ choice: 'A', rationale: '...' }, { choice: 'B', ... }, ...]
   ```
 
-- **merge** - Shallow merge all outputs
+- **merge_object** - Shallow merge all outputs
 
   ```typescript
   merged = Object.assign({}, ...branchData.map((b) => b.output));
   // Result: { choice: 'B', rationale: '...' } (last wins for conflicts)
   ```
 
-- **keyed** - Object keyed by branch index
+- **keyed_by_branch** - Object keyed by branch index
 
   ```typescript
   merged = Object.fromEntries(branchData.map((b) => [b.branchIndex.toString(), b.output]));
@@ -298,11 +309,13 @@ function mergeBranches(
 
 ### Branch Output Schema Sources
 
-Node output schemas come from:
+Task output schemas come from:
 
-1. **Explicit definition** - `NodeDef.output_schema` (user-defined)
-2. **Action schema** - `ActionDef.produces` (default from action type)
-3. **Inferred from LLM** - For `llm_call` actions with structured output
+1. **TaskDef.output_schema** - Primary source, defines what the task produces
+2. **Derived from Actions** - If TaskDef doesn't specify, can be inferred from final step's ActionDef.produces
+3. **Structured LLM output** - For LLM actions with JSON schema output validation
+
+Note: Nodes reference TaskDefs via `node.task_id` and `node.task_version`. The Node itself only defines data mapping (`input_mapping`, `output_mapping`), not schemas.
 
 ### Merge Target Validation
 
@@ -326,9 +339,10 @@ validateSchema(merged, targetSchema);  // Must be array of vote objects
 
 ### Nested Objects in Branch Output
 
-If a branch produces nested objects:
+If a TaskDef output schema defines nested objects:
 
 ```typescript
+// TaskDef.output_schema
 output_schema: {
   type: 'object',
   properties: {
@@ -429,13 +443,23 @@ type Decision =
 
 ## Path Syntax Clarification
 
-With this design, merge source paths are:
+**In Transition merge configuration (primitives.md):**
 
-- `*` - Entire branch output object
-- `choice` - Single field from branch output
-- `reasoning.pros` - Nested field from branch output
+```typescript
+merge: {
+  source: "_branch.output",  // Reads from each sibling's branch table
+  target: "state.votes",     // Writes to main context
+  strategy: "append"
+}
+```
 
-**Not** `_branch.output.choice` - the `_branch` prefix is implicit when reading from branch tables during merge.
+The `_branch.output` path tells the Coordinator to read from branch-isolated tables. During merge execution:
+
+- `_branch.output` → read entire output from `branch_output_{tokenId}` table
+- `_branch.output.choice` → read specific field from branch table
+- `_branch.output.reasoning.pros` → read nested field from branch table
+
+**Implementation detail:** The `getBranchOutputs()` operation strips the `_branch.` prefix and reads from the token-scoped tables. The prefix is a **logical path** in the workflow definition, not a physical table name.
 
 Target paths are standard JSONPath into main context:
 

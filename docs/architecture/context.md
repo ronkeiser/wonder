@@ -19,7 +19,7 @@ When users author a WorkflowDef (via SDK or UI), they define schemas as JSONSche
 - `state_schema` - Defines mutable state structure (auto-inferred from graph or user-defined)
 - `output_schema` - Validates final workflow outputs
 
-These schemas are **stored as JSON** in D1 as part of the `WorkflowDef` record. Nodes can define `output_schema` for their action results, enabling structured LLM outputs and downstream validation.
+These schemas are **stored as JSON** in D1 as part of the `WorkflowDef` record. TaskDefs (referenced by Nodes) can define `output_schema` for their results, enabling structured outputs and downstream validation.
 
 ```typescript
 WorkflowDef {
@@ -27,15 +27,25 @@ WorkflowDef {
   version: number;
   // ...
   input_schema: JSONSchema;      // JSON blob in D1
-  state_schema: JSONSchema;      // JSON blob in D1 (auto-inferred or user-defined)
+  context_schema: JSONSchema;    // JSON blob in D1 (defines state structure)
   output_schema: JSONSchema;     // JSON blob in D1
 }
 
-NodeDef {
+TaskDef {
   id: string;
-  action_id: string;
-  output_schema?: JSONSchema;    // Optional schema for action output
+  version: number;
   // ...
+  output_schema?: JSONSchema;    // Optional schema for task output
+  // Steps execute actions, final step output becomes task output
+}
+
+Node {
+  id: string;
+  task_id: string;               // References TaskDef
+  task_version: number;
+  input_mapping: object | null;  // Map context → task input
+  output_mapping: object | null; // Map task output → context
+  // Nodes don't have output_schema - they reference TaskDefs that do
 }
 ```
 
@@ -44,13 +54,13 @@ NodeDef {
 When a workflow run starts, the Coordinator:
 
 1. Loads the `WorkflowDef` from RESOURCES (including schema JSON, cached in DO)
-2. Passes `input_schema` and `state_schema` to `@wonder/context`
+2. Passes `input_schema` and `context_schema` to `@wonder/context`
 3. `@wonder/context` generates DDL (CREATE TABLE statements)
 4. Coordinator executes DDL in DO SQLite via `operations.context.initializeTable()`
 5. Tables are created in the isolated DO instance for this workflow run
 6. Input data is validated against `input_schema` and inserted into context
 
-**Example state_schema:**
+**Example context_schema:**
 
 ```typescript
 {
@@ -144,7 +154,7 @@ Each workflow run gets its own isolated context in a dedicated DO instance. Sche
 
 During fan-out, each token writes to isolated branch storage. See `branch-storage.md` for complete design.
 
-**Storage approach:** Each branch gets separate SQL tables (e.g., `branch_output_tok_abc123`) generated from the node's `output_schema`. This provides:
+**Storage approach:** Each branch gets separate SQL tables (e.g., `branch_output_tok_abc123`) generated from the TaskDef's `output_schema` (referenced via `node.task_id`). This provides:
 
 - True isolation (no shared state)
 - Schema validation via `@wonder/context`
@@ -165,23 +175,24 @@ Token {
 At fan-in, `decisions/synchronization.ts` evaluates merge strategies:
 
 - **append** - Collect all `_branch.output` into an array
-- **merge** - Shallow merge all outputs into one object
-- **keyed** - Merge into object keyed by branch index
+- **merge_object** - Shallow merge all outputs into one object
+- **keyed_by_branch** - Merge into object keyed by branch index
 - **last_wins** - Take the last completed branch's output
 
 Merged data is written to `context.state` via `SET_CONTEXT` decision → `dispatch/apply.ts` → `operations.context.set()`.
 
 ## Lifecycle
 
-1. **Authoring**: User defines `input_schema`, `state_schema`, `output_schema` as JSONSchema (via SDK/UI)
-2. **Storage**: Schemas stored as JSON in D1 with `WorkflowDef`
+1. **Authoring**: User defines `input_schema`, `context_schema`, `output_schema` as JSONSchema (via SDK/UI)
+2. **Storage**: Schemas stored as JSON in D1 with `WorkflowDef`; TaskDefs store their own `output_schema`
 3. **Initialization**:
    - Coordinator loads `WorkflowDef` from RESOURCES (cached)
    - `@wonder/context` generates DDL from schemas
    - Coordinator executes CREATE TABLE in DO SQLite
    - Input data validated and inserted
 4. **Execution**:
-   - Node outputs validated against `node.output_schema`
+   - Task outputs validated against `TaskDef.output_schema` (referenced via `node.task_id`)
+   - Node's `output_mapping` maps task output to context paths
    - Context operations use generated DML to read/write normalized tables
    - Decision logic reads via `getSnapshot()` (read-only)
    - Dispatch layer writes via `set()` and `applyNodeOutput()`
