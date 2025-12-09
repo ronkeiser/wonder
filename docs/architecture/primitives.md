@@ -460,7 +460,7 @@ Linear sequence of steps executed by a single worker. Task state is in-memory on
 
 - No parallelism (steps execute sequentially)
 - No sub-tasks (flat sequence only)
-- No human gates (fully automated)
+- No human gates (tasks don't pause; human actions create async workflow-level gates and complete immediately)
 - Simple branching only (if/else, on_failure)
 
 **Retry semantics:** Task retry is **business-level retry**—for wrong outputs, failed validations, schema violations. The entire task restarts from step 0 with fresh context. This is distinct from action-level infrastructure retry, which is automatic and invisible.
@@ -1250,6 +1250,63 @@ Logs are **ephemeral operational data** for debugging services, not workflow exe
 
 ## Ephemeral Primitives
 
+### TaskPayload
+
+**Storage:** Nowhere (RPC message only)  
+**Type:**
+
+```typescript
+interface TaskPayload {
+  token_id: string;
+  workflow_run_id: string;
+  task_id: string;
+  task_version: number;
+  input: Record<string, unknown>;
+  resources?: Record<string, string>; // Generic name → container DO ID
+  timeout_ms?: number;
+  retry_attempt?: number;
+}
+```
+
+Message sent from Coordinator to Executor to dispatch task execution. Includes all context needed for stateless execution.
+
+---
+
+### TaskResult
+
+**Storage:** Nowhere (RPC message only)  
+**Type:**
+
+```typescript
+interface TaskResult {
+  token_id: string;
+  success: boolean;
+  output: Record<string, unknown>;
+  error?: {
+    type: 'step_failure' | 'task_timeout' | 'validation_error';
+    step_ref?: string;
+    message: string;
+    retryable: boolean;
+    context_snapshot?: Record<string, unknown>; // For debugging
+  };
+  metrics: {
+    duration_ms: number;
+    steps_executed: number;
+    llm_tokens?: {
+      input: number;
+      output: number;
+      cost_usd: number;
+    };
+  };
+}
+```
+
+Message returned from Executor to Coordinator after task execution. Includes output, error details, and execution metrics.
+
+**context_snapshot:** On failure, Executor optionally includes the task context state at time of failure for debugging. This helps diagnose issues without requiring full workflow replay.
+
+---
+
 ### Decision
 
 **Storage:** Nowhere (return values only)  
@@ -1300,6 +1357,8 @@ Enables **testable coordination logic** without spinning up actors.
 | **Container**     | Containers     | DO SQLite             | Per-run (ephemeral)   |
 | **Token**         | Coordinator    | DO SQLite             | Per-run (ephemeral)   |
 | **Context**       | Coordinator    | DO SQLite → D1        | Per-run → snapshot    |
+| **TaskPayload**   | Executor       | None                  | RPC message only      |
+| **TaskResult**    | Executor       | None                  | RPC message only      |
 | **Decision**      | Coordinator    | None                  | Return value only     |
 | **ArtifactIndex** | Source         | D1                    | Derived (on commit)   |
 | **VectorIndex**   | Resources      | D1 + Vectorize        | Persistent            |

@@ -85,8 +85,8 @@
 - Cloudflare-native git: no GitHub dependency
 - Git objects (blobs, trees, commits) stored in R2, keyed by SHA
 - Refs (branches, tags) stored in D1
-- isomorphic-git with custom R2/D1 backend
-- Sub-second container provisioning (no network clone)
+- Native git in containers + remote helper translating to R2/D1 operations
+- Sub-second container provisioning (R2 cache, no network clone)
 - pnpm store shared in R2; installs are symlinks, not downloads
 - Lockfile hash keys node_modules cache in R2
 

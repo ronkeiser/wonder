@@ -341,7 +341,7 @@ async function executeLLM(
   const modelProfile = await resources.getModelProfile(model_profile_id);
 
   // Render prompt template with input
-  const messages = await templates.render(promptSpec.template, input);
+  const messages = await render(promptSpec.template, input);
 
   // Call LLM provider
   const provider = llmProviders.get(modelProfile.provider);
@@ -398,10 +398,10 @@ async function executeHTTP(
   const { url_template, method, headers, body_template } = actionDef.implementation;
 
   // Render URL template
-  const url = await templates.render(url_template, input);
+  const url = await render(url_template, input);
 
   // Render body template if provided
-  const body = body_template ? await templates.render(body_template, input) : undefined;
+  const body = body_template ? await render(body_template, input) : undefined;
 
   // Make HTTP request
   const response = await fetch(url, {
@@ -534,7 +534,7 @@ async function executeShell(
   }
 
   // Render command template with input
-  const renderedCommand = await templates.render(command_template, input);
+  const renderedCommand = await render(command_template, input);
 
   // Call container DO to execute command
   const containerStub = env.CONTAINERS.get(env.CONTAINERS.idFromString(containerId));
@@ -645,7 +645,7 @@ async function executeHuman(
   const { prompt_template, input_schema, timeout_ms } = actionDef.implementation;
 
   // Render prompt template
-  const renderedPrompt = await templates.render(prompt_template, input);
+  const renderedPrompt = await render(prompt_template, input);
 
   // Create human gate via coordinator (async - doesn't wait for response)
   const gateId = await coordinator.createHumanGate({
@@ -1045,9 +1045,11 @@ const client = await mcpClient.connect({
 const result = await client.callTool(tool_name, args);
 ```
 
-### Template Service
+### Templates Package
 
 ```typescript
+import { render } from '@wonder/templates';
+
 // Render Handlebars template with context
-const rendered = await env.TEMPLATES.render(template_id, context);
+const rendered = await render(template, context);
 ```
