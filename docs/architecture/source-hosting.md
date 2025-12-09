@@ -134,7 +134,7 @@ When an agent commits changes:
 8. Optionally index commit in commits table
 ```
 
-This happens via isomorphic-git running in the container, configured with a custom R2 backend.
+This happens via native git using the Wonder remote helper, which translates operations to Worker API calls.
 
 ### Read Path (Clone/Checkout)
 
@@ -161,38 +161,104 @@ Full checkout isn't always necessary. For large repos:
 
 An agent working on a 10GB monorepo but touching 50 files only fetches those 50 blobs. The rest remain in R2 until needed.
 
-## isomorphic-git Integration
+## Git Remote Helper
 
-[isomorphic-git](https://isomorphic-git.org/) is a pure JavaScript git implementation with pluggable storage backends. It runs in Node, browsers, and Cloudflare Workers.
+All git operations happen in containers, which can run native git binaries. Agents use standard git commands—no custom tooling required.
 
-### Custom Backend
+The integration point is a **git remote helper** that translates git's wire protocol to HTTP calls to a Worker endpoint:
 
-```typescript
-import * as git from 'isomorphic-git';
-import { R2GitBackend } from '@wonder/git';
+```bash
+# Container startup: configure Wonder remote
+git config remote.wonder.url "wonder://repo_01HXYZ..."
+git config remote.wonder.helper "/usr/local/bin/git-remote-wonder"
 
-const backend = new R2GitBackend({
-  bucket: env.R2_GIT_OBJECTS,
-  repoId: 'repo_01HXYZ...',
-});
-
-await git.clone({
-  fs: backend.fs,
-  http: backend.http, // not used for R2 backend
-  dir: '/workspace',
-  url: 'wonder://repo_01HXYZ...',
-  ref: 'main',
-});
+# Standard git commands work
+git clone wonder://repo_01HXYZ /workspace
+git commit -am "agent changes"
+git push wonder main
 ```
 
-The backend implements:
+### Architecture
 
-- `readObject(sha)` → fetch from R2
-- `writeObject(sha, data)` → put to R2
-- `readRef(name)` → query D1
-- `writeRef(name, sha)` → update D1
+```
+Container                    Worker                    Storage
+git push
+  → git-remote-wonder
+       → HTTP POST /push     → Validate access
+                             → Write objects to R2
+                             → Update refs in D1
+                             → Return success
+       ← 200 OK
+  ← ok refs/heads/main
+```
 
-Standard git commands work normally. The agent runs `git add`, `git commit`, `git log`—all routed through the R2/D1 backend.
+The remote helper is **protocol translation only**—a thin adapter between git's wire format and HTTP. The Worker handles the real work: validation, storage, transactions.
+
+### Protocol Contract
+
+The helper implements git's [remote-helper protocol](https://git-scm.com/docs/gitremote-helpers), translating between git's wire format and HTTP:
+
+```
+git → helper:                helper → Worker:
+capabilities
+  → fetch, push
+  → (newline)
+
+list
+  → refs/heads/main abc123   GET /repos/{id}/refs
+  → refs/heads/dev def456      → [{name, sha}, ...]
+  → (newline)
+
+fetch abc123
+  → (git objects)            POST /repos/{id}/fetch
+                               body: {want: ["abc123"]}
+                               → git pack stream
+
+push refs/heads/main:refs/heads/main
+  → ok refs/heads/main       POST /repos/{id}/push
+  → (newline)                  body: git pack stream
+                               → {success: true} | {error, conflicts}
+```
+
+**Implementation options:**
+
+- Shell script using curl/wget + git plumbing commands (~50 lines)
+- Rust binary using reqwest + git2-rs (performance-critical paths)
+- Go binary using net/http + go-git
+
+The protocol is simple enough that any approach works. The key is translating git's text protocol to HTTP requests the Worker understands.
+
+### Worker Endpoints
+
+**GET /repos/{repo_id}/refs**
+
+- Query D1 for all refs
+- Return `[{ name: "refs/heads/main", sha: "a1b2c3..." }]`
+
+**POST /repos/{repo_id}/fetch**
+
+- Parse requested SHAs from request
+- Fetch objects from R2 (commit, trees, blobs)
+- Stream as git pack format
+- Handle missing objects gracefully
+
+**POST /repos/{repo_id}/push**
+
+- Receive git pack of objects
+- Validate object integrity (SHA verification)
+- Check access permissions (project ownership)
+- Write new objects to R2
+- Update refs in D1 (atomic transaction)
+- Detect concurrent push conflicts
+- Return success or error
+
+### Benefits
+
+- **Full git compatibility**: log, blame, bisect, branches, merges all work
+- **Standard tooling**: VS Code, language servers, CI integrations
+- **Simple helper**: ~50 lines of shell script or optimized Rust binary
+- **Worker handles complexity**: auth, validation, transactions, conflict detection
+- **Easy updates**: Worker logic evolves without rebuilding containers
 
 ## Package Management
 
@@ -332,14 +398,14 @@ Every commit is tied to a workflow run. Every workflow run has an event log. Ful
 
 ## Summary
 
-| Component      | Implementation                       |
-| -------------- | ------------------------------------ |
-| Object storage | R2, content-addressed by SHA         |
-| Refs           | D1, mutable pointers                 |
-| Commit index   | D1, denormalized for queries         |
-| Git operations | isomorphic-git with R2/D1 backend    |
-| Package store  | R2, shared pnpm store                |
-| Container init | Checkout from R2 + pnpm link         |
-| Deployment     | Direct to Cloudflare, no external CI |
+| Component      | Implementation                          |
+| -------------- | --------------------------------------- |
+| Object storage | R2, content-addressed by SHA            |
+| Refs           | D1, mutable pointers                    |
+| Commit index   | D1, denormalized for queries            |
+| Git operations | Native git + remote helper → Worker API |
+| Package store  | R2, shared pnpm store                   |
+| Container init | Checkout from R2 + pnpm link            |
+| Deployment     | Direct to Cloudflare, no external CI    |
 
 The result: sub-second container provisioning, unified observability, no external dependencies, and a complete code hosting solution native to Cloudflare.
