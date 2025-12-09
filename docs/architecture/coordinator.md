@@ -390,14 +390,14 @@ async handleTaskResult(tokenId: string, result: TaskResult) {
 private async dispatchToken(tokenId: string) {
   operations.tokens.updateStatus(this.sql, tokenId, 'executing');
 
-  const payload = await buildExecutorPayload(this.sql, this.env, tokenId);
+  const payload = await buildWorkerPayload(this.sql, this.env, tokenId);
 
   if (payload.completedSynchronously) {
-    // Node has no action - complete immediately
+    // Task has no steps - complete immediately
     await this.handleTaskResult(tokenId, { output_data: {} });
   } else {
-    // Fire-and-forget to executor
-    this.env.EXECUTOR.llmCall(payload);
+    // Fire-and-forget to worker
+    this.env.WORKER.executeTask(payload);
   }
 }
 ```
