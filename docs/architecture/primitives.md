@@ -324,9 +324,11 @@ Linear sequence of steps executed by a single worker. Task state is in-memory on
 - No human gates (fully automated)
 - Simple branching only (if/else, on_failure)
 
-**Retry scope:** Entire task restarts from step 0 on retry. Individual step failures can abort, retry the task, or continue based on `on_failure`.
+**Retry semantics:** Task retry is **business-level retry**—for wrong outputs, failed validations, schema violations. The entire task restarts from step 0 with fresh context. This is distinct from action-level infrastructure retry, which is automatic and invisible.
 
-See `docs/architecture/execution-model.md` for design rationale.
+Individual step failures can abort the task, signal task retry, or continue to the next step based on `on_failure`.
+
+See `docs/architecture/execution-model.md` for design rationale and retry model details.
 
 ---
 
@@ -383,11 +385,13 @@ Steps read from and write to an in-memory context object:
 
 **on_failure behavior:**
 
-| Value      | Behavior                                                     |
-| ---------- | ------------------------------------------------------------ |
-| `abort`    | Task fails immediately, returns error                        |
-| `retry`    | Task restarts from step 0 (respects task-level retry config) |
-| `continue` | Ignore failure, proceed to next step                         |
+`on_failure` is a **routing decision**, not a retry mechanism. It determines what happens after this step fails.
+
+| Value      | Behavior                                             |
+| ---------- | ---------------------------------------------------- |
+| `abort`    | Task fails immediately, returns error to coordinator |
+| `retry`    | Signal task retry (coordinator restarts from step 0) |
+| `continue` | Ignore failure, proceed to next step                 |
 
 **Conditional execution:**
 
@@ -426,7 +430,7 @@ condition: {
       backoff: "none" | "linear" | "exponential";
       initial_delay_ms: number;
       max_delay_ms: number | null;
-      retryable_errors: string[] | null;  // Error codes/patterns
+      retryable_errors: string[] | null;  // Error codes/patterns (transient only)
     } | null;
   } | null;
 
@@ -443,6 +447,8 @@ condition: {
 **Primary Key:** `(id, version)`
 
 Versioned, reusable action implementation. Atomic operations executed by workers.
+
+**Retry semantics:** `execution.retry_policy` handles **infrastructure failures only**—network errors, rate limits, provider 5xx errors. This retry is automatic and invisible to the task. Business-level retry (wrong outputs, validation failures) is handled by TaskDef retry, which restarts from step 0.
 
 **ActionKind:**
 

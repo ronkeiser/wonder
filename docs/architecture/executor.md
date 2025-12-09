@@ -262,14 +262,50 @@ async function executeAction(
     throw new Error(`Unknown action kind: ${actionDef.kind}`);
   }
 
-  // Execute with timeout
+  // Execute with infrastructure retry and timeout
+  const retryPolicy = actionDef.execution?.retry_policy;
   const timeoutMs = actionDef.execution?.timeout_ms || 60000;
-  const output = await executeWithTimeout(() => handler.execute(actionDef, input), timeoutMs);
+
+  const output = await executeWithRetry(
+    () => executeWithTimeout(() => handler.execute(actionDef, input), timeoutMs),
+    retryPolicy,
+  );
 
   // Validate output against action schema
   validateOutput(output, actionDef.produces);
 
   return output;
+}
+
+async function executeWithRetry<T>(fn: () => Promise<T>, policy: RetryPolicy | null): Promise<T> {
+  if (!policy) return fn();
+
+  let lastError: Error;
+  for (let attempt = 0; attempt < policy.max_attempts; attempt++) {
+    try {
+      return await fn();
+    } catch (error) {
+      lastError = error;
+
+      // Only retry infrastructure errors, not business errors
+      if (!isInfrastructureError(error)) throw error;
+
+      if (attempt < policy.max_attempts - 1) {
+        const delay = calculateBackoff(attempt, policy);
+        await sleep(delay);
+      }
+    }
+  }
+  throw lastError;
+}
+
+function isInfrastructureError(error: Error): boolean {
+  return (
+    error instanceof NetworkError ||
+    error instanceof TimeoutError ||
+    error instanceof RateLimitError ||
+    (error instanceof ProviderError && error.status >= 500)
+  );
 }
 ```
 

@@ -102,6 +102,59 @@ The worker runs all three steps in memory. Same result, one-third the overhead.
 - Retry loops that should restart from the beginning
 - Tight sequences where coordinator overhead matters
 
+## Retry Model
+
+Retries operate at two distinct levels with sharp boundaries:
+
+### Infrastructure Retry (ActionDef)
+
+**Purpose:** Handle transient failures—network errors, rate limits, provider 5xx errors.
+
+**Behavior:** Automatic and invisible to task logic. The action handler retries the operation within the same step execution. From the task's perspective, the action just took longer.
+
+**Configuration:** `ActionDef.execution.retry_policy`
+
+**Error classification:**
+
+- Network timeouts, connection failures
+- HTTP 429 (rate limit), 500-599 (server errors)
+- Provider-specific transient errors
+
+**Non-retryable:** Business errors (400, 401, 403, 404), validation failures, schema mismatches.
+
+### Business Retry (TaskDef)
+
+**Purpose:** Handle wrong outputs—invalid JSON, failed assertions, schema violations, business logic failures.
+
+**Behavior:** Explicit and visible. The entire task restarts from step 0 with fresh context. All steps re-execute.
+
+**Configuration:** `TaskDef.retry`
+
+**Triggered by:** `Step.on_failure = 'retry'` when a step fails.
+
+**Key characteristic:** Fresh attempt. Previous attempt's state is discarded. If you need to preserve state between retry attempts or implement conditional retry logic, use workflow nodes with durable state.
+
+### Step-Level on_failure: Routing Only
+
+`Step.on_failure` is **not a retry mechanism**. It's a routing decision:
+
+- **`abort`**: Task fails, no retry
+- **`retry`**: Signal coordinator to retry entire task (if `TaskDef.retry` allows)
+- **`continue`**: Log error, proceed to next step
+
+The step itself never retries in isolation. Retry is always at the task level (full reset) or action level (infrastructure only).
+
+### When Retry Logic Needs Branching
+
+If you need:
+
+- Different retry strategies per attempt ("first try model A, then try model B")
+- State preservation between attempts
+- Conditional branching based on failure type
+- Parallel retry attempts
+
+You've outgrown tasks. Use workflow nodes and transitions, where you get full graph routing and durable state.
+
 ## Uniform Structure
 
 The layering is uniform. A node always executes a task. A step always executes an action. This eliminates special cases:
