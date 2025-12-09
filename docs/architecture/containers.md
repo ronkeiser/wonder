@@ -6,6 +6,8 @@ Wonder workflows can provision containers for agents to execute shell commands�
 
 This document describes the ownership model, lifecycle management, and integration with Wonder's execution model.
 
+For how containers interact with repos and artifacts, see [Project Resources](./project-resources.md). For the underlying git storage infrastructure, see [Source Hosting](./source-hosting.md).
+
 ## The Problem
 
 Actions in Wonder are atomic and stateless. An `llm_call` executes, returns output, and completes. But implementing a feature might involve dozens of sequential actions—clone, edit, test, fix, commit—all operating on the same filesystem state.
@@ -15,6 +17,8 @@ Container lifecycle must therefore be scoped higher than individual nodes. A con
 ## Ownership Model
 
 Containers follow a **linear ownership** model, inspired by Rust's ownership semantics.
+
+This is distinct from repo access, which uses branch-based isolation. Container ownership controls who can execute shell commands. Repo access controls who can read and write branches. They operate independently.
 
 ### Core Rules
 
@@ -36,7 +40,7 @@ WorkflowDef {
     dev_env: {
       type: 'container',
       image: 'node:20',
-      repo: 'workspace/my-project',
+      repo: 'api-service',
       branch: 'main'
     }
   }
@@ -44,6 +48,12 @@ WorkflowDef {
 ```
 
 The workflow that declares the resource is the initial owner.
+
+When the container is provisioned:
+
+1. A working branch is created: `wonder/run-{run_id}`
+2. The repo is checked out at that branch
+3. Dependencies are installed (pnpm with shared store)
 
 ### Accepting Resources
 
@@ -138,19 +148,19 @@ Container state is git state. Before hibernation:
 On resume:
 
 1. Provision fresh container
-2. Clone repository, checkout SHA
-3. Run package install (pnpm with warm store)
+2. Clone repo, checkout the working branch at recorded SHA
+3. Run package install (pnpm with shared store)
 4. Continue execution
 
 ### Why Git-Based?
 
-| Benefit                    | Explanation                                                                |
-| -------------------------- | -------------------------------------------------------------------------- |
-| Observability              | Every mutation is a commit. `git log` shows what happened.                 |
-| Reproducibility            | `checkout <sha>` guarantees exact state. No snapshot corruption questions. |
-| Debugging                  | Inspect any point in history by checking out that commit.                  |
-| No new infrastructure      | Git is battle-tested. No custom snapshot/restore machinery.                |
-| Branching mirrors workflow | Exploratory branches in the workflow = git branches. Natural fit.          |
+| Benefit               | Explanation                                                                |
+| --------------------- | -------------------------------------------------------------------------- |
+| Observability         | Every mutation is a commit. `git log` shows what happened.                 |
+| Reproducibility       | `checkout <sha>` guarantees exact state. No snapshot corruption questions. |
+| Debugging             | Inspect any point in history by checking out that commit.                  |
+| No new infrastructure | Git is battle-tested. No custom snapshot/restore machinery.                |
+| Branch isolation      | Each workflow run has its own branch. No conflicts with concurrent runs.   |
 
 ### Enforcing Clean State
 
@@ -170,57 +180,14 @@ This is a validation rule. Workflows that declare containers and include human g
 ```typescript
 state.container: {
   resource_id: 'dev_env',
+  repo_id: 'repo_01HXYZ...',
+  branch: 'wonder/run-01HABC...',
   current_sha: 'a1b2c3d4e5f6...',
-  branch: 'wonder/run-01HXYZ...',
   status: 'active' | 'hibernated'
 }
 ```
 
-Hibernation updates status and drops the container. Resume provisions a new container and restores from SHA.
-
-## Cloudflare-Native Git Storage
-
-Wonder is fully Cloudflare-native. Code storage should be too.
-
-### Architecture
-
-Git is content-addressed storage plus a commit graph:
-
-- **Blobs** (file contents) keyed by SHA → R2
-- **Trees** (directory structures) keyed by SHA → R2
-- **Commits** (metadata + tree pointer + parents) → R2 or D1
-- **Refs** (branches/tags → SHA) → D1
-
-```
-R2: git-objects/{sha}    — content-addressed blobs
-D1: repositories         — repo metadata
-D1: refs                 — branch/tag → SHA mappings
-```
-
-### Benefits Over GitHub
-
-| Aspect          | External Git Host | Cloudflare-Native                |
-| --------------- | ----------------- | -------------------------------- |
-| Clone latency   | 5-60 seconds      | <1 second                        |
-| Install latency | Network-bound     | pnpm store in R2, local symlinks |
-| Observability   | External system   | Same D1 as everything else       |
-| Auth            | OAuth tokens      | Wonder's existing auth           |
-| Cost            | GitHub pricing    | R2 ($0.015/GB/month)             |
-
-### Implementation Path
-
-1. R2-backed object store using isomorphic-git (pure JS, pluggable backends)
-2. D1 schema for refs and repository metadata
-3. Container init that materializes from R2 instead of `git clone`
-4. Shared pnpm store in R2 (warm installs across all containers)
-
-### Lazy Materialization
-
-Full checkout isn't required. Containers can materialize files on demand:
-
-- Query tree object for directory listing
-- Fetch blobs from R2 only when accessed
-- A 10GB repo where the agent touches 50 files = fetch only those 50 blobs
+Hibernation updates status and releases the container. Resume provisions a new container and restores from the branch/SHA.
 
 ## Shell Execution
 
@@ -249,6 +216,102 @@ The executor:
 3. Captures stdout, stderr, exit_code
 4. Returns result to coordinator
 
+### Common Commands
+
+```bash
+# Code modification
+git add -A && git commit -m "message"
+
+# Testing
+pnpm test
+pnpm typecheck
+pnpm lint
+
+# Build
+pnpm build
+
+# Exploration
+find src -name "*.ts" | head -20
+grep -r "pattern" src/
+cat src/index.ts
+```
+
+### Timeouts
+
+Long-running commands need appropriate timeouts:
+
+```typescript
+{
+  kind: 'shell_exec',
+  container: 'dev_env',
+  command: 'pnpm test',
+  timeout_ms: 300000  // 5 minutes for test suite
+}
+```
+
+Timeout triggers node failure, handled via workflow transitions.
+
+## Multi-Container Workflows
+
+Workflows can declare multiple containers:
+
+```typescript
+WorkflowDef {
+  resources: {
+    api_env: {
+      type: 'container',
+      image: 'node:20',
+      repo: 'api-service',
+      branch: 'main'
+    },
+    worker_env: {
+      type: 'container',
+      image: 'node:20',
+      repo: 'worker-jobs',
+      branch: 'main'
+    }
+  }
+}
+```
+
+Each container:
+
+- Has independent ownership (both owned by declaring workflow)
+- Gets its own working branch in its respective repo
+- Can be passed independently to sub-workflows
+
+Ownership rules apply per-container. You could pass `api_env` to one sub-workflow while retaining `worker_env`.
+
+## Lifecycle Summary
+
+```
+Workflow starts
+  → Container provisioned
+  → Working branch created: wonder/run-{run_id}
+  → Repo checked out, dependencies installed
+
+Workflow executes
+  → Shell commands run
+  → Commits accumulate on working branch
+  → Ownership transfers to/from sub-workflows
+
+Human gate reached
+  → Ensure clean git state (commit)
+  → Record SHA in context
+  → Hibernate (destroy container)
+
+Human approves
+  → Provision new container
+  → Checkout working branch at SHA
+  → Install dependencies
+  → Resume execution
+
+Workflow completes
+  → Optionally merge working branch to target
+  → Container destroyed
+  → Working branch retained for history
+```
+
 ## Summary
 
 | Concept         | Design Decision                                   |
@@ -258,7 +321,7 @@ The executor:
 | Transfer        | `pass_resources` on `workflow_call`               |
 | Parallel access | Not supported. Extract data to context.           |
 | Hibernation     | Git-based. Commit before gates, rebuild from SHA. |
-| Storage         | Cloudflare-native: R2 for objects, D1 for refs    |
+| State tracking  | Branch + SHA in workflow context                  |
 | Execution       | `shell_exec` action with ownership validation     |
 
 The model is simple: one owner, explicit handoff, git is the checkpoint mechanism. This covers deep sub-workflow composition, long-running workflows with human gates, and multi-step agent coding tasks—without locks, shared state, or complex capability systems.

@@ -1,10 +1,12 @@
-# Code Management in Wonder
+# Source Hosting
 
 ## Overview
 
 Wonder is fully Cloudflare-native. Workflows, state, artifacts, and events all live within Cloudflare's infrastructure. Code is no exception.
 
-Rather than depending on external git hosts (GitHub, GitLab), Wonder implements a native code storage layer built on R2 and D1. This eliminates network round-trips during container provisioning, unifies observability, and keeps the entire system within a single trust boundary.
+Rather than depending on external git hosts (GitHub, GitLab), Wonder implements a native source hosting layer built on R2 and D1. This eliminates network round-trips during container provisioning, unifies observability, and keeps the entire system within a single trust boundary.
+
+This document covers the infrastructure for hosting code repositories. For how repos relate to artifacts and projects, see [Project Resources](./project-resources.md).
 
 ## Why Not GitHub?
 
@@ -232,86 +234,6 @@ R2: node-modules-cache/{lockfile-hash}.tar
 
 If the lockfile hasn't changed, restore from cache instead of running install. This brings "install" time to pure I/O—seconds for most projects.
 
-## Integration with Workflows
-
-### Container Resource Declaration
-
-```typescript
-WorkflowDef {
-  resources: {
-    dev_env: {
-      type: 'container',
-      image: 'node:20',
-      repo: 'repo_01HXYZ...',     // Wonder-native repo ID
-      branch: 'main',
-      pnpm_store: 'shared'        // use shared R2 store
-    }
-  }
-}
-```
-
-### State Tracking
-
-Container state in workflow context:
-
-```typescript
-state.container: {
-  resource_id: 'dev_env',
-  repo_id: 'repo_01HXYZ...',
-  current_sha: 'a1b2c3d4e5f6...',
-  branch: 'wonder/run-01HABC...',
-  status: 'active' | 'hibernated'
-}
-```
-
-Every commit updates `current_sha`. Hibernation records the SHA; resume restores from it.
-
-### Commits as Workflow Events
-
-Commits can emit workflow events:
-
-```typescript
-{
-  kind: 'container_commit',
-  payload: {
-    resource_id: 'dev_env',
-    sha: 'a1b2c3d...',
-    parent_sha: 'f6e5d4c...',
-    message: 'fix: resolve type error in auth module',
-    files_changed: 3
-  }
-}
-```
-
-The commit graph becomes part of the workflow's observable history. "What did the agent do?" is answered by both workflow events and git log—unified in one system.
-
-## Workflow Branches
-
-Each workflow run operates on an isolated branch:
-
-```
-main
-└── wonder/run-01HXYZ...       ← workflow run branch
-    ├── commit: initial checkout
-    ├── commit: implement feature
-    ├── commit: fix tests
-    └── commit: checkpoint before review
-```
-
-### Benefits
-
-- **Isolation**: Workflow mutations don't affect main until explicit merge
-- **Parallel runs**: Multiple workflow runs on same repo don't conflict
-- **Review flow**: Human gate = "review this branch, approve merge"
-- **Cleanup**: Abandoned runs can have branches deleted without affecting main
-
-### Branch Naming Convention
-
-```
-wonder/run-{run_id}                    — primary workflow branch
-wonder/run-{run_id}/explore-{node_id}  — exploratory sub-branches
-```
-
 ## Repository Lifecycle
 
 ### Creation
@@ -406,7 +328,7 @@ WorkflowDef {
 
 ### Audit Trail
 
-Every commit is tied to a workflow run. Every workflow run has an event log. Full audit trail from code change back to the decision that caused it.
+Every commit is tied to a workflow run. Every workflow run has an event log. Full audit trail from code change back to the workflow that produced it.
 
 ## Summary
 
@@ -418,8 +340,6 @@ Every commit is tied to a workflow run. Every workflow run has an event log. Ful
 | Git operations | isomorphic-git with R2/D1 backend    |
 | Package store  | R2, shared pnpm store                |
 | Container init | Checkout from R2 + pnpm link         |
-| Hibernation    | Record SHA, restore on resume        |
-| Branching      | Per-workflow-run branches            |
 | Deployment     | Direct to Cloudflare, no external CI |
 
-The result: sub-second container provisioning, unified observability, no external dependencies, and git history that's part of the workflow's event stream.
+The result: sub-second container provisioning, unified observability, no external dependencies, and a complete code hosting solution native to Cloudflare.
