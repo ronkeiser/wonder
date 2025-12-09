@@ -31,6 +31,24 @@ D1
 └── commits                          — indexed for queries
 ```
 
+## Storage Architecture
+
+Repos and artifacts have two layers:
+
+**Metadata (Resources service, D1):**
+
+- Repo: id, project_id, name, default_branch, created_at
+- Artifact schema definitions: path patterns, validation rules, frontmatter requirements
+
+**Content (Source service, R2 + D1):**
+
+- Git objects (blobs, trees, commits) in R2
+- Refs (branches, tags) in D1
+
+Resources knows _that_ a repo exists and its configuration. Source knows _what's in it_.
+
+This mirrors other primitives: WorkflowDef metadata lives in Resources, runtime context lives in Coordinator DO. The pattern is consistent—metadata in D1 via Resources, operational state managed by specialized services.
+
 One system. Artifacts aren't special—they're files in a repo with conventions.
 
 ## Project Structure

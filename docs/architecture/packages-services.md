@@ -87,6 +87,44 @@ Every component in Wonder is either a **package** or a **service**:
 
 ## Services
 
+### cache
+
+**Purpose:** Deterministic-input caching
+
+**Responsibilities:**
+
+- Lockfile-keyed dependency caching (node_modules tarballs)
+- Generic hash → tarball storage for any deterministic derivation
+- R2 storage for cache artifacts
+
+**Storage:** R2 (tarballs)
+
+**RPC Methods:** `get(hash)`, `put(hash, tarball)`, `exists(hash)`
+
+**Called by:** Containers (during provisioning)
+
+---
+
+### containers
+
+**Purpose:** Container lifecycle management
+
+**Responsibilities:**
+
+- ContainerDO per repo (container identity = repo identity)
+- Ownership tracking (claim, release, transfer)
+- Shell command execution with ownership validation
+- Hibernation (record SHA) and resume (restore from SHA)
+- Integration with Cloudflare Containers platform
+
+**Storage:** DO SQLite (ownership state, current SHA)
+
+**RPC Methods:** `claim()`, `release()`, `transfer()`, `exec()`
+
+**Called by:** Coordinator (ownership operations), Executor (shell_exec tasks)
+
+---
+
 ### coordinator
 
 **Purpose:** Durable Object-based workflow orchestration
@@ -98,6 +136,7 @@ Every component in Wonder is either a **package** or a **service**:
 - Context storage in DO SQLite
 - Task dispatch to executor
 - Result processing and transition evaluation
+- Container ownership operations (claim/release/transfer via containers service)
 
 **Storage:** DO SQLite (per-run state), D1 (run metadata)
 
@@ -133,12 +172,14 @@ Every component in Wonder is either a **package** or a **service**:
 **Responsibilities:**
 
 - Consume tasks from queue (batch consumer)
-- Execute actions (LLM calls, HTTP, MCP tools, shell, etc.)
-- In-memory context management (task state)
+- Execute task steps sequentially (in-memory state)
+- Handle step-level conditionals and on_failure logic
+- Task-level retry (restart from step 0)
+- Call containers service for shell_exec steps
+- Action execution (LLM calls, HTTP, MCP tools, etc.)
 - Result delivery to coordinator
-- Action-level retry (infrastructure failures)
 
-**Storage:** None (stateless)
+**Storage:** None (stateless, in-memory task state)
 
 **RPC Methods:** None (queue consumer only)
 
@@ -191,17 +232,40 @@ Every component in Wonder is either a **package** or a **service**:
 
 **Responsibilities:**
 
-- Workspace, project, workflow definition CRUD
-- Action, task, prompt spec, model profile management
+- Workspace, project management
+- Workflow definition CRUD (WorkflowDef, Node, Transition)
+- Task definition CRUD (TaskDef, Step)
+- Action, prompt spec, model profile management
+- Repo metadata (name, project_id, default_branch)
 - D1 storage for all resource metadata
 - Schema validation via @wonder/context
 - Version management for definitions
 
 **Storage:** D1 (resources database)
 
-**RPC Methods:** `workspaces()`, `projects()`, `workflowDefs()`, `actions()`, etc.
+**RPC Methods:** `workspaces()`, `projects()`, `repos()`, `workflowDefs()`, `taskDefs()`, `actions()`, etc.
 
-**Called by:** HTTP service (REST API), Web service (UI operations), Coordinator (fetch definitions), Executor (fetch action specs)
+**Called by:** HTTP service (REST API), Web service (UI operations), Coordinator (fetch definitions), Executor (fetch task/action specs)
+
+---
+
+### source
+
+**Purpose:** Versioned content storage (code and artifacts)
+
+**Responsibilities:**
+
+- Git object storage (blobs, trees, commits) in R2
+- Ref management (branches, tags) in D1
+- Git remote helper protocol (fetch, push)
+- Repo content operations for containers
+- Artifacts repo management per project
+
+**Storage:** R2 (git objects), D1 (refs)
+
+**RPC Methods:** `getObject()`, `putObject()`, `getRefs()`, `updateRef()`, `fetch()`, `push()`
+
+**Called by:** Containers (clone/push during provision/hibernation), HTTP (remote helper protocol)
 
 ---
 
@@ -215,6 +279,8 @@ Every component in Wonder is either a **package** or a **service**:
 - Server-side: RPC calls to Resources, Coordinator, etc.
 - Client-side: Browser application for workflow visualization and monitoring
 - Client-side: WebSocket connections to logs/events for streaming
+- Code view: file tree, syntax highlighting, diff viewer, branch switcher
+- Artifacts view: document browser, rich rendering, semantic search
 
 **Storage:** None
 
@@ -229,9 +295,25 @@ Every component in Wonder is either a **package** or a **service**:
 ### Service-to-Service (Workers RPC)
 
 ```typescript
+// Coordinator claiming container ownership
+const container = env.CONTAINERS.get(repoId);
+await container.claim(runId, baseBranch);
+
+// Executor calling Containers for shell_exec
+const container = env.CONTAINERS.get(repoId);
+const result = await container.exec(runId, command, timeoutMs);
+
+// Containers calling Source for clone
+const source = env.SOURCE;
+const objects = await source.fetch(repoId, ref);
+
+// Containers calling Cache for dependencies
+const cache = env.CACHE;
+const tarball = await cache.get(lockfileHash);
+
 // HTTP service calling Resources service
 const resources = env.RESOURCES.workflowDefs();
-const workflowDef = await resources.get(workflow_def_id);
+const workflowDef = await resources.get(workflowDefId);
 
 // Coordinator calling Executor (via queue)
 await env.WORKFLOW_TASKS.send({
@@ -239,10 +321,6 @@ await env.WORKFLOW_TASKS.send({
   task_id: 'task_456',
   input: { ... }
 });
-
-// Executor calling Coordinator
-const coordinator = env.COORDINATOR.get(coordinatorId);
-await coordinator.handleTaskResult(result);
 ```
 
 ### Service-to-Package (Import)
@@ -266,6 +344,12 @@ const rendered = template(context);
 import { createClient } from '@wonder/sdk';
 const client = createClient({ baseUrl: 'https://api.wonder.dev' });
 await client.workflows.create({ ... });
+
+// Git remote helper calling Source service
+git push wonder main
+// → git-remote-wonder binary
+// → HTTP POST to Source service
+// → Objects to R2, refs to D1
 ```
 
 ## Summary
@@ -276,12 +360,15 @@ await client.workflows.create({ ... });
 | @wonder/sdk       | Package | npm (public)       | None             | Import                                        |
 | @wonder/templates | Package | npm (internal)     | None             | Import                                        |
 | @wonder/test      | Package | npm (internal)     | None             | Import                                        |
+| cache             | Service | Cloudflare Workers | R2               | Workers RPC                                   |
+| containers        | Service | Cloudflare Workers | DO SQLite        | Workers RPC                                   |
 | coordinator       | Service | Cloudflare Workers | DO SQLite, D1    | Workers RPC                                   |
 | events            | Service | Cloudflare Workers | D1               | Workers RPC                                   |
 | executor          | Service | Cloudflare Workers | None (stateless) | Workers RPC                                   |
 | http              | Service | Cloudflare Workers | None (gateway)   | Workers RPC                                   |
 | logs              | Service | Cloudflare Workers | D1               | Workers RPC                                   |
 | resources         | Service | Cloudflare Workers | D1               | Workers RPC                                   |
+| source            | Service | Cloudflare Workers | R2, D1           | Workers RPC                                   |
 | web               | Service | Cloudflare Workers | None             | Workers RPC (server), HTTP/WebSocket (client) |
 
 Packages are libraries. Services are deployed workers. Services talk via RPC, never direct imports.
