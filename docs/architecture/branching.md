@@ -162,8 +162,8 @@ Token {
 
 enum TokenState {
   'pending',              // Created, not dispatched yet
-  'dispatched',           // Sent to worker
-  'executing',            // Worker acknowledged, running task
+  'dispatched',           // Sent to Executor
+  'executing',            // Executor acknowledged, running task
   'waiting_for_siblings', // At fan-in, waiting for synchronization
   'completed',            // Successfully finished (terminal)
   'failed',               // Execution error (terminal)
@@ -196,8 +196,8 @@ Any non-terminal → cancelled (via explicit cancellation)
 **State Semantics:**
 
 - `pending`: Token created, waiting to be dispatched (may be in queue)
-- `dispatched`: Sent to worker, awaiting acknowledgment
-- `executing`: Worker running the node's task
+- `dispatched`: Sent to Executor, awaiting acknowledgment
+- `executing`: Executor running the node's task
 - `waiting_for_siblings`: Token arrived at fan-in, waiting for other siblings
 - `completed`: Terminal state - task execution succeeded
 - `failed`: Terminal state - task execution failed
@@ -491,7 +491,7 @@ Each transition creates its own sibling group via `fan_out_transition_id`. Synch
   - Synchronization timeout: `timeout: '5m', on_timeout: 'proceed_with_available' | 'fail'`
 - **Early completion (race patterns)**: `wait_for: { first_n: 3 }, on_completion: 'cancel_remaining'`
   - Transition remaining siblings from `executing` → `cancelled`
-  - Requires cancellation protocol with workers
+  - Requires cancellation protocol with Executor
 - **Explicit cancellation**: Task to cancel sibling groups on demand
   - Query siblings by `fan_out_transition_id`, transition to `cancelled` state
 - **Retry on failure**: Leverage `failed` state with retry_count to automatically retry failed tokens
@@ -620,7 +620,7 @@ Transition {
 
 **Use case:** "Run 5 LLM strategies in parallel, use first successful result, cancel others to save cost."
 
-**Implementation:** Requires cancellation protocol with workers—send RPC to cancel in-flight tasks.
+**Implementation:** Requires cancellation protocol with Executor—send RPC to cancel in-flight tasks.
 
 ### 4. Resource Limits
 
