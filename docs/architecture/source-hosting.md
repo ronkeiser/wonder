@@ -264,41 +264,50 @@ The protocol is simple enough that any approach works. The key is translating gi
 
 Code isn't enough. Node projects need `node_modules`. Fresh `npm install` on every container provision is slow.
 
-### Shared pnpm Store
+### Lockfile-Keyed Cache
 
-pnpm uses a content-addressed store. Packages are downloaded once, then hard-linked into projects. Wonder hosts this store in R2:
+`pnpm-lock.yaml` fully specifies dependencies. Its hash keys a pre-built `node_modules` snapshot in R2:
 
 ```
-R2
-└── pnpm-store/
-    └── {package-hash}         — package tarballs
+R2: node-modules-cache/{lockfile-hash}.tar.gz
 ```
 
-Container init:
+**Container init:**
 
 ```bash
-# Mount or sync pnpm store from R2
-pnpm config set store-dir /mnt/pnpm-store
+# Hash lockfile
+CACHE_KEY=$(sha256sum pnpm-lock.yaml | cut -d' ' -f1)
 
-# Install is now just linking, not downloading
-pnpm install  # sub-10 seconds for most projects
+# Check cache
+if r2-exists "node-modules-cache/$CACHE_KEY.tar.gz"; then
+  r2-download "node-modules-cache/$CACHE_KEY.tar.gz" | tar xzf -
+else
+  pnpm install
+  tar czf - node_modules | r2-upload "node-modules-cache/$CACHE_KEY.tar.gz"
+fi
 ```
 
-For very fast installs, the pnpm store can be:
+**Properties:**
 
-- Pre-warmed with common packages
-- Layered in a base container image
-- Lazily populated as packages are requested
+- **Cache hit**: 1-2 seconds (just extraction)
+- **Cache miss**: Normal install time + upload (self-healing)
+- **Invalidation**: Automatic (lockfile change → different hash → cache miss)
+- **No coordination**: Each container independent, no shared state
+- **Storage cost**: ~$3/month for 1000 projects × 200MB each (negligible)
 
-### Lockfile as Cache Key
+**Optimization for large node_modules:**
 
-`pnpm-lock.yaml` fully specifies dependencies. Its hash can key a pre-built `node_modules` snapshot:
+If extraction becomes a bottleneck (100k+ files), use squashfs instead of tarball:
 
+```bash
+# Build: Create squashfs image
+mksquashfs node_modules node_modules.sqfs -noappend
+
+# Container: Mount as loop device (instant)
+mount -o loop node_modules.sqfs node_modules
 ```
-R2: node-modules-cache/{lockfile-hash}.tar
-```
 
-If the lockfile hasn't changed, restore from cache instead of running install. This brings "install" time to pure I/O—seconds for most projects.
+Still lockfile-keyed, still independent per container, but zero extraction time.
 
 ## Repository Lifecycle
 
@@ -404,8 +413,8 @@ Every commit is tied to a workflow run. Every workflow run has an event log. Ful
 | Refs           | D1, mutable pointers                    |
 | Commit index   | D1, denormalized for queries            |
 | Git operations | Native git + remote helper → Worker API |
-| Package store  | R2, shared pnpm store                   |
-| Container init | Checkout from R2 + pnpm link            |
+| Package cache  | R2, lockfile-keyed node_modules         |
+| Container init | Git checkout + cached node_modules      |
 | Deployment     | Direct to Cloudflare, no external CI    |
 
 The result: sub-second container provisioning, unified observability, no external dependencies, and a complete code hosting solution native to Cloudflare.
