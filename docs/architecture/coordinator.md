@@ -536,3 +536,97 @@ Test decision functions with real workflow definitions and context from deployed
 - Reference implementations for complex patterns
 
 **Core Advantage:** The Decision Pattern makes business logic testable without mocks while maintaining Actor Model benefits (isolated state, single-threaded execution, message passing).
+
+---
+
+## Timeout Handling
+
+The coordinator enforces two types of timeouts to prevent runaway workflows and coordinate parallel work.
+
+### Workflow-Level Timeout
+
+Catches graph-level bugs that task/action timeouts cannot: infinite loops, exponential fan-out, incorrect routing logic.
+
+**Implementation via DO Alarms:**
+
+```typescript
+class WorkflowRunDO {
+  async alarm() {
+    await this.checkWorkflowTimeout();
+
+    // Schedule next check
+    const nextCheck = Date.now() + 30_000; // 30 seconds
+    await this.storage.setAlarm(nextCheck);
+  }
+
+  async checkWorkflowTimeout() {
+    const run = await this.getWorkflowRun();
+    const def = await this.getWorkflowDef();
+
+    if (!def.timeout_ms) return;
+
+    const timeoutAt = run.started_at + def.timeout_ms;
+    if (Date.now() < timeoutAt) return;
+
+    // Timeout triggered
+    if (def.on_timeout === 'human_gate') {
+      await this.transitionToHumanReview('workflow_timeout', {
+        duration_ms: Date.now() - run.started_at,
+        active_tokens: await this.getActiveTokens(),
+        message: 'Workflow exceeded expected duration. Review and decide to continue or abort.',
+      });
+    } else if (def.on_timeout === 'fail') {
+      await this.failWorkflow('Workflow timeout exceeded');
+    } else {
+      // cancel_all
+      await this.cancelAllTokens();
+      await this.markWorkflowTimedOut();
+    }
+  }
+}
+```
+
+**Default behavior:** `on_timeout: 'human_gate'` pauses the workflow for human review rather than killing it. This preserves state, enables debugging, and allows humans to decide whether to extend the timeout or abort.
+
+**Purpose:** A workflow hitting timeout isn't necessarily wrong—it might just need approval to continue. Human gates turn timeouts into supervision checkpoints rather than catastrophic failures.
+
+### Synchronization Timeout
+
+Controls how long to wait for siblings at fan-in merge points. Measured from first sibling arrival, not from fan-out dispatch (avoids double-counting execution time).
+
+**Implementation:**
+
+```typescript
+async function checkSynchronizationTimeout(transition: TransitionDef) {
+  if (!transition.synchronization?.timeout_ms) return;
+
+  const siblings = await this.getSiblings(transition.synchronization.sibling_group);
+  const firstArrival = Math.min(...siblings.map((s) => s.arrived_at));
+  const waitTime = Date.now() - firstArrival;
+
+  if (waitTime < transition.synchronization.timeout_ms) return;
+
+  // Timeout triggered
+  if (transition.synchronization.on_timeout === 'proceed_with_available') {
+    const completed = siblings.filter((s) => s.status === 'completed');
+    if (completed.length > 0) {
+      await this.mergeSiblingsAndProceed(completed, transition);
+    } else {
+      await this.failSynchronization('No siblings completed before timeout');
+    }
+
+    // Mark waiting siblings as timed out
+    const waiting = siblings.filter((s) => s.status === 'waiting_for_siblings');
+    for (const token of waiting) {
+      await this.markTokenTimedOut(token.id);
+    }
+  } else {
+    // on_timeout: 'fail'
+    await this.failSynchronization('Synchronization timeout exceeded');
+  }
+}
+```
+
+**Purpose:** Parallel work may have stragglers. Synchronization timeout lets you decide: wait forever, fail if stragglers miss deadline, or proceed with partial results.
+
+**Note:** Task and action timeouts are enforced by the Executor (platform limits and AbortController). Coordinator only handles workflow-level and synchronization timeouts—the orchestration layer concerns.

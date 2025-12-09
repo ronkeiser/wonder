@@ -144,6 +144,53 @@ Retries operate at two distinct levels with sharp boundaries:
 
 The step itself never retries in isolation. Retry is always at the task level (full reset) or action level (infrastructure only).
 
+## Timeout Model
+
+Timeouts are enforced at three layers, each serving a distinct purpose:
+
+### 1. Action-Level Timeout
+
+**Enforced by:** Executor (AbortController)  
+**Configured in:** `ActionDef.execution.timeout_ms`  
+**Purpose:** Prevent individual actions from hanging (LLM calls, HTTP requests, shell commands)
+
+The Executor wraps action execution with `AbortController` and enforces the timeout inline. If exceeded, the action fails and step-level `on_failure` determines whether the task aborts, retries, or continues.
+
+### 2. Task-Level Timeout
+
+**Enforced by:** Cloudflare Workers platform  
+**Configured in:** `TaskDef.timeout_ms`  
+**Purpose:** Limit entire task execution (all steps sequentially)
+
+Platform terminates the worker if task exceeds limit. No graceful shutdown—execution simply stops. Coordinator detects missing response and handles as task failure.
+
+### 3. Workflow-Level Timeout
+
+**Enforced by:** Coordinator (DO alarms)  
+**Configured in:** `WorkflowDef.timeout_ms` and `on_timeout`  
+**Purpose:** Catch graph-level bugs that action/task timeouts cannot detect
+
+Detects problems like:
+
+- **Infinite loops**: A→B→C→A cycle where each node succeeds but workflow never terminates
+- **Exponential fan-out**: Bug causes unbounded token spawning
+- **Routing errors**: Correct execution but logic errors prevent completion
+
+**Default behavior:** `on_timeout: 'human_gate'` pauses workflow for review rather than killing it. Humans can inspect state, extend timeout, or abort. This turns timeouts into supervision checkpoints, not catastrophic failures.
+
+### 4. Synchronization Timeout
+
+**Enforced by:** Coordinator (DO alarms)  
+**Configured in:** `Transition.synchronization.timeout_ms` and `on_timeout`  
+**Purpose:** Control wait time for siblings at fan-in merge points
+
+Measures time from first sibling arrival (not from fan-out), avoiding double-counting execution time. Policies:
+
+- `fail`: All waiting siblings fail, workflow fails
+- `proceed_with_available`: Merge completed siblings, mark stragglers as timed out
+
+**Timeout Hierarchy:** Action < Task < Workflow (and synchronization is independent per fan-in)
+
 ### When Retry Logic Needs Branching
 
 If you need:

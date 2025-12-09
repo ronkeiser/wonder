@@ -148,6 +148,9 @@ Repository metadata. Each project has one or more code repos and exactly one art
 
   initial_node_id: string;      // Starting node ULID
 
+  timeout_ms: number | null;    // Max workflow duration (catches infinite loops, runaway fan-out)
+  on_timeout: 'human_gate' | 'fail' | 'cancel_all';  // Default: 'human_gate'
+
   created_at: string;
   updated_at: string;
 }
@@ -309,6 +312,8 @@ Edge in workflow graph. **All branching logic lives here:**
 {
   strategy: "all" | "any" | { m_of_n: 3 },
   sibling_group: "fan_out_transition_id",  // Which fan-out spawned these siblings
+  timeout_ms: number | null,    // Max wait time for siblings (null = no timeout)
+  on_timeout: "proceed_with_available" | "fail",  // Default: "fail"
   merge: {
     source: "_branch.output",  // Path in each sibling's isolated state
     target: "state.results",   // Destination in merged context
@@ -316,6 +321,8 @@ Edge in workflow graph. **All branching logic lives here:**
   }
 }
 ```
+
+When `on_timeout: "proceed_with_available"`, merge whatever siblings completed and continue. Waiting siblings marked as timed out.
 
 ---
 
