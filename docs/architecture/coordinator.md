@@ -128,9 +128,9 @@ function decide(
 
 **Does:**
 
-1. Resolves joins_transition ref to ID
+1. Resolves sibling_group ref to fan_out_transition_id
 2. Checks if token is in sibling group
-3. Evaluates synchronization condition (any/all/m_of_n)
+3. Evaluates synchronization condition (strategy: any/all/m_of_n)
 4. If not met: returns CREATE_FAN_IN_TOKEN decision (waiting)
 5. If met: returns SET_CONTEXT (merge) + ACTIVATE_FAN_IN_TOKEN decisions
 
@@ -138,8 +138,8 @@ function decide(
 
 **Pure helpers:**
 
-- `evaluateSyncCondition(siblings, waitFor)` - Check if condition met
-- `mergeOutputs(siblings, mergeConfig)` - Apply merge strategy (append, merge, keyed)
+- `evaluateSyncCondition(siblings, strategy)` - Check if condition met (any/all/m_of_n)
+- `mergeOutputs(siblings, mergeConfig)` - Apply merge strategy (append, merge_object, keyed_by_branch, last_wins)
 - `buildFanInPath(tokenPath)` - Compute stable fan-in path
 
 ### planning/completion.ts
