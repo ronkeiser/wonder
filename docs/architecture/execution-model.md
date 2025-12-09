@@ -73,17 +73,17 @@ The worker runs all three steps in memory. Same result, one-third the overhead.
 
 ## Comparison
 
-| Aspect        | Workflow                         | Task                                   |
-| ------------- | -------------------------------- | -------------------------------------- |
-| Execution     | Coordinator orchestrates workers | Single worker runs to completion       |
-| State         | DO SQLite (durable)              | In-memory (ephemeral)                  |
-| Parallelism   | Fan-out/fan-in                   | None                                   |
-| Branching     | Full graph routing               | Simple if/else                         |
-| Human gates   | Yes (token pauses)               | Yes (via async action, task completes) |
-| Sub-workflows | Yes                              | No                                     |
-| Sub-tasks     | Yes (nodes execute tasks)        | No (flat sequence)                     |
-| Retry scope   | Per-node                         | Whole task                             |
-| Duration      | Seconds to days                  | Milliseconds to minutes                |
+| Aspect        | Workflow                         | Task                             |
+| ------------- | -------------------------------- | -------------------------------- |
+| Execution     | Coordinator orchestrates workers | Single worker runs to completion |
+| State         | DO SQLite (durable)              | In-memory (ephemeral)            |
+| Parallelism   | Fan-out/fan-in                   | None                             |
+| Branching     | Full graph routing               | Simple if/else                   |
+| Human gates   | Yes (token pauses)               | No (use workflow nodes)          |
+| Sub-workflows | Yes                              | No                               |
+| Sub-tasks     | Yes (nodes execute tasks)        | No (flat sequence)               |
+| Retry scope   | Per-node                         | Whole task                       |
+| Duration      | Seconds to days                  | Milliseconds to minutes          |
 
 ## When to Use Each
 
@@ -143,6 +143,27 @@ Retries operate at two distinct levels with sharp boundaries:
 - **`continue`**: Log error, proceed to next step
 
 The step itself never retries in isolation. Retry is always at the task level (full reset) or action level (infrastructure only).
+
+### Conditional Execution
+
+Steps support conditional execution based on task context:
+
+```typescript
+condition: {
+  if: "input.auto_format == true",
+  then: "continue" | "skip" | "succeed" | "fail",
+  else: "continue" | "skip" | "succeed" | "fail"
+}
+```
+
+**Conditional outcomes:**
+
+- **`continue`**: Execute this step normally
+- **`skip`**: Skip this step, proceed to next step
+- **`succeed`**: Skip this step, mark task as successful, return current output
+- **`fail`**: Skip this step, mark task as failed
+
+This enables simple branching without workflow-level complexity. For example, "skip formatting if auto_format is false" or "fail fast if required input is missing."
 
 ## Timeout Model
 
