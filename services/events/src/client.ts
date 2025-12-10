@@ -20,11 +20,11 @@ export function createEmitter(
     ): void;
   },
   context: EventContext & TraceEventContext,
-  options: { traceEnabled?: boolean } = {},
+  options: { traceEnabled?: 'true' | 'false' } = {},
 ): Emitter {
   let eventSequenceNumber = 0;
   let traceSequenceNumber = 0;
-  const traceEnabled = options.traceEnabled ?? false;
+  const traceEnabled = options.traceEnabled === 'true';
 
   return {
     emit: (input: EventInput) => {

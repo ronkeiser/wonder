@@ -34,7 +34,7 @@ export class WorkflowCoordinator extends DurableObject {
         workflow_def_id: 'wf_placeholder',
       },
       {
-        traceEnabled: env.TRACE_EVENTS_ENABLED === 'true',
+        traceEnabled: env.TRACE_EVENTS_ENABLED,
       },
     );
   }

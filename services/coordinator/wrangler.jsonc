@@ -8,35 +8,38 @@
     "bindings": [
       {
         "name": "COORDINATOR",
-        "class_name": "WorkflowCoordinator"
-      }
-    ]
+        "class_name": "WorkflowCoordinator",
+      },
+    ],
   },
   "services": [
     {
       "binding": "EXECUTOR",
-      "service": "wonder-executor"
+      "service": "wonder-executor",
     },
     {
       "binding": "LOGS",
-      "service": "wonder-logs"
+      "service": "wonder-logs",
     },
     {
       "binding": "EVENTS",
-      "service": "wonder-events"
+      "service": "wonder-events",
     },
     {
       "binding": "RESOURCES",
-      "service": "wonder-resources"
-    }
+      "service": "wonder-resources",
+    },
   ],
   "migrations": [
     {
       "tag": "v3",
-      "new_sqlite_classes": ["WorkflowCoordinator"]
-    }
+      "new_sqlite_classes": ["WorkflowCoordinator"],
+    },
   ],
   "observability": {
-    "enabled": true
-  }
+    "enabled": true,
+  },
+  "vars": {
+    "TRACE_EVENTS_ENABLED": "true",
+  },
 }
