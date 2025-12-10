@@ -45,28 +45,35 @@ Clicking a node opens its **Configuration Panel**:
 ### Basic Settings
 
 - **Name**: Display name for the node
-- **Action Type**: Dropdown (LLM Call, HTTP Request, Human Input, etc.)
+- **Task**: Dropdown of available tasks (library or project-local)
+- **Version**: "Latest" or pinned version number
 
-### Action Configuration
+### Input/Output Mapping
 
-Varies by action type. For **LLM Call**:
+- **Input Mapping**: Map workflow context to task inputs
+- **Output Mapping**: Map task outputs back to workflow context
 
-- **Model**: Dropdown of available model profiles
-- **Prompt Template**: Handlebars template with autocomplete
-- **Output Schema**: Define structure of LLM response
+### Task Preview
 
-### Parallel Execution
+Expanded view shows the selected task's structure:
 
-- **Fan Out**: "First Match" or "All"
-- **Branch Count**: Static number or `{{input.num_judges}}`
-- **Fan In**: "Any", "All", or "M of N"
-- **Joins Node**: Dropdown (which fan-out node's branches to collect)
-- **Merge Config**: Source path, target path, strategy
+- Steps (sequential)
+- Actions per step
+- Retry configuration
+- Expected input/output schemas
+
+### Node-Specific Settings
+
+Depends on node position in graph:
+
+- **Container Pass-through**: If node uses containers, which resources to pass to sub-workflows
+- **Timeout**: Node-level timeout override (optional)
 
 ### Visual Indicators
 
-- `×N` badge: Node fans out to N parallel branches
-- `⊕` badge: Node is a fan-in point (waits and merges)
+- Task icon: Shows task type (LLM, Shell, HTTP, etc. based on primary action)
+- Sub-workflow icon: Node calls another workflow
+- Container icon: Node requires container resources
 
 ---
 
@@ -166,30 +173,31 @@ Typing `{{` triggers autocomplete with available paths:
 - `_branch.*` — branch context (when in fan-out)
 - `artifacts.*` — artifact references
 
-### Output Schema Definition
+### Schema References
 
-| Field       | Type   | Description            |
-| ----------- | ------ | ---------------------- |
-| `choice`    | Number | Index of chosen idea   |
-| `rationale` | Text   | Explanation for choice |
+Autocomplete shows schemas from:
 
-This schema:
+- Selected task's output schema
+- Referenced action output schemas
+- Workflow context schema
 
-- Enables structured output from LLM
-- Flows to downstream merge configurations
-- Validates against downstream expectations
+Task output schemas flow to:
+
+- Node output mappings
+- Downstream transition merge configurations
+- State schema inference
 
 ---
 
 ## Transitions
 
-Connections between nodes are **transitions**.
+Connections between nodes are **transitions**. Transitions control all routing logic.
 
 ### Basic Configuration
 
 - **From Node**: Source (set by dragging)
 - **To Node**: Target (set by dragging)
-- **Priority**: Order of evaluation (lower = first)
+- **Priority**: Order of evaluation (same priority = parallel, different = sequential fallback)
 
 ### Conditions
 
@@ -202,34 +210,49 @@ Connections between nodes are **transitions**.
 
 **Expression** (advanced):
 
-- Raw expression: `state.votes.filter(v => v.choice === 0).length > 2`
+- CEL expression: `state.votes.filter(v => v.choice == 0).size() > 2`
 - Must declare reads: `["state.votes"]`
 
-### Special: Foreach
+### Fan-Out (Parallelism)
 
-Spawn a token for each item in a collection:
+Create multiple tokens:
 
-- **Collection**: `state.items`
-- **Item Variable**: `item`
+- **Spawn Count**: Static number (e.g., `5`) or dynamic from context (e.g., `input.num_judges`)
+- **Foreach**: Spawn per collection item
+  - **Collection**: `state.items`
+  - **Item Variable**: `item`
+  - Each token gets `_branch.item` in its context
 
-Each spawned token has `_branch.item` available.
+### Fan-In (Synchronization)
+
+Wait for and merge sibling tokens:
+
+- **Joins Transition**: Reference to fan-out transition ID
+- **Wait For**: `any` (first to arrive) | `all` (all siblings) | `m_of_n` (threshold)
+- **Merge Strategy**: `append` | `merge` | `keyed` | `last_wins`
+- **Merge Config**: Source path, target path per merge
+- **Timeout**: How long to wait for stragglers
+- **On Timeout**: `fail` (all fail) | `proceed_with_available` (merge completed only)
 
 ---
 
 ## Composition: Sub-Workflows
 
-Nodes can call other workflows via `workflow_call` action.
+Nodes can execute tasks that contain `workflow_call` actions, or tasks can be created inline that wrap workflow calls.
 
 ### Configuration
+
+When a node's task contains a `workflow_call` action:
 
 - **Workflow**: Dropdown of available workflows (project + library)
 - **Version**: "Latest" or pinned version number
 - **Input Mapping**: Map current context to sub-workflow inputs
 - **Output Mapping**: Map sub-workflow outputs back to state
+- **Pass Resources**: Which containers to transfer for the duration of the call
 
 ### Visual Indicator
 
-Sub-workflow nodes show a "nested" icon. Click to "drill in" and see the sub-workflow graph (read-only unless it's a local workflow).
+Nodes with workflow_call actions show a "nested" icon. Click to "drill in" and see the sub-workflow graph (read-only unless it's a local workflow).
 
 ---
 
@@ -330,41 +353,52 @@ Human input nodes waiting too long:
 ```
 WorkflowEditor
 ├── LeftSidebar
-│   ├── NodePalette (drag to add nodes)
+│   ├── TaskPalette (drag to add nodes with tasks)
 │   └── StateSchemaPanel (auto-inferred, editable)
 ├── Canvas (Svelte Flow)
-│   ├── Custom node types per action (LLMCallNode, HumanInputNode, etc.)
-│   └── Custom edge type for transitions (condition labels)
+│   ├── Custom node component (shows task info)
+│   └── Custom edge component (shows transition config, fan-out/fan-in indicators)
 └── RightSidebar
-    └── ConfigPanel (contextual: node | edge | workflow settings)
+    └── ConfigPanel (contextual: node | transition | workflow settings)
+    └── TaskPreview (shows selected task's steps/actions)
 ```
 
 ### Custom Node Design
 
-Each action type gets a node component. Common structure:
+Each node shows its task. Common structure:
 
-- Header: icon + label
-- Badges: `×N` for fan-out, `⊕` for fan-in
-- Preview slot: action-specific summary (model name, gate indicator, etc.)
+- Header: icon (derived from task's primary action type) + label
+- Badges: Container, sub-workflow, or custom task indicators
+- Preview slot: Task summary (step count, primary actions, retry config)
 - Handles: top (target) and bottom (source)
 
-Sub-workflow nodes include a "drill in" button to navigate to the nested graph.
+Nodes with workflow_call actions include a "drill in" button to navigate to the nested graph.
 
 ### Custom Edge Design
 
 Transition edges show:
 
 - Condition expression (abbreviated) as a label on the edge
-- `∀` symbol for foreach transitions
+- `×N` or `∀` symbol for fan-out transitions (spawn_count or foreach)
+- `⊕` symbol for fan-in transitions (synchronization point)
 - Priority number if multiple edges from same source
+- Dashed line for lower-priority fallback transitions
 
-### Prompt Editor
+### Task Editor
 
-For LLM Call nodes, use **CodeMirror 6** or **Monaco** with:
+When editing tasks (separate from workflow graph), use **CodeMirror 6** or **Monaco** for:
+
+**Prompt templates** (for LLM actions):
 
 - Handlebars syntax highlighting
 - Autocomplete for `{{input.*}}`, `{{state.*}}`, `{{_branch.*}}`
-- Schema-aware: autocomplete paths come from inferred state schema
+- Schema-aware: autocomplete paths come from task input schema
+
+**CEL expressions** (for conditions, mappings):
+
+- CEL syntax highlighting
+- Type-aware validation
+- Context schema autocomplete
 
 ### Run Visualization
 
