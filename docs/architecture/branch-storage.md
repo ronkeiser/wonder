@@ -128,7 +128,7 @@ interface ContextOperations {
   mergeBranches(
     sql: SqlStorage,
     siblings: TokenRow[],
-    mergeConfig: MergeConfig,
+    merge: { source: string; target: string; strategy: string },
     outputSchema: JSONSchema,
   ): void;
 
@@ -219,7 +219,7 @@ if (syncConditionMet) {
     {
       type: 'MERGE_BRANCHES',
       siblings: siblingTokens,
-      mergeConfig: transition.synchronization.merge,
+      merge: transition.synchronization.merge,
       outputSchema: taskDef.output_schema,
     },
     {
@@ -237,7 +237,7 @@ case 'MERGE_BRANCHES': {
   operations.context.mergeBranches(
     sql,
     decision.siblings,
-    decision.mergeConfig,
+    decision.merge,
     decision.outputSchema
   );
 
@@ -254,7 +254,7 @@ case 'MERGE_BRANCHES': {
 function mergeBranches(
   sql: SqlStorage,
   siblings: TokenRow[],
-  mergeConfig: MergeConfig,
+  merge: { source: string; target: string; strategy: string },
   outputSchema: JSONSchema,
 ): void {
   // Read all branch outputs
@@ -269,10 +269,10 @@ function mergeBranches(
   });
 
   // Apply merge strategy
-  const merged = applyMergeStrategy(branchData, mergeConfig.strategy);
+  const merged = applyMergeStrategy(branchData, merge.strategy);
 
   // Write to main context
-  operations.context.set(sql, mergeConfig.target, merged);
+  operations.context.set(sql, merge.target, merged);
 }
 ```
 
@@ -324,7 +324,7 @@ The merged result must match the target path's schema:
 ```typescript
 // Merge config
 merge: {
-  source: '*',  // All of branch output
+  source: '_branch.output',  // All of branch output
   target: 'state.votes',  // Array in state schema
   strategy: 'append'
 }
@@ -436,7 +436,7 @@ type Decision =
   {
     type: 'MERGE_BRANCHES';
     siblings: TokenRow[];
-    mergeConfig: MergeConfig;
+    merge: { source: string; target: string; strategy: string };
     outputSchema: JSONSchema;
   };
 ```
@@ -482,7 +482,7 @@ Target paths are standard JSONPath into main context:
 
 - `initializeBranchTable(tokenId, schema)` - CREATE TABLE
 - `applyNodeOutput(tokenId, output, schema)` - INSERT into branch table
-- `mergeBranches(siblings, mergeConfig, schema)` - Read branches, merge, write to context
+- `mergeBranches(siblings, merge, schema)` - Read branches, merge, write to context
 - `dropBranchTables(tokenIds)` - DROP TABLE cleanup
 
 **Schema-driven throughout:**

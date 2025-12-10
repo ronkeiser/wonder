@@ -391,14 +391,14 @@ export function createContextOperations(sql: SqlStorage, emitter: IntrospectionE
       dropBranchTablesRaw(sql, tokenIds);
     },
 
-    mergeBranches(siblings: TokenRow[], mergeConfig: MergeConfig, schema: JSONSchema): void {
+    mergeBranches(siblings: TokenRow[], merge: MergeConfig, schema: JSONSchema): void {
       emitter.emit({
         type: 'operation.context.merge.start',
         sibling_count: siblings.length,
-        strategy: mergeConfig.strategy,
+        strategy: merge.strategy,
       });
 
-      const rowsWritten = mergeBranchesRaw(sql, siblings, mergeConfig, schema);
+      const rowsWritten = mergeBranchesRaw(sql, siblings, merge, schema);
 
       emitter.emit({
         type: 'operation.context.merge.complete',

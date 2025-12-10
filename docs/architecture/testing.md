@@ -525,12 +525,19 @@ describe('synchronization.decide', () => {
     // Should merge branches
     expect(decisions).toContainEqual({
       type: 'MERGE_BRANCHES',
-      sibling_token_ids: ['tok_123', 'tok_124', 'tok_125', 'tok_126', 'tok_127'],
-      merge_config: {
+      siblings: expect.arrayContaining([
+        expect.objectContaining({ id: 'tok_123', status: 'completed' }),
+        expect.objectContaining({ id: 'tok_124', status: 'completed' }),
+        expect.objectContaining({ id: 'tok_125', status: 'completed' }),
+        expect.objectContaining({ id: 'tok_126', status: 'completed' }),
+        expect.objectContaining({ id: 'tok_127', status: 'completed' }),
+      ]),
+      merge: expect.objectContaining({
         source: '*.name',
         target: '$.state.all_names',
         strategy: 'append',
-      },
+      }),
+      outputSchema: expect.any(Object),
     });
 
     // Should activate fan-in token
@@ -574,8 +581,9 @@ describe('synchronization.decide', () => {
     // Should merge just the completed sibling
     expect(decisions).toContainEqual({
       type: 'MERGE_BRANCHES',
-      sibling_token_ids: ['tok_123'],
-      merge_config: expect.any(Object),
+      siblings: [expect.objectContaining({ id: 'tok_123', status: 'completed' })],
+      merge: expect.any(Object),
+      outputSchema: expect.any(Object),
     });
   });
 
@@ -613,8 +621,13 @@ describe('synchronization.decide', () => {
     // Should merge only completed siblings
     expect(decisions).toContainEqual({
       type: 'MERGE_BRANCHES',
-      sibling_token_ids: ['tok_123', 'tok_124', 'tok_125'],
-      merge_config: expect.any(Object),
+      siblings: [
+        expect.objectContaining({ id: 'tok_123', status: 'completed' }),
+        expect.objectContaining({ id: 'tok_124', status: 'completed' }),
+        expect.objectContaining({ id: 'tok_125', status: 'completed' }),
+      ],
+      merge: expect.any(Object),
+      outputSchema: expect.any(Object),
     });
   });
 

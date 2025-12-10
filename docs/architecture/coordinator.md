@@ -139,7 +139,7 @@ function decide(
 **Pure helpers:**
 
 - `evaluateSyncCondition(siblings, strategy)` - Check if condition met (any/all/m_of_n)
-- `mergeOutputs(siblings, mergeConfig)` - Apply merge strategy (append, merge_object, keyed_by_branch, last_wins)
+- `mergeOutputs(siblings, merge)` - Apply merge strategy (append, merge_object, keyed_by_branch, last_wins)
 - `buildFanInPath(tokenPath)` - Compute stable fan-in path
 
 ### planning/completion.ts
@@ -191,7 +191,7 @@ get(sql, path) → unknown                 // Read context value
 set(sql, path, value) → void             // Write context value
 applyNodeOutput(sql, tokenId, output, schema) → void  // Write to branch table
 getSnapshot(sql) → ContextSnapshot       // Read-only view for decision logic
-mergeBranches(sql, siblings, mergeConfig, schema) → void  // Merge at fan-in
+mergeBranches(sql, siblings, merge, schema) → void  // Merge at fan-in
 dropBranchTables(sql, tokenIds) → void   // Cleanup after merge
 ```
 

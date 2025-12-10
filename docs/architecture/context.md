@@ -117,7 +117,10 @@ get(sql, path) → unknown                 // Read context value (e.g., 'state.v
 set(sql, path, value) → void             // Write context value with validation
 applyNodeOutput(sql, nodeRef, output, tokenId?) → void  // Apply node output mapping
 getSnapshot(sql) → ContextSnapshot       // Read-only view for decision logic
-getBranchOutputs(sql, nodeRef) → Array<Record<string, unknown>>
+getBranchOutputs(sql, tokenIds, outputSchema) → Array<{ tokenId: string; output: Record<string, unknown> }>
+initializeBranchTable(sql, tokenId, schema) → void  // Create branch output table for token
+mergeBranches(sql, siblings, merge, outputSchema) → void  // Merge branch outputs at fan-in
+dropBranchTables(sql, tokenIds) → void   // Cleanup branch tables after merge
 ```
 
 `@wonder/context` generates parameterized SQL:
