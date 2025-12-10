@@ -4,12 +4,13 @@ Type-safe TypeScript SDK for the Wonder workflow orchestration platform.
 
 ## Overview
 
-The SDK provides a unified client with three integrated layers:
+The SDK provides a unified client with four integrated layers:
 
 1. **Resource Client** - Auto-generated resource-specific methods from OpenAPI spec
-2. **WebSocket Events** - Real-time event streaming and workflow testing helpers
-3. **Raw HTTP Access** - Direct access to underlying HTTP client for custom requests
-4. **Builder Helpers** - Ergonomic builders for creating workflow definitions, schemas, nodes, and transitions
+2. **Workflow Streaming** - Real-time workflow execution with event streaming
+3. **WebSocket Events** - Low-level event streaming and subscription
+4. **Raw HTTP Access** - Direct access to underlying HTTP client for custom requests
+5. **Builder Helpers** - Ergonomic builders for creating workflow definitions, schemas, nodes, and transitions
 
 ## Installation
 
@@ -26,58 +27,106 @@ import { createClient } from '@wonder/sdk';
 
 const wonder = createClient('https://wonder-http.ron-keiser.workers.dev');
 
-// SDK methods
+// Resource client - CRUD operations
 const workspaces = await wonder.workspaces.list();
 
-// WebSocket event helpers
-const result = await wonder.events.runWorkflow('wf_123', { input: 'data' });
+// Workflow streaming - execute and stream events
+const result = await wonder.workflows(workflowId).stream(input, options);
 
 // Raw HTTP methods
 const response = await wonder.GET('/api/custom-endpoint', {});
 ```
 
-### Using the Resource Client
+### Working with Resources
 
 ```typescript
 import { createClient } from '@wonder/sdk';
 
 const wonder = createClient('https://wonder-http.ron-keiser.workers.dev');
 
-// List workspaces
+// List resources
 const workspacesResponse = await wonder.workspaces.list();
 console.log('Workspaces:', workspacesResponse?.workspaces);
 
-// Create a workspace
+// Create a resource
 const createResponse = await wonder.workspaces.create({
   name: 'My Workspace',
   description: 'A workspace for AI workflows',
 });
 console.log('Created workspace:', createResponse?.workspace);
 
-// Get a specific workspace
+// Get a specific resource by ID
 const workspace = await wonder.workspaces('workspace-id').get();
 
-// Update a workspace
+// Update a resource
 await wonder.workspaces('workspace-id').patch({
   name: 'Updated Name',
 });
 
-// Delete a workspace
+// Delete a resource
 await wonder.workspaces('workspace-id').delete();
 ```
 
-### WebSocket Event Streaming
+### Streaming Workflow Execution
+
+The SDK uses a two-phase workflow execution to guarantee zero event loss:
 
 ```typescript
 import { createClient } from '@wonder/sdk';
 
 const wonder = createClient('https://wonder-http.ron-keiser.workers.dev');
 
-// Run workflow to completion and get all events
-const result = await wonder.events.runWorkflow('workflow_123', { topic: 'AI' });
-console.log('Status:', result.status);
+// Stream workflow execution with all events
+const result = await wonder.workflows(workflowId).stream(
+  { topic: 'AI workflows' },
+  {
+    timeout: 60000,
+    idleTimeout: 10000,
+  },
+);
+
+console.log('Status:', result.status); // 'completed' | 'failed' | 'timeout' | 'idle_timeout'
 console.log('Events:', result.events.length);
 console.log('Trace Events:', result.traceEvents.length);
+
+// Stream with custom termination condition
+const result = await wonder.workflows(workflowId).stream(input, {
+  until: (event) => event.event_type === 'node_completed' && event.node_id === 'step3',
+  timeout: 30000,
+});
+
+// Stream with event filtering
+const result = await wonder.workflows(workflowId).stream(input, {
+  subscribe: {
+    event_types: ['workflow_started', 'workflow_completed', 'workflow_failed'],
+  },
+});
+```
+
+**How it works:**
+
+1. Creates a workflow run (status: `pending`)
+2. Subscribes to WebSocket events for that run
+3. Starts execution after subscription is established
+4. Collects events as they stream in real-time
+5. Closes when workflow completes, fails, times out, or custom predicate matches
+6. Returns all collected events
+
+**Stream Options:**
+
+- `subscribe`: Event filters (event_types, category, etc.)
+- `until`: Custom predicate to determine when to close
+- `timeout`: Total execution timeout (default: 5 minutes)
+- `idleTimeout`: Max time between events (default: 30 seconds)
+
+### Low-Level Event Streaming
+
+For more control over event streaming:
+
+```typescript
+import { createClient } from '@wonder/sdk';
+
+const wonder = createClient('https://wonder-http.ron-keiser.workers.dev');
 
 // Wait for workflow completion
 const status = await wonder.events.waitForCompletion('run_id', { timeout: 60000 });
@@ -97,8 +146,14 @@ subscription.close();
 const event = await wonder.events.waitForEvent(
   'run_123',
   (e) => e.event_type === 'node_completed' && e.node_id === 'process',
-  { timeout: 30000 },
+  { timeout: 30000, stream: 'events' },
 );
+
+// List events via HTTP
+const eventsData = await wonder.events.list({
+  workflow_run_id: 'run_123',
+  event_type: 'node_started',
+});
 ```
 
 ### Raw HTTP Methods
@@ -413,15 +468,20 @@ pnpm test
 
 ## Architecture
 
-The SDK uses a two-layer architecture:
+The SDK uses a layered architecture:
 
-1. **Layer 1: Generated Client**
+1. **Generated Client Layer**
    - Auto-generated from OpenAPI spec
    - Uses `openapi-typescript` for type generation
    - Uses `openapi-fetch` for runtime client
    - Located in `src/generated/`
 
-2. **Layer 2: Builder Helpers**
+2. **Enhanced Clients Layer**
+   - `WorkflowsClient`: Extends workflows with `.stream()` method
+   - `EventsClient`: Adds WebSocket subscriptions and event waiting
+   - Wraps generated client with additional functionality
+
+3. **Builder Helpers Layer**
    - Hand-written ergonomic builders
    - Built on top of generated types
    - No runtime overhead (plain object construction)
@@ -430,8 +490,31 @@ The SDK uses a two-layer architecture:
 This separation ensures:
 
 - Generated types stay clean and maintainable
+- Enhanced clients provide high-level abstractions
 - Builders can evolve independently
 - Users can choose their preferred level of abstraction
+
+## Two-Phase Workflow Execution
+
+The SDK solves the race condition problem in workflow event streaming:
+
+**The Problem:**
+
+- Traditional approach: Start workflow → Get run ID → Subscribe to events
+- By the time subscription establishes, early events are already published and lost
+
+**The Solution:**
+
+1. Create workflow run (doesn't execute yet)
+2. Subscribe to events using the run ID
+3. Start execution after subscription is ready
+4. Guaranteed to capture all events from the beginning
+
+**API Endpoints:**
+
+- `POST /api/workflows/{id}/runs` - Creates run with `pending` status
+- `POST /api/workflows/{id}/runs/{run_id}/start` - Starts execution
+- `POST /api/workflows/{id}/start` - Convenience shortcut (create + start)
 
 ## Examples
 

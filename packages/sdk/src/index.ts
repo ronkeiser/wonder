@@ -7,6 +7,8 @@ import createOpenAPIClient from 'openapi-fetch';
 import { EventsClient } from './events';
 import { createClient as createGeneratedClient } from './generated/client';
 import type { paths } from './generated/schema';
+import type { StreamOptions, StreamResult } from './workflows';
+import { createWorkflowsClient } from './workflows';
 
 export type * from './generated/schema';
 
@@ -20,6 +22,7 @@ export type {
   Subscription,
   SubscriptionFilter,
 } from './events';
+export type { StreamOptions, StreamResult } from './workflows';
 
 /**
  * Unified Wonder client with SDK methods, WebSocket events, and raw HTTP access
@@ -27,6 +30,11 @@ export type {
 export interface WonderClient extends ReturnType<typeof createGeneratedClient> {
   // Events client extends generated events with WebSocket capabilities
   events: EventsClient;
+
+  // Workflows extends generated workflows with streaming capabilities
+  workflows: ReturnType<typeof createGeneratedClient>['workflows'] & {
+    stream: (workflowId: string, input: unknown, options?: StreamOptions) => Promise<StreamResult>;
+  };
 
   // Raw HTTP methods
   GET: Client<paths>['GET'];
@@ -46,10 +54,17 @@ export function createClient(
   const baseClient = createOpenAPIClient<paths>({ baseUrl });
   const sdkClient = createGeneratedClient(baseClient);
   const eventsClient = new EventsClient(baseUrl, baseClient);
+  const workflowsClient = createWorkflowsClient(
+    sdkClient.workflows,
+    baseUrl,
+    baseClient,
+    eventsClient,
+  );
 
   return {
     ...sdkClient,
     events: eventsClient,
+    workflows: workflowsClient,
     GET: baseClient.GET.bind(baseClient),
     POST: baseClient.POST.bind(baseClient),
     PUT: baseClient.PUT.bind(baseClient),

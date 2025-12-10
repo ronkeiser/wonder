@@ -234,52 +234,6 @@ export class EventsClient {
 
     return event.event_type === 'workflow_completed' ? 'completed' : 'failed';
   }
-
-  /**
-   * Helper: Run workflow to completion and return events
-   */
-  async runWorkflow(
-    workflowId: string,
-    input: unknown,
-    options: { timeout?: number } = {},
-  ): Promise<{
-    workflow_run_id: string;
-    status: 'completed' | 'failed';
-    events: any[];
-    traceEvents: any[];
-  }> {
-    // Start workflow using SDK
-    const response = await this.sdk.POST('/api/workflows/{id}/start', {
-      params: { path: { id: workflowId } },
-      body: input as any,
-    });
-
-    if (!response.data?.workflow_run_id) {
-      throw new Error('Failed to start workflow');
-    }
-
-    const workflow_run_id = response.data.workflow_run_id;
-
-    // Wait for completion via WebSocket
-    const status = await this.waitForCompletion(workflow_run_id, options);
-
-    // Fetch all events and trace events
-    const [eventsData, traceData] = await Promise.all([
-      this.sdk.GET('/api/events', {
-        params: { query: { workflow_run_id } },
-      }),
-      this.sdk.GET('/api/events/trace', {
-        params: { query: { workflow_run_id } },
-      }),
-    ]);
-
-    return {
-      workflow_run_id,
-      status,
-      events: eventsData.data?.events || [],
-      traceEvents: traceData.data?.events || [],
-    };
-  }
 }
 
 /**

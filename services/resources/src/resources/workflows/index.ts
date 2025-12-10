@@ -217,15 +217,16 @@ export class Workflows extends Resource {
     return { success: true };
   }
 
-  async start(
+  async createRun(
     workflowId: string,
     input: Record<string, unknown>,
   ): Promise<{
     workflow_run_id: string;
-    durable_object_id: string;
+    project_id: string;
+    workspace_id: string;
   }> {
     this.serviceCtx.logger.info({
-      event_type: 'workflow_start_requested',
+      event_type: 'workflow_run_create_requested',
       metadata: { workflow_id: workflowId },
     });
 
@@ -277,17 +278,17 @@ export class Workflows extends Resource {
         },
       ];
 
-      // Create workflow run record
+      // Create workflow run record (status: pending, not running yet)
       await repo.createWorkflowRun(this.serviceCtx.db, {
         id: workflowRunId,
         project_id: workflow.project_id,
         workflow_id: workflow.id,
         workflow_def_id: workflow_def.id,
         workflow_version: workflow_def.version,
-        status: 'running',
+        status: 'pending',
         context,
         active_tokens: activeTokens,
-        durable_object_id: workflowRunId, // Use workflow_run_id as DO id
+        durable_object_id: workflowRunId,
       });
 
       this.serviceCtx.logger.info({
@@ -295,24 +296,14 @@ export class Workflows extends Resource {
         metadata: { workflow_id: workflowId, workflow_run_id: workflowRunId },
       });
 
-      // Trigger workflow execution via coordinator DO (RPC)
-      const coordinatorId = this.env.COORDINATOR.idFromName(workflowRunId);
-      const coordinator = this.env.COORDINATOR.get(coordinatorId);
-
-      await coordinator.start(input, {
-        workflow_run_id: workflowRunId,
-        workspace_id: project.workspace_id,
-        project_id: workflow.project_id,
-        workflow_def_id: workflow_def.id,
-      });
-
       return {
         workflow_run_id: workflowRunId,
-        durable_object_id: workflowRunId,
+        project_id: workflow.project_id,
+        workspace_id: project.workspace_id,
       };
     } catch (error) {
       this.serviceCtx.logger.error({
-        event_type: 'workflow_start_failed',
+        event_type: 'workflow_run_create_failed',
         message: error instanceof Error ? error.message : String(error),
         metadata: {
           workflow_id: workflowId,
@@ -321,5 +312,104 @@ export class Workflows extends Resource {
       });
       throw error;
     }
+  }
+
+  async startRun(
+    workflowId: string,
+    workflowRunId: string,
+  ): Promise<{
+    durable_object_id: string;
+  }> {
+    this.serviceCtx.logger.info({
+      event_type: 'workflow_run_start_requested',
+      metadata: { workflow_id: workflowId, workflow_run_id: workflowRunId },
+    });
+
+    try {
+      // Get the workflow run
+      const run = await this.serviceCtx.db
+        .select()
+        .from(schema.workflow_runs)
+        .where(eq(schema.workflow_runs.id, workflowRunId))
+        .get();
+
+      if (!run) {
+        throw new NotFoundError(
+          `Workflow run not found: ${workflowRunId}`,
+          'workflow_run',
+          workflowRunId,
+        );
+      }
+
+      // Verify it belongs to this workflow
+      if (run.workflow_id !== workflowId) {
+        throw new ConflictError(
+          `Workflow run ${workflowRunId} does not belong to workflow ${workflowId}`,
+          'workflow_id',
+          'mismatch',
+        );
+      }
+
+      // Get project to access workspace_id
+      const project = await this.serviceCtx.db
+        .select()
+        .from(schema.projects)
+        .where(eq(schema.projects.id, run.project_id))
+        .get();
+      if (!project) {
+        throw new NotFoundError(`Project not found: ${run.project_id}`, 'project', run.project_id);
+      }
+
+      // Update status to running
+      await this.serviceCtx.db
+        .update(schema.workflow_runs)
+        .set({ status: 'running', updated_at: new Date().toISOString() })
+        .where(eq(schema.workflow_runs.id, workflowRunId))
+        .run();
+
+      // Trigger workflow execution via coordinator DO (RPC)
+      const coordinatorId = this.env.COORDINATOR.idFromName(workflowRunId);
+      const coordinator = this.env.COORDINATOR.get(coordinatorId);
+
+      await coordinator.start(run.context.input, {
+        workflow_run_id: workflowRunId,
+        workspace_id: project.workspace_id,
+        project_id: run.project_id,
+        workflow_def_id: run.workflow_def_id,
+      });
+
+      this.serviceCtx.logger.info({
+        event_type: 'workflow_run_started',
+        metadata: { workflow_id: workflowId, workflow_run_id: workflowRunId },
+      });
+
+      return {
+        durable_object_id: workflowRunId,
+      };
+    } catch (error) {
+      this.serviceCtx.logger.error({
+        event_type: 'workflow_run_start_failed',
+        message: error instanceof Error ? error.message : String(error),
+        metadata: {
+          workflow_id: workflowId,
+          workflow_run_id: workflowRunId,
+          stack: error instanceof Error ? error.stack : undefined,
+        },
+      });
+      throw error;
+    }
+  }
+
+  async start(
+    workflowId: string,
+    input: Record<string, unknown>,
+  ): Promise<{
+    workflow_run_id: string;
+    durable_object_id: string;
+  }> {
+    // Convenience method: create + start in one call
+    const { workflow_run_id, project_id, workspace_id } = await this.createRun(workflowId, input);
+    const { durable_object_id } = await this.startRun(workflowId, workflow_run_id);
+    return { workflow_run_id, durable_object_id };
   }
 }
