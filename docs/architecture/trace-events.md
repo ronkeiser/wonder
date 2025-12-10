@@ -463,9 +463,7 @@ class WorkflowCoordinator extends DurableObject {
     const { decisions, events } = routing.decide(token, workflow, context);
 
     // Emit trace events from decision functions
-    for (const event of events) {
-      this.emitter.emitTrace(event);
-    }
+    this.emitter.emitTrace(events);
 
     // Dispatch decisions
     const tokensToDispatch = await dispatch.applyDecisions(

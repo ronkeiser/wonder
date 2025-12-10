@@ -8,11 +8,16 @@ import type {
   EventInput,
   GetEventsOptions,
   GetTraceEventsOptions,
+  TraceEventContext,
   TraceEventEntry,
   TraceEventInput,
 } from './types.js';
+import { getEventCategory } from './types.js';
 
+// Re-export client and types for consumer convenience
+export { createEmitter } from './client.js';
 export { Streamer } from './streamer.js';
+export type { Emitter } from './types.js';
 
 /**
  * Main service
@@ -117,7 +122,34 @@ export class EventsService extends WorkerEntrypoint<Env> {
   }
 
   /**
-   * RPC method - writes trace events to D1
+   * RPC method - writes a single trace event to D1
+   */
+  writeTraceEvent(context: TraceEventContext, event: TraceEventInput & { sequence: number }): void {
+    this.ctx.waitUntil(
+      (async () => {
+        try {
+          const entry: TraceEventEntry = {
+            id: ulid(),
+            timestamp: Date.now(),
+            ...context,
+            ...event,
+            category: getEventCategory(event.type),
+            token_id: event.token_id ?? null,
+            node_id: event.node_id ?? null,
+            duration_ms: event.duration_ms ?? null,
+            payload: JSON.stringify(event),
+          };
+
+          await this.db.insert(traceEvents).values(entry);
+        } catch (error) {
+          console.error('[EVENTS] Failed to insert trace event:', error);
+        }
+      })(),
+    );
+  }
+
+  /**
+   * RPC method - writes trace events batch to D1
    */
   writeTraceEvents(batch: TraceEventEntry[]): void {
     this.ctx.waitUntil(

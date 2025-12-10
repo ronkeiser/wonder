@@ -90,7 +90,7 @@ export interface GetEventsOptions {
  */
 export interface Emitter {
   emit: (event: EventInput) => void;
-  emitTrace: (event: TraceEventInput) => void;
+  emitTrace: (event: TraceEventInput | TraceEventInput[]) => void;
 }
 
 /**

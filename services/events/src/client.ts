@@ -36,15 +36,19 @@ export function createEmitter(
       });
     },
 
-    emitTrace: (input: TraceEventInput) => {
+    emitTrace: (event: TraceEventInput | TraceEventInput[]) => {
       if (!traceEnabled) return;
 
-      traceSequenceNumber++;
-      // The service's writeTraceEvent() method handles id, timestamp, and other entry fields
-      eventsBinding.writeTraceEvent(context, {
-        ...input,
-        sequence: traceSequenceNumber,
-      });
+      const events = Array.isArray(event) ? event : [event];
+
+      for (const evt of events) {
+        traceSequenceNumber++;
+        // The service's writeTraceEvent() method handles id, timestamp, and other entry fields
+        eventsBinding.writeTraceEvent(context, {
+          ...evt,
+          sequence: traceSequenceNumber,
+        });
+      }
     },
   };
 }
