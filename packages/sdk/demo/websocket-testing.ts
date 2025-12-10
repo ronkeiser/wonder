@@ -1,24 +1,25 @@
 /**
  * Example: End-to-End Workflow Testing with WebSocket Events
  *
- * This example demonstrates how to use the Wonder test client to:
+ * This example demonstrates how to use the unified Wonder client to:
  * 1. Start a workflow
  * 2. Monitor events in real-time via WebSocket
  * 3. Wait for completion
  * 4. Validate execution results
+ * 5. Use raw HTTP methods for custom requests
  */
 
-import { createWonderTestClient } from '@wonder/sdk/testing';
+import { createClient } from '@wonder/sdk';
 
 async function main() {
-  const wonder = createWonderTestClient('https://wonder-http.ron-keiser.workers.dev');
+  const wonder = createClient('https://wonder-http.ron-keiser.workers.dev');
 
   console.log('🚀 Starting workflow execution example...\n');
 
   // Example 1: Using runWorkflow() helper
   console.log('📦 Example 1: Using runWorkflow() helper');
   try {
-    const result = await wonder.runWorkflow(
+    const result = await wonder.events.runWorkflow(
       'workflow_abc123',
       { topic: 'AI workflows', count: 5 },
       { timeout: 60000 },
@@ -126,8 +127,27 @@ async function main() {
 
   console.log('\n---\n');
 
-  // Example 4: Parallel workflow monitoring
-  console.log('🔀 Example 4: Monitor multiple workflows in parallel');
+  // Example 4: Using raw HTTP methods
+  console.log('🔧 Example 4: Using raw HTTP methods for custom requests');
+
+  try {
+    // Use raw GET for direct HTTP access
+    const response = await wonder.GET('/api/workspaces', {});
+    console.log(`✅ Raw GET: Found ${response.data?.workspaces?.length || 0} workspaces`);
+
+    // Use raw POST with full control
+    const createResponse = await wonder.POST('/api/workspaces', {
+      body: { name: 'Test Workspace', description: 'Created via raw HTTP' },
+    });
+    console.log(`✅ Raw POST: Created workspace ${createResponse.data?.workspace?.id}`);
+  } catch (error) {
+    console.log('❌ Raw HTTP request failed:', (error as Error).message);
+  }
+
+  console.log('\n---\n');
+
+  // Example 5: Parallel workflow monitoring
+  console.log('🔀 Example 5: Monitor multiple workflows in parallel');
 
   const workflows = ['wf_1', 'wf_2', 'wf_3'];
   const promises = workflows.map(async (wfId) => {

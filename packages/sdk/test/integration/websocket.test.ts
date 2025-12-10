@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { createEventsTestingClient } from '../../src/testing/events-client.js';
+import { createClient } from '../../src/index.js';
 
 /**
  * WebSocket Integration Tests
@@ -12,19 +12,19 @@ import { createEventsTestingClient } from '../../src/testing/events-client.js';
 describe('WebSocket Event Client', () => {
   const BASE_URL = process.env.API_URL || 'https://wonder-http.ron-keiser.workers.dev';
 
-  it('should create events testing client', () => {
-    const client = createEventsTestingClient(BASE_URL);
-    expect(client).toBeDefined();
-    expect(client.subscribe).toBeDefined();
-    expect(client.waitForEvent).toBeDefined();
-    expect(client.waitForCompletion).toBeDefined();
+  it('should create events client', () => {
+    const wonder = createClient(BASE_URL);
+    expect(wonder.events).toBeDefined();
+    expect(wonder.events.subscribe).toBeDefined();
+    expect(wonder.events.waitForEvent).toBeDefined();
+    expect(wonder.events.waitForCompletion).toBeDefined();
   });
 
   it('should connect to WebSocket endpoint', async () => {
-    const client = createEventsTestingClient(BASE_URL);
+    const wonder = createClient(BASE_URL);
 
     // Create a subscription
-    const subscription = await client.subscribe([
+    const subscription = await wonder.events.subscribe([
       {
         id: 'test-sub',
         stream: 'events',
@@ -45,10 +45,10 @@ describe('WebSocket Event Client', () => {
   });
 
   it('should handle subscription filters', async () => {
-    const client = createEventsTestingClient(BASE_URL);
+    const wonder = createClient(BASE_URL);
     const events: any[] = [];
 
-    const subscription = await client.subscribe([
+    const subscription = await wonder.events.subscribe([
       {
         id: 'filtered-sub',
         stream: 'events',
@@ -72,11 +72,11 @@ describe('WebSocket Event Client', () => {
   });
 
   it('should support multiple subscriptions', async () => {
-    const client = createEventsTestingClient(BASE_URL);
+    const wonder = createClient(BASE_URL);
     const workflowEvents: any[] = [];
     const traceEvents: any[] = [];
 
-    const subscription = await client.subscribe([
+    const subscription = await wonder.events.subscribe([
       {
         id: 'workflow-sub',
         stream: 'events',
@@ -106,12 +106,10 @@ describe('WebSocket Event Client', () => {
 
   it('should handle connection errors gracefully', async () => {
     // Use an invalid URL to test error handling
-    const invalidClient = createEventsTestingClient(
-      'https://invalid-url-that-does-not-exist.workers.dev',
-    );
+    const wonder = createClient('https://invalid-url-that-does-not-exist.workers.dev');
 
     await expect(
-      invalidClient.subscribe([
+      wonder.events.subscribe([
         {
           id: 'error-test',
           stream: 'events',
@@ -123,11 +121,11 @@ describe('WebSocket Event Client', () => {
   });
 
   it('should timeout when waiting for events that never arrive', async () => {
-    const client = createEventsTestingClient(BASE_URL);
+    const wonder = createClient(BASE_URL);
 
     // Wait for an event that will never come
     await expect(
-      client.waitForEvent(
+      wonder.events.waitForEvent(
         'nonexistent-run-id',
         () => true,
         { timeout: 100 }, // Very short timeout
@@ -140,10 +138,10 @@ describe('WebSocket Connection Management', () => {
   const BASE_URL = process.env.API_URL || 'https://wonder-http.ron-keiser.workers.dev';
 
   it('should allow closing and reopening connections', async () => {
-    const client = createEventsTestingClient(BASE_URL);
+    const wonder = createClient(BASE_URL);
 
     // First connection
-    const sub1 = await client.subscribe([
+    const sub1 = await wonder.events.subscribe([
       {
         id: 'conn-1',
         stream: 'events',
@@ -154,7 +152,7 @@ describe('WebSocket Connection Management', () => {
     sub1.close();
 
     // Second connection should work
-    const sub2 = await client.subscribe([
+    const sub2 = await wonder.events.subscribe([
       {
         id: 'conn-2',
         stream: 'events',
@@ -168,9 +166,9 @@ describe('WebSocket Connection Management', () => {
   });
 
   it('should handle unsubscribe messages', async () => {
-    const client = createEventsTestingClient(BASE_URL);
+    const wonder = createClient(BASE_URL);
 
-    const subscription = await client.subscribe([
+    const subscription = await wonder.events.subscribe([
       {
         id: 'unsub-test',
         stream: 'events',

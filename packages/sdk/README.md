@@ -4,10 +4,12 @@ Type-safe TypeScript SDK for the Wonder workflow orchestration platform.
 
 ## Overview
 
-The SDK provides two layers:
+The SDK provides a unified client with three integrated layers:
 
-1. **Resource Client** (Layer 1) - Auto-generated resource-specific methods from OpenAPI spec
-2. **Builder Helpers** (Layer 2) - Ergonomic builders for creating workflow definitions, schemas, nodes, and transitions
+1. **Resource Client** - Auto-generated resource-specific methods from OpenAPI spec
+2. **WebSocket Events** - Real-time event streaming and workflow testing helpers
+3. **Raw HTTP Access** - Direct access to underlying HTTP client for custom requests
+4. **Builder Helpers** - Ergonomic builders for creating workflow definitions, schemas, nodes, and transitions
 
 ## Installation
 
@@ -17,20 +19,29 @@ pnpm add @wonder/sdk
 
 ## Quick Start
 
+### Create a Client
+
+```typescript
+import { createClient } from '@wonder/sdk';
+
+const wonder = createClient('https://wonder-http.ron-keiser.workers.dev');
+
+// SDK methods
+const workspaces = await wonder.workspaces.list();
+
+// WebSocket event helpers
+const result = await wonder.events.runWorkflow('wf_123', { input: 'data' });
+
+// Raw HTTP methods
+const response = await wonder.GET('/api/custom-endpoint', {});
+```
+
 ### Using the Resource Client
 
 ```typescript
-import createClient from 'openapi-fetch';
-import { createClient as createWonderClient } from '@wonder/sdk';
-import type { paths } from '@wonder/sdk/schema';
+import { createClient } from '@wonder/sdk';
 
-const API_URL = 'https://wonder-http.ron-keiser.workers.dev';
-
-// Create base HTTP client
-const baseClient = createClient<paths>({ baseUrl: API_URL });
-
-// Create Wonder client with resource-specific methods
-const wonder = createWonderClient(baseClient);
+const wonder = createClient('https://wonder-http.ron-keiser.workers.dev');
 
 // List workspaces
 const workspacesResponse = await wonder.workspaces.list();
@@ -53,6 +64,64 @@ await wonder.workspaces('workspace-id').patch({
 
 // Delete a workspace
 await wonder.workspaces('workspace-id').delete();
+```
+
+### WebSocket Event Streaming
+
+```typescript
+import { createClient } from '@wonder/sdk';
+
+const wonder = createClient('https://wonder-http.ron-keiser.workers.dev');
+
+// Run workflow to completion and get all events
+const result = await wonder.events.runWorkflow('workflow_123', { topic: 'AI' });
+console.log('Status:', result.status);
+console.log('Events:', result.events.length);
+console.log('Trace Events:', result.traceEvents.length);
+
+// Wait for workflow completion
+const status = await wonder.events.waitForCompletion('run_id', { timeout: 60000 });
+
+// Subscribe to event streams
+const subscription = await wonder.events.subscribe([
+  {
+    id: 'my-sub',
+    stream: 'events',
+    filters: { workflow_run_id: 'run_123' },
+    callback: (event) => console.log('Event:', event.event_type),
+  },
+]);
+subscription.close();
+
+// Wait for specific events
+const event = await wonder.events.waitForEvent(
+  'run_123',
+  (e) => e.event_type === 'node_completed' && e.node_id === 'process',
+  { timeout: 30000 },
+);
+```
+
+### Raw HTTP Methods
+
+Access the underlying HTTP client for custom requests:
+
+```typescript
+import { createClient } from '@wonder/sdk';
+
+const wonder = createClient('https://wonder-http.ron-keiser.workers.dev');
+
+// Raw GET
+const response = await wonder.GET('/api/workspaces', {});
+
+// Raw POST
+await wonder.POST('/api/workspaces', {
+  body: { name: 'Test', description: 'Created via raw HTTP' },
+});
+
+// Other HTTP methods
+await wonder.PUT('/api/resource/{id}', { params: { path: { id: '123' } }, body: {...} });
+await wonder.DELETE('/api/resource/{id}', { params: { path: { id: '123' } } });
+await wonder.PATCH('/api/resource/{id}', { params: { path: { id: '123' } }, body: {...} });
 ```
 
 ### Using Workflow Builders

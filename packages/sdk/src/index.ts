@@ -2,7 +2,9 @@
  * Wonder SDK - Type-safe client for the Wonder API
  */
 
+import type { Client } from 'openapi-fetch';
 import createOpenAPIClient from 'openapi-fetch';
+import { EventsClient } from './events';
 import { createClient as createGeneratedClient } from './generated/client';
 import type { paths } from './generated/schema';
 
@@ -11,18 +13,52 @@ export type * from './generated/schema';
 // Export builders
 export { node, schema, transition, workflowDef } from './builders';
 
-// Re-export the generated createClient function
-export { createClient } from './generated/client';
+// Export types
+export type {
+  EventsClient,
+  EventStreamSubscription,
+  Subscription,
+  SubscriptionFilter,
+} from './events';
 
 /**
- * Create a Wonder API client with the specified base URL
- * @param baseUrl - The base URL for the API
+ * Unified Wonder client with SDK methods, WebSocket events, and raw HTTP access
  */
-export function createWonderClient(
-  baseUrl: string = process.env.RESOURCES_URL || 'https://wonder-http.ron-keiser.workers.dev',
-) {
-  const baseClient = createOpenAPIClient<paths>({ baseUrl });
-  return createGeneratedClient(baseClient);
+export interface WonderClient extends Omit<ReturnType<typeof createGeneratedClient>, 'events'> {
+  // Events client with HTTP queries and WebSocket streaming
+  events: EventsClient;
+
+  // Raw HTTP methods
+  GET: Client<paths>['GET'];
+  POST: Client<paths>['POST'];
+  PUT: Client<paths>['PUT'];
+  DELETE: Client<paths>['DELETE'];
+  PATCH: Client<paths>['PATCH'];
 }
 
-export const client = createWonderClient();
+/**
+ * Create a unified Wonder API client with SDK methods, WebSocket events, and raw HTTP access
+ * @param baseUrl - The base URL for the API
+ */
+export function createClient(
+  baseUrl: string = process.env.RESOURCES_URL || 'https://wonder-http.ron-keiser.workers.dev',
+): WonderClient {
+  const baseClient = createOpenAPIClient<paths>({ baseUrl });
+  const sdkClient = createGeneratedClient(baseClient);
+  const eventsClient = new EventsClient(baseUrl, baseClient);
+
+  // Remove the basic events collection from SDK since we're replacing it with the enhanced version
+  const { events, ...sdkWithoutEvents } = sdkClient;
+
+  return {
+    ...sdkWithoutEvents,
+    events: eventsClient,
+    GET: baseClient.GET.bind(baseClient),
+    POST: baseClient.POST.bind(baseClient),
+    PUT: baseClient.PUT.bind(baseClient),
+    DELETE: baseClient.DELETE.bind(baseClient),
+    PATCH: baseClient.PATCH.bind(baseClient),
+  };
+}
+
+export const client = createClient();

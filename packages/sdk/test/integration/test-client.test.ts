@@ -1,16 +1,16 @@
 import { describe, expect, it } from 'vitest';
-import { createWonderTestClient } from '../../src/testing/wonder-test-client.js';
+import { createClient } from '../../src/index.js';
 
 /**
- * Wonder Test Client Integration
+ * Unified Wonder Client Integration
  *
- * Tests the combined SDK + WebSocket client functionality
+ * Tests the unified SDK + WebSocket + raw HTTP client functionality
  */
-describe('Wonder Test Client', () => {
+describe('Unified Wonder Client', () => {
   const BASE_URL = process.env.API_URL || 'https://wonder-http.ron-keiser.workers.dev';
 
-  it('should create test client with all SDK methods', () => {
-    const wonder = createWonderTestClient(BASE_URL);
+  it('should create client with all SDK methods', () => {
+    const wonder = createClient(BASE_URL);
 
     // SDK collections should be present
     expect(wonder.workspaces).toBeDefined();
@@ -26,13 +26,18 @@ describe('Wonder Test Client', () => {
     expect(wonder.events.subscribe).toBeDefined();
     expect(wonder.events.waitForEvent).toBeDefined();
     expect(wonder.events.waitForCompletion).toBeDefined();
+    expect(wonder.events.runWorkflow).toBeDefined();
 
-    // Helper method should be present
-    expect(wonder.runWorkflow).toBeDefined();
+    // Raw HTTP methods should be present
+    expect(wonder.GET).toBeDefined();
+    expect(wonder.POST).toBeDefined();
+    expect(wonder.PUT).toBeDefined();
+    expect(wonder.DELETE).toBeDefined();
+    expect(wonder.PATCH).toBeDefined();
   });
 
   it('should access SDK methods normally', async () => {
-    const wonder = createWonderTestClient(BASE_URL);
+    const wonder = createClient(BASE_URL);
 
     // SDK methods should work as expected
     // Note: These will fail if the API is not accessible, which is expected
@@ -46,22 +51,34 @@ describe('Wonder Test Client', () => {
   });
 
   it('should have WebSocket client with correct interface', () => {
-    const wonder = createWonderTestClient(BASE_URL);
+    const wonder = createClient(BASE_URL);
     const { events } = wonder;
 
     // Events client should have all required methods
     expect(events.subscribe).toBeInstanceOf(Function);
     expect(events.waitForEvent).toBeInstanceOf(Function);
     expect(events.waitForCompletion).toBeInstanceOf(Function);
+    expect(events.runWorkflow).toBeInstanceOf(Function);
+  });
+
+  it('should have raw HTTP methods', () => {
+    const wonder = createClient(BASE_URL);
+
+    // Verify raw HTTP methods exist and are callable
+    expect(wonder.GET).toBeInstanceOf(Function);
+    expect(wonder.POST).toBeInstanceOf(Function);
+    expect(wonder.PUT).toBeInstanceOf(Function);
+    expect(wonder.DELETE).toBeInstanceOf(Function);
+    expect(wonder.PATCH).toBeInstanceOf(Function);
   });
 
   it('should handle runWorkflow helper signature', () => {
-    const wonder = createWonderTestClient(BASE_URL);
+    const wonder = createClient(BASE_URL);
 
-    // Verify the helper exists and has correct type
-    expect(wonder.runWorkflow).toBeInstanceOf(Function);
+    // Verify the helper exists on events and has correct type
+    expect(wonder.events.runWorkflow).toBeInstanceOf(Function);
     // Function.length counts required parameters only (options has default value)
-    expect(wonder.runWorkflow.length).toBe(2); // workflowId, input
+    expect(wonder.events.runWorkflow.length).toBe(2); // workflowId, input
   });
 });
 
@@ -69,7 +86,7 @@ describe('WebSocket + SDK Integration', () => {
   const BASE_URL = process.env.API_URL || 'https://wonder-http.ron-keiser.workers.dev';
 
   it('should connect to events stream independently', async () => {
-    const wonder = createWonderTestClient(BASE_URL);
+    const wonder = createClient(BASE_URL);
 
     // Events client should be able to create subscriptions
     const subscription = await wonder.events.subscribe([
@@ -86,7 +103,7 @@ describe('WebSocket + SDK Integration', () => {
   });
 
   it('should handle waitForCompletion timeout', async () => {
-    const wonder = createWonderTestClient(BASE_URL);
+    const wonder = createClient(BASE_URL);
 
     // Waiting for nonexistent workflow should timeout
     await expect(wonder.events.waitForCompletion('fake-run-id', { timeout: 100 })).rejects.toThrow(
@@ -95,7 +112,7 @@ describe('WebSocket + SDK Integration', () => {
   });
 
   it('should create proper filter objects', async () => {
-    const wonder = createWonderTestClient(BASE_URL);
+    const wonder = createClient(BASE_URL);
     const receivedEvents: any[] = [];
 
     const subscription = await wonder.events.subscribe([
@@ -127,7 +144,7 @@ describe('Type Safety', () => {
   const BASE_URL = process.env.API_URL || 'https://wonder-http.ron-keiser.workers.dev';
 
   it('should preserve SDK return types', () => {
-    const wonder = createWonderTestClient(BASE_URL);
+    const wonder = createClient(BASE_URL);
 
     // Verify collections return functions (for parameterized resources)
     expect(typeof wonder.workspaces('id').get).toBe('function');
@@ -136,7 +153,7 @@ describe('Type Safety', () => {
   });
 
   it('should have consistent WebSocket event types', async () => {
-    const wonder = createWonderTestClient(BASE_URL);
+    const wonder = createClient(BASE_URL);
 
     // Event callback should receive properly typed events
     let receivedEvent: any;
