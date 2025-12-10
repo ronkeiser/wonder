@@ -16,8 +16,7 @@ describe('WebSocket Event Client', () => {
     const wonder = createClient(BASE_URL);
     expect(wonder.events).toBeDefined();
     expect(wonder.events.subscribe).toBeDefined();
-    expect(wonder.events.waitForEvent).toBeDefined();
-    expect(wonder.events.waitForCompletion).toBeDefined();
+    expect(wonder.events.list).toBeDefined();
   });
 
   it('should connect to WebSocket endpoint', async () => {
@@ -118,19 +117,6 @@ describe('WebSocket Event Client', () => {
         },
       ]),
     ).rejects.toThrow();
-  });
-
-  it('should timeout when waiting for events that never arrive', async () => {
-    const wonder = createClient(BASE_URL);
-
-    // Wait for an event that will never come
-    await expect(
-      wonder.events.waitForEvent(
-        'nonexistent-run-id',
-        () => true,
-        { timeout: 100 }, // Very short timeout
-      ),
-    ).rejects.toThrow(/Timeout/);
   });
 });
 

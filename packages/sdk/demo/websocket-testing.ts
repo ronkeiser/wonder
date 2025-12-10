@@ -16,10 +16,10 @@ async function main() {
 
   console.log('🚀 Starting workflow execution example...\n');
 
-  // Example 1: Using runWorkflow() helper
-  console.log('📦 Example 1: Using runWorkflow() helper');
+  // Example 1: Using stream() helper
+  console.log('📦 Example 1: Using stream() helper');
   try {
-    const result = await wonder.events.runWorkflow(
+    const result = await wonder.workflows.stream(
       'workflow_abc123',
       { topic: 'AI workflows', count: 5 },
       { timeout: 60000 },
@@ -39,7 +39,10 @@ async function main() {
   // Example 2: Manual event monitoring
   console.log('📡 Example 2: Manual event monitoring with WebSocket');
 
-  // Start the workflow manually
+  // Subscribe to events manually using low-level API
+  const events: any[] = [];
+
+  // Start workflow and get run ID (for manual subscription example)
   const startResponse = await wonder.workflows('workflow_abc123').start({
     topic: 'WebSocket example',
     count: 3,
@@ -53,8 +56,6 @@ async function main() {
   const runId = startResponse.workflow_run_id;
   console.log(`🎬 Started workflow: ${runId}`);
 
-  // Subscribe to events for this specific run
-  const events: any[] = [];
   const subscription = await wonder.events.subscribe([
     {
       id: 'monitor-workflow',
@@ -71,6 +72,13 @@ async function main() {
           console.log(`      → Node started: ${event.node_id}`);
         } else if (event.event_type === 'node_completed') {
           console.log(`      ✓ Node completed: ${event.node_id}`);
+        } else if (
+          event.event_type === 'workflow_completed' ||
+          event.event_type === 'workflow_failed'
+        ) {
+          console.log(`\n✅ Workflow ${event.status}!`);
+          console.log(`   Total events received: ${events.length}`);
+          subscription.close();
         }
       },
     },
@@ -87,42 +95,35 @@ async function main() {
     },
   ]);
 
-  // Wait for completion
-  try {
-    const status = await wonder.events.waitForCompletion(runId, { timeout: 60000 });
-    console.log(`\n✅ Workflow ${status}!`);
-    console.log(`   Total events received: ${events.length}`);
-  } catch (error) {
-    console.log(`\n❌ Workflow error: ${(error as Error).message}`);
-  } finally {
-    subscription.close();
-  }
+  // Note: In this manual example, we let the callbacks handle everything.
+  // The subscription will be closed when workflow_completed/failed event arrives.
+  // For automatic handling, use workflows.stream() instead (see Examples 1, 3, 5).
 
   console.log('\n---\n');
 
-  // Example 3: Wait for specific events
+  // Example 3: Wait for specific event with until predicate
   console.log('⏳ Example 3: Wait for specific event');
 
-  const startResponse2 = await wonder.workflows('workflow_xyz789').start({ data: 'test' });
-  const runId2 = startResponse2?.workflow_run_id;
+  try {
+    const result = await wonder.workflows.stream(
+      'workflow_xyz789',
+      { data: 'test' },
+      {
+        until: (event: any) =>
+          event.event_type === 'node_completed' && event.node_id === 'process_data',
+        timeout: 30000,
+      },
+    );
 
-  if (runId2) {
-    console.log(`🎬 Started workflow: ${runId2}`);
+    const nodeEvent = result.events.find(
+      (e: any) => e.event_type === 'node_completed' && e.node_id === 'process_data',
+    );
 
-    try {
-      // Wait for a specific node to complete
-      const nodeEvent = await wonder.events.waitForEvent(
-        runId2,
-        (event) => event.event_type === 'node_completed' && event.node_id === 'process_data',
-        { timeout: 30000 },
-      );
-
-      console.log('✅ Specific node completed!');
-      console.log(`   Node: ${nodeEvent.node_id}`);
-      console.log(`   Timestamp: ${new Date(nodeEvent.timestamp).toISOString()}`);
-    } catch (error) {
-      console.log('❌ Timeout waiting for specific event');
-    }
+    console.log('✅ Specific node completed!');
+    console.log(`   Node: ${nodeEvent?.node_id}`);
+    console.log(`   Timestamp: ${new Date(nodeEvent?.timestamp).toISOString()}`);
+  } catch (error) {
+    console.log('❌ Timeout waiting for specific event');
   }
 
   console.log('\n---\n');
@@ -151,14 +152,8 @@ async function main() {
 
   const workflows = ['wf_1', 'wf_2', 'wf_3'];
   const promises = workflows.map(async (wfId) => {
-    const response = await wonder.workflows(wfId).start({ test: true });
-    if (!response?.workflow_run_id) return null;
-
-    const status = await wonder.events.waitForCompletion(response.workflow_run_id, {
-      timeout: 30000,
-    });
-
-    return { wfId, runId: response.workflow_run_id, status };
+    const result = await wonder.workflows.stream(wfId, { test: true }, { timeout: 30000 });
+    return { wfId, runId: result.workflow_run_id, status: result.status };
   });
 
   const results = await Promise.allSettled(promises);

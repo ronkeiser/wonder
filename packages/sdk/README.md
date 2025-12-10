@@ -12,12 +12,6 @@ The SDK provides a unified client with four integrated layers:
 4. **Raw HTTP Access** - Direct access to underlying HTTP client for custom requests
 5. **Builder Helpers** - Ergonomic builders for creating workflow definitions, schemas, nodes, and transitions
 
-## Installation
-
-```bash
-pnpm add @wonder/sdk
-```
-
 ## Quick Start
 
 ### Create a Client
@@ -493,28 +487,6 @@ This separation ensures:
 - Enhanced clients provide high-level abstractions
 - Builders can evolve independently
 - Users can choose their preferred level of abstraction
-
-## Two-Phase Workflow Execution
-
-The SDK solves the race condition problem in workflow event streaming:
-
-**The Problem:**
-
-- Traditional approach: Start workflow → Get run ID → Subscribe to events
-- By the time subscription establishes, early events are already published and lost
-
-**The Solution:**
-
-1. Create workflow run (doesn't execute yet)
-2. Subscribe to events using the run ID
-3. Start execution after subscription is ready
-4. Guaranteed to capture all events from the beginning
-
-**API Endpoints:**
-
-- `POST /api/workflows/{id}/runs` - Creates run with `pending` status
-- `POST /api/workflows/{id}/runs/{run_id}/start` - Starts execution
-- `POST /api/workflows/{id}/start` - Convenience shortcut (create + start)
 
 ## Examples
 

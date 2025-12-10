@@ -24,9 +24,7 @@ describe('Unified Wonder Client', () => {
     // WebSocket events client should be present
     expect(wonder.events).toBeDefined();
     expect(wonder.events.subscribe).toBeDefined();
-    expect(wonder.events.waitForEvent).toBeDefined();
-    expect(wonder.events.waitForCompletion).toBeDefined();
-    expect(wonder.events.runWorkflow).toBeDefined();
+    expect(wonder.events.list).toBeDefined();
 
     // Raw HTTP methods should be present
     expect(wonder.GET).toBeDefined();
@@ -56,9 +54,7 @@ describe('Unified Wonder Client', () => {
 
     // Events client should have all required methods
     expect(events.subscribe).toBeInstanceOf(Function);
-    expect(events.waitForEvent).toBeInstanceOf(Function);
-    expect(events.waitForCompletion).toBeInstanceOf(Function);
-    expect(events.runWorkflow).toBeInstanceOf(Function);
+    expect(events.list).toBeInstanceOf(Function);
   });
 
   it('should have raw HTTP methods', () => {
@@ -70,15 +66,6 @@ describe('Unified Wonder Client', () => {
     expect(wonder.PUT).toBeInstanceOf(Function);
     expect(wonder.DELETE).toBeInstanceOf(Function);
     expect(wonder.PATCH).toBeInstanceOf(Function);
-  });
-
-  it('should handle runWorkflow helper signature', () => {
-    const wonder = createClient(BASE_URL);
-
-    // Verify the helper exists on events and has correct type
-    expect(wonder.events.runWorkflow).toBeInstanceOf(Function);
-    // Function.length counts required parameters only (options has default value)
-    expect(wonder.events.runWorkflow.length).toBe(2); // workflowId, input
   });
 });
 
@@ -100,15 +87,6 @@ describe('WebSocket + SDK Integration', () => {
 
     expect(subscription).toBeDefined();
     subscription.close();
-  });
-
-  it('should handle waitForCompletion timeout', async () => {
-    const wonder = createClient(BASE_URL);
-
-    // Waiting for nonexistent workflow should timeout
-    await expect(wonder.events.waitForCompletion('fake-run-id', { timeout: 100 })).rejects.toThrow(
-      /Timeout/,
-    );
   });
 
   it('should create proper filter objects', async () => {
