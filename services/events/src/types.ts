@@ -92,12 +92,8 @@ export interface Emitter {
   emit: (context: EventContext, input: EventInput) => void;
 }
 
-// ============================================================================
-// INTROSPECTION EVENTS
-// ============================================================================
-
 /**
- * Introspection event types for coordinator execution debugging
+ * Trace event types for coordinator execution debugging
  *
  * These events provide line-by-line visibility into coordinator execution:
  * - Decision logic (routing, synchronization)
@@ -107,9 +103,9 @@ export interface Emitter {
  */
 
 /**
- * Base introspection event structure
+ * Base trace event structure
  */
-export interface IntrospectionEventBase {
+export interface TraceEventBase {
   // Ordering & timing (added by emitter)
   sequence?: number;
   timestamp?: number;
@@ -240,20 +236,20 @@ export type DispatchEvent =
     };
 
 /**
- * All introspection event types
+ * All trace event types
  */
-export type IntrospectionEvent = (DecisionEvent | OperationEvent | SQLEvent | DispatchEvent) &
-  IntrospectionEventBase;
+export type TraceEvent = (DecisionEvent | OperationEvent | SQLEvent | DispatchEvent) &
+  TraceEventBase;
 
 /**
  * Event category extracted from type
  */
-export type IntrospectionCategory = 'decision' | 'operation' | 'dispatch' | 'sql';
+export type TraceEventCategory = 'decision' | 'operation' | 'dispatch' | 'sql';
 
 /**
  * Extract category from event type string
  */
-export function getEventCategory(type: string): IntrospectionCategory {
+export function getEventCategory(type: string): TraceEventCategory {
   const category = type.split('.')[0];
   if (
     category === 'decision' ||
@@ -267,23 +263,23 @@ export function getEventCategory(type: string): IntrospectionCategory {
 }
 
 /**
- * Context required for emitting introspection events
+ * Context required for emitting trace events
  */
-export interface IntrospectionContext {
+export interface TraceEventContext {
   workflow_run_id: string;
   workspace_id: string;
   project_id: string;
 }
 
 /**
- * Introspection event entry as stored in D1
+ * Trace event entry as stored in D1
  */
-export interface IntrospectionEventEntry extends IntrospectionContext {
+export interface TraceEventEntry extends TraceEventContext {
   id: string;
   sequence: number;
   timestamp: number;
   type: string;
-  category: IntrospectionCategory;
+  category: TraceEventCategory;
   token_id: string | null;
   node_id: string | null;
   duration_ms: number | null;
@@ -291,14 +287,14 @@ export interface IntrospectionEventEntry extends IntrospectionContext {
 }
 
 /**
- * Options for querying introspection events
+ * Options for querying trace events
  */
-export interface GetIntrospectionEventsOptions {
+export interface GetTraceEventsOptions {
   workflow_run_id?: string;
   token_id?: string;
   node_id?: string;
   type?: string;
-  category?: IntrospectionCategory;
+  category?: TraceEventCategory;
   workspace_id?: string;
   project_id?: string;
   limit?: number;
@@ -306,10 +302,10 @@ export interface GetIntrospectionEventsOptions {
 }
 
 /**
- * Introspection emitter interface
+ * Trace event emitter interface
  */
-export interface IntrospectionEmitter {
-  emit: (event: IntrospectionEvent) => void;
-  flush: (context: IntrospectionContext) => Promise<void>;
-  getEvents: () => IntrospectionEvent[];
+export interface TraceEventEmitter {
+  emit: (event: TraceEvent) => void;
+  flush: (context: TraceEventContext) => Promise<void>;
+  getEvents: () => TraceEvent[];
 }

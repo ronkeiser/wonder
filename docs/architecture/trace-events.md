@@ -1,8 +1,8 @@
-# Introspection
+# Trace Events
 
-Introspection provides line-by-line visibility into coordinator execution without cluttering code with logs. Events are structured data that flow through a separate observability channel.
+Trace events provide line-by-line visibility into coordinator execution without cluttering code with logs. They are structured data that flow through a separate observability channel.
 
-**Introspection replaces logging for normal coordinator operations.** Execution traces, performance metrics, state changes, and debugging information are captured as introspection events. The coordinator only logs critical failures - errors indicating the coordinator itself is broken, not workflow execution issues.
+**Trace events replace logging for normal coordinator operations.** Execution traces, performance metrics, state changes, and debugging information are captured as trace events. The coordinator only logs critical failures - errors indicating the coordinator itself is broken, not workflow execution issues.
 
 ## Storage Architecture
 
@@ -20,7 +20,7 @@ Introspection provides line-by-line visibility into coordinator execution withou
 - Performance trends over time
 - Not used for individual workflow debugging
 
-**Events Service expands to handle introspection:**
+**Events Service expands to handle trace events:**
 
 ```sql
 -- services/events/schema.sql
@@ -66,8 +66,8 @@ CREATE TABLE workflow_events (
   INDEX idx_workflow_events_token (token_id)
 );
 
--- NEW: Introspection events table
-CREATE TABLE introspection_events (
+-- NEW: Trace events table
+CREATE TABLE trace_events (
   id TEXT PRIMARY KEY,
 
   -- Ordering & timing
@@ -94,12 +94,12 @@ CREATE TABLE introspection_events (
   payload TEXT NOT NULL,     -- JSON blob with type-specific data
 
   -- Indexes for common query patterns
-  INDEX idx_introspection_workflow_sequence (workflow_run_id, sequence),
-  INDEX idx_introspection_type (type),
-  INDEX idx_introspection_category (category),
-  INDEX idx_introspection_token (token_id),
-  INDEX idx_introspection_workspace (workspace_id, timestamp),
-  INDEX idx_introspection_duration (duration_ms)
+  INDEX idx_trace_events_workflow_sequence (workflow_run_id, sequence),
+  INDEX idx_trace_events_type (type),
+  INDEX idx_trace_events_category (category),
+  INDEX idx_trace_events_token (token_id),
+  INDEX idx_trace_events_workspace (workspace_id, timestamp),
+  INDEX idx_trace_events_duration (duration_ms)
 );
 ```
 
@@ -126,14 +126,14 @@ CREATE TABLE introspection_events (
 ### Query Examples
 
 ```sql
--- All introspection events for a workflow (ordered execution trace)
-SELECT * FROM introspection_events
+-- All trace events for a workflow (ordered execution trace)
+SELECT * FROM trace_events
 WHERE workflow_run_id = ?
 ORDER BY sequence;
 
 -- SQL performance issues in workspace
 SELECT type, COUNT(*) as count, AVG(duration_ms) as avg_duration
-FROM introspection_events
+FROM trace_events
 WHERE workspace_id = ?
   AND category = 'sql'
   AND duration_ms > 50
@@ -142,19 +142,19 @@ ORDER BY avg_duration DESC;
 
 -- Token execution trace (debug specific branch)
 SELECT sequence, type, node_id, duration_ms, payload
-FROM introspection_events
+FROM trace_events
 WHERE token_id = ?
 ORDER BY sequence;
 
 -- Decision layer events only (routing and synchronization logic)
-SELECT * FROM introspection_events
+SELECT * FROM trace_events
 WHERE workflow_run_id = ?
   AND category = 'decision'
 ORDER BY sequence;
 
 -- Slow operations across project (performance dashboard)
 SELECT type, AVG(duration_ms) as avg_duration, MAX(duration_ms) as max_duration
-FROM introspection_events
+FROM trace_events
 WHERE project_id = ?
   AND duration_ms IS NOT NULL
   AND timestamp > ?  -- Last 24 hours
@@ -164,7 +164,7 @@ ORDER BY avg_duration DESC;
 
 -- Find workflows with slow SQL queries
 SELECT workflow_run_id, COUNT(*) as slow_query_count
-FROM introspection_events
+FROM trace_events
 WHERE workspace_id = ?
   AND category = 'sql'
   AND duration_ms > 100
@@ -173,9 +173,9 @@ ORDER BY slow_query_count DESC
 LIMIT 10;
 ```
 
-## Strategy: Event-Driven Introspection
+## Strategy: Event-Driven Tracing
 
-**Key principle:** Events are data, not logs. They're emitted by pure functions, collected by the coordinator, and stored separately for analysis.
+**Key principle:** Trace events are data, not logs. They're emitted by pure functions, collected by the coordinator, and stored separately for analysis.
 
 **Benefits:**
 
@@ -191,7 +191,7 @@ LIMIT 10;
 ```typescript
 // coordinator/src/events.ts
 
-export type IntrospectionEvent =
+export type TraceEvent =
   // Decision layer
   | { type: 'decision.routing.start'; token_id: string; node_id: string }
   | { type: 'decision.routing.evaluate_transition'; transition_id: string; condition: any }
@@ -233,18 +233,18 @@ export type IntrospectionEvent =
 ```typescript
 // coordinator/src/events.ts
 
-export class IntrospectionEmitter {
-  private events: IntrospectionEvent[] = [];
+export class TraceEmitter {
+  private events: TraceEvent[] = [];
   private enabled: boolean;
   private workflowRunId: string;
 
   constructor(workflowRunId: string, env: Env) {
     this.workflowRunId = workflowRunId;
-    // Enable introspection via header or env var
-    this.enabled = env.INTROSPECTION_ENABLED === 'true';
+    // Enable trace events via header or env var
+    this.enabled = env.TRACE_EVENTS_ENABLED === 'true';
   }
 
-  emit(event: IntrospectionEvent): void {
+  emit(event: TraceEvent): void {
     if (!this.enabled) return;
 
     this.events.push({
@@ -263,7 +263,7 @@ export class IntrospectionEmitter {
       sequence: event.sequence,
       timestamp: event.timestamp,
       type: event.type,
-      category: event.type.split('.')[0] as IntrospectionCategory,
+      category: event.type.split('.')[0] as TraceEventCategory,
       token_id: event.token_id ?? null,
       node_id: event.node_id ?? null,
       workspace_id: context.workspace_id,
@@ -273,7 +273,7 @@ export class IntrospectionEmitter {
     }));
 
     // Write to Events Service via RPC
-    env.EVENTS.writeIntrospection(batch);
+    env.EVENTS.writeTraceEvents(batch);
 
     // Optional: Also write to Analytics Engine for dashboards
     if (env.ANALYTICS) {
@@ -285,7 +285,7 @@ export class IntrospectionEmitter {
 
     this.events = [];
   } // For testing: return events instead of flushing
-  getEvents(): IntrospectionEvent[] {
+  getEvents(): TraceEvent[] {
     return [...this.events];
   }
 }
@@ -302,8 +302,8 @@ export function decide(
   token: TokenRow,
   workflow: WorkflowDef,
   context: ContextSnapshot,
-): { decisions: Decision[]; events: IntrospectionEvent[] } {
-  const events: IntrospectionEvent[] = [];
+): { decisions: Decision[]; events: TraceEvent[] } {
+  const events: TraceEvent[] = [];
 
   events.push({
     type: 'decision.routing.start',
@@ -349,7 +349,7 @@ Operations emit events through the emitter:
 ```typescript
 // operations/context.ts
 
-export function createContextOperations(sql: SqlStorage, emitter: IntrospectionEmitter) {
+export function createContextOperations(sql: SqlStorage, emitter: TraceEmitter) {
   return {
     get(path: string): unknown {
       const value = getRaw(sql, path);
@@ -416,7 +416,7 @@ Wrap SQL storage to capture all queries:
 ```typescript
 // operations/sql.ts
 
-export function createInstrumentedSQL(sql: SqlStorage, emitter: IntrospectionEmitter): SqlStorage {
+export function createInstrumentedSQL(sql: SqlStorage, emitter: TraceEmitter): SqlStorage {
   return {
     exec(query: string, params?: any[]): any {
       const start = performance.now();
@@ -442,14 +442,14 @@ export function createInstrumentedSQL(sql: SqlStorage, emitter: IntrospectionEmi
 // coordinator/src/index.ts
 
 class WorkflowCoordinator extends DurableObject {
-  private emitter: IntrospectionEmitter;
+  private emitter: TraceEmitter;
   private sql: SqlStorage;
 
   constructor(ctx: DurableObjectState, env: Env) {
     super(ctx, env);
 
     // Initialize emitter
-    this.emitter = new IntrospectionEmitter(this.workflowRunId, env);
+    this.emitter = new TraceEmitter(this.workflowRunId, env);
 
     // Wrap SQL with instrumentation
     this.sql = createInstrumentedSQL(this.ctx.storage.sql, this.emitter);
@@ -504,15 +504,15 @@ class WorkflowCoordinator extends DurableObject {
   }
 
   // For testing: expose events
-  async getIntrospectionEvents(): Promise<IntrospectionEvent[]> {
+  async getTraceEvents(): Promise<TraceEvent[]> {
     return this.emitter.getEvents();
   }
 }
 ```
 
-## Testing with Introspection
+## Testing with Trace Events
 
-### Enable Introspection
+### Enable Trace Events
 
 ```typescript
 // Enable via header for specific workflow run
@@ -520,12 +520,12 @@ const { data } = await client.POST('/api/workflows/{id}/start', {
   params: { path: { id: workflowId } },
   body: {},
   headers: {
-    'X-Introspection-Enabled': 'true',
+    'X-Trace-Events-Enabled': 'true',
   },
 });
 
 // Or via env var (all workflows in environment)
-env.INTROSPECTION_ENABLED = 'true';
+env.TRACE_EVENTS_ENABLED = 'true';
 ```
 
 ### Trace Full Execution Path
@@ -534,20 +534,20 @@ env.INTROSPECTION_ENABLED = 'true';
 test('trace full execution path', async () => {
   const sdk = createSDK({ baseUrl: DEPLOYED_URL });
 
-  // Start with introspection enabled
+  // Start with trace events enabled
   const { workflow_run_id } = await sdk.workflows.start(
     workflow_id,
     {},
     {
-      headers: { 'X-Introspection': 'true' },
+      headers: { 'X-Trace-Events': 'true' },
     },
   );
 
   // Wait for completion
   await waitForCompletion(workflow_run_id);
 
-  // Fetch introspection events via HTTP service
-  const events = await sdk.introspection.getEvents(workflow_run_id);
+  // Fetch trace events via HTTP service
+  const events = await sdk.traceEvents.getEvents(workflow_run_id);
 
   // Verify execution path
   expect(events).toContainEqual({
@@ -618,13 +618,13 @@ test('identify slow SQL queries', async () => {
   const { data } = await client.POST('/api/workflows/{id}/start', {
     params: { path: { id: workflowId } },
     body: {},
-    headers: { 'X-Introspection-Enabled': 'true' },
+    headers: { 'X-Trace-Events-Enabled': 'true' },
   });
   const workflowRunId = data!.workflow_run_id;
 
   await waitForCompletion(workflowRunId);
 
-  const events = await client.introspection.getEvents(workflowRunId); // Find slow queries
+  const events = await client.traceEvents.getEvents(workflowRunId); // Find slow queries
   const sqlEvents = events.filter((e) => e.type === 'operation.sql.query');
   const slowQueries = sqlEvents.filter((e) => e.duration_ms > 10);
 
@@ -695,13 +695,13 @@ test('branch tables created and cleaned up correctly', async () => {
   const { data } = await client.POST('/api/workflows/{id}/start', {
     params: { path: { id: workflowId } },
     body: {},
-    headers: { 'X-Introspection-Enabled': 'true' },
+    headers: { 'X-Trace-Events-Enabled': 'true' },
   });
   const workflowRunId = data!.workflow_run_id;
 
   await waitForCompletion(workflowRunId);
 
-  const events = await client.introspection.getEvents(workflowRunId); // Get all branch table operations
+  const events = await client.traceEvents.getEvents(workflowRunId); // Get all branch table operations
   const branchOps = events.filter(
     (e) =>
       e.type === 'operation.context.branch_table.create' ||
@@ -734,7 +734,7 @@ test('branch tables created and cleaned up correctly', async () => {
 
 ## Events Service RPC Methods
 
-The Events Service expands to handle introspection events via RPC:
+The Events Service expands to handle trace events via RPC:
 
 ```typescript
 // services/events/src/index.ts
@@ -743,55 +743,55 @@ export class EventsService extends WorkerEntrypoint<Env> {
   private db = drizzle(this.env.DB);
 
   /**
-   * RPC method - writes introspection events to D1
+   * RPC method - writes trace events to D1
    */
-  writeIntrospection(batch: IntrospectionEventEntry[]): void {
+  writeTraceEvents(batch: TraceEventEntry[]): void {
     this.ctx.waitUntil(
       (async () => {
         try {
-          await this.db.insert(introspectionEvents).values(batch);
+          await this.db.insert(traceEvents).values(batch);
         } catch (error) {
-          console.error('[EVENTS] Failed to insert introspection events:', error);
+          console.error('[EVENTS] Failed to insert trace events:', error);
         }
       })(),
     );
   }
 
   /**
-   * RPC method - retrieves introspection events from D1
+   * RPC method - retrieves trace events from D1
    */
-  async getIntrospectionEvents(options: GetIntrospectionEventsOptions = {}) {
+  async getTraceEvents(options: GetTraceEventsOptions = {}) {
     const conditions = [];
 
     if (options.workflow_run_id)
-      conditions.push(eq(introspectionEvents.workflow_run_id, options.workflow_run_id));
+      conditions.push(eq(traceEvents.workflow_run_id, options.workflow_run_id));
     if (options.token_id)
-      conditions.push(eq(introspectionEvents.token_id, options.token_id));
+      conditions.push(eq(traceEvents.token_id, options.token_id));
     if (options.node_id)
-      conditions.push(eq(introspectionEvents.node_id, options.node_id));
+      conditions.push(eq(traceEvents.node_id, options.node_id));
     if (options.type)
-      conditions.push(eq(introspectionEvents.type, options.type));
+      conditions.push(eq(traceEvents.type, options.type));
     if (options.category)
-      conditions.push(eq(introspectionEvents.category, options.category));
+      conditions.push(eq(traceEvents.category, options.category));
     if (options.workspace_id)
-      conditions.push(eq(introspectionEvents.workspace_id, options.workspace_id));
+      conditions.push(eq(traceEvents.workspace_id, options.workspace_id));
     if (options.project_id)
-      conditions.push(eq(introspectionEvents.project_id, options.project_id));
+      conditions.push(eq(traceEvents.project_id, options.project_id));
     if (options.min_duration_ms)
-      conditions.push(gte(introspectionEvents.duration_ms, options.min_duration_ms));
+      conditions.push(gte(traceEvents.duration_ms, options.min_duration_ms));
 
     const limit = options.limit || 1000;
 
     const results = await this.db
       .select()
-      .from(introspectionEvents)
+      .from(traceEvents)
       .where(conditions.length > 0 ? and(...conditions) : undefined)
-      .orderBy(introspectionEvents.sequence)
+      .orderBy(traceEvents.sequence)
       .limit(limit);
 
-    return {p((row) => ({
+    return results.map((row) => ({
         ...row,
-        payload: JSON.parse(row.payload as string) as IntrospectionEvent,
+        payload: JSON.parse(row.payload as string) as TraceEvent,
       })),
     };
   }
@@ -800,7 +800,7 @@ export class EventsService extends WorkerEntrypoint<Env> {
 
 ## SDK Integration
 
-The SDK provides introspection methods that call the HTTP service:
+The SDK provides trace event methods that call the HTTP service:
 
 ```typescript
 // packages/sdk/src/client.ts
@@ -811,34 +811,34 @@ export function createWonderClient(options: { baseUrl: string }) {
   return {
     ...client,
 
-    // Introspection methods (HTTP service endpoints)
-    introspection: {
-      async getEvents(workflowRunId: string): Promise<IntrospectionEvent[]> {
+    // Trace event methods (HTTP service endpoints)
+    traceEvents: {
+      async getEvents(workflowRunId: string): Promise<TraceEvent[]> {
         const response = await fetch(
-          `${options.baseUrl}/api/introspection?workflow_run_id=${workflowRunId}`,
+          `${options.baseUrl}/api/trace-events?workflow_run_id=${workflowRunId}`,
         );
 
         if (!response.ok) {
-          throw new Error(`Failed to fetch introspection events: ${response.statusText}`);
+          throw new Error(`Failed to fetch trace events: ${response.statusText}`);
         }
 
-        const data = (await response.json()) as { events: Array<{ payload: IntrospectionEvent }> };
+        const data = (await response.json()) as { events: Array<{ payload: TraceEvent }> };
         return data.events.map((e) => e.payload);
       },
 
       async filterEvents(
         workflowRunId: string,
-        predicate: (event: IntrospectionEvent) => boolean,
-      ): Promise<IntrospectionEvent[]> {
+        predicate: (event: TraceEvent) => boolean,
+      ): Promise<TraceEvent[]> {
         const events = await this.getEvents(workflowRunId);
         return events.filter(predicate);
       },
 
       async waitForEvent(
         workflowRunId: string,
-        predicate: (event: IntrospectionEvent) => boolean,
+        predicate: (event: TraceEvent) => boolean,
         options?: { timeout?: number; pollInterval?: number },
-      ): Promise<IntrospectionEvent> {
+      ): Promise<TraceEvent> {
         const timeout = options?.timeout ?? 30000;
         const pollInterval = options?.pollInterval ?? 500;
         const startTime = Date.now();
@@ -851,7 +851,7 @@ export function createWonderClient(options: { baseUrl: string }) {
           await new Promise((resolve) => setTimeout(resolve, pollInterval));
         }
 
-        throw new Error(`Timeout waiting for introspection event after ${timeout}ms`);
+        throw new Error(`Timeout waiting for trace event after ${timeout}ms`);
       },
     },
   };
@@ -862,14 +862,14 @@ export function createWonderClient(options: { baseUrl: string }) {
 
 ### Events Service Storage
 
-Introspection events are stored in the Events Service D1 database via RPC and queried through the HTTP service:
+Trace events are stored in the Events Service D1 database via RPC and queried through the HTTP service:
 
 ```typescript
 // Query events for a workflow run via SDK (calls HTTP service → RPC → Events service)
-const events = await sdk.introspection.getEvents(workflow_run_id);
+const events = await sdk.traceEvents.getEvents(workflow_run_id);
 
 // Or direct HTTP call to HTTP service (which calls Events service via RPC)
-const response = await fetch(`${HTTP_URL}/api/introspection?workflow_run_id=${workflow_run_id}`);
+const response = await fetch(`${HTTP_URL}/api/trace-events?workflow_run_id=${workflow_run_id}`);
 const { events } = await response.json();
 ```
 
@@ -894,7 +894,7 @@ Set up alerts for:
 
 ## Best Practices
 
-**Enable selectively** - Not every workflow needs introspection. Enable for:
+**Enable selectively** - Not every workflow needs trace events. Enable for:
 
 - Complex workflows being debugged
 - Performance profiling sessions
@@ -928,7 +928,7 @@ Set up alerts for:
 
 ## Comparison with Logging
 
-| Aspect          | Introspection Events             | Traditional Logs             |
+| Aspect          | Trace Events                     | Traditional Logs             |
 | --------------- | -------------------------------- | ---------------------------- |
 | **Structure**   | Typed, queryable data            | Unstructured text            |
 | **Performance** | Batched, async flush             | Inline, blocks execution     |
@@ -939,4 +939,4 @@ Set up alerts for:
 | **Testability** | Events are assertions            | Parse log strings            |
 | **Production**  | Safe (opt-in)                    | Always on, fills storage     |
 
-Introspection events are **data** designed for analysis. Logs are **text** designed for debugging. Both serve different purposes.
+Trace events are **data** designed for analysis. Logs are **text** designed for debugging. Both serve different purposes.

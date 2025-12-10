@@ -2,52 +2,23 @@ import { WorkerEntrypoint } from 'cloudflare:workers';
 import { and, desc, eq, gte } from 'drizzle-orm';
 import { drizzle } from 'drizzle-orm/d1';
 import { ulid } from 'ulid';
-import { introspectionEvents, workflowEvents } from './db/schema.js';
+import { traceEvents, workflowEvents } from './db/schema.js';
 import type {
   EventContext,
   EventInput,
   GetEventsOptions,
-  GetIntrospectionEventsOptions,
-  IntrospectionEvent,
-  IntrospectionEventEntry,
+  GetTraceEventsOptions,
+  TraceEvent,
+  TraceEventEntry,
 } from './types.js';
+
+export { Streamer } from './streamer.js';
 
 /**
  * Main service
  */
 export class EventsService extends WorkerEntrypoint<Env> {
   private db = drizzle(this.env.DB);
-
-  private buildWorkflowEventConditions(options: GetEventsOptions) {
-    const conditions = [];
-    if (options.workflow_run_id)
-      conditions.push(eq(workflowEvents.workflow_run_id, options.workflow_run_id));
-    if (options.parent_run_id)
-      conditions.push(eq(workflowEvents.parent_run_id, options.parent_run_id));
-    if (options.workspace_id)
-      conditions.push(eq(workflowEvents.workspace_id, options.workspace_id));
-    if (options.project_id) conditions.push(eq(workflowEvents.project_id, options.project_id));
-    if (options.event_type) conditions.push(eq(workflowEvents.event_type, options.event_type));
-    if (options.node_id) conditions.push(eq(workflowEvents.node_id, options.node_id));
-    if (options.token_id) conditions.push(eq(workflowEvents.token_id, options.token_id));
-    return conditions;
-  }
-
-  private buildIntrospectionEventConditions(options: GetIntrospectionEventsOptions) {
-    const conditions = [];
-    if (options.workflow_run_id)
-      conditions.push(eq(introspectionEvents.workflow_run_id, options.workflow_run_id));
-    if (options.token_id) conditions.push(eq(introspectionEvents.token_id, options.token_id));
-    if (options.node_id) conditions.push(eq(introspectionEvents.node_id, options.node_id));
-    if (options.type) conditions.push(eq(introspectionEvents.type, options.type));
-    if (options.category) conditions.push(eq(introspectionEvents.category, options.category));
-    if (options.workspace_id)
-      conditions.push(eq(introspectionEvents.workspace_id, options.workspace_id));
-    if (options.project_id) conditions.push(eq(introspectionEvents.project_id, options.project_id));
-    if (options.min_duration_ms)
-      conditions.push(gte(introspectionEvents.duration_ms, options.min_duration_ms));
-    return conditions;
-  }
 
   /**
    * HTTP entrypoint
@@ -121,50 +92,73 @@ export class EventsService extends WorkerEntrypoint<Env> {
    * RPC method - retrieves events from D1
    */
   async getEvents(options: GetEventsOptions = {}) {
-    const conditions = this.buildWorkflowEventConditions(options);
-    const limit = options.limit || 100;
-
     const events = await this.db
       .select()
       .from(workflowEvents)
-      .where(conditions.length > 0 ? and(...conditions) : undefined)
+      .where(
+        and(
+          options.workflow_run_id
+            ? eq(workflowEvents.workflow_run_id, options.workflow_run_id)
+            : undefined,
+          options.parent_run_id
+            ? eq(workflowEvents.parent_run_id, options.parent_run_id)
+            : undefined,
+          options.workspace_id ? eq(workflowEvents.workspace_id, options.workspace_id) : undefined,
+          options.project_id ? eq(workflowEvents.project_id, options.project_id) : undefined,
+          options.event_type ? eq(workflowEvents.event_type, options.event_type) : undefined,
+          options.node_id ? eq(workflowEvents.node_id, options.node_id) : undefined,
+          options.token_id ? eq(workflowEvents.token_id, options.token_id) : undefined,
+        ),
+      )
       .orderBy(desc(workflowEvents.timestamp))
-      .limit(limit);
+      .limit(options.limit || 100);
 
     return { events };
   }
 
   /**
-   * RPC method - writes introspection events to D1
+   * RPC method - writes trace events to D1
    */
-  writeIntrospection(batch: IntrospectionEventEntry[]): void {
+  writeTraceEvents(batch: TraceEventEntry[]): void {
     this.ctx.waitUntil(
       (async () => {
         try {
-          await this.db.insert(introspectionEvents).values(batch);
+          await this.db.insert(traceEvents).values(batch);
         } catch (error) {
-          console.error('[EVENTS] Failed to insert introspection events:', error);
+          console.error('[EVENTS] Failed to insert trace events:', error);
         }
       })(),
     );
   }
 
   /**
-   * RPC method - retrieves introspection events from D1
+   * RPC method - retrieves trace events from D1
    */
-  async getIntrospectionEvents(options: GetIntrospectionEventsOptions = {}) {
-    const conditions = this.buildIntrospectionEventConditions(options);
-    const limit = options.limit || 1000;
-
+  async getTraceEvents(options: GetTraceEventsOptions = {}) {
     const results = await this.db
       .select()
-      .from(introspectionEvents)
-      .where(conditions.length > 0 ? and(...conditions) : undefined)
-      .orderBy(introspectionEvents.sequence)
-      .limit(limit);
+      .from(traceEvents)
+      .where(
+        and(
+          options.workflow_run_id
+            ? eq(traceEvents.workflow_run_id, options.workflow_run_id)
+            : undefined,
+          options.token_id ? eq(traceEvents.token_id, options.token_id) : undefined,
+          options.node_id ? eq(traceEvents.node_id, options.node_id) : undefined,
+          options.type ? eq(traceEvents.type, options.type) : undefined,
+          options.category ? eq(traceEvents.category, options.category) : undefined,
+          options.workspace_id ? eq(traceEvents.workspace_id, options.workspace_id) : undefined,
+          options.project_id ? eq(traceEvents.project_id, options.project_id) : undefined,
+          options.min_duration_ms
+            ? gte(traceEvents.duration_ms, options.min_duration_ms)
+            : undefined,
+        ),
+      )
+      .orderBy(traceEvents.sequence)
+      .limit(options.limit || 1000);
 
     return {
-      events: results.map((row) => JSON.parse(row.payload) as IntrospectionEvent),
+      events: results.map((row) => JSON.parse(row.payload) as TraceEvent),
     };
   }
 }

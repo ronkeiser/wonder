@@ -32,7 +32,7 @@
 ## Observability
 
 - **[logs-events-decisions.md](logs-events-decisions.md)** - Three-layer architecture distinguishing pure decision logic, actor execution, and event outcomes for testability.
-- **[introspection.md](introspection.md)** - Line-by-line coordinator execution visibility through structured introspection events stored separately from workflow events.
+- **[trace-events.md](trace-events.md)** - Line-by-line coordinator execution visibility through structured trace events stored separately from workflow events.
 
 ## Development
 

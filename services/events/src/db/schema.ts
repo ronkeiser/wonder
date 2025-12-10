@@ -55,7 +55,7 @@ export const workflowEvents = sqliteTable(
 );
 
 /**
- * Introspection events table for coordinator execution debugging
+ * Trace events table for coordinator execution debugging
  *
  * Schema optimized for line-by-line execution visibility:
  * - sequence: per-workflow ordered execution trace
@@ -66,8 +66,8 @@ export const workflowEvents = sqliteTable(
  *
  * Note: Opt-in per workflow run via header or env var
  */
-export const introspectionEvents = sqliteTable(
-  'introspection_events',
+export const traceEvents = sqliteTable(
+  'trace_events',
   {
     id: text('id').primaryKey(),
 
@@ -95,11 +95,11 @@ export const introspectionEvents = sqliteTable(
     payload: text('payload').notNull(), // JSON blob with type-specific data
   },
   (table) => [
-    index('idx_introspection_workflow_sequence').on(table.workflow_run_id, table.sequence),
-    index('idx_introspection_type').on(table.type),
-    index('idx_introspection_category').on(table.category),
-    index('idx_introspection_token').on(table.token_id),
-    index('idx_introspection_workspace').on(table.workspace_id, table.timestamp),
-    index('idx_introspection_duration').on(table.duration_ms),
+    index('idx_trace_events_workflow_sequence').on(table.workflow_run_id, table.sequence),
+    index('idx_trace_events_type').on(table.type),
+    index('idx_trace_events_category').on(table.category),
+    index('idx_trace_events_token').on(table.token_id),
+    index('idx_trace_events_workspace').on(table.workspace_id, table.timestamp),
+    index('idx_trace_events_duration').on(table.duration_ms),
   ],
 );
