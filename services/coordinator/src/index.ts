@@ -4,9 +4,22 @@
  * Durable Object-based workflow orchestration service.
  * Manages workflow lifecycle via RPC.
  */
+import { DurableObject } from 'cloudflare:workers';
 
-// Export Durable Objects (required for Workers runtime)
-export { WorkflowCoordinator } from './coordinator';
+/**
+ * WorkflowCoordinator Durable Object
+ *
+ * Hello World example.
+ */
+export class WorkflowCoordinator extends DurableObject {
+  constructor(ctx: DurableObjectState, env: Env) {
+    super(ctx, env);
+  }
+
+  async sayHello(name: string): Promise<string> {
+    return `Hello, ${name}!`;
+  }
+}
 
 /**
  * Worker entrypoint
