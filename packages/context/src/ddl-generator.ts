@@ -46,8 +46,16 @@ export class DDLGenerator {
     const columns = this.generateColumns(this.schema, '');
     const arrayTables = this.generateArrayTables(tableName, this.schema);
 
+    // Add primary key as first column
+    const pkColumn = {
+      name: 'id',
+      type: 'INTEGER',
+      constraints: ['PRIMARY KEY AUTOINCREMENT'],
+    };
+
     // Build CREATE TABLE statement
-    const columnDefs = columns.map((col) => {
+    const allColumns = [pkColumn, ...columns];
+    const columnDefs = allColumns.map((col) => {
       const parts = [col.name, col.type];
       if (col.constraints.length > 0) {
         parts.push(...col.constraints);
@@ -76,6 +84,11 @@ export class DDLGenerator {
     }
 
     for (const [fieldName, fieldSchema] of Object.entries(schema.properties)) {
+      // Skip 'id' field - we add it automatically as PRIMARY KEY
+      if (fieldName === 'id' && !prefix) {
+        continue;
+      }
+
       const columnName = prefix ? `${prefix}_${fieldName}` : fieldName;
       const isRequired = schema.required?.includes(fieldName) ?? false;
 
@@ -88,7 +101,7 @@ export class DDLGenerator {
         columns.push({
           name: columnName,
           type: 'TEXT',
-          constraints: this.buildConstraints(fieldSchema, isRequired, true),
+          constraints: this.buildConstraints(fieldSchema, isRequired, columnName, true),
         });
       } else if (fieldSchema.type === 'array' && this.options.arrayStrategy === 'table') {
         // Arrays handled as separate tables - skip column
@@ -99,7 +112,7 @@ export class DDLGenerator {
         columns.push({
           name: columnName,
           type: sqlType,
-          constraints: this.buildConstraints(fieldSchema, isRequired),
+          constraints: this.buildConstraints(fieldSchema, isRequired, columnName),
         });
       }
     }
@@ -130,7 +143,7 @@ export class DDLGenerator {
             constraints: ['NOT NULL'],
           },
           {
-            name: 'index',
+            name: '"index"', // Quote reserved keyword
             type: 'INTEGER',
             constraints: ['NOT NULL'],
           },
@@ -146,7 +159,7 @@ export class DDLGenerator {
           columns.push({
             name: 'value',
             type: sqlType,
-            constraints: [],
+            constraints: this.buildConstraints(itemSchema, true, 'value'),
           });
         }
 
@@ -159,7 +172,7 @@ export class DDLGenerator {
           return `  ${parts.join(' ')}`;
         });
 
-        const fkConstraint = `  FOREIGN KEY (${parentTableName}_id) REFERENCES ${parentTableName}(rowid)`;
+        const fkConstraint = `  FOREIGN KEY (${parentTableName}_id) REFERENCES ${parentTableName}(id)`;
 
         const ddl = `CREATE TABLE ${arrayTableName} (\n${columnDefs.join(
           ',\n',
@@ -217,6 +230,7 @@ export class DDLGenerator {
   private buildConstraints(
     schema: SchemaType,
     isRequired: boolean,
+    columnName: string,
     isJsonColumn = false,
   ): string[] {
     const constraints: string[] = [];
@@ -246,10 +260,10 @@ export class DDLGenerator {
       const checks: string[] = [];
 
       if (schema.minLength !== undefined) {
-        checks.push(`length(${schema.minLength}) >= ${schema.minLength}`);
+        checks.push(`length(${columnName}) >= ${schema.minLength}`);
       }
       if (schema.maxLength !== undefined) {
-        checks.push(`length(${schema.maxLength}) <= ${schema.maxLength}`);
+        checks.push(`length(${columnName}) <= ${schema.maxLength}`);
       }
       if (schema.pattern !== undefined) {
         // SQLite doesn't have native regex, but we can add a comment
@@ -267,16 +281,16 @@ export class DDLGenerator {
       const checks: string[] = [];
 
       if (schema.minimum !== undefined) {
-        checks.push(`value >= ${schema.minimum}`);
+        checks.push(`${columnName} >= ${schema.minimum}`);
       }
       if (schema.maximum !== undefined) {
-        checks.push(`value <= ${schema.maximum}`);
+        checks.push(`${columnName} <= ${schema.maximum}`);
       }
       if (schema.exclusiveMinimum !== undefined) {
-        checks.push(`value > ${schema.exclusiveMinimum}`);
+        checks.push(`${columnName} > ${schema.exclusiveMinimum}`);
       }
       if (schema.exclusiveMaximum !== undefined) {
-        checks.push(`value < ${schema.exclusiveMaximum}`);
+        checks.push(`${columnName} < ${schema.exclusiveMaximum}`);
       }
 
       if (checks.length > 0) {
@@ -289,7 +303,7 @@ export class DDLGenerator {
       const values = schema.enum
         .map((v) => (typeof v === 'string' ? `'${v}'` : String(v)))
         .join(', ');
-      constraints.push(`CHECK (value IN (${values}))`);
+      constraints.push(`CHECK (${columnName} IN (${values}))`);
     }
 
     return constraints;

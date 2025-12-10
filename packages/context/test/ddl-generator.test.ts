@@ -20,7 +20,7 @@ describe('DDLGenerator', () => {
       const ddl = generator.generateDDL('users');
 
       expect(ddl).toContain('CREATE TABLE users');
-      expect(ddl).toContain('id INTEGER NOT NULL');
+      expect(ddl).toContain('id INTEGER PRIMARY KEY AUTOINCREMENT');
       expect(ddl).toContain('name TEXT NOT NULL');
       expect(ddl).toContain('active INTEGER');
     });
@@ -97,8 +97,8 @@ describe('DDLGenerator', () => {
       const ddl = generator.generateDDL('users');
 
       expect(ddl).toContain('CHECK');
-      expect(ddl).toContain('value >= 0');
-      expect(ddl).toContain('value <= 150');
+      expect(ddl).toContain('age >= 0');
+      expect(ddl).toContain('age <= 150');
     });
 
     it('should generate enum constraints', () => {
@@ -138,8 +138,8 @@ describe('DDLGenerator', () => {
       const ddl = generator.generateDDL('scores');
 
       expect(ddl).toContain('CHECK');
-      expect(ddl).toContain('value > 0');
-      expect(ddl).toContain('value < 100');
+      expect(ddl).toContain('score > 0');
+      expect(ddl).toContain('score < 100');
     });
   });
 
@@ -229,9 +229,9 @@ describe('DDLGenerator', () => {
 
       expect(ddl).toContain('CREATE TABLE posts_tags');
       expect(ddl).toContain('posts_id INTEGER NOT NULL');
-      expect(ddl).toContain('index INTEGER NOT NULL');
+      expect(ddl).toContain('"index" INTEGER NOT NULL');
       expect(ddl).toContain('value TEXT');
-      expect(ddl).toContain('FOREIGN KEY (posts_id) REFERENCES posts(rowid)');
+      expect(ddl).toContain('FOREIGN KEY (posts_id) REFERENCES posts(id)');
     });
 
     it('should store arrays as JSON when configured', () => {

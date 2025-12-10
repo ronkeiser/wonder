@@ -176,7 +176,7 @@ describe('DMLGenerator', () => {
       expect(result.statements).toHaveLength(4); // 1 main + 3 array items
       expect(result.statements[0]).toBe('INSERT INTO posts (id) VALUES (?);');
       expect(result.statements[1]).toBe(
-        'INSERT INTO posts_tags (posts_id, index, value) VALUES (?, ?, ?);',
+        'INSERT INTO posts_tags (posts_id, "index", value) VALUES (?, ?, ?);',
       );
 
       expect(result.values[0]).toEqual([1]);
@@ -214,7 +214,7 @@ describe('DMLGenerator', () => {
 
       expect(result.statements).toHaveLength(3);
       expect(result.statements[1]).toBe(
-        'INSERT INTO posts_comments (posts_id, index, author, text) VALUES (?, ?, ?, ?);',
+        'INSERT INTO posts_comments (posts_id, "index", author, text) VALUES (?, ?, ?, ?);',
       );
 
       expect(result.values[1]).toEqual(['{{PARENT_ID}}', 0, 'Alice', 'Great!']);
@@ -404,7 +404,7 @@ describe('DMLGenerator', () => {
       expect(result).toHaveLength(2);
       // Array table deleted first (FK constraint)
       expect(result[0]).toBe(
-        'DELETE FROM posts_tags WHERE posts_id IN (SELECT rowid FROM posts WHERE id = 1);',
+        'DELETE FROM posts_tags WHERE posts_id IN (SELECT id FROM posts WHERE id = 1);',
       );
       expect(result[1]).toBe('DELETE FROM posts WHERE id = 1;');
     });

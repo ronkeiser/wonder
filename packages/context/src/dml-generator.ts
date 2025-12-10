@@ -217,7 +217,7 @@ export class DMLGenerator {
               '',
             );
 
-            const allColumns = [`${parentTableName}_id`, 'index', ...columns];
+            const allColumns = [`${parentTableName}_id`, '"index"', ...columns];
             const allVals = [parentIdPlaceholder, index, ...vals];
             const placeholders = allColumns.map(() => '?').join(', ');
 
@@ -227,7 +227,7 @@ export class DMLGenerator {
             values.push(allVals);
           } else {
             // Array of scalars
-            const allColumns = [`${parentTableName}_id`, 'index', 'value'];
+            const allColumns = [`${parentTableName}_id`, '"index"', 'value'];
             const allVals = [parentIdPlaceholder, index, item];
 
             statements.push(
@@ -262,7 +262,7 @@ export class DMLGenerator {
 
         // Use subquery to properly cascade delete based on parent FK
         statements.push(
-          `DELETE FROM ${arrayTableName} WHERE ${parentTableName}_id IN (SELECT rowid FROM ${parentTableName} WHERE ${parentWhereClause});`,
+          `DELETE FROM ${arrayTableName} WHERE ${parentTableName}_id IN (SELECT id FROM ${parentTableName} WHERE ${parentWhereClause});`,
         );
       }
     }
