@@ -23,7 +23,8 @@ The coordinator enhances this with a **Decision Layer** where decision logic is 
 coordinator/src/
 ├── index.ts                    # DO class (Actor) - thin orchestrator
 ├── types.ts                    # Decision type definitions
-├── events.ts                   # Event emission (workflow + introspection)
+├── events.ts                   # Event emission (workflow + trace events)
+├── trace.ts                    # SQL instrumentation for trace events
 ├── planning/                   # Pure logic - returns Decision[]
 │   ├── routing.ts              # Transition evaluation
 │   ├── synchronization.ts      # Fan-in logic

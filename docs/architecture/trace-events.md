@@ -414,7 +414,7 @@ export function createContextOperations(sql: SqlStorage, emitter: TraceEmitter) 
 Wrap SQL storage to capture all queries:
 
 ```typescript
-// operations/sql.ts
+// trace.ts
 
 export function createInstrumentedSQL(sql: SqlStorage, emitter: TraceEmitter): SqlStorage {
   return {
@@ -440,6 +440,9 @@ export function createInstrumentedSQL(sql: SqlStorage, emitter: TraceEmitter): S
 
 ```typescript
 // coordinator/src/index.ts
+
+import { TraceEmitter } from './events.js';
+import { createInstrumentedSQL } from './trace.js';
 
 class WorkflowCoordinator extends DurableObject {
   private emitter: TraceEmitter;
