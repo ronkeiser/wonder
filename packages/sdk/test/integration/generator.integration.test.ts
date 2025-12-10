@@ -40,14 +40,14 @@ describe('SDK Generator Integration', () => {
       expect(postMethod?.successStatusCode).toBe('204');
     });
 
-    it('should default to 200 when no 2xx status code found', () => {
+    it('should skip endpoints without 2xx status codes (e.g., WebSocket upgrades)', () => {
       const pathsWithoutSuccess = convertOpenApiPaths({
         '/test': {
           get: {
             operationId: 'getTest',
             responses: {
-              '404': { description: 'Not found' },
-              '500': { description: 'Server error' },
+              '101': { description: 'WebSocket upgrade' },
+              '400': { description: 'Bad request' },
             },
           },
         },
@@ -57,7 +57,8 @@ describe('SDK Generator Integration', () => {
       const testNode = tree.find((n) => n.name === 'test');
       const getMethod = testNode?.methods?.find((m) => m.verb === 'get');
 
-      expect(getMethod?.successStatusCode).toBe('200');
+      // Methods without 2xx responses should be skipped
+      expect(getMethod).toBeUndefined();
     });
   });
 

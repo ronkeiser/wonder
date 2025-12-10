@@ -142,11 +142,21 @@ export function buildRouteTree(paths: PathDefinition[]): RouteNode[] {
 
       // Add method at final segment
       if (isLast && !node.methods.some((m) => m.verb === method)) {
-        const successStatusCode =
-          Object.keys(responses ?? {}).find((code) => code.startsWith('2')) ??
-          DEFAULT_SUCCESS_STATUS;
+        // Find first 2xx status code
+        // Note: Status codes like 101 (WebSocket) or 1xx (informational) are not considered success codes
+        const successStatusCode = Object.keys(responses ?? {}).find((code) => /^2\d\d$/.test(code));
 
-        node.methods.push({ verb: method, operationId, originalPath: path, successStatusCode });
+        // Skip endpoints without a 2xx response (e.g., WebSocket upgrades that only return 101)
+        if (!successStatusCode && responses && Object.keys(responses).length > 0) {
+          continue;
+        }
+
+        node.methods.push({
+          verb: method,
+          operationId,
+          originalPath: path,
+          successStatusCode: successStatusCode ?? DEFAULT_SUCCESS_STATUS,
+        });
       }
 
       parent = node;
