@@ -1,4 +1,10 @@
-import type { Emitter, EventContext, EventInput } from './types.js';
+import type {
+  Emitter,
+  EventContext,
+  EventInput,
+  TraceEventContext,
+  TraceEventInput,
+} from './types.js';
 
 /**
  * Create an event emitter that wraps the EVENTS service binding
@@ -6,20 +12,38 @@ import type { Emitter, EventContext, EventInput } from './types.js';
  * Tracks sequence_number internally for event ordering within a workflow run
  */
 export function createEmitter(
-  ctx: { waitUntil(promise: Promise<unknown>): void },
   eventsBinding: {
-    write(context: EventContext, input: EventInput): void;
+    write(context: EventContext, event: EventInput): void;
+    writeTraceEvent(
+      context: TraceEventContext,
+      event: TraceEventInput & { sequence: number },
+    ): void;
   },
+  context: EventContext & TraceEventContext,
+  options: { traceEnabled?: boolean } = {},
 ): Emitter {
-  let sequenceNumber = 0;
+  let eventSequenceNumber = 0;
+  let traceSequenceNumber = 0;
+  const traceEnabled = options.traceEnabled ?? false;
 
   return {
-    emit: (context: EventContext, input: EventInput) => {
-      sequenceNumber++;
+    emit: (input: EventInput) => {
+      eventSequenceNumber++;
       // The service's write() method handles id, timestamp, and waitUntil internally
       eventsBinding.write(context, {
         ...input,
-        sequence_number: sequenceNumber,
+        sequence_number: eventSequenceNumber,
+      });
+    },
+
+    emitTrace: (input: TraceEventInput) => {
+      if (!traceEnabled) return;
+
+      traceSequenceNumber++;
+      // The service's writeTraceEvent() method handles id, timestamp, and other entry fields
+      eventsBinding.writeTraceEvent(context, {
+        ...input,
+        sequence: traceSequenceNumber,
       });
     },
   };

@@ -8,8 +8,8 @@ import type {
   EventInput,
   GetEventsOptions,
   GetTraceEventsOptions,
-  TraceEvent,
   TraceEventEntry,
+  TraceEventInput,
 } from './types.js';
 
 export { Streamer } from './streamer.js';
@@ -158,7 +158,7 @@ export class EventsService extends WorkerEntrypoint<Env> {
       .limit(options.limit || 1000);
 
     return {
-      events: results.map((row) => JSON.parse(row.payload) as TraceEvent),
+      events: results.map((row) => JSON.parse(row.payload) as TraceEventInput),
     };
   }
 }

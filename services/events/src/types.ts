@@ -86,10 +86,11 @@ export interface GetEventsOptions {
 }
 
 /**
- * Universal event emitter - accepts context on each emit call
+ * Universal event emitter - context bound at creation
  */
 export interface Emitter {
-  emit: (context: EventContext, input: EventInput) => void;
+  emit: (event: EventInput) => void;
+  emitTrace: (event: TraceEventInput) => void;
 }
 
 /**
@@ -103,9 +104,9 @@ export interface Emitter {
  */
 
 /**
- * Base trace event structure
+ * Base trace event input structure
  */
-export interface TraceEventBase {
+export interface TraceEventInputBase {
   // Ordering & timing (added by emitter)
   sequence?: number;
   timestamp?: number;
@@ -236,10 +237,10 @@ export type DispatchEvent =
     };
 
 /**
- * All trace event types
+ * All trace event input types
  */
-export type TraceEvent = (DecisionEvent | OperationEvent | SQLEvent | DispatchEvent) &
-  TraceEventBase;
+export type TraceEventInput = (DecisionEvent | OperationEvent | SQLEvent | DispatchEvent) &
+  TraceEventInputBase;
 
 /**
  * Event category extracted from type
@@ -305,7 +306,7 @@ export interface GetTraceEventsOptions {
  * Trace event emitter interface
  */
 export interface TraceEventEmitter {
-  emit: (event: TraceEvent) => void;
+  emit: (event: TraceEventInput) => void;
   flush: (context: TraceEventContext) => Promise<void>;
-  getEvents: () => TraceEvent[];
+  getEvents: () => TraceEventInput[];
 }

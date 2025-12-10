@@ -175,16 +175,17 @@ LIMIT 10;
 
 ## Strategy: Event-Driven Tracing
 
-**Key principle:** Trace events are data, not logs. They're emitted by pure functions, collected by the coordinator, and stored separately for analysis.
+**Key principle:** Trace events are data, not logs. They're emitted via RPC to the Events service immediately, with no client-side batching.
 
 **Benefits:**
 
 - Zero impact on code clarity
-- Opt-in per workflow run (via header or env var)
+- Opt-in per workflow run (via option flag)
 - Structured and queryable
-- Production-safe (Analytics Engine, not logs)
+- No batching complexity - RPC handles thousands of calls per second
 - Time-travel debugging (replay production events)
 - Performance profiling (SQL timing)
+- No lost events on crash (immediate RPC delivery)
 
 ## Event Types
 
@@ -230,66 +231,45 @@ export type TraceEvent =
 
 ## Event Emitter
 
+Use the `createEmitter` function from `@wonder/events/client`:
+
 ```typescript
-// coordinator/src/events.ts
+// services/events/src/client.ts
 
-export class TraceEmitter {
-  private events: TraceEvent[] = [];
-  private enabled: boolean;
-  private workflowRunId: string;
+import { createEmitter } from '@wonder/events/client';
 
-  constructor(workflowRunId: string, env: Env) {
-    this.workflowRunId = workflowRunId;
-    // Enable trace events via header or env var
-    this.enabled = env.TRACE_EVENTS_ENABLED === 'true';
-  }
+// In coordinator constructor
+const emitter = createEmitter(
+  env.EVENTS, // Events service binding
+  {
+    workflow_run_id: this.workflowRunId,
+    workspace_id: workflow.workspace_id,
+    project_id: workflow.project_id,
+    workflow_def_id: workflow.workflow_def_id,
+  },
+  { traceEnabled: env.TRACE_EVENTS_ENABLED === 'true' },
+);
 
-  emit(event: TraceEvent): void {
-    if (!this.enabled) return;
+// Emit workflow events
+emitter.emit({
+  event_type: 'node_started',
+  node_id: 'node_123',
+});
 
-    this.events.push({
-      ...event,
-      timestamp: Date.now(),
-      sequence: this.events.length,
-    });
-  }
-
-  async flush(env: Env, context: { workspace_id: string; project_id: string }): Promise<void> {
-    if (this.events.length === 0) return;
-
-    const batch = this.events.map((event) => ({
-      id: crypto.randomUUID(),
-      workflow_run_id: this.workflowRunId,
-      sequence: event.sequence,
-      timestamp: event.timestamp,
-      type: event.type,
-      category: event.type.split('.')[0] as TraceEventCategory,
-      token_id: event.token_id ?? null,
-      node_id: event.node_id ?? null,
-      workspace_id: context.workspace_id,
-      project_id: context.project_id,
-      duration_ms: event.duration_ms ?? null,
-      payload: JSON.stringify(event),
-    }));
-
-    // Write to Events Service via RPC
-    env.EVENTS.writeTraceEvents(batch);
-
-    // Optional: Also write to Analytics Engine for dashboards
-    if (env.ANALYTICS) {
-      await env.ANALYTICS.writeDataPoint({
-        blobs: [JSON.stringify(this.events)],
-        indexes: [this.workflowRunId],
-      });
-    }
-
-    this.events = [];
-  } // For testing: return events instead of flushing
-  getEvents(): TraceEvent[] {
-    return [...this.events];
-  }
-}
+// Emit trace events
+emitter.emitTrace({
+  type: 'decision.routing.start',
+  token_id: 'tok_123',
+  node_id: 'node_123',
+});
 ```
+
+The emitter:
+
+- Tracks sequence numbers internally
+- Calls Events service RPC immediately (no batching)
+- Handles all entry construction (id, timestamp, category)
+- Opt-in via `traceEnabled` flag
 
 ## Instrumenting Decision Functions
 
@@ -346,7 +326,7 @@ export function decide(
 
 Operations emit events through the emitter:
 
-```typescript
+````typescript
 // operations/context.ts
 
 export function createContextOperations(sql: SqlStorage, emitter: TraceEmitter) {
@@ -364,6 +344,28 @@ export function createContextOperations(sql: SqlStorage, emitter: TraceEmitter) 
     set(path: string, value: unknown): void {
       emitter.emit({
         type: 'operation.context.write',
+## Instrumenting Operations
+
+Operations emit trace events through the emitter:
+
+```typescript
+// operations/context.ts
+
+export function createContextOperations(sql: SqlStorage, emitter: Emitter) {
+  return {
+    get(path: string): unknown {
+      const value = getRaw(sql, path);
+      emitter.emitTrace({
+        type: 'operation.context.read',
+        path,
+        value,
+      });
+      return value;
+    },
+
+    set(path: string, value: unknown): void {
+      emitter.emitTrace({
+        type: 'operation.context.write',
         path,
         value,
       });
@@ -372,7 +374,7 @@ export function createContextOperations(sql: SqlStorage, emitter: TraceEmitter) 
 
     initializeBranchTable(tokenId: string, schema: JSONSchema): void {
       const tableName = `branch_output_${tokenId}`;
-      emitter.emit({
+      emitter.emitTrace({
         type: 'operation.context.branch_table.create',
         token_id: tokenId,
         table_name: tableName,
@@ -383,47 +385,25 @@ export function createContextOperations(sql: SqlStorage, emitter: TraceEmitter) 
     dropBranchTables(tokenIds: string[]): void {
       for (const tokenId of tokenIds) {
         const tableName = `branch_output_${tokenId}`;
-        emitter.emit({
+        emitter.emitTrace({
           type: 'operation.context.branch_table.drop',
           table_name: tableName,
         });
-      }
-      dropBranchTablesRaw(sql, tokenIds);
-    },
+## SQL Query Instrumentation
 
-    mergeBranches(siblings: TokenRow[], merge: MergeConfig, schema: JSONSchema): void {
-      emitter.emit({
-        type: 'operation.context.merge.start',
-        sibling_count: siblings.length,
-        strategy: merge.strategy,
-      });
-
-      const rowsWritten = mergeBranchesRaw(sql, siblings, merge, schema);
-
-      emitter.emit({
-        type: 'operation.context.merge.complete',
-        rows_written: rowsWritten,
-      });
-    },
-  };
-}
-```
-
-## SQL Query Interceptor
-
-Wrap SQL storage to capture all queries:
+Emit trace events for SQL queries to track performance:
 
 ```typescript
-// trace.ts
+// operations/sql.ts
 
-export function createInstrumentedSQL(sql: SqlStorage, emitter: TraceEmitter): SqlStorage {
+export function createInstrumentedSQL(sql: SqlStorage, emitter: Emitter): SqlStorage {
   return {
     exec(query: string, params?: any[]): any {
       const start = performance.now();
       const result = sql.exec(query, params);
       const duration = performance.now() - start;
 
-      emitter.emit({
+      emitter.emitTrace({
         type: 'operation.sql.query',
         sql: query,
         params: params ?? [],
@@ -434,28 +414,40 @@ export function createInstrumentedSQL(sql: SqlStorage, emitter: TraceEmitter): S
     },
   };
 }
-```
+````
 
 ## Coordinator Integration
 
 ```typescript
 // coordinator/src/index.ts
 
-import { TraceEmitter } from './events.js';
-import { createInstrumentedSQL } from './trace.js';
+import { createEmitter } from '@wonder/events/client';
+import type { Emitter } from '@wonder/events/types';
+import { createInstrumentedSQL } from './operations/sql.js';
 
 class WorkflowCoordinator extends DurableObject {
-  private emitter: TraceEmitter;
+  private emitter: Emitter;
   private sql: SqlStorage;
 
   constructor(ctx: DurableObjectState, env: Env) {
     super(ctx, env);
 
-    // Initialize emitter
-    this.emitter = new TraceEmitter(this.workflowRunId, env);
+    // Initialize emitter with context bound at creation
+    this.emitter = createEmitter(
+      env.EVENTS,
+      {
+        workflow_run_id: this.workflowRunId,
+        workspace_id: workflow.workspace_id,
+        project_id: workflow.project_id,
+        workflow_def_id: workflow.workflow_def_id,
+      },
+      { traceEnabled: env.TRACE_EVENTS_ENABLED === 'true' },
+    );
 
-    // Wrap SQL with instrumentation
-    this.sql = createInstrumentedSQL(this.ctx.storage.sql, this.emitter);
+    // Optionally wrap SQL with instrumentation
+    this.sql = env.TRACE_EVENTS_ENABLED
+      ? createInstrumentedSQL(this.ctx.storage.sql, this.emitter)
+      : this.ctx.storage.sql;
   }
 
   async handleTaskResult(tokenId: string, result: TaskResult) {
@@ -470,9 +462,9 @@ class WorkflowCoordinator extends DurableObject {
     // Run decision logic (returns decisions + events)
     const { decisions, events } = routing.decide(token, workflow, context);
 
-    // Collect events from decision functions
+    // Emit trace events from decision functions
     for (const event of events) {
-      this.emitter.emit(event);
+      this.emitter.emitTrace(event);
     }
 
     // Dispatch decisions
@@ -486,29 +478,12 @@ class WorkflowCoordinator extends DurableObject {
     // Dispatch tokens
     await Promise.all(tokensToDispatch.map((id) => this.dispatchToken(id)));
 
-    // Flush events periodically
-    if (this.emitter.getEvents().length > 100) {
-      await this.emitter.flush(this.env, {
-        workspace_id: workflow.workspace_id,
-        project_id: workflow.project_id,
-      });
-    }
+    // No flush needed - events sent via RPC immediately
   }
 
   async finalizeWorkflow(workflowRunId: string, finalOutput: any) {
     // ... finalization logic
-
-    // Flush remaining events on completion
-    const workflow = await this.getWorkflow(workflowRunId);
-    await this.emitter.flush(this.env, {
-      workspace_id: workflow.workspace_id,
-      project_id: workflow.project_id,
-    });
-  }
-
-  // For testing: expose events
-  async getTraceEvents(): Promise<TraceEvent[]> {
-    return this.emitter.getEvents();
+    // No flush needed - all events already sent via RPC
   }
 }
 ```
@@ -900,23 +875,24 @@ Set up alerts for:
 **Enable selectively** - Not every workflow needs trace events. Enable for:
 
 - Complex workflows being debugged
+
+## Best Practices
+
+**Enable selectively** - Not every workflow needs trace events. Enable for:
+
+- Complex workflows being debugged
 - Performance profiling sessions
 - Production issue reproduction
 - New feature validation
 
-**Flush periodically** - Batch events and flush to Analytics Engine:
+**No batching needed** - Events are sent via RPC immediately:
 
-- Every 100 events
-- Every 30 seconds
-- On workflow completion
-- Prevents memory buildup in DO
+- RPC handles 1,000+ req/sec per DO (soft limit)
+- Each trace event is ~1KB serialized
+- Events service batches writes to D1 internally
+- No memory buildup, no lost events on crash
 
 **Event granularity** - Balance detail vs overhead:
-
-- Too much: Every variable read (noisy)
-- Too little: Only major operations (miss issues)
-- Just right: Decision boundaries, operations, SQL queries
-
 **Event retention** - Analytics Engine 30-day default:
 
 - Keep hot data in Analytics Engine
@@ -931,15 +907,23 @@ Set up alerts for:
 
 ## Comparison with Logging
 
-| Aspect          | Trace Events                     | Traditional Logs             |
-| --------------- | -------------------------------- | ---------------------------- |
-| **Structure**   | Typed, queryable data            | Unstructured text            |
-| **Performance** | Batched, async flush             | Inline, blocks execution     |
-| **Storage**     | Analytics Engine                 | Log files / services         |
-| **Querying**    | SQL over structured data         | grep / log search            |
-| **Cost**        | Low (Analytics Engine free tier) | High (log ingestion)         |
-| **Code Impact** | Zero (separate channel)          | High (scattered console.log) |
-| **Testability** | Events are assertions            | Parse log strings            |
-| **Production**  | Safe (opt-in)                    | Always on, fills storage     |
+| Aspect        | Trace Events          | Traditional Logs  |
+| ------------- | --------------------- | ----------------- |
+| **Structure** | Typed, queryable data | Unstructured text |
+
+## Comparison with Logging
+
+| Aspect          | Trace Events               | Traditional Logs             |
+| --------------- | -------------------------- | ---------------------------- |
+| **Structure**   | Typed, queryable data      | Unstructured text            |
+| **Performance** | Immediate RPC, async write | Inline, blocks execution     |
+| **Storage**     | D1 (Events service)        | Log files / services         |
+| **Querying**    | SQL over structured data   | grep / log search            |
+| **Cost**        | Low (D1 included)          | High (log ingestion)         |
+| **Code Impact** | Zero (separate channel)    | High (scattered console.log) |
+| **Testability** | Events are assertions      | Parse log strings            |
+| **Production**  | Safe (opt-in)              | Always on, fills storage     |
+| **Delivery**    | Immediate via RPC          | Batched or buffered          |
+| **Reliability** | No lost events on DO crash | Can lose buffered logs       |
 
 Trace events are **data** designed for analysis. Logs are **text** designed for debugging. Both serve different purposes.
