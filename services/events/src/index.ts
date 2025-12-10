@@ -141,6 +141,15 @@ export class EventsService extends WorkerEntrypoint<Env> {
           };
 
           await this.db.insert(traceEvents).values(entry);
+
+          // Broadcast to WebSocket clients
+          try {
+            const id = this.env.STREAMER.idFromName('events-streamer');
+            const stub = this.env.STREAMER.get(id);
+            await stub.broadcastTraceEvent(entry);
+          } catch (error) {
+            console.error('[EVENTS] Failed to broadcast trace event to WebSocket clients:', error);
+          }
         } catch (error) {
           console.error('[EVENTS] Failed to insert trace event:', error);
         }

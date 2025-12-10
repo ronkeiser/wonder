@@ -7,29 +7,34 @@
     {
       "binding": "RESOURCES",
       "service": "wonder-resources",
-      "entrypoint": "WonderResources"
+      "entrypoint": "WonderResources",
     },
     {
       "binding": "LOGS",
       "service": "wonder-logs",
-      "entrypoint": "LogsService"
-    }
+      "entrypoint": "LogsService",
+    },
+    {
+      "binding": "EVENTS",
+      "service": "wonder-events",
+      "entrypoint": "EventsService",
+    },
   ],
   "durable_objects": {
     "bindings": [
       {
         "name": "COORDINATOR",
         "class_name": "WorkflowCoordinator",
-        "script_name": "wonder-coordinator"
-      }
-    ]
+        "script_name": "wonder-coordinator",
+      },
+    ],
   },
   "observability": {
     "logs": {
       "enabled": true,
       "head_sampling_rate": 1,
       "invocation_logs": false,
-      "persist": true
-    }
-  }
+      "persist": true,
+    },
+  },
 }
