@@ -153,6 +153,18 @@ export function createClient(baseClient: any) {
         }
       }
     ),
+    "workflow-runs": Object.assign(
+      (id: string) => ({
+        }),
+      {
+      }
+    ),
+    events: {
+      list: async (options?: any): Promise<paths['/api/events']['get']['responses']['200']['content']['application/json']> => {
+        const response = await baseClient.GET(`/api/events`, {});
+        return response.data;
+      }
+    },
     logs: {
       list: async (options?: any): Promise<paths['/api/logs']['get']['responses']['200']['content']['application/json']> => {
         const response = await baseClient.GET(`/api/logs`, {});

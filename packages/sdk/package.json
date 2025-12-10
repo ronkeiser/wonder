@@ -5,7 +5,8 @@
   "exports": {
     ".": "./src/index.ts",
     "./generated/client": "./src/generated/client.ts",
-    "./schema": "./src/generated/schema.d.ts"
+    "./schema": "./src/generated/schema.d.ts",
+    "./testing": "./src/testing/index.ts"
   },
   "scripts": {
     "generate": "tsx scripts/generate.ts",

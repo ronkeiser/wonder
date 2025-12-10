@@ -820,6 +820,145 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/workflow-runs/{id}/stream": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: {
+            parameters: {
+                query?: never;
+                header?: never;
+                path: {
+                    id: string;
+                };
+                cookie?: never;
+            };
+            requestBody?: never;
+            responses: {
+                /** @description WebSocket connection established */
+                101: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content?: never;
+                };
+                /** @description WebSocket upgrade required */
+                400: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": {
+                            error: string;
+                            received_upgrade?: string;
+                        };
+                    };
+                };
+            };
+        };
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/events": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Get workflow events */
+        get: {
+            parameters: {
+                query?: {
+                    workflow_run_id?: string;
+                    parent_run_id?: string;
+                    workspace_id?: string;
+                    project_id?: string;
+                    event_type?: string;
+                    node_id?: string;
+                    token_id?: string;
+                    limit?: number;
+                    after_sequence?: number | null;
+                };
+                header?: never;
+                path?: never;
+                cookie?: never;
+            };
+            requestBody?: never;
+            responses: {
+                /** @description Workflow events retrieved successfully */
+                200: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["EventsResponse"];
+                    };
+                };
+            };
+        };
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/events/trace": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Get trace events */
+        get: {
+            parameters: {
+                query?: {
+                    workflow_run_id?: string;
+                    token_id?: string;
+                    node_id?: string;
+                    type?: string;
+                    category?: "decision" | "operation" | "dispatch" | "sql";
+                    workspace_id?: string;
+                    project_id?: string;
+                    limit?: number;
+                    min_duration_ms?: number | null;
+                };
+                header?: never;
+                path?: never;
+                cookie?: never;
+            };
+            requestBody?: never;
+            responses: {
+                /** @description Trace events retrieved successfully */
+                200: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["TraceEventsResponse"];
+                    };
+                };
+            };
+        };
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/logs": {
         parameters: {
             query?: never;
@@ -1298,6 +1437,45 @@ export interface components {
         };
         WorkflowDeleteResponse: {
             success: boolean;
+        };
+        EventEntry: {
+            id: string;
+            timestamp: number;
+            sequence_number: number;
+            event_type: string;
+            workflow_run_id: string;
+            parent_run_id: string | null;
+            workflow_def_id: string;
+            node_id: string | null;
+            token_id: string | null;
+            path_id: string | null;
+            workspace_id: string;
+            project_id: string;
+            tokens: number | null;
+            cost_usd: number | null;
+            message: string | null;
+            metadata: string;
+        };
+        EventsResponse: {
+            events: components["schemas"]["EventEntry"][];
+        };
+        TraceEventEntry: {
+            id: string;
+            sequence: number;
+            timestamp: number;
+            type: string;
+            /** @enum {string} */
+            category: "decision" | "operation" | "dispatch" | "sql";
+            workflow_run_id: string;
+            token_id: string | null;
+            node_id: string | null;
+            workspace_id: string;
+            project_id: string;
+            duration_ms: number | null;
+            payload: string;
+        };
+        TraceEventsResponse: {
+            events: components["schemas"]["TraceEventEntry"][];
         };
     };
     responses: never;
