@@ -1088,26 +1088,224 @@ test('fan-out → merge → fan-out → merge → rank', async () => {
     },
   });
 
-  // Execute workflow
+  // Execute workflow with trace events enabled
   const { workflow_run_id } = await client.POST('/api/workflows/{id}/start', {
     params: { path: { id: workflow_id } },
     body: {},
+    headers: { 'X-Trace-Events-Enabled': 'true' },
   });
 
   console.log('✓ Workflow started:', workflow_run_id);
-  console.log(`  Flow: 10 names → 5 judges → final ranking`);
+
+  // Wait for completion via trace events
+  const completionEvent = await sdk.traceEvents.waitForEvent(
+    workflow_run_id,
+    (event) => event.type === 'workflow_completed' || event.type === 'workflow_failed',
+    { timeout: 120000 }, // 2 minutes for complex workflow
+  );
+
+  expect(completionEvent.type).toBe('workflow_completed');
+
+  // Fetch all trace events for validation
+  const events = await sdk.traceEvents.getEvents(workflow_run_id);
+
+  // Validate first fan-out: 10 ideation tokens
+  const ideationTokens = events.filter(
+    (e) => e.type === 'operation.tokens.create' && e.payload.node_id === 'ideation_node',
+  );
+  expect(ideationTokens).toHaveLength(10);
+
+  // Validate synchronization at first merge
+  const firstMerge = events.find(
+    (e) => e.type === 'decision.sync.activate' && e.node_id === 'merge_names_node',
+  );
+  expect(firstMerge).toBeDefined();
+  expect(firstMerge.payload.sibling_count).toBe(10);
+
+  // Validate branch table lifecycle (10 created, 10 dropped)
+  const branchTablesCreated = events.filter(
+    (e) => e.type === 'operation.context.branch_table.create',
+  );
+  const branchTablesDropped = events.filter(
+    (e) => e.type === 'operation.context.branch_table.drop',
+  );
+  expect(branchTablesCreated.length).toBe(branchTablesDropped.length);
+
+  // Validate second fan-out: 5 judging tokens
+  const judgingTokens = events.filter(
+    (e) => e.type === 'operation.tokens.create' && e.payload.node_id === 'judging_node',
+  );
+  expect(judgingTokens).toHaveLength(5);
+
+  // Validate synchronization at second merge
+  const secondMerge = events.find(
+    (e) => e.type === 'decision.sync.activate' && e.node_id === 'merge_scores_node',
+  );
+  expect(secondMerge).toBeDefined();
+  expect(secondMerge.payload.sibling_count).toBe(5);
+
+  // Validate final context output
+  const context = await sdk.context.getSnapshot(workflow_run_id);
+  expect(context.output).toBeDefined();
+  expect(context.output.ranked_names).toBeDefined();
+  expect(Array.isArray(context.output.ranked_names)).toBe(true);
+
+  // Validate merge strategies worked correctly
+  expect(context.merge_names_node_output.all_names).toHaveLength(10);
+  expect(context.merge_scores_node_output.all_scores).toHaveLength(5);
+
+  console.log('✓ All validations passed');
 });
 ```
 
 **What this validates:**
 
-- Two-stage fan-out pattern (10x → 5x)
-- Template rendering (`{{#each names}}`, `{{#each judge_scores}}{{#each this}}`)
-- Branch isolation (each token writes to separate tables)
-- Merge strategies (append arrays)
-- Schema-driven context (validated I/O)
-- Transition-centric control flow
-- Real LLM integration (Cloudflare Workers AI)
+- **Workflow completion**: Uses trace events to wait for `workflow_completed` event
+- **Token spawning**: Verifies exact count of tokens created for each fan-out (10x, 5x)
+- **Synchronization**: Confirms fan-in activations with correct sibling counts
+- **Branch isolation**: Validates branch tables created and cleaned up (no leaks)
+- **Merge strategies**: Checks merged data has expected structure and counts
+- **Context state**: Verifies final output schema and data correctness
+- **Execution path**: Trace events provide complete visibility into coordinator decisions
+- **Real LLM integration**: Actual calls to Cloudflare Workers AI
+- **Template rendering**: Handlebars templates evaluated with real context
+- **Schema validation**: All I/O validated against JSONSchema at runtime
+
+### E2E Test Validation Strategy
+
+E2E tests determine success by:
+
+1. **Completion Detection** - Wait for workflow completion via trace events:
+
+   ```typescript
+   const completionEvent = await sdk.traceEvents.waitForEvent(
+     workflow_run_id,
+     (event) => event.type === 'workflow_completed',
+   );
+   expect(completionEvent.type).toBe('workflow_completed'); // Not 'workflow_failed'
+   ```
+
+2. **Execution Path Validation** - Verify coordinator made correct decisions:
+
+   ```typescript
+   const routingEvents = events.filter((e) => e.type === 'decision.routing.transition_matched');
+   expect(routingEvents).toContainEqual(
+     expect.objectContaining({
+       transition_id: 'start_to_ideation',
+       spawn_count: 10,
+     }),
+   );
+   ```
+
+3. **Token Lifecycle Verification** - Confirm all expected tokens created and completed:
+
+   ```typescript
+   const tokenCreates = events.filter((e) => e.type === 'operation.tokens.create');
+   const tokenCompletes = events.filter(
+     (e) => e.type === 'operation.tokens.update_status' && e.payload.to === 'completed',
+   );
+   expect(tokenCreates.length).toBe(tokenCompletes.length); // No stuck tokens
+   ```
+
+4. **Synchronization Correctness** - Validate fan-in merge logic:
+
+   ```typescript
+   const syncEvents = events.filter((e) => e.type === 'decision.sync.activate');
+   expect(syncEvents[0].payload.sibling_count).toBe(10); // All siblings present
+   expect(syncEvents[0].payload.merge_config.strategy).toBe('array');
+   ```
+
+5. **Branch Isolation** - Ensure no branch table leaks:
+
+   ```typescript
+   const creates = events.filter((e) => e.type === 'operation.context.branch_table.create');
+   const drops = events.filter((e) => e.type === 'operation.context.branch_table.drop');
+   expect(creates.length).toBe(drops.length); // All cleaned up
+   ```
+
+6. **Context State Validation** - Check final output matches expectations:
+
+   ```typescript
+   const context = await sdk.context.getSnapshot(workflow_run_id);
+   expect(context.output.ranked_names).toHaveLength(10);
+   expect(context.merge_names_node_output.all_names).toHaveLength(10);
+   ```
+
+7. **Performance Metrics** - Detect slow operations:
+
+   ```typescript
+   const sqlEvents = events.filter((e) => e.type === 'operation.sql.query');
+   const slowQueries = sqlEvents.filter((e) => e.duration_ms > 50);
+   expect(slowQueries).toHaveLength(0); // No slow queries
+   ```
+
+8. **Error Absence** - Verify no unexpected failures:
+   ```typescript
+   const errorEvents = events.filter(
+     (e) => e.type === 'workflow_failed' || e.type === 'node_failed' || e.type === 'token_failed',
+   );
+   expect(errorEvents).toHaveLength(0);
+   ```
+
+### Benefits of Trace Event Validation
+
+- **Deterministic**: Events provide objective record of what happened
+- **Complete**: Full execution path visible, not just final state
+- **Debuggable**: Failed tests show exact decision/operation that went wrong
+- **Fast feedback**: Don't need to poll run status, subscribe to event stream
+- **Production parity**: Same trace events used for debugging production issues
+- **No mocks**: Test real coordinator decisions with real event sequences
+- **Performance profiling**: Identify slow operations during test runs
+
+### WebSocket Streaming for Live Validation
+
+```typescript
+test('validate workflow execution in real-time', async () => {
+  const events: TraceEvent[] = [];
+
+  // Subscribe to event stream
+  const ws = await sdk.traceEvents.subscribe(workflow_run_id, (event) => {
+    events.push(event);
+
+    // Real-time validation
+    if (event.type === 'decision.routing.transition_matched') {
+      expect(event.payload.spawn_count).toBeGreaterThan(0);
+    }
+
+    if (event.type === 'operation.sql.query') {
+      expect(event.duration_ms).toBeLessThan(100);
+    }
+  });
+
+  // Start workflow
+  await sdk.workflows.start(
+    workflow_id,
+    {},
+    {
+      headers: { 'X-Trace-Events-Enabled': 'true' },
+    },
+  );
+
+  // Wait for completion event via WebSocket
+  await new Promise((resolve) => {
+    const checkCompletion = () => {
+      if (events.some((e) => e.type === 'workflow_completed')) {
+        resolve(undefined);
+      } else {
+        setTimeout(checkCompletion, 100);
+      }
+    };
+    checkCompletion();
+  });
+
+  ws.close();
+
+  // All validations already done in real-time via callback
+  expect(events.length).toBeGreaterThan(0);
+});
+```
+
+This approach makes E2E tests **self-documenting** - the assertions explain exactly what the system should do, verified by observable trace events from the actual deployment.
 
 ### Integration Tests for Operations
 
