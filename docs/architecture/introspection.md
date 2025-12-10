@@ -263,7 +263,7 @@ export class IntrospectionEmitter {
       sequence: event.sequence,
       timestamp: event.timestamp,
       type: event.type,
-      category: event.type.split('.')[0], // Extract 'decision', 'operation', 'dispatch', 'sql'
+      category: event.type.split('.')[0] as IntrospectionCategory,
       token_id: event.token_id ?? null,
       node_id: event.node_id ?? null,
       workspace_id: context.workspace_id,
@@ -272,16 +272,8 @@ export class IntrospectionEmitter {
       payload: JSON.stringify(event),
     }));
 
-    // Write to Events Service (D1) for immediate querying
-    const response = await fetch(`${env.EVENTS_URL}/introspection/write`, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify(batch),
-    });
-
-    if (!response.ok) {
-      console.error('Failed to write introspection events:', await response.text());
-    }
+    // Write to Events Service via RPC
+    env.EVENTS.writeIntrospection(batch);
 
     // Optional: Also write to Analytics Engine for dashboards
     if (env.ANALYTICS) {
@@ -554,9 +546,8 @@ test('trace full execution path', async () => {
   // Wait for completion
   await waitForCompletion(workflow_run_id);
 
-  // Fetch introspection events
-  const coordinatorId = getCoordinatorId(workflow_run_id);
-  const events = await sdk.rpc.coordinator(coordinatorId).getIntrospectionEvents();
+  // Fetch introspection events via HTTP service
+  const events = await sdk.introspection.getEvents(workflow_run_id);
 
   // Verify execution path
   expect(events).toContainEqual({
@@ -741,107 +732,75 @@ test('branch tables created and cleaned up correctly', async () => {
 });
 ```
 
-## Events Service API
+## Events Service RPC Methods
 
-The Events Service expands to handle introspection events:
+The Events Service expands to handle introspection events via RPC:
 
 ```typescript
 // services/events/src/index.ts
 
-export default {
-  async fetch(request: Request, env: Env): Promise<Response> {
-    const url = new URL(request.url);
+export class EventsService extends WorkerEntrypoint<Env> {
+  private db = drizzle(this.env.DB);
 
-    // Existing workflow events endpoints
-    if (url.pathname === '/events') {
-      // ... existing code ...
-    }
+  /**
+   * RPC method - writes introspection events to D1
+   */
+  writeIntrospection(batch: IntrospectionEventEntry[]): void {
+    this.ctx.waitUntil(
+      (async () => {
+        try {
+          await this.db.insert(introspectionEvents).values(batch);
+        } catch (error) {
+          console.error('[EVENTS] Failed to insert introspection events:', error);
+        }
+      })(),
+    );
+  }
 
-    // NEW: Introspection endpoints
-    if (url.pathname === '/introspection/events') {
-      const workflowRunId = url.searchParams.get('workflow_run_id');
-      if (!workflowRunId) {
-        return Response.json({ error: 'workflow_run_id required' }, { status: 400 });
-      }
+  /**
+   * RPC method - retrieves introspection events from D1
+   */
+  async getIntrospectionEvents(options: GetIntrospectionEventsOptions = {}) {
+    const conditions = [];
 
-      const events = await env.DB.prepare(
-        `
-        SELECT * FROM introspection_events
-        WHERE workflow_run_id = ?
-        ORDER BY sequence ASC
-      `,
-      )
-        .bind(workflowRunId)
-        .all();
+    if (options.workflow_run_id)
+      conditions.push(eq(introspectionEvents.workflow_run_id, options.workflow_run_id));
+    if (options.token_id)
+      conditions.push(eq(introspectionEvents.token_id, options.token_id));
+    if (options.node_id)
+      conditions.push(eq(introspectionEvents.node_id, options.node_id));
+    if (options.type)
+      conditions.push(eq(introspectionEvents.type, options.type));
+    if (options.category)
+      conditions.push(eq(introspectionEvents.category, options.category));
+    if (options.workspace_id)
+      conditions.push(eq(introspectionEvents.workspace_id, options.workspace_id));
+    if (options.project_id)
+      conditions.push(eq(introspectionEvents.project_id, options.project_id));
+    if (options.min_duration_ms)
+      conditions.push(gte(introspectionEvents.duration_ms, options.min_duration_ms));
 
-      return Response.json({
-        events: events.results.map((row) => ({
-          ...row,
-          payload: JSON.parse(row.payload as string),
-        })),
-      });
-    }
+    const limit = options.limit || 1000;
 
-    if (url.pathname === '/introspection/write' && request.method === 'POST') {
-      const batch: IntrospectionEventRow[] = await request.json();
+    const results = await this.db
+      .select()
+      .from(introspectionEvents)
+      .where(conditions.length > 0 ? and(...conditions) : undefined)
+      .orderBy(introspectionEvents.sequence)
+      .limit(limit);
 
-      if (!Array.isArray(batch) || batch.length === 0) {
-        return Response.json({ error: 'batch must be non-empty array' }, { status: 400 });
-      }
-
-      const stmt = env.DB.prepare(`
-        INSERT INTO introspection_events (
-          id, workflow_run_id, sequence, timestamp, type, category,
-          token_id, node_id, workspace_id, project_id, duration_ms, payload
-        )
-        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
-      `);
-
-      await env.DB.batch(
-        batch.map((e) =>
-          stmt.bind(
-            e.id,
-            e.workflow_run_id,
-            e.sequence,
-            e.timestamp,
-            e.type,
-            e.category,
-            e.token_id,
-            e.node_id,
-            e.workspace_id,
-            e.project_id,
-            e.duration_ms,
-            e.payload,
-          ),
-        ),
-      );
-
-      return Response.json({ success: true, count: batch.length });
-    }
-
-    return Response.json({ error: 'Not found' }, { status: 404 });
-  },
-};
-
-interface IntrospectionEventRow {
-  id: string;
-  workflow_run_id: string;
-  sequence: number;
-  timestamp: number;
-  type: string;
-  category: string;
-  token_id: string | null;
-  node_id: string | null;
-  workspace_id: string;
-  project_id: string;
-  duration_ms: number | null;
-  payload: string; // JSON
+    return {p((row) => ({
+        ...row,
+        payload: JSON.parse(row.payload as string) as IntrospectionEvent,
+      })),
+    };
+  }
 }
 ```
 
 ## SDK Integration
 
-The SDK provides introspection methods:
+The SDK provides introspection methods that call the HTTP service:
 
 ```typescript
 // packages/sdk/src/client.ts
@@ -852,11 +811,11 @@ export function createWonderClient(options: { baseUrl: string }) {
   return {
     ...client,
 
-    // Introspection methods
+    // Introspection methods (HTTP service endpoints)
     introspection: {
       async getEvents(workflowRunId: string): Promise<IntrospectionEvent[]> {
         const response = await fetch(
-          `${options.baseUrl}/events/introspection/events?workflow_run_id=${workflowRunId}`,
+          `${options.baseUrl}/api/introspection?workflow_run_id=${workflowRunId}`,
         );
 
         if (!response.ok) {
@@ -903,16 +862,14 @@ export function createWonderClient(options: { baseUrl: string }) {
 
 ### Events Service Storage
 
-Introspection events are stored in the Events Service D1 database and can be queried immediately:
+Introspection events are stored in the Events Service D1 database via RPC and queried through the HTTP service:
 
 ```typescript
-// Query events for a workflow run via SDK
+// Query events for a workflow run via SDK (calls HTTP service → RPC → Events service)
 const events = await sdk.introspection.getEvents(workflow_run_id);
 
-// Or directly via Events Service API
-const response = await fetch(
-  `${EVENTS_URL}/introspection/events?workflow_run_id=${workflow_run_id}`,
-);
+// Or direct HTTP call to HTTP service (which calls Events service via RPC)
+const response = await fetch(`${HTTP_URL}/api/introspection?workflow_run_id=${workflow_run_id}`);
 const { events } = await response.json();
 ```
 

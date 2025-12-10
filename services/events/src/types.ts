@@ -12,12 +12,15 @@ export type EventType =
   | 'node_started'
   | 'node_completed'
   | 'node_failed'
-  // Parallelism
+  // Token lifecycle
   | 'token_spawned'
-  | 'token_merged'
+  | 'token_dispatched'
+  | 'token_completed'
+  | 'token_failed'
   | 'token_cancelled'
-  | 'fan_out_triggered'
-  | 'fan_in_complete'
+  // Parallelism synchronization
+  | 'fan_in_waiting'
+  | 'fan_in_completed'
   // Sub-workflows
   | 'subworkflow_started'
   | 'subworkflow_completed'
@@ -26,9 +29,10 @@ export type EventType =
   | 'llm_call_started'
   | 'llm_call_completed'
   | 'llm_call_failed'
+  // State changes
   | 'transition_evaluated'
   | 'context_updated'
-  | 'artifact_created';
+  | 'artifact_written';
 
 /**
  * Context required for emitting events - provided by coordinator
@@ -86,4 +90,226 @@ export interface GetEventsOptions {
  */
 export interface Emitter {
   emit: (context: EventContext, input: EventInput) => void;
+}
+
+// ============================================================================
+// INTROSPECTION EVENTS
+// ============================================================================
+
+/**
+ * Introspection event types for coordinator execution debugging
+ *
+ * These events provide line-by-line visibility into coordinator execution:
+ * - Decision logic (routing, synchronization)
+ * - Operations (context, tokens)
+ * - SQL queries and performance
+ * - Dispatch layer batching
+ */
+
+/**
+ * Base introspection event structure
+ */
+export interface IntrospectionEventBase {
+  // Ordering & timing (added by emitter)
+  sequence?: number;
+  timestamp?: number;
+
+  // Execution context
+  token_id?: string;
+  node_id?: string;
+
+  // Performance tracking
+  duration_ms?: number;
+}
+
+/**
+ * Decision layer events - pure routing and synchronization logic
+ */
+export type DecisionEvent =
+  | {
+      type: 'decision.routing.start';
+      token_id: string;
+      node_id: string;
+    }
+  | {
+      type: 'decision.routing.evaluate_transition';
+      transition_id: string;
+      condition: unknown;
+    }
+  | {
+      type: 'decision.routing.transition_matched';
+      transition_id: string;
+      spawn_count: number;
+    }
+  | {
+      type: 'decision.routing.complete';
+      decisions: unknown[]; // Decision[] from coordinator
+    }
+  | {
+      type: 'decision.sync.start';
+      token_id: string;
+      sibling_count: number;
+    }
+  | {
+      type: 'decision.sync.check_condition';
+      strategy: string;
+      completed: number;
+      required: number;
+    }
+  | {
+      type: 'decision.sync.wait';
+      reason: string;
+    }
+  | {
+      type: 'decision.sync.activate';
+      merge_config: unknown;
+    };
+
+/**
+ * Operation layer events - context, token, and state operations
+ */
+export type OperationEvent =
+  | {
+      type: 'operation.context.read';
+      path: string;
+      value: unknown;
+    }
+  | {
+      type: 'operation.context.write';
+      path: string;
+      value: unknown;
+    }
+  | {
+      type: 'operation.context.branch_table.create';
+      token_id: string;
+      table_name: string;
+    }
+  | {
+      type: 'operation.context.branch_table.drop';
+      table_name: string;
+    }
+  | {
+      type: 'operation.context.merge.start';
+      sibling_count: number;
+      strategy: string;
+    }
+  | {
+      type: 'operation.context.merge.complete';
+      rows_written: number;
+    }
+  | {
+      type: 'operation.tokens.create';
+      token_id: string;
+      node_id: string;
+      parent_token_id: string | null;
+    }
+  | {
+      type: 'operation.tokens.update_status';
+      token_id: string;
+      from: string;
+      to: string;
+    };
+
+/**
+ * SQL layer events - query performance and debugging
+ */
+export type SQLEvent = {
+  type: 'operation.sql.query';
+  sql: string;
+  params: unknown[];
+  duration_ms: number;
+};
+
+/**
+ * Dispatch layer events - decision batching and application
+ */
+export type DispatchEvent =
+  | {
+      type: 'dispatch.batch.start';
+      decision_count: number;
+    }
+  | {
+      type: 'dispatch.batch.group';
+      batch_type: string;
+      count: number;
+    }
+  | {
+      type: 'dispatch.decision.apply';
+      decision_type: string;
+      decision: unknown; // Decision from coordinator
+    };
+
+/**
+ * All introspection event types
+ */
+export type IntrospectionEvent = (DecisionEvent | OperationEvent | SQLEvent | DispatchEvent) &
+  IntrospectionEventBase;
+
+/**
+ * Event category extracted from type
+ */
+export type IntrospectionCategory = 'decision' | 'operation' | 'dispatch' | 'sql';
+
+/**
+ * Extract category from event type string
+ */
+export function getEventCategory(type: string): IntrospectionCategory {
+  const category = type.split('.')[0];
+  if (
+    category === 'decision' ||
+    category === 'operation' ||
+    category === 'dispatch' ||
+    category === 'sql'
+  ) {
+    return category;
+  }
+  return 'operation'; // Default fallback
+}
+
+/**
+ * Context required for emitting introspection events
+ */
+export interface IntrospectionContext {
+  workflow_run_id: string;
+  workspace_id: string;
+  project_id: string;
+}
+
+/**
+ * Introspection event entry as stored in D1
+ */
+export interface IntrospectionEventEntry extends IntrospectionContext {
+  id: string;
+  sequence: number;
+  timestamp: number;
+  type: string;
+  category: IntrospectionCategory;
+  token_id: string | null;
+  node_id: string | null;
+  duration_ms: number | null;
+  payload: string; // JSON string of full event
+}
+
+/**
+ * Options for querying introspection events
+ */
+export interface GetIntrospectionEventsOptions {
+  workflow_run_id?: string;
+  token_id?: string;
+  node_id?: string;
+  type?: string;
+  category?: IntrospectionCategory;
+  workspace_id?: string;
+  project_id?: string;
+  limit?: number;
+  min_duration_ms?: number; // Filter slow queries
+}
+
+/**
+ * Introspection emitter interface
+ */
+export interface IntrospectionEmitter {
+  emit: (event: IntrospectionEvent) => void;
+  flush: (context: IntrospectionContext) => Promise<void>;
+  getEvents: () => IntrospectionEvent[];
 }

@@ -11,6 +11,7 @@
 
 - Built on Cloudflare: Workers, Durable Objects, D1, Vectorize, R2, Analytics Engine, Containers
 - Service communication via RPC (service bindings)
+- SDK is HTTP-only client (REST API wrapper via openapi-fetch); no direct service access
 - UI built with SvelteKit
 - Testing via Vitest with miniflare (local Cloudflare runtime)
 
