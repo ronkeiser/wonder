@@ -24,8 +24,8 @@ export type {
 /**
  * Unified Wonder client with SDK methods, WebSocket events, and raw HTTP access
  */
-export interface WonderClient extends Omit<ReturnType<typeof createGeneratedClient>, 'events'> {
-  // Events client with HTTP queries and WebSocket streaming
+export interface WonderClient extends ReturnType<typeof createGeneratedClient> {
+  // Events client extends generated events with WebSocket capabilities
   events: EventsClient;
 
   // Raw HTTP methods
@@ -47,11 +47,8 @@ export function createClient(
   const sdkClient = createGeneratedClient(baseClient);
   const eventsClient = new EventsClient(baseUrl, baseClient);
 
-  // Remove the basic events collection from SDK since we're replacing it with the enhanced version
-  const { events, ...sdkWithoutEvents } = sdkClient;
-
   return {
-    ...sdkWithoutEvents,
+    ...sdkClient,
     events: eventsClient,
     GET: baseClient.GET.bind(baseClient),
     POST: baseClient.POST.bind(baseClient),

@@ -50,22 +50,23 @@ export class EventsClient {
   private wsUrl: string;
   private sdk: Client<paths>;
 
+  // HTTP query method from generated client
+  list: (
+    options?: paths['/api/events']['get']['parameters']['query'],
+  ) => Promise<paths['/api/events']['get']['responses']['200']['content']['application/json']>;
+
   constructor(baseUrl: string, sdk: Client<paths>) {
     // Convert HTTP URL to WebSocket URL
     // https://wonder-http.*.workers.dev -> wss://wonder-events.*.workers.dev
     const eventsUrl = baseUrl.replace('wonder-http', 'wonder-events');
     this.wsUrl = eventsUrl.replace('https://', 'wss://').replace('http://', 'ws://');
     this.sdk = sdk;
-  }
 
-  /**
-   * Query workflow events via HTTP (snapshot)
-   */
-  async list(
-    options?: paths['/api/events']['get']['parameters']['query'],
-  ): Promise<paths['/api/events']['get']['responses']['200']['content']['application/json']> {
-    const response = await this.sdk.GET('/api/events', { params: { query: options || {} } });
-    return response.data!;
+    // Bind the HTTP list method
+    this.list = async (options?) => {
+      const response = await this.sdk.GET('/api/events', { params: { query: options || {} } });
+      return response.data!;
+    };
   }
 
   /**
