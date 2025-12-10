@@ -9,25 +9,34 @@
       "database_name": "wonder",
       "database_id": "a670820b-6a86-441f-a2eb-9936908a9e92",
       "migrations_dir": "src/infrastructure/db/migrations",
-      "remote": true
-    }
+      "remote": true,
+    },
   ],
   "services": [
     {
       "binding": "LOGS",
       "service": "wonder-logs",
-      "entrypoint": "LogsService"
-    }
+      "entrypoint": "LogsService",
+    },
   ],
+  "durable_objects": {
+    "bindings": [
+      {
+        "name": "COORDINATOR",
+        "class_name": "WorkflowCoordinator",
+        "script_name": "wonder-coordinator",
+      },
+    ],
+  },
   "vars": {
-    "ENVIRONMENT": "development"
+    "ENVIRONMENT": "development",
   },
   "observability": {
     "logs": {
       "enabled": true,
       "head_sampling_rate": 1,
       "invocation_logs": false,
-      "persist": true
-    }
-  }
+      "persist": true,
+    },
+  },
 }

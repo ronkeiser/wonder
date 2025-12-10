@@ -1,7 +1,9 @@
 /** Workflows RPC resource */
 
+import { eq } from 'drizzle-orm';
 import { ulid } from 'ulid';
 import { ConflictError, NotFoundError, extractDbError } from '~/errors';
+import * as schema from '~/infrastructure/db/schema';
 import { Resource } from '../base';
 import * as repo from './repository';
 
@@ -240,6 +242,20 @@ export class Workflows extends Resource {
 
       const { workflow, workflow_def } = result;
 
+      // Get project to access workspace_id
+      const project = await this.serviceCtx.db
+        .select()
+        .from(schema.projects)
+        .where(eq(schema.projects.id, workflow.project_id))
+        .get();
+      if (!project) {
+        throw new NotFoundError(
+          `Project not found: ${workflow.project_id}`,
+          'project',
+          workflow.project_id,
+        );
+      }
+
       // Generate workflow_run_id (ULID)
       const workflowRunId = ulid();
 
@@ -279,9 +295,16 @@ export class Workflows extends Resource {
         metadata: { workflow_id: workflowId, workflow_run_id: workflowRunId },
       });
 
-      // TODO: Trigger workflow execution via coordinator DO or queue
-      // For now, this is a placeholder - actual execution would be triggered
-      // by sending a message to the coordinator DO or dispatching tasks to the queue
+      // Trigger workflow execution via coordinator DO (RPC)
+      const coordinatorId = this.env.COORDINATOR.idFromName(workflowRunId);
+      const coordinator = this.env.COORDINATOR.get(coordinatorId);
+
+      await coordinator.start(input, {
+        workflow_run_id: workflowRunId,
+        workspace_id: project.workspace_id,
+        project_id: workflow.project_id,
+        workflow_def_id: workflow_def.id,
+      });
 
       return {
         workflow_run_id: workflowRunId,

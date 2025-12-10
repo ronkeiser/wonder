@@ -13,47 +13,36 @@ import { DurableObject } from 'cloudflare:workers';
  * Each instance coordinates a single workflow run.
  */
 export class WorkflowCoordinator extends DurableObject {
-  private emitter: Emitter;
-  private workflowRunId: string;
+  private emitter?: Emitter;
 
   constructor(ctx: DurableObjectState, env: Env) {
     super(ctx, env);
-
-    // Generate workflow run ID (in real implementation, this comes from initialization)
-    this.workflowRunId = 'run_placeholder';
-
-    // Initialize emitter with context bound at creation
-    // Note: In real implementation, workspace_id, project_id, and workflow_def_id
-    // come from workflow initialization or metadata storage
-    this.emitter = createEmitter(
-      env.EVENTS,
-      {
-        workflow_run_id: this.workflowRunId,
-        workspace_id: 'ws_placeholder',
-        project_id: 'proj_placeholder',
-        workflow_def_id: 'wf_placeholder',
-      },
-      {
-        traceEnabled: env.TRACE_EVENTS_ENABLED,
-      },
-    );
   }
 
-  async sayHello(name: string): Promise<string> {
-    // Example: emit workflow event
+  /**
+   * Start workflow execution
+   */
+  async start(
+    input: Record<string, unknown>,
+    context: {
+      workflow_run_id: string;
+      workspace_id: string;
+      project_id: string;
+      workflow_def_id: string;
+    },
+  ): Promise<void> {
+    // Initialize emitter with full context
+    this.emitter = createEmitter(this.env.EVENTS, context, {
+      traceEnabled: this.env.TRACE_EVENTS_ENABLED,
+    });
+
+    // Emit workflow started event
     this.emitter.emit({
       event_type: 'workflow_started',
-      message: `Workflow started for ${name}`,
+      message: `Workflow started with input: ${JSON.stringify(input)}`,
     });
 
-    // Example: emit trace event (token_id required for decision.routing.start)
-    this.emitter.emitTrace({
-      type: 'decision.routing.start',
-      token_id: 'tok_example',
-      node_id: 'start_node',
-    });
-
-    return `Hello, ${name}!`;
+    // TODO: Load workflow definition and begin execution
   }
 }
 
