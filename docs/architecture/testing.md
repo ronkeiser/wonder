@@ -42,22 +42,29 @@ Test decision functions with real workflow definitions and context from live inf
 
 ### Layer 3: E2E Tests (Primary - Full Stack)
 
-Execute complete workflows with real infrastructure. **This is the primary validation layer** - E2E tests are the ultimate source of truth that the architecture works. Layers 1 and 2 are safety rails for fast iteration.
+Execute complete workflows with **deployed services** (not Miniflare). **This is the primary validation layer** - E2E tests are the ultimate source of truth that the architecture works. Layers 1 and 2 are safety rails for fast iteration.
 
 **Scope:**
 
 - Full workflow execution (edge test: ideation → judging → ranking)
-- Real Cloudflare services (DO, D1, Workers AI)
+- **Deployed Cloudflare services** (DO, D1, Workers, R2, Analytics Engine)
 - Template rendering, schema validation, action execution
 - Token spawning, synchronization, branch isolation
+- Real LLM providers (OpenAI, Anthropic)
 
 **Benefits:**
 
 - Definitive proof the system works end-to-end
-- Tests the actual production code path
-- Validates all integration points together
-- Fast enough to run frequently (Miniflare is quick)
+- Tests the actual production deployment
+- Validates all integration points together (including networking, service bindings, RPC)
+- Catches deployment-specific issues (env vars, bindings, resource limits)
 - Reference implementation for complex patterns
+
+**Infrastructure:**
+
+- Runs against deployed preview or staging environment
+- Not Miniflare (that's for integration tests)
+- Slower but comprehensive (seconds to minutes per test)
 
 ## Why Testing Without Mocks Works
 
@@ -110,8 +117,9 @@ test('routing decision with multiple matching transitions', () => {
 
 1. Decision logic tested in isolation (pure functions)
 2. Operations are simple primitives (SQL queries, RPC calls) that don't need mocking
-3. Integration tests use real infrastructure (Miniflare for local, deployed for CI)
-4. No "mock drift" where mocks diverge from real behavior
+3. Integration tests use Miniflare (local Cloudflare runtime) for fast feedback
+4. E2E tests use deployed services for production validation
+5. No "mock drift" where mocks diverge from real behavior
 
 ## Three-Layer Testing Strategy
 
@@ -151,22 +159,40 @@ Test decision functions with real workflow definitions and context from live inf
 - Safe to run against production (read-only)
 - Medium speed (hundreds of ms)
 
-### Layer 3: E2E Tests (Slow - Full Stack)
+### Layer 3: Integration Tests (Fast - Miniflare)
 
-Execute complete workflows with real infrastructure. Validates the entire system works together.
+Execute workflows using Miniflare's local Cloudflare runtime. Fast feedback for development.
 
 **Scope:**
 
-- Full workflow execution (edge test: ideation → judging → ranking)
-- Real Cloudflare services (DO, D1, Workers AI)
+- Full workflow execution locally
+- Miniflare provides: DO, D1, Workers, R2 (in-memory or SQLite)
 - Template rendering, schema validation, action execution
 - Token spawning, synchronization, branch isolation
 
 **Benefits:**
 
-- End-to-end validation
-- Proves architecture works in practice
-- Catches integration issues
+- Fast iteration during development (milliseconds to seconds)
+- No deployment needed
+- Deterministic (no network flakiness)
+- Good enough for most architecture validation
+
+### Layer 4: E2E Tests (Slow - Deployed Services)
+
+Execute workflows against **deployed services** in preview/staging environment. Validates production deployment.
+
+**Scope:**
+
+- Full workflow execution on real Cloudflare infrastructure
+- Deployed services with real networking, RPC, service bindings
+- Real LLM providers, external APIs
+- Resource limits, quotas, timeouts as in production
+
+**Benefits:**
+
+- Ultimate validation that deployment works
+- Catches deployment-specific issues (bindings, env vars, network)
+- Tests actual resource consumption and limits
 - Reference implementation for complex patterns
 
 ## Testing Routing Logic
@@ -1122,13 +1148,22 @@ test('tryActivate handles race condition', async () => {
 - Medium speed (hundreds of ms)
 - No mocks for workflow/context data
 
-**E2E Tests (Layer 3):**
+**Integration Tests (Layer 3 - Miniflare):**
 
-- End-to-end validation
-- Proves architecture works in practice
-- Real Cloudflare infrastructure
-- Template + schema + action execution
-- Reference implementation
+- Fast local validation (milliseconds to seconds)
+- Miniflare simulates Cloudflare runtime (DO, D1, Workers, R2)
+- Good for rapid iteration during development
+- Deterministic, no network dependencies
+- Catches most architecture issues
+
+**E2E Tests (Layer 4 - Deployed):**
+
+- **True end-to-end validation against deployed services**
+- Tests actual production deployment (not simulation)
+- Real networking, RPC, service bindings, resource limits
+- Catches deployment-specific issues
+- Slower but comprehensive (seconds to minutes)
+- Reference implementation and production readiness validation
 
 **Core Advantage:**
-The Decision Pattern makes business logic testable without mocks while maintaining the benefits of the Actor Model (isolated state, single-threaded execution, message passing). Fast feedback loops enable rapid iteration while comprehensive E2E tests ensure production readiness.
+The Decision Pattern makes business logic testable without mocks while maintaining the benefits of the Actor Model (isolated state, single-threaded execution, message passing). Fast feedback via Miniflare enables rapid iteration, while deployed E2E tests ensure production readiness.
