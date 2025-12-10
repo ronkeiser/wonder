@@ -639,6 +639,7 @@ Versioned, reusable action implementation. Atomic operations executed by workers
   workflow_def_id: string | { from_context: string };
   version: number | { from_context: string } | null; // null = latest
   inherit_artifacts: boolean; // default: false
+  pass_resources: Record<string, string> | null; // Map parent resource_id → child resource key
   on_failure: 'propagate' | 'catch'; // default: propagate
 }
 
