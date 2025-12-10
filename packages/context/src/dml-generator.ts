@@ -260,11 +260,10 @@ export class DMLGenerator {
       if (fieldSchema.type === 'array' && fieldSchema.items) {
         const arrayTableName = `${this.options.arrayTablePrefix}${parentTableName}_${fieldName}`;
 
-        // Convert parent WHERE clause to array table WHERE clause
-        // This assumes the parent ID is available in the context
-        const arrayWhereClause = parentWhereClause.replace(/\bid\b/g, `${parentTableName}_id`);
-
-        statements.push(`DELETE FROM ${arrayTableName} WHERE ${arrayWhereClause};`);
+        // Use subquery to properly cascade delete based on parent FK
+        statements.push(
+          `DELETE FROM ${arrayTableName} WHERE ${parentTableName}_id IN (SELECT rowid FROM ${parentTableName} WHERE ${parentWhereClause});`,
+        );
       }
     }
 

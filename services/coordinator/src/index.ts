@@ -39,7 +39,8 @@ export class WorkflowCoordinator extends DurableObject {
     // Emit workflow started event
     this.emitter.emit({
       event_type: 'workflow_started',
-      message: `Workflow started with input: ${JSON.stringify(input)}`,
+      message: `Workflow started`,
+      metadata: { input },
     });
 
     // TODO: Load workflow definition and begin execution
