@@ -820,6 +820,103 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/workflows/{id}/runs": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post: {
+            parameters: {
+                query?: never;
+                header?: never;
+                path: {
+                    id: string;
+                };
+                cookie?: never;
+            };
+            requestBody?: {
+                content: {
+                    "application/json": components["schemas"]["CreateWorkflowRun"];
+                };
+            };
+            responses: {
+                /** @description Workflow run created successfully */
+                201: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["WorkflowRunCreateResponse"];
+                    };
+                };
+                /** @description Failed to create workflow run */
+                500: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["WorkflowRunCreateError"];
+                    };
+                };
+            };
+        };
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/workflows/{id}/runs/{run_id}/start": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post: {
+            parameters: {
+                query?: never;
+                header?: never;
+                path: {
+                    id: string;
+                    run_id: string;
+                };
+                cookie?: never;
+            };
+            requestBody?: never;
+            responses: {
+                /** @description Workflow run started successfully */
+                200: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["WorkflowRunStartResponse"];
+                    };
+                };
+                /** @description Failed to start workflow run */
+                500: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["WorkflowRunStartError"];
+                    };
+                };
+            };
+        };
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/workflow-runs/{id}/stream": {
         parameters: {
             query?: never;
@@ -1437,6 +1534,30 @@ export interface components {
         };
         WorkflowDeleteResponse: {
             success: boolean;
+        };
+        WorkflowRunCreateResponse: {
+            workflow_run_id: string;
+            project_id: string;
+            workspace_id: string;
+        };
+        WorkflowRunCreateError: {
+            error: string;
+        };
+        CreateWorkflowRun: {
+            /**
+             * @example {
+             *       "input": "value"
+             *     }
+             */
+            input: {
+                [key: string]: unknown;
+            };
+        };
+        WorkflowRunStartResponse: {
+            durable_object_id: string;
+        };
+        WorkflowRunStartError: {
+            error: string;
         };
         EventEntry: {
             id: string;

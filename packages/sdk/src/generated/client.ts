@@ -144,6 +144,10 @@ export function createClient(baseClient: any) {
           start: async (body: NonNullable<paths['/api/workflows/{id}/start']['post']['requestBody']>['content']['application/json'], options?: any): Promise<paths['/api/workflows/{id}/start']['post']['responses']['200']['content']['application/json']> => {
             const response = await baseClient.POST(`/api/workflows/${id}/start`, { body });
             return response.data;
+          },
+          create: async (body: NonNullable<paths['/api/workflows/{id}/runs']['post']['requestBody']>['content']['application/json'], options?: any): Promise<paths['/api/workflows/{id}/runs']['post']['responses']['201']['content']['application/json']> => {
+            const response = await baseClient.POST(`/api/workflows/${id}/runs`, { body });
+            return response.data;
           }
         }),
       {

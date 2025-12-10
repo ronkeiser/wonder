@@ -53,21 +53,16 @@ export function createWorkflowsClient(
     } = options;
 
     // Phase 1: Create the workflow run (doesn't start execution)
-    // Note: This endpoint doesn't exist in the generated schema yet
-    // Will work after regenerating the SDK
-    const createResponse = await sdk.POST(
-      '/api/workflows/{id}/runs' as any,
-      {
-        params: { path: { id: workflowId } },
-        body: { input: input as any },
-      } as any,
-    );
+    const createResponse = await sdk.POST('/api/workflows/{id}/runs', {
+      params: { path: { id: workflowId } },
+      body: { input: input as any },
+    });
 
-    if (!(createResponse.data as any)?.workflow_run_id) {
+    if (!createResponse.data?.workflow_run_id) {
       throw new Error('Failed to create workflow run');
     }
 
-    const { workflow_run_id } = createResponse.data as any;
+    const { workflow_run_id } = createResponse.data;
 
     // Phase 2: Subscribe to events BEFORE starting execution
     const events: any[] = [];
@@ -172,12 +167,9 @@ export function createWorkflowsClient(
           // Small delay to ensure WebSocket handshake completes
           setTimeout(async () => {
             try {
-              await sdk.POST(
-                '/api/workflows/{id}/runs/{run_id}/start' as any,
-                {
-                  params: { path: { id: workflowId, run_id: workflow_run_id } },
-                } as any,
-              );
+              await sdk.POST('/api/workflows/{id}/runs/{run_id}/start', {
+                params: { path: { id: workflowId, run_id: workflow_run_id } },
+              });
             } catch (error) {
               cleanup();
               reject(error);
