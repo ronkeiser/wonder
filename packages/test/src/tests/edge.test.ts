@@ -151,13 +151,21 @@ describe('Edge Test - Hello World', () => {
     const workflowId = workflowResponse!.workflow.id;
     console.log('✓ Workflow created:', workflowId);
 
-    // Step 8: Start workflow execution
-    const startResponse = await wonder.workflows(workflowId).start({});
+    // Step 8: Execute workflow with streaming
+    const result = await wonder.workflows(workflowId).stream(
+      {},
+      {
+        timeout: 60000,
+        idleTimeout: 10000,
+      },
+    );
 
-    expect(startResponse).toBeDefined();
-    expect(startResponse?.workflow_run_id).toBeDefined();
+    expect(result).toBeDefined();
+    expect(result.status).toBe('completed');
+    expect(result.events.length).toBeGreaterThan(0);
 
-    console.log('✓ Workflow started:', startResponse!.workflow_run_id);
+    console.log('✓ Workflow executed:', result.status);
+    console.log(`  Collected ${result.events.length} events`);
     console.log('  Single node: Hello World');
   });
 });

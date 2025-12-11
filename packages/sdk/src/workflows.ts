@@ -6,12 +6,16 @@ import type { Client } from 'openapi-fetch';
 import type { EventsClient, SubscriptionFilter } from './events.js';
 import type { paths } from './generated/schema.js';
 
+const DEFAULT_TIMEOUT_MS = 300000; // 5 minutes
+const DEFAULT_IDLE_TIMEOUT_MS = 30000; // 30 seconds
+const WEBSOCKET_HANDSHAKE_DELAY_MS = 100;
+
 export interface StreamOptions {
   /** Event subscription filters */
   subscribe?: SubscriptionFilter;
 
   /** Predicate to determine when to close connection (in addition to workflow completion/failure) */
-  until?: (event: any) => boolean;
+  until?: (event: WorkflowEvent) => boolean;
 
   /** Total timeout in milliseconds */
   timeout?: number;
@@ -23,8 +27,18 @@ export interface StreamOptions {
 export interface StreamResult {
   workflow_run_id: string;
   status: 'completed' | 'failed' | 'timeout' | 'idle_timeout';
-  events: any[];
-  traceEvents: any[];
+  events: WorkflowEvent[];
+  traceEvents: WorkflowEvent[];
+}
+
+interface WorkflowEvent {
+  event_type: string;
+  stream?: 'events' | 'trace';
+  [key: string]: unknown;
+}
+
+interface Subscription {
+  close: () => void;
 }
 
 /**
@@ -40,7 +54,7 @@ export function createWorkflowsClient(
    * Stream a workflow execution with events
    * Uses two-phase execution to avoid missing early events
    */
-  async function stream(
+  async function streamWorkflow(
     workflowId: string,
     input: unknown,
     options: StreamOptions = {},
@@ -48,14 +62,14 @@ export function createWorkflowsClient(
     const {
       subscribe = {},
       until,
-      timeout = 300000, // 5 min default
-      idleTimeout = 30000, // 30s default
+      timeout = DEFAULT_TIMEOUT_MS,
+      idleTimeout = DEFAULT_IDLE_TIMEOUT_MS,
     } = options;
 
     // Phase 1: Create the workflow run (doesn't start execution)
     const createResponse = await sdk.POST('/api/workflows/{id}/runs', {
       params: { path: { id: workflowId } },
-      body: { input: input as any },
+      body: { input: input as Record<string, unknown> },
     });
 
     if (!createResponse.data?.workflow_run_id) {
@@ -65,14 +79,12 @@ export function createWorkflowsClient(
     const { workflow_run_id } = createResponse.data;
 
     // Phase 2: Subscribe to events BEFORE starting execution
-    const events: any[] = [];
-    const traceEvents: any[] = [];
-
     return new Promise<StreamResult>((resolve, reject) => {
+      const events: WorkflowEvent[] = [];
+      const traceEvents: WorkflowEvent[] = [];
       let totalTimer: NodeJS.Timeout | null = null;
       let idleTimer: NodeJS.Timeout | null = null;
-      let status: 'completed' | 'failed' | 'timeout' | 'idle_timeout' = 'completed';
-      let subscription: any = null;
+      let subscription: Subscription | null = null;
 
       const cleanup = () => {
         if (totalTimer) clearTimeout(totalTimer);
@@ -80,87 +92,60 @@ export function createWorkflowsClient(
         if (subscription) subscription.close();
       };
 
+      const resolveWithCleanup = (
+        status: StreamResult['status'],
+        finalEvents = events,
+        finalTraceEvents = traceEvents,
+      ) => {
+        cleanup();
+        resolve({ workflow_run_id, status, events: finalEvents, traceEvents: finalTraceEvents });
+      };
+
       // Set up total timeout
       if (timeout) {
-        totalTimer = setTimeout(() => {
-          cleanup();
-          status = 'timeout';
-          resolve({ workflow_run_id, status, events, traceEvents });
-        }, timeout);
+        totalTimer = setTimeout(() => resolveWithCleanup('timeout'), timeout);
       }
 
       const resetIdleTimer = () => {
         if (idleTimer) clearTimeout(idleTimer);
         if (idleTimeout) {
-          idleTimer = setTimeout(() => {
-            cleanup();
-            status = 'idle_timeout';
-            resolve({ workflow_run_id, status, events, traceEvents });
-          }, idleTimeout);
+          idleTimer = setTimeout(() => resolveWithCleanup('idle_timeout'), idleTimeout);
         }
       };
 
-      const eventCallback = (event: any) => {
+      const eventCallback = (event: WorkflowEvent) => {
         resetIdleTimer();
 
         // Collect events by stream type
-        if (event.stream === 'trace') {
-          traceEvents.push(event);
-        } else {
-          events.push(event);
-        }
+        (event.stream === 'trace' ? traceEvents : events).push(event);
 
         // Check for terminal conditions
         if (event.event_type === 'workflow_completed') {
-          cleanup();
-          status = 'completed';
-          resolve({ workflow_run_id, status, events, traceEvents });
-          return;
+          return resolveWithCleanup('completed');
         }
 
         if (event.event_type === 'workflow_failed') {
-          cleanup();
-          status = 'failed';
-          resolve({ workflow_run_id, status, events, traceEvents });
-          return;
+          return resolveWithCleanup('failed');
         }
 
         // Check custom predicate
-        if (until && until(event)) {
-          cleanup();
-          resolve({ workflow_run_id, status, events, traceEvents });
-          return;
+        if (until?.(event)) {
+          return resolveWithCleanup('completed');
         }
       };
 
       // Subscribe to both events and trace events
-      const subscriptions = [
-        {
-          id: 'events',
-          stream: 'events' as const,
-          filters: {
-            workflow_run_id,
-            ...subscribe,
-          },
-          callback: eventCallback,
-        },
-        {
-          id: 'trace',
-          stream: 'trace' as const,
-          filters: {
-            workflow_run_id,
-            ...subscribe,
-          },
-          callback: eventCallback,
-        },
-      ];
+      const subscriptions = (['events', 'trace'] as const).map((stream) => ({
+        id: stream,
+        stream,
+        filters: { workflow_run_id, ...subscribe },
+        callback: eventCallback,
+      }));
 
       eventsClient
         .subscribe(subscriptions)
         .then((sub) => {
           subscription = sub;
-
-          // Start idle timer
           resetIdleTimer();
 
           // Phase 3: Start execution (after subscription is established)
@@ -174,7 +159,7 @@ export function createWorkflowsClient(
               cleanup();
               reject(error);
             }
-          }, 100);
+          }, WEBSOCKET_HANDSHAKE_DELAY_MS);
         })
         .catch((error) => {
           cleanup();
@@ -183,8 +168,15 @@ export function createWorkflowsClient(
     });
   }
 
-  // Return extended workflows client
-  return Object.assign(generatedWorkflows, {
-    stream,
-  });
+  // Wrap the generatedWorkflows function to add stream method to the returned object
+  const wrappedWorkflows = (id: string) => {
+    const workflowInstance = generatedWorkflows(id);
+    return {
+      ...workflowInstance,
+      stream: (input: unknown, options?: StreamOptions) => streamWorkflow(id, input, options),
+    };
+  };
+
+  // Copy over the static methods (create, list, etc.)
+  return Object.assign(wrappedWorkflows, generatedWorkflows);
 }

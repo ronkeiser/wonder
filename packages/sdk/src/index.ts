@@ -27,14 +27,12 @@ export type { StreamOptions, StreamResult } from './workflows';
 /**
  * Unified Wonder client with SDK methods, WebSocket events, and raw HTTP access
  */
-export interface WonderClient extends ReturnType<typeof createGeneratedClient> {
+export interface WonderClient extends Omit<ReturnType<typeof createGeneratedClient>, 'workflows'> {
   // Events client extends generated events with WebSocket capabilities
   events: EventsClient;
 
   // Workflows extends generated workflows with streaming capabilities
-  workflows: ReturnType<typeof createGeneratedClient>['workflows'] & {
-    stream: (workflowId: string, input: unknown, options?: StreamOptions) => Promise<StreamResult>;
-  };
+  workflows: ReturnType<typeof createWorkflowsClient>;
 
   // Raw HTTP methods
   GET: Client<paths>['GET'];
