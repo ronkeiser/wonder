@@ -87,6 +87,14 @@
 
       items = filtered;
       filtered.forEach((item: any) => seenIds.add(item.id));
+
+      // Scroll to bottom after DOM updates
+      setTimeout(() => {
+        const container = document.getElementById('items-container');
+        if (container) {
+          container.scrollTop = container.scrollHeight;
+        }
+      }, 0);
     } catch (error) {
       console.error(`Failed to fetch items:`, error);
     }
@@ -118,6 +126,14 @@
     } else {
       items = [...items.slice(0, insertIndex), item, ...items.slice(insertIndex)];
     }
+
+    // Auto-scroll to bottom after DOM updates
+    setTimeout(() => {
+      const container = document.getElementById('items-container');
+      if (container) {
+        container.scrollTop = container.scrollHeight;
+      }
+    }, 0);
 
     // Keep only last 1000 entries
     if (items.length > 1000) {
