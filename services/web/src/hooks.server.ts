@@ -25,53 +25,44 @@ export const handle: Handle = async ({ event, resolve }) => {
     const httpUrl = event.platform?.env?.HTTP_URL;
     const apiKey = event.platform?.env?.API_KEY;
 
-    // Use service binding if available, otherwise fall back to HTTP_URL for local dev
-    if (httpService) {
-      // For WebSocket upgrades, forward to HTTP service
-      const upgrade = event.request.headers.get('upgrade');
-      if (upgrade?.toLowerCase() === 'websocket') {
-        const headers = new Headers(event.request.headers);
-        if (apiKey) headers.set('X-API-Key', apiKey);
-        return httpService.fetch(new Request(event.request, { headers }));
-      }
-
-      // For regular API requests, forward to HTTP service
-      const headers = new Headers(event.request.headers);
-      if (apiKey) headers.set('X-API-Key', apiKey);
-      const response = await httpService.fetch(new Request(event.request, { headers }));
-      return response;
-    } else if (httpUrl) {
-      // Local development fallback: use HTTP_URL
-      const url = new URL(event.url.pathname + event.url.search, httpUrl);
-
-      // For WebSocket upgrades, forward to remote service
-      const upgrade = event.request.headers.get('upgrade');
-      if (upgrade?.toLowerCase() === 'websocket') {
-        // Change protocol to wss for remote websocket
-        url.protocol = 'wss:';
-        const wsUrl = url.toString().replace('/api/', '/stream/');
-        const headers = new Headers(event.request.headers);
-        if (apiKey) headers.set('X-API-Key', apiKey);
-        return fetch(wsUrl, {
-          headers,
-        });
-      }
-
-      // For regular API requests, forward to remote HTTP service
-      const headers = new Headers(event.request.headers);
-      if (apiKey) headers.set('X-API-Key', apiKey);
-      const response = await fetch(url, {
-        method: event.request.method,
-        headers,
-        body:
-          event.request.method !== 'GET' && event.request.method !== 'HEAD'
-            ? await event.request.text()
-            : undefined,
-      });
-      return response;
+    if (!httpService && !httpUrl) {
+      return new Response('HTTP service not available', { status: 503 });
     }
 
-    return new Response('HTTP service not available', { status: 503 });
+    // Check if this is a WebSocket upgrade
+    const isWebSocket = event.request.headers.get('upgrade')?.toLowerCase() === 'websocket';
+
+    // Prepare headers - add API key only for non-WebSocket requests
+    const headers = new Headers(event.request.headers);
+    if (!isWebSocket && apiKey) {
+      headers.set('X-API-Key', apiKey);
+    }
+
+    // Use service binding if available
+    if (httpService) {
+      return httpService.fetch(
+        new Request(event.request.url, {
+          method: event.request.method,
+          headers,
+          body: event.request.body,
+        }),
+      );
+    }
+
+    // Local development fallback: use HTTP_URL
+    const url = new URL(event.url.pathname + event.url.search, httpUrl!);
+    if (isWebSocket) {
+      url.protocol = url.protocol === 'https:' ? 'wss:' : 'ws:';
+    }
+
+    return fetch(url, {
+      method: event.request.method,
+      headers,
+      body:
+        event.request.method !== 'GET' && event.request.method !== 'HEAD'
+          ? await event.request.text()
+          : undefined,
+    });
   }
 
   // For all other requests, use normal SvelteKit rendering

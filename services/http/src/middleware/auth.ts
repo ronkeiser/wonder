@@ -7,19 +7,22 @@ import type { Context, Next } from 'hono';
 
 /**
  * Middleware to require API key authentication
- * Expects the API key in the X-API-Key header or apiKey query parameter (for WebSocket upgrades)
+ * Expects the API key in the X-API-Key header
+ *
+ * WebSocket upgrades are allowed through - auth will be handled in the ws package
  */
 export async function auth(c: Context<{ Bindings: Env }>, next: Next): Promise<Response | void> {
-  // Check header first (for regular HTTP requests)
-  let apiKey = c.req.header('X-API-Key');
-
-  // For WebSocket upgrades, check query parameter (browsers can't set custom headers)
-  if (!apiKey && c.req.header('Upgrade') === 'websocket') {
-    apiKey = c.req.query('apiKey');
+  // Allow WebSocket upgrades through without auth
+  const upgrade = c.req.header('Upgrade');
+  if (upgrade?.toLowerCase() === 'websocket') {
+    await next();
+    return;
   }
 
+  const apiKey = c.req.header('X-API-Key');
+
   if (!apiKey) {
-    return c.json({ error: 'Missing X-API-Key header or apiKey query parameter' }, 401);
+    return c.json({ error: 'Missing X-API-Key header' }, 401);
   }
 
   if (apiKey !== c.env.API_KEY) {

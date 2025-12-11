@@ -75,17 +75,15 @@ interface SubscriptionMessage {
 export class EventsClient {
   private wsUrl: string;
   private sdk: Client<paths>;
-  private apiKey?: string;
 
   // HTTP query method from generated client
   list: (
     options?: paths['/api/events']['get']['parameters']['query'],
   ) => Promise<paths['/api/events']['get']['responses']['200']['content']['application/json']>;
 
-  constructor(baseUrl: string, sdk: Client<paths>, apiKey?: string) {
+  constructor(baseUrl: string, sdk: Client<paths>) {
     this.wsUrl = this.convertToWebSocketUrl(baseUrl);
     this.sdk = sdk;
-    this.apiKey = apiKey;
 
     // Bind the HTTP list method
     this.list = async (options?) => {
@@ -140,12 +138,9 @@ export class EventsClient {
    * Subscribe to event/trace stream via WebSocket with server-side filtering
    */
   async subscribe(subscriptions: Subscription[]): Promise<EventStreamSubscription> {
-    let url = `${this.wsUrl}/api/events/stream`;
-    // Add API key as query parameter for WebSocket auth (can't use headers in browser WebSocket)
-    if (this.apiKey) {
-      url += `?apiKey=${encodeURIComponent(this.apiKey)}`;
-    }
+    const url = `${this.wsUrl}/api/events/stream`;
     const ws = new WebSocket(url);
+
     const callbacks = new Map(subscriptions.map((s) => [s.id, s.callback]));
     const errorCallbacks: Array<(error: Error) => void> = [];
     const eventCallbacks: Array<(event: WorkflowEvent) => void> = [];
