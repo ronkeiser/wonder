@@ -59,27 +59,23 @@
 </script>
 
 <div class="item-entry" style="border-left-color: {getColor()}">
-  <div class="item-content">
-    <div class="item-header">
-      <span class="item-time">{header.time}</span>
-      <span class="item-badge" style="background-color: {header.badge.color}">
-        {header.badge.text}
-      </span>
-      {#if header.identifier}
-        <span class="item-identifier">[{header.identifier}]</span>
-      {/if}
-      {#if header.message}
-        <span class="item-message">{header.message}</span>
-      {/if}
-    </div>
-    {#if formattedMetadata}
-      <!-- svelte-ignore a11y_no_noninteractive_element_interactions -->
-      <!-- svelte-ignore a11y_click_events_have_key_events -->
-      <pre
-        class="item-metadata json-data"
-        onclick={toggleLocalPrettyPrint}>{formattedMetadata}</pre>
+  <div class="item-header">
+    <span class="item-time">{header.time}</span>
+    <span class="item-badge" style="background-color: {header.badge.color}">
+      {header.badge.text}
+    </span>
+    {#if header.identifier}
+      <span class="item-identifier">[{header.identifier}]</span>
+    {/if}
+    {#if header.message}
+      <span class="item-message">{header.message}</span>
     {/if}
   </div>
+  {#if formattedMetadata}
+    <!-- svelte-ignore a11y_no_noninteractive_element_interactions -->
+    <!-- svelte-ignore a11y_click_events_have_key_events -->
+    <pre class="item-metadata json-data" onclick={toggleLocalPrettyPrint}>{formattedMetadata}</pre>
+  {/if}
   <button class="copy-btn" onclick={() => onCopy(item)} title="Copy to clipboard">
     <svg viewBox="0 0 16 16" fill="currentColor">
       <path
@@ -99,8 +95,6 @@
     border-left: 3px solid transparent;
     font-size: 0.875rem;
     line-height: 1.5;
-    display: flex;
-    align-items: flex-start;
     position: relative;
   }
 
@@ -112,15 +106,12 @@
     opacity: 1;
   }
 
-  .item-content {
-    flex: 1;
-  }
-
   .item-header {
     display: flex;
     gap: 0.5rem;
     align-items: baseline;
     flex-wrap: wrap;
+    padding-right: 2rem; /* Space for copy button */
   }
 
   .item-time {
@@ -167,15 +158,15 @@
 
   .copy-btn {
     opacity: 0;
-    margin-left: auto;
+    position: absolute;
+    top: 0.5rem;
+    right: 0.5rem;
     padding: 0.25rem;
     background: transparent;
     border: 1px solid var(--border);
     border-radius: 4px;
     color: var(--text-secondary);
     cursor: pointer;
-    flex-shrink: 0;
-    margin-top: 0.125rem;
     transition:
       background 0.2s,
       color 0.2s,
