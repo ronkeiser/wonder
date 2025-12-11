@@ -95,9 +95,7 @@ export class EventsClient {
   }
 
   private convertToWebSocketUrl(httpUrl: string): string {
-    return httpUrl
-      .replace('wonder-http', 'wonder-events')
-      .replace(/^https?:\/\//, (match) => (match === 'https://' ? 'wss://' : 'ws://'));
+    return httpUrl.replace(/^https?:\/\//, (match) => (match === 'https://' ? 'wss://' : 'ws://'));
   }
 
   private sendSubscriptionMessage(ws: WebSocket, message: SubscriptionMessage): void {
@@ -142,7 +140,7 @@ export class EventsClient {
    * Subscribe to event/trace stream via WebSocket with server-side filtering
    */
   async subscribe(subscriptions: Subscription[]): Promise<EventStreamSubscription> {
-    const url = `${this.wsUrl}/stream`;
+    const url = `${this.wsUrl}/api/events/stream`;
     const ws = new WebSocket(url);
     const callbacks = new Map(subscriptions.map((s) => [s.id, s.callback]));
     const errorCallbacks: Array<(error: Error) => void> = [];
