@@ -30,7 +30,7 @@
     if (getItemColor) {
       return getItemColor(item);
     }
-    return 'var(--gray)';
+    return 'var(--gray-light)';
   }
 
   const header = $derived(renderItemHeader(item));

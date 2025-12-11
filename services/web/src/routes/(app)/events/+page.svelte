@@ -41,7 +41,7 @@
       time: formatTime(item.timestamp),
       badge: {
         text: item.event_type,
-        color: colorMap[item.event_type] || 'var(--gray)',
+        color: colorMap[item.event_type] || 'var(--gray-light)',
       },
       identifier: item.workflow_run_id ? item.workflow_run_id.slice(-8) : undefined,
       message: item.message,
