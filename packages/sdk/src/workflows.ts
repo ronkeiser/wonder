@@ -9,6 +9,7 @@ import { TraceEventCollection } from './trace.js';
 
 const DEFAULT_TIMEOUT_MS = 300000; // 5 minutes
 const DEFAULT_IDLE_TIMEOUT_MS = 30000; // 30 seconds
+const DEFAULT_GRACE_PERIOD_MS = 100; // Grace period after terminal event
 const WEBSOCKET_HANDSHAKE_DELAY_MS = 100;
 
 export type EventEntry = components['schemas']['EventEntry'];
@@ -26,6 +27,9 @@ export interface StreamOptions {
 
   /** Idle timeout (max time between events) in milliseconds */
   idleTimeout?: number;
+
+  /** Grace period in milliseconds to wait after terminal event before closing (to collect in-flight events) */
+  gracePeriod?: number;
 }
 
 export interface StreamResult {
@@ -65,6 +69,7 @@ export function createWorkflowsClient(
       until,
       timeout = DEFAULT_TIMEOUT_MS,
       idleTimeout = DEFAULT_IDLE_TIMEOUT_MS,
+      gracePeriod = DEFAULT_GRACE_PERIOD_MS,
     } = options;
 
     // Phase 1: Create the workflow run (doesn't start execution)
@@ -132,17 +137,23 @@ export function createWorkflowsClient(
 
         // Check for terminal conditions (only applies to EventEntry, not TraceEventEntry)
         if ('event_type' in event && event.event_type === 'workflow_completed') {
-          return resolveWithCleanup('completed');
+          // Wait for grace period to collect any in-flight events before closing
+          setTimeout(() => resolveWithCleanup('completed'), gracePeriod);
+          return;
         }
 
         if ('event_type' in event && event.event_type === 'workflow_failed') {
-          return resolveWithCleanup('failed');
+          // Wait for grace period to collect any in-flight events before closing
+          setTimeout(() => resolveWithCleanup('failed'), gracePeriod);
+          return;
         }
 
         // Check custom predicate (only EventEntry has event_type for until callback)
         if (until && 'event_type' in event) {
           if (until(event as EventEntry)) {
-            return resolveWithCleanup('completed');
+            // Wait for grace period to collect any in-flight events before closing
+            setTimeout(() => resolveWithCleanup('completed'), gracePeriod);
+            return;
           }
         }
       };
