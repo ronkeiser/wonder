@@ -4,6 +4,7 @@
 
   const tabs = [
     { id: 'events', label: 'Events', href: '/events' },
+    { id: 'traces', label: 'Traces', href: '/events/trace' },
     { id: 'logs', label: 'Logs', href: '/logs' },
   ];
 

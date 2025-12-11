@@ -5,6 +5,7 @@ import { ulid } from 'ulid';
 import { traceEvents, workflowEvents } from './db/schema.js';
 import type {
   EventContext,
+  EventEntry,
   EventInput,
   GetEventsOptions,
   GetTraceEventsOptions,
@@ -53,17 +54,23 @@ export class EventsService extends WorkerEntrypoint<Env> {
             timestamp: Date.now(),
             ...context,
             ...input,
-            sequence_number: input.sequence_number ?? 0,
+            sequence: input.sequence ?? 0,
             metadata: JSON.stringify(input.metadata || {}),
           };
 
           await this.db.insert(workflowEvents).values(eventEntry);
 
+          // Parse metadata for broadcasting (WebSocket clients expect parsed object)
+          const entryWithParsedMetadata = {
+            ...eventEntry,
+            metadata: input.metadata || {},
+          } as any as EventEntry;
+
           // Broadcast to connected WebSocket clients
           try {
             const id = this.env.STREAMER.idFromName('events-streamer');
             const stub = this.env.STREAMER.get(id);
-            await stub.broadcast(eventEntry);
+            await stub.broadcast(entryWithParsedMetadata);
           } catch (error) {
             console.error('[EVENTS] Failed to broadcast event to WebSocket clients:', error);
           }
@@ -109,7 +116,7 @@ export class EventsService extends WorkerEntrypoint<Env> {
     this.ctx.waitUntil(
       (async () => {
         try {
-          const entry: TraceEventEntry = {
+          const entry = {
             id: ulid(),
             timestamp: Date.now(),
             ...context,
@@ -118,16 +125,22 @@ export class EventsService extends WorkerEntrypoint<Env> {
             token_id: event.token_id ?? null,
             node_id: event.node_id ?? null,
             duration_ms: event.duration_ms ?? null,
-            payload: event,
+            payload: JSON.stringify(event),
           };
 
           await this.db.insert(traceEvents).values(entry);
+
+          // Parse payload for broadcasting (WebSocket clients expect parsed object)
+          const entryWithParsedPayload = {
+            ...entry,
+            payload: event,
+          };
 
           // Broadcast to WebSocket clients
           try {
             const id = this.env.STREAMER.idFromName('events-streamer');
             const stub = this.env.STREAMER.get(id);
-            await stub.broadcastTraceEvent(entry);
+            await stub.broadcastTraceEvent(entryWithParsedPayload as any);
           } catch (error) {
             console.error('[EVENTS] Failed to broadcast trace event to WebSocket clients:', error);
           }
@@ -145,7 +158,13 @@ export class EventsService extends WorkerEntrypoint<Env> {
     this.ctx.waitUntil(
       (async () => {
         try {
-          await this.db.insert(traceEvents).values(batch);
+          // Stringify payloads for database insertion
+          const batchWithStringPayloads = batch.map((entry) => ({
+            ...entry,
+            payload: JSON.stringify(entry.payload),
+          }));
+
+          await this.db.insert(traceEvents).values(batchWithStringPayloads);
         } catch (error) {
           console.error('[EVENTS] Failed to insert trace events:', error);
         }
@@ -179,8 +198,14 @@ export class EventsService extends WorkerEntrypoint<Env> {
       .orderBy(traceEvents.sequence)
       .limit(options.limit || 1000);
 
+    // Manually parse JSON payloads
+    const events = results.map((row) => ({
+      ...row,
+      payload: typeof row.payload === 'string' ? JSON.parse(row.payload) : row.payload,
+    }));
+
     return {
-      events: results,
+      events,
     };
   }
 }

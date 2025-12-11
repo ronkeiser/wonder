@@ -2,7 +2,7 @@
  * Trace Event Helpers - Ergonomic trace event access for tests
  *
  * Provides typed access to trace events with semantic query methods.
- * Payload is already a parsed object from the service (no JSON.parse needed).
+ * Payloads are parsed objects returned directly from the service.
  */
 
 import type { components } from './generated/schema.js';
@@ -89,8 +89,7 @@ export class TraceEventCollection {
   private events: TypedTraceEvent[];
 
   constructor(events: TraceEventEntry[]) {
-    // Events already have parsed payloads from the service
-    // The payload is always present despite being marked optional in the generated schema
+    // Payloads are parsed objects from the service
     this.events = events as TypedTraceEvent[];
   }
 

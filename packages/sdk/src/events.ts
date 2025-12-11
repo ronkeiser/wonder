@@ -115,18 +115,8 @@ export class EventsClient {
     if (data.type === WS_MESSAGE_TYPE.EVENT) {
       if (!data.event) return;
 
-      // Parse payload if it's a JSON string (for trace events from Drizzle)
-      let event = data.event;
-      if (data.stream === 'trace' && 'payload' in event && typeof event.payload === 'string') {
-        try {
-          event = { ...event, payload: JSON.parse(event.payload) };
-        } catch (error) {
-          console.error('Failed to parse trace event payload:', error);
-        }
-      }
-
       // Attach stream property to event for routing in workflows.ts
-      const eventWithStream = { ...event, stream: data.stream } as WorkflowEvent & {
+      const eventWithStream = { ...data.event, stream: data.stream } as WorkflowEvent & {
         stream?: 'events' | 'trace';
       };
 

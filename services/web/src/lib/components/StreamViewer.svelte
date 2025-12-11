@@ -74,8 +74,9 @@
         .filter((item: any) => item.timestamp >= cutoffTime)
         .sort((a: any, b: any) => {
           if (a.timestamp !== b.timestamp) return a.timestamp - b.timestamp;
-          if (a.sequence_number && b.sequence_number) {
-            return a.sequence_number - b.sequence_number;
+          // Sort by sequence for tie-breaking
+          if (a.sequence !== undefined && b.sequence !== undefined) {
+            return a.sequence - b.sequence;
           }
           return 0;
         });
@@ -110,8 +111,9 @@
       if (existingItem.timestamp !== item.timestamp) {
         return existingItem.timestamp > item.timestamp;
       }
-      if (existingItem.sequence_number && item.sequence_number) {
-        return existingItem.sequence_number > item.sequence_number;
+      // Sort by sequence for tie-breaking
+      if (existingItem.sequence !== undefined && item.sequence !== undefined) {
+        return existingItem.sequence > item.sequence;
       }
       return false;
     });

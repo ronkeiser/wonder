@@ -9,7 +9,7 @@ import { index, integer, real, sqliteTable, text } from 'drizzle-orm/sqlite-core
  * - node_id: which node in the workflow graph
  * - token_id: which token (for parallel execution tracking)
  * - path_id: execution path for tracing
- * - sequence_number: total ordering for replay
+ * - sequence: total ordering for replay
  * - workspace_id/project_id: tenant filtering
  * - cost_usd/tokens: LLM cost tracking
  */
@@ -18,7 +18,7 @@ export const workflowEvents = sqliteTable(
   {
     id: text('id').primaryKey(),
     timestamp: integer('timestamp').notNull(),
-    sequence_number: integer('sequence_number').notNull(), // For replay ordering
+    sequence: integer('sequence').notNull(), // For replay ordering
     event_type: text('event_type').notNull(),
 
     // Execution context
@@ -50,7 +50,7 @@ export const workflowEvents = sqliteTable(
     index('idx_events_project_id').on(table.project_id),
     index('idx_events_node_id').on(table.node_id),
     index('idx_events_token_id').on(table.token_id),
-    index('idx_events_sequence').on(table.workflow_run_id, table.sequence_number),
+    index('idx_events_sequence').on(table.workflow_run_id, table.sequence),
   ],
 );
 
@@ -92,7 +92,7 @@ export const traceEvents = sqliteTable(
     duration_ms: real('duration_ms'), // For SQL queries, operation timing
 
     // Payload (structured data specific to event type)
-    payload: text('payload', { mode: 'json' }).notNull(), // JSON object with type-specific data
+    payload: text('payload').notNull(), // JSON string - parsed manually in service
   },
   (table) => [
     index('idx_trace_events_workflow_sequence').on(table.workflow_run_id, table.sequence),

@@ -32,7 +32,7 @@ export function createEmitter(
       // The service's write() method handles id, timestamp, and waitUntil internally
       eventsBinding.write(context, {
         ...input,
-        sequence_number: eventSequenceNumber,
+        sequence: eventSequenceNumber,
       });
     },
 

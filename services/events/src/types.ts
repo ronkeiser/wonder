@@ -50,7 +50,7 @@ export interface EventContext {
  */
 export interface EventInput {
   event_type: EventType | string; // Allow custom event types
-  sequence_number?: number;
+  sequence?: number;
   node_id?: string;
   token_id?: string;
   path_id?: string;
@@ -66,7 +66,7 @@ export interface EventInput {
 export interface EventEntry extends EventContext, Omit<EventInput, 'metadata'> {
   id: string;
   timestamp: number;
-  sequence_number: number;
+  sequence: number;
   metadata: string; // JSON string
 }
 
@@ -288,7 +288,7 @@ export interface TraceEventEntry extends TraceEventContext {
   token_id: string | null;
   node_id: string | null;
   duration_ms: number | null;
-  payload: TraceEventInput; // JSON object (Drizzle auto-parses with mode: 'json')
+  payload: TraceEventInput; // Parsed JSON object (service parses after query)
 }
 
 /**
