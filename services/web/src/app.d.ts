@@ -3,7 +3,9 @@
 declare global {
   namespace App {
     // interface Error {}
-    // interface Locals {}
+    interface Locals {
+      authenticated?: boolean;
+    }
     // interface PageData {}
     // interface PageState {}
     interface Platform {
@@ -12,6 +14,9 @@ declare global {
         ASSETS?: unknown;
         HTTP_URL?: string;
         API_KEY?: string;
+        AUTH_USERNAME?: string;
+        AUTH_PASSWORD?: string;
+        SESSION_SECRET?: string;
       };
     }
   }

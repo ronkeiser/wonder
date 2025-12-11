@@ -1,6 +1,24 @@
+import { verifySession } from '$lib/auth';
 import type { Handle } from '@sveltejs/kit';
+import { redirect } from '@sveltejs/kit';
 
 export const handle: Handle = async ({ event, resolve }) => {
+  // Check authentication for all requests (except login/logout)
+  const isAuthRoute = event.url.pathname.startsWith('/auth/');
+  const sessionSecret = event.platform?.env?.SESSION_SECRET;
+
+  if (sessionSecret && !isAuthRoute) {
+    const cookies = event.request.headers.get('cookie');
+    const authenticated = await verifySession(cookies, sessionSecret);
+
+    if (!authenticated) {
+      throw redirect(302, '/auth/login');
+    }
+
+    // Make auth state available to all pages
+    event.locals.authenticated = true;
+  }
+
   // Proxy API requests to the HTTP service
   if (event.url.pathname.startsWith('/api/')) {
     const httpService = event.platform?.env?.HTTP;
