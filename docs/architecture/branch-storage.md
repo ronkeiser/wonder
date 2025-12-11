@@ -13,11 +13,9 @@ The challenge: How do we store branch-isolated data in schema-driven SQL tables?
 
 ## Design: Token-Scoped Tables
 
-### Approach
-
 Each branch writes to **separate ephemeral tables** prefixed by token ID. At fan-in, data is read from all sibling token tables, merged according to strategy, and written to the main context tables.
 
-**Key insight:** Branch isolation is achieved through table namespacing, not row filtering.
+Branch isolation is achieved through table namespacing—each token gets its own set of tables generated from the schema.
 
 ### Example: 5-way fan-out for voting
 
@@ -396,35 +394,6 @@ Inner fan-in (tok_1_a through tok_1_e) merges into `branch_output_tok_1`.
 Outer fan-in (tok_1, tok_2, tok_3) merges into main `context_state`.
 
 Each level of fan-in reads from its sibling branch tables and writes to its parent's context (which might itself be a branch table).
-
-## Alternative: Single Table with token_id Column
-
-**Simpler approach:** Use a single branch_output table with a `token_id` discriminator column.
-
-```sql
-CREATE TABLE branch_outputs (
-  id INTEGER PRIMARY KEY,
-  token_id TEXT NOT NULL,
-  choice TEXT CHECK (choice IN ('A', 'B')),
-  rationale TEXT
-);
-
-CREATE INDEX idx_branch_outputs_token ON branch_outputs(token_id);
-```
-
-**Pros:**
-
-- Fewer tables (no CREATE/DROP per token)
-- Simpler schema management
-- Works with any number of parallel branches
-
-**Cons:**
-
-- Shared table for all branches (potential contention, though mitigated by DO single-threading)
-- Harder to enforce per-branch schema constraints
-- Manual cleanup (DELETE WHERE token_id IN (...))
-
-**Recommendation:** Start with token_id column approach for simplicity. Profile and switch to separate tables if CREATE/DROP overhead is acceptable.
 
 ## Decision Type Addition
 

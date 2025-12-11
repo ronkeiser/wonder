@@ -33,6 +33,7 @@
 
 - **[logs-events-decisions.md](logs-events-decisions.md)** - Three-layer architecture distinguishing pure decision logic, actor execution, and event outcomes for testability.
 - **[trace-events.md](trace-events.md)** - Line-by-line coordinator execution visibility through structured trace events stored separately from workflow events.
+- **[debugging.md](debugging.md)** - Quick reference for querying workflow events, trace events, and logs via HTTP endpoints with curl examples for common debugging patterns.
 
 ## Development
 
