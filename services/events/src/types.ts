@@ -167,6 +167,10 @@ export type DecisionEvent =
  */
 export type OperationEvent =
   | {
+      type: 'operation.context.initialize';
+      table_count: number;
+    }
+  | {
       type: 'operation.context.read';
       path: string;
       value: unknown;

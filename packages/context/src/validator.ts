@@ -10,7 +10,7 @@ import {
   validateString,
 } from './constraints.js';
 import type { CustomTypeRegistry } from './custom-types.js';
-import type { SchemaType, ValidationError, ValidationResult, ValidatorOptions } from './types.js';
+import type { JSONSchema, ValidationError, ValidationResult, ValidatorOptions } from './types.js';
 import { ValidationErrorCode } from './types.js';
 import { getType } from './utils.js';
 
@@ -18,7 +18,7 @@ export class Validator {
   private options: Required<ValidatorOptions>;
 
   constructor(
-    private schema: SchemaType,
+    private schema: JSONSchema,
     private customTypes: CustomTypeRegistry,
     options: ValidatorOptions = {},
   ) {
@@ -49,7 +49,7 @@ export class Validator {
   /**
    * Recursive value validation
    */
-  private validateValue(value: unknown, schema: SchemaType, path: string): ValidationError[] {
+  private validateValue(value: unknown, schema: JSONSchema, path: string): ValidationError[] {
     const errors: ValidationError[] = [];
 
     // Handle nullable
@@ -123,7 +123,7 @@ export class Validator {
   /**
    * Custom type validation
    */
-  private validateCustomType(value: unknown, schema: SchemaType, path: string): ValidationError[] {
+  private validateCustomType(value: unknown, schema: JSONSchema, path: string): ValidationError[] {
     const customType = this.customTypes.get(schema.type);
     if (!customType) {
       return [
@@ -168,7 +168,7 @@ export class Validator {
  */
 export function validateSchema(
   data: unknown,
-  schema: SchemaType,
+  schema: JSONSchema,
   customTypes: CustomTypeRegistry,
   options?: ValidatorOptions,
 ): ValidationResult {

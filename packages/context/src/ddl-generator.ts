@@ -1,7 +1,7 @@
-// DDL Generator - converts SchemaType to SQLite DDL
+// DDL Generator - converts JSONSchema to SQLite DDL
 
 import type { CustomTypeRegistry } from './custom-types.js';
-import type { SchemaType } from './types.js';
+import type { JSONSchema } from './types.js';
 
 export type ColumnDefinition = {
   name: string;
@@ -24,7 +24,7 @@ export class DDLGenerator {
   private options: Required<DDLGeneratorOptions>;
 
   constructor(
-    private schema: SchemaType,
+    private schema: JSONSchema,
     private customTypes: CustomTypeRegistry,
     options: DDLGeneratorOptions = {},
   ) {
@@ -76,7 +76,7 @@ export class DDLGenerator {
   /**
    * Generate column definitions from schema
    */
-  private generateColumns(schema: SchemaType, prefix: string): ColumnDefinition[] {
+  private generateColumns(schema: JSONSchema, prefix: string): ColumnDefinition[] {
     const columns: ColumnDefinition[] = [];
 
     if (!schema.properties) {
@@ -123,7 +123,7 @@ export class DDLGenerator {
   /**
    * Generate separate tables for arrays
    */
-  private generateArrayTables(parentTableName: string, schema: SchemaType): string[] {
+  private generateArrayTables(parentTableName: string, schema: JSONSchema): string[] {
     const tables: string[] = [];
 
     if (!schema.properties || this.options.arrayStrategy !== 'table') {
@@ -191,9 +191,9 @@ export class DDLGenerator {
   }
 
   /**
-   * Map SchemaType to SQLite type
+   * Map JSONSchema to SQLite type
    */
-  private mapTypeToSQL(schema: SchemaType): string {
+  private mapTypeToSQL(schema: JSONSchema): string {
     // Check if custom type with SQL mapping
     if (this.customTypes.has(schema.type)) {
       const customType = this.customTypes.get(schema.type);
@@ -228,7 +228,7 @@ export class DDLGenerator {
    * Build SQL constraints from schema
    */
   private buildConstraints(
-    schema: SchemaType,
+    schema: JSONSchema,
     isRequired: boolean,
     columnName: string,
     isJsonColumn = false,
@@ -326,7 +326,7 @@ export class DDLGenerator {
   /**
    * Collect array table names recursively
    */
-  private collectArrayTableNames(parentTableName: string, schema: SchemaType): string[] {
+  private collectArrayTableNames(parentTableName: string, schema: JSONSchema): string[] {
     const tableNames: string[] = [];
 
     if (!schema.properties) {

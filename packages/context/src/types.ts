@@ -1,14 +1,14 @@
-// Core schema type definition
-export type SchemaType = {
+// Core schema type definition (JSONSchema subset)
+export type JSONSchema = {
   type: 'string' | 'number' | 'integer' | 'boolean' | 'object' | 'array' | 'null';
 
   // Object validation
-  properties?: Record<string, SchemaType>;
+  properties?: Record<string, JSONSchema>;
   required?: string[];
   additionalProperties?: boolean;
 
   // Array validation
-  items?: SchemaType;
+  items?: JSONSchema;
 
   // String constraints
   minLength?: number;
@@ -42,7 +42,7 @@ export type SchemaType = {
 // Custom type definition (for extensibility)
 export type CustomTypeDefinition = {
   // Validation function - returns true if valid
-  validate: (value: unknown, schema: SchemaType, path: string) => boolean;
+  validate: (value: unknown, schema: JSONSchema, path: string) => boolean;
 
   // SQL mapping (for DDL generation - Phase 2)
   toSQL?: () => SQLTypeMapping;

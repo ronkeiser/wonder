@@ -1,6 +1,6 @@
 // Type-specific constraint validation logic
 
-import type { SchemaType, ValidationError } from './types.js';
+import type { JSONSchema, ValidationError } from './types.js';
 import { ValidationErrorCode } from './types.js';
 import { deepEqual, getType, isPlainObject } from './utils.js';
 
@@ -9,7 +9,7 @@ import { deepEqual, getType, isPlainObject } from './utils.js';
  */
 export function validateString(
   value: unknown,
-  schema: SchemaType,
+  schema: JSONSchema,
   path: string,
 ): ValidationError[] {
   const errors: ValidationError[] = [];
@@ -96,7 +96,7 @@ export function validateString(
  */
 export function validateNumber(
   value: unknown,
-  schema: SchemaType,
+  schema: JSONSchema,
   path: string,
 ): ValidationError[] {
   const errors: ValidationError[] = [];
@@ -207,7 +207,7 @@ export function validateNumber(
  */
 export function validateInteger(
   value: unknown,
-  schema: SchemaType,
+  schema: JSONSchema,
   path: string,
 ): ValidationError[] {
   const errors: ValidationError[] = [];
@@ -232,7 +232,7 @@ export function validateInteger(
  */
 export function validateBoolean(
   value: unknown,
-  schema: SchemaType,
+  schema: JSONSchema,
   path: string,
 ): ValidationError[] {
   const errors: ValidationError[] = [];
@@ -280,9 +280,9 @@ export function validateBoolean(
  */
 export function validateArray(
   value: unknown,
-  schema: SchemaType,
+  schema: JSONSchema,
   path: string,
-  validateValue: (value: unknown, schema: SchemaType, path: string) => ValidationError[],
+  validateValue: (value: unknown, schema: JSONSchema, path: string) => ValidationError[],
 ): ValidationError[] {
   const errors: ValidationError[] = [];
 
@@ -359,9 +359,9 @@ export function validateArray(
  */
 export function validateObject(
   value: unknown,
-  schema: SchemaType,
+  schema: JSONSchema,
   path: string,
-  validateValue: (value: unknown, schema: SchemaType, path: string) => ValidationError[],
+  validateValue: (value: unknown, schema: JSONSchema, path: string) => ValidationError[],
 ): ValidationError[] {
   const errors: ValidationError[] = [];
 
@@ -414,7 +414,7 @@ export function validateObject(
 /**
  * Validate a null value
  */
-export function validateNull(value: unknown, _schema: SchemaType, path: string): ValidationError[] {
+export function validateNull(value: unknown, _schema: JSONSchema, path: string): ValidationError[] {
   const errors: ValidationError[] = [];
 
   if (value !== null) {

@@ -34,4 +34,113 @@
  * See docs/architecture/branch-storage.md for complete design.
  */
 
-// TODO: Implement context operations using @wonder/context
+import type { JSONSchema } from '@wonder/context';
+import { CustomTypeRegistry, DDLGenerator, DMLGenerator, Validator } from '@wonder/context';
+import type { Emitter } from '@wonder/events';
+import type { ContextSnapshot } from '../types.js';
+
+// Create empty custom type registry
+const customTypes = new CustomTypeRegistry();
+
+/**
+ * Initialize main context tables from workflow schemas
+ */
+export function initializeTable(
+  sql: SqlStorage,
+  inputSchema: JSONSchema,
+  contextSchema: JSONSchema | undefined,
+  emitter: Emitter,
+): void {
+  let tableCount = 0;
+
+  // Create input table
+  if (inputSchema.type === 'object') {
+    const ddlGen = new DDLGenerator(inputSchema, customTypes);
+    const ddl = ddlGen.generateDDL('context_input');
+    sql.exec(ddl);
+    tableCount++;
+  }
+
+  // Create state table if context schema provided
+  if (contextSchema?.type === 'object') {
+    const ddlGen = new DDLGenerator(contextSchema, customTypes);
+    const ddl = ddlGen.generateDDL('context_state');
+    sql.exec(ddl);
+    tableCount++;
+  }
+
+  // Create output table (initially empty, populated at completion)
+  sql.exec(`
+    CREATE TABLE IF NOT EXISTS context_output (
+      id INTEGER PRIMARY KEY AUTOINCREMENT
+    );
+  `);
+  tableCount++;
+
+  emitter.emitTrace({
+    type: 'operation.context.initialize',
+    table_count: tableCount,
+  });
+}
+
+/**
+ * Initialize context with validated input data
+ */
+export function initializeWithInput(
+  sql: SqlStorage,
+  input: Record<string, unknown>,
+  inputSchema: JSONSchema,
+  emitter: Emitter,
+): void {
+  // Validate input against schema
+  const validator = new Validator(inputSchema, customTypes);
+  const result = validator.validate(input);
+
+  if (!result.valid) {
+    throw new Error(`Input validation failed: ${result.errors.map((e) => e.message).join(', ')}`);
+  }
+
+  // Generate and execute INSERT
+  const dmlGen = new DMLGenerator(inputSchema, customTypes);
+  const { statements, values } = dmlGen.generateInsert('context_input', input);
+
+  for (let i = 0; i < statements.length; i++) {
+    sql.exec(statements[i], values[i]);
+  }
+
+  emitter.emitTrace({
+    type: 'operation.context.write',
+    path: 'input',
+    value: input,
+  });
+}
+
+/**
+ * Read value from context at JSONPath
+ * Simplified for Chunk 1 - only supports reading entire context sections
+ */
+export function get(sql: SqlStorage, path: string): unknown {
+  // For now, only support reading 'input', 'state', 'output'
+  const tableName = `context_${path}`;
+
+  const result = sql.exec(`SELECT * FROM ${tableName} LIMIT 1;`);
+  const rows = [...result];
+
+  if (rows.length === 0) {
+    return {};
+  }
+
+  // Return first row (we only have one row per context table in simple case)
+  return rows[0];
+}
+
+/**
+ * Get read-only snapshot of entire context for decision logic
+ */
+export function getSnapshot(sql: SqlStorage): ContextSnapshot {
+  return {
+    input: (get(sql, 'input') as Record<string, unknown>) || {},
+    state: (get(sql, 'state') as Record<string, unknown>) || {},
+    output: (get(sql, 'output') as Record<string, unknown>) || {},
+  };
+}

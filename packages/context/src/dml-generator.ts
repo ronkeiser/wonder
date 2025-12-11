@@ -1,7 +1,7 @@
 // DML (Data Manipulation Language) Generator - INSERT/UPDATE/DELETE statements
 
 import type { CustomTypeRegistry } from './custom-types.js';
-import type { SchemaType } from './types.js';
+import type { JSONSchema } from './types.js';
 
 export type DMLGeneratorOptions = {
   // Strategy for nested objects: 'flatten' or 'json'
@@ -28,7 +28,7 @@ export class DMLGenerator {
   private options: Required<DMLGeneratorOptions>;
 
   constructor(
-    private schema: SchemaType,
+    private schema: JSONSchema,
     _customTypes: CustomTypeRegistry,
     options: DMLGeneratorOptions = {},
   ) {
@@ -131,7 +131,7 @@ export class DMLGenerator {
    */
   private extractColumnsAndValues(
     data: Record<string, unknown>,
-    schema: SchemaType,
+    schema: JSONSchema,
     prefix: string,
   ): { columns: string[]; vals: unknown[] } {
     const columns: string[] = [];
@@ -186,7 +186,7 @@ export class DMLGenerator {
   private generateArrayInserts(
     parentTableName: string,
     data: Record<string, unknown>,
-    schema: SchemaType,
+    schema: JSONSchema,
     parentIdPlaceholder: string,
   ): InsertResult {
     const statements: string[] = [];
@@ -247,7 +247,7 @@ export class DMLGenerator {
    */
   private generateArrayDeletes(
     parentTableName: string,
-    schema: SchemaType,
+    schema: JSONSchema,
     parentWhereClause: string,
   ): string[] {
     const statements: string[] = [];
@@ -292,7 +292,7 @@ export class DMLGenerator {
   /**
    * Collect all column names from schema (for parameterized queries)
    */
-  private collectColumns(schema: SchemaType, prefix: string, columns: string[]): void {
+  private collectColumns(schema: JSONSchema, prefix: string, columns: string[]): void {
     if (!schema.properties) {
       return;
     }
