@@ -1,5 +1,11 @@
 <script lang="ts">
   import StreamViewer from '$lib/components/StreamViewer.svelte';
+  import TabbedLayout from '$lib/components/TabbedLayout.svelte';
+
+  const tabs = [
+    { id: 'events', label: 'Events', href: '/events' },
+    { id: 'logs', label: 'Logs', href: '/logs' },
+  ];
 
   const eventTypeOptions = [
     { value: 'workflow_started', label: 'workflow_started' },
@@ -60,16 +66,18 @@
   <title>Events</title>
 </svelte:head>
 
-<StreamViewer
-  title="Events"
-  apiPath="/api/events"
-  streamPath="/api/events/stream"
-  filterLabel="Event Types"
-  filterParam="event_type"
-  filterOptions={eventTypeOptions}
-  itemsKey="events"
-  itemKey="event"
-  {subscribeMessage}
-  getItemColor={getEventColor}
-  renderItemHeader={renderEventHeader}
-/>
+<TabbedLayout {tabs} activeTabId="events">
+  <StreamViewer
+    title="Events"
+    apiPath="/api/events"
+    streamPath="/api/events/stream"
+    filterLabel="Event Types"
+    filterParam="event_type"
+    filterOptions={eventTypeOptions}
+    itemsKey="events"
+    itemKey="event"
+    {subscribeMessage}
+    getItemColor={getEventColor}
+    renderItemHeader={renderEventHeader}
+  />
+</TabbedLayout>

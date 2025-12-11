@@ -1,5 +1,11 @@
 <script lang="ts">
   import StreamViewer from '$lib/components/StreamViewer.svelte';
+  import TabbedLayout from '$lib/components/TabbedLayout.svelte';
+
+  const tabs = [
+    { id: 'events', label: 'Events', href: '/events' },
+    { id: 'logs', label: 'Logs', href: '/logs' },
+  ];
 
   const serviceOptions = [
     { value: 'coordinator', label: 'coordinator' },
@@ -49,15 +55,17 @@
   <title>Logs</title>
 </svelte:head>
 
-<StreamViewer
-  title="Logs"
-  apiPath="/api/logs"
-  streamPath="/api/logs/stream"
-  filterLabel="Services"
-  filterParam="service"
-  filterOptions={serviceOptions}
-  itemsKey="logs"
-  itemKey="log"
-  getItemColor={getLogColor}
-  renderItemHeader={renderLogHeader}
-/>
+<TabbedLayout {tabs} activeTabId="logs">
+  <StreamViewer
+    title="Logs"
+    apiPath="/api/logs"
+    streamPath="/api/logs/stream"
+    filterLabel="Services"
+    filterParam="service"
+    filterOptions={serviceOptions}
+    itemsKey="logs"
+    itemKey="log"
+    getItemColor={getLogColor}
+    renderItemHeader={renderLogHeader}
+  />
+</TabbedLayout>
