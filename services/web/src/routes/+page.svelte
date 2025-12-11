@@ -6,11 +6,7 @@
 </svelte:head>
 
 <div class="home">
-  <h1>Wonder Platform</h1>
-  <nav>
-    <a href="/events">Events</a>
-    <a href="/logs">Logs</a>
-  </nav>
+  <h1>Wonder</h1>
 </div>
 
 <style>
@@ -28,28 +24,5 @@
     font-size: 2rem;
     font-weight: 600;
     margin-bottom: 2rem;
-  }
-
-  nav {
-    display: flex;
-    gap: 1rem;
-  }
-
-  a {
-    padding: 0.75rem 1.5rem;
-    background: #21262d;
-    border: 1px solid #30363d;
-    border-radius: 6px;
-    color: #c9d1d9;
-    text-decoration: none;
-    font-size: 1rem;
-    transition:
-      background 0.2s,
-      border-color 0.2s;
-  }
-
-  a:hover {
-    background: #30363d;
-    border-color: #58a6ff;
   }
 </style>
