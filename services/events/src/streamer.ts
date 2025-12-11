@@ -1,8 +1,5 @@
 import { DurableObject } from 'cloudflare:workers';
-import { and, desc, eq, gte } from 'drizzle-orm';
-import { drizzle } from 'drizzle-orm/d1';
-import { traceEvents, workflowEvents } from './db/schema.js';
-import type { EventContext, EventEntry, TraceEventContext, TraceEventEntry } from './types.js';
+import type { EventEntry, TraceEventEntry } from './types.js';
 
 /**
  * Subscription filter for server-side event filtering
@@ -52,8 +49,6 @@ interface Subscription {
  * Durable Object for managing WebSocket connections to stream events in real-time
  */
 export class Streamer extends DurableObject {
-  private db = drizzle(this.env.DB);
-
   /**
    * Handle WebSocket upgrade and initial connection
    */
@@ -73,9 +68,6 @@ export class Streamer extends DurableObject {
       // Store empty subscriptions object in WebSocket metadata for hibernation
       server.serializeAttachment({});
       this.ctx.acceptWebSocket(server);
-
-      // Send recent events (last 5 minutes) to initialize the client
-      await this.sendRecentEvents(server);
 
       return new Response(null, {
         status: 101,
@@ -113,29 +105,6 @@ export class Streamer extends DurableObject {
         JSON.stringify({
           type: 'error',
           message: 'Invalid subscription message',
-        }),
-      );
-    }
-  }
-
-  /**
-   * Fetch and send the last 5 minutes of events to a client
-   */
-  async sendRecentEvents(ws: WebSocket): Promise<void> {
-    const fiveMinutesAgo = Date.now() - 5 * 60 * 1000;
-
-    const recentEvents = await this.db
-      .select()
-      .from(workflowEvents)
-      .where(gte(workflowEvents.timestamp, fiveMinutesAgo))
-      .orderBy(desc(workflowEvents.timestamp))
-      .limit(100);
-
-    if (recentEvents.length > 0) {
-      ws.send(
-        JSON.stringify({
-          type: 'history',
-          events: [...recentEvents].reverse(), // Send oldest first
         }),
       );
     }

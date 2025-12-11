@@ -1,14 +1,9 @@
 import { DurableObject } from 'cloudflare:workers';
-import { and, desc, eq, gte } from 'drizzle-orm';
-import { drizzle } from 'drizzle-orm/d1';
-import { logs } from './db/schema.js';
 
 /**
  * Durable Object for managing WebSocket connections to stream logs in real-time
  */
 export class Streamer extends DurableObject {
-  private db = drizzle(this.env.DB);
-
   /**
    * Handle WebSocket upgrade and initial connection
    */
@@ -27,9 +22,6 @@ export class Streamer extends DurableObject {
 
       this.ctx.acceptWebSocket(server);
 
-      // Send recent logs (last 5 minutes) to initialize the client
-      await this.sendRecentLogs(server);
-
       return new Response(null, {
         status: 101,
         webSocket: client,
@@ -37,29 +29,6 @@ export class Streamer extends DurableObject {
     }
 
     return new Response('Not Found', { status: 404 });
-  }
-
-  /**
-   * Fetch and send the last 5 minutes of logs to a client
-   */
-  async sendRecentLogs(ws: WebSocket): Promise<void> {
-    const fiveMinutesAgo = Date.now() - 5 * 60 * 1000;
-
-    const recentLogs = await this.db
-      .select()
-      .from(logs)
-      .where(gte(logs.timestamp, fiveMinutesAgo))
-      .orderBy(desc(logs.timestamp))
-      .limit(100);
-
-    if (recentLogs.length > 0) {
-      ws.send(
-        JSON.stringify({
-          type: 'history',
-          logs: [...recentLogs].reverse(), // Send oldest first
-        }),
-      );
-    }
   }
 
   /**
