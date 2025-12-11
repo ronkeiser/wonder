@@ -9,27 +9,8 @@ import { createClient as createGeneratedClient } from './generated/client';
 import type { paths } from './generated/schema';
 import { createWorkflowsClient } from './workflows';
 
-export type * from './generated/schema';
-
-// Export builders
 export { node, schema, transition, workflowDef } from './builders';
 
-// Export trace helpers
-export { TraceEventCollection } from './trace-helpers';
-export type { TraceEventEntry, TracePayloads, TypedTraceEvent } from './trace-helpers';
-
-// Export types
-export type {
-  EventsClient,
-  EventStreamSubscription,
-  Subscription,
-  SubscriptionFilter,
-} from './events';
-export type { StreamOptions, StreamResult } from './workflows';
-
-/**
- * Unified Wonder client with SDK methods, WebSocket events, and raw HTTP access
- */
 export interface WonderClient extends Omit<ReturnType<typeof createGeneratedClient>, 'workflows'> {
   // Events client extends generated events with WebSocket capabilities
   events: EventsClient;
@@ -73,5 +54,3 @@ export function createClient(
     PATCH: baseClient.PATCH.bind(baseClient),
   };
 }
-
-export const client = createClient();

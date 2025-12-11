@@ -3,9 +3,7 @@
   "version": "0.0.1",
   "type": "module",
   "exports": {
-    ".": "./src/index.ts",
-    "./generated/client": "./src/generated/client.ts",
-    "./schema": "./src/generated/schema.d.ts"
+    ".": "./src/index.ts"
   },
   "scripts": {
     "generate": "tsx scripts/generate.ts",
