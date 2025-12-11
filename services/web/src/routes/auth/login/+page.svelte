@@ -54,49 +54,53 @@
   }
 
   .login-card {
-    background: var(--gray-darker);
-    padding: 2.5rem;
-    border-radius: 8px;
-    border: 1px solid var(--gray);
+    background: transparent;
+    padding: 1.5rem;
     width: 100%;
-    max-width: 400px;
+    max-width: 280px;
   }
 
   h1 {
-    margin: 0 0 2rem 0;
+    margin: 0 0 1.5rem 0;
     text-align: center;
     color: var(--gray-lighter);
-    font-weight: 600;
-    font-size: 1.75rem;
+    font-weight: 400;
+    font-size: 0.875rem;
+    letter-spacing: 0.1em;
+    text-transform: uppercase;
   }
 
   .form-group {
-    margin-bottom: 1.25rem;
+    margin-bottom: 0.875rem;
   }
 
   label {
     display: block;
-    margin-bottom: 0.5rem;
-    color: var(--gray-lighter);
-    font-weight: 500;
-    font-size: 0.875rem;
+    margin-bottom: 0.25rem;
+    color: var(--gray-light);
+    font-weight: 400;
+    font-size: 0.625rem;
+    text-transform: uppercase;
+    letter-spacing: 0.05em;
   }
 
   input {
     width: 100%;
-    padding: 0.75rem;
-    background: var(--gray-darkest);
-    border: 1px solid var(--gray);
-    border-radius: 6px;
-    font-size: 1rem;
+    padding: 0.5rem 0.625rem;
+    background: transparent;
+    border: none;
+    border-bottom: 1px solid var(--gray-dark);
+    border-radius: 0;
+    font-size: 0.75rem;
     color: var(--gray-lighter);
     box-sizing: border-box;
     font-family: inherit;
+    transition: border-color 0.2s;
   }
 
   input:focus {
     outline: none;
-    border-color: var(--accent);
+    border-bottom-color: var(--accent);
   }
 
   input:disabled {
@@ -106,20 +110,24 @@
 
   button {
     width: 100%;
-    padding: 0.75rem;
-    background: var(--accent);
-    color: var(--gray-darkest);
-    border: none;
-    border-radius: 6px;
-    font-size: 1rem;
-    font-weight: 600;
+    padding: 0.5rem;
+    background: transparent;
+    color: var(--gray-lighter);
+    border: 1px solid var(--gray-dark);
+    border-radius: 0;
+    font-size: 0.625rem;
+    font-weight: 400;
     cursor: pointer;
     margin-top: 1rem;
     font-family: inherit;
+    text-transform: uppercase;
+    letter-spacing: 0.1em;
+    transition: all 0.2s;
   }
 
   button:hover:not(:disabled) {
-    background: var(--accent-hover);
+    border-color: var(--accent);
+    color: var(--accent);
   }
 
   button:disabled {
@@ -128,13 +136,14 @@
   }
 
   .error {
-    padding: 0.75rem;
-    background: var(--error-bg);
+    padding: 0.5rem;
+    background: transparent;
     color: var(--error-text);
-    border: 1px solid var(--error-text);
-    border-radius: 6px;
-    margin-bottom: 1rem;
-    text-align: center;
-    font-size: 0.875rem;
+    border: none;
+    border-left: 2px solid var(--error-text);
+    border-radius: 0;
+    margin-bottom: 0.75rem;
+    text-align: left;
+    font-size: 0.625rem;
   }
 </style>
