@@ -351,7 +351,7 @@
   .stream-viewer {
     display: flex;
     flex-direction: column;
-    height: 100vh;
+    height: 100%;
     background: var(--bg-primary);
     color: var(--text-primary);
   }
