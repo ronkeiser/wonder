@@ -140,7 +140,11 @@ export class EventsClient {
    * Subscribe to event/trace stream via WebSocket with server-side filtering
    */
   async subscribe(subscriptions: Subscription[]): Promise<EventStreamSubscription> {
-    const url = `${this.wsUrl}/api/events/stream`;
+    let url = `${this.wsUrl}/api/events/stream`;
+    // Add API key as query parameter for WebSocket auth (can't use headers in browser WebSocket)
+    if (this.apiKey) {
+      url += `?apiKey=${encodeURIComponent(this.apiKey)}`;
+    }
     const ws = new WebSocket(url);
     const callbacks = new Map(subscriptions.map((s) => [s.id, s.callback]));
     const errorCallbacks: Array<(error: Error) => void> = [];
