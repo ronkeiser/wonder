@@ -1,8 +1,8 @@
 import { DurableObject } from 'cloudflare:workers';
 import { and, desc, eq, gte } from 'drizzle-orm';
 import { drizzle } from 'drizzle-orm/d1';
-import { workflowEvents } from './db/schema.js';
-import type { EventEntry, TraceEventEntry } from './types.js';
+import { traceEvents, workflowEvents } from './db/schema.js';
+import type { EventContext, EventEntry, TraceEventContext, TraceEventEntry } from './types.js';
 import uiHTML from './web/ui.html';
 
 /**
@@ -54,7 +54,6 @@ interface Subscription {
  */
 export class Streamer extends DurableObject {
   private db = drizzle(this.env.DB);
-  private subscriptions = new WeakMap<WebSocket, Map<string, Subscription>>();
 
   /**
    * Handle WebSocket upgrade and initial connection
@@ -79,10 +78,9 @@ export class Streamer extends DurableObject {
       const pair = new WebSocketPair();
       const [client, server] = Object.values(pair);
 
+      // Store empty subscriptions object in WebSocket metadata for hibernation
+      server.serializeAttachment({});
       this.ctx.acceptWebSocket(server);
-
-      // Initialize empty subscription map for this connection
-      this.subscriptions.set(server, new Map());
 
       // Send recent events (last 5 minutes) to initialize the client
       await this.sendRecentEvents(server);
@@ -102,18 +100,20 @@ export class Streamer extends DurableObject {
   webSocketMessage(ws: WebSocket, message: string): void {
     try {
       const msg = JSON.parse(message) as SubscriptionMessage;
-      const subs = this.subscriptions.get(ws);
 
-      if (!subs) return;
+      // Get subscriptions from hibernation-safe WebSocket metadata
+      const subsObj = (ws.deserializeAttachment() as Record<string, Subscription>) || {};
 
       if (msg.type === 'subscribe') {
-        subs.set(msg.id, {
+        subsObj[msg.id] = {
           id: msg.id,
           stream: msg.stream,
           filters: msg.filters,
-        });
+        };
+        ws.serializeAttachment(subsObj);
       } else if (msg.type === 'unsubscribe') {
-        subs.delete(msg.id);
+        delete subsObj[msg.id];
+        ws.serializeAttachment(subsObj);
       }
     } catch (error) {
       console.error('Error handling WebSocket message:', error);
@@ -154,11 +154,11 @@ export class Streamer extends DurableObject {
    */
   async broadcast(eventEntry: EventEntry): Promise<void> {
     this.ctx.getWebSockets().forEach((ws) => {
-      const subs = this.subscriptions.get(ws);
-      if (!subs) return;
+      // Get subscriptions from hibernation-safe WebSocket metadata
+      const subsObj = (ws.deserializeAttachment() as Record<string, Subscription>) || {};
 
       // Find matching subscriptions
-      for (const sub of subs.values()) {
+      for (const sub of Object.values(subsObj)) {
         if (sub.stream === 'events' && this.matchesEventFilter(eventEntry, sub.filters)) {
           try {
             ws.send(
@@ -182,11 +182,11 @@ export class Streamer extends DurableObject {
    */
   async broadcastTraceEvent(traceEntry: TraceEventEntry): Promise<void> {
     this.ctx.getWebSockets().forEach((ws) => {
-      const subs = this.subscriptions.get(ws);
-      if (!subs) return;
+      // Get subscriptions from hibernation-safe WebSocket metadata
+      const subsObj = (ws.deserializeAttachment() as Record<string, Subscription>) || {};
 
       // Find matching subscriptions
-      for (const sub of subs.values()) {
+      for (const sub of Object.values(subsObj)) {
         if (sub.stream === 'trace' && this.matchesTraceFilter(traceEntry, sub.filters)) {
           try {
             ws.send(
@@ -234,10 +234,12 @@ export class Streamer extends DurableObject {
     if (filter.category && event.category !== filter.category) return false;
     if (filter.type && event.type !== filter.type) return false;
     if (
-      filter.min_duration_ms &&
-      (!event.duration_ms || event.duration_ms < filter.min_duration_ms)
-    )
+      filter.min_duration_ms !== undefined &&
+      event.duration_ms !== null &&
+      event.duration_ms < filter.min_duration_ms
+    ) {
       return false;
+    }
 
     return true;
   }
@@ -246,7 +248,6 @@ export class Streamer extends DurableObject {
    * Handle WebSocket close events
    */
   webSocketClose(ws: WebSocket, code: number, reason: string): void {
-    this.subscriptions.delete(ws);
     ws.close(code, reason);
   }
 
@@ -255,6 +256,5 @@ export class Streamer extends DurableObject {
    */
   webSocketError(ws: WebSocket, error: unknown): void {
     console.error('WebSocket error:', error);
-    this.subscriptions.delete(ws);
   }
 }

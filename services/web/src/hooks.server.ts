@@ -9,7 +9,8 @@ export const handle: Handle = async ({ event, resolve }) => {
     }
 
     // For WebSocket upgrades, forward to HTTP service
-    if (event.request.headers.get('upgrade') === 'websocket') {
+    const upgrade = event.request.headers.get('upgrade');
+    if (upgrade?.toLowerCase() === 'websocket') {
       return httpService.fetch(event.request);
     }
 
