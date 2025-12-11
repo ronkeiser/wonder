@@ -762,8 +762,10 @@
       function connect() {
         setStatus('connecting');
 
-        const protocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
-        const ws = new WebSocket(`${protocol}//${window.location.host}/stream`);
+        const httpServiceUrl = window.location.origin.replace('wonder-logs', 'wonder-http');
+        const protocol = httpServiceUrl.startsWith('https') ? 'wss:' : 'ws:';
+        const host = httpServiceUrl.replace(/^https?:\/\//, '');
+        const ws = new WebSocket(`${protocol}//${host}/api/logs/stream`);
 
         ws.onopen = () => {
           setStatus('connected');

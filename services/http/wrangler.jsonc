@@ -27,6 +27,16 @@
         "class_name": "WorkflowCoordinator",
         "script_name": "wonder-coordinator",
       },
+      {
+        "name": "EVENTS_STREAMER",
+        "class_name": "Streamer",
+        "script_name": "wonder-events",
+      },
+      {
+        "name": "LOGS_STREAMER",
+        "class_name": "Streamer",
+        "script_name": "wonder-logs",
+      },
     ],
   },
   "observability": {
