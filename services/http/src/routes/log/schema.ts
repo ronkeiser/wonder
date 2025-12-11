@@ -23,4 +23,6 @@ export const LogEntrySchema = z.object({
   metadata: z.string(),
 });
 
-export const LogsResponseSchema = z.array(LogEntrySchema);
+export const LogsResponseSchema = z.object({
+  logs: z.array(LogEntrySchema),
+});
