@@ -47,7 +47,7 @@
     display: flex;
     justify-content: space-between;
     align-items: center;
-    height: 4rem;
+    height: 3.5rem;
     padding: 0 1rem;
     background: var(--bg-secondary);
     border-bottom: 1px solid var(--border);
