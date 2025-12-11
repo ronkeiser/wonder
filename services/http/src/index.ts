@@ -5,7 +5,7 @@
 
 import { OpenAPIHono } from '@hono/zod-openapi';
 import { cors } from 'hono/cors';
-import { requireApiKey } from './middleware/auth';
+import { auth } from './middleware/auth';
 import { actions } from './routes/action/route';
 import { events } from './routes/event/route';
 import { logs } from './routes/log/route';
@@ -32,7 +32,7 @@ app.use('/*', cors());
 app.get('/health', (c) => c.text('OK'));
 
 // API key authentication for all API routes
-// app.use('/api/*', requireApiKey);
+app.use('/api/*', auth);
 
 // Mount resource routes
 const routes = app
