@@ -42,7 +42,7 @@ export interface EventContext {
   workspace_id: string;
   project_id: string;
   workflow_def_id: string;
-  parent_run_id?: string;
+  parent_run_id?: string | null;
 }
 
 /**
@@ -51,12 +51,12 @@ export interface EventContext {
 export interface EventInput {
   event_type: EventType | string; // Allow custom event types
   sequence?: number;
-  node_id?: string;
-  token_id?: string;
-  path_id?: string;
-  tokens?: number; // For LLM calls
-  cost_usd?: number; // For LLM calls
-  message?: string;
+  node_id?: string | null;
+  token_id?: string | null;
+  path_id?: string | null;
+  tokens?: number | null; // For LLM calls
+  cost_usd?: number | null; // For LLM calls
+  message?: string | null;
   metadata?: Record<string, unknown>;
 }
 
@@ -68,6 +68,16 @@ export interface EventEntry extends EventContext, Omit<EventInput, 'metadata'> {
   timestamp: number;
   sequence: number;
   metadata: string; // JSON string
+}
+
+/**
+ * Event entry with parsed metadata for WebSocket broadcasting
+ */
+export interface BroadcastEventEntry extends EventContext, EventInput {
+  id: string;
+  timestamp: number;
+  sequence: number;
+  metadata: Record<string, unknown>;
 }
 
 /**
@@ -288,7 +298,22 @@ export interface TraceEventEntry extends TraceEventContext {
   token_id: string | null;
   node_id: string | null;
   duration_ms: number | null;
-  payload: TraceEventInput; // Parsed JSON object (service parses after query)
+  payload: string; // JSON string in DB
+}
+
+/**
+ * Trace event entry with parsed payload for WebSocket broadcasting
+ */
+export interface BroadcastTraceEventEntry extends TraceEventContext {
+  id: string;
+  sequence: number;
+  timestamp: number;
+  type: string;
+  category: TraceEventCategory;
+  token_id: string | null;
+  node_id: string | null;
+  duration_ms: number | null;
+  payload: TraceEventInput; // Parsed object
 }
 
 /**

@@ -4,11 +4,13 @@ import { drizzle } from 'drizzle-orm/d1';
 import { ulid } from 'ulid';
 import { traceEvents, workflowEvents } from './db/schema.js';
 import type {
+  BroadcastTraceEventEntry,
   EventContext,
   EventEntry,
   EventInput,
   GetEventsOptions,
   GetTraceEventsOptions,
+  TraceEventCategory,
   TraceEventContext,
   TraceEventEntry,
   TraceEventInput,
@@ -64,7 +66,7 @@ export class EventsService extends WorkerEntrypoint<Env> {
           const entryWithParsedMetadata = {
             ...eventEntry,
             metadata: input.metadata || {},
-          } as any as EventEntry;
+          };
 
           // Broadcast to connected WebSocket clients
           try {
@@ -84,7 +86,7 @@ export class EventsService extends WorkerEntrypoint<Env> {
   /**
    * RPC method - retrieves events from D1
    */
-  async getEvents(options: GetEventsOptions = {}) {
+  async getEvents(options: GetEventsOptions = {}): Promise<{ events: EventEntry[] }> {
     const events = await this.db
       .select()
       .from(workflowEvents)
@@ -140,7 +142,7 @@ export class EventsService extends WorkerEntrypoint<Env> {
           try {
             const id = this.env.STREAMER.idFromName('events-streamer');
             const stub = this.env.STREAMER.get(id);
-            await stub.broadcastTraceEvent(entryWithParsedPayload as any);
+            await stub.broadcastTraceEvent(entryWithParsedPayload);
           } catch (error) {
             console.error('[EVENTS] Failed to broadcast trace event to WebSocket clients:', error);
           }
@@ -175,7 +177,9 @@ export class EventsService extends WorkerEntrypoint<Env> {
   /**
    * RPC method - retrieves trace events from D1
    */
-  async getTraceEvents(options: GetTraceEventsOptions = {}) {
+  async getTraceEvents(
+    options: GetTraceEventsOptions = {},
+  ): Promise<{ events: BroadcastTraceEventEntry[] }> {
     const results = await this.db
       .select()
       .from(traceEvents)
@@ -201,6 +205,7 @@ export class EventsService extends WorkerEntrypoint<Env> {
     // Manually parse JSON payloads
     const events = results.map((row) => ({
       ...row,
+      category: row.category as TraceEventCategory,
       payload: typeof row.payload === 'string' ? JSON.parse(row.payload) : row.payload,
     }));
 

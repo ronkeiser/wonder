@@ -1,5 +1,5 @@
 import { DurableObject } from 'cloudflare:workers';
-import type { EventEntry, TraceEventEntry } from './types.js';
+import type { BroadcastEventEntry, BroadcastTraceEventEntry } from './types.js';
 
 /**
  * Subscription filter for server-side event filtering
@@ -113,7 +113,7 @@ export class Streamer extends DurableObject {
   /**
    * Broadcast a new event entry to all connected WebSocket clients
    */
-  async broadcast(eventEntry: EventEntry): Promise<void> {
+  async broadcast(eventEntry: BroadcastEventEntry): Promise<void> {
     this.ctx.getWebSockets().forEach((ws) => {
       // Get subscriptions from hibernation-safe WebSocket metadata
       const subsObj = (ws.deserializeAttachment() as Record<string, Subscription>) || {};
@@ -141,7 +141,7 @@ export class Streamer extends DurableObject {
   /**
    * Broadcast trace event to subscribed clients
    */
-  async broadcastTraceEvent(traceEntry: TraceEventEntry): Promise<void> {
+  async broadcastTraceEvent(traceEntry: BroadcastTraceEventEntry): Promise<void> {
     this.ctx.getWebSockets().forEach((ws) => {
       // Get subscriptions from hibernation-safe WebSocket metadata
       const subsObj = (ws.deserializeAttachment() as Record<string, Subscription>) || {};
@@ -169,7 +169,7 @@ export class Streamer extends DurableObject {
   /**
    * Check if workflow event matches subscription filter
    */
-  private matchesEventFilter(event: EventEntry, filter: SubscriptionFilter): boolean {
+  private matchesEventFilter(event: BroadcastEventEntry, filter: SubscriptionFilter): boolean {
     if (filter.workflow_run_id && event.workflow_run_id !== filter.workflow_run_id) return false;
     if (filter.parent_run_id && event.parent_run_id !== filter.parent_run_id) return false;
     if (filter.workspace_id && event.workspace_id !== filter.workspace_id) return false;
@@ -186,7 +186,7 @@ export class Streamer extends DurableObject {
   /**
    * Check if trace event matches subscription filter
    */
-  private matchesTraceFilter(event: TraceEventEntry, filter: SubscriptionFilter): boolean {
+  private matchesTraceFilter(event: BroadcastTraceEventEntry, filter: SubscriptionFilter): boolean {
     if (filter.workflow_run_id && event.workflow_run_id !== filter.workflow_run_id) return false;
     if (filter.workspace_id && event.workspace_id !== filter.workspace_id) return false;
     if (filter.project_id && event.project_id !== filter.project_id) return false;
