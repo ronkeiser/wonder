@@ -9,6 +9,39 @@
     { value: 'resources', label: 'resources' },
     { value: 'http', label: 'http' },
   ];
+
+  const levelColorMap: Record<string, string> = {
+    error: 'var(--red)',
+    warn: 'var(--yellow)',
+    info: 'var(--blue)',
+    debug: 'var(--gray)',
+  };
+
+  function getLogColor(item: any): string {
+    return levelColorMap[item.level] || 'var(--gray)';
+  }
+
+  function formatTime(timestamp: number): string {
+    const date = new Date(timestamp);
+    return date.toLocaleTimeString('en-US', {
+      hour12: false,
+      hour: '2-digit',
+      minute: '2-digit',
+      second: '2-digit',
+      fractionalSecondDigits: 3,
+    });
+  }
+
+  function renderLogHeader(item: any) {
+    return {
+      time: formatTime(item.timestamp),
+      parts: [
+        { text: `[${item.level}]`, class: 'item-level' },
+        { text: item.service, class: 'item-service' },
+        { text: item.message, class: 'item-message' },
+      ],
+    };
+  }
 </script>
 
 <svelte:head>
@@ -16,9 +49,14 @@
 </svelte:head>
 
 <StreamViewer
-  type="logs"
+  title="Logs"
   apiPath="/api/logs"
   streamPath="/api/logs/stream"
-  filterType="service"
+  filterLabel="Services"
+  filterParam="service"
   filterOptions={serviceOptions}
+  itemsKey="logs"
+  itemKey="log"
+  getItemColor={getLogColor}
+  renderItemHeader={renderLogHeader}
 />

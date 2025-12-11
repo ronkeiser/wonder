@@ -2,14 +2,35 @@
   import { onMount, onDestroy } from 'svelte';
 
   interface Props {
-    type: 'events' | 'logs';
+    title: string;
     apiPath: string;
     streamPath: string;
-    filterType: 'event_type' | 'service';
+    filterLabel: string;
+    filterParam: string;
     filterOptions: Array<{ value: string; label: string }>;
+    itemsKey: string; // e.g., 'events' or 'logs'
+    itemKey: string; // e.g., 'event' or 'log'
+    subscribeMessage?: object; // Optional WebSocket subscription message
+    getItemColor?: (item: any) => string;
+    renderItemHeader: (item: any) => {
+      time: string;
+      parts: Array<{ text: string; class?: string }>;
+    };
   }
 
-  let { type, apiPath, streamPath, filterType, filterOptions }: Props = $props();
+  let {
+    title,
+    apiPath,
+    streamPath,
+    filterLabel,
+    filterParam,
+    filterOptions,
+    itemsKey,
+    itemKey,
+    subscribeMessage,
+    getItemColor,
+    renderItemHeader,
+  }: Props = $props();
 
   let items = $state<any[]>([]);
   let status = $state<'connected' | 'disconnected' | 'connecting'>('disconnected');
@@ -19,9 +40,6 @@
   let ws: WebSocket | null = null;
   let seenIds = new Set<string>();
 
-  const itemKey = type === 'events' ? 'event' : 'log';
-  const itemsKey = type === 'events' ? 'events' : 'logs';
-
   function formatJsonPretty(obj: any) {
     const json = JSON.stringify(obj, null, 2);
     return json.replace(/"((?:[^"\\]|\\.)*)"/g, (match, content) => {
@@ -30,39 +48,11 @@
     });
   }
 
-  function formatTime(timestamp: number) {
-    const date = new Date(timestamp);
-    return date.toLocaleTimeString('en-US', {
-      hour12: false,
-      hour: '2-digit',
-      minute: '2-digit',
-      second: '2-digit',
-      fractionalSecondDigits: 3,
-    });
-  }
-
-  function getItemColor(item: any) {
-    if (type === 'events') {
-      const colorMap: Record<string, string> = {
-        workflow_started: 'var(--blue)',
-        workflow_completed: 'var(--green)',
-        workflow_failed: 'var(--red)',
-        task_started: 'var(--indigo)',
-        task_completed: 'var(--violet)',
-        task_failed: 'var(--orange)',
-        error: 'var(--red)',
-        warning: 'var(--yellow)',
-      };
-      return colorMap[item.event_type] || 'var(--gray)';
-    } else {
-      const levelMap: Record<string, string> = {
-        error: 'var(--red)',
-        warn: 'var(--yellow)',
-        info: 'var(--blue)',
-        debug: 'var(--gray)',
-      };
-      return levelMap[item.level] || 'var(--gray)';
+  function getColor(item: any): string {
+    if (getItemColor) {
+      return getItemColor(item);
     }
+    return 'var(--gray)';
   }
 
   async function filterItemsByTime(minutes: number) {
@@ -76,7 +66,7 @@
       const url = new URL(apiPath, window.location.origin);
       url.searchParams.set('limit', '1000');
       if (currentFilter) {
-        url.searchParams.set(filterType, currentFilter);
+        url.searchParams.set(filterParam, currentFilter);
       }
 
       const response = await fetch(url);
@@ -86,7 +76,7 @@
         .filter((item: any) => item.timestamp >= cutoffTime)
         .sort((a: any, b: any) => {
           if (a.timestamp !== b.timestamp) return a.timestamp - b.timestamp;
-          if (type === 'events' && a.sequence_number && b.sequence_number) {
+          if (a.sequence_number && b.sequence_number) {
             return a.sequence_number - b.sequence_number;
           }
           return 0;
@@ -95,7 +85,7 @@
       items = filtered;
       filtered.forEach((item: any) => seenIds.add(item.id));
     } catch (error) {
-      console.error(`Failed to fetch ${type}:`, error);
+      console.error(`Failed to fetch items:`, error);
     }
   }
 
@@ -105,7 +95,7 @@
 
     // Check if item matches current filter
     if (currentFilter) {
-      const itemFilterValue = type === 'events' ? item.event_type : item.service;
+      const itemFilterValue = item[filterParam];
       if (itemFilterValue !== currentFilter) return;
     }
 
@@ -114,7 +104,7 @@
       if (existingItem.timestamp !== item.timestamp) {
         return existingItem.timestamp > item.timestamp;
       }
-      if (type === 'events' && existingItem.sequence_number && item.sequence_number) {
+      if (existingItem.sequence_number && item.sequence_number) {
         return existingItem.sequence_number > item.sequence_number;
       }
       return false;
@@ -150,15 +140,8 @@
       status = 'connected';
       console.log('WebSocket connected');
 
-      if (type === 'events') {
-        ws?.send(
-          JSON.stringify({
-            type: 'subscribe',
-            id: 'events',
-            stream: 'events',
-            filters: {},
-          }),
-        );
+      if (subscribeMessage) {
+        ws?.send(JSON.stringify(subscribeMessage));
       }
     };
 
@@ -197,7 +180,7 @@
     // Load filters from URL params
     const urlParams = new URLSearchParams(window.location.search);
     const savedMinutes = urlParams.get('m');
-    const savedFilter = urlParams.get(filterType);
+    const savedFilter = urlParams.get(filterParam);
     const savedPretty = urlParams.get('pretty');
 
     if (savedMinutes) timeFilterMinutes = parseInt(savedMinutes);
@@ -217,9 +200,9 @@
 
     const url = new URL(window.location.href);
     if (value) {
-      url.searchParams.set(filterType, value);
+      url.searchParams.set(filterParam, value);
     } else {
-      url.searchParams.delete(filterType);
+      url.searchParams.delete(filterParam);
     }
     window.history.pushState({}, '', url);
 
@@ -251,14 +234,14 @@
 
 <div class="stream-viewer">
   <header>
-    <h1>{type === 'events' ? 'Events' : 'Logs'}</h1>
+    <h1>{title}</h1>
     <div class="controls">
       <select
         class="filter-select"
         bind:value={currentFilter}
         onchange={(e) => handleFilterChange(e.currentTarget.value)}
       >
-        <option value="">All {type === 'events' ? 'Event Types' : 'Services'}</option>
+        <option value="">All {filterLabel}</option>
         {#each filterOptions as option}
           <option value={option.value}>{option.label}</option>
         {/each}
@@ -300,23 +283,14 @@
 
   <div class="items" id="items-container">
     {#each items as item (item.id)}
-      <div class="item-entry" style="border-left-color: {getItemColor(item)}">
+      {@const header = renderItemHeader(item)}
+      <div class="item-entry" style="border-left-color: {getColor(item)}">
         <div class="item-content">
           <div class="item-header">
-            <span class="item-time">{formatTime(item.timestamp)}</span>
-            {#if type === 'events'}
-              <span class="item-type">{item.event_type}</span>
-              {#if item.workflow_id}
-                <span class="item-id">workflow:{item.workflow_id}</span>
-              {/if}
-              {#if item.task_id}
-                <span class="item-id">task:{item.task_id}</span>
-              {/if}
-            {:else}
-              <span class="item-level">[{item.level}]</span>
-              <span class="item-service">{item.service}</span>
-              <span class="item-message">{item.message}</span>
-            {/if}
+            <span class="item-time">{header.time}</span>
+            {#each header.parts as part}
+              <span class={part.class || 'item-part'}>{part.text}</span>
+            {/each}
           </div>
           {#if item.metadata && typeof item.metadata === 'object'}
             <pre class="item-metadata json-data">{prettyPrintEnabled
@@ -595,6 +569,10 @@
   .item-time {
     color: var(--text-secondary);
     font-weight: 500;
+  }
+
+  .item-part {
+    color: var(--text-primary);
   }
 
   .item-type,
