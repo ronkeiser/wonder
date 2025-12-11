@@ -522,7 +522,8 @@
         const cutoffTime = Date.now() - minutes * 60 * 1000;
 
         try {
-          const url = new URL('/logs', window.location.origin);
+          const httpServiceUrl = window.location.origin.replace('wonder-logs', 'wonder-http');
+          const url = new URL('/api/logs', httpServiceUrl);
           url.searchParams.set('limit', '1000');
           if (currentService) {
             url.searchParams.set('service', currentService);

@@ -530,7 +530,8 @@
         const cutoffTime = Date.now() - minutes * 60 * 1000;
 
         try {
-          const url = new URL('/events', window.location.origin);
+          const httpServiceUrl = window.location.origin.replace('wonder-events', 'wonder-http');
+          const url = new URL('/api/events', httpServiceUrl);
           url.searchParams.set('limit', '1000');
           if (currentEventType) {
             url.searchParams.set('event_type', currentEventType);
@@ -800,14 +801,16 @@
         ws.onopen = () => {
           setStatus('connected');
           console.log('WebSocket connected');
-          
+
           // Subscribe to all events (no filters)
-          ws.send(JSON.stringify({
-            type: 'subscribe',
-            id: 'events',
-            stream: 'events',
-            filters: {}
-          }));
+          ws.send(
+            JSON.stringify({
+              type: 'subscribe',
+              id: 'events',
+              stream: 'events',
+              filters: {},
+            }),
+          );
         };
 
         ws.onmessage = (message) => {

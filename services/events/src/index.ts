@@ -38,26 +38,7 @@ export class EventsService extends WorkerEntrypoint<Env> {
       return stub.fetch(request);
     }
 
-    if (url.pathname === '/events') {
-      const options: GetEventsOptions = {
-        workflow_run_id: url.searchParams.get('workflow_run_id') || undefined,
-        parent_run_id: url.searchParams.get('parent_run_id') || undefined,
-        workspace_id: url.searchParams.get('workspace_id') || undefined,
-        project_id: url.searchParams.get('project_id') || undefined,
-        event_type: url.searchParams.get('event_type') || undefined,
-        node_id: url.searchParams.get('node_id') || undefined,
-        token_id: url.searchParams.get('token_id') || undefined,
-        limit: url.searchParams.has('limit') ? parseInt(url.searchParams.get('limit')!) : undefined,
-        after_sequence: url.searchParams.has('after_sequence')
-          ? parseInt(url.searchParams.get('after_sequence')!)
-          : undefined,
-      };
-
-      const results = await this.getEvents(options);
-      return Response.json(results);
-    }
-
-    return new Response('Events service', { status: 200 });
+    return new Response('Events service - RPC only', { status: 200 });
   }
 
   /**

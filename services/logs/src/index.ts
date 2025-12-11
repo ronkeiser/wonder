@@ -35,24 +35,7 @@ export class LogsService extends WorkerEntrypoint<Env> {
       return stub.fetch(request);
     }
 
-    if (url.pathname === '/logs') {
-      const options: GetLogsOptions = {
-        service: url.searchParams.get('service') || undefined,
-        level: (url.searchParams.get('level') as LogLevel) || undefined,
-        event_type: url.searchParams.get('event_type') || undefined,
-        trace_id: url.searchParams.get('trace_id') || undefined,
-        request_id: url.searchParams.get('request_id') || undefined,
-        workspace_id: url.searchParams.get('workspace_id') || undefined,
-        project_id: url.searchParams.get('project_id') || undefined,
-        user_id: url.searchParams.get('user_id') || undefined,
-        limit: url.searchParams.has('limit') ? parseInt(url.searchParams.get('limit')!) : undefined,
-      };
-
-      const results = await this.getLogs(options);
-      return Response.json(results);
-    }
-
-    return new Response('Logs service', { status: 200 });
+    return new Response('Logs service - RPC only', { status: 200 });
   }
 
   /**
