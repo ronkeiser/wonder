@@ -218,5 +218,38 @@ describe('Edge Test - Hello World', () => {
     console.log(`    Status transitions: ${statusChanges.join(', ')}`);
 
     console.log('\n✅ Chunk 1 validation complete: minimal execution loop working');
+
+    // Step 9: Clean up resources
+    console.log('\n🧹 Cleaning up resources...');
+
+    // Delete workflow (workflow binding)
+    await wonder.workflows(workflowId).delete();
+    console.log('  ✓ Deleted workflow:', workflowId);
+
+    // Delete workflow definition
+    await wonder['workflow-defs'](workflowDefId).delete();
+    console.log('  ✓ Deleted workflow def:', workflowDefId);
+
+    // Delete action
+    await wonder.actions(helloActionId).delete();
+    console.log('  ✓ Deleted action:', helloActionId);
+
+    // Delete prompt spec
+    await wonder['prompt-specs'](helloPromptId).delete();
+    console.log('  ✓ Deleted prompt spec:', helloPromptId);
+
+    // Delete model profile
+    await wonder['model-profiles'](modelProfileId).delete();
+    console.log('  ✓ Deleted model profile:', modelProfileId);
+
+    // Delete project
+    await wonder.projects(projectId).delete();
+    console.log('  ✓ Deleted project:', projectId);
+
+    // Delete workspace
+    await wonder.workspaces(workspaceId).delete();
+    console.log('  ✓ Deleted workspace:', workspaceId);
+
+    console.log('✅ Cleanup complete');
   });
 });
