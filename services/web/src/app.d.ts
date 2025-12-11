@@ -11,6 +11,7 @@ declare global {
         HTTP?: Fetcher;
         ASSETS?: unknown;
         HTTP_URL?: string;
+        API_KEY?: string;
       };
     }
   }

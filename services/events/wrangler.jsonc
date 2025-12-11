@@ -8,24 +8,24 @@
       "binding": "DB",
       "database_name": "wonder-events",
       "database_id": "6e452c1d-25f0-48c5-9f05-1d752896fada",
-      "migrations_dir": "./src/db/migrations"
-    }
+      "migrations_dir": "./src/db/migrations",
+    },
   ],
   "durable_objects": {
     "bindings": [
       {
         "name": "STREAMER",
-        "class_name": "Streamer"
-      }
-    ]
+        "class_name": "Streamer",
+      },
+    ],
   },
   "migrations": [
     {
       "tag": "v1",
-      "new_classes": ["Streamer"]
-    }
+      "new_classes": ["Streamer"],
+    },
   ],
   "observability": {
-    "enabled": true
-  }
+    "enabled": true,
+  },
 }

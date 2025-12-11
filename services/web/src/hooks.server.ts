@@ -5,17 +5,22 @@ export const handle: Handle = async ({ event, resolve }) => {
   if (event.url.pathname.startsWith('/api/')) {
     const httpService = event.platform?.env?.HTTP;
     const httpUrl = event.platform?.env?.HTTP_URL;
+    const apiKey = event.platform?.env?.API_KEY;
 
     // Use service binding if available, otherwise fall back to HTTP_URL for local dev
     if (httpService) {
       // For WebSocket upgrades, forward to HTTP service
       const upgrade = event.request.headers.get('upgrade');
       if (upgrade?.toLowerCase() === 'websocket') {
-        return httpService.fetch(event.request);
+        const headers = new Headers(event.request.headers);
+        if (apiKey) headers.set('X-API-Key', apiKey);
+        return httpService.fetch(new Request(event.request, { headers }));
       }
 
       // For regular API requests, forward to HTTP service
-      const response = await httpService.fetch(event.request);
+      const headers = new Headers(event.request.headers);
+      if (apiKey) headers.set('X-API-Key', apiKey);
+      const response = await httpService.fetch(new Request(event.request, { headers }));
       return response;
     } else if (httpUrl) {
       // Local development fallback: use HTTP_URL
@@ -27,15 +32,19 @@ export const handle: Handle = async ({ event, resolve }) => {
         // Change protocol to wss for remote websocket
         url.protocol = 'wss:';
         const wsUrl = url.toString().replace('/api/', '/stream/');
+        const headers = new Headers(event.request.headers);
+        if (apiKey) headers.set('X-API-Key', apiKey);
         return fetch(wsUrl, {
-          headers: event.request.headers,
+          headers,
         });
       }
 
       // For regular API requests, forward to remote HTTP service
+      const headers = new Headers(event.request.headers);
+      if (apiKey) headers.set('X-API-Key', apiKey);
       const response = await fetch(url, {
         method: event.request.method,
-        headers: event.request.headers,
+        headers,
         body:
           event.request.method !== 'GET' && event.request.method !== 'HEAD'
             ? await event.request.text()
