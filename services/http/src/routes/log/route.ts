@@ -12,7 +12,7 @@ export const logs = new OpenAPIHono<{ Bindings: Env }>();
 logs.openapi(getLogsRoute, async (c) => {
   const query = c.req.valid('query');
   const result = await c.env.LOGS.getLogs(query);
-  return c.json(result.logs);
+  return c.json(result);
 });
 
 /** GET /stream - WebSocket stream */

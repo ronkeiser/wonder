@@ -72,7 +72,10 @@
       const response = await fetch(url);
       const data = await response.json();
 
-      const filtered = data[itemsKey]
+      // Handle both array response and object response
+      const rawItems = Array.isArray(data) ? data : data[itemsKey];
+
+      const filtered = rawItems
         .filter((item: any) => item.timestamp >= cutoffTime)
         .sort((a: any, b: any) => {
           if (a.timestamp !== b.timestamp) return a.timestamp - b.timestamp;

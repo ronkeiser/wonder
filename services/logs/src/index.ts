@@ -133,7 +133,7 @@ export class LogsService extends WorkerEntrypoint<Env> {
       .orderBy(desc(logs.timestamp))
       .limit(limit);
 
-    return { logs: [...results] };
+    return { logs: results };
   }
 }
 
