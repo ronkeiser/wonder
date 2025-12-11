@@ -152,7 +152,7 @@ export class Streamer extends DurableObject {
   /**
    * Broadcast a new event entry to all connected WebSocket clients
    */
-  broadcast(eventEntry: EventEntry): void {
+  async broadcast(eventEntry: EventEntry): Promise<void> {
     this.ctx.getWebSockets().forEach((ws) => {
       const subs = this.subscriptions.get(ws);
       if (!subs) return;
@@ -180,7 +180,7 @@ export class Streamer extends DurableObject {
   /**
    * Broadcast trace event to subscribed clients
    */
-  broadcastTraceEvent(traceEntry: TraceEventEntry): void {
+  async broadcastTraceEvent(traceEntry: TraceEventEntry): Promise<void> {
     this.ctx.getWebSockets().forEach((ws) => {
       const subs = this.subscriptions.get(ws);
       if (!subs) return;
