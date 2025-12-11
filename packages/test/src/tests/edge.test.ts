@@ -161,11 +161,62 @@ describe('Edge Test - Hello World', () => {
     );
 
     expect(result).toBeDefined();
+    const workflowRunId = result.workflow_run_id;
+    console.log('✓ Workflow run ID:', workflowRunId);
+
+    // Debug execution if workflow didn't complete
+    if (result.status !== 'completed') {
+      console.log('\n⚠️  Workflow did not complete.');
+      console.log('Workflow events:', JSON.stringify(result.events, null, 2));
+      console.log('Trace events:', JSON.stringify(result.traceEvents, null, 2));
+    }
+
     expect(result.status).toBe('completed');
     expect(result.events.length).toBeGreaterThan(0);
 
-    console.log('✓ Workflow executed:', result.status);
-    console.log(`  Collected ${result.events.length} events`);
-    console.log('  Single node: Hello World');
+    // Validate workflow events (business logic)
+    const workflowEvents = result.events.filter((e) => e.event_type === 'workflow_started');
+    expect(workflowEvents.length).toBe(1);
+    console.log('  ✓ workflow_started event present');
+
+    const nodeEvents = result.events.filter((e) => e.event_type === 'node_completed');
+    expect(nodeEvents.length).toBe(1);
+    console.log('  ✓ node_completed event present');
+
+    const completedEvents = result.events.filter((e) => e.event_type === 'workflow_completed');
+    expect(completedEvents.length).toBe(1);
+    console.log('  ✓ workflow_completed event present');
+
+    // Validate trace events (internal execution) - use ergonomic trace helpers
+    const trace = result.trace;
+
+    const contextInit = trace.context.initialize();
+    expect(contextInit).toBeDefined();
+    expect(contextInit!.payload.table_count).toBeGreaterThan(0);
+    console.log(
+      `  ✓ operation.context.initialize trace (${contextInit!.payload.table_count} tables)`,
+    );
+
+    const contextWrite = trace.context.writeAt('input');
+    expect(contextWrite).toBeDefined();
+    expect(contextWrite!.payload.path).toBe('input');
+    console.log('  ✓ operation.context.write trace (input stored)');
+
+    const tokenCreates = trace.tokens.creates();
+    expect(tokenCreates.length).toBeGreaterThan(0);
+    expect(tokenCreates[0].payload.token_id).toBeDefined();
+    // For Chunk 1, coordinator uses hardcoded 'node_start', not the actual node ID from workflow def
+    expect(tokenCreates[0].payload.node_id).toBe('node_start');
+    console.log(`  ✓ operation.tokens.create trace (token: ${tokenCreates[0].payload.token_id})`);
+
+    const tokenStatusUpdates = trace.tokens.statusUpdates();
+    expect(tokenStatusUpdates.length).toBeGreaterThanOrEqual(2); // pending→executing, executing→completed
+    console.log(`  ✓ operation.tokens.update_status traces (${tokenStatusUpdates.length} updates)`);
+
+    // Validate token status transitions
+    const statusChanges = tokenStatusUpdates.map((e) => `${e.payload.from}→${e.payload.to}`);
+    console.log(`    Status transitions: ${statusChanges.join(', ')}`);
+
+    console.log('\n✅ Chunk 1 validation complete: minimal execution loop working');
   });
 });

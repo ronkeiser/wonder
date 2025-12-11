@@ -118,7 +118,7 @@ export class EventsService extends WorkerEntrypoint<Env> {
             token_id: event.token_id ?? null,
             node_id: event.node_id ?? null,
             duration_ms: event.duration_ms ?? null,
-            payload: JSON.stringify(event),
+            payload: event,
           };
 
           await this.db.insert(traceEvents).values(entry);
@@ -180,7 +180,7 @@ export class EventsService extends WorkerEntrypoint<Env> {
       .limit(options.limit || 1000);
 
     return {
-      events: results.map((row) => JSON.parse(row.payload) as TraceEventInput),
+      events: results,
     };
   }
 }

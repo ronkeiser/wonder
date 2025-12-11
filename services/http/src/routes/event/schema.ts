@@ -44,7 +44,7 @@ export const TraceEventEntrySchema = z
     workspace_id: z.string(),
     project_id: z.string(),
     duration_ms: z.number().nullable(),
-    payload: z.string(),
+    payload: z.unknown(), // JSON object
   })
   .openapi('TraceEventEntry');
 

@@ -15,6 +15,10 @@ export type * from './generated/schema';
 // Export builders
 export { node, schema, transition, workflowDef } from './builders';
 
+// Export trace helpers
+export { TraceEventCollection } from './trace-helpers';
+export type { TraceEventEntry, TracePayloads, TypedTraceEvent } from './trace-helpers';
+
 // Export types
 export type {
   EventsClient,

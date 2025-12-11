@@ -3,7 +3,7 @@
  */
 
 import type { Client } from 'openapi-fetch';
-import type { paths } from './generated/schema.js';
+import type { components, paths } from './generated/schema.js';
 
 const WS_MESSAGE_TYPE = {
   SUBSCRIBE: 'subscribe',
@@ -47,13 +47,13 @@ export interface Subscription {
   callback: (event: WorkflowEvent) => void;
 }
 
-export interface WorkflowEvent {
-  event_type: string;
-  [key: string]: unknown;
-}
+export type WorkflowEvent =
+  | components['schemas']['EventEntry']
+  | components['schemas']['TraceEventEntry'];
 
 interface WebSocketMessage {
   type: string;
+  stream?: 'events' | 'trace';
   subscription_id?: string;
   event?: WorkflowEvent;
   message?: string;
@@ -115,13 +115,28 @@ export class EventsClient {
     if (data.type === WS_MESSAGE_TYPE.EVENT) {
       if (!data.event) return;
 
+      // Parse payload if it's a JSON string (for trace events from Drizzle)
+      let event = data.event;
+      if (data.stream === 'trace' && 'payload' in event && typeof event.payload === 'string') {
+        try {
+          event = { ...event, payload: JSON.parse(event.payload) };
+        } catch (error) {
+          console.error('Failed to parse trace event payload:', error);
+        }
+      }
+
+      // Attach stream property to event for routing in workflows.ts
+      const eventWithStream = { ...event, stream: data.stream } as WorkflowEvent & {
+        stream?: 'events' | 'trace';
+      };
+
       // Route to subscription-specific callback
       if (data.subscription_id) {
-        callbacks.get(data.subscription_id)?.(data.event);
+        callbacks.get(data.subscription_id)?.(eventWithStream);
       }
 
       // Notify general event callbacks
-      eventCallbacks.forEach((cb) => cb(data.event!));
+      eventCallbacks.forEach((cb) => cb(eventWithStream));
       return;
     }
 

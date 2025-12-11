@@ -4,18 +4,22 @@
 
 import type { Client } from 'openapi-fetch';
 import type { EventsClient, SubscriptionFilter } from './events.js';
-import type { paths } from './generated/schema.js';
+import type { components, paths } from './generated/schema.js';
+import { TraceEventCollection } from './trace-helpers.js';
 
 const DEFAULT_TIMEOUT_MS = 300000; // 5 minutes
 const DEFAULT_IDLE_TIMEOUT_MS = 30000; // 30 seconds
 const WEBSOCKET_HANDSHAKE_DELAY_MS = 100;
+
+export type EventEntry = components['schemas']['EventEntry'];
+export type TraceEventEntry = components['schemas']['TraceEventEntry'];
 
 export interface StreamOptions {
   /** Event subscription filters */
   subscribe?: SubscriptionFilter;
 
   /** Predicate to determine when to close connection (in addition to workflow completion/failure) */
-  until?: (event: WorkflowEvent) => boolean;
+  until?: (event: EventEntry) => boolean;
 
   /** Total timeout in milliseconds */
   timeout?: number;
@@ -27,15 +31,12 @@ export interface StreamOptions {
 export interface StreamResult {
   workflow_run_id: string;
   status: 'completed' | 'failed' | 'timeout' | 'idle_timeout';
-  events: WorkflowEvent[];
-  traceEvents: WorkflowEvent[];
+  events: EventEntry[];
+  traceEvents: TraceEventEntry[];
+  trace: TraceEventCollection; // Parsed trace events with ergonomic API
 }
 
-interface WorkflowEvent {
-  event_type: string;
-  stream?: 'events' | 'trace';
-  [key: string]: unknown;
-}
+type InternalEvent = (EventEntry | TraceEventEntry) & { stream?: 'events' | 'trace' };
 
 interface Subscription {
   close: () => void;
@@ -45,7 +46,7 @@ interface Subscription {
  * Create workflows client that extends generated workflows with streaming capabilities
  */
 export function createWorkflowsClient(
-  generatedWorkflows: any,
+  generatedWorkflows: ReturnType<typeof import('./generated/client.js').createClient>['workflows'],
   baseUrl: string,
   sdk: Client<paths>,
   eventsClient: EventsClient,
@@ -80,8 +81,8 @@ export function createWorkflowsClient(
 
     // Phase 2: Subscribe to events BEFORE starting execution
     return new Promise<StreamResult>((resolve, reject) => {
-      const events: WorkflowEvent[] = [];
-      const traceEvents: WorkflowEvent[] = [];
+      const events: EventEntry[] = [];
+      const traceEvents: TraceEventEntry[] = [];
       let totalTimer: NodeJS.Timeout | null = null;
       let idleTimer: NodeJS.Timeout | null = null;
       let subscription: Subscription | null = null;
@@ -98,7 +99,13 @@ export function createWorkflowsClient(
         finalTraceEvents = traceEvents,
       ) => {
         cleanup();
-        resolve({ workflow_run_id, status, events: finalEvents, traceEvents: finalTraceEvents });
+        resolve({
+          workflow_run_id,
+          status,
+          events: finalEvents,
+          traceEvents: finalTraceEvents,
+          trace: new TraceEventCollection(finalTraceEvents),
+        });
       };
 
       // Set up total timeout
@@ -113,24 +120,30 @@ export function createWorkflowsClient(
         }
       };
 
-      const eventCallback = (event: WorkflowEvent) => {
+      const eventCallback = (event: InternalEvent) => {
         resetIdleTimer();
 
         // Collect events by stream type
-        (event.stream === 'trace' ? traceEvents : events).push(event);
+        if (event.stream === 'trace') {
+          traceEvents.push(event as TraceEventEntry);
+        } else {
+          events.push(event as EventEntry);
+        }
 
-        // Check for terminal conditions
-        if (event.event_type === 'workflow_completed') {
+        // Check for terminal conditions (only applies to EventEntry, not TraceEventEntry)
+        if ('event_type' in event && event.event_type === 'workflow_completed') {
           return resolveWithCleanup('completed');
         }
 
-        if (event.event_type === 'workflow_failed') {
+        if ('event_type' in event && event.event_type === 'workflow_failed') {
           return resolveWithCleanup('failed');
         }
 
-        // Check custom predicate
-        if (until?.(event)) {
-          return resolveWithCleanup('completed');
+        // Check custom predicate (only EventEntry has event_type for until callback)
+        if (until && 'event_type' in event) {
+          if (until(event as EventEntry)) {
+            return resolveWithCleanup('completed');
+          }
         }
       };
 

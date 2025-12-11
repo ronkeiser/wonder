@@ -92,7 +92,7 @@ export const traceEvents = sqliteTable(
     duration_ms: real('duration_ms'), // For SQL queries, operation timing
 
     // Payload (structured data specific to event type)
-    payload: text('payload').notNull(), // JSON blob with type-specific data
+    payload: text('payload', { mode: 'json' }).notNull(), // JSON object with type-specific data
   },
   (table) => [
     index('idx_trace_events_workflow_sequence').on(table.workflow_run_id, table.sequence),

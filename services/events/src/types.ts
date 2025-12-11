@@ -288,7 +288,7 @@ export interface TraceEventEntry extends TraceEventContext {
   token_id: string | null;
   node_id: string | null;
   duration_ms: number | null;
-  payload: string; // JSON string of full event
+  payload: TraceEventInput; // JSON object (Drizzle auto-parses with mode: 'json')
 }
 
 /**

@@ -1593,7 +1593,7 @@ export interface components {
             workspace_id: string;
             project_id: string;
             duration_ms: number | null;
-            payload: string;
+            payload?: unknown;
         };
         TraceEventsResponse: {
             events: components["schemas"]["TraceEventEntry"][];
