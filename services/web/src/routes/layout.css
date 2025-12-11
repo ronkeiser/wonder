@@ -1,1 +1,12 @@
-@import 'tailwindcss';
+* {
+  margin: 0;
+  padding: 0;
+  box-sizing: border-box;
+}
+
+body {
+  font-family:
+    ui-monospace, 'Cascadia Code', 'Source Code Pro', Menlo, Consolas, 'DejaVu Sans Mono', monospace;
+  background: #0d1117;
+  color: #c9d1d9;
+}

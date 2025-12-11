@@ -1,38 +1,44 @@
-# sv
+# Wonder Web Service
 
-Everything you need to build a Svelte project, powered by [`sv`](https://github.com/sveltejs/cli).
+SvelteKit-based web interface for the Wonder Platform.
 
-## Creating a project
+## Features
 
-If you're seeing this, you've probably already done this step. Congrats!
+- **Events UI** (`/events`): Real-time event streaming with filtering by event type
+- **Logs UI** (`/logs`): Real-time log streaming with filtering by service
+- **Shared Components**: Common StreamViewer component used by both UIs
 
-```sh
-# create a new project in the current directory
-npx sv create
+## Architecture
 
-# create a new project in my-app
-npx sv create my-app
-```
+The web service acts as a UI gateway:
 
-## Developing
+- All API requests (`/api/*`) are proxied to the HTTP service via service binding
+- WebSocket streams are forwarded to the HTTP service for real-time updates
+- Static assets and UI rendering are handled by SvelteKit
 
-Once you've created a project and installed dependencies with `npm install` (or `pnpm install` or `yarn`), start a development server:
-
-```sh
-npm run dev
-
-# or start the server and open the app in a new browser tab
-npm run dev -- --open
-```
-
-## Building
-
-To create a production version of your app:
+## Development
 
 ```sh
-npm run build
+# Start development server
+pnpm dev
+
+# Build for production
+pnpm build
+
+# Preview production build
+pnpm preview
+
+# Deploy to Cloudflare Workers
+pnpm deploy
 ```
 
-You can preview the production build with `npm run preview`.
+## Routes
 
-> To deploy your app, you may need to install an [adapter](https://svelte.dev/docs/kit/adapters) for your target environment.
+- `/` - Home page with navigation
+- `/events` - Events viewer UI
+- `/logs` - Logs viewer UI
+
+## Service Bindings
+
+- `HTTP` - Wonder HTTP service for API and WebSocket forwarding
+- `ASSETS` - SvelteKit build output for static assets
