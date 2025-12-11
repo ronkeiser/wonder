@@ -14,7 +14,9 @@
     getItemColor?: (item: any) => string;
     renderItemHeader: (item: any) => {
       time: string;
-      parts: Array<{ text: string; class?: string }>;
+      badge: { text: string; color: string };
+      identifier?: string;
+      message?: string;
     };
   }
 
@@ -307,9 +309,15 @@
         <div class="item-content">
           <div class="item-header">
             <span class="item-time">{header.time}</span>
-            {#each header.parts as part}
-              <span class={part.class || 'item-part'}>{part.text}</span>
-            {/each}
+            <span class="item-badge" style="background-color: {header.badge.color}">
+              {header.badge.text}
+            </span>
+            {#if header.identifier}
+              <span class="item-identifier">[{header.identifier}]</span>
+            {/if}
+            {#if header.message}
+              <span class="item-message">{header.message}</span>
+            {/if}
           </div>
           {#if item.metadata && typeof item.metadata === 'object'}
             <pre class="item-metadata json-data">{prettyPrintEnabled
@@ -590,27 +598,23 @@
     font-weight: 500;
   }
 
-  .item-part {
-    color: var(--text-primary);
-  }
-
-  .item-type,
-  .item-level {
-    color: var(--accent);
-    font-weight: 600;
-  }
-
-  .item-service {
-    color: var(--text-secondary);
-  }
-
-  .item-id {
-    color: var(--text-secondary);
+  .item-badge {
+    display: inline-block;
+    padding: 0.125rem 0.375rem;
+    border-radius: 3px;
     font-size: 0.75rem;
+    font-weight: 600;
+    color: #000;
+  }
+
+  .item-identifier {
+    color: var(--text-link);
+    font-size: 0.9rem;
   }
 
   .item-message {
     color: var(--text-primary);
+    font-size: 0.9rem;
   }
 
   .item-metadata {

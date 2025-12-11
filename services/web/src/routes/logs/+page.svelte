@@ -35,11 +35,12 @@
   function renderLogHeader(item: any) {
     return {
       time: formatTime(item.timestamp),
-      parts: [
-        { text: `[${item.level}]`, class: 'item-level' },
-        { text: item.service, class: 'item-service' },
-        { text: item.message, class: 'item-message' },
-      ],
+      badge: {
+        text: item.level.toUpperCase(),
+        color: levelColorMap[item.level] || 'var(--gray)',
+      },
+      identifier: item.service,
+      message: item.message,
     };
   }
 </script>

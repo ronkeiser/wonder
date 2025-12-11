@@ -37,20 +37,14 @@
   }
 
   function renderEventHeader(item: any) {
-    const parts: Array<{ text: string; class?: string }> = [
-      { text: item.event_type, class: 'item-type' },
-    ];
-
-    if (item.workflow_id) {
-      parts.push({ text: `workflow:${item.workflow_id}`, class: 'item-id' });
-    }
-    if (item.task_id) {
-      parts.push({ text: `task:${item.task_id}`, class: 'item-id' });
-    }
-
     return {
       time: formatTime(item.timestamp),
-      parts,
+      badge: {
+        text: item.event_type,
+        color: colorMap[item.event_type] || 'var(--gray)',
+      },
+      identifier: item.workflow_id ? item.workflow_id.slice(-8) : undefined,
+      message: item.message,
     };
   }
 
