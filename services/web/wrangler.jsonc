@@ -15,18 +15,8 @@
   ],
   "vars": {
     "HTTP_URL": "https://wonder-http.ron-keiser.workers.dev",
-    // "AUTH_USERNAME": "admin" -- Use wrangler secret for production
   },
-  // Use `wrangler secret put` for these sensitive values:
-  // - AUTH_USERNAME
-  // - AUTH_PASSWORD
-  // - SESSION_SECRET (generate with: openssl rand -base64 32)
   "observability": {
-    "logs": {
-      "enabled": true,
-      "head_sampling_rate": 1,
-      "invocation_logs": false,
-      "persist": true,
-    },
+    "enabled": false,
   },
 }

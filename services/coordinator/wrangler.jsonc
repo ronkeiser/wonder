@@ -3,7 +3,8 @@
   "name": "wonder-coordinator",
   "main": "src/index.ts",
   "compatibility_date": "2025-12-01",
-
+  "workers_dev": false,
+  "preview_urls": false,
   "durable_objects": {
     "bindings": [
       {
@@ -37,7 +38,7 @@
     },
   ],
   "observability": {
-    "enabled": true,
+    "enabled": false,
   },
   "vars": {
     "TRACE_EVENTS_ENABLED": "true",

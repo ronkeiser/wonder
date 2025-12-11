@@ -25,16 +25,7 @@ export class LogsService extends WorkerEntrypoint<Env> {
   /**
    * HTTP entrypoint
    */
-  async fetch(request: Request): Promise<Response> {
-    const url = new URL(request.url);
-
-    // Route to Streamer DO for WebSocket connections
-    if (url.pathname === '/stream') {
-      const id = this.env.STREAMER.idFromName('logs-streamer');
-      const stub = this.env.STREAMER.get(id);
-      return stub.fetch(request);
-    }
-
+  async fetch(): Promise<Response> {
     return new Response('Logs service - RPC only', { status: 200 });
   }
 

@@ -3,33 +3,31 @@
   "name": "wonder-logs",
   "main": "src/index.ts",
   "compatibility_date": "2025-12-01",
-
+  "workers_dev": false,
+  "preview_urls": false,
   "d1_databases": [
     {
       "binding": "DB",
       "database_name": "wonder-logs",
       "database_id": "6b9dfbac-506a-4efa-8118-0bee9f0946ea",
-      "migrations_dir": "./src/db/migrations"
-    }
+      "migrations_dir": "./src/db/migrations",
+    },
   ],
-
   "durable_objects": {
     "bindings": [
       {
         "name": "STREAMER",
-        "class_name": "Streamer"
-      }
-    ]
+        "class_name": "Streamer",
+      },
+    ],
   },
-
   "migrations": [
     {
       "tag": "v1",
-      "new_classes": ["Streamer"]
-    }
+      "new_classes": ["Streamer"],
+    },
   ],
-
   "observability": {
-    "enabled": true
-  }
+    "enabled": false,
+  },
 }

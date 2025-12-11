@@ -1,28 +1,27 @@
 {
+  "$schema": "./node_modules/wrangler/config-schema.json",
   "name": "wonder-executor",
   "main": "src/index.ts",
   "compatibility_date": "2025-12-01",
-
+  "workers_dev": false,
+  "preview_urls": false,
   "ai": {
-    "binding": "AI"
+    "binding": "AI",
   },
-
   "services": [
     { "binding": "LOGS", "service": "wonder-logs" },
-    { "binding": "EVENTS", "service": "wonder-events" }
+    { "binding": "EVENTS", "service": "wonder-events" },
   ],
-
   "durable_objects": {
     "bindings": [
       {
         "name": "COORDINATOR",
         "class_name": "WorkflowCoordinator",
-        "script_name": "wonder-coordinator"
-      }
-    ]
+        "script_name": "wonder-coordinator",
+      },
+    ],
   },
-
   "observability": {
-    "enabled": true
-  }
+    "enabled": false,
+  },
 }
