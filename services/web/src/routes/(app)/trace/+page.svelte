@@ -1,12 +1,5 @@
 <script lang="ts">
   import StreamViewer from '$lib/components/StreamViewer.svelte';
-  import TabbedLayout from '$lib/components/TabbedLayout.svelte';
-
-  const tabs = [
-    { id: 'events', label: 'Events', href: '/events' },
-    { id: 'traces', label: 'Traces', href: '/events/trace' },
-    { id: 'logs', label: 'Logs', href: '/logs' },
-  ];
 
   const categoryOptions = [
     { value: 'decision', label: 'decision' },
@@ -66,6 +59,10 @@
     };
   }
 
+  function getTraceMetadata(item: any) {
+    return item.payload;
+  }
+
   const subscribeMessage = {
     type: 'subscribe',
     id: 'traces',
@@ -78,18 +75,17 @@
   <title>Trace Events</title>
 </svelte:head>
 
-<TabbedLayout {tabs} activeTabId="traces">
-  <StreamViewer
-    title="Trace Events"
-    apiPath="/api/events/trace"
-    streamPath="/api/events/stream"
-    filterLabel="Categories"
-    filterParam="category"
-    filterOptions={categoryOptions}
-    itemsKey="events"
-    itemKey="event"
-    {subscribeMessage}
-    getItemColor={getTraceColor}
-    renderItemHeader={renderTraceHeader}
-  />
-</TabbedLayout>
+<StreamViewer
+  title="Trace Events"
+  apiPath="/api/events/trace"
+  streamPath="/api/events/stream"
+  filterLabel="Categories"
+  filterParam="category"
+  filterOptions={categoryOptions}
+  itemsKey="events"
+  itemKey="event"
+  {subscribeMessage}
+  getItemColor={getTraceColor}
+  getMetadata={getTraceMetadata}
+  renderItemHeader={renderTraceHeader}
+/>

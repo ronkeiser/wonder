@@ -1,12 +1,5 @@
 <script lang="ts">
   import StreamViewer from '$lib/components/StreamViewer.svelte';
-  import TabbedLayout from '$lib/components/TabbedLayout.svelte';
-
-  const tabs = [
-    { id: 'events', label: 'Events', href: '/events' },
-    { id: 'traces', label: 'Traces', href: '/events/trace' },
-    { id: 'logs', label: 'Logs', href: '/logs' },
-  ];
 
   const serviceOptions = [
     { value: 'coordinator', label: 'coordinator' },
@@ -50,23 +43,26 @@
       message: item.message,
     };
   }
+
+  function getLogMetadata(item: any) {
+    return item.metadata;
+  }
 </script>
 
 <svelte:head>
   <title>Logs</title>
 </svelte:head>
 
-<TabbedLayout {tabs} activeTabId="logs">
-  <StreamViewer
-    title="Logs"
-    apiPath="/api/logs"
-    streamPath="/api/logs/stream"
-    filterLabel="Services"
-    filterParam="service"
-    filterOptions={serviceOptions}
-    itemsKey="logs"
-    itemKey="log"
-    getItemColor={getLogColor}
-    renderItemHeader={renderLogHeader}
-  />
-</TabbedLayout>
+<StreamViewer
+  title="Logs"
+  apiPath="/api/logs"
+  streamPath="/api/logs/stream"
+  filterLabel="Services"
+  filterParam="service"
+  filterOptions={serviceOptions}
+  itemsKey="logs"
+  itemKey="log"
+  getItemColor={getLogColor}
+  getMetadata={getLogMetadata}
+  renderItemHeader={renderLogHeader}
+/>

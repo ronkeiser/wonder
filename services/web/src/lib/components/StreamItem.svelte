@@ -1,6 +1,7 @@
 <script lang="ts">
   interface Props {
     item: any;
+    metadata?: any;
     prettyPrint: boolean;
     getItemColor?: (item: any) => string;
     renderItemHeader: (item: any) => {
@@ -12,7 +13,7 @@
     onCopy: (item: any) => void;
   }
 
-  let { item, prettyPrint, getItemColor, renderItemHeader, onCopy }: Props = $props();
+  let { item, metadata, prettyPrint, getItemColor, renderItemHeader, onCopy }: Props = $props();
 
   // Local override for individual toggle (null = use global default)
   let localPrettyPrint = $state<boolean | null>(null);
@@ -38,16 +39,16 @@
   const effectivePrettyPrint = $derived(localPrettyPrint !== null ? localPrettyPrint : prettyPrint);
 
   const formattedMetadata = $derived.by(() => {
-    if (!item.metadata || item.metadata === '{}') return null;
+    if (!metadata) return null;
 
     try {
-      const parsed = typeof item.metadata === 'string' ? JSON.parse(item.metadata) : item.metadata;
+      const parsed = typeof metadata === 'string' ? JSON.parse(metadata) : metadata;
 
-      if (Object.keys(parsed).length === 0) return null;
+      if (typeof parsed === 'object' && Object.keys(parsed).length === 0) return null;
 
       return effectivePrettyPrint ? formatJsonPretty(parsed) : JSON.stringify(parsed);
     } catch (e) {
-      return item.metadata;
+      return typeof metadata === 'string' ? metadata : JSON.stringify(metadata);
     }
   });
 

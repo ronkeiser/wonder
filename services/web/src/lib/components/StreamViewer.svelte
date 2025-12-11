@@ -13,6 +13,7 @@
     itemKey: string; // e.g., 'event' or 'log'
     subscribeMessage?: object; // Optional WebSocket subscription message
     getItemColor?: (item: any) => string;
+    getMetadata?: (item: any) => any;
     renderItemHeader: (item: any) => {
       time: string;
       badge: { text: string; color: string };
@@ -32,6 +33,7 @@
     itemKey,
     subscribeMessage,
     getItemColor,
+    getMetadata,
     renderItemHeader,
   }: Props = $props();
 
@@ -305,6 +307,7 @@
     {#each items as item (item.id)}
       <StreamItem
         {item}
+        metadata={getMetadata?.(item)}
         prettyPrint={prettyPrintEnabled}
         {getItemColor}
         {renderItemHeader}
