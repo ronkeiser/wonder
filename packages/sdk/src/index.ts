@@ -7,7 +7,6 @@ import createOpenAPIClient from 'openapi-fetch';
 import { EventsClient } from './events';
 import { createClient as createGeneratedClient } from './generated/client';
 import type { paths } from './generated/schema';
-import type { StreamOptions, StreamResult } from './workflows';
 import { createWorkflowsClient } from './workflows';
 
 export type * from './generated/schema';
