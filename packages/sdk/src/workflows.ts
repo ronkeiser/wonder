@@ -5,7 +5,7 @@
 import type { Client } from 'openapi-fetch';
 import type { EventsClient, SubscriptionFilter } from './events.js';
 import type { components, paths } from './generated/schema.js';
-import { TraceEventCollection } from './trace-helpers.js';
+import { TraceEventCollection } from './trace.js';
 
 const DEFAULT_TIMEOUT_MS = 300000; // 5 minutes
 const DEFAULT_IDLE_TIMEOUT_MS = 30000; // 30 seconds

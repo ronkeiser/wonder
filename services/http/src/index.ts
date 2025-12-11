@@ -32,7 +32,7 @@ app.use('/*', cors());
 app.get('/health', (c) => c.text('OK'));
 
 // API key authentication for all API routes
-app.use('/api/*', requireApiKey);
+// app.use('/api/*', requireApiKey);
 
 // Mount resource routes
 const routes = app

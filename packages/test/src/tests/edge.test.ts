@@ -1,4 +1,4 @@
-import { node, schema, transition, workflowDef } from '@wonder/sdk';
+import { node, schema, workflowDef } from '@wonder/sdk';
 import { describe, expect, it } from 'vitest';
 import { wonder } from '~/client';
 

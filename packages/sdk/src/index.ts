@@ -29,13 +29,18 @@ export interface WonderClient extends Omit<ReturnType<typeof createGeneratedClie
 /**
  * Create a unified Wonder API client with SDK methods, WebSocket events, and raw HTTP access
  * @param baseUrl - The base URL for the API
+ * @param apiKey - The API key for authentication
  */
 export function createClient(
   baseUrl: string = process.env.RESOURCES_URL || 'https://wonder-http.ron-keiser.workers.dev',
+  apiKey?: string,
 ): WonderClient {
-  const baseClient = createOpenAPIClient<paths>({ baseUrl });
+  const baseClient = createOpenAPIClient<paths>({
+    baseUrl,
+    headers: apiKey ? { 'X-API-Key': apiKey } : {},
+  });
   const sdkClient = createGeneratedClient(baseClient);
-  const eventsClient = new EventsClient(baseUrl, baseClient);
+  const eventsClient = new EventsClient(baseUrl, baseClient, apiKey);
   const workflowsClient = createWorkflowsClient(
     sdkClient.workflows,
     baseUrl,
