@@ -115,6 +115,13 @@ export class WorkflowCoordinator extends DurableObject {
     // Check if workflow is complete (no more active tokens)
     const activeCount = tokenOps.getActiveCount(sql, token.workflow_run_id);
 
+    this.emitter.emitTrace({
+      type: 'decision.sync.check_condition',
+      strategy: 'completion_check',
+      completed: 1,
+      required: activeCount,
+    });
+
     if (activeCount === 0) {
       await this.finalizeWorkflow(token.workflow_run_id);
     }
@@ -129,6 +136,11 @@ export class WorkflowCoordinator extends DurableObject {
     if (!this.emitter) {
       throw new Error('Emitter not initialized');
     }
+
+    this.emitter.emitTrace({
+      type: 'dispatch.batch.start',
+      decision_count: 1,
+    });
 
     const sql = this.ctx.storage.sql;
 
@@ -148,10 +160,21 @@ export class WorkflowCoordinator extends DurableObject {
       throw new Error('Emitter not initialized');
     }
 
+    this.emitter.emitTrace({
+      type: 'decision.sync.activate',
+      merge_config: { workflow_run_id: workflowRunId },
+    });
+
     const sql = this.ctx.storage.sql;
 
     // Get context snapshot
     const context = contextOps.getSnapshot(sql);
+
+    this.emitter.emitTrace({
+      type: 'operation.context.read',
+      path: 'output',
+      value: context.output,
+    });
 
     // Extract output (simplified for Chunk 1)
     const finalOutput = context.output;

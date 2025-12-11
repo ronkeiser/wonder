@@ -123,15 +123,20 @@ export function get(sql: SqlStorage, path: string): unknown {
   // For now, only support reading 'input', 'state', 'output'
   const tableName = `context_${path}`;
 
-  const result = sql.exec(`SELECT * FROM ${tableName} LIMIT 1;`);
-  const rows = [...result];
+  try {
+    const result = sql.exec(`SELECT * FROM ${tableName} LIMIT 1;`);
+    const rows = [...result];
 
-  if (rows.length === 0) {
+    if (rows.length === 0) {
+      return {};
+    }
+
+    // Return first row (we only have one row per context table in simple case)
+    return rows[0];
+  } catch (error) {
+    // Table might not exist (e.g., context_state when no context_schema defined)
     return {};
   }
-
-  // Return first row (we only have one row per context table in simple case)
-  return rows[0];
 }
 
 /**

@@ -54,19 +54,17 @@ export function create(sql: SqlStorage, params: CreateTokenParams, emitter: Emit
       branch_index, branch_total, created_at, updated_at
     ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?);
   `,
-    [
-      tokenId,
-      params.workflow_run_id,
-      params.node_id,
-      'pending',
-      params.parent_token_id,
-      params.path_id,
-      params.fan_out_transition_id,
-      params.branch_index,
-      params.branch_total,
-      now,
-      now,
-    ],
+    tokenId,
+    params.workflow_run_id,
+    params.node_id,
+    'pending',
+    params.parent_token_id,
+    params.path_id,
+    params.fan_out_transition_id,
+    params.branch_index,
+    params.branch_total,
+    now,
+    now,
   );
 
   emitter.emitTrace({
@@ -87,7 +85,7 @@ export function get(sql: SqlStorage, tokenId: string): TokenRow {
     `
     SELECT * FROM tokens WHERE id = ?;
   `,
-    [tokenId],
+    tokenId,
   );
 
   const rows = [...result];
@@ -115,7 +113,9 @@ export function updateStatus(
     SET status = ?, updated_at = ? 
     WHERE id = ?;
   `,
-    [status, Date.now(), tokenId],
+    status,
+    Date.now(),
+    tokenId,
   );
 
   emitter.emitTrace({
@@ -137,7 +137,7 @@ export function getActiveCount(sql: SqlStorage, workflowRunId: string): number {
     WHERE workflow_run_id = ? 
     AND status IN ('pending', 'dispatched', 'executing');
   `,
-    [workflowRunId],
+    workflowRunId,
   );
 
   const rows = [...result];
