@@ -6,7 +6,7 @@
 
 <div class="login-container">
   <div class="login-card">
-    <h1>Wonder Login</h1>
+    <h1>Wonder</h1>
 
     <form method="POST">
       <div class="form-group">
@@ -46,86 +46,106 @@
 
 <style>
   .login-container {
+    --gray-darkest: #0d1117;
+    --gray-darker: #161b22;
+    --gray-dark: #21262d;
+    --gray: #30363d;
+    --gray-light: #8b949e;
+    --gray-lighter: #c9d1d9;
+    --blue: #58a6ff;
+    --blue-hover: #79b8ff;
+    --red-bg: #3f1a1a;
+    --red-text: #f85149;
+
     min-height: 100vh;
     display: flex;
     align-items: center;
     justify-content: center;
-    background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+    background: var(--gray-darkest);
   }
 
   .login-card {
-    background: white;
-    padding: 2rem;
+    background: var(--gray-darker);
+    padding: 2.5rem;
     border-radius: 8px;
-    box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
+    border: 1px solid var(--gray);
     width: 100%;
     max-width: 400px;
   }
 
   h1 {
-    margin: 0 0 1.5rem 0;
+    margin: 0 0 2rem 0;
     text-align: center;
-    color: #333;
+    color: var(--gray-lighter);
+    font-weight: 600;
+    font-size: 1.75rem;
   }
 
   .form-group {
-    margin-bottom: 1rem;
+    margin-bottom: 1.25rem;
   }
 
   label {
     display: block;
     margin-bottom: 0.5rem;
-    color: #555;
+    color: var(--gray-lighter);
     font-weight: 500;
+    font-size: 0.875rem;
   }
 
   input {
     width: 100%;
     padding: 0.75rem;
-    border: 1px solid #ddd;
-    border-radius: 4px;
+    background: var(--gray-darkest);
+    border: 1px solid var(--gray);
+    border-radius: 6px;
     font-size: 1rem;
+    color: var(--gray-lighter);
     box-sizing: border-box;
+    font-family: inherit;
   }
 
   input:focus {
     outline: none;
-    border-color: #667eea;
+    border-color: var(--blue);
   }
 
   input:disabled {
-    background: #f5f5f5;
+    opacity: 0.5;
     cursor: not-allowed;
   }
 
   button {
     width: 100%;
     padding: 0.75rem;
-    background: #667eea;
-    color: white;
+    background: var(--blue);
+    color: var(--gray-darkest);
     border: none;
-    border-radius: 4px;
+    border-radius: 6px;
     font-size: 1rem;
-    font-weight: 500;
+    font-weight: 600;
     cursor: pointer;
     margin-top: 1rem;
+    font-family: inherit;
   }
 
   button:hover:not(:disabled) {
-    background: #5568d3;
+    background: var(--blue-hover);
   }
 
   button:disabled {
-    background: #aaa;
+    opacity: 0.5;
     cursor: not-allowed;
   }
 
   .error {
     padding: 0.75rem;
-    background: #fee;
-    color: #c33;
-    border-radius: 4px;
+    background: var(--red-bg);
+    color: var(--red-text);
+    border: 1px solid var(--red-text);
+    border-radius: 6px;
     margin-bottom: 1rem;
     text-align: center;
+    font-size: 0.875rem;
   }
 </style>
