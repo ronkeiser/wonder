@@ -49,7 +49,7 @@
     --gray-darkest: #0d1117;
     --gray-darker: #161b22;
     --gray-dark: #21262d;
-    --gray: #30363d;
+    --gray: #586078;
     --gray-light: #8b949e;
     --gray-lighter: #c9d1d9;
     --blue: #58a6ff;

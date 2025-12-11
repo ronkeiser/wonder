@@ -328,7 +328,7 @@
     --violet: #bf76ff;
     --pink: #ff77bd;
 
-    --gray: #30363d;
+    --gray: #586078;
     --gray-dark: #21262d;
     --gray-darker: #161b22;
     --gray-darkest: #0d1117;
