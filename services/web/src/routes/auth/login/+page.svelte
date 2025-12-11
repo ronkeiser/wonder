@@ -46,17 +46,6 @@
 
 <style>
   .login-container {
-    --gray-darkest: #0d1117;
-    --gray-darker: #161b22;
-    --gray-dark: #21262d;
-    --gray: #586078;
-    --gray-light: #8b949e;
-    --gray-lighter: #c9d1d9;
-    --blue: #58a6ff;
-    --blue-hover: #79b8ff;
-    --red-bg: #3f1a1a;
-    --red-text: #f85149;
-
     min-height: 100vh;
     display: flex;
     align-items: center;
@@ -107,7 +96,7 @@
 
   input:focus {
     outline: none;
-    border-color: var(--blue);
+    border-color: var(--accent);
   }
 
   input:disabled {
@@ -118,7 +107,7 @@
   button {
     width: 100%;
     padding: 0.75rem;
-    background: var(--blue);
+    background: var(--accent);
     color: var(--gray-darkest);
     border: none;
     border-radius: 6px;
@@ -130,7 +119,7 @@
   }
 
   button:hover:not(:disabled) {
-    background: var(--blue-hover);
+    background: var(--accent-hover);
   }
 
   button:disabled {
@@ -140,9 +129,9 @@
 
   .error {
     padding: 0.75rem;
-    background: var(--red-bg);
-    color: var(--red-text);
-    border: 1px solid var(--red-text);
+    background: var(--error-bg);
+    color: var(--error-text);
+    border: 1px solid var(--error-text);
     border-radius: 6px;
     margin-bottom: 1rem;
     text-align: center;

@@ -318,37 +318,6 @@
 </div>
 
 <style>
-  :root {
-    --red: #f85149;
-    --orange: #ffb640;
-    --yellow: #ffe44a;
-    --green: #38a05c;
-    --blue: #56a5ff;
-    --indigo: #8a5cff;
-    --violet: #bf76ff;
-    --pink: #ff77bd;
-
-    --gray: #2a2e3c;
-    --gray-dark: #1d202f;
-    --gray-darker: #131623;
-    --gray-darkest: #0b0e1c;
-    --gray-light: #9598b0;
-    --gray-lighter: #cdd0df;
-    --gray-lighter: #c9d1d9;
-    --blue-light: #a5d6ff;
-
-    --bg-primary: var(--gray-darkest);
-    --bg-secondary: var(--gray-darker);
-    --bg-tertiary: var(--gray-dark);
-    --bg-hover: var(--gray);
-    --text-primary: var(--gray-lighter);
-    --text-secondary: var(--gray-light);
-    --text-link: var(--blue-light);
-    --border: var(--gray);
-    --accent: var(--blue);
-    --accent-emphasis: #58a6ff80;
-  }
-
   .stream-viewer {
     display: flex;
     flex-direction: column;
