@@ -2,7 +2,6 @@ import { DurableObject } from 'cloudflare:workers';
 import { and, desc, eq, gte } from 'drizzle-orm';
 import { drizzle } from 'drizzle-orm/d1';
 import { logs } from './db/schema.js';
-import uiHTML from './web/ui.html';
 
 /**
  * Durable Object for managing WebSocket connections to stream logs in real-time
@@ -15,13 +14,6 @@ export class Streamer extends DurableObject {
    */
   async fetch(request: Request): Promise<Response> {
     const url = new URL(request.url);
-
-    // Serve the UI on the root path
-    if (url.pathname === '/' || url.pathname === '') {
-      return new Response(uiHTML, {
-        headers: { 'Content-Type': 'text/html' },
-      });
-    }
 
     // Handle WebSocket connections on /stream
     if (url.pathname === '/stream') {

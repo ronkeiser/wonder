@@ -31,8 +31,8 @@ export class EventsService extends WorkerEntrypoint<Env> {
   async fetch(request: Request): Promise<Response> {
     const url = new URL(request.url);
 
-    // Route to Streamer DO for UI and WebSocket connections
-    if (url.pathname === '/' || url.pathname === '/stream') {
+    // Route to Streamer DO for WebSocket connections
+    if (url.pathname === '/stream') {
       const id = this.env.STREAMER.idFromName('events-streamer');
       const stub = this.env.STREAMER.get(id);
       return stub.fetch(request);

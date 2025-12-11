@@ -3,7 +3,6 @@ import { and, desc, eq, gte } from 'drizzle-orm';
 import { drizzle } from 'drizzle-orm/d1';
 import { traceEvents, workflowEvents } from './db/schema.js';
 import type { EventContext, EventEntry, TraceEventContext, TraceEventEntry } from './types.js';
-import uiHTML from './web/ui.html';
 
 /**
  * Subscription filter for server-side event filtering
@@ -60,13 +59,6 @@ export class Streamer extends DurableObject {
    */
   async fetch(request: Request): Promise<Response> {
     const url = new URL(request.url);
-
-    // Serve the UI on the root path
-    if (url.pathname === '/' || url.pathname === '') {
-      return new Response(uiHTML, {
-        headers: { 'Content-Type': 'text/html' },
-      });
-    }
 
     // Handle WebSocket connections on /stream
     if (url.pathname === '/stream') {
