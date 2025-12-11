@@ -328,11 +328,12 @@
     --violet: #bf76ff;
     --pink: #ff77bd;
 
-    --gray: #2a2f38;
-    --gray-dark: #1d2129;
-    --gray-darker: #13171f;
-    --gray-darkest: #0b0f18;
-    --gray-light: #8b949e;
+    --gray: #2a2e3c;
+    --gray-dark: #1d202f;
+    --gray-darker: #131623;
+    --gray-darkest: #0b0e1c;
+    --gray-light: #9598b0;
+    --gray-lighter: #cdd0df;
     --gray-lighter: #c9d1d9;
     --blue-light: #a5d6ff;
 
