@@ -32,11 +32,11 @@ logs.get('/stream', async (c) => {
   // Forward to Streamer DO with rewritten path
   const id = c.env.LOGS_STREAMER.idFromName('logs-streamer');
   const stub = c.env.LOGS_STREAMER.get(id);
-  
+
   // Rewrite the URL to /stream (what the Streamer expects)
   const url = new URL(c.req.url);
   url.pathname = '/stream';
   const request = new Request(url, c.req.raw);
-  
+
   return stub.fetch(request);
 });

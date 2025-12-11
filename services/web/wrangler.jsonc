@@ -1,0 +1,27 @@
+{
+  "$schema": "./node_modules/wrangler/config-schema.json",
+  "name": "wonder-web",
+  "main": ".svelte-kit/cloudflare/_worker.js",
+  "assets": {
+    "directory": ".svelte-kit/cloudflare",
+    "binding": "ASSETS",
+  },
+  "compatibility_date": "2025-11-18",
+  "services": [
+    {
+      "binding": "HTTP",
+      "service": "wonder-http",
+    },
+  ],
+  "vars": {
+    "HTTP_URL": "https://wonder-http.ron-keiser.workers.dev",
+  },
+  "observability": {
+    "logs": {
+      "enabled": true,
+      "head_sampling_rate": 1,
+      "invocation_logs": false,
+      "persist": true,
+    },
+  },
+}

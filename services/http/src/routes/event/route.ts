@@ -39,11 +39,11 @@ events.get('/stream', async (c) => {
   // Forward to Streamer DO with rewritten path
   const id = c.env.EVENTS_STREAMER.idFromName('events-streamer');
   const stub = c.env.EVENTS_STREAMER.get(id);
-  
+
   // Rewrite the URL to /stream (what the Streamer expects)
   const url = new URL(c.req.url);
   url.pathname = '/stream';
   const request = new Request(url, c.req.raw);
-  
+
   return stub.fetch(request);
 });

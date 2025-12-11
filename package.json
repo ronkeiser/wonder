@@ -12,7 +12,8 @@
     "deploy:executor": "wrangler deploy --config services/executor/wrangler.jsonc",
     "deploy:http": "wrangler deploy --config services/http/wrangler.jsonc",
     "deploy:logs": "wrangler deploy --config services/logs/wrangler.jsonc",
-    "deploy:resources": "wrangler deploy --config services/resources/wrangler.jsonc"
+    "deploy:resources": "wrangler deploy --config services/resources/wrangler.jsonc",
+    "deploy:web": "pnpm --filter web run deploy"
   },
   "engines": {
     "node": ">=24.0.0",
