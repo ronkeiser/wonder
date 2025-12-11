@@ -1,11 +1,11 @@
 /**
- * Schema builders - Ergonomic helpers for creating SchemaType objects
+ * Schema builders - Ergonomic helpers for creating JSONSchema objects
  *
- * These return plain typed objects that match SchemaType from @wonder/context.
+ * These return plain typed objects that match JSONSchema from @wonder/context.
  * No magic, just convenience functions for common patterns.
  */
 
-import type { SchemaType } from '@wonder/context';
+import type { JSONSchema } from '@wonder/context';
 
 /**
  * Create a string schema with optional constraints
@@ -15,7 +15,7 @@ export function string(constraints?: {
   maxLength?: number;
   pattern?: string;
   enum?: string[];
-}): SchemaType {
+}): JSONSchema {
   if (constraints?.enum) {
     return {
       type: 'string',
@@ -40,7 +40,7 @@ export function integer(constraints?: {
   exclusiveMinimum?: number;
   exclusiveMaximum?: number;
   multipleOf?: number;
-}): SchemaType {
+}): JSONSchema {
   return {
     type: 'integer',
     ...(constraints?.minimum !== undefined && { minimum: constraints.minimum }),
@@ -64,7 +64,7 @@ export function number(constraints?: {
   exclusiveMinimum?: number;
   exclusiveMaximum?: number;
   multipleOf?: number;
-}): SchemaType {
+}): JSONSchema {
   return {
     type: 'number',
     ...(constraints?.minimum !== undefined && { minimum: constraints.minimum }),
@@ -82,7 +82,7 @@ export function number(constraints?: {
 /**
  * Create a boolean schema
  */
-export function boolean(): SchemaType {
+export function boolean(): JSONSchema {
   return {
     type: 'boolean',
   };
@@ -91,7 +91,7 @@ export function boolean(): SchemaType {
 /**
  * Create a null schema
  */
-export function nullType(): SchemaType {
+export function nullType(): JSONSchema {
   return {
     type: 'null',
   };
@@ -101,12 +101,12 @@ export function nullType(): SchemaType {
  * Create an object schema with properties
  */
 export function object(
-  properties: Record<string, SchemaType>,
+  properties: Record<string, JSONSchema>,
   options?: {
     required?: string[];
     additionalProperties?: boolean;
   },
-): SchemaType {
+): JSONSchema {
   return {
     type: 'object',
     properties,
@@ -119,13 +119,13 @@ export function object(
  * Create an array schema
  */
 export function array(
-  items: SchemaType,
+  items: JSONSchema,
   constraints?: {
     minItems?: number;
     maxItems?: number;
     uniqueItems?: boolean;
   },
-): SchemaType {
+): JSONSchema {
   return {
     type: 'array',
     items,
@@ -138,7 +138,7 @@ export function array(
 /**
  * Create an enum schema from values
  */
-export function enumType(values: unknown[]): SchemaType {
+export function enumType(values: unknown[]): JSONSchema {
   // Infer type from first value
   const firstValue = values[0];
   const inferredType =

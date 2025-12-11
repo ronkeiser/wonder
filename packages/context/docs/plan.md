@@ -10,7 +10,7 @@ Build `@wonder/schemas` as a **standalone, reusable** validation and DDL generat
 
 **@wonder/schemas is a general-purpose library:**
 
-- Defines its own `SchemaType` definition language (like JSON Schema)
+- Defines its own `JSONSchema` definition language (like JSON Schema)
 - Has ZERO knowledge of Wonder-specific types or domain concepts
 - Exports its schema definition types for consumers to import
 - Provides CustomTypeRegistry for runtime type extensions
@@ -18,7 +18,7 @@ Build `@wonder/schemas` as a **standalone, reusable** validation and DDL generat
 
 **Wonder API is a consumer:**
 
-- Imports `SchemaType` from `@wonder/schemas`
+- Imports `JSONSchema` from `@wonder/schemas`
 - Registers domain-specific custom types (`artifact_ref`, `workflow_ref`) at runtime
 - Uses the library's validation and DDL capabilities
 - Wraps schemas as needed: `{ type: 'object', properties: {...}, required: [...] }`
@@ -26,11 +26,11 @@ Build `@wonder/schemas` as a **standalone, reusable** validation and DDL generat
 **Dependency Direction:**
 
 ```
-@wonder/schemas (defines SchemaType)
+@wonder/schemas (defines JSONSchema)
         ↑
         | imports
         |
-Wonder API (uses SchemaType, registers custom types)
+Wonder API (uses JSONSchema, registers custom types)
 ```
 
 ## Package Rename
@@ -43,9 +43,9 @@ Wonder API (uses SchemaType, registers custom types)
 
 ### Root Schema Flexibility
 
-**Accept SchemaType, not Record<string, SchemaType>:**
+**Accept JSONSchema, not Record<string, JSONSchema>:**
 
-The validator accepts a **single SchemaType** as the root schema, which can be any type:
+The validator accepts a **single JSONSchema** as the root schema, which can be any type:
 
 ```typescript
 // Object schema (most common for Wonder)
@@ -58,7 +58,7 @@ The validator accepts a **single SchemaType** as the root schema, which can be a
 { type: 'string', minLength: 1 }
 ```
 
-**Why not force Record<string, SchemaType>?**
+**Why not force Record<string, JSONSchema>?**
 
 - Artificially constrains what can be validated (only objects with properties)
 - Prevents validating arrays, primitives, or nested structures at root
@@ -68,7 +68,7 @@ The validator accepts a **single SchemaType** as the root schema, which can be a
 **Wonder's typical usage:**
 
 ```typescript
-const contextSchema: SchemaType = {
+const contextSchema: JSONSchema = {
   type: 'object',
   properties: {
     input: { type: 'object', properties: {...} },
@@ -236,15 +236,15 @@ packages/schemas/
 // src/types.ts
 
 // Core schema type definition
-export type SchemaType = {
+export type JSONSchema = {
   type: 'string' | 'number' | 'integer' | 'boolean' | 'object' | 'array' | 'null';
 
   // Object validation
-  properties?: Record<string, SchemaType>;
+  properties?: Record<string, JSONSchema>;
   required?: string[];
 
   // Array validation
-  items?: SchemaType;
+  items?: JSONSchema;
 
   // String constraints
   minLength?: number;
@@ -278,7 +278,7 @@ export type SchemaType = {
 // Custom type definition (for extensibility)
 export type CustomTypeDefinition = {
   // Validation function - returns true if valid
-  validate: (value: unknown, schema: SchemaType, path: string) => boolean;
+  validate: (value: unknown, schema: JSONSchema, path: string) => boolean;
 
   // Optional metadata
   description?: string;
@@ -371,7 +371,7 @@ export class CustomTypeRegistry {
 
 export class Validator {
   constructor(
-    private schema: SchemaType, // Single SchemaType, not Record
+    private schema: JSONSchema, // Single JSONSchema, not Record
     private customTypes: CustomTypeRegistry,
     private options: ValidatorOptions = {},
   ) {
@@ -399,7 +399,7 @@ export class Validator {
   }
 
   // Recursive value validation
-  private validateValue(value: unknown, schema: SchemaType, path: string): ValidationError[] {
+  private validateValue(value: unknown, schema: JSONSchema, path: string): ValidationError[] {
     const errors: ValidationError[] = [];
 
     // Handle nullable
@@ -452,16 +452,16 @@ export class Validator {
   }
 
   // Type-specific validators (see constraints.ts for implementation)
-  private validateString(value: unknown, schema: SchemaType, path: string): ValidationError[];
-  private validateNumber(value: unknown, schema: SchemaType, path: string): ValidationError[];
-  private validateInteger(value: unknown, schema: SchemaType, path: string): ValidationError[];
-  private validateBoolean(value: unknown, schema: SchemaType, path: string): ValidationError[];
-  private validateObject(value: unknown, schema: SchemaType, path: string): ValidationError[];
-  private validateArray(value: unknown, schema: SchemaType, path: string): ValidationError[];
-  private validateNull(value: unknown, schema: SchemaType, path: string): ValidationError[];
+  private validateString(value: unknown, schema: JSONSchema, path: string): ValidationError[];
+  private validateNumber(value: unknown, schema: JSONSchema, path: string): ValidationError[];
+  private validateInteger(value: unknown, schema: JSONSchema, path: string): ValidationError[];
+  private validateBoolean(value: unknown, schema: JSONSchema, path: string): ValidationError[];
+  private validateObject(value: unknown, schema: JSONSchema, path: string): ValidationError[];
+  private validateArray(value: unknown, schema: JSONSchema, path: string): ValidationError[];
+  private validateNull(value: unknown, schema: JSONSchema, path: string): ValidationError[];
 
   // Custom type validation
-  private validateCustomType(value: unknown, schema: SchemaType, path: string): ValidationError[] {
+  private validateCustomType(value: unknown, schema: JSONSchema, path: string): ValidationError[] {
     const customType = this.customTypes.get(schema.type);
     if (!customType) {
       return [
@@ -527,7 +527,7 @@ Type-specific validators with full constraint checking (minLength, maxLength, pa
 // String validation with constraints
 export function validateString(
   value: unknown,
-  schema: SchemaType,
+  schema: JSONSchema,
   path: string,
 ): ValidationError[] {
   const errors: ValidationError[] = [];
@@ -646,7 +646,7 @@ export function validateString(
 ```typescript
 type CustomTypeDefinition = {
   // Validation (from Phase 1)
-  validate: (value: unknown, schema: SchemaType, path: string) => boolean;
+  validate: (value: unknown, schema: JSONSchema, path: string) => boolean;
 
   // SQL mapping (new)
   sqlType: 'TEXT' | 'INTEGER' | 'REAL' | 'BLOB';
@@ -662,19 +662,19 @@ type CustomTypeDefinition = {
 
 ```typescript
 class DDLGenerator {
-  constructor(private schema: Record<string, SchemaType>, private customTypes: CustomTypeRegistry);
+  constructor(private schema: Record<string, JSONSchema>, private customTypes: CustomTypeRegistry);
 
   // Generate CREATE TABLE statements
   generateDDL(tableName: string): string;
 
   // Map schema to columns
-  private generateColumns(schema: Record<string, SchemaType>): ColumnDefinition[];
+  private generateColumns(schema: Record<string, JSONSchema>): ColumnDefinition[];
 
   // Map arrays to separate tables
-  private generateArrayTables(tableName: string, schema: Record<string, SchemaType>): string[];
+  private generateArrayTables(tableName: string, schema: Record<string, JSONSchema>): string[];
 
   // Type mapping
-  private mapTypeToSQL(schema: SchemaType): string;
+  private mapTypeToSQL(schema: JSONSchema): string;
 }
 ```
 
@@ -708,16 +708,16 @@ class DDLGenerator {
 ```typescript
 // docs/architecture/primitives.ts
 
-// Import SchemaType from the library (not define it here)
-import type { SchemaType } from '@wonder/schemas';
+// Import JSONSchema from the library (not define it here)
+import type { JSONSchema } from '@wonder/schemas';
 
 export type WorkflowDef = {
   // ... other fields ...
 
-  // Schemas are now proper SchemaType (object schemas)
-  input_schema: SchemaType;
-  output_schema: SchemaType;
-  context_schema?: SchemaType;
+  // Schemas are now proper JSONSchema (object schemas)
+  input_schema: JSONSchema;
+  output_schema: JSONSchema;
+  context_schema?: JSONSchema;
 
   // ... other fields ...
 };
@@ -753,18 +753,18 @@ export function registerWonderTypes(registry: CustomTypeRegistry): void {
 - Update `services/api/src/domains/schema/validation.ts`
 - Replace inline validator with `@wonder/schemas`
 - Ensure error messages match or improve current format
-- Import `SchemaType` from `@wonder/schemas` instead of defining locally
+- Import `JSONSchema` from `@wonder/schemas` instead of defining locally
 
 ### 3.4 Schema Migration
 
-- Convert existing `Record<string, SchemaType>` to proper `SchemaType` objects:
+- Convert existing `Record<string, JSONSchema>` to proper `JSONSchema` objects:
 
   ```typescript
   // Old
   const schema = { name: { type: 'string' }, age: { type: 'number' } };
 
   // New
-  const schema: SchemaType = {
+  const schema: JSONSchema = {
     type: 'object',
     properties: { name: { type: 'string' }, age: { type: 'number' } },
     required: ['name', 'age'],
@@ -772,7 +772,7 @@ export function registerWonderTypes(registry: CustomTypeRegistry): void {
   ```
 
 - Update all workflow definitions in fixtures and tests
-- Update `primitives.ts` to import `SchemaType` from `@wonder/schemas`
+- Update `primitives.ts` to import `JSONSchema` from `@wonder/schemas`
 
 ### 3.4 Testing
 
@@ -813,10 +813,10 @@ class Schema {
 ### Simple Usage (Result-Driven)
 
 ```typescript
-import { Validator, CustomTypeRegistry, type SchemaType } from '@wonder/schemas';
+import { Validator, CustomTypeRegistry, type JSONSchema } from '@wonder/schemas';
 
-// Define schema using SchemaType
-const schema: SchemaType = {
+// Define schema using JSONSchema
+const schema: JSONSchema = {
   type: 'object',
   properties: {
     name: { type: 'string', minLength: 1 },
@@ -837,7 +837,7 @@ if (!result.valid) {
 ### Advanced Usage with Custom Types
 
 ```typescript
-import { Validator, CustomTypeRegistry, type SchemaType } from '@wonder/schemas';
+import { Validator, CustomTypeRegistry, type JSONSchema } from '@wonder/schemas';
 
 // Register custom types at runtime
 const registry = new CustomTypeRegistry();
@@ -846,7 +846,7 @@ registry.register('artifact_ref', {
 });
 
 // Use custom type in schema
-const schema: SchemaType = {
+const schema: JSONSchema = {
   type: 'object',
   properties: {
     artifact_id: { type: 'artifact_ref' as any }, // Cast needed for TS
@@ -870,7 +870,7 @@ if (!result.valid) {
 
 ```typescript
 // services/api/src/domains/schema/wonder-schema.ts
-import { Validator, CustomTypeRegistry, type SchemaType } from '@wonder/schemas';
+import { Validator, CustomTypeRegistry, type JSONSchema } from '@wonder/schemas';
 
 // Create registry with Wonder's custom types
 export function createWonderRegistry(): CustomTypeRegistry {
@@ -888,7 +888,7 @@ export function createWonderRegistry(): CustomTypeRegistry {
 }
 
 // Validate workflow input
-export function validateWorkflowInput(input: unknown, inputSchema: SchemaType): ValidationResult {
+export function validateWorkflowInput(input: unknown, inputSchema: JSONSchema): ValidationResult {
   const registry = createWonderRegistry();
   const validator = new Validator(inputSchema, registry);
   return validator.validate(input);
@@ -991,7 +991,7 @@ export function validateWorkflowInput(input: unknown, inputSchema: SchemaType): 
 ## Success Criteria
 
 - ✅ **Library Independence**: @wonder/schemas has zero Wonder-specific code or knowledge
-- ✅ **Proper Dependency Direction**: Wonder imports `SchemaType` from @wonder/schemas
+- ✅ **Proper Dependency Direction**: Wonder imports `JSONSchema` from @wonder/schemas
 - ✅ **Flexible Root Schemas**: Can validate objects, arrays, primitives at root level
 - ✅ **Custom Type System**: Runtime registration for domain-specific types
 - ✅ **Better Error Messages**: JSON Pointer paths, collect all errors
@@ -1004,7 +1004,7 @@ export function validateWorkflowInput(input: unknown, inputSchema: SchemaType): 
 ```
 ┌─────────────────────────────────────────┐
 │         @wonder/schemas (library)        │
-│  - Defines SchemaType                   │
+│  - Defines JSONSchema                   │
 │  - Exports types for consumers          │
 │  - Validator class                      │
 │  - CustomTypeRegistry                   │
@@ -1012,12 +1012,12 @@ export function validateWorkflowInput(input: unknown, inputSchema: SchemaType): 
 │  - Zero domain knowledge                │
 └─────────────────────────────────────────┘
                     ↑
-                    │ imports SchemaType
+                    │ imports JSONSchema
                     │ uses Validator
                     │
 ┌─────────────────────────────────────────┐
 │      Wonder API (consumer)              │
-│  - Imports SchemaType                   │
+│  - Imports JSONSchema                   │
 │  - Registers artifact_ref, workflow_ref │
 │  - Wraps schemas as needed              │
 │  - Validates workflow I/O               │

@@ -1,12 +1,12 @@
 import { describe, expect, it } from 'vitest';
 import { CustomTypeRegistry } from '../src/custom-types.js';
 import { DDLGenerator } from '../src/ddl-generator.js';
-import type { SchemaType } from '../src/types.js';
+import type { JSONSchema } from '../src/types.js';
 
 describe('DDLGenerator', () => {
   describe('Basic table generation', () => {
     it('should generate simple table with scalar fields', () => {
-      const schema: SchemaType = {
+      const schema: JSONSchema = {
         type: 'object',
         properties: {
           id: { type: 'integer' },
@@ -26,7 +26,7 @@ describe('DDLGenerator', () => {
     });
 
     it('should handle nullable fields', () => {
-      const schema: SchemaType = {
+      const schema: JSONSchema = {
         type: 'object',
         properties: {
           email: { type: 'string', nullable: true },
@@ -41,7 +41,7 @@ describe('DDLGenerator', () => {
     });
 
     it('should handle all scalar types', () => {
-      const schema: SchemaType = {
+      const schema: JSONSchema = {
         type: 'object',
         properties: {
           text: { type: 'string' },
@@ -63,7 +63,7 @@ describe('DDLGenerator', () => {
 
   describe('Constraint generation', () => {
     it('should generate string length constraints', () => {
-      const schema: SchemaType = {
+      const schema: JSONSchema = {
         type: 'object',
         properties: {
           username: {
@@ -82,7 +82,7 @@ describe('DDLGenerator', () => {
     });
 
     it('should generate number range constraints', () => {
-      const schema: SchemaType = {
+      const schema: JSONSchema = {
         type: 'object',
         properties: {
           age: {
@@ -102,7 +102,7 @@ describe('DDLGenerator', () => {
     });
 
     it('should generate enum constraints', () => {
-      const schema: SchemaType = {
+      const schema: JSONSchema = {
         type: 'object',
         properties: {
           status: {
@@ -123,7 +123,7 @@ describe('DDLGenerator', () => {
     });
 
     it('should generate exclusive range constraints', () => {
-      const schema: SchemaType = {
+      const schema: JSONSchema = {
         type: 'object',
         properties: {
           score: {
@@ -145,7 +145,7 @@ describe('DDLGenerator', () => {
 
   describe('Nested objects', () => {
     it('should flatten nested objects by default', () => {
-      const schema: SchemaType = {
+      const schema: JSONSchema = {
         type: 'object',
         properties: {
           user: {
@@ -166,7 +166,7 @@ describe('DDLGenerator', () => {
     });
 
     it('should store nested objects as JSON when configured', () => {
-      const schema: SchemaType = {
+      const schema: JSONSchema = {
         type: 'object',
         properties: {
           metadata: {
@@ -188,7 +188,7 @@ describe('DDLGenerator', () => {
     });
 
     it('should handle deeply nested objects', () => {
-      const schema: SchemaType = {
+      const schema: JSONSchema = {
         type: 'object',
         properties: {
           level1: {
@@ -214,7 +214,7 @@ describe('DDLGenerator', () => {
 
   describe('Array handling', () => {
     it('should create separate table for arrays by default', () => {
-      const schema: SchemaType = {
+      const schema: JSONSchema = {
         type: 'object',
         properties: {
           tags: {
@@ -235,7 +235,7 @@ describe('DDLGenerator', () => {
     });
 
     it('should store arrays as JSON when configured', () => {
-      const schema: SchemaType = {
+      const schema: JSONSchema = {
         type: 'object',
         properties: {
           tags: {
@@ -255,7 +255,7 @@ describe('DDLGenerator', () => {
     });
 
     it('should handle array of objects', () => {
-      const schema: SchemaType = {
+      const schema: JSONSchema = {
         type: 'object',
         properties: {
           comments: {
@@ -280,7 +280,7 @@ describe('DDLGenerator', () => {
     });
 
     it('should handle nested arrays', () => {
-      const schema: SchemaType = {
+      const schema: JSONSchema = {
         type: 'object',
         properties: {
           sections: {
@@ -307,7 +307,7 @@ describe('DDLGenerator', () => {
     });
 
     it('should use array table prefix when configured', () => {
-      const schema: SchemaType = {
+      const schema: JSONSchema = {
         type: 'object',
         properties: {
           tags: {
@@ -337,7 +337,7 @@ describe('DDLGenerator', () => {
         }),
       });
 
-      const schema: SchemaType = {
+      const schema: JSONSchema = {
         type: 'object',
         properties: {
           createdAt: { type: 'timestamp' as any },
@@ -357,7 +357,7 @@ describe('DDLGenerator', () => {
         validate: (value: unknown) => typeof value === 'string' && value.includes('@'),
       });
 
-      const schema: SchemaType = {
+      const schema: JSONSchema = {
         type: 'object',
         properties: {
           email: { type: 'email' as any },
@@ -373,7 +373,7 @@ describe('DDLGenerator', () => {
 
   describe('Table name methods', () => {
     it('should return all table names including array tables', () => {
-      const schema: SchemaType = {
+      const schema: JSONSchema = {
         type: 'object',
         properties: {
           tags: {
@@ -394,7 +394,7 @@ describe('DDLGenerator', () => {
     });
 
     it('should return only main table when arrays stored as JSON', () => {
-      const schema: SchemaType = {
+      const schema: JSONSchema = {
         type: 'object',
         properties: {
           tags: {
@@ -415,7 +415,7 @@ describe('DDLGenerator', () => {
 
   describe('Edge cases', () => {
     it('should throw error for non-object root schema', () => {
-      const schema: SchemaType = {
+      const schema: JSONSchema = {
         type: 'string',
       };
 
@@ -427,7 +427,7 @@ describe('DDLGenerator', () => {
     });
 
     it('should handle empty object schema', () => {
-      const schema: SchemaType = {
+      const schema: JSONSchema = {
         type: 'object',
         properties: {},
       };
@@ -439,7 +439,7 @@ describe('DDLGenerator', () => {
     });
 
     it('should handle schema with no properties', () => {
-      const schema: SchemaType = {
+      const schema: JSONSchema = {
         type: 'object',
       };
 
@@ -452,7 +452,7 @@ describe('DDLGenerator', () => {
 
   describe('DDL formatting', () => {
     it('should format DDL with proper indentation', () => {
-      const schema: SchemaType = {
+      const schema: JSONSchema = {
         type: 'object',
         properties: {
           id: { type: 'integer' },
@@ -469,7 +469,7 @@ describe('DDLGenerator', () => {
     });
 
     it('should separate multiple tables with blank lines', () => {
-      const schema: SchemaType = {
+      const schema: JSONSchema = {
         type: 'object',
         properties: {
           tags: {

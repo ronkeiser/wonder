@@ -27,11 +27,11 @@ export function createWonderRegistry(): CustomTypeRegistry {
 }
 ```
 
-## 2. Import SchemaType in Wonder's Type Definitions
+## 2. Import JSONSchema in Wonder's Type Definitions
 
 ```typescript
 // docs/architecture/primitives.ts
-import type { SchemaType } from '@wonder/schemas';
+import type { JSONSchema } from '@wonder/schemas';
 
 export type WorkflowContext = {
   input: Record<string, unknown>;
@@ -44,9 +44,9 @@ export type WorkflowDefinition = {
   name: string;
   version: string;
   // Schemas define the shape of each context field
-  input_schema: SchemaType;
-  state_schema: SchemaType;
-  output_schema: SchemaType;
+  input_schema: JSONSchema;
+  state_schema: JSONSchema;
+  output_schema: JSONSchema;
   steps: WorkflowStep[];
 };
 ```
@@ -55,7 +55,7 @@ export type WorkflowDefinition = {
 
 ```typescript
 // services/api/src/domains/schema/validation.ts
-import { Validator, validateSchema, type SchemaType } from '@wonder/schemas';
+import { Validator, validateSchema, type JSONSchema } from '@wonder/schemas';
 import { createWonderRegistry } from './custom-types.js';
 
 // Create singleton registry
@@ -68,9 +68,9 @@ export function validateWorkflowContext(
   input: unknown,
   state: unknown,
   output: unknown,
-  inputSchema: SchemaType,
-  stateSchema: SchemaType,
-  outputSchema: SchemaType,
+  inputSchema: JSONSchema,
+  stateSchema: JSONSchema,
+  outputSchema: JSONSchema,
 ) {
   const errors = [];
 
@@ -185,19 +185,19 @@ if (!result.valid) {
 ## Key Design Points
 
 1. **@wonder/schemas is standalone**:
-   - Defines `SchemaType` and all validation logic
+   - Defines `JSONSchema` and all validation logic
    - Has zero knowledge of Wonder-specific types
    - Works in any Cloudflare Workers environment
 
 2. **Wonder API is a consumer**:
-   - Imports `SchemaType` from `@wonder/schemas`
+   - Imports `JSONSchema` from `@wonder/schemas`
    - Registers custom types (`artifact_ref`, `workflow_ref`) at runtime
    - Uses the library's validators for context validation
 
 3. **Wonder's domain constraint**:
    - Context fields (input, state, output) are always objects with keyed values
    - Wonder wraps schemas as: `{ type: 'object', properties: {...}, required: [...] }`
-   - The library's flexibility (accepting any SchemaType) allows this without artificial constraints
+   - The library's flexibility (accepting any JSONSchema) allows this without artificial constraints
 
 4. **Validation happens at the API layer**:
    - Before storing context in SQLite/DO

@@ -2,7 +2,7 @@
 
 ## Summary
 
-Successfully implemented DDL (Data Definition Language) generation for `@wonder/schemas`. The package now supports converting SchemaType definitions into SQLite CREATE TABLE statements.
+Successfully implemented DDL (Data Definition Language) generation for `@wonder/schemas`. The package now supports converting JSONSchema definitions into SQLite CREATE TABLE statements.
 
 ## Completed Features
 
@@ -15,7 +15,7 @@ Successfully implemented DDL (Data Definition Language) generation for `@wonder/
 ### 2. DDLGenerator Class
 
 - Full-featured SQLite DDL generator
-- Generates CREATE TABLE statements from SchemaType definitions
+- Generates CREATE TABLE statements from JSONSchema definitions
 - Configurable strategies for nested objects and arrays
 - Proper constraint handling and foreign keys
 

@@ -115,12 +115,12 @@ console.log('VALIDATION CHECKS:');
 
 // Check code structure
 const hasImports = clientCode.includes('import type { paths }');
-const hasSchemaImport = clientCode.includes('import type { SchemaType }');
+const hasSchemaImport = clientCode.includes('import type { JSONSchema }');
 const hasCreateClient = clientCode.includes('export function createClient');
 const hasReturn = clientCode.includes('return {');
 
 console.log(`  ✓ Has type imports: ${hasImports}`);
-console.log(`  ✓ Has SchemaType import: ${hasSchemaImport}`);
+console.log(`  ✓ Has JSONSchema import: ${hasSchemaImport}`);
 console.log(`  ✓ Has createClient function: ${hasCreateClient}`);
 console.log(`  ✓ Has return statement: ${hasReturn}`);
 

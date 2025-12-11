@@ -1,12 +1,12 @@
 import { describe, expect, it } from 'vitest';
 import { CustomTypeRegistry } from '../src/custom-types.js';
 import { DMLGenerator } from '../src/dml-generator.js';
-import type { SchemaType } from '../src/types.js';
+import type { JSONSchema } from '../src/types.js';
 
 describe('DMLGenerator', () => {
   describe('INSERT generation - scalar fields', () => {
     it('should generate basic INSERT statement', () => {
-      const schema: SchemaType = {
+      const schema: JSONSchema = {
         type: 'object',
         properties: {
           id: { type: 'integer' },
@@ -29,7 +29,7 @@ describe('DMLGenerator', () => {
     });
 
     it('should convert boolean to 0/1', () => {
-      const schema: SchemaType = {
+      const schema: JSONSchema = {
         type: 'object',
         properties: {
           enabled: { type: 'boolean' },
@@ -47,7 +47,7 @@ describe('DMLGenerator', () => {
     });
 
     it('should handle missing optional fields', () => {
-      const schema: SchemaType = {
+      const schema: JSONSchema = {
         type: 'object',
         properties: {
           id: { type: 'integer' },
@@ -69,7 +69,7 @@ describe('DMLGenerator', () => {
     });
 
     it('should handle all scalar types', () => {
-      const schema: SchemaType = {
+      const schema: JSONSchema = {
         type: 'object',
         properties: {
           text: { type: 'string' },
@@ -93,7 +93,7 @@ describe('DMLGenerator', () => {
 
   describe('INSERT generation - nested objects (flatten)', () => {
     it('should flatten nested objects', () => {
-      const schema: SchemaType = {
+      const schema: JSONSchema = {
         type: 'object',
         properties: {
           id: { type: 'integer' },
@@ -123,7 +123,7 @@ describe('DMLGenerator', () => {
     });
 
     it('should handle multiple nesting levels', () => {
-      const schema: SchemaType = {
+      const schema: JSONSchema = {
         type: 'object',
         properties: {
           user: {
@@ -156,7 +156,7 @@ describe('DMLGenerator', () => {
 
   describe('INSERT generation - arrays (table strategy)', () => {
     it('should generate separate INSERT for array of scalars', () => {
-      const schema: SchemaType = {
+      const schema: JSONSchema = {
         type: 'object',
         properties: {
           id: { type: 'integer' },
@@ -186,7 +186,7 @@ describe('DMLGenerator', () => {
     });
 
     it('should generate separate INSERT for array of objects', () => {
-      const schema: SchemaType = {
+      const schema: JSONSchema = {
         type: 'object',
         properties: {
           id: { type: 'integer' },
@@ -222,7 +222,7 @@ describe('DMLGenerator', () => {
     });
 
     it('should handle empty arrays', () => {
-      const schema: SchemaType = {
+      const schema: JSONSchema = {
         type: 'object',
         properties: {
           id: { type: 'integer' },
@@ -244,7 +244,7 @@ describe('DMLGenerator', () => {
     });
 
     it('should use PARENT_ID placeholder for foreign keys', () => {
-      const schema: SchemaType = {
+      const schema: JSONSchema = {
         type: 'object',
         properties: {
           id: { type: 'integer' },
@@ -267,7 +267,7 @@ describe('DMLGenerator', () => {
 
   describe('INSERT generation - arrays (json strategy)', () => {
     it('should store array as JSON string', () => {
-      const schema: SchemaType = {
+      const schema: JSONSchema = {
         type: 'object',
         properties: {
           id: { type: 'integer' },
@@ -294,7 +294,7 @@ describe('DMLGenerator', () => {
 
   describe('UPDATE generation', () => {
     it('should generate basic UPDATE statement', () => {
-      const schema: SchemaType = {
+      const schema: JSONSchema = {
         type: 'object',
         properties: {
           name: { type: 'string' },
@@ -311,7 +311,7 @@ describe('DMLGenerator', () => {
     });
 
     it('should handle partial updates', () => {
-      const schema: SchemaType = {
+      const schema: JSONSchema = {
         type: 'object',
         properties: {
           name: { type: 'string' },
@@ -328,7 +328,7 @@ describe('DMLGenerator', () => {
     });
 
     it('should handle array updates with DELETE and INSERT', () => {
-      const schema: SchemaType = {
+      const schema: JSONSchema = {
         type: 'object',
         properties: {
           id: { type: 'integer' },
@@ -349,7 +349,7 @@ describe('DMLGenerator', () => {
     });
 
     it('should flatten nested objects in UPDATE', () => {
-      const schema: SchemaType = {
+      const schema: JSONSchema = {
         type: 'object',
         properties: {
           metadata: {
@@ -371,7 +371,7 @@ describe('DMLGenerator', () => {
 
   describe('DELETE generation', () => {
     it('should generate basic DELETE statement', () => {
-      const schema: SchemaType = {
+      const schema: JSONSchema = {
         type: 'object',
         properties: {
           id: { type: 'integer' },
@@ -387,7 +387,7 @@ describe('DMLGenerator', () => {
     });
 
     it('should cascade delete for array tables', () => {
-      const schema: SchemaType = {
+      const schema: JSONSchema = {
         type: 'object',
         properties: {
           id: { type: 'integer' },
@@ -410,7 +410,7 @@ describe('DMLGenerator', () => {
     });
 
     it('should handle multiple array tables in correct order', () => {
-      const schema: SchemaType = {
+      const schema: JSONSchema = {
         type: 'object',
         properties: {
           id: { type: 'integer' },
@@ -435,7 +435,7 @@ describe('DMLGenerator', () => {
 
   describe('Edge cases', () => {
     it('should handle empty data object', () => {
-      const schema: SchemaType = {
+      const schema: JSONSchema = {
         type: 'object',
         properties: {
           id: { type: 'integer' },
@@ -451,7 +451,7 @@ describe('DMLGenerator', () => {
     });
 
     it('should throw error for non-object schema', () => {
-      const schema: SchemaType = {
+      const schema: JSONSchema = {
         type: 'string',
       };
 
@@ -463,7 +463,7 @@ describe('DMLGenerator', () => {
     });
 
     it('should handle schema with no properties', () => {
-      const schema: SchemaType = {
+      const schema: JSONSchema = {
         type: 'object',
         properties: {},
       };
@@ -475,7 +475,7 @@ describe('DMLGenerator', () => {
     });
 
     it('should handle mixed field types', () => {
-      const schema: SchemaType = {
+      const schema: JSONSchema = {
         type: 'object',
         properties: {
           scalar: { type: 'string' },
@@ -507,7 +507,7 @@ describe('DMLGenerator', () => {
 
   describe('Strategy consistency', () => {
     it('should use array table prefix', () => {
-      const schema: SchemaType = {
+      const schema: JSONSchema = {
         type: 'object',
         properties: {
           id: { type: 'integer' },
@@ -527,7 +527,7 @@ describe('DMLGenerator', () => {
     });
 
     it('should respect nested object JSON strategy', () => {
-      const schema: SchemaType = {
+      const schema: JSONSchema = {
         type: 'object',
         properties: {
           metadata: {

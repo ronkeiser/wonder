@@ -25,9 +25,9 @@ const AUTO_GENERATED_HEADER = `/**
 `;
 
 /**
- * Check if a path should use SchemaType reference
+ * Check if a path should use JSONSchema reference
  */
-function shouldUseSchemaType(path: string): boolean {
+function shouldUseJSONSchema(path: string): boolean {
   const workflowSchemas = ['input_schema', 'output_schema', 'context_schema'];
   return (
     (path.includes('WorkflowDef') && workflowSchemas.some((schema) => path.endsWith(schema))) ||
@@ -63,8 +63,8 @@ async function generate() {
   const { factory } = ts;
   const ast = await openapiTS(DOC_URL, {
     transform(schemaObject, options) {
-      return shouldUseSchemaType(options.path ?? '')
-        ? factory.createTypeReferenceNode('SchemaType')
+      return shouldUseJSONSchema(options.path ?? '')
+        ? factory.createTypeReferenceNode('JSONSchema')
         : undefined;
     },
   });
@@ -75,7 +75,7 @@ async function generate() {
       true,
       undefined,
       factory.createNamedImports([
-        factory.createImportSpecifier(false, undefined, factory.createIdentifier('SchemaType')),
+        factory.createImportSpecifier(false, undefined, factory.createIdentifier('JSONSchema')),
       ]),
     ),
     factory.createStringLiteral('@wonder/context'),

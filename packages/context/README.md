@@ -401,7 +401,7 @@ for (let i = 1; i < statements.length; i++) {
 
 ### Types
 
-- **`SchemaType`** - Schema definition (object, string, integer, array, etc.)
+- **`JSONSchema`** - Schema definition (object, string, integer, array, etc.)
 - **`ValidationError`** - Error with JSON Pointer path, code, expected/actual
 - **`CustomTypeDefinition`** - Custom type with validate() and optional toSQL()
 - **`SQLTypeMapping`** - SQL type (TEXT/INTEGER/REAL/BLOB) + constraints

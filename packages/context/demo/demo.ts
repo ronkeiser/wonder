@@ -1,14 +1,14 @@
 // Demo script for @wonder/schemas
 
 import { CustomTypeRegistry, DDLGenerator, Validator } from '../src/index.js';
-import type { SchemaType } from '../src/types.js';
+import type { JSONSchema } from '../src/types.js';
 
 console.log('='.repeat(60));
 console.log('🎯 @wonder/schemas Demo');
 console.log('='.repeat(60));
 
 // Define a schema for a blog post
-const postSchema: SchemaType = {
+const postSchema: JSONSchema = {
   type: 'object',
   properties: {
     id: { type: 'integer' },
@@ -140,7 +140,7 @@ customRegistry.register('timestamp', {
   description: 'Unix timestamp (milliseconds since epoch)',
 });
 
-const eventSchema: SchemaType = {
+const eventSchema: JSONSchema = {
   type: 'object',
   properties: {
     id: { type: 'integer' },

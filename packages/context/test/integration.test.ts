@@ -3,7 +3,7 @@ import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 import { CustomTypeRegistry } from '../src/custom-types.js';
 import { DDLGenerator } from '../src/ddl-generator.js';
 import { DMLGenerator } from '../src/dml-generator.js';
-import type { SchemaType } from '../src/types.js';
+import type { JSONSchema } from '../src/types.js';
 import { Validator } from '../src/validator.js';
 
 // D1Database type from Miniflare
@@ -39,7 +39,7 @@ describe('D1 Integration Tests', () => {
 
   describe('Basic DDL and DML', () => {
     it('should create table and insert scalar data', async () => {
-      const schema: SchemaType = {
+      const schema: JSONSchema = {
         type: 'object',
         properties: {
           id: { type: 'integer' },
@@ -83,7 +83,7 @@ describe('D1 Integration Tests', () => {
     });
 
     it('should enforce CHECK constraints', async () => {
-      const schema: SchemaType = {
+      const schema: JSONSchema = {
         type: 'object',
         properties: {
           id: { type: 'integer' },
@@ -118,7 +118,7 @@ describe('D1 Integration Tests', () => {
 
   describe('Nested Objects (Flatten Strategy)', () => {
     it('should flatten nested objects into columns', async () => {
-      const schema: SchemaType = {
+      const schema: JSONSchema = {
         type: 'object',
         properties: {
           id: { type: 'integer' },
@@ -162,7 +162,7 @@ describe('D1 Integration Tests', () => {
 
   describe('Arrays (Table Strategy)', () => {
     it('should create array table and insert array data', async () => {
-      const schema: SchemaType = {
+      const schema: JSONSchema = {
         type: 'object',
         properties: {
           id: { type: 'integer' },
@@ -221,7 +221,7 @@ describe('D1 Integration Tests', () => {
     });
 
     it('should insert array of objects', async () => {
-      const schema: SchemaType = {
+      const schema: JSONSchema = {
         type: 'object',
         properties: {
           id: { type: 'integer' },
@@ -284,7 +284,7 @@ describe('D1 Integration Tests', () => {
     });
 
     it('should enforce foreign key constraints', async () => {
-      const schema: SchemaType = {
+      const schema: JSONSchema = {
         type: 'object',
         properties: {
           id: { type: 'integer' },
@@ -309,7 +309,7 @@ describe('D1 Integration Tests', () => {
 
   describe('UPDATE operations', () => {
     it('should update scalar fields', async () => {
-      const schema: SchemaType = {
+      const schema: JSONSchema = {
         type: 'object',
         properties: {
           id: { type: 'integer' },
@@ -345,7 +345,7 @@ describe('D1 Integration Tests', () => {
 
   describe('DELETE operations', () => {
     it('should cascade delete array tables', async () => {
-      const schema: SchemaType = {
+      const schema: JSONSchema = {
         type: 'object',
         properties: {
           id: { type: 'integer' },
@@ -396,7 +396,7 @@ describe('D1 Integration Tests', () => {
 
   describe('Validation integration', () => {
     it('should validate before INSERT', async () => {
-      const schema: SchemaType = {
+      const schema: JSONSchema = {
         type: 'object',
         properties: {
           id: { type: 'integer' },

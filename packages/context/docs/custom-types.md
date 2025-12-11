@@ -19,7 +19,7 @@ Custom types provide:
 ```typescript
 export type CustomTypeDefinition = {
   // Validation function (returns true if valid)
-  validate: (value: unknown, schema: SchemaType, path: string) => boolean;
+  validate: (value: unknown, schema: JSONSchema, path: string) => boolean;
 
   // SQL type mapping
   sqlType: 'TEXT' | 'INTEGER' | 'REAL' | 'BLOB';
@@ -135,7 +135,7 @@ const ddl = schema.generateDDL('context');
 // services/api/src/domains/schema/wonder-schema.ts
 import { Schema, type CustomTypeDefinition } from '@wonder/schemas';
 
-export type SchemaType = {
+export type JSONSchema = {
   type:
     | 'string'
     | 'number'
@@ -147,9 +147,9 @@ export type SchemaType = {
     | 'workflow_ref'; // Custom types
 
   // Standard JSON Schema
-  properties?: Record<string, SchemaType>;
+  properties?: Record<string, JSONSchema>;
   required?: string[];
-  items?: SchemaType;
+  items?: JSONSchema;
 
   // Wonder-specific metadata
   artifact_type_id?: string;
@@ -164,7 +164,7 @@ function createULIDValidator() {
 }
 
 // Create schema with Wonder's custom types
-export function createWonderSchema(schemaDefinition: Record<string, SchemaType>): Schema {
+export function createWonderSchema(schemaDefinition: Record<string, JSONSchema>): Schema {
   const schema = new Schema(schemaDefinition);
 
   // Register custom types

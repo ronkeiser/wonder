@@ -1,13 +1,13 @@
 import { describe, expect, it } from 'vitest';
 import { CustomTypeRegistry } from '../src/custom-types.js';
-import type { SchemaType } from '../src/types.js';
+import type { JSONSchema } from '../src/types.js';
 import { ValidationErrorCode } from '../src/types.js';
 import { Validator, validateSchema } from '../src/validator.js';
 
 describe('Validator', () => {
   describe('basic type validation', () => {
     it('should validate string type', () => {
-      const schema: SchemaType = {
+      const schema: JSONSchema = {
         type: 'object',
         properties: {
           name: { type: 'string' },
@@ -22,7 +22,7 @@ describe('Validator', () => {
     });
 
     it('should reject non-string value', () => {
-      const schema: SchemaType = {
+      const schema: JSONSchema = {
         type: 'object',
         properties: {
           name: { type: 'string' },
@@ -39,7 +39,7 @@ describe('Validator', () => {
     });
 
     it('should validate number type', () => {
-      const schema: SchemaType = {
+      const schema: JSONSchema = {
         type: 'object',
         properties: {
           age: { type: 'number' },
@@ -53,7 +53,7 @@ describe('Validator', () => {
     });
 
     it('should validate integer type', () => {
-      const schema: SchemaType = {
+      const schema: JSONSchema = {
         type: 'object',
         properties: {
           count: { type: 'integer' },
@@ -67,7 +67,7 @@ describe('Validator', () => {
     });
 
     it('should reject float as integer', () => {
-      const schema: SchemaType = {
+      const schema: JSONSchema = {
         type: 'object',
         properties: {
           count: { type: 'integer' },
@@ -82,7 +82,7 @@ describe('Validator', () => {
     });
 
     it('should validate boolean type', () => {
-      const schema: SchemaType = {
+      const schema: JSONSchema = {
         type: 'object',
         properties: {
           active: { type: 'boolean' },
@@ -96,7 +96,7 @@ describe('Validator', () => {
     });
 
     it('should validate array type', () => {
-      const schema: SchemaType = {
+      const schema: JSONSchema = {
         type: 'object',
         properties: {
           tags: { type: 'array', items: { type: 'string' } },
@@ -110,7 +110,7 @@ describe('Validator', () => {
     });
 
     it('should validate object type', () => {
-      const schema: SchemaType = {
+      const schema: JSONSchema = {
         type: 'object',
         properties: {
           user: {
@@ -130,7 +130,7 @@ describe('Validator', () => {
     });
 
     it('should validate null type', () => {
-      const schema: SchemaType = { type: 'null' };
+      const schema: JSONSchema = { type: 'null' };
       const registry = new CustomTypeRegistry();
       const validator = new Validator(schema, registry);
 
@@ -141,7 +141,7 @@ describe('Validator', () => {
 
   describe('required fields', () => {
     it('should validate required fields', () => {
-      const schema: SchemaType = {
+      const schema: JSONSchema = {
         type: 'object',
         properties: {
           name: { type: 'string' },
@@ -157,7 +157,7 @@ describe('Validator', () => {
     });
 
     it('should report missing required fields', () => {
-      const schema: SchemaType = {
+      const schema: JSONSchema = {
         type: 'object',
         properties: {
           name: { type: 'string' },
@@ -176,7 +176,7 @@ describe('Validator', () => {
     });
 
     it('should allow optional fields to be undefined', () => {
-      const schema: SchemaType = {
+      const schema: JSONSchema = {
         type: 'object',
         properties: {
           name: { type: 'string' },
@@ -194,7 +194,7 @@ describe('Validator', () => {
 
   describe('nullable values', () => {
     it('should accept null for nullable types', () => {
-      const schema: SchemaType = {
+      const schema: JSONSchema = {
         type: 'object',
         properties: {
           value: { type: 'string', nullable: true },
@@ -208,7 +208,7 @@ describe('Validator', () => {
     });
 
     it('should reject null for non-nullable types', () => {
-      const schema: SchemaType = {
+      const schema: JSONSchema = {
         type: 'object',
         properties: {
           value: { type: 'string' },
@@ -225,7 +225,7 @@ describe('Validator', () => {
 
   describe('nested objects', () => {
     it('should validate nested object properties', () => {
-      const schema: SchemaType = {
+      const schema: JSONSchema = {
         type: 'object',
         properties: {
           user: {
@@ -257,7 +257,7 @@ describe('Validator', () => {
     });
 
     it('should report nested validation errors with correct paths', () => {
-      const schema: SchemaType = {
+      const schema: JSONSchema = {
         type: 'object',
         properties: {
           user: {
@@ -290,7 +290,7 @@ describe('Validator', () => {
 
   describe('arrays', () => {
     it('should validate array items', () => {
-      const schema: SchemaType = {
+      const schema: JSONSchema = {
         type: 'object',
         properties: {
           numbers: { type: 'array', items: { type: 'number' } },
@@ -304,7 +304,7 @@ describe('Validator', () => {
     });
 
     it('should report errors for invalid array items', () => {
-      const schema: SchemaType = {
+      const schema: JSONSchema = {
         type: 'object',
         properties: {
           numbers: { type: 'array', items: { type: 'number' } },
@@ -319,7 +319,7 @@ describe('Validator', () => {
     });
 
     it('should validate arrays of objects', () => {
-      const schema: SchemaType = {
+      const schema: JSONSchema = {
         type: 'object',
         properties: {
           users: {
@@ -349,7 +349,7 @@ describe('Validator', () => {
 
   describe('custom types', () => {
     it('should validate custom types', () => {
-      const schema: SchemaType = {
+      const schema: JSONSchema = {
         type: 'object',
         properties: {
           artifact_id: { type: 'artifact_ref' as any },
@@ -366,7 +366,7 @@ describe('Validator', () => {
     });
 
     it('should reject invalid custom type values', () => {
-      const schema: SchemaType = {
+      const schema: JSONSchema = {
         type: 'object',
         properties: {
           artifact_id: { type: 'artifact_ref' as any },
@@ -384,7 +384,7 @@ describe('Validator', () => {
     });
 
     it('should error on unregistered custom type', () => {
-      const schema: SchemaType = {
+      const schema: JSONSchema = {
         type: 'object',
         properties: {
           artifact_id: { type: 'artifact_ref' as any },
@@ -401,7 +401,7 @@ describe('Validator', () => {
 
   describe('error collection options', () => {
     it('should collect all errors by default', () => {
-      const schema: SchemaType = {
+      const schema: JSONSchema = {
         type: 'object',
         properties: {
           name: { type: 'string', minLength: 5 },
@@ -419,7 +419,7 @@ describe('Validator', () => {
     });
 
     it('should stop on first error when collectAllErrors is false', () => {
-      const schema: SchemaType = {
+      const schema: JSONSchema = {
         type: 'object',
         properties: {
           name: { type: 'string', minLength: 5 },
@@ -439,7 +439,7 @@ describe('Validator', () => {
 
   describe('validateSchema helper', () => {
     it('should work as a convenience function', () => {
-      const schema: SchemaType = {
+      const schema: JSONSchema = {
         type: 'object',
         properties: {
           name: { type: 'string' },
@@ -454,7 +454,7 @@ describe('Validator', () => {
 
   describe('root data validation', () => {
     it('should reject non-object root data when schema is object', () => {
-      const schema: SchemaType = {
+      const schema: JSONSchema = {
         type: 'object',
         properties: {
           name: { type: 'string' },
@@ -469,7 +469,7 @@ describe('Validator', () => {
     });
 
     it('should reject array as root data when schema is object', () => {
-      const schema: SchemaType = {
+      const schema: JSONSchema = {
         type: 'object',
         properties: {
           name: { type: 'string' },
@@ -483,7 +483,7 @@ describe('Validator', () => {
     });
 
     it('should reject null as root data when schema is object', () => {
-      const schema: SchemaType = {
+      const schema: JSONSchema = {
         type: 'object',
         properties: {
           name: { type: 'string' },
@@ -499,7 +499,7 @@ describe('Validator', () => {
 
   describe('non-object root schemas', () => {
     it('should validate string at root', () => {
-      const schema: SchemaType = { type: 'string', minLength: 3 };
+      const schema: JSONSchema = { type: 'string', minLength: 3 };
       const registry = new CustomTypeRegistry();
       const validator = new Validator(schema, registry);
 
@@ -508,7 +508,7 @@ describe('Validator', () => {
     });
 
     it('should validate array at root', () => {
-      const schema: SchemaType = {
+      const schema: JSONSchema = {
         type: 'array',
         items: { type: 'number' },
       };
@@ -520,7 +520,7 @@ describe('Validator', () => {
     });
 
     it('should validate number at root', () => {
-      const schema: SchemaType = { type: 'number', minimum: 0, maximum: 100 };
+      const schema: JSONSchema = { type: 'number', minimum: 0, maximum: 100 };
       const registry = new CustomTypeRegistry();
       const validator = new Validator(schema, registry);
 
