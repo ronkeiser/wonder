@@ -11,14 +11,13 @@
   ];
 
   const colorMap: Record<string, string> = {
-    workflow_started: 'var(--pink)',
-    workflow_completed: 'var(--green)',
-    workflow_failed: 'var(--red)',
-    task_started: 'var(--indigo)',
-    task_completed: 'var(--violet)',
-    task_failed: 'var(--orange)',
-    error: 'var(--red)',
-    warning: 'var(--yellow)',
+    workflow_started: 'var(--indigo)',
+    workflow_completed: 'var(--pink)',
+    workflow_failed: 'var(--orange)',
+    task_started: 'var(--pink)',
+    task_completed: 'var(--indigo)',
+    task_failed: 'var(--violet)',
+    node_completed: 'var(--gray-light)',
   };
 
   function getEventColor(item: any): string {
