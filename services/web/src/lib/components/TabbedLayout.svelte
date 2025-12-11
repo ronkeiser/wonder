@@ -16,11 +16,18 @@
 
 <div class="tabbed-layout">
   <div class="tabs">
-    {#each tabs as tab}
-      <a href={tab.href} class="tab" class:active={tab.id === activeTabId}>
-        {tab.label}
-      </a>
-    {/each}
+    <div class="tabs-left">
+      {#each tabs as tab}
+        <a href={tab.href} class="tab" class:active={tab.id === activeTabId}>
+          {tab.label}
+        </a>
+      {/each}
+    </div>
+    <div class="tabs-right">
+      <form method="POST" action="/auth/logout">
+        <button type="submit" class="logout-btn">Log Out</button>
+      </form>
+    </div>
   </div>
   <div class="content">
     {@render children()}
@@ -38,15 +45,30 @@
 
   .tabs {
     display: flex;
-    gap: 0.5rem;
-    padding: 1rem;
-    padding-bottom: 0;
+    justify-content: space-between;
+    align-items: center;
+    height: 4rem;
+    padding: 0 1rem;
     background: var(--bg-secondary);
     border-bottom: 1px solid var(--border);
   }
 
+  .tabs-left {
+    display: flex;
+    gap: 0.5rem;
+    height: 100%;
+  }
+
+  .tabs-right {
+    display: flex;
+    align-items: center;
+    height: 100%;
+  }
+
   .tab {
-    padding: 0.5rem 1rem;
+    display: flex;
+    align-items: flex-end;
+    padding: 0 1rem 1rem;
     background: transparent;
     border: none;
     border-bottom: 2px solid transparent;
@@ -68,6 +90,24 @@
   .tab.active {
     color: var(--text-primary);
     border-bottom-color: var(--accent);
+  }
+
+  .logout-btn {
+    padding: 0.25rem 0.75rem;
+    background: transparent;
+    border: 1px solid var(--border);
+    color: var(--text-secondary);
+    cursor: pointer;
+    font-size: 0.75rem;
+    font-family: inherit;
+    border-radius: 4px;
+    transition: all 0.2s;
+  }
+
+  .logout-btn:hover {
+    background: var(--bg-primary);
+    color: var(--text-primary);
+    border-color: var(--text-secondary);
   }
 
   .content {
