@@ -44,6 +44,12 @@ export class WorkflowCoordinator extends DurableObject {
     });
 
     // TODO: Load workflow definition and begin execution
+    // For now, immediately complete the workflow for testing
+    this.emitter.emit({
+      event_type: 'workflow_completed',
+      message: `Workflow completed`,
+      metadata: { output: {} },
+    });
   }
 }
 

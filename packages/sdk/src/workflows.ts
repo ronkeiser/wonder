@@ -73,7 +73,7 @@ export function createWorkflowsClient(
     });
 
     if (!createResponse.data?.workflow_run_id) {
-      throw new Error('Failed to create workflow run');
+      throw new Error(`Failed to create workflow run`);
     }
 
     const { workflow_run_id } = createResponse.data;
