@@ -17,7 +17,7 @@
   ];
 
   const colorMap: Record<string, string> = {
-    workflow_started: 'var(--blue)',
+    workflow_started: 'var(--pink)',
     workflow_completed: 'var(--green)',
     workflow_failed: 'var(--red)',
     task_started: 'var(--indigo)',
@@ -49,7 +49,7 @@
         text: item.event_type,
         color: colorMap[item.event_type] || 'var(--gray)',
       },
-      identifier: item.workflow_id ? item.workflow_id.slice(-8) : undefined,
+      identifier: item.workflow_run_id ? item.workflow_run_id.slice(-8) : undefined,
       message: item.message,
     };
   }

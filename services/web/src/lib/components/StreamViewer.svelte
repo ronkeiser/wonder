@@ -263,7 +263,7 @@
     </div>
     <div class="right-controls">
       <div class="time-filters">
-        {#each [5, 15, 60, 1440] as minutes}
+        {#each [1, 5, 15, 60, 1440] as minutes}
           <button
             class="time-filter-btn"
             class:active={timeFilterMinutes === minutes}

@@ -144,7 +144,7 @@
     background: var(--bg-secondary);
     border-radius: 4px;
     color: var(--text-secondary);
-    font-size: 0.8125rem;
+    font-size: 0.75rem;
     overflow-x: auto;
     white-space: pre-wrap;
     word-break: break-word;
