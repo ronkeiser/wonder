@@ -2,6 +2,20 @@
 
 Quick reference for querying workflow execution data via HTTP endpoints.
 
+## Authentication
+
+All API endpoints require an API key in the `X-API-Key` header. The key is stored in `.env` at the project root:
+
+```bash
+# Set the API key (from .env)
+export API_KEY="ga5jSrsUxsZQtcIT8v1WEUeHhP+2S5o/gNSS7QLEFYM="
+
+# Include in all requests
+curl -H "X-API-Key: $API_KEY" "https://wonder-http.ron-keiser.workers.dev/api/logs?limit=10"
+```
+
+All curl examples below assume you've exported the `API_KEY` environment variable.
+
 ## Query Events
 
 ### Workflow Events
