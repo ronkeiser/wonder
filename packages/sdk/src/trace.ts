@@ -213,6 +213,14 @@ export class TraceEventCollection {
       validate(): TypedTraceEvent<TracePayloads.ContextValidate> | undefined {
         return self.find<TracePayloads.ContextValidate>('operation.context.validate');
       },
+      validates(): TypedTraceEvent<TracePayloads.ContextValidate>[] {
+        return self.filter<TracePayloads.ContextValidate>('operation.context.validate');
+      },
+      validateAt(path: string): TypedTraceEvent<TracePayloads.ContextValidate> | undefined {
+        return self.findWhere(
+          (e) => e.type === 'operation.context.validate' && e.payload.path === path,
+        ) as TypedTraceEvent<TracePayloads.ContextValidate> | undefined;
+      },
       snapshots(): TypedTraceEvent<TracePayloads.ContextSnapshot>[] {
         return self.filter<TracePayloads.ContextSnapshot>('operation.context.snapshot');
       },

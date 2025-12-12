@@ -223,6 +223,34 @@ describe('Coordinator - Context Operations', () => {
     expect(inputReads[0].payload.value).toMatchObject(inputData);
     console.log('  ✓ Context read includes input data');
 
+    // Validate output validation (new applyNodeOutput functionality)
+    const outputValidation = trace.context.validateAt('output');
+    expect(outputValidation).toBeDefined();
+    expect(outputValidation!.payload.path).toBe('output');
+    expect(outputValidation!.payload.valid).toBe(true);
+    expect(outputValidation!.payload.error_count).toBe(0);
+    console.log('  ✓ operation.context.validate (output validated successfully)');
+
+    // Validate we have multiple validations (input + output)
+    const allValidations = trace.context.validates();
+    expect(allValidations.length).toBeGreaterThanOrEqual(2); // input and output
+    console.log(`  ✓ Multiple validations performed (${allValidations.length} total)`);
+
+    // Validate output write
+    const outputWrite = trace.context.writeAt('output');
+    expect(outputWrite).toBeDefined();
+    expect(outputWrite!.payload.path).toBe('output');
+    expect(outputWrite!.payload.value).toBeDefined();
+    const outputValue = outputWrite!.payload.value as Record<string, unknown>;
+    expect(outputValue.greeting).toBeDefined();
+    expect(outputValue.final_count).toBeDefined();
+    console.log('  ✓ operation.context.write (output stored)');
+
+    // Validate output was read in snapshot
+    const outputReads = contextReads.filter((e) => e.payload.path === 'output');
+    expect(outputReads.length).toBeGreaterThan(0);
+    console.log('  ✓ Context read includes output data');
+
     console.log('\n✅ Context operations validation complete');
 
     // Step 10: Clean up resources

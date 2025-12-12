@@ -76,7 +76,8 @@ export type ContextSnapshot = {
 };
 
 /**
- * Workflow definition (simplified for Chunk 1)
+ * Workflow definition
+ * TODO: Add nodes, transitions, and graph structure fields
  */
 export type WorkflowDef = {
   id: string;

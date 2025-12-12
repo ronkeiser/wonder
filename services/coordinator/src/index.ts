@@ -123,6 +123,9 @@ export class WorkflowCoordinator extends DurableObject {
       const token = this.tokens.get(tokenId);
       workflow_run_id = token.workflow_run_id;
 
+      // Apply task output to context
+      await this.context.applyNodeOutput(result.output_data);
+
       // Emit node completed event
       this.emitter.emit({
         event_type: 'node_completed',
@@ -146,7 +149,7 @@ export class WorkflowCoordinator extends DurableObject {
         await this.finalizeWorkflow(workflow_run_id);
       }
 
-      // For Chunk 1, we don't route to next nodes - single node only
+      // TODO: Implement routing to next nodes via decision logic
     } catch (error) {
       this.logger.error({
         event_type: 'coordinator_task_result_failed',
@@ -177,9 +180,14 @@ export class WorkflowCoordinator extends DurableObject {
     // Update token status to executing
     this.tokens.updateStatus(tokenId, 'executing');
 
-    // For Chunk 1, immediately complete the token with empty output
-    // In future chunks, we'll dispatch to the Executor service
-    await this.handleTaskResult(tokenId, { output_data: {} });
+    // TODO: Dispatch to Executor service instead of completing synchronously
+    // Currently using mock output for testing output validation
+    await this.handleTaskResult(tokenId, {
+      output_data: {
+        greeting: 'Hello from coordinator stub',
+        final_count: 42,
+      },
+    });
   }
 
   /**
@@ -196,7 +204,7 @@ export class WorkflowCoordinator extends DurableObject {
       const context = this.context.getSnapshot();
 
       // For now, output is already in context.output if tasks produced any
-      // Future chunks: apply output_mapping from workflow def
+      // TODO: Apply output_mapping from workflow def to extract final output
       const finalOutput = context.output;
 
       this.emitter.emitTrace({

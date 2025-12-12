@@ -57,8 +57,10 @@ export class ContextManager {
   // Cached validators and generators
   private inputValidator: Validator | null = null;
   private contextValidator: Validator | null = null;
+  private outputValidator: Validator | null = null;
   private inputDMLGenerator: DMLGenerator | null = null;
   private contextDMLGenerator: DMLGenerator | null = null;
+  private outputDMLGenerator: DMLGenerator | null = null;
 
   constructor(sql: SqlStorage, metadata: MetadataManager, emitter: Emitter) {
     this.sql = sql;
@@ -179,7 +181,7 @@ export class ContextManager {
 
   /**
    * Read value from context at JSONPath
-   * Simplified for Chunk 2 - only supports reading entire context sections
+   * TODO: Support nested JSONPath reading (e.g., 'state.votes[0].choice')
    */
   get(path: string): unknown {
     // For now, only support reading 'input', 'state', 'output'
@@ -219,7 +221,7 @@ export class ContextManager {
 
   /**
    * Write value to context at JSONPath
-   * Simplified for Chunk 2 - supports setting scalar values and objects
+   * TODO: Support nested JSONPath updates without full table clear
    */
   set(path: string, value: unknown): void {
     // For now, only support writing to 'state' or 'output'
@@ -252,6 +254,56 @@ export class ContextManager {
       type: 'operation.context.write',
       path,
       value,
+    });
+  }
+
+  /**
+   * Apply node output to context
+   * Writes task output to context_output table with schema validation
+   */
+  async applyNodeOutput(output: Record<string, unknown>): Promise<void> {
+    await this.loadSchemas();
+
+    // Lazy-initialize validator
+    if (!this.outputValidator) {
+      this.outputValidator = new Validator(this.outputSchema!, this.customTypes);
+    }
+
+    const result = this.outputValidator.validate(output);
+
+    this.emitter.emitTrace({
+      type: 'operation.context.validate',
+      path: 'output',
+      schema_type: this.outputSchema!.type || 'unknown',
+      valid: result.valid,
+      error_count: result.errors.length,
+      errors: result.errors.slice(0, 5).map((e) => e.message),
+    });
+
+    if (!result.valid) {
+      throw new Error(
+        `Output validation failed: ${result.errors.map((e) => e.message).join(', ')}`,
+      );
+    }
+
+    // Lazy-initialize DML generator
+    if (!this.outputDMLGenerator) {
+      this.outputDMLGenerator = new DMLGenerator(this.outputSchema!, this.customTypes);
+    }
+
+    // Clear existing output and insert new
+    this.sql.exec('DELETE FROM context_output;');
+
+    const { statements, values } = this.outputDMLGenerator.generateInsert('context_output', output);
+
+    for (let i = 0; i < statements.length; i++) {
+      this.sql.exec(statements[i], ...values[i]);
+    }
+
+    this.emitter.emitTrace({
+      type: 'operation.context.write',
+      path: 'output',
+      value: output,
     });
   }
 

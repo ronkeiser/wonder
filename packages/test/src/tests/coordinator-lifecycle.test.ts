@@ -216,7 +216,7 @@ describe('Edge Test - Hello World', () => {
     const statusChanges = tokenStatusUpdates.map((e) => `${e.payload.from}→${e.payload.to}`);
     console.log(`    Status transitions: ${statusChanges.join(', ')}`);
 
-    console.log('\n✅ Chunk 1 validation complete: minimal execution loop working');
+    console.log('\n✅ Validation complete: minimal execution loop working');
 
     // Step 9: Clean up resources
     console.log('\n🧹 Cleaning up resources...');
