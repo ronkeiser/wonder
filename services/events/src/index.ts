@@ -75,7 +75,6 @@ export class EventsService extends WorkerEntrypoint<Env> {
             id: ulid(),
             timestamp: Date.now(),
             ...context,
-            workspace_id: '',
             ...input,
             sequence: input.sequence ?? 0,
             metadata: JSON.stringify(input.metadata || {}),
@@ -114,7 +113,6 @@ export class EventsService extends WorkerEntrypoint<Env> {
           options.parent_run_id
             ? eq(workflowEvents.parent_run_id, options.parent_run_id)
             : undefined,
-          options.workspace_id ? eq(workflowEvents.workspace_id, options.workspace_id) : undefined,
           options.project_id ? eq(workflowEvents.project_id, options.project_id) : undefined,
           options.event_type ? eq(workflowEvents.event_type, options.event_type) : undefined,
           options.node_id ? eq(workflowEvents.node_id, options.node_id) : undefined,
@@ -138,7 +136,6 @@ export class EventsService extends WorkerEntrypoint<Env> {
             id: ulid(),
             timestamp: Date.now(),
             ...context,
-            workspace_id: '',
             ...event,
             category: getEventCategory(event.type),
             token_id: event.token_id ?? null,
@@ -171,7 +168,6 @@ export class EventsService extends WorkerEntrypoint<Env> {
           // Stringify payloads for database insertion
           const batchWithStringPayloads = batch.map((entry) => ({
             ...entry,
-            workspace_id: '',
             payload: JSON.stringify(entry.payload),
           }));
 
@@ -201,7 +197,6 @@ export class EventsService extends WorkerEntrypoint<Env> {
           options.node_id ? eq(traceEvents.node_id, options.node_id) : undefined,
           options.type ? eq(traceEvents.type, options.type) : undefined,
           options.category ? eq(traceEvents.category, options.category) : undefined,
-          options.workspace_id ? eq(traceEvents.workspace_id, options.workspace_id) : undefined,
           options.project_id ? eq(traceEvents.project_id, options.project_id) : undefined,
           options.min_duration_ms
             ? gte(traceEvents.duration_ms, options.min_duration_ms)

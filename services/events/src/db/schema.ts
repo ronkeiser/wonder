@@ -10,7 +10,7 @@ import { index, integer, real, sqliteTable, text } from 'drizzle-orm/sqlite-core
  * - token_id: which token (for parallel execution tracking)
  * - path_id: execution path for tracing
  * - sequence: total ordering for replay
- * - workspace_id/project_id: tenant filtering
+ * - project_id: tenant filtering
  * - cost_usd/tokens: LLM cost tracking
  */
 export const workflowEvents = sqliteTable(
@@ -30,7 +30,6 @@ export const workflowEvents = sqliteTable(
     path_id: text('path_id'), // Execution path tracing
 
     // Tenant context
-    workspace_id: text('workspace_id').notNull(),
     project_id: text('project_id').notNull(),
 
     // Cost tracking (for LLM calls)
@@ -46,7 +45,6 @@ export const workflowEvents = sqliteTable(
     index('idx_events_event_type').on(table.event_type),
     index('idx_events_workflow_run_id').on(table.workflow_run_id),
     index('idx_events_parent_run_id').on(table.parent_run_id),
-    index('idx_events_workspace_id').on(table.workspace_id),
     index('idx_events_project_id').on(table.project_id),
     index('idx_events_node_id').on(table.node_id),
     index('idx_events_token_id').on(table.token_id),
@@ -61,7 +59,7 @@ export const workflowEvents = sqliteTable(
  * - sequence: per-workflow ordered execution trace
  * - category: fast filtering by layer (decision/operation/dispatch/sql)
  * - token_id/node_id: execution context for path tracing
- * - workspace_id/project_id: tenant isolation
+ * - project_id: tenant isolation
  * - duration_ms: performance profiling and alerting
  *
  * Note: Opt-in per workflow run via header or env var
@@ -84,8 +82,7 @@ export const traceEvents = sqliteTable(
     token_id: text('token_id'), // Most events relate to specific token
     node_id: text('node_id'), // Many events happen at specific node
 
-    // Tenant context (multi-workspace isolation & billing attribution)
-    workspace_id: text('workspace_id').notNull(),
+    // Tenant context
     project_id: text('project_id').notNull(),
 
     // Performance tracking
@@ -99,7 +96,7 @@ export const traceEvents = sqliteTable(
     index('idx_trace_events_type').on(table.type),
     index('idx_trace_events_category').on(table.category),
     index('idx_trace_events_token').on(table.token_id),
-    index('idx_trace_events_workspace').on(table.workspace_id, table.timestamp),
+    index('idx_trace_events_project').on(table.project_id, table.timestamp),
     index('idx_trace_events_duration').on(table.duration_ms),
   ],
 );

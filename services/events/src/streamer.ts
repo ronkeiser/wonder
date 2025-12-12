@@ -8,7 +8,6 @@ interface SubscriptionFilter {
   // Workflow execution context
   workflow_run_id?: string;
   parent_run_id?: string;
-  workspace_id?: string;
   project_id?: string;
 
   // Event classification

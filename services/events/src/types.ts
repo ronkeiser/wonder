@@ -85,7 +85,6 @@ export interface BroadcastEventEntry extends EventContext, EventInput {
 export interface GetEventsOptions {
   workflow_run_id?: string;
   parent_run_id?: string;
-  workspace_id?: string;
   project_id?: string;
   event_type?: string;
   node_id?: string;
@@ -388,7 +387,6 @@ export interface GetTraceEventsOptions {
   node_id?: string;
   type?: string;
   category?: TraceEventCategory;
-  workspace_id?: string;
   project_id?: string;
   limit?: number;
   min_duration_ms?: number; // Filter slow queries

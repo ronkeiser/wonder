@@ -1014,7 +1014,6 @@ export interface paths {
                 query?: {
                     workflow_run_id?: string;
                     parent_run_id?: string;
-                    workspace_id?: string;
                     project_id?: string;
                     event_type?: string;
                     node_id?: string;
@@ -1063,7 +1062,6 @@ export interface paths {
                     node_id?: string;
                     type?: string;
                     category?: "decision" | "operation" | "dispatch" | "sql";
-                    workspace_id?: string;
                     project_id?: string;
                     limit?: number;
                     min_duration_ms?: number | null;
@@ -1612,7 +1610,6 @@ export interface components {
             node_id?: string | null;
             token_id?: string | null;
             path_id?: string | null;
-            workspace_id: string;
             project_id: string;
             tokens?: number | null;
             cost_usd?: number | null;
@@ -1632,7 +1629,6 @@ export interface components {
             workflow_run_id: string;
             token_id: string | null;
             node_id: string | null;
-            workspace_id: string;
             project_id: string;
             duration_ms: number | null;
             payload: {

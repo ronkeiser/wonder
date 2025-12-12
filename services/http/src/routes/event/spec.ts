@@ -14,7 +14,6 @@ export const getEventsRoute = createRoute({
     query: z.object({
       workflow_run_id: z.string().optional(),
       parent_run_id: z.string().optional(),
-      workspace_id: z.string().optional(),
       project_id: z.string().optional(),
       event_type: z.string().optional(),
       node_id: z.string().optional(),
@@ -47,7 +46,6 @@ export const getTraceEventsRoute = createRoute({
       node_id: z.string().optional(),
       type: z.string().optional(),
       category: z.enum(['decision', 'operation', 'dispatch', 'sql']).optional(),
-      workspace_id: z.string().optional(),
       project_id: z.string().optional(),
       limit: z.coerce.number().int().positive().max(10000).optional().default(1000),
       min_duration_ms: z.coerce.number().nonnegative().optional(),
