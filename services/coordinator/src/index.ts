@@ -19,37 +19,34 @@ import type { TaskResult, WorkflowDef, WorkflowRun } from './types.js';
  * Each instance coordinates a single workflow run.
  */
 export class WorkflowCoordinator extends DurableObject {
-  private metadata?: {
-    workflowRun: WorkflowRun;
-    workflowDef: WorkflowDef;
-  };
+  private workflowRun: WorkflowRun;
+  private workflowDef: WorkflowDef;
   private emitter: Emitter;
   private contextManager: ContextManager;
-  private workflowCache: Map<string, WorkflowDef> = new Map();
 
   constructor(ctx: DurableObjectState, env: Env) {
     super(ctx, env);
 
+    let metadata: { workflowRun: WorkflowRun; workflowDef: WorkflowDef } | undefined;
+
     this.ctx.blockConcurrencyWhile(async () => {
-      this.metadata = await initialize(this.env, this.ctx.id.toString());
+      metadata = await initialize(this.ctx.storage.sql, this.env, this.ctx.id.toString());
     });
 
-    // Synchronously instantiate emitter and contextManager after initialization
-    if (!this.metadata) {
-      throw new Error('Metadata not initialized');
+    if (!metadata) {
+      throw new Error('Failed to initialize metadata');
     }
 
-    const { workflowRun, workflowDef } = this.metadata;
-
-    this.workflowCache.set(workflowRun.id, workflowDef);
+    this.workflowRun = metadata.workflowRun;
+    this.workflowDef = metadata.workflowDef;
 
     this.emitter = createEmitter(
       this.env.EVENTS,
       {
-        workflow_run_id: workflowRun.id,
-        workspace_id: workflowRun.workspace_id,
-        project_id: workflowRun.project_id,
-        workflow_def_id: workflowRun.workflow_def_id,
+        workflow_run_id: this.workflowRun.id,
+        workspace_id: this.workflowRun.workspace_id,
+        project_id: this.workflowRun.project_id,
+        workflow_def_id: this.workflowRun.workflow_def_id,
       },
       {
         traceEnabled: this.env.TRACE_EVENTS_ENABLED,
@@ -59,33 +56,16 @@ export class WorkflowCoordinator extends DurableObject {
     this.contextManager = new ContextManager(
       ctx.storage.sql,
       this.emitter,
-      workflowDef.input_schema,
-      workflowDef.context_schema,
+      this.workflowDef.input_schema,
+      this.workflowDef.context_schema,
     );
   }
 
   /**
    * Start workflow execution
    */
-  async start(
-    input: Record<string, unknown>,
-    context: {
-      workflow_run_id: string;
-      workspace_id: string;
-      project_id: string;
-      workflow_def_id: string;
-      initial_node_id: string;
-      input_schema: JSONSchema;
-      context_schema?: JSONSchema;
-      output_schema: JSONSchema;
-    },
-  ): Promise<void> {
+  async start(input: Record<string, unknown>): Promise<void> {
     const sql = this.ctx.storage.sql;
-
-    // Initialize emitter with full context
-    this.emitter = createEmitter(this.env.EVENTS, context, {
-      traceEnabled: this.env.TRACE_EVENTS_ENABLED,
-    });
 
     // Emit workflow started event
     this.emitter.emit({
@@ -97,26 +77,6 @@ export class WorkflowCoordinator extends DurableObject {
     // Initialize storage tables
     tokenOps.initializeTable(sql);
 
-    // Load workflow definition
-    // For Chunk 2, use schemas passed from caller (future: load from RESOURCES)
-    const workflow: WorkflowDef = {
-      id: context.workflow_def_id,
-      version: 1,
-      initial_node_id: context.initial_node_id,
-      input_schema: context.input_schema,
-      context_schema: context.context_schema,
-      output_schema: context.output_schema,
-    };
-    this.workflowCache.set(context.workflow_run_id, workflow);
-
-    // Initialize context manager
-    this.contextManager = new ContextManager(
-      sql,
-      this.emitter,
-      workflow.input_schema,
-      workflow.context_schema,
-    );
-
     // Initialize context tables and store input
     this.contextManager.initialize();
     this.contextManager.initializeWithInput(input);
@@ -125,8 +85,8 @@ export class WorkflowCoordinator extends DurableObject {
     const tokenId = tokenOps.create(
       sql,
       {
-        workflow_run_id: context.workflow_run_id,
-        node_id: workflow.initial_node_id,
+        workflow_run_id: this.workflowRun.id,
+        node_id: this.workflowDef.initial_node_id,
         parent_token_id: null,
         path_id: 'root',
         fan_out_transition_id: null,
@@ -209,11 +169,10 @@ export class WorkflowCoordinator extends DurableObject {
 
     // Extract output (simplified for Chunk 2 - just use current output or input)
     // Future chunks: apply output_mapping from workflow def
-    const workflow = this.workflowCache.get(workflowRunId);
     const finalOutput = Object.keys(context.output).length > 0 ? context.output : context.input; // Fallback to input if no output set
 
     // Write final output to context
-    if (workflow && Object.keys(finalOutput).length > 0) {
+    if (Object.keys(finalOutput).length > 0) {
       this.contextManager.set('output', finalOutput);
     }
 
