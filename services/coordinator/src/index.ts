@@ -4,10 +4,11 @@
  * Durable Object-based workflow orchestration service.
  * Manages workflow lifecycle via RPC.
  */
-import { createEmitter, type Emitter } from '@wonder/events';
+import type { Emitter } from '@wonder/events';
 import { createLogger, type Logger } from '@wonder/logs';
 import { DurableObject } from 'cloudflare:workers';
 import { ContextManager } from './operations/context.js';
+import { CoordinatorEmitter } from './operations/events.js';
 import { initialize } from './operations/initialize.js';
 import * as tokenOps from './operations/tokens.js';
 import * as workflowOps from './operations/workflows.js';
@@ -41,106 +42,122 @@ export class WorkflowCoordinator extends DurableObject {
     this.workflowRun = metadata.workflowRun;
     this.workflowDef = metadata.workflowDef;
 
-    this.emitter = createEmitter(
+    this.emitter = new CoordinatorEmitter(
+      ctx.storage.sql,
       this.env.EVENTS,
-      {
-        workflow_run_id: this.workflowRun.id,
-        workspace_id: this.workflowRun.workspace_id,
-        project_id: this.workflowRun.project_id,
-        workflow_def_id: this.workflowRun.workflow_def_id,
-      },
-      {
-        traceEnabled: this.env.TRACE_EVENTS_ENABLED,
-      },
+      this.env.TRACE_EVENTS_ENABLED === 'true',
     );
 
     this.logger = createLogger(this.ctx, this.env.LOGS, {
       service: 'coordinator',
       environment: 'development',
-      instance_id: this.workflowRun.id,
     });
 
-    this.contextManager = new ContextManager(
-      ctx.storage.sql,
-      this.emitter,
-      this.workflowDef.input_schema,
-      this.workflowDef.context_schema,
-    );
+    this.contextManager = new ContextManager(ctx.storage.sql, this.emitter);
   }
 
   /**
    * Start workflow execution
    */
   async start(input: Record<string, unknown>): Promise<void> {
-    const sql = this.ctx.storage.sql;
+    try {
+      const sql = this.ctx.storage.sql;
 
-    // Emit workflow started event
-    this.emitter.emit({
-      event_type: 'workflow_started',
-      message: 'Workflow started',
-      metadata: { input },
-    });
+      // Emit workflow started event
+      this.emitter.emit({
+        event_type: 'workflow_started',
+        message: 'Workflow started',
+        metadata: { input },
+      });
 
-    // Initialize storage tables
-    tokenOps.initializeTable(sql);
+      // Initialize storage tables
+      tokenOps.initializeTable(sql);
 
-    // Initialize context tables and store input
-    this.contextManager.initialize();
-    this.contextManager.initializeWithInput(input);
+      // Initialize context tables and store input
+      this.contextManager.initialize();
+      this.contextManager.initializeWithInput(input);
 
-    // Create initial token
-    const tokenId = tokenOps.create(
-      sql,
-      {
-        workflow_run_id: this.workflowRun.id,
-        node_id: this.workflowDef.initial_node_id,
-        parent_token_id: null,
-        path_id: 'root',
-        fan_out_transition_id: null,
-        branch_index: 0,
-        branch_total: 1,
-      },
-      this.emitter,
-    );
+      // Create initial token
+      const tokenId = tokenOps.create(
+        sql,
+        {
+          workflow_run_id: this.workflowRun.id,
+          node_id: this.workflowDef.initial_node_id,
+          parent_token_id: null,
+          path_id: 'root',
+          fan_out_transition_id: null,
+          branch_index: 0,
+          branch_total: 1,
+        },
+        this.emitter,
+      );
 
-    // Dispatch token (start execution)
-    await this.dispatchToken(tokenId);
+      // Dispatch token (start execution)
+      await this.dispatchToken(tokenId);
+    } catch (error) {
+      this.logger.error({
+        event_type: 'coordinator_start_failed',
+        message: 'Critical error in start()',
+        trace_id: this.workflowRun.id,
+        metadata: {
+          error: error instanceof Error ? error.message : String(error),
+          stack: error instanceof Error ? error.stack : undefined,
+          input,
+        },
+      });
+      throw error;
+    }
   }
 
   /**
    * Handle task result from Executor
    */
   async handleTaskResult(tokenId: string, result: TaskResult): Promise<void> {
-    const sql = this.ctx.storage.sql;
+    try {
+      const sql = this.ctx.storage.sql;
 
-    // Mark token as completed
-    tokenOps.updateStatus(sql, tokenId, 'completed', this.emitter);
-    const token = tokenOps.get(sql, tokenId);
+      // Mark token as completed
+      tokenOps.updateStatus(sql, tokenId, 'completed', this.emitter);
+      const token = tokenOps.get(sql, tokenId);
 
-    // Emit node completed event
-    this.emitter.emit({
-      event_type: 'node_completed',
-      node_id: token.node_id,
-      token_id: tokenId,
-      message: 'Node completed',
-      metadata: { output: result.output_data },
-    });
+      // Emit node completed event
+      this.emitter.emit({
+        event_type: 'node_completed',
+        node_id: token.node_id,
+        token_id: tokenId,
+        message: 'Node completed',
+        metadata: { output: result.output_data },
+      });
 
-    // Check if workflow is complete (no more active tokens)
-    const activeCount = tokenOps.getActiveCount(sql, token.workflow_run_id);
+      // Check if workflow is complete (no more active tokens)
+      const activeCount = tokenOps.getActiveCount(sql, token.workflow_run_id);
 
-    this.emitter.emitTrace({
-      type: 'decision.sync.check_condition',
-      strategy: 'completion_check',
-      completed: 1,
-      required: activeCount,
-    });
+      this.emitter.emitTrace({
+        type: 'decision.sync.check_condition',
+        strategy: 'completion_check',
+        completed: 1,
+        required: activeCount,
+      });
 
-    if (activeCount === 0) {
-      await this.finalizeWorkflow(token.workflow_run_id);
+      if (activeCount === 0) {
+        await this.finalizeWorkflow(token.workflow_run_id);
+      }
+
+      // For Chunk 1, we don't route to next nodes - single node only
+    } catch (error) {
+      this.logger.error({
+        event_type: 'coordinator_task_result_failed',
+        message: 'Critical error in handleTaskResult()',
+        trace_id: this.workflowRun.id,
+        metadata: {
+          error: error instanceof Error ? error.message : String(error),
+          stack: error instanceof Error ? error.stack : undefined,
+          tokenId,
+          result,
+        },
+      });
+      throw error;
     }
-
-    // For Chunk 1, we don't route to next nodes - single node only
   }
 
   /**
@@ -166,35 +183,49 @@ export class WorkflowCoordinator extends DurableObject {
    * Finalize workflow and extract output
    */
   private async finalizeWorkflow(workflowRunId: string): Promise<void> {
-    this.emitter.emitTrace({
-      type: 'decision.sync.activate',
-      merge_config: { workflow_run_id: workflowRunId },
-    });
+    try {
+      this.emitter.emitTrace({
+        type: 'decision.sync.activate',
+        merge_config: { workflow_run_id: workflowRunId },
+      });
 
-    // Get context snapshot
-    const context = this.contextManager.getSnapshot();
+      // Get context snapshot
+      const context = this.contextManager.getSnapshot();
 
-    // Extract output (simplified for Chunk 2 - just use current output or input)
-    // Future chunks: apply output_mapping from workflow def
-    const finalOutput = Object.keys(context.output).length > 0 ? context.output : context.input; // Fallback to input if no output set
+      // Extract output (simplified for Chunk 2 - just use current output or input)
+      // Future chunks: apply output_mapping from workflow def
+      const finalOutput = Object.keys(context.output).length > 0 ? context.output : context.input; // Fallback to input if no output set
 
-    // Write final output to context
-    if (Object.keys(finalOutput).length > 0) {
-      this.contextManager.set('output', finalOutput);
+      // Write final output to context
+      if (Object.keys(finalOutput).length > 0) {
+        this.contextManager.set('output', finalOutput);
+      }
+
+      this.emitter.emitTrace({
+        type: 'operation.context.read',
+        path: 'output',
+        value: finalOutput,
+      });
+
+      // Emit workflow completed event
+      this.emitter.emit({
+        event_type: 'workflow_completed',
+        message: 'Workflow completed',
+        metadata: { output: finalOutput },
+      });
+    } catch (error) {
+      this.logger.error({
+        event_type: 'coordinator_finalize_failed',
+        message: 'Critical error in finalizeWorkflow()',
+        trace_id: this.workflowRun.id,
+        metadata: {
+          error: error instanceof Error ? error.message : String(error),
+          stack: error instanceof Error ? error.stack : undefined,
+          workflowRunId,
+        },
+      });
+      throw error;
     }
-
-    this.emitter.emitTrace({
-      type: 'operation.context.read',
-      path: 'output',
-      value: finalOutput,
-    });
-
-    // Emit workflow completed event
-    this.emitter.emit({
-      event_type: 'workflow_completed',
-      message: 'Workflow completed',
-      metadata: { output: finalOutput },
-    });
   }
 }
 

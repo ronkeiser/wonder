@@ -40,15 +40,16 @@ import type { ContextSnapshot } from '../types.js';
  * ContextManager manages runtime state for a workflow execution.
  *
  * Encapsulates schema-driven SQL operations with caching for validators
- * and generators. Constructed once per workflow run with schemas loaded
- * from WorkflowDef.
+ * and generators. Schemas are loaded from metadata table on-demand.
  */
 export class ContextManager {
   private readonly sql: SqlStorage;
   private readonly emitter: Emitter;
-  private readonly inputSchema: JSONSchema;
-  private readonly contextSchema: JSONSchema | undefined;
   private readonly customTypes: CustomTypeRegistry;
+
+  // Cached schemas loaded from metadata
+  private inputSchema: JSONSchema | null = null;
+  private contextSchema: JSONSchema | null = null;
 
   // Cached validators and generators
   private inputValidator: Validator | null = null;
@@ -56,29 +57,60 @@ export class ContextManager {
   private inputDMLGenerator: DMLGenerator | null = null;
   private contextDMLGenerator: DMLGenerator | null = null;
 
-  constructor(
-    sql: SqlStorage,
-    emitter: Emitter,
-    inputSchema: JSONSchema,
-    contextSchema?: JSONSchema,
-  ) {
+  constructor(sql: SqlStorage, emitter: Emitter) {
     this.sql = sql;
     this.emitter = emitter;
-    this.inputSchema = inputSchema;
-    this.contextSchema = contextSchema;
     this.customTypes = new CustomTypeRegistry();
+  }
+
+  /**
+   * Load schemas from metadata table (lazy initialization)
+   */
+  private loadSchemas(): void {
+    if (this.inputSchema !== null) {
+      // Already loaded
+      return;
+    }
+
+    try {
+      const result = this.sql.exec('SELECT value FROM metadata WHERE key = ?', 'workflow_def');
+      const rows = [...result];
+
+      if (rows.length === 0) {
+        throw new Error('WorkflowDef not found in metadata - start() must be called first');
+      }
+
+      const row = rows[0] as { value: string };
+      const workflowDef = JSON.parse(row.value);
+
+      this.inputSchema = workflowDef.input_schema as JSONSchema;
+      this.contextSchema = (workflowDef.context_schema as JSONSchema | undefined) ?? null;
+
+      console.log('[ContextManager] schemas loaded from metadata', {
+        hasInputSchema: !!this.inputSchema,
+        hasContextSchema: !!this.contextSchema,
+      });
+    } catch (error) {
+      console.error('[ContextManager] FATAL: Failed to load schemas from metadata:', {
+        error: error instanceof Error ? error.message : String(error),
+        stack: error instanceof Error ? error.stack : undefined,
+      });
+      throw error;
+    }
   }
 
   /**
    * Initialize main context tables from workflow schemas
    */
   initialize(): void {
+    this.loadSchemas();
+
     let tableCount = 0;
     const tablesCreated: string[] = [];
 
     // Create input table
-    if (this.inputSchema.type === 'object') {
-      const ddlGen = new DDLGenerator(this.inputSchema, this.customTypes);
+    if (this.inputSchema!.type === 'object') {
+      const ddlGen = new DDLGenerator(this.inputSchema!, this.customTypes);
       const ddl = ddlGen.generateDDL('context_input');
       this.sql.exec(ddl);
       tableCount++;
@@ -105,7 +137,7 @@ export class ContextManager {
 
     this.emitter.emitTrace({
       type: 'operation.context.initialize',
-      has_input_schema: this.inputSchema.type === 'object',
+      has_input_schema: this.inputSchema!.type === 'object',
       has_context_schema: this.contextSchema?.type === 'object',
       table_count: tableCount,
       tables_created: tablesCreated,
@@ -116,9 +148,11 @@ export class ContextManager {
    * Initialize context with validated input data
    */
   initializeWithInput(input: Record<string, unknown>): void {
+    this.loadSchemas();
+
     // Lazy-initialize validator
     if (!this.inputValidator) {
-      this.inputValidator = new Validator(this.inputSchema, this.customTypes);
+      this.inputValidator = new Validator(this.inputSchema!, this.customTypes);
     }
 
     const result = this.inputValidator.validate(input);
@@ -126,7 +160,7 @@ export class ContextManager {
     this.emitter.emitTrace({
       type: 'operation.context.validate',
       path: 'input',
-      schema_type: this.inputSchema.type || 'unknown',
+      schema_type: this.inputSchema!.type || 'unknown',
       valid: result.valid,
       error_count: result.errors.length,
       errors: result.errors.slice(0, 5).map((e) => e.message), // First 5 errors
@@ -138,7 +172,7 @@ export class ContextManager {
 
     // Lazy-initialize DML generator
     if (!this.inputDMLGenerator) {
-      this.inputDMLGenerator = new DMLGenerator(this.inputSchema, this.customTypes);
+      this.inputDMLGenerator = new DMLGenerator(this.inputSchema!, this.customTypes);
     }
 
     const { statements, values } = this.inputDMLGenerator.generateInsert('context_input', input);
