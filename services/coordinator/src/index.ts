@@ -10,7 +10,7 @@ import { DurableObject } from 'cloudflare:workers';
 import { ContextManager } from './operations/context.js';
 import { CoordinatorEmitter } from './operations/events.js';
 import { MetadataManager } from './operations/metadata.js';
-import * as tokenOps from './operations/tokens.js';
+import { TokenManager } from './operations/tokens.js';
 import * as workflowOps from './operations/workflows.js';
 import type { TaskResult, WorkflowDef, WorkflowRun } from './types.js';
 
@@ -24,6 +24,7 @@ export class WorkflowCoordinator extends DurableObject {
   private emitter: Emitter;
   private logger: Logger;
   private context: ContextManager;
+  private tokens: TokenManager;
 
   constructor(ctx: DurableObjectState, env: Env) {
     super(ctx, env);
@@ -44,6 +45,7 @@ export class WorkflowCoordinator extends DurableObject {
     );
 
     this.context = new ContextManager(ctx.storage.sql, this.metadata, this.emitter);
+    this.tokens = new TokenManager(ctx.storage.sql, this.metadata, this.emitter);
   }
 
   /**
@@ -76,26 +78,22 @@ export class WorkflowCoordinator extends DurableObject {
       });
 
       // Initialize storage tables
-      tokenOps.initializeTable(sql);
+      this.tokens.initialize();
 
       // Initialize context tables and store input
       await this.context.initialize();
       await this.context.initializeWithInput(input);
 
       // Create initial token
-      const tokenId = tokenOps.create(
-        sql,
-        {
-          workflow_run_id: workflowRun.id,
-          node_id: workflowDef.initial_node_id,
-          parent_token_id: null,
-          path_id: 'root',
-          fan_out_transition_id: null,
-          branch_index: 0,
-          branch_total: 1,
-        },
-        this.emitter,
-      );
+      const tokenId = this.tokens.create({
+        workflow_run_id: workflowRun.id,
+        node_id: workflowDef.initial_node_id,
+        parent_token_id: null,
+        path_id: 'root',
+        fan_out_transition_id: null,
+        branch_index: 0,
+        branch_total: 1,
+      });
 
       // Dispatch token (start execution)
       await this.dispatchToken(tokenId);
@@ -122,8 +120,8 @@ export class WorkflowCoordinator extends DurableObject {
 
     try {
       // Mark token as completed
-      tokenOps.updateStatus(sql, tokenId, 'completed', this.emitter);
-      const token = tokenOps.get(sql, tokenId);
+      this.tokens.updateStatus(tokenId, 'completed');
+      const token = this.tokens.get(tokenId);
       workflow_run_id = token.workflow_run_id;
 
       // Emit node completed event
@@ -136,7 +134,7 @@ export class WorkflowCoordinator extends DurableObject {
       });
 
       // Check if workflow is complete (no more active tokens)
-      const activeCount = tokenOps.getActiveCount(sql, workflow_run_id);
+      const activeCount = this.tokens.getActiveCount(workflow_run_id);
 
       this.emitter.emitTrace({
         type: 'decision.sync.check_condition',
@@ -178,7 +176,7 @@ export class WorkflowCoordinator extends DurableObject {
     const sql = this.ctx.storage.sql;
 
     // Update token status to executing
-    tokenOps.updateStatus(sql, tokenId, 'executing', this.emitter);
+    this.tokens.updateStatus(tokenId, 'executing');
 
     // For Chunk 1, immediately complete the token with empty output
     // In future chunks, we'll dispatch to the Executor service
