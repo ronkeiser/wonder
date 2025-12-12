@@ -52,6 +52,7 @@ export class ContextManager {
   // Cached schemas loaded from metadata
   private inputSchema: JSONSchema | null = null;
   private contextSchema: JSONSchema | null = null;
+  private outputSchema: JSONSchema | null = null;
 
   // Cached validators and generators
   private inputValidator: Validator | null = null;
@@ -79,6 +80,7 @@ export class ContextManager {
 
     this.inputSchema = workflowDef.input_schema;
     this.contextSchema = workflowDef.context_schema ?? null;
+    this.outputSchema = workflowDef.output_schema;
   }
 
   /**
@@ -89,6 +91,11 @@ export class ContextManager {
 
     let tableCount = 0;
     const tablesCreated: string[] = [];
+
+    // Drop existing tables to ensure clean schema
+    this.sql.exec('DROP TABLE IF EXISTS context_input');
+    this.sql.exec('DROP TABLE IF EXISTS context_state');
+    this.sql.exec('DROP TABLE IF EXISTS context_output');
 
     // Create input table
     if (this.inputSchema!.type === 'object') {
@@ -108,14 +115,14 @@ export class ContextManager {
       tablesCreated.push('context_state');
     }
 
-    // Create output table (initially empty, populated at completion)
-    this.sql.exec(`
-      CREATE TABLE IF NOT EXISTS context_output (
-        id INTEGER PRIMARY KEY AUTOINCREMENT
-      );
-    `);
-    tableCount++;
-    tablesCreated.push('context_output');
+    // Create output table from output schema
+    if (this.outputSchema!.type === 'object') {
+      const ddlGen = new DDLGenerator(this.outputSchema!, this.customTypes);
+      const ddl = ddlGen.generateDDL('context_output');
+      this.sql.exec(ddl);
+      tableCount++;
+      tablesCreated.push('context_output');
+    }
 
     this.emitter.emitTrace({
       type: 'operation.context.initialize',
@@ -160,7 +167,7 @@ export class ContextManager {
     const { statements, values } = this.inputDMLGenerator.generateInsert('context_input', input);
 
     for (let i = 0; i < statements.length; i++) {
-      this.sql.exec(statements[i], values[i]);
+      this.sql.exec(statements[i], ...values[i]);
     }
 
     this.emitter.emitTrace({

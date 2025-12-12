@@ -49,16 +49,24 @@ export class WorkflowCoordinator extends DurableObject {
   /**
    * Start workflow execution
    */
-  async start(workflow_run_id: string, input: Record<string, unknown>): Promise<void> {
+  async start(workflow_run_id: string): Promise<void> {
     try {
       const sql = this.ctx.storage.sql;
 
       // Initialize metadata manager (loads/fetches metadata)
       await this.metadata.initialize(workflow_run_id);
 
-      // Get metadata for token creation
+      // Get metadata for token creation and input
       const workflowRun = await this.metadata.getWorkflowRun();
       const workflowDef = await this.metadata.getWorkflowDef();
+
+      // Extract input from workflow run context
+      const context = workflowRun.context as {
+        input: Record<string, unknown>;
+        state: object;
+        output: object;
+      };
+      const input = context.input;
 
       // Emit workflow started event
       this.emitter.emit({
@@ -99,7 +107,6 @@ export class WorkflowCoordinator extends DurableObject {
         metadata: {
           error: error instanceof Error ? error.message : String(error),
           stack: error instanceof Error ? error.stack : undefined,
-          input,
         },
       });
       throw error;
@@ -191,14 +198,9 @@ export class WorkflowCoordinator extends DurableObject {
       // Get context snapshot
       const context = this.context.getSnapshot();
 
-      // Extract output (simplified for Chunk 2 - just use current output or input)
+      // For now, output is already in context.output if tasks produced any
       // Future chunks: apply output_mapping from workflow def
-      const finalOutput = Object.keys(context.output).length > 0 ? context.output : context.input; // Fallback to input if no output set
-
-      // Write final output to context
-      if (Object.keys(finalOutput).length > 0) {
-        this.context.set('output', finalOutput);
-      }
+      const finalOutput = context.output;
 
       this.emitter.emitTrace({
         type: 'operation.context.read',

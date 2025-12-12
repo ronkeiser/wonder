@@ -34,7 +34,7 @@ export class MetadataManager {
     this.sql = sql;
     this.env = env;
     this.logger = createLogger(ctx, env.LOGS, {
-      service: 'coordinator.metadata',
+      service: 'coordinator',
       environment: 'development',
     });
 
@@ -73,10 +73,24 @@ export class MetadataManager {
    * Triggers load/fetch of metadata on first call.
    */
   async initialize(workflow_run_id: string): Promise<void> {
-    this.workflow_run_id = workflow_run_id;
-    // Trigger metadata load (will cache for subsequent calls)
-    await this.getWorkflowRun();
-    await this.getWorkflowDef();
+    try {
+      this.workflow_run_id = workflow_run_id;
+      // Trigger metadata load (will cache for subsequent calls)
+      await this.getWorkflowRun();
+      await this.getWorkflowDef();
+    } catch (error) {
+      this.logger.error({
+        event_type: 'metadata_initialize_failed',
+        message: 'Failed to initialize metadata manager',
+        trace_id: workflow_run_id,
+        metadata: {
+          workflow_run_id,
+          error: error instanceof Error ? error.message : String(error),
+          stack: error instanceof Error ? error.stack : undefined,
+        },
+      });
+      throw error;
+    }
   }
 
   /**
@@ -86,29 +100,43 @@ export class MetadataManager {
    * Must be called after initialize().
    */
   async getWorkflowRun(): Promise<WorkflowRun> {
-    if (!this.workflow_run_id) {
-      throw new Error('MetadataManager not initialized - call initialize() first');
-    }
+    try {
+      if (!this.workflow_run_id) {
+        throw new Error('MetadataManager not initialized - call initialize() first');
+      }
 
-    // Check memory cache
-    if (this.cachedRun) {
+      // Check memory cache
+      if (this.cachedRun) {
+        return this.cachedRun;
+      }
+
+      // Check SQL cache
+      const sqlRun = this.getWorkflowRunFromSql();
+      if (sqlRun) {
+        this.cachedRun = sqlRun;
+        return sqlRun;
+      }
+
+      // Fetch from RESOURCES
+      const metadata = await this.fetchFromResources(this.workflow_run_id);
+      this.cachedRun = metadata.workflowRun;
+      this.cachedDef = metadata.workflowDef;
+      this.saveToSql(metadata.workflowRun, metadata.workflowDef);
+
       return this.cachedRun;
+    } catch (error) {
+      this.logger.error({
+        event_type: 'metadata_get_workflow_run_failed',
+        message: 'Failed to get WorkflowRun',
+        trace_id: this.workflow_run_id || 'unknown',
+        metadata: {
+          workflow_run_id: this.workflow_run_id,
+          error: error instanceof Error ? error.message : String(error),
+          stack: error instanceof Error ? error.stack : undefined,
+        },
+      });
+      throw error;
     }
-
-    // Check SQL cache
-    const sqlRun = this.getWorkflowRunFromSql();
-    if (sqlRun) {
-      this.cachedRun = sqlRun;
-      return sqlRun;
-    }
-
-    // Fetch from RESOURCES
-    const metadata = await this.fetchFromResources(this.workflow_run_id);
-    this.cachedRun = metadata.workflowRun;
-    this.cachedDef = metadata.workflowDef;
-    this.saveToSql(metadata.workflowRun, metadata.workflowDef);
-
-    return this.cachedRun;
   }
 
   /**
@@ -117,20 +145,34 @@ export class MetadataManager {
    * Checks memory → SQL. Must be called after initialize().
    */
   async getWorkflowDef(): Promise<WorkflowDef> {
-    // Check memory cache
-    if (this.cachedDef) {
-      return this.cachedDef;
-    }
+    try {
+      // Check memory cache
+      if (this.cachedDef) {
+        return this.cachedDef;
+      }
 
-    // Check SQL cache
-    const sqlDef = this.getWorkflowDefFromSql();
-    if (sqlDef) {
-      this.cachedDef = sqlDef;
-      return sqlDef;
-    }
+      // Check SQL cache
+      const sqlDef = this.getWorkflowDefFromSql();
+      if (sqlDef) {
+        this.cachedDef = sqlDef;
+        return sqlDef;
+      }
 
-    // Should not reach here - getWorkflowRun() should have loaded both
-    throw new Error('WorkflowDef not found - getWorkflowRun() must be called first');
+      // Should not reach here - getWorkflowRun() should have loaded both
+      throw new Error('WorkflowDef not found - getWorkflowRun() must be called first');
+    } catch (error) {
+      this.logger.error({
+        event_type: 'metadata_get_workflow_def_failed',
+        message: 'Failed to get WorkflowDef',
+        trace_id: this.workflow_run_id || 'unknown',
+        metadata: {
+          workflow_run_id: this.workflow_run_id,
+          error: error instanceof Error ? error.message : String(error),
+          stack: error instanceof Error ? error.stack : undefined,
+        },
+      });
+      throw error;
+    }
   }
 
   /**
@@ -148,7 +190,17 @@ export class MetadataManager {
       const row = rows[0] as { value: string };
       return JSON.parse(row.value) as WorkflowRun;
     } catch (error) {
-      // Log error but don't emit trace - SQL errors are handled at higher level
+      this.logger.error({
+        event_type: 'metadata_sql_read_failed',
+        message: 'Failed to read WorkflowRun from SQL cache',
+        trace_id: this.workflow_run_id || 'unknown',
+        metadata: {
+          workflow_run_id: this.workflow_run_id,
+          key: 'workflow_run',
+          error: error instanceof Error ? error.message : String(error),
+          stack: error instanceof Error ? error.stack : undefined,
+        },
+      });
       throw error;
     }
   }
@@ -168,7 +220,17 @@ export class MetadataManager {
       const row = rows[0] as { value: string };
       return JSON.parse(row.value) as WorkflowDef;
     } catch (error) {
-      // Log error but don't emit trace - SQL errors are handled at higher level
+      this.logger.error({
+        event_type: 'metadata_sql_read_failed',
+        message: 'Failed to read WorkflowDef from SQL cache',
+        trace_id: this.workflow_run_id || 'unknown',
+        metadata: {
+          workflow_run_id: this.workflow_run_id,
+          key: 'workflow_def',
+          error: error instanceof Error ? error.message : String(error),
+          stack: error instanceof Error ? error.stack : undefined,
+        },
+      });
       throw error;
     }
   }
@@ -177,17 +239,32 @@ export class MetadataManager {
    * Save metadata to SQL cache
    */
   private saveToSql(workflowRun: WorkflowRun, workflowDef: WorkflowDef): void {
-    this.sql.exec(
-      'INSERT OR REPLACE INTO metadata (key, value) VALUES (?, ?)',
-      'workflow_run',
-      JSON.stringify(workflowRun),
-    );
+    try {
+      this.sql.exec(
+        'INSERT OR REPLACE INTO metadata (key, value) VALUES (?, ?)',
+        'workflow_run',
+        JSON.stringify(workflowRun),
+      );
 
-    this.sql.exec(
-      'INSERT OR REPLACE INTO metadata (key, value) VALUES (?, ?)',
-      'workflow_def',
-      JSON.stringify(workflowDef),
-    );
+      this.sql.exec(
+        'INSERT OR REPLACE INTO metadata (key, value) VALUES (?, ?)',
+        'workflow_def',
+        JSON.stringify(workflowDef),
+      );
+    } catch (error) {
+      this.logger.error({
+        event_type: 'metadata_sql_write_failed',
+        message: 'Failed to save metadata to SQL cache',
+        trace_id: this.workflow_run_id || 'unknown',
+        metadata: {
+          workflow_run_id: workflowRun.id,
+          workflow_def_id: workflowDef.id,
+          error: error instanceof Error ? error.message : String(error),
+          stack: error instanceof Error ? error.stack : undefined,
+        },
+      });
+      throw error;
+    }
   }
 
   /**

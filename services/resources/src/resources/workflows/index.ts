@@ -278,14 +278,14 @@ export class Workflows extends Resource {
         },
       ];
 
-      // Create workflow run record (status: pending, not running yet)
+      // Create workflow run record (status: waiting until startRun is called)
       await repo.createWorkflowRun(this.serviceCtx.db, {
         id: workflowRunId,
         project_id: workflow.project_id,
         workflow_id: workflow.id,
         workflow_def_id: workflow_def.id,
         workflow_version: workflow_def.version,
-        status: 'pending',
+        status: 'waiting',
         context,
         active_tokens: activeTokens,
         durable_object_id: workflowRunId,
@@ -371,7 +371,7 @@ export class Workflows extends Resource {
       const coordinatorId = this.env.COORDINATOR.idFromName(workflowRunId);
       const coordinator = this.env.COORDINATOR.get(coordinatorId);
 
-      await coordinator.start(workflowRunId, run.context.input);
+      await coordinator.start(workflowRunId);
 
       this.serviceCtx.logger.info({
         event_type: 'workflow_run_started',
