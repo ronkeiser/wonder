@@ -105,9 +105,9 @@
   }
 
   .logout-btn:hover {
-    background: var(--bg-primary);
+    background: var(--gray-dark);
     color: var(--text-primary);
-    border-color: var(--text-secondary);
+    border-color: var(--gray);
   }
 
   .content {
