@@ -30,7 +30,7 @@
     if (getItemColor) {
       return getItemColor(item);
     }
-    return 'var(--gray-light)';
+    return 'var(--gray-lighter)';
   }
 
   const header = $derived(renderItemHeader(item));
@@ -130,7 +130,7 @@
   }
 
   .item-identifier {
-    color: var(--text-link);
+    color: var(--blue-lighter);
     font-size: 0.9rem;
   }
 

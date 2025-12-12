@@ -63,7 +63,7 @@
   h1 {
     margin: 0 0 1.5rem 0;
     text-align: center;
-    color: var(--gray-lighter);
+    color: var(--gray-lightest);
     font-weight: 400;
     font-size: 0.875rem;
     letter-spacing: 0.1em;
@@ -77,7 +77,7 @@
   label {
     display: block;
     margin-bottom: 0.25rem;
-    color: var(--gray-light);
+    color: var(--gray-lighter);
     font-weight: 400;
     font-size: 0.625rem;
     text-transform: uppercase;
@@ -92,7 +92,7 @@
     border-bottom: 1px solid var(--gray-dark);
     border-radius: 0;
     font-size: 0.75rem;
-    color: var(--gray-lighter);
+    color: var(--gray-lightest);
     box-sizing: border-box;
     font-family: inherit;
     transition: border-color 0.2s;
@@ -112,7 +112,7 @@
     width: 100%;
     padding: 0.5rem;
     background: transparent;
-    color: var(--gray-lighter);
+    color: var(--gray-lightest);
     border: 1px solid var(--gray-dark);
     border-radius: 0;
     font-size: 0.625rem;

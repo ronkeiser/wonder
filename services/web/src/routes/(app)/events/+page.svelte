@@ -11,10 +11,10 @@
   ];
 
   const colorMap: Record<string, string> = {
-    workflow_started: 'var(--indigo)',
-    workflow_completed: 'var(--pink)',
+    workflow_started: 'var(--pink)',
+    workflow_completed: 'var(--green)',
     workflow_failed: 'var(--orange)',
-    task_started: 'var(--pink)',
+    task_started: 'var(--blue)',
     task_completed: 'var(--indigo)',
     task_failed: 'var(--violet)',
     node_completed: 'var(--gray-light)',
@@ -40,7 +40,7 @@
       time: formatTime(item.timestamp),
       badge: {
         text: item.event_type,
-        color: colorMap[item.event_type] || 'var(--gray-light)',
+        color: colorMap[item.event_type] || 'var(--gray-lighter)',
       },
       identifier: item.workflow_run_id ? item.workflow_run_id.slice(-8) : undefined,
       message: item.message,
