@@ -41,6 +41,7 @@ export class LogsService extends WorkerEntrypoint<Env> {
           level,
           ...context,
           ...input,
+          message: input.message || input.event_type, // Default message to event_type if not provided
           metadata: JSON.stringify(input.metadata || {}),
         };
 
