@@ -4,8 +4,8 @@
  * Durable Object-based workflow orchestration service.
  * Manages workflow lifecycle via RPC.
  */
-import type { JSONSchema } from '@wonder/context';
 import { createEmitter, type Emitter } from '@wonder/events';
+import { createLogger, type Logger } from '@wonder/logs';
 import { DurableObject } from 'cloudflare:workers';
 import { ContextManager } from './operations/context.js';
 import { initialize } from './operations/initialize.js';
@@ -22,6 +22,7 @@ export class WorkflowCoordinator extends DurableObject {
   private workflowRun: WorkflowRun;
   private workflowDef: WorkflowDef;
   private emitter: Emitter;
+  private logger: Logger;
   private contextManager: ContextManager;
 
   constructor(ctx: DurableObjectState, env: Env) {
@@ -52,6 +53,12 @@ export class WorkflowCoordinator extends DurableObject {
         traceEnabled: this.env.TRACE_EVENTS_ENABLED,
       },
     );
+
+    this.logger = createLogger(this.ctx, this.env.LOGS, {
+      service: 'coordinator',
+      environment: 'development',
+      instance_id: this.workflowRun.id,
+    });
 
     this.contextManager = new ContextManager(
       ctx.storage.sql,
