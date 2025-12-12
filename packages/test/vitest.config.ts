@@ -11,7 +11,8 @@ export default defineConfig({
     globals: true,
     environment: 'node',
     testTimeout: 30000, // 30s for e2e tests that hit live APIs
-    // include: ['./src/tests/edge.test.ts'],
+    include: ['./src/tests/*'],
+    exclude: ['./src/tests/archive/*'],
   },
   envDir: '.',
   envPrefix: ['API_'],
