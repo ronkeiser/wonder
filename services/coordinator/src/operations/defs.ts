@@ -1,11 +1,11 @@
 /**
- * Metadata Operations
+ * Definition Operations
  *
- * MetadataManager handles workflow metadata (WorkflowRun and WorkflowDef)
+ * DefinitionManager handles workflow definitions (WorkflowRun and WorkflowDef)
  * with multi-level caching (memory → SQL → RESOURCES RPC).
  *
- * Used by ContextManager, CoordinatorEmitter, and start() to access metadata.
- * All metadata access goes through this manager - single source of truth.
+ * Used by ContextManager, CoordinatorEmitter, and start() to access definitions.
+ * All definition access goes through this manager - single source of truth.
  */
 
 import type { JSONSchema } from '@wonder/context';
@@ -13,14 +13,14 @@ import { createLogger, type Logger } from '@wonder/logs';
 import type { WorkflowDef, WorkflowRun } from '../types.js';
 
 /**
- * MetadataManager provides cached access to workflow metadata
+ * DefinitionManager provides cached access to workflow definitions
  *
  * Caching strategy:
  * 1. Memory cache (fastest) - cleared on DO eviction
  * 2. SQL cache (durable) - persists across DO wake-ups
  * 3. RESOURCES RPC (slowest) - only on first access
  */
-export class MetadataManager {
+export class DefinitionManager {
   private readonly sql: SqlStorage;
   private readonly env: Env;
   private readonly logger: Logger;
@@ -102,7 +102,7 @@ export class MetadataManager {
   async getWorkflowRun(): Promise<WorkflowRun> {
     try {
       if (!this.workflow_run_id) {
-        throw new Error('MetadataManager not initialized - call initialize() first');
+        throw new Error('DefinitionManager not initialized - call initialize() first');
       }
 
       // Check memory cache

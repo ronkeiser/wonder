@@ -10,10 +10,9 @@ Every component in Wonder is either a **package** or a **service**:
 ## Architecture Rules
 
 1. **Services are deployed as Cloudflare Workers** with their own `wrangler.jsonc` configuration
-2. **Services communicate via Workers RPC** (not direct imports)
-3. **Services may import types from packages** (for shared interfaces)
-4. **Services never import from other services** (enforces loose coupling)
-5. **Packages have no runtime dependencies on services** (pure library code)
+2. **Services communicate via Workers RPC** (not direct imports for runtime calls)
+3. **Services may import types and schemas from packages or other services** (compile-time dependencies on data shapes are acceptable)
+4. **Packages have no runtime dependencies on services** (pure library code)
 
 ## Packages
 

@@ -35,21 +35,21 @@ import type { JSONSchema } from '@wonder/context';
 import { CustomTypeRegistry, DDLGenerator, DMLGenerator, Validator } from '@wonder/context';
 import type { Emitter } from '@wonder/events';
 import type { ContextSnapshot } from '../types.js';
-import type { MetadataManager } from './metadata.js';
+import type { DefinitionManager } from './defs.js';
 
 /**
  * ContextManager manages runtime state for a workflow execution.
  *
  * Encapsulates schema-driven SQL operations with caching for validators
- * and generators. Schemas are loaded from metadata table on-demand.
+ * and generators. Schemas are loaded from definitions on-demand.
  */
 export class ContextManager {
   private readonly sql: SqlStorage;
-  private readonly metadata: MetadataManager;
+  private readonly defs: DefinitionManager;
   private readonly emitter: Emitter;
   private readonly customTypes: CustomTypeRegistry;
 
-  // Cached schemas loaded from metadata
+  // Cached schemas loaded from definitions
   private inputSchema: JSONSchema | null = null;
   private contextSchema: JSONSchema | null = null;
   private outputSchema: JSONSchema | null = null;
@@ -62,15 +62,15 @@ export class ContextManager {
   private contextDMLGenerator: DMLGenerator | null = null;
   private outputDMLGenerator: DMLGenerator | null = null;
 
-  constructor(sql: SqlStorage, metadata: MetadataManager, emitter: Emitter) {
+  constructor(sql: SqlStorage, defs: DefinitionManager, emitter: Emitter) {
     this.sql = sql;
-    this.metadata = metadata;
+    this.defs = defs;
     this.emitter = emitter;
     this.customTypes = new CustomTypeRegistry();
   }
 
   /**
-   * Load schemas from metadata table (lazy initialization)
+   * Load schemas from definitions (lazy initialization)
    */
   private async loadSchemas(): Promise<void> {
     if (this.inputSchema !== null) {
@@ -78,7 +78,7 @@ export class ContextManager {
       return;
     }
 
-    const workflowDef = await this.metadata.getWorkflowDef();
+    const workflowDef = await this.defs.getWorkflowDef();
 
     this.inputSchema = workflowDef.input_schema;
     this.contextSchema = workflowDef.context_schema ?? null;

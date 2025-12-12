@@ -7,7 +7,7 @@
 import type { Emitter } from '@wonder/events';
 import { ulid } from 'ulid';
 import type { CreateTokenParams, TokenRow, TokenStatus } from '../types.js';
-import type { MetadataManager } from './metadata.js';
+import type { DefinitionManager } from './defs.js';
 
 /**
  * TokenManager manages token state for a workflow execution.
@@ -17,12 +17,12 @@ import type { MetadataManager } from './metadata.js';
  */
 export class TokenManager {
   private readonly sql: SqlStorage;
-  private readonly metadata: MetadataManager;
+  private readonly defs: DefinitionManager;
   private readonly emitter: Emitter;
 
-  constructor(sql: SqlStorage, metadata: MetadataManager, emitter: Emitter) {
+  constructor(sql: SqlStorage, defs: DefinitionManager, emitter: Emitter) {
     this.sql = sql;
-    this.metadata = metadata;
+    this.defs = defs;
     this.emitter = emitter;
   }
 

@@ -8,8 +8,8 @@ import type { Emitter } from '@wonder/events';
 import { createLogger, type Logger } from '@wonder/logs';
 import { DurableObject } from 'cloudflare:workers';
 import { ContextManager } from './operations/context.js';
+import { DefinitionManager } from './operations/defs.js';
 import { CoordinatorEmitter } from './operations/events.js';
-import { MetadataManager } from './operations/metadata.js';
 import { TokenManager } from './operations/tokens.js';
 import type { TaskResult } from './types.js';
 
@@ -19,7 +19,7 @@ import type { TaskResult } from './types.js';
  * Each instance coordinates a single workflow run.
  */
 export class WorkflowCoordinator extends DurableObject {
-  private metadata: MetadataManager;
+  private defs: DefinitionManager;
   private emitter: Emitter;
   private logger: Logger;
   private context: ContextManager;
@@ -33,18 +33,18 @@ export class WorkflowCoordinator extends DurableObject {
       environment: 'development',
     });
 
-    // Initialize MetadataManager first
-    this.metadata = new MetadataManager(ctx, ctx.storage.sql, this.env);
+    // Initialize DefinitionManager first
+    this.defs = new DefinitionManager(ctx, ctx.storage.sql, this.env);
 
-    // Initialize emitter with MetadataManager
+    // Initialize emitter with DefinitionManager
     this.emitter = new CoordinatorEmitter(
-      this.metadata,
+      this.defs,
       this.env.EVENTS,
       this.env.TRACE_EVENTS_ENABLED === 'true',
     );
 
-    this.context = new ContextManager(ctx.storage.sql, this.metadata, this.emitter);
-    this.tokens = new TokenManager(ctx.storage.sql, this.metadata, this.emitter);
+    this.context = new ContextManager(ctx.storage.sql, this.defs, this.emitter);
+    this.tokens = new TokenManager(ctx.storage.sql, this.defs, this.emitter);
   }
 
   /**
@@ -54,12 +54,12 @@ export class WorkflowCoordinator extends DurableObject {
     try {
       const sql = this.ctx.storage.sql;
 
-      // Initialize metadata manager (loads/fetches metadata)
-      await this.metadata.initialize(workflow_run_id);
+      // Initialize definition manager (loads/fetches definitions)
+      await this.defs.initialize(workflow_run_id);
 
-      // Get metadata for token creation and input
-      const workflowRun = await this.metadata.getWorkflowRun();
-      const workflowDef = await this.metadata.getWorkflowDef();
+      // Get definitions for token creation and input
+      const workflowRun = await this.defs.getWorkflowRun();
+      const workflowDef = await this.defs.getWorkflowDef();
 
       // Extract input from workflow run context
       const context = workflowRun.context as {

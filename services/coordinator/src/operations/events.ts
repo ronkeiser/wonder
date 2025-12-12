@@ -6,29 +6,29 @@
  */
 
 import { createEmitter, type Emitter } from '@wonder/events';
-import type { MetadataManager } from './metadata.js';
+import type { DefinitionManager } from './defs.js';
 
 /**
- * CoordinatorEmitter wraps the standard Emitter with metadata-backed context loading
+ * CoordinatorEmitter wraps the standard Emitter with definition-backed context loading
  *
  * Context is loaded lazily on first emit and cached for subsequent emissions.
  * This allows the emitter to be constructed in the DO constructor before
- * metadata is available, matching the pattern used by ContextManager.
+ * definitions are available, matching the pattern used by ContextManager.
  */
 export class CoordinatorEmitter implements Emitter {
-  private readonly metadata: MetadataManager;
+  private readonly defs: DefinitionManager;
   private readonly eventsService: Env['EVENTS'];
   private readonly traceEnabled: 'true' | 'false';
   private cachedEmitter: Emitter | null = null;
 
-  constructor(metadata: MetadataManager, eventsService: Env['EVENTS'], traceEnabled: boolean) {
-    this.metadata = metadata;
+  constructor(defs: DefinitionManager, eventsService: Env['EVENTS'], traceEnabled: boolean) {
+    this.defs = defs;
     this.eventsService = eventsService;
     this.traceEnabled = traceEnabled ? 'true' : 'false';
   }
 
   /**
-   * Load event context from metadata (lazy initialization with caching)
+   * Load event context from definitions (lazy initialization with caching)
    */
   private async getEmitter(): Promise<Emitter> {
     if (this.cachedEmitter) {
@@ -37,7 +37,7 @@ export class CoordinatorEmitter implements Emitter {
 
     try {
       // Get workflow run (initialize() must have been called first)
-      const workflowRun = await this.metadata.getWorkflowRun();
+      const workflowRun = await this.defs.getWorkflowRun();
 
       this.cachedEmitter = createEmitter(
         this.eventsService,
