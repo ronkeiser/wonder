@@ -7,7 +7,7 @@
 import type { JSONSchema } from '@wonder/context';
 import { createEmitter, type Emitter } from '@wonder/events';
 import { DurableObject } from 'cloudflare:workers';
-import * as contextOps from './operations/context.js';
+import { ContextManager } from './operations/context.js';
 import * as tokenOps from './operations/tokens.js';
 import * as workflowOps from './operations/workflows.js';
 import type { TaskResult, WorkflowDef } from './types.js';
@@ -19,6 +19,7 @@ import type { TaskResult, WorkflowDef } from './types.js';
  */
 export class WorkflowCoordinator extends DurableObject {
   private emitter?: Emitter;
+  private contextManager?: ContextManager;
   private workflowCache: Map<string, WorkflowDef> = new Map();
 
   constructor(ctx: DurableObjectState, env: Env) {
@@ -70,11 +71,17 @@ export class WorkflowCoordinator extends DurableObject {
     };
     this.workflowCache.set(context.workflow_run_id, workflow);
 
-    // Initialize context tables
-    contextOps.initializeTable(sql, workflow.input_schema, workflow.context_schema, this.emitter);
+    // Initialize context manager
+    this.contextManager = new ContextManager(
+      sql,
+      this.emitter,
+      workflow.input_schema,
+      workflow.context_schema,
+    );
 
-    // Store and validate input
-    contextOps.initializeWithInput(sql, input, workflow.input_schema, this.emitter);
+    // Initialize context tables and store input
+    this.contextManager.initialize();
+    this.contextManager.initializeWithInput(input);
 
     // Create initial token
     const tokenId = tokenOps.create(
@@ -101,6 +108,9 @@ export class WorkflowCoordinator extends DurableObject {
   async handleTaskResult(tokenId: string, result: TaskResult): Promise<void> {
     if (!this.emitter) {
       throw new Error('Emitter not initialized');
+    }
+    if (!this.contextManager) {
+      throw new Error('ContextManager not initialized');
     }
 
     const sql = this.ctx.storage.sql;
@@ -165,16 +175,17 @@ export class WorkflowCoordinator extends DurableObject {
     if (!this.emitter) {
       throw new Error('Emitter not initialized');
     }
+    if (!this.contextManager) {
+      throw new Error('ContextManager not initialized');
+    }
 
     this.emitter.emitTrace({
       type: 'decision.sync.activate',
       merge_config: { workflow_run_id: workflowRunId },
     });
 
-    const sql = this.ctx.storage.sql;
-
     // Get context snapshot
-    const context = contextOps.getSnapshot(sql, this.emitter);
+    const context = this.contextManager.getSnapshot();
 
     // Extract output (simplified for Chunk 2 - just use current output or input)
     // Future chunks: apply output_mapping from workflow def
@@ -183,7 +194,7 @@ export class WorkflowCoordinator extends DurableObject {
 
     // Write final output to context
     if (workflow && Object.keys(finalOutput).length > 0) {
-      contextOps.set(sql, 'output', finalOutput, this.emitter);
+      this.contextManager.set('output', finalOutput);
     }
 
     this.emitter.emitTrace({
