@@ -86,9 +86,9 @@ export class ContextManager {
   }
 
   /**
-   * Initialize main context tables from workflow schemas
+   * Initialize main context tables from workflow schemas and store input
    */
-  async initialize(): Promise<void> {
+  async initialize(input: Record<string, unknown>): Promise<void> {
     await this.loadSchemas();
 
     let tableCount = 0;
@@ -133,12 +133,15 @@ export class ContextManager {
       table_count: tableCount,
       tables_created: tablesCreated,
     });
+
+    // Validate and store input
+    await this.storeInput(input);
   }
 
   /**
-   * Initialize context with validated input data
+   * Validate and store input data (internal)
    */
-  async initializeWithInput(input: Record<string, unknown>): Promise<void> {
+  private async storeInput(input: Record<string, unknown>): Promise<void> {
     await this.loadSchemas();
 
     // Lazy-initialize validator

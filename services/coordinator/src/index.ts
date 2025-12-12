@@ -80,8 +80,7 @@ export class WorkflowCoordinator extends DurableObject {
       this.tokens.initialize();
 
       // Initialize context tables and store input
-      await this.context.initialize();
-      await this.context.initializeWithInput(input);
+      await this.context.initialize(input);
 
       // Create initial token
       const tokenId = this.tokens.create({
