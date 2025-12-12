@@ -34,6 +34,7 @@ export class WorkflowCoordinator extends DurableObject {
       workspace_id: string;
       project_id: string;
       workflow_def_id: string;
+      initial_node_id: string;
     },
   ): Promise<void> {
     const sql = this.ctx.storage.sql;
@@ -58,7 +59,7 @@ export class WorkflowCoordinator extends DurableObject {
     const workflow: WorkflowDef = {
       id: context.workflow_def_id,
       version: 1,
-      initial_node_id: 'node_start',
+      initial_node_id: context.initial_node_id,
       input_schema: { type: 'object', properties: {} },
       output_schema: { type: 'object', properties: {} },
     };

@@ -205,8 +205,7 @@ describe('Edge Test - Hello World', () => {
     const tokenCreates = trace.tokens.creates();
     expect(tokenCreates.length).toBeGreaterThan(0);
     expect(tokenCreates[0].payload.token_id).toBeDefined();
-    // For Chunk 1, coordinator uses hardcoded 'node_start', not the actual node ID from workflow def
-    expect(tokenCreates[0].payload.node_id).toBe('node_start');
+    expect(tokenCreates[0].payload.node_id).toBe(workflowDefResponse.workflow_def.initial_node_id);
     console.log(`  ✓ operation.tokens.create trace (token: ${tokenCreates[0].payload.token_id})`);
 
     const tokenStatusUpdates = trace.tokens.statusUpdates();
