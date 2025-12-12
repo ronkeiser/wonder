@@ -4,7 +4,8 @@
   "version": "0.0.1",
   "type": "module",
   "exports": {
-    "./types": "./src/types.ts"
+    "./types": "./src/types.ts",
+    "./schemas": "./src/infrastructure/db/schema.ts"
   },
   "scripts": {
     "dev": "wrangler dev",

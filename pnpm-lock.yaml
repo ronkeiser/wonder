@@ -130,9 +130,15 @@ importers:
       '@wonder/logs':
         specifier: workspace:*
         version: link:../logs
+      '@wonder/resources':
+        specifier: workspace:*
+        version: link:../resources
       '@wonder/templates':
         specifier: workspace:*
         version: link:../../packages/templates
+      drizzle-orm:
+        specifier: ^0.44.7
+        version: 0.44.7(@cloudflare/workers-types@4.20251127.0)
       ulid:
         specifier: ^3.0.2
         version: 3.0.2

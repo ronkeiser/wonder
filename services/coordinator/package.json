@@ -14,7 +14,9 @@
     "@wonder/events": "workspace:*",
     "@wonder/logs": "workspace:*",
     "@wonder/context": "workspace:*",
+    "@wonder/resources": "workspace:*",
     "@wonder/templates": "workspace:*",
+    "drizzle-orm": "^0.44.7",
     "ulid": "^3.0.2"
   },
   "devDependencies": {
