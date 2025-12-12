@@ -371,12 +371,7 @@ export class Workflows extends Resource {
       const coordinatorId = this.env.COORDINATOR.idFromName(workflowRunId);
       const coordinator = this.env.COORDINATOR.get(coordinatorId);
 
-      await coordinator.start(run.context.input, {
-        workflow_run_id: workflowRunId,
-        workspace_id: project.workspace_id,
-        project_id: run.project_id,
-        workflow_def_id: run.workflow_def_id,
-      });
+      await coordinator.start(workflowRunId, run.context.input);
 
       this.serviceCtx.logger.info({
         event_type: 'workflow_run_started',

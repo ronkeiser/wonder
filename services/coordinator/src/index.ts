@@ -20,8 +20,8 @@ import type { TaskResult, WorkflowDef, WorkflowRun } from './types.js';
  * Each instance coordinates a single workflow run.
  */
 export class WorkflowCoordinator extends DurableObject {
-  private workflowRun: WorkflowRun;
-  private workflowDef: WorkflowDef;
+  private workflowRun!: WorkflowRun;
+  private workflowDef!: WorkflowDef;
   private emitter: Emitter;
   private logger: Logger;
   private contextManager: ContextManager;
@@ -29,19 +29,7 @@ export class WorkflowCoordinator extends DurableObject {
   constructor(ctx: DurableObjectState, env: Env) {
     super(ctx, env);
 
-    let metadata: { workflowRun: WorkflowRun; workflowDef: WorkflowDef } | undefined;
-
-    this.ctx.blockConcurrencyWhile(async () => {
-      metadata = await initialize(this.ctx.storage.sql, this.env, this.ctx.id.toString());
-    });
-
-    if (!metadata) {
-      throw new Error('Failed to initialize metadata');
-    }
-
-    this.workflowRun = metadata.workflowRun;
-    this.workflowDef = metadata.workflowDef;
-
+    // Initialize managers that load metadata lazily from SQL
     this.emitter = new CoordinatorEmitter(
       ctx.storage.sql,
       this.env.EVENTS,
@@ -59,9 +47,14 @@ export class WorkflowCoordinator extends DurableObject {
   /**
    * Start workflow execution
    */
-  async start(input: Record<string, unknown>): Promise<void> {
+  async start(workflow_run_id: string, input: Record<string, unknown>): Promise<void> {
     try {
       const sql = this.ctx.storage.sql;
+
+      // Load or fetch workflow metadata
+      const metadata = await initialize(sql, this.env, workflow_run_id);
+      this.workflowRun = metadata.workflowRun;
+      this.workflowDef = metadata.workflowDef;
 
       // Emit workflow started event
       this.emitter.emit({
@@ -74,8 +67,8 @@ export class WorkflowCoordinator extends DurableObject {
       tokenOps.initializeTable(sql);
 
       // Initialize context tables and store input
-      this.contextManager.initialize();
-      this.contextManager.initializeWithInput(input);
+      await this.contextManager.initialize();
+      await this.contextManager.initializeWithInput(input);
 
       // Create initial token
       const tokenId = tokenOps.create(

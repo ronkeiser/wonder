@@ -6,6 +6,7 @@
  */
 
 import { createEmitter, type Emitter } from '@wonder/events';
+import { getWorkflowRun } from './initialize.js';
 
 /**
  * CoordinatorEmitter wraps the standard Emitter with SQL-backed context loading
@@ -37,15 +38,8 @@ export class CoordinatorEmitter implements Emitter {
     try {
       console.log('[CoordinatorEmitter] loading context from metadata');
 
-      const result = this.sql.exec('SELECT value FROM metadata WHERE key = ?', 'workflow_run');
-      const rows = [...result];
-
-      if (rows.length === 0) {
-        throw new Error('WorkflowRun not found in metadata - start() must be called first');
-      }
-
-      const row = rows[0] as { value: string };
-      const workflowRun = JSON.parse(row.value);
+      // Use shared utility from initialize.ts
+      const workflowRun = getWorkflowRun(this.sql);
 
       console.log('[CoordinatorEmitter] context loaded', {
         workflow_run_id: workflowRun.id,

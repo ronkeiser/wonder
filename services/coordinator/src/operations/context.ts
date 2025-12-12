@@ -35,6 +35,7 @@ import type { JSONSchema } from '@wonder/context';
 import { CustomTypeRegistry, DDLGenerator, DMLGenerator, Validator } from '@wonder/context';
 import type { Emitter } from '@wonder/events';
 import type { ContextSnapshot } from '../types.js';
+import { getWorkflowDef } from './initialize.js';
 
 /**
  * ContextManager manages runtime state for a workflow execution.
@@ -66,25 +67,18 @@ export class ContextManager {
   /**
    * Load schemas from metadata table (lazy initialization)
    */
-  private loadSchemas(): void {
+  private async loadSchemas(): Promise<void> {
     if (this.inputSchema !== null) {
       // Already loaded
       return;
     }
 
     try {
-      const result = this.sql.exec('SELECT value FROM metadata WHERE key = ?', 'workflow_def');
-      const rows = [...result];
+      // Use shared utility from initialize.ts
+      const workflowDef = await getWorkflowDef(this.sql);
 
-      if (rows.length === 0) {
-        throw new Error('WorkflowDef not found in metadata - start() must be called first');
-      }
-
-      const row = rows[0] as { value: string };
-      const workflowDef = JSON.parse(row.value);
-
-      this.inputSchema = workflowDef.input_schema as JSONSchema;
-      this.contextSchema = (workflowDef.context_schema as JSONSchema | undefined) ?? null;
+      this.inputSchema = workflowDef.input_schema;
+      this.contextSchema = workflowDef.context_schema ?? null;
 
       console.log('[ContextManager] schemas loaded from metadata', {
         hasInputSchema: !!this.inputSchema,
@@ -102,8 +96,8 @@ export class ContextManager {
   /**
    * Initialize main context tables from workflow schemas
    */
-  initialize(): void {
-    this.loadSchemas();
+  async initialize(): Promise<void> {
+    await this.loadSchemas();
 
     let tableCount = 0;
     const tablesCreated: string[] = [];
@@ -147,8 +141,8 @@ export class ContextManager {
   /**
    * Initialize context with validated input data
    */
-  initializeWithInput(input: Record<string, unknown>): void {
-    this.loadSchemas();
+  async initializeWithInput(input: Record<string, unknown>): Promise<void> {
+    await this.loadSchemas();
 
     // Lazy-initialize validator
     if (!this.inputValidator) {

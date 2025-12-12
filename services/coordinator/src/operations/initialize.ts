@@ -1,7 +1,8 @@
 /**
  * Initialization Operations
  *
- * Loads workflow metadata from DO SQL or fetches from RESOURCES if not cached.
+ * Shared utilities for accessing workflow metadata from DO SQL.
+ * Used by start() to fetch/cache metadata and by managers to read cached metadata.
  */
 
 import type { JSONSchema } from '@wonder/context';
@@ -10,7 +11,7 @@ import type { WorkflowDef, WorkflowRun } from '../types.js';
 /**
  * Initialize metadata table in DO SQL
  */
-function initializeTable(sql: SqlStorage): void {
+export function initializeTable(sql: SqlStorage): void {
   try {
     sql.exec(`
       CREATE TABLE IF NOT EXISTS metadata (
@@ -29,44 +30,46 @@ function initializeTable(sql: SqlStorage): void {
 }
 
 /**
- * Load metadata from DO SQL
+ * Get WorkflowRun from metadata table
+ * Throws if not found - start() must be called first
  */
-function loadFromSql(
-  sql: SqlStorage,
-): { workflowRun: WorkflowRun; workflowDef: WorkflowDef } | null {
+export function getWorkflowRun(sql: SqlStorage): WorkflowRun {
   try {
-    console.log('[initialize] attempting to load metadata from SQL cache');
+    const result = sql.exec('SELECT value FROM metadata WHERE key = ?', 'workflow_run');
+    const rows = [...result];
 
-    const workflowRunResult = sql.exec('SELECT value FROM metadata WHERE key = ?', 'workflow_run');
-    const workflowDefResult = sql.exec('SELECT value FROM metadata WHERE key = ?', 'workflow_def');
-
-    const workflowRunRows = [...workflowRunResult];
-    const workflowDefRows = [...workflowDefResult];
-
-    if (workflowRunRows.length === 0 || workflowDefRows.length === 0) {
-      console.log('[initialize] metadata not found in SQL cache', {
-        workflowRunFound: workflowRunRows.length > 0,
-        workflowDefFound: workflowDefRows.length > 0,
-      });
-      return null;
+    if (rows.length === 0) {
+      throw new Error('WorkflowRun not found in metadata - start() must be called first');
     }
 
-    const workflowRunRow = workflowRunRows[0] as { value: string };
-    const workflowDefRow = workflowDefRows[0] as { value: string };
-
-    console.log('[initialize] parsing cached metadata JSON');
-    const workflowRun = JSON.parse(workflowRunRow.value);
-    const workflowDef = JSON.parse(workflowDefRow.value);
-
-    console.log('[initialize] successfully loaded metadata from SQL cache', {
-      workflowRunId: workflowRun.id,
-      workflowDefId: workflowDef.id,
-      workflowDefVersion: workflowDef.version,
-    });
-
-    return { workflowRun, workflowDef };
+    const row = rows[0] as { value: string };
+    return JSON.parse(row.value) as WorkflowRun;
   } catch (error) {
-    console.error('[initialize] ERROR: Failed to load metadata from SQL cache:', {
+    console.error('[initialize] ERROR: Failed to get WorkflowRun from metadata:', {
+      error: error instanceof Error ? error.message : String(error),
+      stack: error instanceof Error ? error.stack : undefined,
+    });
+    throw error;
+  }
+}
+
+/**
+ * Get WorkflowDef from metadata table
+ * Throws if not found - start() must be called first
+ */
+export function getWorkflowDef(sql: SqlStorage): WorkflowDef {
+  try {
+    const result = sql.exec('SELECT value FROM metadata WHERE key = ?', 'workflow_def');
+    const rows = [...result];
+
+    if (rows.length === 0) {
+      throw new Error('WorkflowDef not found in metadata - start() must be called first');
+    }
+
+    const row = rows[0] as { value: string };
+    return JSON.parse(row.value) as WorkflowDef;
+  } catch (error) {
+    console.error('[initialize] ERROR: Failed to get WorkflowDef from metadata:', {
       error: error instanceof Error ? error.message : String(error),
       stack: error instanceof Error ? error.stack : undefined,
     });
@@ -77,9 +80,13 @@ function loadFromSql(
 /**
  * Save metadata to DO SQL
  */
-function saveToSql(sql: SqlStorage, workflowRun: WorkflowRun, workflowDef: WorkflowDef): void {
+export function saveMetadata(
+  sql: SqlStorage,
+  workflowRun: WorkflowRun,
+  workflowDef: WorkflowDef,
+): void {
   try {
-    console.log('[initialize] saving metadata to SQL cache', {
+    console.log('[initialize] saving metadata to SQL', {
       workflowRunId: workflowRun.id,
       workflowDefId: workflowDef.id,
       workflowDefVersion: workflowDef.version,
@@ -97,9 +104,9 @@ function saveToSql(sql: SqlStorage, workflowRun: WorkflowRun, workflowDef: Workf
       JSON.stringify(workflowDef),
     );
 
-    console.log('[initialize] metadata successfully saved to SQL cache');
+    console.log('[initialize] metadata successfully saved to SQL');
   } catch (error) {
-    console.error('[initialize] ERROR: Failed to save metadata to SQL cache:', {
+    console.error('[initialize] ERROR: Failed to save metadata to SQL:', {
       error: error instanceof Error ? error.message : String(error),
       stack: error instanceof Error ? error.stack : undefined,
       workflowRunId: workflowRun.id,
@@ -177,10 +184,8 @@ async function fetchFromResources(
 /**
  * Initialize coordinator metadata
  *
- * Checks DO SQL for cached metadata first. If not found, fetches from RESOURCES
- * and caches in DO SQL for subsequent initializations.
- *
- * Called during DO initialization to load metadata.
+ * Fetches metadata from RESOURCES and caches in DO SQL.
+ * Called by start() on first workflow invocation.
  */
 export async function initialize(
   sql: SqlStorage,
@@ -190,27 +195,20 @@ export async function initialize(
   try {
     console.log('[initialize] START: initializing coordinator metadata', { workflowRunId });
 
-    // Initialize table
+    // Ensure metadata table exists
     initializeTable(sql);
 
-    // Try to load from SQL first
-    const cached = loadFromSql(sql);
-    if (cached) {
-      console.log('[initialize] SUCCESS: metadata loaded from cache');
-      return cached;
-    }
-
-    // Not cached - fetch from RESOURCES
-    console.log('[initialize] cache miss, fetching from RESOURCES');
+    // Fetch from RESOURCES
+    console.log('[initialize] fetching from RESOURCES');
     const metadata = await fetchFromResources(env, workflowRunId);
 
-    // Cache in SQL for next time
-    saveToSql(sql, metadata.workflowRun, metadata.workflowDef);
+    // Save to SQL for managers to access
+    saveMetadata(sql, metadata.workflowRun, metadata.workflowDef);
 
     console.log('[initialize] SUCCESS: metadata fetched and cached');
     return metadata;
   } catch (error) {
-    console.error('[initialize] FATAL: Initialization failed completely:', {
+    console.error('[initialize] FATAL: Initialization failed:', {
       error: error instanceof Error ? error.message : String(error),
       stack: error instanceof Error ? error.stack : undefined,
       workflowRunId,
