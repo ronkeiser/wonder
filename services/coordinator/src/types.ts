@@ -5,6 +5,28 @@
 import type { JSONSchema } from '@wonder/context';
 
 /**
+ * Workflow run metadata
+ */
+export type WorkflowRun = {
+  id: string;
+  project_id: string;
+  workspace_id: string;
+  workflow_id: string;
+  workflow_def_id: string;
+  workflow_version: number;
+  status: string;
+  context: object;
+  active_tokens: object[];
+  durable_object_id: string;
+  parent_run_id: string | null;
+  parent_node_id: string | null;
+  latest_snapshot: object | null;
+  created_at: string;
+  updated_at: string;
+  completed_at: string | null;
+};
+
+/**
  * Token represents a position in the workflow graph
  */
 export type TokenRow = {

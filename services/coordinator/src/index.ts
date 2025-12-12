@@ -10,7 +10,7 @@ import { DurableObject } from 'cloudflare:workers';
 import { ContextManager } from './operations/context.js';
 import * as tokenOps from './operations/tokens.js';
 import * as workflowOps from './operations/workflows.js';
-import type { TaskResult, WorkflowDef } from './types.js';
+import type { TaskResult, WorkflowDef, WorkflowRun } from './types.js';
 
 /**
  * WorkflowCoordinator Durable Object
@@ -18,12 +18,82 @@ import type { TaskResult, WorkflowDef } from './types.js';
  * Each instance coordinates a single workflow run.
  */
 export class WorkflowCoordinator extends DurableObject {
-  private emitter?: Emitter;
-  private contextManager?: ContextManager;
+  private metadata?: {
+    workflowRun: WorkflowRun;
+    workflowDef: WorkflowDef;
+  };
+  private emitter: Emitter;
+  private contextManager: ContextManager;
   private workflowCache: Map<string, WorkflowDef> = new Map();
 
   constructor(ctx: DurableObjectState, env: Env) {
     super(ctx, env);
+
+    this.ctx.blockConcurrencyWhile(() => this.initialize());
+
+    // Synchronously instantiate emitter and contextManager after initialization
+    if (!this.metadata) {
+      throw new Error('Metadata not initialized');
+    }
+
+    const { workflowRun, workflowDef } = this.metadata;
+
+    this.workflowCache.set(workflowRun.id, workflowDef);
+
+    this.emitter = createEmitter(
+      this.env.EVENTS,
+      {
+        workflow_run_id: workflowRun.id,
+        workspace_id: workflowRun.workspace_id,
+        project_id: workflowRun.project_id,
+        workflow_def_id: workflowRun.workflow_def_id,
+      },
+      {
+        traceEnabled: this.env.TRACE_EVENTS_ENABLED,
+      },
+    );
+
+    this.contextManager = new ContextManager(
+      ctx.storage.sql,
+      this.emitter,
+      workflowDef.input_schema,
+      workflowDef.context_schema,
+    );
+  }
+
+  /**
+   * Initialize DO state on first access
+   *
+   * Fetches workflow metadata from RESOURCES and stores it in the metadata field.
+   *
+   * Called in constructor with blockConcurrencyWhile to ensure exactly-once
+   * initialization with no race conditions.
+   */
+  private async initialize() {
+    const sql = this.ctx.storage.sql;
+    const workflowRunId = this.ctx.id.toString();
+
+    // Fetch or load from SQL
+    using workflowRunsResource = this.env.RESOURCES.workflowRuns();
+    const runResponse = await workflowRunsResource.get(workflowRunId);
+    const workflowRun = runResponse.workflow_run;
+
+    using workflowDefsResource = this.env.RESOURCES.workflowDefs();
+    const defResponse = await workflowDefsResource.get(workflowRun.workflow_def_id);
+    const rawDef = defResponse.workflow_def;
+
+    // Map to coordinator's WorkflowDef type
+    const workflowDef: WorkflowDef = {
+      id: rawDef.id,
+      version: rawDef.version,
+      initial_node_id: rawDef.initial_node_id!,
+      input_schema: rawDef.input_schema as JSONSchema,
+      context_schema: rawDef.context_schema as JSONSchema | undefined,
+      output_schema: rawDef.output_schema as JSONSchema,
+      output_mapping: rawDef.output_mapping as Record<string, string> | undefined,
+    };
+
+    this.metadata = { workflowRun, workflowDef };
   }
 
   /**
@@ -106,13 +176,6 @@ export class WorkflowCoordinator extends DurableObject {
    * Handle task result from Executor
    */
   async handleTaskResult(tokenId: string, result: TaskResult): Promise<void> {
-    if (!this.emitter) {
-      throw new Error('Emitter not initialized');
-    }
-    if (!this.contextManager) {
-      throw new Error('ContextManager not initialized');
-    }
-
     const sql = this.ctx.storage.sql;
 
     // Mark token as completed
@@ -149,10 +212,6 @@ export class WorkflowCoordinator extends DurableObject {
    * Dispatch token to Executor
    */
   private async dispatchToken(tokenId: string): Promise<void> {
-    if (!this.emitter) {
-      throw new Error('Emitter not initialized');
-    }
-
     this.emitter.emitTrace({
       type: 'dispatch.batch.start',
       decision_count: 1,
@@ -172,13 +231,6 @@ export class WorkflowCoordinator extends DurableObject {
    * Finalize workflow and extract output
    */
   private async finalizeWorkflow(workflowRunId: string): Promise<void> {
-    if (!this.emitter) {
-      throw new Error('Emitter not initialized');
-    }
-    if (!this.contextManager) {
-      throw new Error('ContextManager not initialized');
-    }
-
     this.emitter.emitTrace({
       type: 'decision.sync.activate',
       merge_config: { workflow_run_id: workflowRunId },
