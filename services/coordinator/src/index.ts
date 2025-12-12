@@ -58,8 +58,8 @@ export class WorkflowCoordinator extends DurableObject {
       await this.defs.initialize(workflow_run_id);
 
       // Get definitions for token creation and input
-      const workflowRun = await this.defs.getWorkflowRun();
-      const workflowDef = await this.defs.getWorkflowDef();
+      const workflowRun = this.defs.getWorkflowRun();
+      const workflowDef = this.defs.getWorkflowDef();
 
       // Extract input from workflow run context
       const context = workflowRun.context as {

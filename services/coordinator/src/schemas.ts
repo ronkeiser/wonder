@@ -11,15 +11,14 @@
 
 import { index, integer, sqliteTable, text } from 'drizzle-orm/sqlite-core';
 
-// =============================================================================
-// DEFINITION TABLES (imported from Resources service)
-// =============================================================================
-
+/**
+ * Definition tables (imported from Resources service)
+ */
 export { nodes, transitions, workflow_defs, workflow_runs } from '@wonder/resources/schemas';
 
-// =============================================================================
-// EXECUTION TABLES (internal coordinator state)
-// =============================================================================
+/**
+ * Execution tables (internal coordinator state)
+ */
 
 /**
  * Token Status
@@ -45,16 +44,16 @@ export const tokens = sqliteTable(
     node_id: text('node_id').notNull(),
     status: text('status').$type<TokenStatus>().notNull(),
 
-    // Lineage tracking
+    /** Lineage tracking */
     parent_token_id: text('parent_token_id'),
     path_id: text('path_id').notNull(),
     fan_out_transition_id: text('fan_out_transition_id'),
 
-    // Branch position (for fan-out siblings)
+    /** Branch position (for fan-out siblings) */
     branch_index: integer('branch_index').notNull(),
     branch_total: integer('branch_total').notNull(),
 
-    // Timestamps
+    /** Timestamps */
     created_at: integer('created_at', { mode: 'timestamp_ms' }).notNull(),
     updated_at: integer('updated_at', { mode: 'timestamp_ms' }).notNull(),
     arrived_at: integer('arrived_at', { mode: 'timestamp_ms' }),

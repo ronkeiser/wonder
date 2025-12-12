@@ -208,9 +208,9 @@ export class DefinitionManager {
     }
   }
 
-  // ===========================================================================
-  // ACCESSORS
-  // ===========================================================================
+  /**
+   * Accessors
+   */
 
   private ensureInitialized(): void {
     if (!this.initialized) {

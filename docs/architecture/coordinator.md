@@ -23,8 +23,13 @@ The coordinator enhances this with a **Decision Layer** where decision logic is 
 coordinator/src/
 ├── index.ts                    # DO class (Actor) - thin orchestrator
 ├── types.ts                    # Decision type definitions
+├── schemas.ts                  # Drizzle table schemas (imports from @wonder/resources)
 ├── events.ts                   # Event emission (workflow + trace events)
 ├── trace.ts                    # SQL instrumentation for trace events
+├── migrations/                 # DO SQLite migrations (drizzle-kit generated)
+│   ├── 0000_*.sql              # Initial schema (FK constraints stripped)
+│   ├── meta/                   # Drizzle migration metadata
+│   └── migrations.ts           # Bundles SQL for runtime migrator
 ├── planning/                   # Pure logic - returns Decision[]
 │   ├── routing.ts              # Transition evaluation
 │   ├── synchronization.ts      # Fan-in logic
@@ -35,7 +40,7 @@ coordinator/src/
 │   ├── tokens.ts               # Token CRUD + queries
 │   ├── context.ts              # Context CRUD + snapshots
 │   ├── artifacts.ts            # Artifact staging
-│   ├── defs.ts                 # Workflow definitions (Run + Def) with multi-level caching
+│   ├── defs.ts                 # Workflow definitions - copies from RESOURCES on init
 │   └── events.ts               # Event emission coordination
 └── dispatch/                   # Decision dispatch (convert to operations)
     ├── apply.ts                # Main decision dispatcher
