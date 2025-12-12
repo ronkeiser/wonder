@@ -31,3 +31,24 @@ export const streamWorkflowRunRoute = createRoute({
     },
   },
 });
+
+export const deleteWorkflowRunRoute = createRoute({
+  method: 'delete',
+  path: '/{id}',
+  tags: ['workflow-runs'],
+  request: {
+    params: z.object({
+      id: ulid().openapi({ param: { name: 'id', in: 'path' } }),
+    }),
+  },
+  responses: {
+    200: {
+      content: {
+        'application/json': {
+          schema: z.object({ success: z.boolean() }).openapi('WorkflowRunDeleteResponse'),
+        },
+      },
+      description: 'Workflow run deleted successfully',
+    },
+  },
+});

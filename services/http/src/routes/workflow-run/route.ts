@@ -3,7 +3,7 @@
  */
 
 import { OpenAPIHono } from '@hono/zod-openapi';
-import { streamWorkflowRunRoute } from './spec';
+import { deleteWorkflowRunRoute, streamWorkflowRunRoute } from './spec';
 
 /** /workflow-runs */
 export const workflowRuns = new OpenAPIHono<{ Bindings: Env }>();
@@ -27,4 +27,12 @@ workflowRuns.openapi(streamWorkflowRunRoute, async (c) => {
   const doId = c.env.COORDINATOR.idFromName(id);
   const stub = c.env.COORDINATOR.get(doId);
   return stub.fetch(c.req.raw);
+});
+
+/** DELETE /{id} */
+workflowRuns.openapi(deleteWorkflowRunRoute, async (c) => {
+  const { id } = c.req.valid('param');
+  using workflowRuns = c.env.RESOURCES.workflowRuns();
+  const result = await workflowRuns.delete(id);
+  return c.json(result);
 });

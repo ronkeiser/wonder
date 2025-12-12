@@ -70,4 +70,29 @@ export class WorkflowRuns extends Resource {
       metadata: { workflow_run_id: id },
     });
   }
+
+  async delete(id: string): Promise<{ success: boolean }> {
+    this.serviceCtx.logger.info({
+      event_type: 'workflow_run_delete_started',
+      metadata: { workflow_run_id: id },
+    });
+
+    // Verify workflow run exists
+    const workflowRun = await repo.getWorkflowRun(this.serviceCtx.db, id);
+    if (!workflowRun) {
+      this.serviceCtx.logger.warn({
+        event_type: 'workflow_run_not_found',
+        metadata: { workflow_run_id: id },
+      });
+      throw new NotFoundError(`Workflow run not found: ${id}`, 'workflow_run', id);
+    }
+
+    await repo.deleteWorkflowRun(this.serviceCtx.db, id);
+    this.serviceCtx.logger.info({
+      event_type: 'workflow_run_deleted',
+      metadata: { workflow_run_id: id },
+    });
+
+    return { success: true };
+  }
 }

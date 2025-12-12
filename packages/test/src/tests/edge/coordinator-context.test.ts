@@ -228,6 +228,9 @@ describe('Coordinator - Context Operations', () => {
     // Step 10: Clean up resources
     console.log('\n🧹 Cleaning up resources...');
 
+    await wonder['workflow-runs'](workflowRunId).delete();
+    console.log('  ✓ Deleted workflow run:', workflowRunId);
+
     await wonder.workflows(workflowId).delete();
     console.log('  ✓ Deleted workflow:', workflowId);
 

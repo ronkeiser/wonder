@@ -159,6 +159,10 @@ export function createClient(baseClient: any) {
     ),
     "workflow-runs": Object.assign(
       (id: string) => ({
+          delete: async (options?: any): Promise<paths['/api/workflow-runs/{id}']['delete']['responses']['200']['content']['application/json']> => {
+            const response = await baseClient.DELETE(`/api/workflow-runs/${id}`, {});
+            return response.data;
+          }
         }),
       {
       }

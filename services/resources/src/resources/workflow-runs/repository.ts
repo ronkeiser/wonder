@@ -56,3 +56,7 @@ export async function updateWorkflowRun(
 
   return result.length > 0;
 }
+
+export async function deleteWorkflowRun(db: DrizzleD1Database, id: string): Promise<void> {
+  await db.delete(workflow_runs).where(eq(workflow_runs.id, id)).run();
+}
