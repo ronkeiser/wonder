@@ -35,7 +35,7 @@ coordinator/src/
 │   ├── tokens.ts               # Token CRUD + queries
 │   ├── context.ts              # Context CRUD + snapshots
 │   ├── artifacts.ts            # Artifact staging
-│   ├── metadata.ts             # Workflow metadata (Run + Def) with multi-level caching
+│   ├── defs.ts                 # Workflow definitions (Run + Def) with multi-level caching
 │   └── events.ts               # Event emission coordination
 └── dispatch/                   # Decision dispatch (convert to operations)
     ├── apply.ts                # Main decision dispatcher
@@ -173,7 +173,7 @@ Token state management via TokenManager class.
 
 ```typescript
 class TokenManager {
-  constructor(sql, metadata, emitter)
+  constructor(sql, defs, emitter)
 
   initialize() → void                                      // Create tokens table
   create(params) → tokenId                                 // Create new token
@@ -190,7 +190,7 @@ Schema-driven SQL operations for workflow context and branch storage.
 
 ```typescript
 class ContextManager {
-  constructor(sql, metadata, emitter)
+  constructor(sql, defs, emitter)
 
   initialize() → Promise<void>                             // Create tables from schema DDL
   initializeWithInput(input) → Promise<void>               // Validate and insert input
@@ -214,15 +214,15 @@ getStaged(sql) → Artifact[]
 commitAll(env, sql) → void  // writes to RESOURCES
 ```
 
-### operations/metadata.ts
+### operations/defs.ts
 
-Workflow metadata management with multi-level caching.
+Workflow definition management with multi-level caching.
 
 ```typescript
-class MetadataManager {
+class DefinitionManager {
   constructor(ctx, sql, env)
 
-  initialize(workflow_run_id) → Promise<void>        // Load metadata on first access
+  initialize(workflow_run_id) → Promise<void>        // Load definitions on first access
   getWorkflowRun() → Promise<WorkflowRun>            // Memory → SQL → RESOURCES
   getWorkflowDef() → Promise<WorkflowDef>            // Memory → SQL (fetched with Run)
 }
@@ -317,7 +317,7 @@ The DO class (Actor). Thin orchestration layer that coordinates decision logic a
 
 ```typescript
 class WorkflowCoordinator extends DurableObject {
-  private metadata: MetadataManager;
+  private defs: DefinitionManager;
   private emitter: Emitter;
   private context: ContextManager;
   private tokens: TokenManager;
@@ -338,11 +338,11 @@ Only two external entry points (messages this actor can receive):
 
 ```typescript
 async start(workflowRunId: string) {
-  // Initialize metadata manager (loads WorkflowRun + WorkflowDef)
-  await this.metadata.initialize(workflowRunId);
+  // Initialize definition manager (loads WorkflowRun + WorkflowDef)
+  await this.defs.initialize(workflowRunId);
 
-  const workflowRun = await this.metadata.getWorkflowRun();
-  const workflowDef = await this.metadata.getWorkflowDef();
+  const workflowRun = await this.defs.getWorkflowRun();
+  const workflowDef = await this.defs.getWorkflowDef();
   const input = workflowRun.context.input;
 
   // Initialize storage
@@ -377,8 +377,8 @@ async handleTaskResult(tokenId: string, result: TaskResult) {
   const token = this.tokens.get(tokenId);
   this.context.applyNodeOutput(token.node_id, result.output_data, tokenId);
 
-  // 2. Load workflow and context (cached in metadata manager)
-  const workflowDef = await this.metadata.getWorkflowDef();
+  // 2. Load workflow and context (cached in definition manager)
+  const workflowDef = await this.defs.getWorkflowDef();
   const contextData = this.context.getSnapshot();
 
   // 3. Run decision logic (pure - returns data)
@@ -432,7 +432,7 @@ handleTaskResult(tokenId, result)  [Actor message received]
   │
   ├─► Load state (read-only snapshot for decision logic)
   │   ├─► token = this.tokens.get(tokenId)
-  │   ├─► workflowDef = await this.metadata.getWorkflowDef()  [cached]
+  │   ├─► workflowDef = await this.defs.getWorkflowDef()  [cached]
   │   └─► contextData = this.context.getSnapshot()
   │
   ├─► Decision logic (pure, returns Decision[] data)
@@ -507,18 +507,18 @@ Single SQL transaction instead of three separate operations.
 
 This keeps synchronization logic isolated, testable, and independent of actor mechanics.
 
-### Metadata Caching
+### Definition Caching
 
-MetadataManager provides multi-level caching:
+DefinitionManager provides multi-level caching:
 
 ```typescript
-class MetadataManager {
+class DefinitionManager {
   // Memory cache (fastest)
   private cachedRun: WorkflowRun | null = null;
   private cachedDef: WorkflowDef | null = null;
 
   // SQL cache (durable, persists across DO wake-ups)
-  // Stored in metadata table
+  // Stored in defs table
 
   // RESOURCES RPC (slowest, only on cache miss)
 }
