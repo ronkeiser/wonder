@@ -4,6 +4,7 @@
  * Durable Object-based workflow orchestration service.
  * Manages workflow lifecycle via RPC.
  */
+import type { JSONSchema } from '@wonder/context';
 import { createEmitter, type Emitter } from '@wonder/events';
 import { DurableObject } from 'cloudflare:workers';
 import * as contextOps from './operations/context.js';
@@ -35,6 +36,9 @@ export class WorkflowCoordinator extends DurableObject {
       project_id: string;
       workflow_def_id: string;
       initial_node_id: string;
+      input_schema: JSONSchema;
+      context_schema?: JSONSchema;
+      output_schema: JSONSchema;
     },
   ): Promise<void> {
     const sql = this.ctx.storage.sql;
@@ -55,13 +59,14 @@ export class WorkflowCoordinator extends DurableObject {
     tokenOps.initializeTable(sql);
 
     // Load workflow definition
-    // For Chunk 1, use a minimal hardcoded workflow to test the execution loop
+    // For Chunk 2, use schemas passed from caller (future: load from RESOURCES)
     const workflow: WorkflowDef = {
       id: context.workflow_def_id,
       version: 1,
       initial_node_id: context.initial_node_id,
-      input_schema: { type: 'object', properties: {} },
-      output_schema: { type: 'object', properties: {} },
+      input_schema: context.input_schema,
+      context_schema: context.context_schema,
+      output_schema: context.output_schema,
     };
     this.workflowCache.set(context.workflow_run_id, workflow);
 
@@ -169,16 +174,23 @@ export class WorkflowCoordinator extends DurableObject {
     const sql = this.ctx.storage.sql;
 
     // Get context snapshot
-    const context = contextOps.getSnapshot(sql);
+    const context = contextOps.getSnapshot(sql, this.emitter);
+
+    // Extract output (simplified for Chunk 2 - just use current output or input)
+    // Future chunks: apply output_mapping from workflow def
+    const workflow = this.workflowCache.get(workflowRunId);
+    const finalOutput = Object.keys(context.output).length > 0 ? context.output : context.input; // Fallback to input if no output set
+
+    // Write final output to context
+    if (workflow && Object.keys(finalOutput).length > 0) {
+      contextOps.set(sql, 'output', finalOutput, this.emitter);
+    }
 
     this.emitter.emitTrace({
       type: 'operation.context.read',
       path: 'output',
-      value: context.output,
+      value: finalOutput,
     });
-
-    // Extract output (simplified for Chunk 1)
-    const finalOutput = context.output;
 
     // Emit workflow completed event
     this.emitter.emit({

@@ -75,7 +75,18 @@ const TraceEventPayloadSchema = z.discriminatedUnion('type', [
   // Operation events - context
   z.object({
     type: z.literal('operation.context.initialize'),
+    has_input_schema: z.boolean(),
+    has_context_schema: z.boolean(),
     table_count: z.number(),
+    tables_created: z.array(z.string()),
+  }),
+  z.object({
+    type: z.literal('operation.context.validate'),
+    path: z.string(),
+    schema_type: z.string(),
+    valid: z.boolean(),
+    error_count: z.number(),
+    errors: z.array(z.string()).optional(),
   }),
   z.object({
     type: z.literal('operation.context.read'),
@@ -91,6 +102,7 @@ const TraceEventPayloadSchema = z.discriminatedUnion('type', [
     type: z.literal('operation.context.branch_table.create'),
     token_id: z.string(),
     table_name: z.string(),
+    schema_type: z.string(),
   }),
   z.object({
     type: z.literal('operation.context.branch_table.drop'),
@@ -100,9 +112,12 @@ const TraceEventPayloadSchema = z.discriminatedUnion('type', [
     type: z.literal('operation.context.merge.start'),
     sibling_count: z.number(),
     strategy: z.string(),
+    source_path: z.string(),
+    target_path: z.string(),
   }),
   z.object({
     type: z.literal('operation.context.merge.complete'),
+    target_path: z.string(),
     rows_written: z.number(),
   }),
   // Operation events - tokens
@@ -110,6 +125,7 @@ const TraceEventPayloadSchema = z.discriminatedUnion('type', [
     type: z.literal('operation.tokens.create'),
     token_id: z.string(),
     node_id: z.string(),
+    task_id: z.string(),
     parent_token_id: z.string().nullable(),
   }),
   z.object({

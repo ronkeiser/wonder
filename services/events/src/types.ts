@@ -178,7 +178,18 @@ export type DecisionEvent =
 export type OperationEvent =
   | {
       type: 'operation.context.initialize';
+      has_input_schema: boolean;
+      has_context_schema: boolean;
       table_count: number;
+      tables_created: string[]; // e.g., ['context_input', 'context_state', 'context_output']
+    }
+  | {
+      type: 'operation.context.validate';
+      path: string;
+      schema_type: string; // e.g., 'object', 'array', etc.
+      valid: boolean;
+      error_count: number;
+      errors?: string[]; // First few error messages if validation failed
     }
   | {
       type: 'operation.context.read';
@@ -191,9 +202,18 @@ export type OperationEvent =
       value: unknown;
     }
   | {
+      type: 'operation.context.snapshot';
+      snapshot: {
+        input: unknown;
+        state: unknown;
+        output: unknown;
+      };
+    }
+  | {
       type: 'operation.context.branch_table.create';
       token_id: string;
       table_name: string;
+      schema_type: string; // Schema type that drove table creation
     }
   | {
       type: 'operation.context.branch_table.drop';
@@ -203,15 +223,19 @@ export type OperationEvent =
       type: 'operation.context.merge.start';
       sibling_count: number;
       strategy: string;
+      source_path: string; // e.g., '_branch.output'
+      target_path: string; // e.g., 'state.votes'
     }
   | {
       type: 'operation.context.merge.complete';
+      target_path: string;
       rows_written: number;
     }
   | {
       type: 'operation.tokens.create';
       token_id: string;
       node_id: string;
+      task_id: string; // What task this token will execute
       parent_token_id: string | null;
     }
   | {

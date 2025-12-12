@@ -22,7 +22,10 @@ export interface TypedTraceEvent<T = any> extends Omit<TraceEventEntry, 'payload
  */
 export namespace TracePayloads {
   export interface ContextInitialize {
+    has_input_schema: boolean;
+    has_context_schema: boolean;
     table_count: number;
+    tables_created: string[];
   }
 
   export interface ContextRead {
@@ -33,6 +36,22 @@ export namespace TracePayloads {
   export interface ContextWrite {
     path: string;
     value: unknown;
+  }
+
+  export interface ContextValidate {
+    path: string;
+    schema_type: string;
+    valid: boolean;
+    error_count: number;
+    errors?: string[];
+  }
+
+  export interface ContextSnapshot {
+    snapshot: {
+      input: unknown;
+      state: unknown;
+      output: unknown;
+    };
   }
 
   export interface BranchTableCreate {
@@ -190,6 +209,12 @@ export class TraceEventCollection {
         return self.findWhere(
           (e) => e.type === 'operation.context.write' && e.payload.path === path,
         ) as TypedTraceEvent<TracePayloads.ContextWrite> | undefined;
+      },
+      validate(): TypedTraceEvent<TracePayloads.ContextValidate> | undefined {
+        return self.find<TracePayloads.ContextValidate>('operation.context.validate');
+      },
+      snapshots(): TypedTraceEvent<TracePayloads.ContextSnapshot>[] {
+        return self.filter<TracePayloads.ContextSnapshot>('operation.context.snapshot');
       },
     };
   }
