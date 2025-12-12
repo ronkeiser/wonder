@@ -8,6 +8,7 @@ import type { JSONSchema } from '@wonder/context';
 import { createEmitter, type Emitter } from '@wonder/events';
 import { DurableObject } from 'cloudflare:workers';
 import { ContextManager } from './operations/context.js';
+import { initialize } from './operations/initialize.js';
 import * as tokenOps from './operations/tokens.js';
 import * as workflowOps from './operations/workflows.js';
 import type { TaskResult, WorkflowDef, WorkflowRun } from './types.js';
@@ -29,7 +30,9 @@ export class WorkflowCoordinator extends DurableObject {
   constructor(ctx: DurableObjectState, env: Env) {
     super(ctx, env);
 
-    this.ctx.blockConcurrencyWhile(() => this.initialize());
+    this.ctx.blockConcurrencyWhile(async () => {
+      this.metadata = await initialize(this.env, this.ctx.id.toString());
+    });
 
     // Synchronously instantiate emitter and contextManager after initialization
     if (!this.metadata) {
@@ -59,41 +62,6 @@ export class WorkflowCoordinator extends DurableObject {
       workflowDef.input_schema,
       workflowDef.context_schema,
     );
-  }
-
-  /**
-   * Initialize DO state on first access
-   *
-   * Fetches workflow metadata from RESOURCES and stores it in the metadata field.
-   *
-   * Called in constructor with blockConcurrencyWhile to ensure exactly-once
-   * initialization with no race conditions.
-   */
-  private async initialize() {
-    const sql = this.ctx.storage.sql;
-    const workflowRunId = this.ctx.id.toString();
-
-    // Fetch or load from SQL
-    using workflowRunsResource = this.env.RESOURCES.workflowRuns();
-    const runResponse = await workflowRunsResource.get(workflowRunId);
-    const workflowRun = runResponse.workflow_run;
-
-    using workflowDefsResource = this.env.RESOURCES.workflowDefs();
-    const defResponse = await workflowDefsResource.get(workflowRun.workflow_def_id);
-    const rawDef = defResponse.workflow_def;
-
-    // Map to coordinator's WorkflowDef type
-    const workflowDef: WorkflowDef = {
-      id: rawDef.id,
-      version: rawDef.version,
-      initial_node_id: rawDef.initial_node_id!,
-      input_schema: rawDef.input_schema as JSONSchema,
-      context_schema: rawDef.context_schema as JSONSchema | undefined,
-      output_schema: rawDef.output_schema as JSONSchema,
-      output_mapping: rawDef.output_mapping as Record<string, string> | undefined,
-    };
-
-    this.metadata = { workflowRun, workflowDef };
   }
 
   /**
