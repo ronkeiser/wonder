@@ -11,8 +11,7 @@ import { ContextManager } from './operations/context.js';
 import { CoordinatorEmitter } from './operations/events.js';
 import { MetadataManager } from './operations/metadata.js';
 import { TokenManager } from './operations/tokens.js';
-import * as workflowOps from './operations/workflows.js';
-import type { TaskResult, WorkflowDef, WorkflowRun } from './types.js';
+import type { TaskResult } from './types.js';
 
 /**
  * WorkflowCoordinator Durable Object

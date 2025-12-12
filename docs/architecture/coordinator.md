@@ -35,7 +35,8 @@ coordinator/src/
 │   ├── tokens.ts               # Token CRUD + queries
 │   ├── context.ts              # Context CRUD + snapshots
 │   ├── artifacts.ts            # Artifact staging
-│   └── workflows.ts            # Load workflow defs (with caching)
+│   ├── metadata.ts             # Workflow metadata (Run + Def) with multi-level caching
+│   └── events.ts               # Event emission coordination
 └── dispatch/                   # Decision dispatch (convert to operations)
     ├── apply.ts                # Main decision dispatcher
     ├── batch.ts                # Decision batching optimization
@@ -168,16 +169,19 @@ function extractFinalOutput(
 
 ### operations/tokens.ts
 
-Direct SQL operations for token state.
+Token state management via TokenManager class.
 
 ```typescript
-get(sql, tokenId) → TokenRow
-create(sql, params) → tokenId
-tryCreateFanIn(sql, params) → tokenId | null  // handles unique constraint
-tryActivate(sql, workflowRunId, nodeId, path) → boolean  // atomic CAS
-updateStatus(sql, tokenId, status) → void
-getSiblings(sql, workflowRunId, fanOutTransitionId) → TokenRow[]
-getActiveCount(sql, workflowRunId) → number
+class TokenManager {
+  constructor(sql, metadata, emitter)
+
+  initialize() → void                                      // Create tokens table
+  create(params) → tokenId                                 // Create new token
+  get(tokenId) → TokenRow                                  // Get token by ID
+  updateStatus(tokenId, status) → void                     // Update token status
+  getActiveCount(workflowRunId) → number                   // Count active tokens
+  // Future: tryCreateFanIn, tryActivate, getSiblings for fan-out/fan-in
+}
 ```
 
 ### operations/context.ts
@@ -185,15 +189,16 @@ getActiveCount(sql, workflowRunId) → number
 Schema-driven SQL operations for workflow context and branch storage.
 
 ```typescript
-initializeTable(sql) → void              // Create tables from schema DDL
-initializeWithInput(sql, input) → void   // Populate initial context
-initializeBranchTable(sql, tokenId, schema) → void  // Create branch output table
-get(sql, path) → unknown                 // Read context value
-set(sql, path, value) → void             // Write context value
-applyNodeOutput(sql, tokenId, output, schema) → void  // Write to branch table
-getSnapshot(sql) → ContextSnapshot       // Read-only view for decision logic
-mergeBranches(sql, siblings, merge, schema) → void  // Merge at fan-in
-dropBranchTables(sql, tokenIds) → void   // Cleanup after merge
+class ContextManager {
+  constructor(sql, metadata, emitter)
+
+  initialize() → Promise<void>                             // Create tables from schema DDL
+  initializeWithInput(input) → Promise<void>               // Validate and insert input
+  get(path) → unknown                                      // Read context value
+  set(path, value) → void                                  // Write context value
+  getSnapshot() → ContextSnapshot                          // Read-only view for decision logic
+  // Future: initializeBranchTable, applyNodeOutput, mergeBranches, dropBranchTables
+}
 ```
 
 See `branch-storage.md` for branch isolation design.
@@ -209,14 +214,27 @@ getStaged(sql) → Artifact[]
 commitAll(env, sql) → void  // writes to RESOURCES
 ```
 
-### operations/workflows.ts
+### operations/metadata.ts
 
-Load workflow definitions with caching.
+Workflow metadata management with multi-level caching.
 
 ```typescript
-load(env, workflowRunId) → Promise<WorkflowDef>
-// Caching handled in DO, not here
+class MetadataManager {
+  constructor(ctx, sql, env)
+
+  initialize(workflow_run_id) → Promise<void>        // Load metadata on first access
+  getWorkflowRun() → Promise<WorkflowRun>            // Memory → SQL → RESOURCES
+  getWorkflowDef() → Promise<WorkflowDef>            // Memory → SQL (fetched with Run)
+}
 ```
+
+**Caching strategy:**
+
+- Memory cache (fastest) - cleared on DO eviction
+- SQL cache (durable) - persists across DO wake-ups
+- RESOURCES RPC (slowest) - only on first access
+
+Both `WorkflowRun` and `WorkflowDef` are fetched together and cached together. Used by ContextManager (for schemas), CoordinatorEmitter (for IDs), and decision logic (for graph structure).
 
 ## Dispatch Layer
 
@@ -299,9 +317,12 @@ The DO class (Actor). Thin orchestration layer that coordinates decision logic a
 
 ```typescript
 class WorkflowCoordinator extends DurableObject {
-  private workflowCache: Map<string, WorkflowDef>; // Actor instance cache
+  private metadata: MetadataManager;
+  private emitter: Emitter;
+  private context: ContextManager;
+  private tokens: TokenManager;
 
-  async start(workflowRunId: string, input: Record<string, unknown>): Promise<void>;
+  async start(workflowRunId: string): Promise<void>;
   async handleTaskResult(tokenId: string, result: TaskResult): Promise<void>;
 }
 ```
@@ -316,22 +337,25 @@ Only two external entry points (messages this actor can receive):
 ### start(workflow_run_id, input)
 
 ```typescript
-async start(workflowRunId: string, input: Record<string, unknown>) {
+async start(workflowRunId: string) {
+  // Initialize metadata manager (loads WorkflowRun + WorkflowDef)
+  await this.metadata.initialize(workflowRunId);
+
+  const workflowRun = await this.metadata.getWorkflowRun();
+  const workflowDef = await this.metadata.getWorkflowDef();
+  const input = workflowRun.context.input;
+
   // Initialize storage
-  operations.tokens.initializeTable(this.sql);
-  operations.context.initializeTable(this.sql);
-  operations.artifacts.initializeTable(this.sql);
+  this.tokens.initialize();
+  await this.context.initialize();
 
   // Store input
-  operations.context.initializeWithInput(this.sql, input);
-
-  // Load workflow (fetch from RESOURCES, cache in DO)
-  const workflow = await this.getWorkflow(workflowRunId);
+  await this.context.initializeWithInput(input);
 
   // Create initial token
-  const tokenId = operations.tokens.create(this.sql, {
-    workflow_run_id: workflowRunId,
-    node_id: workflow.initial_node_id,
+  const tokenId = this.tokens.create({
+    workflow_run_id: workflowRun.id,
+    node_id: workflowDef.initial_node_id,
     parent_token_id: null,
     path_id: 'root',
     fan_out_transition_id: null,
@@ -348,24 +372,22 @@ async start(workflowRunId: string, input: Record<string, unknown>) {
 
 ```typescript
 async handleTaskResult(tokenId: string, result: TaskResult) {
-  const sql = this.ctx.storage.sql;
-
   // 1. Mark complete and apply result
-  operations.tokens.updateStatus(sql, tokenId, 'completed');
-  const token = operations.tokens.get(sql, tokenId);
-  operations.context.applyNodeOutput(sql, token.node_id, result.output_data, tokenId);
+  this.tokens.updateStatus(tokenId, 'completed');
+  const token = this.tokens.get(tokenId);
+  this.context.applyNodeOutput(token.node_id, result.output_data, tokenId);
 
-  // 2. Load workflow and context (cached)
-  const workflow = await this.getWorkflow(token.workflow_run_id);
-  const contextData = operations.context.getSnapshot(sql);
+  // 2. Load workflow and context (cached in metadata manager)
+  const workflowDef = await this.metadata.getWorkflowDef();
+  const contextData = this.context.getSnapshot();
 
   // 3. Run decision logic (pure - returns data)
-  const routingDecisions = planning.routing.decide(token, workflow, contextData);
+  const routingDecisions = planning.routing.decide(token, workflowDef, contextData);
 
   // 4. Dispatch decisions (converts to operations, handles synchronization recursively)
   const tokensToDispatch = await dispatch.applyDecisions(
     routingDecisions,
-    sql,
+    this.sql,
     this.env,
     this.logger,
   );
@@ -374,13 +396,10 @@ async handleTaskResult(tokenId: string, result: TaskResult) {
   await Promise.all(tokensToDispatch.map(id => this.dispatchToken(id)));
 
   // 6. Check completion
-  const activeCount = operations.tokens.getActiveCount(sql, token.workflow_run_id);
+  const activeCount = this.tokens.getActiveCount(token.workflow_run_id);
   if (activeCount === 0) {
-    const markedComplete = operations.tokens.markWorkflowComplete(sql, token.workflow_run_id);
-    if (markedComplete) {
-      const finalOutput = decisions.completion.extractFinalOutput(workflow, contextData);
-      await this.finalizeWorkflow(token.workflow_run_id, finalOutput);
-    }
+    const finalOutput = planning.completion.extractFinalOutput(workflowDef, contextData);
+    await this.finalizeWorkflow(token.workflow_run_id, finalOutput);
   }
 }
 ```
@@ -389,7 +408,7 @@ async handleTaskResult(tokenId: string, result: TaskResult) {
 
 ```typescript
 private async dispatchToken(tokenId: string) {
-  operations.tokens.updateStatus(this.sql, tokenId, 'executing');
+  this.tokens.updateStatus(tokenId, 'executing');
 
   const payload = await buildExecutorPayload(this.sql, this.env, tokenId);
 
@@ -412,9 +431,9 @@ handleTaskResult(tokenId, result)  [Actor message received]
   ├─► operations.context.applyNodeOutput(result.output_data)  [Actor state mutation]
   │
   ├─► Load state (read-only snapshot for decision logic)
-  │   ├─► token = operations.tokens.get(tokenId)
-  │   ├─► workflow = await getWorkflow(cached)
-  │   └─► contextData = operations.context.getSnapshot()
+  │   ├─► token = this.tokens.get(tokenId)
+  │   ├─► workflowDef = await this.metadata.getWorkflowDef()  [cached]
+  │   └─► contextData = this.context.getSnapshot()
   │
   ├─► Decision logic (pure, returns Decision[] data)
   │   └─► decisions = planning.routing.decide(token, workflow, contextData)
@@ -488,15 +507,24 @@ Single SQL transaction instead of three separate operations.
 
 This keeps synchronization logic isolated, testable, and independent of actor mechanics.
 
-### Actor-Level Caching
+### Metadata Caching
 
-Workflow definitions cached in coordinator actor instance:
+MetadataManager provides multi-level caching:
 
 ```typescript
-private workflowCache: Map<string, WorkflowDef> = new Map();
+class MetadataManager {
+  // Memory cache (fastest)
+  private cachedRun: WorkflowRun | null = null;
+  private cachedDef: WorkflowDef | null = null;
+
+  // SQL cache (durable, persists across DO wake-ups)
+  // Stored in metadata table
+
+  // RESOURCES RPC (slowest, only on cache miss)
+}
 ```
 
-Loaded once per workflow_run_id, reused for all token completions. Invalidated on actor restart (acceptable - cold start penalty only).
+**Cache flow:** Memory → SQL → RESOURCES. Both `WorkflowRun` and `WorkflowDef` loaded together on first access, cached at all three levels. Memory cache invalidated on DO eviction (cold start penalty), but SQL cache persists.
 
 ## Testing Strategy
 
