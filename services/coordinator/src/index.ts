@@ -34,7 +34,7 @@ export class WorkflowCoordinator extends DurableObject {
     });
 
     // Initialize DefinitionManager first
-    this.defs = new DefinitionManager(ctx, ctx.storage.sql, this.env);
+    this.defs = new DefinitionManager(ctx, this.env);
 
     // Initialize emitter with DefinitionManager
     this.emitter = new CoordinatorEmitter(
@@ -86,7 +86,7 @@ export class WorkflowCoordinator extends DurableObject {
       // Create initial token
       const tokenId = this.tokens.create({
         workflow_run_id: workflowRun.id,
-        node_id: workflowDef.initial_node_id,
+        node_id: workflowDef.initial_node_id!,
         parent_token_id: null,
         path_id: 'root',
         fan_out_transition_id: null,

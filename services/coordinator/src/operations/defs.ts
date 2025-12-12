@@ -1,87 +1,103 @@
 /**
  * Definition Operations
  *
- * DefinitionManager handles workflow definitions (WorkflowRun and WorkflowDef)
- * with multi-level caching (memory → SQL → RESOURCES RPC).
- *
- * Used by ContextManager, CoordinatorEmitter, and start() to access definitions.
- * All definition access goes through this manager - single source of truth.
+ * DefinitionManager handles workflow definitions with drizzle-orm.
+ * On initialize(), copies definitions from RESOURCES into DO SQLite.
+ * Provides type-safe accessors for routing decisions.
  */
 
-import type { JSONSchema } from '@wonder/context';
 import { createLogger, type Logger } from '@wonder/logs';
-import type { WorkflowDef, WorkflowRun } from '../types.js';
+import { and, eq } from 'drizzle-orm';
+import { drizzle, type DrizzleSqliteDODatabase } from 'drizzle-orm/durable-sqlite';
+import { migrate } from 'drizzle-orm/durable-sqlite/migrator';
+
+import migrations from '../migrations/migrations';
+import * as schema from '../schemas';
+import { nodes, transitions, workflow_defs, workflow_runs } from '../schemas.js';
+
+// Types inferred from schema
+export type WorkflowRunRow = typeof workflow_runs.$inferSelect;
+export type WorkflowDefRow = typeof workflow_defs.$inferSelect;
+export type NodeRow = typeof nodes.$inferSelect;
+export type TransitionRow = typeof transitions.$inferSelect;
 
 /**
- * DefinitionManager provides cached access to workflow definitions
+ * DefinitionManager provides access to workflow definitions stored in DO SQLite.
  *
- * Caching strategy:
- * 1. Memory cache (fastest) - cleared on DO eviction
- * 2. SQL cache (durable) - persists across DO wake-ups
- * 3. RESOURCES RPC (slowest) - only on first access
+ * On first initialize():
+ * 1. Runs migrations (creates tables)
+ * 2. Checks if already populated (DO wake-up case)
+ * 3. If not, fetches from RESOURCES and inserts all tables
  */
 export class DefinitionManager {
-  private readonly sql: SqlStorage;
+  private readonly db: DrizzleSqliteDODatabase<typeof schema>;
   private readonly env: Env;
   private readonly logger: Logger;
-
-  // Memory cache
-  private cachedRun: WorkflowRun | null = null;
-  private cachedDef: WorkflowDef | null = null;
   private workflow_run_id: string | null = null;
+  private initialized = false;
 
-  constructor(ctx: DurableObjectState, sql: SqlStorage, env: Env) {
-    this.sql = sql;
+  constructor(ctx: DurableObjectState, env: Env) {
+    this.db = drizzle(ctx.storage, { schema });
     this.env = env;
     this.logger = createLogger(ctx, env.LOGS, {
       service: 'coordinator',
       environment: 'development',
     });
-
-    // Ensure metadata table exists
-    this.initializeTable();
   }
 
   /**
-   * Initialize metadata table in DO SQL
-   */
-  private initializeTable(): void {
-    try {
-      this.sql.exec(`
-        CREATE TABLE IF NOT EXISTS metadata (
-          key TEXT PRIMARY KEY,
-          value TEXT NOT NULL
-        )
-      `);
-    } catch (error) {
-      this.logger.error({
-        event_type: 'metadata_table_init_failed',
-        message: 'Failed to create metadata table',
-        metadata: {
-          error: error instanceof Error ? error.message : String(error),
-          stack: error instanceof Error ? error.stack : undefined,
-        },
-      });
-      throw error;
-    }
-  }
-
-  /**
-   * Initialize metadata manager with workflow_run_id
+   * Initialize definitions for a workflow run.
    *
-   * Must be called before getWorkflowRun() or getWorkflowDef().
-   * Triggers load/fetch of metadata on first call.
+   * - Runs migrations (idempotent)
+   * - Checks if already populated (DO wake-up)
+   * - If not, fetches from RESOURCES and inserts
    */
   async initialize(workflow_run_id: string): Promise<void> {
     try {
       this.workflow_run_id = workflow_run_id;
-      // Trigger metadata load (will cache for subsequent calls)
-      await this.getWorkflowRun();
-      await this.getWorkflowDef();
+
+      // Run migrations (idempotent - creates tables if not exist)
+      migrate(this.db, migrations);
+      this.logger.info({
+        event_type: 'defs_migrations_complete',
+        message: 'DO SQLite migrations applied',
+        trace_id: workflow_run_id,
+      });
+
+      // Check if already populated (DO wake-up case)
+      const existing = this.db.select({ id: workflow_runs.id }).from(workflow_runs).limit(1).all();
+      if (existing.length > 0) {
+        this.logger.info({
+          event_type: 'defs_already_populated',
+          message: 'DO SQLite already populated (wake-up)',
+          trace_id: workflow_run_id,
+        });
+        this.initialized = true;
+        return;
+      }
+
+      // Fetch from RESOURCES and insert
+      await this.fetchAndInsert(workflow_run_id);
+
+      // Log table counts
+      const nodeCount = this.db.select({ id: nodes.id }).from(nodes).all().length;
+      const transitionCount = this.db.select({ id: transitions.id }).from(transitions).all().length;
+      this.logger.info({
+        event_type: 'defs_populated',
+        message: 'DO SQLite populated from RESOURCES',
+        trace_id: workflow_run_id,
+        metadata: {
+          workflow_run_id,
+          node_count: nodeCount,
+          transition_count: transitionCount,
+        },
+      });
+
+      this.initialized = true;
     } catch (error) {
       this.logger.error({
-        event_type: 'metadata_initialize_failed',
-        message: 'Failed to initialize metadata manager',
+        event_type: 'defs_initialize_failed',
+        message: 'Failed to initialize DefinitionManager',
         trace_id: workflow_run_id,
         metadata: {
           workflow_run_id,
@@ -94,224 +110,235 @@ export class DefinitionManager {
   }
 
   /**
-   * Get WorkflowRun with multi-level caching
-   *
-   * Checks memory → SQL → RESOURCES, caching at each level.
-   * Must be called after initialize().
+   * Fetch definitions from RESOURCES service and insert into DO SQLite.
    */
-  async getWorkflowRun(): Promise<WorkflowRun> {
-    try {
-      if (!this.workflow_run_id) {
-        throw new Error('DefinitionManager not initialized - call initialize() first');
-      }
+  private async fetchAndInsert(workflowRunId: string): Promise<void> {
+    // 1. Fetch workflow run
+    using workflowRunsResource = this.env.RESOURCES.workflowRuns();
+    const runResponse = await workflowRunsResource.get(workflowRunId);
+    const run = runResponse.workflow_run;
 
-      // Check memory cache
-      if (this.cachedRun) {
-        return this.cachedRun;
-      }
+    // 2. Fetch workflow def with nodes and transitions
+    using workflowDefsResource = this.env.RESOURCES.workflowDefs();
+    const defResponse = await workflowDefsResource.get(run.workflow_def_id, run.workflow_version);
+    const def = defResponse.workflow_def;
+    const nodesList = defResponse.nodes;
+    const transitionsList = defResponse.transitions;
 
-      // Check SQL cache
-      const sqlRun = this.getWorkflowRunFromSql();
-      if (sqlRun) {
-        this.cachedRun = sqlRun;
-        return sqlRun;
-      }
+    // 3. Insert workflow run
+    this.db
+      .insert(workflow_runs)
+      .values({
+        id: run.id,
+        project_id: run.project_id,
+        workflow_id: run.workflow_id,
+        workflow_def_id: run.workflow_def_id,
+        workflow_version: run.workflow_version,
+        status: run.status as 'running' | 'completed' | 'failed' | 'waiting',
+        context: run.context,
+        active_tokens: run.active_tokens,
+        durable_object_id: run.durable_object_id,
+        latest_snapshot: run.latest_snapshot,
+        parent_run_id: run.parent_run_id,
+        parent_node_id: run.parent_node_id,
+        created_at: run.created_at,
+        updated_at: run.updated_at,
+        completed_at: run.completed_at,
+      })
+      .run();
 
-      // Fetch from RESOURCES
-      const metadata = await this.fetchFromResources(this.workflow_run_id);
-      this.cachedRun = metadata.workflowRun;
-      this.cachedDef = metadata.workflowDef;
-      this.saveToSql(metadata.workflowRun, metadata.workflowDef);
+    // 4. Insert workflow def
+    this.db
+      .insert(workflow_defs)
+      .values({
+        id: def.id,
+        version: def.version,
+        name: def.name,
+        description: def.description,
+        project_id: def.project_id,
+        library_id: def.library_id,
+        tags: def.tags,
+        input_schema: def.input_schema,
+        output_schema: def.output_schema,
+        output_mapping: def.output_mapping,
+        context_schema: def.context_schema,
+        initial_node_id: def.initial_node_id,
+        created_at: def.created_at,
+        updated_at: def.updated_at,
+      })
+      .run();
 
-      return this.cachedRun;
-    } catch (error) {
-      this.logger.error({
-        event_type: 'metadata_get_workflow_run_failed',
-        message: 'Failed to get WorkflowRun',
-        trace_id: this.workflow_run_id || 'unknown',
-        metadata: {
-          workflow_run_id: this.workflow_run_id,
-          error: error instanceof Error ? error.message : String(error),
-          stack: error instanceof Error ? error.stack : undefined,
-        },
-      });
-      throw error;
+    // 5. Insert nodes
+    for (const node of nodesList) {
+      this.db
+        .insert(nodes)
+        .values({
+          id: node.id,
+          ref: node.ref,
+          workflow_def_id: node.workflow_def_id,
+          workflow_def_version: node.workflow_def_version,
+          name: node.name,
+          action_id: node.action_id,
+          action_version: node.action_version,
+          input_mapping: node.input_mapping,
+          output_mapping: node.output_mapping,
+        })
+        .run();
+    }
+
+    // 6. Insert transitions
+    for (const transition of transitionsList) {
+      this.db
+        .insert(transitions)
+        .values({
+          id: transition.id,
+          ref: transition.ref,
+          workflow_def_id: transition.workflow_def_id,
+          workflow_def_version: transition.workflow_def_version,
+          from_node_id: transition.from_node_id,
+          to_node_id: transition.to_node_id,
+          priority: transition.priority,
+          condition: transition.condition,
+          spawn_count: transition.spawn_count,
+          foreach: transition.foreach,
+          synchronization: transition.synchronization,
+          loop_config: transition.loop_config,
+        })
+        .run();
+    }
+  }
+
+  // ===========================================================================
+  // ACCESSORS
+  // ===========================================================================
+
+  private ensureInitialized(): void {
+    if (!this.initialized) {
+      throw new Error('DefinitionManager not initialized - call initialize() first');
     }
   }
 
   /**
-   * Get WorkflowDef with multi-level caching
-   *
-   * Checks memory → SQL. Must be called after initialize().
+   * Get the workflow run
    */
-  async getWorkflowDef(): Promise<WorkflowDef> {
-    try {
-      // Check memory cache
-      if (this.cachedDef) {
-        return this.cachedDef;
-      }
-
-      // Check SQL cache
-      const sqlDef = this.getWorkflowDefFromSql();
-      if (sqlDef) {
-        this.cachedDef = sqlDef;
-        return sqlDef;
-      }
-
-      // Should not reach here - getWorkflowRun() should have loaded both
-      throw new Error('WorkflowDef not found - getWorkflowRun() must be called first');
-    } catch (error) {
-      this.logger.error({
-        event_type: 'metadata_get_workflow_def_failed',
-        message: 'Failed to get WorkflowDef',
-        trace_id: this.workflow_run_id || 'unknown',
-        metadata: {
-          workflow_run_id: this.workflow_run_id,
-          error: error instanceof Error ? error.message : String(error),
-          stack: error instanceof Error ? error.stack : undefined,
-        },
-      });
-      throw error;
+  getWorkflowRun(): WorkflowRunRow {
+    this.ensureInitialized();
+    const result = this.db.select().from(workflow_runs).limit(1).all();
+    if (result.length === 0) {
+      throw new Error('WorkflowRun not found');
     }
+    return result[0];
   }
 
   /**
-   * Get WorkflowRun from SQL cache
+   * Get the workflow definition
    */
-  private getWorkflowRunFromSql(): WorkflowRun | null {
-    try {
-      const result = this.sql.exec('SELECT value FROM metadata WHERE key = ?', 'workflow_run');
-      const rows = [...result];
-
-      if (rows.length === 0) {
-        return null;
-      }
-
-      const row = rows[0] as { value: string };
-      return JSON.parse(row.value) as WorkflowRun;
-    } catch (error) {
-      this.logger.error({
-        event_type: 'metadata_sql_read_failed',
-        message: 'Failed to read WorkflowRun from SQL cache',
-        trace_id: this.workflow_run_id || 'unknown',
-        metadata: {
-          workflow_run_id: this.workflow_run_id,
-          key: 'workflow_run',
-          error: error instanceof Error ? error.message : String(error),
-          stack: error instanceof Error ? error.stack : undefined,
-        },
-      });
-      throw error;
+  getWorkflowDef(): WorkflowDefRow {
+    this.ensureInitialized();
+    const result = this.db.select().from(workflow_defs).limit(1).all();
+    if (result.length === 0) {
+      throw new Error('WorkflowDef not found');
     }
+    return result[0];
   }
 
   /**
-   * Get WorkflowDef from SQL cache
+   * Get a node by ID
    */
-  private getWorkflowDefFromSql(): WorkflowDef | null {
-    try {
-      const result = this.sql.exec('SELECT value FROM metadata WHERE key = ?', 'workflow_def');
-      const rows = [...result];
+  getNode(nodeId: string): NodeRow {
+    this.ensureInitialized();
+    const def = this.getWorkflowDef();
+    const result = this.db
+      .select()
+      .from(nodes)
+      .where(
+        and(
+          eq(nodes.workflow_def_id, def.id),
+          eq(nodes.workflow_def_version, def.version),
+          eq(nodes.id, nodeId),
+        ),
+      )
+      .limit(1)
+      .all();
 
-      if (rows.length === 0) {
-        return null;
-      }
-
-      const row = rows[0] as { value: string };
-      return JSON.parse(row.value) as WorkflowDef;
-    } catch (error) {
-      this.logger.error({
-        event_type: 'metadata_sql_read_failed',
-        message: 'Failed to read WorkflowDef from SQL cache',
-        trace_id: this.workflow_run_id || 'unknown',
-        metadata: {
-          workflow_run_id: this.workflow_run_id,
-          key: 'workflow_def',
-          error: error instanceof Error ? error.message : String(error),
-          stack: error instanceof Error ? error.stack : undefined,
-        },
-      });
-      throw error;
+    if (result.length === 0) {
+      throw new Error(`Node not found: ${nodeId}`);
     }
+    return result[0];
   }
 
   /**
-   * Save metadata to SQL cache
+   * Get all nodes for this workflow
    */
-  private saveToSql(workflowRun: WorkflowRun, workflowDef: WorkflowDef): void {
-    try {
-      this.sql.exec(
-        'INSERT OR REPLACE INTO metadata (key, value) VALUES (?, ?)',
-        'workflow_run',
-        JSON.stringify(workflowRun),
-      );
-
-      this.sql.exec(
-        'INSERT OR REPLACE INTO metadata (key, value) VALUES (?, ?)',
-        'workflow_def',
-        JSON.stringify(workflowDef),
-      );
-    } catch (error) {
-      this.logger.error({
-        event_type: 'metadata_sql_write_failed',
-        message: 'Failed to save metadata to SQL cache',
-        trace_id: this.workflow_run_id || 'unknown',
-        metadata: {
-          workflow_run_id: workflowRun.id,
-          workflow_def_id: workflowDef.id,
-          error: error instanceof Error ? error.message : String(error),
-          stack: error instanceof Error ? error.stack : undefined,
-        },
-      });
-      throw error;
-    }
+  getNodes(): NodeRow[] {
+    this.ensureInitialized();
+    const def = this.getWorkflowDef();
+    return this.db
+      .select()
+      .from(nodes)
+      .where(and(eq(nodes.workflow_def_id, def.id), eq(nodes.workflow_def_version, def.version)))
+      .all();
   }
 
   /**
-   * Fetch metadata from RESOURCES service
+   * Get transitions from a specific node (for routing)
    */
-  private async fetchFromResources(
-    workflowRunId: string,
-  ): Promise<{ workflowRun: WorkflowRun; workflowDef: WorkflowDef }> {
-    try {
-      // Fetch workflow run
-      using workflowRunsResource = this.env.RESOURCES.workflowRuns();
-      const runResponse = await workflowRunsResource.get(workflowRunId);
-      const workflowRun = runResponse.workflow_run;
+  getTransitionsFrom(nodeId: string): TransitionRow[] {
+    this.ensureInitialized();
+    const def = this.getWorkflowDef();
+    return this.db
+      .select()
+      .from(transitions)
+      .where(
+        and(
+          eq(transitions.workflow_def_id, def.id),
+          eq(transitions.workflow_def_version, def.version),
+          eq(transitions.from_node_id, nodeId),
+        ),
+      )
+      .all();
+  }
 
-      // Fetch workflow definition
-      using workflowDefsResource = this.env.RESOURCES.workflowDefs();
-      const defResponse = await workflowDefsResource.get(workflowRun.workflow_def_id);
-      const rawDef = defResponse.workflow_def;
+  /**
+   * Get all transitions for this workflow
+   */
+  getTransitions(): TransitionRow[] {
+    this.ensureInitialized();
+    const def = this.getWorkflowDef();
+    return this.db
+      .select()
+      .from(transitions)
+      .where(
+        and(
+          eq(transitions.workflow_def_id, def.id),
+          eq(transitions.workflow_def_version, def.version),
+        ),
+      )
+      .all();
+  }
 
-      // Map to coordinator's WorkflowDef type
-      if (!rawDef.initial_node_id) {
-        throw new Error(`WorkflowDef ${rawDef.id} is missing initial_node_id`);
-      }
+  /**
+   * Get a transition by ID
+   */
+  getTransition(transitionId: string): TransitionRow {
+    this.ensureInitialized();
+    const def = this.getWorkflowDef();
+    const result = this.db
+      .select()
+      .from(transitions)
+      .where(
+        and(
+          eq(transitions.workflow_def_id, def.id),
+          eq(transitions.workflow_def_version, def.version),
+          eq(transitions.id, transitionId),
+        ),
+      )
+      .limit(1)
+      .all();
 
-      const workflowDef: WorkflowDef = {
-        id: rawDef.id,
-        version: rawDef.version,
-        initial_node_id: rawDef.initial_node_id,
-        input_schema: rawDef.input_schema as JSONSchema,
-        context_schema: rawDef.context_schema as JSONSchema | undefined,
-        output_schema: rawDef.output_schema as JSONSchema,
-        output_mapping: rawDef.output_mapping as Record<string, string> | undefined,
-      };
-
-      return { workflowRun, workflowDef };
-    } catch (error) {
-      this.logger.error({
-        event_type: 'metadata_fetch_failed',
-        message: 'Failed to fetch metadata from RESOURCES',
-        trace_id: workflowRunId,
-        metadata: {
-          workflow_run_id: workflowRunId,
-          error: error instanceof Error ? error.message : String(error),
-          stack: error instanceof Error ? error.stack : undefined,
-        },
-      });
-      throw error;
+    if (result.length === 0) {
+      throw new Error(`Transition not found: ${transitionId}`);
     }
+    return result[0];
   }
 }

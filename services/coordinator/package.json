@@ -8,6 +8,7 @@
     "deploy": "wrangler deploy",
     "types": "wrangler types -c wrangler.jsonc -c ../executor/wrangler.jsonc -c ../resources/wrangler.jsonc -c ../logs/wrangler.jsonc -c ../events/wrangler.jsonc",
     "typecheck": "tsc --noEmit",
+    "db:generate": "drizzle-kit generate",
     "test": "vitest"
   },
   "dependencies": {
@@ -21,6 +22,7 @@
   },
   "devDependencies": {
     "@cloudflare/vitest-pool-workers": "^0.10.11",
+    "drizzle-kit": "^0.31.7",
     "typescript": "^5.9.3",
     "wrangler": "^4.51.0"
   }

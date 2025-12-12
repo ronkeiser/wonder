@@ -78,11 +78,11 @@ export class ContextManager {
       return;
     }
 
-    const workflowDef = await this.defs.getWorkflowDef();
+    const workflowDef = this.defs.getWorkflowDef();
 
-    this.inputSchema = workflowDef.input_schema;
-    this.contextSchema = workflowDef.context_schema ?? null;
-    this.outputSchema = workflowDef.output_schema;
+    this.inputSchema = workflowDef.input_schema as JSONSchema;
+    this.contextSchema = (workflowDef.context_schema as JSONSchema) ?? null;
+    this.outputSchema = workflowDef.output_schema as JSONSchema;
   }
 
   /**

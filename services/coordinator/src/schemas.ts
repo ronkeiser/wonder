@@ -1,16 +1,28 @@
 /**
- * Coordinator Internal Schemas
+ * Coordinator DO SQLite Schemas
  *
- * These schemas are internal to the coordinator DO and are NOT exported.
- * They define execution state that lives only in DO SQLite.
+ * Two categories:
+ * 1. Definition tables - imported from @wonder/resources/schemas
+ * 2. Execution tables - internal coordinator state (tokens, fan_ins)
+ *
+ * Note: Migration SQL is manually edited to remove FK constraints since
+ * the DO's isolated SQLite doesn't have the referenced tables (projects, workflows).
  */
 
 import { index, integer, sqliteTable, text } from 'drizzle-orm/sqlite-core';
 
+// =============================================================================
+// DEFINITION TABLES (imported from Resources service)
+// =============================================================================
+
+export { nodes, transitions, workflow_defs, workflow_runs } from '@wonder/resources/schemas';
+
+// =============================================================================
+// EXECUTION TABLES (internal coordinator state)
+// =============================================================================
+
 /**
  * Token Status
- *
- * pending → dispatched → executing → completed/failed/timed_out/cancelled
  */
 export type TokenStatus =
   | 'pending'
@@ -24,64 +36,56 @@ export type TokenStatus =
 
 /**
  * Tokens track execution position within a workflow run.
- *
- * Fan-out creates multiple tokens (siblings sharing fan_out_transition_id).
- * Fan-in merges tokens back together.
  */
 export const tokens = sqliteTable(
   'tokens',
   {
     id: text('id').primaryKey(),
-    workflowRunId: text('workflow_run_id').notNull(),
-    nodeId: text('node_id').notNull(),
+    workflow_run_id: text('workflow_run_id').notNull(),
+    node_id: text('node_id').notNull(),
     status: text('status').$type<TokenStatus>().notNull(),
 
     // Lineage tracking
-    parentTokenId: text('parent_token_id'),
-    pathId: text('path_id').notNull(),
-    fanOutTransitionId: text('fan_out_transition_id'),
+    parent_token_id: text('parent_token_id'),
+    path_id: text('path_id').notNull(),
+    fan_out_transition_id: text('fan_out_transition_id'),
 
     // Branch position (for fan-out siblings)
-    branchIndex: integer('branch_index').notNull(),
-    branchTotal: integer('branch_total').notNull(),
+    branch_index: integer('branch_index').notNull(),
+    branch_total: integer('branch_total').notNull(),
 
     // Timestamps
-    createdAt: integer('created_at', { mode: 'timestamp_ms' }).notNull(),
-    updatedAt: integer('updated_at', { mode: 'timestamp_ms' }).notNull(),
-    arrivedAt: integer('arrived_at', { mode: 'timestamp_ms' }), // For synchronization timeout tracking
+    created_at: integer('created_at', { mode: 'timestamp_ms' }).notNull(),
+    updated_at: integer('updated_at', { mode: 'timestamp_ms' }).notNull(),
+    arrived_at: integer('arrived_at', { mode: 'timestamp_ms' }),
   },
   (table) => [
-    index('idx_tokens_workflow_run').on(table.workflowRunId),
+    index('idx_tokens_workflow_run').on(table.workflow_run_id),
     index('idx_tokens_status').on(table.status),
-    index('idx_tokens_fan_out').on(table.fanOutTransitionId),
-    index('idx_tokens_path').on(table.pathId),
+    index('idx_tokens_fan_out').on(table.fan_out_transition_id),
+    index('idx_tokens_path').on(table.path_id),
   ],
 );
 
 /**
  * Fan-in tracking for synchronization.
- *
- * Created when first sibling arrives at a synchronization point.
- * Activated when synchronization condition is met.
  */
-export const fanIns = sqliteTable(
+export const fan_ins = sqliteTable(
   'fan_ins',
   {
     id: text('id').primaryKey(),
-    workflowRunId: text('workflow_run_id').notNull(),
-    nodeId: text('node_id').notNull(),
-    fanInPath: text('fan_in_path').notNull(), // Stable path for this fan-in point
+    workflow_run_id: text('workflow_run_id').notNull(),
+    node_id: text('node_id').notNull(),
+    fan_in_path: text('fan_in_path').notNull(),
     status: text('status').$type<'waiting' | 'activated' | 'timed_out'>().notNull(),
 
-    // The transition that defines synchronization behavior
-    transitionId: text('transition_id').notNull(),
+    transition_id: text('transition_id').notNull(),
 
-    // Tracking
-    firstArrivalAt: integer('first_arrival_at', { mode: 'timestamp_ms' }).notNull(),
-    activatedAt: integer('activated_at', { mode: 'timestamp_ms' }),
+    first_arrival_at: integer('first_arrival_at', { mode: 'timestamp_ms' }).notNull(),
+    activated_at: integer('activated_at', { mode: 'timestamp_ms' }),
   },
   (table) => [
-    index('idx_fan_ins_workflow_run').on(table.workflowRunId),
-    index('idx_fan_ins_path').on(table.fanInPath),
+    index('idx_fan_ins_workflow_run').on(table.workflow_run_id),
+    index('idx_fan_ins_path').on(table.fan_in_path),
   ],
 );

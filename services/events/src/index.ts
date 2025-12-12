@@ -75,6 +75,7 @@ export class EventsService extends WorkerEntrypoint<Env> {
             id: ulid(),
             timestamp: Date.now(),
             ...context,
+            workspace_id: '',
             ...input,
             sequence: input.sequence ?? 0,
             metadata: JSON.stringify(input.metadata || {}),
@@ -137,6 +138,7 @@ export class EventsService extends WorkerEntrypoint<Env> {
             id: ulid(),
             timestamp: Date.now(),
             ...context,
+            workspace_id: '',
             ...event,
             category: getEventCategory(event.type),
             token_id: event.token_id ?? null,
@@ -169,6 +171,7 @@ export class EventsService extends WorkerEntrypoint<Env> {
           // Stringify payloads for database insertion
           const batchWithStringPayloads = batch.map((entry) => ({
             ...entry,
+            workspace_id: '',
             payload: JSON.stringify(entry.payload),
           }));
 

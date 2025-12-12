@@ -172,7 +172,6 @@ export class Streamer extends DurableObject {
   private matchesEventFilter(event: BroadcastEventEntry, filter: SubscriptionFilter): boolean {
     if (filter.workflow_run_id && event.workflow_run_id !== filter.workflow_run_id) return false;
     if (filter.parent_run_id && event.parent_run_id !== filter.parent_run_id) return false;
-    if (filter.workspace_id && event.workspace_id !== filter.workspace_id) return false;
     if (filter.project_id && event.project_id !== filter.project_id) return false;
     if (filter.node_id && event.node_id !== filter.node_id) return false;
     if (filter.token_id && event.token_id !== filter.token_id) return false;
@@ -188,7 +187,6 @@ export class Streamer extends DurableObject {
    */
   private matchesTraceFilter(event: BroadcastTraceEventEntry, filter: SubscriptionFilter): boolean {
     if (filter.workflow_run_id && event.workflow_run_id !== filter.workflow_run_id) return false;
-    if (filter.workspace_id && event.workspace_id !== filter.workspace_id) return false;
     if (filter.project_id && event.project_id !== filter.project_id) return false;
     if (filter.token_id && event.token_id !== filter.token_id) return false;
     if (filter.node_id && event.node_id !== filter.node_id) return false;

@@ -37,13 +37,12 @@ export class CoordinatorEmitter implements Emitter {
 
     try {
       // Get workflow run (initialize() must have been called first)
-      const workflowRun = await this.defs.getWorkflowRun();
+      const workflowRun = this.defs.getWorkflowRun();
 
       this.cachedEmitter = createEmitter(
         this.eventsService,
         {
           workflow_run_id: workflowRun.id,
-          workspace_id: workflowRun.workspace_id,
           project_id: workflowRun.project_id,
           workflow_def_id: workflowRun.workflow_def_id,
           parent_run_id: workflowRun.parent_run_id,
