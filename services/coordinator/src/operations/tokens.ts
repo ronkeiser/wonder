@@ -1,60 +1,47 @@
 /**
  * Token Operations
  *
- * Direct SQL operations for token state management.
+ * Drizzle-based operations for token state management.
  */
 
 import type { Emitter } from '@wonder/events';
+import { and, count, eq, inArray } from 'drizzle-orm';
+import { drizzle, type DrizzleSqliteDODatabase } from 'drizzle-orm/durable-sqlite';
 import { ulid } from 'ulid';
-import type { CreateTokenParams, TokenRow, TokenStatus } from '../types.js';
+
+import * as schema from '../schemas';
+import { tokens, type TokenStatus } from '../schemas.js';
 import type { DefinitionManager } from './defs.js';
+
+/** Token row type inferred from schema */
+export type TokenRow = typeof tokens.$inferSelect;
+
+/** Parameters for creating a new token */
+export type CreateTokenParams = {
+  workflow_run_id: string;
+  node_id: string;
+  parent_token_id: string | null;
+  path_id: string;
+  fan_out_transition_id: string | null;
+  branch_index: number;
+  branch_total: number;
+};
 
 /**
  * TokenManager manages token state for a workflow execution.
  *
- * Encapsulates SQL operations for token lifecycle management including
+ * Uses drizzle-orm for type-safe token lifecycle management including
  * creation, status updates, and queries.
  */
 export class TokenManager {
-  private readonly sql: SqlStorage;
+  private readonly db: DrizzleSqliteDODatabase<typeof schema>;
   private readonly defs: DefinitionManager;
   private readonly emitter: Emitter;
 
-  constructor(sql: SqlStorage, defs: DefinitionManager, emitter: Emitter) {
-    this.sql = sql;
+  constructor(ctx: DurableObjectState, defs: DefinitionManager, emitter: Emitter) {
+    this.db = drizzle(ctx.storage, { schema });
     this.defs = defs;
     this.emitter = emitter;
-  }
-
-  /**
-   * Initialize tokens table
-   */
-  initialize(): void {
-    this.sql.exec(`
-      CREATE TABLE IF NOT EXISTS tokens (
-        id TEXT PRIMARY KEY,
-        workflow_run_id TEXT NOT NULL,
-        node_id TEXT NOT NULL,
-        status TEXT NOT NULL,
-        parent_token_id TEXT,
-        path_id TEXT NOT NULL,
-        fan_out_transition_id TEXT,
-        branch_index INTEGER NOT NULL,
-        branch_total INTEGER NOT NULL,
-        created_at INTEGER NOT NULL,
-        updated_at INTEGER NOT NULL
-      );
-    `);
-
-    this.sql.exec(`
-      CREATE INDEX IF NOT EXISTS idx_tokens_workflow_run 
-      ON tokens(workflow_run_id);
-    `);
-
-    this.sql.exec(`
-      CREATE INDEX IF NOT EXISTS idx_tokens_status 
-      ON tokens(status);
-    `);
   }
 
   /**
@@ -62,34 +49,30 @@ export class TokenManager {
    */
   create(params: CreateTokenParams): string {
     const tokenId = ulid();
-    const now = Date.now();
+    const now = new Date();
 
-    this.sql.exec(
-      `
-      INSERT INTO tokens (
-        id, workflow_run_id, node_id, status,
-        parent_token_id, path_id, fan_out_transition_id,
-        branch_index, branch_total, created_at, updated_at
-      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?);
-    `,
-      tokenId,
-      params.workflow_run_id,
-      params.node_id,
-      'pending',
-      params.parent_token_id,
-      params.path_id,
-      params.fan_out_transition_id,
-      params.branch_index,
-      params.branch_total,
-      now,
-      now,
-    );
+    this.db
+      .insert(tokens)
+      .values({
+        id: tokenId,
+        workflow_run_id: params.workflow_run_id,
+        node_id: params.node_id,
+        status: 'pending',
+        parent_token_id: params.parent_token_id,
+        path_id: params.path_id,
+        fan_out_transition_id: params.fan_out_transition_id,
+        branch_index: params.branch_index,
+        branch_total: params.branch_total,
+        created_at: now,
+        updated_at: now,
+      })
+      .run();
 
     this.emitter.emitTrace({
       type: 'operation.tokens.create',
       token_id: tokenId,
       node_id: params.node_id,
-      task_id: params.node_id, // Task ID is currently the same as node ID
+      task_id: params.node_id,
       parent_token_id: params.parent_token_id,
     });
 
@@ -100,19 +83,13 @@ export class TokenManager {
    * Get token by ID
    */
   get(tokenId: string): TokenRow {
-    const result = this.sql.exec<TokenRow>(
-      `
-      SELECT * FROM tokens WHERE id = ?;
-    `,
-      tokenId,
-    );
+    const result = this.db.select().from(tokens).where(eq(tokens.id, tokenId)).limit(1).all();
 
-    const rows = [...result];
-    if (rows.length === 0) {
+    if (result.length === 0) {
       throw new Error(`Token not found: ${tokenId}`);
     }
 
-    return rows[0];
+    return result[0];
   }
 
   /**
@@ -121,16 +98,14 @@ export class TokenManager {
   updateStatus(tokenId: string, status: TokenStatus): void {
     const token = this.get(tokenId);
 
-    this.sql.exec(
-      `
-      UPDATE tokens 
-      SET status = ?, updated_at = ? 
-      WHERE id = ?;
-    `,
-      status,
-      Date.now(),
-      tokenId,
-    );
+    this.db
+      .update(tokens)
+      .set({
+        status,
+        updated_at: new Date(),
+      })
+      .where(eq(tokens.id, tokenId))
+      .run();
 
     this.emitter.emitTrace({
       type: 'operation.tokens.update_status',
@@ -144,17 +119,17 @@ export class TokenManager {
    * Count active tokens for a workflow run
    */
   getActiveCount(workflowRunId: string): number {
-    const result = this.sql.exec<{ count: number }>(
-      `
-      SELECT COUNT(*) as count 
-      FROM tokens 
-      WHERE workflow_run_id = ? 
-      AND status IN ('pending', 'dispatched', 'executing');
-    `,
-      workflowRunId,
-    );
+    const result = this.db
+      .select({ count: count() })
+      .from(tokens)
+      .where(
+        and(
+          eq(tokens.workflow_run_id, workflowRunId),
+          inArray(tokens.status, ['pending', 'dispatched', 'executing']),
+        ),
+      )
+      .all();
 
-    const rows = [...result];
-    return rows[0]?.count ?? 0;
+    return result[0]?.count ?? 0;
   }
 }

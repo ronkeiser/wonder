@@ -44,7 +44,7 @@ export class WorkflowCoordinator extends DurableObject {
     );
 
     this.context = new ContextManager(ctx.storage.sql, this.defs, this.emitter);
-    this.tokens = new TokenManager(ctx.storage.sql, this.defs, this.emitter);
+    this.tokens = new TokenManager(ctx, this.defs, this.emitter);
   }
 
   /**
@@ -75,9 +75,6 @@ export class WorkflowCoordinator extends DurableObject {
         message: 'Workflow started',
         metadata: { input },
       });
-
-      // Initialize storage tables
-      this.tokens.initialize();
 
       // Initialize context tables and store input
       await this.context.initialize(input);
