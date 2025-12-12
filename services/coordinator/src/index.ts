@@ -23,7 +23,7 @@ export class WorkflowCoordinator extends DurableObject {
   private metadata: MetadataManager;
   private emitter: Emitter;
   private logger: Logger;
-  private contextManager: ContextManager;
+  private context: ContextManager;
 
   constructor(ctx: DurableObjectState, env: Env) {
     super(ctx, env);
@@ -43,7 +43,7 @@ export class WorkflowCoordinator extends DurableObject {
       this.env.TRACE_EVENTS_ENABLED === 'true',
     );
 
-    this.contextManager = new ContextManager(ctx.storage.sql, this.metadata, this.emitter);
+    this.context = new ContextManager(ctx.storage.sql, this.metadata, this.emitter);
   }
 
   /**
@@ -71,8 +71,8 @@ export class WorkflowCoordinator extends DurableObject {
       tokenOps.initializeTable(sql);
 
       // Initialize context tables and store input
-      await this.contextManager.initialize();
-      await this.contextManager.initializeWithInput(input);
+      await this.context.initialize();
+      await this.context.initializeWithInput(input);
 
       // Create initial token
       const tokenId = tokenOps.create(
@@ -189,7 +189,7 @@ export class WorkflowCoordinator extends DurableObject {
       });
 
       // Get context snapshot
-      const context = this.contextManager.getSnapshot();
+      const context = this.context.getSnapshot();
 
       // Extract output (simplified for Chunk 2 - just use current output or input)
       // Future chunks: apply output_mapping from workflow def
@@ -197,7 +197,7 @@ export class WorkflowCoordinator extends DurableObject {
 
       // Write final output to context
       if (Object.keys(finalOutput).length > 0) {
-        this.contextManager.set('output', finalOutput);
+        this.context.set('output', finalOutput);
       }
 
       this.emitter.emitTrace({
