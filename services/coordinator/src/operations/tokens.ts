@@ -71,6 +71,7 @@ export function create(sql: SqlStorage, params: CreateTokenParams, emitter: Emit
     type: 'operation.tokens.create',
     token_id: tokenId,
     node_id: params.node_id,
+    task_id: params.node_id, // Task ID is currently the same as node ID
     parent_token_id: params.parent_token_id,
   });
 

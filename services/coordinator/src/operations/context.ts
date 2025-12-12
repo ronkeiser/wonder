@@ -35,7 +35,7 @@ import type { JSONSchema } from '@wonder/context';
 import { CustomTypeRegistry, DDLGenerator, DMLGenerator, Validator } from '@wonder/context';
 import type { Emitter } from '@wonder/events';
 import type { ContextSnapshot } from '../types.js';
-import { getWorkflowDef } from './initialize.js';
+import type { MetadataManager } from './metadata.js';
 
 /**
  * ContextManager manages runtime state for a workflow execution.
@@ -45,6 +45,7 @@ import { getWorkflowDef } from './initialize.js';
  */
 export class ContextManager {
   private readonly sql: SqlStorage;
+  private readonly metadata: MetadataManager;
   private readonly emitter: Emitter;
   private readonly customTypes: CustomTypeRegistry;
 
@@ -58,8 +59,9 @@ export class ContextManager {
   private inputDMLGenerator: DMLGenerator | null = null;
   private contextDMLGenerator: DMLGenerator | null = null;
 
-  constructor(sql: SqlStorage, emitter: Emitter) {
+  constructor(sql: SqlStorage, metadata: MetadataManager, emitter: Emitter) {
     this.sql = sql;
+    this.metadata = metadata;
     this.emitter = emitter;
     this.customTypes = new CustomTypeRegistry();
   }
@@ -73,24 +75,10 @@ export class ContextManager {
       return;
     }
 
-    try {
-      // Use shared utility from initialize.ts
-      const workflowDef = await getWorkflowDef(this.sql);
+    const workflowDef = await this.metadata.getWorkflowDef();
 
-      this.inputSchema = workflowDef.input_schema;
-      this.contextSchema = workflowDef.context_schema ?? null;
-
-      console.log('[ContextManager] schemas loaded from metadata', {
-        hasInputSchema: !!this.inputSchema,
-        hasContextSchema: !!this.contextSchema,
-      });
-    } catch (error) {
-      console.error('[ContextManager] FATAL: Failed to load schemas from metadata:', {
-        error: error instanceof Error ? error.message : String(error),
-        stack: error instanceof Error ? error.stack : undefined,
-      });
-      throw error;
-    }
+    this.inputSchema = workflowDef.input_schema;
+    this.contextSchema = workflowDef.context_schema ?? null;
   }
 
   /**

@@ -9,7 +9,7 @@ import { createLogger, type Logger } from '@wonder/logs';
 import { DurableObject } from 'cloudflare:workers';
 import { ContextManager } from './operations/context.js';
 import { CoordinatorEmitter } from './operations/events.js';
-import { initialize } from './operations/initialize.js';
+import { MetadataManager } from './operations/metadata.js';
 import * as tokenOps from './operations/tokens.js';
 import * as workflowOps from './operations/workflows.js';
 import type { TaskResult, WorkflowDef, WorkflowRun } from './types.js';
@@ -20,8 +20,7 @@ import type { TaskResult, WorkflowDef, WorkflowRun } from './types.js';
  * Each instance coordinates a single workflow run.
  */
 export class WorkflowCoordinator extends DurableObject {
-  private workflowRun!: WorkflowRun;
-  private workflowDef!: WorkflowDef;
+  private metadata: MetadataManager;
   private emitter: Emitter;
   private logger: Logger;
   private contextManager: ContextManager;
@@ -29,19 +28,22 @@ export class WorkflowCoordinator extends DurableObject {
   constructor(ctx: DurableObjectState, env: Env) {
     super(ctx, env);
 
-    // Initialize managers that load metadata lazily from SQL
-    this.emitter = new CoordinatorEmitter(
-      ctx.storage.sql,
-      this.env.EVENTS,
-      this.env.TRACE_EVENTS_ENABLED === 'true',
-    );
-
     this.logger = createLogger(this.ctx, this.env.LOGS, {
       service: 'coordinator',
       environment: 'development',
     });
 
-    this.contextManager = new ContextManager(ctx.storage.sql, this.emitter);
+    // Initialize MetadataManager first
+    this.metadata = new MetadataManager(ctx, ctx.storage.sql, this.env);
+
+    // Initialize emitter with MetadataManager
+    this.emitter = new CoordinatorEmitter(
+      this.metadata,
+      this.env.EVENTS,
+      this.env.TRACE_EVENTS_ENABLED === 'true',
+    );
+
+    this.contextManager = new ContextManager(ctx.storage.sql, this.metadata, this.emitter);
   }
 
   /**
@@ -51,10 +53,12 @@ export class WorkflowCoordinator extends DurableObject {
     try {
       const sql = this.ctx.storage.sql;
 
-      // Load or fetch workflow metadata
-      const metadata = await initialize(sql, this.env, workflow_run_id);
-      this.workflowRun = metadata.workflowRun;
-      this.workflowDef = metadata.workflowDef;
+      // Initialize metadata manager (loads/fetches metadata)
+      await this.metadata.initialize(workflow_run_id);
+
+      // Get metadata for token creation
+      const workflowRun = await this.metadata.getWorkflowRun();
+      const workflowDef = await this.metadata.getWorkflowDef();
 
       // Emit workflow started event
       this.emitter.emit({
@@ -74,8 +78,8 @@ export class WorkflowCoordinator extends DurableObject {
       const tokenId = tokenOps.create(
         sql,
         {
-          workflow_run_id: this.workflowRun.id,
-          node_id: this.workflowDef.initial_node_id,
+          workflow_run_id: workflowRun.id,
+          node_id: workflowDef.initial_node_id,
           parent_token_id: null,
           path_id: 'root',
           fan_out_transition_id: null,
@@ -91,7 +95,7 @@ export class WorkflowCoordinator extends DurableObject {
       this.logger.error({
         event_type: 'coordinator_start_failed',
         message: 'Critical error in start()',
-        trace_id: this.workflowRun.id,
+        trace_id: workflow_run_id,
         metadata: {
           error: error instanceof Error ? error.message : String(error),
           stack: error instanceof Error ? error.stack : undefined,
@@ -106,12 +110,14 @@ export class WorkflowCoordinator extends DurableObject {
    * Handle task result from Executor
    */
   async handleTaskResult(tokenId: string, result: TaskResult): Promise<void> {
-    try {
-      const sql = this.ctx.storage.sql;
+    const sql = this.ctx.storage.sql;
+    let workflow_run_id: string | undefined;
 
+    try {
       // Mark token as completed
       tokenOps.updateStatus(sql, tokenId, 'completed', this.emitter);
       const token = tokenOps.get(sql, tokenId);
+      workflow_run_id = token.workflow_run_id;
 
       // Emit node completed event
       this.emitter.emit({
@@ -123,7 +129,7 @@ export class WorkflowCoordinator extends DurableObject {
       });
 
       // Check if workflow is complete (no more active tokens)
-      const activeCount = tokenOps.getActiveCount(sql, token.workflow_run_id);
+      const activeCount = tokenOps.getActiveCount(sql, workflow_run_id);
 
       this.emitter.emitTrace({
         type: 'decision.sync.check_condition',
@@ -133,7 +139,7 @@ export class WorkflowCoordinator extends DurableObject {
       });
 
       if (activeCount === 0) {
-        await this.finalizeWorkflow(token.workflow_run_id);
+        await this.finalizeWorkflow(workflow_run_id);
       }
 
       // For Chunk 1, we don't route to next nodes - single node only
@@ -141,7 +147,7 @@ export class WorkflowCoordinator extends DurableObject {
       this.logger.error({
         event_type: 'coordinator_task_result_failed',
         message: 'Critical error in handleTaskResult()',
-        trace_id: this.workflowRun.id,
+        trace_id: workflow_run_id,
         metadata: {
           error: error instanceof Error ? error.message : String(error),
           stack: error instanceof Error ? error.stack : undefined,
@@ -210,7 +216,7 @@ export class WorkflowCoordinator extends DurableObject {
       this.logger.error({
         event_type: 'coordinator_finalize_failed',
         message: 'Critical error in finalizeWorkflow()',
-        trace_id: this.workflowRun.id,
+        trace_id: workflowRunId,
         metadata: {
           error: error instanceof Error ? error.message : String(error),
           stack: error instanceof Error ? error.stack : undefined,

@@ -243,6 +243,47 @@ export type OperationEvent =
       token_id: string;
       from: string;
       to: string;
+    }
+  | {
+      type: 'operation.metadata.table_init';
+      message: string;
+    }
+  | {
+      type: 'operation.metadata.table_init_error';
+      message: string;
+      error: string;
+    }
+  | {
+      type: 'operation.metadata.cache_hit';
+      resource: 'workflow_run' | 'workflow_def';
+      level: 'memory' | 'sql';
+      workflow_run_id?: string;
+      workflow_def_id?: string;
+    }
+  | {
+      type: 'operation.metadata.cache_miss';
+      resource: 'workflow_run' | 'workflow_def';
+      workflow_run_id: string;
+    }
+  | {
+      type: 'operation.metadata.fetch_start';
+      workflow_run_id: string;
+    }
+  | {
+      type: 'operation.metadata.fetch_success';
+      workflow_run_id: string;
+      workflow_def_id: string;
+      duration_ms: number;
+    }
+  | {
+      type: 'operation.metadata.fetch_error';
+      workflow_run_id: string;
+      error: string;
+    }
+  | {
+      type: 'operation.metadata.save';
+      workflow_run_id: string;
+      workflow_def_id: string;
     };
 
 /**
