@@ -34,56 +34,43 @@ export class PromptSpecs extends Resource {
       updated_at: string;
     };
   }> {
-    this.serviceCtx.logger.info({
-      event_type: 'prompt_spec_create_started',
-      metadata: { name: data.name, version: data.version },
-    });
+    return this.withLogging(
+      'create',
+      { metadata: { name: data.name, version: data.version } },
+      async () => {
+        try {
+          const promptSpec = await repo.createPromptSpec(this.serviceCtx.db, {
+            version: data.version,
+            name: data.name,
+            description: data.description ?? '',
+            system_prompt: data.system_prompt ?? null,
+            template: data.template,
+            template_language: data.template_language ?? 'handlebars',
+            requires: data.requires ?? {},
+            produces: data.produces ?? {},
+            examples: data.examples ?? null,
+            tags: data.tags ?? null,
+          });
 
-    try {
-      const promptSpec = await repo.createPromptSpec(this.serviceCtx.db, {
-        version: data.version,
-        name: data.name,
-        description: data.description ?? '',
-        system_prompt: data.system_prompt ?? null,
-        template: data.template,
-        template_language: data.template_language ?? 'handlebars',
-        requires: data.requires ?? {},
-        produces: data.produces ?? {},
-        examples: data.examples ?? null,
-        tags: data.tags ?? null,
-      });
+          return {
+            prompt_spec_id: promptSpec.id,
+            prompt_spec: promptSpec,
+          };
+        } catch (error) {
+          const dbError = extractDbError(error);
 
-      this.serviceCtx.logger.info({
-        event_type: 'prompt_spec_created',
-        metadata: { prompt_spec_id: promptSpec.id, name: promptSpec.name },
-      });
+          if (dbError.constraint === 'unique') {
+            throw new ConflictError(
+              `PromptSpec with ${dbError.field} already exists`,
+              dbError.field,
+              'unique',
+            );
+          }
 
-      return {
-        prompt_spec_id: promptSpec.id,
-        prompt_spec: promptSpec,
-      };
-    } catch (error) {
-      const dbError = extractDbError(error);
-
-      if (dbError.constraint === 'unique') {
-        this.serviceCtx.logger.warn({
-          event_type: 'prompt_spec_create_conflict',
-          metadata: { name: data.name, field: dbError.field },
-        });
-        throw new ConflictError(
-          `PromptSpec with ${dbError.field} already exists`,
-          dbError.field,
-          'unique',
-        );
-      }
-
-      this.serviceCtx.logger.error({
-        event_type: 'prompt_spec_create_failed',
-        message: dbError.message,
-        metadata: { name: data.name },
-      });
-      throw error;
-    }
+          throw error;
+        }
+      },
+    );
   }
 
   async get(
@@ -106,29 +93,26 @@ export class PromptSpecs extends Resource {
       updated_at: string;
     };
   }> {
-    this.serviceCtx.logger.info({
-      event_type: 'prompt_spec_get',
-      metadata: { prompt_spec_id: id, version },
-    });
+    return this.withLogging(
+      'get',
+      { prompt_spec_id: id, version, metadata: { prompt_spec_id: id, version } },
+      async () => {
+        const promptSpec =
+          version !== undefined
+            ? await repo.getPromptSpecVersion(this.serviceCtx.db, id, version)
+            : await repo.getLatestPromptSpec(this.serviceCtx.db, id);
 
-    const promptSpec =
-      version !== undefined
-        ? await repo.getPromptSpecVersion(this.serviceCtx.db, id, version)
-        : await repo.getLatestPromptSpec(this.serviceCtx.db, id);
+        if (!promptSpec) {
+          throw new NotFoundError(
+            `PromptSpec not found: ${id}${version !== undefined ? ` version ${version}` : ''}`,
+            'prompt_spec',
+            id,
+          );
+        }
 
-    if (!promptSpec) {
-      this.serviceCtx.logger.warn({
-        event_type: 'prompt_spec_not_found',
-        metadata: { prompt_spec_id: id, version },
-      });
-      throw new NotFoundError(
-        `PromptSpec not found: ${id}${version !== undefined ? ` version ${version}` : ''}`,
-        'prompt_spec',
-        id,
-      );
-    }
-
-    return { prompt_spec: promptSpec };
+        return { prompt_spec: promptSpec };
+      },
+    );
   }
 
   async list(params?: { limit?: number }): Promise<{
@@ -148,46 +132,33 @@ export class PromptSpecs extends Resource {
       updated_at: string;
     }>;
   }> {
-    this.serviceCtx.logger.info({
-      event_type: 'prompt_spec_list',
-      metadata: params ?? {},
+    return this.withLogging('list', { metadata: params }, async () => {
+      const promptSpecs = await repo.listPromptSpecs(this.serviceCtx.db, params?.limit);
+      return { prompt_specs: promptSpecs };
     });
-
-    const promptSpecs = await repo.listPromptSpecs(this.serviceCtx.db, params?.limit);
-
-    return { prompt_specs: promptSpecs };
   }
 
   async delete(id: string, version?: number): Promise<{ success: boolean }> {
-    this.serviceCtx.logger.info({
-      event_type: 'prompt_spec_delete_started',
-      metadata: { prompt_spec_id: id, version },
-    });
+    return this.withLogging(
+      'delete',
+      { prompt_spec_id: id, version, metadata: { prompt_spec_id: id, version } },
+      async () => {
+        const promptSpec =
+          version !== undefined
+            ? await repo.getPromptSpecVersion(this.serviceCtx.db, id, version)
+            : await repo.getPromptSpec(this.serviceCtx.db, id);
 
-    // Verify prompt spec exists
-    const promptSpec =
-      version !== undefined
-        ? await repo.getPromptSpecVersion(this.serviceCtx.db, id, version)
-        : await repo.getPromptSpec(this.serviceCtx.db, id);
+        if (!promptSpec) {
+          throw new NotFoundError(
+            `PromptSpec not found: ${id}${version !== undefined ? ` version ${version}` : ''}`,
+            'prompt_spec',
+            id,
+          );
+        }
 
-    if (!promptSpec) {
-      this.serviceCtx.logger.warn({
-        event_type: 'prompt_spec_not_found',
-        metadata: { prompt_spec_id: id, version },
-      });
-      throw new NotFoundError(
-        `PromptSpec not found: ${id}${version !== undefined ? ` version ${version}` : ''}`,
-        'prompt_spec',
-        id,
-      );
-    }
-
-    await repo.deletePromptSpec(this.serviceCtx.db, id, version);
-    this.serviceCtx.logger.info({
-      event_type: 'prompt_spec_deleted',
-      metadata: { prompt_spec_id: id, version },
-    });
-
-    return { success: true };
+        await repo.deletePromptSpec(this.serviceCtx.db, id, version);
+        return { success: true };
+      },
+    );
   }
 }

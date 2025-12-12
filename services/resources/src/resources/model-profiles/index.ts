@@ -29,73 +29,56 @@ export class ModelProfiles extends Resource {
       cost_per_1k_output_tokens: number;
     };
   }> {
-    this.serviceCtx.logger.info({
-      event_type: 'model_profile_create_started',
-      metadata: { name: data.name, provider: data.provider },
-    });
+    return this.withLogging(
+      'create',
+      { metadata: { name: data.name, provider: data.provider } },
+      async () => {
+        try {
+          const profile = await repo.createModelProfile(this.serviceCtx.db, {
+            name: data.name,
+            provider: data.provider,
+            model_id: data.model_id,
+            parameters: (data.parameters ?? {}) as object,
+            execution_config: data.execution_config ?? null,
+            cost_per_1k_input_tokens: data.cost_per_1k_input_tokens ?? 0,
+            cost_per_1k_output_tokens: data.cost_per_1k_output_tokens ?? 0,
+          });
 
-    try {
-      const profile = await repo.createModelProfile(this.serviceCtx.db, {
-        name: data.name,
-        provider: data.provider,
-        model_id: data.model_id,
-        parameters: (data.parameters ?? {}) as object,
-        execution_config: data.execution_config ?? null,
-        cost_per_1k_input_tokens: data.cost_per_1k_input_tokens ?? 0,
-        cost_per_1k_output_tokens: data.cost_per_1k_output_tokens ?? 0,
-      });
+          return {
+            model_profile_id: profile.id,
+            model_profile: profile,
+          };
+        } catch (error) {
+          const dbError = extractDbError(error);
 
-      this.serviceCtx.logger.info({
-        event_type: 'model_profile_created',
-        metadata: { model_profile_id: profile.id, name: profile.name },
-      });
+          if (dbError.constraint === 'unique') {
+            throw new ConflictError(
+              `ModelProfile with ${dbError.field} already exists`,
+              dbError.field,
+              'unique',
+            );
+          }
 
-      return {
-        model_profile_id: profile.id,
-        model_profile: profile,
-      };
-    } catch (error) {
-      const dbError = extractDbError(error);
-
-      if (dbError.constraint === 'unique') {
-        this.serviceCtx.logger.warn({
-          event_type: 'model_profile_create_conflict',
-          metadata: { name: data.name, field: dbError.field },
-        });
-        throw new ConflictError(
-          `ModelProfile with ${dbError.field} already exists`,
-          dbError.field,
-          'unique',
-        );
-      }
-
-      this.serviceCtx.logger.error({
-        event_type: 'model_profile_create_failed',
-        message: dbError.message,
-        metadata: { name: data.name },
-      });
-      throw error;
-    }
+          throw error;
+        }
+      },
+    );
   }
 
   async get(id: string): Promise<{
     model_profile: ModelProfile;
   }> {
-    this.serviceCtx.logger.info({
-      event_type: 'model_profile_get',
-      metadata: { model_profile_id: id },
-    });
-
-    const profile = await repo.getModelProfile(this.serviceCtx.db, id);
-    if (!profile) {
-      this.serviceCtx.logger.warn({
-        event_type: 'model_profile_not_found',
-        metadata: { model_profile_id: id },
-      });
-      throw new NotFoundError(`ModelProfile not found: ${id}`, 'model_profile', id);
-    }
-
-    return { model_profile: profile as ModelProfile };
+    return this.withLogging(
+      'get',
+      { model_profile_id: id, metadata: { model_profile_id: id } },
+      async () => {
+        const profile = await repo.getModelProfile(this.serviceCtx.db, id);
+        if (!profile) {
+          throw new NotFoundError(`ModelProfile not found: ${id}`, 'model_profile', id);
+        }
+        return { model_profile: profile as ModelProfile };
+      },
+    );
   }
 
   async list(params?: { limit?: number; provider?: ModelProvider }): Promise<{
@@ -110,40 +93,28 @@ export class ModelProfiles extends Resource {
       cost_per_1k_output_tokens: number;
     }>;
   }> {
-    this.serviceCtx.logger.info({
-      event_type: 'model_profile_list',
-      metadata: params,
+    return this.withLogging('list', { metadata: params }, async () => {
+      const profiles = params?.provider
+        ? await repo.listModelProfilesByProvider(this.serviceCtx.db, params.provider, params.limit)
+        : await repo.listModelProfiles(this.serviceCtx.db, params?.limit);
+
+      return { model_profiles: profiles };
     });
-
-    const profiles = params?.provider
-      ? await repo.listModelProfilesByProvider(this.serviceCtx.db, params.provider, params.limit)
-      : await repo.listModelProfiles(this.serviceCtx.db, params?.limit);
-
-    return { model_profiles: profiles };
   }
 
   async delete(id: string): Promise<{ success: boolean }> {
-    this.serviceCtx.logger.info({
-      event_type: 'model_profile_delete_started',
-      metadata: { model_profile_id: id },
-    });
+    return this.withLogging(
+      'delete',
+      { model_profile_id: id, metadata: { model_profile_id: id } },
+      async () => {
+        const profile = await repo.getModelProfile(this.serviceCtx.db, id);
+        if (!profile) {
+          throw new NotFoundError(`ModelProfile not found: ${id}`, 'model_profile', id);
+        }
 
-    // Verify model profile exists
-    const profile = await repo.getModelProfile(this.serviceCtx.db, id);
-    if (!profile) {
-      this.serviceCtx.logger.warn({
-        event_type: 'model_profile_not_found',
-        metadata: { model_profile_id: id },
-      });
-      throw new NotFoundError(`ModelProfile not found: ${id}`, 'model_profile', id);
-    }
-
-    await repo.deleteModelProfile(this.serviceCtx.db, id);
-    this.serviceCtx.logger.info({
-      event_type: 'model_profile_deleted',
-      metadata: { model_profile_id: id },
-    });
-
-    return { success: true };
+        await repo.deleteModelProfile(this.serviceCtx.db, id);
+        return { success: true };
+      },
+    );
   }
 }

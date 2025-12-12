@@ -25,74 +25,50 @@ export class WorkflowRuns extends Resource {
       completed_at: string | null;
     };
   }> {
-    this.serviceCtx.logger.info({
-      event_type: 'workflow_run_get',
-      metadata: { workflow_run_id: id },
-    });
-
-    const workflowRun = await repo.getWorkflowRunWithProject(this.serviceCtx.db, id);
-    if (!workflowRun) {
-      this.serviceCtx.logger.warn({
-        event_type: 'workflow_run_not_found',
-        metadata: { workflow_run_id: id },
-      });
-      throw new NotFoundError(`Workflow run not found: ${id}`, 'workflow_run', id);
-    }
-
-    return { workflow_run: workflowRun };
+    return this.withLogging(
+      'get',
+      { workflow_run_id: id, metadata: { workflow_run_id: id } },
+      async () => {
+        const workflowRun = await repo.getWorkflowRunWithProject(this.serviceCtx.db, id);
+        if (!workflowRun) {
+          throw new NotFoundError(`Workflow run not found: ${id}`, 'workflow_run', id);
+        }
+        return { workflow_run: workflowRun };
+      },
+    );
   }
 
   async complete(id: string, final_output: object): Promise<void> {
-    this.serviceCtx.logger.info({
-      event_type: 'workflow_run_complete',
-      trace_id: id,
-      metadata: { workflow_run_id: id, final_output },
-    });
+    return this.withLogging(
+      'complete',
+      { trace_id: id, workflow_run_id: id, metadata: { workflow_run_id: id, final_output } },
+      async () => {
+        const updated = await repo.updateWorkflowRun(this.serviceCtx.db, id, {
+          status: 'completed',
+          completed_at: new Date().toISOString(),
+          context: { final_output },
+        });
 
-    const updated = await repo.updateWorkflowRun(this.serviceCtx.db, id, {
-      status: 'completed',
-      completed_at: new Date().toISOString(),
-      context: { final_output },
-    });
-
-    if (!updated) {
-      this.serviceCtx.logger.warn({
-        event_type: 'workflow_run_complete_failed',
-        trace_id: id,
-        metadata: { workflow_run_id: id },
-      });
-      throw new NotFoundError(`Workflow run not found: ${id}`, 'workflow_run', id);
-    }
-
-    this.serviceCtx.logger.info({
-      event_type: 'workflow_run_completed',
-      trace_id: id,
-      metadata: { workflow_run_id: id },
-    });
+        if (!updated) {
+          throw new NotFoundError(`Workflow run not found: ${id}`, 'workflow_run', id);
+        }
+      },
+    );
   }
 
   async delete(id: string): Promise<{ success: boolean }> {
-    this.serviceCtx.logger.info({
-      event_type: 'workflow_run_delete_started',
-      metadata: { workflow_run_id: id },
-    });
+    return this.withLogging(
+      'delete',
+      { workflow_run_id: id, metadata: { workflow_run_id: id } },
+      async () => {
+        const workflowRun = await repo.getWorkflowRun(this.serviceCtx.db, id);
+        if (!workflowRun) {
+          throw new NotFoundError(`Workflow run not found: ${id}`, 'workflow_run', id);
+        }
 
-    // Verify workflow run exists
-    const workflowRun = await repo.getWorkflowRun(this.serviceCtx.db, id);
-    if (!workflowRun) {
-      this.serviceCtx.logger.warn({
-        event_type: 'workflow_run_not_found',
-        metadata: { workflow_run_id: id },
-      });
-      throw new NotFoundError(`Workflow run not found: ${id}`, 'workflow_run', id);
-    }
-
-    await repo.deleteWorkflowRun(this.serviceCtx.db, id);
-    this.serviceCtx.logger.info({
-      event_type: 'workflow_run_deleted',
-      metadata: { workflow_run_id: id },
-    });
-
-    return { success: true };
+        await repo.deleteWorkflowRun(this.serviceCtx.db, id);
+        return { success: true };
+      },
+    );
   }
 }

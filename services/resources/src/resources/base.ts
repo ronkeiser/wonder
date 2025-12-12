@@ -25,4 +25,52 @@ export abstract class Resource extends RpcTarget {
       executionContext: ctx,
     };
   }
+
+  /**
+   * Wraps an async operation with automatic start/complete/error logging
+   * @param operation - The operation name (e.g., 'get', 'delete', 'complete')
+   * @param context - Context to include in all log events (e.g., workflow_run_id, trace_id)
+   * @param fn - The async operation to execute
+   * @returns The result of the operation
+   * @throws Re-throws the original error after logging
+   */
+  protected async withLogging<T>(
+    operation: string,
+    context: Record<string, any>,
+    fn: () => Promise<T>,
+  ): Promise<T> {
+    // Generate resource name from class name (e.g., 'WorkflowRuns' -> 'workflow_runs')
+    const resourceName = this.constructor.name
+      .replace(/([A-Z])/g, '_$1')
+      .toLowerCase()
+      .slice(1);
+
+    this.serviceCtx.logger.info({
+      event_type: `${resourceName}_${operation}_started`,
+      ...context,
+    });
+
+    try {
+      const result = await fn();
+
+      this.serviceCtx.logger.info({
+        event_type: `${resourceName}_${operation}_completed`,
+        ...context,
+      });
+
+      return result;
+    } catch (error) {
+      this.serviceCtx.logger.error({
+        event_type: `${resourceName}_${operation}_error`,
+        message: error instanceof Error ? error.message : String(error),
+        ...context,
+        metadata: {
+          ...context.metadata,
+          error_name: error instanceof Error ? error.name : 'Unknown',
+          stack: error instanceof Error ? error.stack : undefined,
+        },
+      });
+      throw error;
+    }
+  }
 }

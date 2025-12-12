@@ -29,68 +29,47 @@ export class Workflows extends Resource {
       updated_at: string;
     };
   }> {
-    this.serviceCtx.logger.info({
-      event_type: 'workflow_create_started',
-      project_id: data.project_id,
-      metadata: { name: data.name },
-    });
+    return this.withLogging(
+      'create',
+      { project_id: data.project_id, metadata: { project_id: data.project_id, name: data.name } },
+      async () => {
+        try {
+          const workflow = await repo.createWorkflow(this.serviceCtx.db, {
+            project_id: data.project_id,
+            name: data.name,
+            description: data.description ?? data.name,
+            workflow_def_id: data.workflow_def_id,
+            pinned_version: data.pinned_version ?? null,
+            enabled: data.enabled ?? true,
+          });
 
-    try {
-      const workflow = await repo.createWorkflow(this.serviceCtx.db, {
-        project_id: data.project_id,
-        name: data.name,
-        description: data.description ?? data.name,
-        workflow_def_id: data.workflow_def_id,
-        pinned_version: data.pinned_version ?? null,
-        enabled: data.enabled ?? true,
-      });
+          return {
+            workflow_id: workflow.id,
+            workflow,
+          };
+        } catch (error) {
+          const dbError = extractDbError(error);
 
-      this.serviceCtx.logger.info({
-        event_type: 'workflow_created',
-        metadata: { workflow_id: workflow.id, name: workflow.name },
-      });
+          if (dbError.constraint === 'unique') {
+            throw new ConflictError(
+              `Workflow with ${dbError.field} already exists`,
+              dbError.field,
+              'unique',
+            );
+          }
 
-      return {
-        workflow_id: workflow.id,
-        workflow,
-      };
-    } catch (error) {
-      const dbError = extractDbError(error);
+          if (dbError.constraint === 'foreign_key') {
+            throw new NotFoundError(
+              'Referenced project or workflow_def does not exist',
+              'reference',
+              data.workflow_def_id,
+            );
+          }
 
-      if (dbError.constraint === 'unique') {
-        this.serviceCtx.logger.warn({
-          event_type: 'workflow_create_conflict',
-          project_id: data.project_id,
-          metadata: { name: data.name, field: dbError.field },
-        });
-        throw new ConflictError(
-          `Workflow with ${dbError.field} already exists`,
-          dbError.field,
-          'unique',
-        );
-      }
-
-      if (dbError.constraint === 'foreign_key') {
-        this.serviceCtx.logger.warn({
-          event_type: 'workflow_create_invalid_reference',
-          project_id: data.project_id,
-          metadata: { workflow_def_id: data.workflow_def_id },
-        });
-        throw new NotFoundError(
-          'Referenced project or workflow_def does not exist',
-          'reference',
-          data.workflow_def_id,
-        );
-      }
-
-      this.serviceCtx.logger.error({
-        event_type: 'workflow_create_failed',
-        project_id: data.project_id,
-        message: dbError.message,
-        metadata: { name: data.name },
-      });
-      throw error;
-    }
+          throw error;
+        }
+      },
+    );
   }
 
   async get(id: string): Promise<{
@@ -106,21 +85,13 @@ export class Workflows extends Resource {
       updated_at: string;
     };
   }> {
-    this.serviceCtx.logger.info({
-      event_type: 'workflow_get',
-      metadata: { workflow_id: id },
+    return this.withLogging('get', { workflow_id: id, metadata: { workflow_id: id } }, async () => {
+      const workflow = await repo.getWorkflow(this.serviceCtx.db, id);
+      if (!workflow) {
+        throw new NotFoundError(`Workflow not found: ${id}`, 'workflow', id);
+      }
+      return { workflow };
     });
-
-    const workflow = await repo.getWorkflow(this.serviceCtx.db, id);
-    if (!workflow) {
-      this.serviceCtx.logger.warn({
-        event_type: 'workflow_not_found',
-        metadata: { workflow_id: id },
-      });
-      throw new NotFoundError(`Workflow not found: ${id}`, 'workflow', id);
-    }
-
-    return { workflow };
   }
 
   async list(params?: { limit?: number; project_id?: string }): Promise<{
@@ -136,17 +107,17 @@ export class Workflows extends Resource {
       updated_at: string;
     }>;
   }> {
-    this.serviceCtx.logger.info({
-      event_type: 'workflow_list',
-      project_id: params?.project_id,
-      metadata: { limit: params?.limit },
-    });
+    return this.withLogging(
+      'list',
+      { project_id: params?.project_id, metadata: { limit: params?.limit } },
+      async () => {
+        const workflowsResult = params?.project_id
+          ? await repo.listWorkflowsByProject(this.serviceCtx.db, params.project_id, params.limit)
+          : await repo.listWorkflows(this.serviceCtx.db, params?.limit);
 
-    const workflowsResult = params?.project_id
-      ? await repo.listWorkflowsByProject(this.serviceCtx.db, params.project_id, params.limit)
-      : await repo.listWorkflows(this.serviceCtx.db, params?.limit);
-
-    return { workflows: workflowsResult };
+        return { workflows: workflowsResult };
+      },
+    );
   }
 
   async update(
@@ -170,51 +141,33 @@ export class Workflows extends Resource {
       updated_at: string;
     };
   }> {
-    this.serviceCtx.logger.info({
-      event_type: 'workflow_update_started',
-      metadata: { workflow_id: id },
-    });
-
-    const workflow = await repo.updateWorkflow(this.serviceCtx.db, id, data);
-    if (!workflow) {
-      this.serviceCtx.logger.warn({
-        event_type: 'workflow_not_found',
-        metadata: { workflow_id: id },
-      });
-      throw new NotFoundError(`Workflow not found: ${id}`, 'workflow', id);
-    }
-
-    this.serviceCtx.logger.info({
-      event_type: 'workflow_updated',
-      metadata: { workflow_id: workflow.id, name: workflow.name },
-    });
-
-    return { workflow };
+    return this.withLogging(
+      'update',
+      { workflow_id: id, metadata: { workflow_id: id } },
+      async () => {
+        const workflow = await repo.updateWorkflow(this.serviceCtx.db, id, data);
+        if (!workflow) {
+          throw new NotFoundError(`Workflow not found: ${id}`, 'workflow', id);
+        }
+        return { workflow };
+      },
+    );
   }
 
   async delete(id: string): Promise<{ success: boolean }> {
-    this.serviceCtx.logger.info({
-      event_type: 'workflow_delete_started',
-      metadata: { workflow_id: id },
-    });
+    return this.withLogging(
+      'delete',
+      { workflow_id: id, metadata: { workflow_id: id } },
+      async () => {
+        const workflow = await repo.getWorkflow(this.serviceCtx.db, id);
+        if (!workflow) {
+          throw new NotFoundError(`Workflow not found: ${id}`, 'workflow', id);
+        }
 
-    // Verify workflow exists
-    const workflow = await repo.getWorkflow(this.serviceCtx.db, id);
-    if (!workflow) {
-      this.serviceCtx.logger.warn({
-        event_type: 'workflow_not_found',
-        metadata: { workflow_id: id },
-      });
-      throw new NotFoundError(`Workflow not found: ${id}`, 'workflow', id);
-    }
-
-    await repo.deleteWorkflow(this.serviceCtx.db, id);
-    this.serviceCtx.logger.info({
-      event_type: 'workflow_deleted',
-      metadata: { workflow_id: id },
-    });
-
-    return { success: true };
+        await repo.deleteWorkflow(this.serviceCtx.db, id);
+        return { success: true };
+      },
+    );
   }
 
   async createRun(
