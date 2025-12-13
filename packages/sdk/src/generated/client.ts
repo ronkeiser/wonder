@@ -10,7 +10,7 @@ import type { paths } from './schema.js';
  * @param baseClient - The underlying HTTP client (from openapi-fetch)
  */
 export function createClient(baseClient: any) {
-  return {
+  const client = {
     workspaces: Object.assign(
       (id: string) => ({
           get: async (options?: any): Promise<paths['/api/workspaces/{id}']['get']['responses']['200']['content']['application/json']> => {
@@ -202,4 +202,13 @@ export function createClient(baseClient: any) {
       }
     }
   };
+
+  // Add camelCase aliases for kebab-case properties
+  return Object.assign(client, {
+    promptSpecs: client["prompt-specs"],
+    modelProfiles: client["model-profiles"],
+    taskDefs: client["task-defs"],
+    workflowDefs: client["workflow-defs"],
+    workflowRuns: client["workflow-runs"]
+  });
 }

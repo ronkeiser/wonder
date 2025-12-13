@@ -1,7 +1,7 @@
-import { node, schema, workflowDef } from '@wonder/sdk';
+import { node, schema, step, taskDef, workflowDef } from '@wonder/sdk';
 import { describe, expect, it } from 'vitest';
 import {
-  cleanupWorkflowTest,
+  createTrackedClient,
   createWorkflow,
   executeWorkflow,
   setupTestContext,
@@ -16,20 +16,109 @@ describe('Coordinator - Simple Workflow Tests', () => {
    * - Mapping data between workflow context tables and task execution
    * - Writing to the state table during node execution
    * - Verifying state writes via trace events
+   * - Automatic resource cleanup with tracked client
    *
    * Test flow:
-   * 1. Setup: Create base resources (workspace, project, model profile, action, task)
-   * 2. Define: Create workflow definition with state schema
+   * 1. Setup: Create tracked client and base infrastructure
+   * 2. Define: Create prompt spec, action, task, and workflow
    * 3. Execute: Run workflow with input data
    * 4. Verify: Check completion status and state writes
-   * 5. Cleanup: Delete all created resources
+   * 5. Cleanup: Automatically delete all created resources
    */
   it('executes a workflow with context state', async () => {
-    /**
-     * Create all base resources needed for workflow testing.
-     * Returns: workspace, project, model profile, echo action, and echo task IDs
-     */
-    const ctx = await setupTestContext();
+    /** Create tracked client that automatically tracks all created resources */
+    const { wonder, tracker } = createTrackedClient();
+
+    /** Create base infrastructure (workspace, project, model profile) */
+    const ctx = await setupTestContext(wonder);
+
+    /** Create prompt spec that echoes input */
+    const promptSpecResponse = await wonder.promptSpecs.create({
+      version: 1,
+      name: 'Echo Input',
+      description: 'Echo the input name and count',
+      template: 'Return a greeting that says "Hello {{name}}" and count is {{count}}.',
+      template_language: 'handlebars',
+      requires: {
+        name: schema.string(),
+        count: schema.number(),
+      },
+      produces: schema.object(
+        {
+          greeting: schema.string(),
+          processed_count: schema.number(),
+        },
+        { required: ['greeting', 'processed_count'] },
+      ),
+    });
+
+    if (!promptSpecResponse?.prompt_spec) {
+      throw new Error('Failed to create prompt spec');
+    }
+
+    /** Create LLM action using the prompt spec */
+    const actionResponse = await wonder.actions.create({
+      version: 1,
+      name: 'Echo Action',
+      description: 'LLM action that processes input',
+      kind: 'llm_call',
+      implementation: {
+        prompt_spec_id: promptSpecResponse.prompt_spec.id,
+        model_profile_id: ctx.modelProfileId,
+      },
+    });
+
+    if (!actionResponse?.action) {
+      throw new Error('Failed to create action');
+    }
+
+    /** Create task definition that wraps the echo action */
+    const taskDefResponse = await wonder.taskDefs.create(
+      taskDef({
+        name: 'Echo Task',
+        description: 'Task that wraps the echo action',
+        version: 1,
+        project_id: ctx.projectId,
+        input_schema: schema.object(
+          {
+            name: schema.string(),
+            count: schema.number(),
+          },
+          { required: ['name', 'count'] },
+        ),
+        output_schema: schema.object(
+          {
+            greeting: schema.string(),
+            processed_count: schema.number(),
+          },
+          { required: ['greeting', 'processed_count'] },
+        ),
+        steps: [
+          step({
+            ref: 'call_echo',
+            ordinal: 0,
+            action_id: actionResponse.action.id,
+            action_version: 1,
+            input_mapping: {
+              name: '$.input.name',
+              count: '$.input.count',
+            },
+            output_mapping: {
+              'output.greeting': '$.response.greeting',
+              'output.processed_count': '$.response.processed_count',
+            },
+          }),
+        ],
+      }),
+    );
+
+    if (!taskDefResponse?.task_def) {
+      throw new Error('Failed to create task definition');
+    }
+
+    if (!taskDefResponse?.task_def) {
+      throw new Error('Failed to create task definition');
+    }
 
     /**
      * Define the workflow structure.
@@ -84,22 +173,22 @@ describe('Coordinator - Simple Workflow Tests', () => {
       /** The actual processing units in the workflow */
       nodes: [
         node({
-          ref: 'process', // Unique identifier for this node
+          ref: 'process',
           name: 'Process',
-          task_id: ctx.echoTaskId, // References the task definition to execute
+          task_id: taskDefResponse.task_def.id,
           task_version: 1,
 
           /** Maps workflow context → task input (JSONPath expressions pull data) */
           input_mapping: {
-            name: '$.input.name', // Read from workflow input table
-            count: '$.input.count', // Read from workflow input table
+            name: '$.input.name',
+            count: '$.input.count',
           },
 
           /** Maps task output → workflow context (stores results in context tables) */
           output_mapping: {
-            'output.greeting': '$.greeting', // Write to output table
-            'output.processed_count': '$.processed_count', // Write to output table
-            'state.intermediate': '$.greeting', // Write to state table (context)
+            'output.greeting': '$.greeting',
+            'output.processed_count': '$.processed_count',
+            'state.intermediate': '$.greeting',
           },
         }),
       ],
@@ -130,7 +219,10 @@ describe('Coordinator - Simple Workflow Tests', () => {
     const stateWrites = result.trace.context.writes().filter((e) => e.payload.path === 'state');
     expect(stateWrites.length).toBeGreaterThan(0);
 
-    /** Delete all resources created during this test */
-    await cleanupWorkflowTest(setup, result.workflowRunId);
+    /**
+     * Cleanup all resources in reverse order of creation.
+     * Resources are automatically tracked by the client proxy.
+     */
+    await tracker.cleanup();
   });
 });

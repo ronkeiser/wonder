@@ -313,7 +313,7 @@ export function formatClientCode(structure: ClientStructure): string {
   lines.push(' * @param baseClient - The underlying HTTP client (from openapi-fetch)');
   lines.push(' */');
   lines.push('export function createClient(baseClient: any) {');
-  lines.push('  return {');
+  lines.push('  const client = {');
 
   // Add collection properties
   lines.push(
@@ -321,6 +321,24 @@ export function formatClientCode(structure: ClientStructure): string {
   );
 
   lines.push('  };');
+  lines.push('');
+  lines.push('  // Add camelCase aliases for kebab-case properties');
+  lines.push('  return Object.assign(client, {');
+
+  // Generate camelCase aliases for properties with dashes
+  const aliasLines: string[] = [];
+  for (const collection of structure.collections) {
+    if (collection.name.includes('-')) {
+      const camelCase = collection.name.replace(/-([a-z])/g, (_, letter) => letter.toUpperCase());
+      aliasLines.push(`    ${camelCase}: client["${collection.name}"]`);
+    }
+  }
+
+  if (aliasLines.length > 0) {
+    lines.push(aliasLines.join(',\n'));
+  }
+
+  lines.push('  });');
   lines.push('}');
   lines.push('');
 

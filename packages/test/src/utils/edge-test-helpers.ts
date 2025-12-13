@@ -1,13 +1,118 @@
 import { node, schema, step, taskDef, workflowDef } from '@wonder/sdk';
 import { wonder } from '~/client';
 
+/**
+ * Represents a resource that can be deleted.
+ */
+export interface Deletable {
+  delete: () => Promise<unknown>;
+}
+
+/**
+ * Tracks created resources and provides automatic cleanup.
+ */
+export class ResourceTracker {
+  private resources: Deletable[] = [];
+
+  /**
+   * Track a resource for cleanup.
+   */
+  track(resource: Deletable): void {
+    this.resources.push(resource);
+  }
+
+  /**
+   * Clean up all tracked resources in reverse order (LIFO).
+   */
+  async cleanup(): Promise<void> {
+    const count = this.resources.length;
+    if (count === 0) {
+      return;
+    }
+
+    console.log(`✨ Cleaning up ${count} resource${count === 1 ? '' : 's'}...`);
+
+    // Reverse order - delete most recently created resources first
+    for (const resource of this.resources.reverse()) {
+      try {
+        await resource.delete();
+      } catch (error) {
+        // Silently continue - resource may already be deleted or cascade deleted
+        console.warn('Failed to delete resource:', error);
+      }
+    }
+    this.resources = [];
+
+    console.log(`🧹 Cleanup complete!`);
+  }
+
+  /**
+   * Get the number of tracked resources.
+   */
+  get count(): number {
+    return this.resources.length;
+  }
+}
+
+/**
+ * Create a wonder client wrapper that automatically tracks created resources.
+ */
+export function createTrackedClient() {
+  const tracker = new ResourceTracker();
+
+  // Create a proxy that intercepts resource creation
+  const trackedWonder = new Proxy(wonder, {
+    get(target, prop) {
+      const original = (target as any)[prop];
+
+      // Pass through non-collection properties (like camelCase aliases)
+      if (typeof original !== 'function') {
+        return original;
+      }
+
+      // Wrap collection functions (they are callable AND have methods)
+      return new Proxy(original, {
+        get(collectionTarget, collectionProp) {
+          const collectionMethod = (collectionTarget as any)[collectionProp];
+
+          // Intercept create methods
+          if (collectionProp === 'create' && typeof collectionMethod === 'function') {
+            return async (...args: any[]) => {
+              const result = await collectionMethod.apply(collectionTarget, args);
+
+              // Track the created resource for cleanup
+              // Extract ID from response and create deletable
+              // Response format: { workspace_id: "...", workspace: { id: "...", ... } }
+              const keys = Object.keys(result || {});
+              const idKey = keys.find((k) => k.endsWith('_id'));
+              const id = idKey ? (result as any)[idKey] : undefined;
+
+              if (id) {
+                const deletable = (target as any)[prop as string](id);
+                tracker.track(deletable);
+              }
+
+              return result;
+            };
+          }
+
+          return collectionMethod;
+        },
+        // Also proxy the callable function itself (for calling like wonder.workspaces(id))
+        apply(collectionTarget, thisArg, args) {
+          return collectionTarget.apply(thisArg, args);
+        },
+      });
+    },
+  });
+
+  return { wonder: trackedWonder, tracker };
+}
+
 export interface TestContext {
   workspaceId: string;
   projectId: string;
   modelProfileId: string;
-  echoPromptId: string;
-  echoActionId: string;
-  echoTaskId: string;
 }
 
 export interface WorkflowTestSetup extends TestContext {
@@ -16,16 +121,18 @@ export interface WorkflowTestSetup extends TestContext {
 }
 
 /**
- * Sets up the base context needed for workflow tests:
+ * Sets up the base infrastructure needed for workflow tests:
  * - Workspace
  * - Project
  * - Model profile
- * - Echo prompt spec and action (for simple testing)
- * - Echo task definition
+ *
+ * Tests should create their own prompt specs, actions, and task definitions.
+ *
+ * @param client - Optional wonder client to use (defaults to global wonder)
  */
-export async function setupTestContext(): Promise<TestContext> {
+export async function setupTestContext(client = wonder): Promise<TestContext> {
   // Create workspace
-  const workspaceResponse = await wonder.workspaces.create({
+  const workspaceResponse = await client.workspaces.create({
     name: `Test Workspace ${Date.now()}`,
   });
 
@@ -35,7 +142,7 @@ export async function setupTestContext(): Promise<TestContext> {
   const workspaceId = workspaceResponse.workspace.id;
 
   // Create project
-  const projectResponse = await wonder.projects.create({
+  const projectResponse = await client.projects.create({
     workspace_id: workspaceId,
     name: `Test Project ${Date.now()}`,
     description: 'Test project for workflow tests',
@@ -47,7 +154,7 @@ export async function setupTestContext(): Promise<TestContext> {
   const projectId = projectResponse.project.id;
 
   // Create model profile
-  const modelProfileResponse = await wonder['model-profiles'].create({
+  const modelProfileResponse = await client.modelProfiles.create({
     name: `Test Model Profile ${Date.now()}`,
     provider: 'cloudflare',
     model_id: '@cf/meta/llama-3.1-8b-instruct',
@@ -64,100 +171,10 @@ export async function setupTestContext(): Promise<TestContext> {
   }
   const modelProfileId = modelProfileResponse.model_profile.id;
 
-  // Create echo prompt spec
-  const echoPromptResponse = await wonder['prompt-specs'].create({
-    version: 1,
-    name: 'Echo Input',
-    description: 'Echo the input name and count',
-    template: 'Return a greeting that says "Hello {{name}}" and count is {{count}}.',
-    template_language: 'handlebars',
-    requires: {
-      name: schema.string(),
-      count: schema.number(),
-    },
-    produces: schema.object(
-      {
-        greeting: schema.string(),
-        processed_count: schema.number(),
-      },
-      { required: ['greeting', 'processed_count'] },
-    ),
-  });
-
-  if (!echoPromptResponse?.prompt_spec) {
-    throw new Error('Failed to create prompt spec');
-  }
-  const echoPromptId = echoPromptResponse.prompt_spec.id;
-
-  // Create echo action
-  const echoActionResponse = await wonder.actions.create({
-    version: 1,
-    name: 'Echo Action',
-    description: 'LLM action that processes input',
-    kind: 'llm_call',
-    implementation: {
-      prompt_spec_id: echoPromptId,
-      model_profile_id: modelProfileId,
-    },
-  });
-
-  if (!echoActionResponse?.action) {
-    throw new Error('Failed to create action');
-  }
-  const echoActionId = echoActionResponse.action.id;
-
-  // Create echo task definition
-  const echoTask = taskDef({
-    name: 'Echo Task',
-    description: 'Task that wraps the echo action',
-    version: 1,
-    project_id: projectId,
-    input_schema: schema.object(
-      {
-        name: schema.string(),
-        count: schema.number(),
-      },
-      { required: ['name', 'count'] },
-    ),
-    output_schema: schema.object(
-      {
-        greeting: schema.string(),
-        processed_count: schema.number(),
-      },
-      { required: ['greeting', 'processed_count'] },
-    ),
-    steps: [
-      step({
-        ref: 'call_echo',
-        ordinal: 0,
-        action_id: echoActionId,
-        action_version: 1,
-        input_mapping: {
-          name: '$.input.name',
-          count: '$.input.count',
-        },
-        output_mapping: {
-          'output.greeting': '$.response.greeting',
-          'output.processed_count': '$.response.processed_count',
-        },
-      }),
-    ],
-  });
-
-  const taskDefResponse = await wonder['task-defs'].create(echoTask);
-
-  if (!taskDefResponse?.task_def) {
-    throw new Error('Failed to create task definition');
-  }
-  const echoTaskId = taskDefResponse.task_def.id;
-
   return {
     workspaceId,
     projectId,
     modelProfileId,
-    echoPromptId,
-    echoActionId,
-    echoTaskId,
   };
 }
 
@@ -168,7 +185,7 @@ export async function createWorkflow(
   ctx: TestContext,
   workflow: ReturnType<typeof workflowDef>,
 ): Promise<WorkflowTestSetup> {
-  const workflowDefResponse = await wonder['workflow-defs'].create(workflow);
+  const workflowDefResponse = await wonder.workflowDefs.create(workflow);
 
   if (!workflowDefResponse?.workflow_def_id) {
     throw new Error('Failed to create workflow definition');
@@ -219,18 +236,53 @@ export async function executeWorkflow(
 }
 
 /**
- * Cleans up all resources created during a workflow test.
+ * Cleans up resources in reverse order (LIFO).
+ * Silently continues if a delete fails.
  */
-export async function cleanupWorkflowTest(setup: WorkflowTestSetup, workflowRunId?: string) {
+export async function cleanup(...resources: (Deletable | undefined | null)[]) {
+  // Reverse order - delete most recently created resources first
+  for (const resource of resources.reverse()) {
+    if (resource) {
+      try {
+        await resource.delete();
+      } catch (error) {
+        // Silently continue - resource may already be deleted or cascade deleted
+        console.warn('Failed to delete resource:', error);
+      }
+    }
+  }
+}
+
+/**
+ * Cleans up all resources created during a workflow test.
+ * @deprecated Use cleanup() instead for more flexibility
+ */
+export async function cleanupWorkflowTest(
+  setup: WorkflowTestSetup,
+  workflowRunId?: string,
+  taskDefId?: string,
+  actionId?: string,
+  promptSpecId?: string,
+) {
   if (workflowRunId) {
     await wonder['workflow-runs'](workflowRunId).delete();
   }
 
   await wonder.workflows(setup.workflowId).delete();
   await wonder['workflow-defs'](setup.workflowDefId).delete();
-  await wonder['task-defs'](setup.echoTaskId).delete();
-  await wonder.actions(setup.echoActionId).delete();
-  await wonder['prompt-specs'](setup.echoPromptId).delete();
+
+  if (taskDefId) {
+    await wonder['task-defs'](taskDefId).delete();
+  }
+
+  if (actionId) {
+    await wonder.actions(actionId).delete();
+  }
+
+  if (promptSpecId) {
+    await wonder['prompt-specs'](promptSpecId).delete();
+  }
+
   await wonder['model-profiles'](setup.modelProfileId).delete();
   await wonder.projects(setup.projectId).delete();
   await wonder.workspaces(setup.workspaceId).delete();
@@ -241,9 +293,6 @@ export async function cleanupWorkflowTest(setup: WorkflowTestSetup, workflowRunI
  * Use this if you created a context but didn't create a workflow.
  */
 export async function cleanupTestContext(ctx: TestContext) {
-  await wonder['task-defs'](ctx.echoTaskId).delete();
-  await wonder.actions(ctx.echoActionId).delete();
-  await wonder['prompt-specs'](ctx.echoPromptId).delete();
   await wonder['model-profiles'](ctx.modelProfileId).delete();
   await wonder.projects(ctx.projectId).delete();
   await wonder.workspaces(ctx.workspaceId).delete();
