@@ -3,12 +3,19 @@
   "version": "0.0.1",
   "type": "module",
   "private": true,
-  "scripts": {},
+  "bin": {
+    "build-services": "./src/index.ts"
+  },
+  "scripts": {
+    "build-services": "tsx src/index.ts"
+  },
   "dependencies": {
-    "@wonder/sdk": "workspace:*"
+    "@wonder/sdk": "workspace:*",
+    "jsonc-parser": "^3.3.1"
   },
   "devDependencies": {
     "@types/node": "^24.10.1",
+    "tsx": "^4.19.4",
     "typescript": "^5.9.3"
   }
 }

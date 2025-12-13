@@ -21,15 +21,6 @@
       "entrypoint": "LogsService",
     },
   ],
-  "durable_objects": {
-    "bindings": [
-      {
-        "name": "COORDINATOR",
-        "class_name": "WorkflowCoordinator",
-        "script_name": "wonder-coordinator",
-      },
-    ],
-  },
   "vars": {
     "ENVIRONMENT": "development",
   },

@@ -4,8 +4,14 @@
   "version": "0.0.1",
   "type": "module",
   "exports": {
-    "./types": "./src/types.ts",
-    "./schemas": "./src/infrastructure/db/schema.ts"
+    "./types": {
+      "types": "./dist/types.d.ts",
+      "default": "./src/types.ts"
+    },
+    "./schemas": {
+      "types": "./dist/infrastructure/db/schema.d.ts",
+      "default": "./src/infrastructure/db/schema.ts"
+    }
   },
   "scripts": {
     "dev": "wrangler dev",

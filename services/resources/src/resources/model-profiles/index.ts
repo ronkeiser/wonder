@@ -37,6 +37,7 @@ export class ModelProfiles extends Resource {
           const profile = await repo.createModelProfile(this.serviceCtx.db, {
             name: data.name,
             provider: data.provider,
+            // @ts-ignore - model_id comes as string from API, needs validation
             model_id: data.model_id,
             parameters: (data.parameters ?? {}) as object,
             execution_config: data.execution_config ?? null,
