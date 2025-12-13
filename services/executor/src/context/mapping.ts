@@ -15,6 +15,7 @@
  * @see docs/architecture/executor.md
  */
 
+import type { Logger } from '@wonder/logs';
 import type { TaskContext } from '../execution/types';
 
 /**
@@ -204,12 +205,28 @@ export function applyOutputMapping(
   mapping: Record<string, unknown> | null | undefined,
   actionOutput: Record<string, unknown>,
   context: TaskContext,
+  logger?: Logger,
 ): void {
   if (!mapping) {
     // Default behavior: store entire output in state._lastOutput
     context.state._lastOutput = actionOutput;
+    logger?.info({
+      event_type: 'output_mapping_no_mapping',
+      message: 'No output mapping, storing in state._lastOutput',
+      metadata: { action_output_keys: Object.keys(actionOutput) },
+    });
     return;
   }
+
+  logger?.info({
+    event_type: 'output_mapping_applying',
+    message: 'Applying output mapping',
+    metadata: {
+      mapping,
+      action_output: actionOutput,
+      action_output_keys: Object.keys(actionOutput),
+    },
+  });
 
   for (const [targetPath, sourceValue] of Object.entries(mapping)) {
     if (sourceValue === null || sourceValue === undefined) continue;
@@ -218,8 +235,20 @@ export function applyOutputMapping(
 
     if (typeof sourceValue === 'string') {
       if (sourceValue.startsWith('$.')) {
-        // Get from action output (wrap it so $.output.x works)
-        value = getValueByPath({ output: actionOutput }, sourceValue);
+        // Get from action output directly
+        // $.response.greeting extracts actionOutput.response.greeting
+        value = getValueByPath(actionOutput, sourceValue);
+        logger?.info({
+          event_type: 'output_mapping_extract',
+          message: 'Extracted value from action output',
+          metadata: {
+            source_path: sourceValue,
+            target_path: targetPath,
+            extracted_value: value,
+            extracted_value_type: typeof value,
+            action_output_keys: Object.keys(actionOutput),
+          },
+        });
       } else if (sourceValue.includes('{{') && sourceValue.includes('}}')) {
         // Template with output context
         value = interpolateTemplate(sourceValue, { ...context, _output: actionOutput });
@@ -234,7 +263,26 @@ export function applyOutputMapping(
 
     // Set in context
     setValueByPath(context as unknown as Record<string, unknown>, targetPath, value);
+
+    logger?.info({
+      event_type: 'output_mapping_set',
+      message: 'Set value in context',
+      metadata: {
+        target_path: targetPath,
+        value: value,
+        context_output_after: context.output,
+      },
+    });
   }
+
+  logger?.info({
+    event_type: 'output_mapping_complete',
+    message: 'Output mapping complete',
+    metadata: {
+      final_context_output: context.output,
+      final_context_state: context.state,
+    },
+  });
 }
 
 /**

@@ -126,6 +126,8 @@ export async function runTask(
         duration_ms: metrics.duration_ms,
         steps_executed: metrics.steps_executed,
         steps_skipped: metrics.steps_skipped,
+        context_output: context.output,
+        context_output_keys: Object.keys(context.output),
       },
     });
 

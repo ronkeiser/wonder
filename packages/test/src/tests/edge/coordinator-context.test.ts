@@ -1,4 +1,4 @@
-import { node, schema, workflowDef } from '@wonder/sdk';
+import { node, schema, step, taskDef, workflowDef } from '@wonder/sdk';
 import { describe, expect, it } from 'vitest';
 import { wonder } from '~/client';
 
@@ -82,7 +82,54 @@ describe('Coordinator - Context Operations', () => {
     const echoActionId = echoActionResponse!.action.id;
     console.log('✓ Echo action created:', echoActionId);
 
-    // Step 6: Create workflow with input, state, and output schemas
+    // Step 6: Create task definition that wraps the echo action
+    const echoTask = taskDef({
+      name: 'Echo Task',
+      description: 'Task that wraps the echo action',
+      version: 1,
+      project_id: projectId,
+      input_schema: schema.object(
+        {
+          name: schema.string(),
+          count: schema.number(),
+        },
+        { required: ['name', 'count'] },
+      ),
+      output_schema: schema.object(
+        {
+          greeting: schema.string(),
+          processed_count: schema.number(),
+        },
+        { required: ['greeting', 'processed_count'] },
+      ),
+      steps: [
+        step({
+          ref: 'call_echo',
+          ordinal: 0,
+          action_id: echoActionId,
+          action_version: 1,
+          input_mapping: {
+            name: '$.input.name',
+            count: '$.input.count',
+          },
+          output_mapping: {
+            'output.greeting': '$.response.greeting',
+            'output.processed_count': '$.response.processed_count',
+          },
+        }),
+      ],
+    });
+
+    const taskDefResponse = await wonder['task-defs'].create(echoTask);
+
+    expect(taskDefResponse).toBeDefined();
+    expect(taskDefResponse?.task_def).toBeDefined();
+    expect(taskDefResponse?.task_def.id).toBeDefined();
+
+    const echoTaskId = taskDefResponse!.task_def.id;
+    console.log('✓ Echo task def created:', echoTaskId);
+
+    // Step 7: Create workflow with input, state, and output schemas
     const workflow = workflowDef({
       name: `Context Test Workflow ${Date.now()}`,
       description: 'Workflow to test context operations',
@@ -106,23 +153,23 @@ describe('Coordinator - Context Operations', () => {
         { required: ['greeting', 'final_count'] },
       ),
       output_mapping: {
-        greeting: '$.process_node_output.greeting',
-        final_count: '$.process_node_output.processed_count',
+        greeting: '$.output.process_node.greeting',
+        final_count: '$.output.process_node.processed_count',
       },
       initial_node_ref: 'process_node',
       nodes: [
         node({
           ref: 'process_node',
           name: 'Process Input',
-          action_id: echoActionId,
-          action_version: 1,
+          task_id: echoTaskId,
+          task_version: 1,
           input_mapping: {
             name: '$.input.name',
             count: '$.input.count',
           },
           output_mapping: {
-            greeting: '$.response.greeting',
-            processed_count: '$.response.processed_count',
+            greeting: '$.greeting',
+            processed_count: '$.processed_count',
           },
         }),
       ],
@@ -139,7 +186,7 @@ describe('Coordinator - Context Operations', () => {
     const workflowDefId = workflowDefResponse.workflow_def_id;
     console.log('✓ Workflow def created:', workflowDefId);
 
-    // Step 7: Create workflow binding
+    // Step 8: Create workflow binding
     const workflowResponse = await wonder.workflows.create({
       project_id: projectId,
       workflow_def_id: workflowDefId,
@@ -151,7 +198,7 @@ describe('Coordinator - Context Operations', () => {
     const workflowId = workflowResponse!.workflow.id;
     console.log('✓ Workflow created:', workflowId);
 
-    // Step 8: Execute workflow with input data
+    // Step 9: Execute workflow with input data
     const inputData = {
       name: 'Alice',
       count: 42,
@@ -175,7 +222,7 @@ describe('Coordinator - Context Operations', () => {
 
     expect(result.status).toBe('completed');
 
-    // Step 9: Validate context trace events
+    // Step 10: Validate context trace events
     const trace = result.trace;
 
     // Validate context initialization
@@ -223,28 +270,26 @@ describe('Coordinator - Context Operations', () => {
     expect(inputReads[0].payload.value).toMatchObject(inputData);
     console.log('  ✓ Context read includes input data');
 
-    // Validate output validation (new applyNodeOutput functionality)
-    const outputValidation = trace.context.validateAt('output');
-    expect(outputValidation).toBeDefined();
-    expect(outputValidation!.payload.path).toBe('output');
-    expect(outputValidation!.payload.valid).toBe(true);
-    expect(outputValidation!.payload.error_count).toBe(0);
-    console.log('  ✓ operation.context.validate (output validated successfully)');
+    // Validate input validation happened
+    const inputValidation = trace.context.validateAt('input');
+    expect(inputValidation).toBeDefined();
+    expect(inputValidation!.payload.path).toBe('input');
+    expect(inputValidation!.payload.valid).toBe(true);
+    expect(inputValidation!.payload.error_count).toBe(0);
+    console.log('  ✓ operation.context.validate (input validated successfully)');
 
-    // Validate we have multiple validations (input + output)
-    const allValidations = trace.context.validates();
-    expect(allValidations.length).toBeGreaterThanOrEqual(2); // input and output
-    console.log(`  ✓ Multiple validations performed (${allValidations.length} total)`);
-
-    // Validate output write
+    // Validate output write (node outputs are stored under their ref)
     const outputWrite = trace.context.writeAt('output');
     expect(outputWrite).toBeDefined();
     expect(outputWrite!.payload.path).toBe('output');
     expect(outputWrite!.payload.value).toBeDefined();
     const outputValue = outputWrite!.payload.value as Record<string, unknown>;
-    expect(outputValue.greeting).toBeDefined();
-    expect(outputValue.final_count).toBeDefined();
-    console.log('  ✓ operation.context.write (output stored)');
+    // Node output is stored under its ref: process_node
+    expect(outputValue.process_node).toBeDefined();
+    const nodeOutput = outputValue.process_node as Record<string, unknown>;
+    expect(nodeOutput.greeting).toBeDefined();
+    expect(nodeOutput.processed_count).toBeDefined();
+    console.log('  ✓ operation.context.write (output stored under node ref)');
 
     // Validate output was read in snapshot
     const outputReads = contextReads.filter((e) => e.payload.path === 'output');
@@ -253,7 +298,7 @@ describe('Coordinator - Context Operations', () => {
 
     console.log('\n✅ Context operations validation complete');
 
-    // Step 10: Clean up resources
+    // Step 11: Clean up resources
     console.log('\n🧹 Cleaning up resources...');
 
     await wonder['workflow-runs'](workflowRunId).delete();
@@ -264,6 +309,9 @@ describe('Coordinator - Context Operations', () => {
 
     await wonder['workflow-defs'](workflowDefId).delete();
     console.log('  ✓ Deleted workflow def:', workflowDefId);
+
+    await wonder['task-defs'](echoTaskId).delete();
+    console.log('  ✓ Deleted task def:', echoTaskId);
 
     await wonder.actions(echoActionId).delete();
     console.log('  ✓ Deleted action:', echoActionId);

@@ -194,34 +194,25 @@ export class ContextManager {
   }
 
   /**
-   * Apply validated output to context
+   * Apply node output to context (merge into output namespace)
+   *
+   * Node outputs are stored under their ref to avoid collisions.
+   * Final output validation happens at workflow finalization.
    */
   async applyNodeOutput(output: Record<string, unknown>): Promise<void> {
     this.loadSchemas();
 
-    const result = this.outputTable!.validate(output);
+    // Merge node output into existing output context
+    // This allows multiple nodes to contribute to output
+    const currentOutput = (this.get('output') as Record<string, unknown>) || {};
+    const mergedOutput = { ...currentOutput, ...output };
 
-    this.emitter.emitTrace({
-      type: 'operation.context.validate',
-      path: 'output',
-      schema_type: 'object',
-      valid: result.valid,
-      error_count: result.errors.length,
-      errors: result.errors.slice(0, 5).map((e) => e.message),
-    });
-
-    if (!result.valid) {
-      throw new Error(
-        `Output validation failed: ${result.errors.map((e) => e.message).join(', ')}`,
-      );
-    }
-
-    this.outputTable!.replace(output);
+    this.outputTable!.replace(mergedOutput);
 
     this.emitter.emitTrace({
       type: 'operation.context.write',
       path: 'output',
-      value: output,
+      value: mergedOutput,
     });
   }
 

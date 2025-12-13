@@ -1,4 +1,4 @@
-import { node, schema, workflowDef } from '@wonder/sdk';
+import { node, schema, step, taskDef, workflowDef } from '@wonder/sdk';
 import { describe, expect, it } from 'vitest';
 import { wonder } from '~/client';
 
@@ -91,7 +91,43 @@ describe('Edge Test - Hello World', () => {
     const helloActionId = helloActionResponse!.action.id;
     console.log('✓ Hello world action created:', helloActionId);
 
-    // Step 6: Create workflow definition with single node
+    // Step 6: Create task definition that wraps the action
+    const helloTask = taskDef({
+      name: 'Hello World Task',
+      description: 'Task that wraps the hello world action',
+      version: 1,
+      project_id: projectId,
+      input_schema: schema.object({}),
+      output_schema: schema.object(
+        {
+          message: schema.string(),
+        },
+        { required: ['message'] },
+      ),
+      steps: [
+        step({
+          ref: 'call_hello',
+          ordinal: 0,
+          action_id: helloActionId,
+          action_version: 1,
+          input_mapping: {},
+          output_mapping: {
+            message: '$.response.message',
+          },
+        }),
+      ],
+    });
+
+    const taskDefResponse = await wonder['task-defs'].create(helloTask);
+
+    expect(taskDefResponse).toBeDefined();
+    expect(taskDefResponse?.task_def).toBeDefined();
+    expect(taskDefResponse?.task_def.id).toBeDefined();
+
+    const helloTaskId = taskDefResponse!.task_def.id;
+    console.log('✓ Hello world task def created:', helloTaskId);
+
+    // Step 7: Create workflow definition with single node
     const workflow = workflowDef({
       name: `Hello World Workflow ${Date.now()}`,
       description: 'Simple hello world workflow',
@@ -104,15 +140,15 @@ describe('Edge Test - Hello World', () => {
         { required: ['message'] },
       ),
       output_mapping: {
-        message: '$.hello_node_output.message',
+        message: '$.output.hello_node.message',
       },
       initial_node_ref: 'hello_node',
       nodes: [
         node({
           ref: 'hello_node',
           name: 'Hello World',
-          action_id: helloActionId,
-          action_version: 1,
+          task_id: helloTaskId,
+          task_version: 1,
           input_mapping: {},
           output_mapping: {
             message: '$.response.message',
@@ -136,7 +172,7 @@ describe('Edge Test - Hello World', () => {
     console.log('✓ Workflow def created:', workflowDefId);
     console.log('  Initial node ID:', workflowDefResponse.workflow_def.initial_node_id);
 
-    // Step 7: Create workflow (binds workflow_def to project)
+    // Step 8: Create workflow (binds workflow_def to project)
     const workflowResponse = await wonder.workflows.create({
       project_id: projectId,
       workflow_def_id: workflowDefId,
@@ -151,7 +187,7 @@ describe('Edge Test - Hello World', () => {
     const workflowId = workflowResponse!.workflow.id;
     console.log('✓ Workflow created:', workflowId);
 
-    // Step 8: Execute workflow with streaming
+    // Step 9: Execute workflow with streaming
     const result = await wonder.workflows(workflowId).stream(
       {},
       {
@@ -218,7 +254,7 @@ describe('Edge Test - Hello World', () => {
 
     console.log('\n✅ Validation complete: minimal execution loop working');
 
-    // Step 9: Clean up resources
+    // Step 10: Clean up resources
     console.log('\n🧹 Cleaning up resources...');
 
     // Delete workflow (workflow binding)
@@ -228,6 +264,10 @@ describe('Edge Test - Hello World', () => {
     // Delete workflow definition
     await wonder['workflow-defs'](workflowDefId).delete();
     console.log('  ✓ Deleted workflow def:', workflowDefId);
+
+    // Delete task definition
+    await wonder['task-defs'](helloTaskId).delete();
+    console.log('  ✓ Deleted task def:', helloTaskId);
 
     // Delete action
     await wonder.actions(helloActionId).delete();

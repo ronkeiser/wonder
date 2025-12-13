@@ -113,6 +113,28 @@ export function createClient(baseClient: any) {
         }
       }
     ),
+    "task-defs": Object.assign(
+      (id: string) => ({
+          get: async (options?: any): Promise<paths['/api/task-defs/{id}']['get']['responses']['200']['content']['application/json']> => {
+            const response = await baseClient.GET(`/api/task-defs/${id}`, {});
+            return response.data;
+          },
+          delete: async (options?: any): Promise<paths['/api/task-defs/{id}']['delete']['responses']['200']['content']['application/json']> => {
+            const response = await baseClient.DELETE(`/api/task-defs/${id}`, {});
+            return response.data;
+          }
+        }),
+      {
+        create: async (body: NonNullable<paths['/api/task-defs']['post']['requestBody']>['content']['application/json'], options?: any): Promise<paths['/api/task-defs']['post']['responses']['201']['content']['application/json']> => {
+          const response = await baseClient.POST(`/api/task-defs`, { body });
+          return response.data;
+        },
+        list: async (options?: any): Promise<paths['/api/task-defs']['get']['responses']['200']['content']['application/json']> => {
+          const response = await baseClient.GET(`/api/task-defs`, {});
+          return response.data;
+        }
+      }
+    ),
     "workflow-defs": Object.assign(
       (id: string) => ({
           get: async (options?: any): Promise<paths['/api/workflow-defs/{id}']['get']['responses']['200']['content']['application/json']> => {

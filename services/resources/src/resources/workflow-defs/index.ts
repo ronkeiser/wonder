@@ -167,44 +167,71 @@ export class WorkflowDefs extends Resource {
 
     // 6. Create all nodes and build ref→ID map
     const refToIdMap = new Map<string, string>();
-    for (const nodeData of data.nodes) {
-      const node = await repo.createNode(this.serviceCtx.db, {
-        ref: nodeData.ref,
-        workflow_def_id: workflowDef.id,
-        workflow_def_version: workflowDef.version,
-        name: nodeData.name,
-        task_id: nodeData.task_id,
-        task_version: nodeData.task_version,
-        input_mapping: nodeData.input_mapping ?? null,
-        output_mapping: nodeData.output_mapping ?? null,
-        resource_bindings: nodeData.resource_bindings ?? null,
+    try {
+      for (const nodeData of data.nodes) {
+        const node = await repo.createNode(this.serviceCtx.db, {
+          ref: nodeData.ref,
+          workflow_def_id: workflowDef.id,
+          workflow_def_version: workflowDef.version,
+          name: nodeData.name,
+          task_id: nodeData.task_id,
+          task_version: nodeData.task_version,
+          input_mapping: nodeData.input_mapping ?? null,
+          output_mapping: nodeData.output_mapping ?? null,
+          resource_bindings: nodeData.resource_bindings ?? null,
+        });
+        refToIdMap.set(nodeData.ref, node.id);
+      }
+    } catch (error) {
+      this.serviceCtx.logger.error({
+        event_type: 'workflow_def_node_create_failed',
+        message: error instanceof Error ? error.message : String(error),
+        metadata: { workflow_def_id: workflowDef.id, name: data.name },
       });
-      refToIdMap.set(nodeData.ref, node.id);
+      throw error;
     }
 
     // 7. Set initial_node_id using ref→ID map
     const initialNodeId = refToIdMap.get(data.initial_node_ref)!;
-    await repo.updateWorkflowDef(this.serviceCtx.db, workflowDef.id, workflowDef.version, {
-      initial_node_id: initialNodeId,
-    });
-    workflowDef.initial_node_id = initialNodeId;
+    try {
+      await repo.updateWorkflowDef(this.serviceCtx.db, workflowDef.id, workflowDef.version, {
+        initial_node_id: initialNodeId,
+      });
+      workflowDef.initial_node_id = initialNodeId;
+    } catch (error) {
+      this.serviceCtx.logger.error({
+        event_type: 'workflow_def_update_initial_node_failed',
+        message: error instanceof Error ? error.message : String(error),
+        metadata: { workflow_def_id: workflowDef.id, initial_node_id: initialNodeId },
+      });
+      throw error;
+    }
 
     // 8. Create transitions (from_node_ref/to_node_ref → from_node_id/to_node_id)
     if (data.transitions) {
-      for (const transitionData of data.transitions) {
-        await repo.createTransition(this.serviceCtx.db, {
-          ref: transitionData.ref ?? null,
-          workflow_def_id: workflowDef.id,
-          workflow_def_version: workflowDef.version,
-          from_node_id: refToIdMap.get(transitionData.from_node_ref)!,
-          to_node_id: refToIdMap.get(transitionData.to_node_ref)!,
-          priority: transitionData.priority,
-          condition: transitionData.condition ?? null,
-          spawn_count: transitionData.spawn_count ?? null,
-          foreach: transitionData.foreach ?? null,
-          synchronization: transitionData.synchronization ?? null,
-          loop_config: transitionData.loop_config ?? null,
+      try {
+        for (const transitionData of data.transitions) {
+          await repo.createTransition(this.serviceCtx.db, {
+            ref: transitionData.ref ?? null,
+            workflow_def_id: workflowDef.id,
+            workflow_def_version: workflowDef.version,
+            from_node_id: refToIdMap.get(transitionData.from_node_ref)!,
+            to_node_id: refToIdMap.get(transitionData.to_node_ref)!,
+            priority: transitionData.priority,
+            condition: transitionData.condition ?? null,
+            spawn_count: transitionData.spawn_count ?? null,
+            foreach: transitionData.foreach ?? null,
+            synchronization: transitionData.synchronization ?? null,
+            loop_config: transitionData.loop_config ?? null,
+          });
+        }
+      } catch (error) {
+        this.serviceCtx.logger.error({
+          event_type: 'workflow_def_transition_create_failed',
+          message: error instanceof Error ? error.message : String(error),
+          metadata: { workflow_def_id: workflowDef.id, name: data.name },
         });
+        throw error;
       }
     }
 

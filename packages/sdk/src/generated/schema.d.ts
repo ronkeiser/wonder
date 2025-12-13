@@ -570,6 +570,132 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/task-defs": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: {
+            parameters: {
+                query?: {
+                    project_id?: string;
+                    library_id?: string;
+                    limit?: number;
+                };
+                header?: never;
+                path?: never;
+                cookie?: never;
+            };
+            requestBody?: never;
+            responses: {
+                /** @description TaskDefs retrieved successfully */
+                200: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["TaskDefListResponse"];
+                    };
+                };
+            };
+        };
+        put?: never;
+        post: {
+            parameters: {
+                query?: never;
+                header?: never;
+                path?: never;
+                cookie?: never;
+            };
+            requestBody?: {
+                content: {
+                    "application/json": components["schemas"]["CreateTaskDef"];
+                };
+            };
+            responses: {
+                /** @description TaskDef created successfully */
+                201: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["TaskDefCreateResponse"];
+                    };
+                };
+            };
+        };
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/task-defs/{id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: {
+            parameters: {
+                query?: {
+                    version?: number;
+                };
+                header?: never;
+                path: {
+                    id: string;
+                };
+                cookie?: never;
+            };
+            requestBody?: never;
+            responses: {
+                /** @description TaskDef retrieved successfully */
+                200: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["TaskDefGetResponse"];
+                    };
+                };
+            };
+        };
+        put?: never;
+        post?: never;
+        delete: {
+            parameters: {
+                query?: {
+                    version?: number;
+                };
+                header?: never;
+                path: {
+                    id: string;
+                };
+                cookie?: never;
+            };
+            requestBody?: never;
+            responses: {
+                /** @description TaskDef deleted successfully */
+                200: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": {
+                            success: boolean;
+                        };
+                    };
+                };
+            };
+        };
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/workflow-defs": {
         parameters: {
             query?: never;
@@ -1407,6 +1533,192 @@ export interface components {
             cost_per_1k_input_tokens: number;
             /** @example 0.06 */
             cost_per_1k_output_tokens: number;
+        };
+        Step: {
+            /** @example 01ARZ3NDEKTSV4RRFFQ69G5FAV */
+            id: string;
+            /** @example call_llm */
+            ref: string;
+            /** @example 0 */
+            ordinal: number;
+            /** @example 01ARZ3NDEKTSV4RRFFQ69G5FAV */
+            action_id: string;
+            /** @example 1 */
+            action_version: number;
+            /**
+             * @example {
+             *       "prompt": "$.input.prompt"
+             *     }
+             */
+            input_mapping: {
+                [key: string]: unknown;
+            } | null;
+            /**
+             * @example {
+             *       "response": "$.result.text"
+             *     }
+             */
+            output_mapping: {
+                [key: string]: unknown;
+            } | null;
+            /**
+             * @default abort
+             * @example abort
+             * @enum {string}
+             */
+            on_failure: "abort" | "retry" | "continue";
+            condition?: {
+                if: string;
+                /** @enum {string} */
+                then: "continue" | "skip" | "succeed" | "fail";
+                /** @enum {string} */
+                else: "continue" | "skip" | "succeed" | "fail";
+            } | null;
+        };
+        RetryConfig: {
+            /** @example 3 */
+            max_attempts: number;
+            /**
+             * @example exponential
+             * @enum {string}
+             */
+            backoff: "none" | "linear" | "exponential";
+            /** @example 1000 */
+            initial_delay_ms: number;
+            /** @example 30000 */
+            max_delay_ms: number | null;
+        } | null;
+        TaskDef: {
+            /** @example 01ARZ3NDEKTSV4RRFFQ69G5FAV */
+            id: string;
+            version: number;
+            name: string;
+            description: string;
+            project_id: string | null;
+            library_id: string | null;
+            tags: string[] | null;
+            input_schema: {
+                [key: string]: unknown;
+            };
+            output_schema: {
+                [key: string]: unknown;
+            };
+            steps: components["schemas"]["Step"][];
+            retry: components["schemas"]["RetryConfig"];
+            timeout_ms: number | null;
+            created_at: string;
+            updated_at: string;
+        };
+        TaskDefCreateResponse: {
+            task_def_id: string;
+            task_def: components["schemas"]["TaskDef"];
+        };
+        CreateStep: {
+            /** @example call_llm */
+            ref: string;
+            /** @example 0 */
+            ordinal: number;
+            /** @example 01ARZ3NDEKTSV4RRFFQ69G5FAV */
+            action_id: string;
+            /** @example 1 */
+            action_version: number;
+            /**
+             * @default null
+             * @example {
+             *       "prompt": "$.input.prompt"
+             *     }
+             */
+            input_mapping: {
+                [key: string]: unknown;
+            } | null;
+            /**
+             * @default null
+             * @example {
+             *       "response": "$.result.text"
+             *     }
+             */
+            output_mapping: {
+                [key: string]: unknown;
+            } | null;
+            /**
+             * @default abort
+             * @example abort
+             * @enum {string}
+             */
+            on_failure: "abort" | "retry" | "continue";
+            /** @default null */
+            condition: {
+                if: string;
+                /** @enum {string} */
+                then: "continue" | "skip" | "succeed" | "fail";
+                /** @enum {string} */
+                else: "continue" | "skip" | "succeed" | "fail";
+            } | null;
+        };
+        CreateTaskDef: {
+            /** @example Write File Verified */
+            name: string;
+            /** @example Write file with read-back verification */
+            description?: string;
+            /**
+             * @default 1
+             * @example 1
+             */
+            version: number;
+            /** @example 01ARZ3NDEKTSV4RRFFQ69G5FAV */
+            project_id?: string;
+            library_id?: string;
+            tags?: string[];
+            /**
+             * @example {
+             *       "type": "object",
+             *       "properties": {
+             *         "path": {
+             *           "type": "string"
+             *         },
+             *         "content": {
+             *           "type": "string"
+             *         }
+             *       }
+             *     }
+             */
+            input_schema: {
+                [key: string]: unknown;
+            };
+            /**
+             * @example {
+             *       "type": "object",
+             *       "properties": {
+             *         "success": {
+             *           "type": "boolean"
+             *         }
+             *       }
+             *     }
+             */
+            output_schema: {
+                [key: string]: unknown;
+            };
+            /**
+             * @example [
+             *       {
+             *         "ref": "write",
+             *         "ordinal": 0,
+             *         "action_id": "write_file_action",
+             *         "action_version": 1,
+             *         "on_failure": "abort"
+             *       }
+             *     ]
+             */
+            steps: components["schemas"]["CreateStep"][];
+            retry?: components["schemas"]["RetryConfig"];
+            /** @example 30000 */
+            timeout_ms?: number;
+        };
+        TaskDefListResponse: {
+            task_defs: components["schemas"]["TaskDef"][];
+        };
+        TaskDefGetResponse: {
+            task_def: components["schemas"]["TaskDef"];
         };
         WorkflowDef: {
             id: string;

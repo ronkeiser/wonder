@@ -8,11 +8,13 @@
  */
 
 import m0000 from './0000_certain_mandrill.sql';
+import m0001 from './0001_cheerful_norman_osborn.sql';
 import journal from './meta/_journal.json';
 
 export default {
   journal,
   migrations: {
     m0000,
+    m0001,
   },
 };

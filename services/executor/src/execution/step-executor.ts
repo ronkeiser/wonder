@@ -101,6 +101,7 @@ export async function executeStep(
     step.output_mapping as Record<string, unknown> | null,
     actionResult.output,
     context,
+    logger,
   );
 
   logger.info({

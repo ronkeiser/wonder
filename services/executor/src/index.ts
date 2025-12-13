@@ -118,6 +118,16 @@ export default class ExecutorService extends WorkerEntrypoint<Env> {
       const coordinator = this.env.COORDINATOR.get(coordinatorId);
 
       if (result.success) {
+        this.logger.info({
+          event_type: 'task_result_sending',
+          message: 'Sending task result to coordinator',
+          trace_id: payload.workflow_run_id,
+          metadata: {
+            token_id: payload.token_id,
+            output_data: result.output,
+            output_keys: result.output ? Object.keys(result.output) : [],
+          },
+        });
         await coordinator.handleTaskResult(payload.token_id, {
           output_data: result.output,
         });

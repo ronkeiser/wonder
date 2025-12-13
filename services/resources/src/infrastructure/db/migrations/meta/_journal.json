@@ -15,6 +15,13 @@
       "when": 1764942092637,
       "tag": "0001_great_genesis",
       "breakpoints": true
+    },
+    {
+      "idx": 2,
+      "version": "6",
+      "when": 1765615884867,
+      "tag": "0002_chief_wolverine",
+      "breakpoints": true
     }
   ]
 }

@@ -9,7 +9,7 @@ import { createClient as createGeneratedClient } from './generated/client';
 import type { paths } from './generated/schema';
 import { createWorkflowsClient } from './workflows';
 
-export { node, schema, transition, workflowDef } from './builders';
+export { node, schema, step, taskDef, transition, workflowDef } from './builders';
 
 export interface WonderClient extends Omit<ReturnType<typeof createGeneratedClient>, 'workflows'> {
   // Events client extends generated events with WebSocket capabilities
@@ -40,7 +40,7 @@ export function createClient(
     headers: apiKey ? { 'X-API-Key': apiKey } : {},
   });
   const sdkClient = createGeneratedClient(baseClient);
-  const eventsClient = new EventsClient(baseUrl, baseClient, apiKey);
+  const eventsClient = new EventsClient(baseUrl, baseClient);
   const workflowsClient = createWorkflowsClient(
     sdkClient.workflows,
     baseUrl,
