@@ -1,0 +1,14 @@
+{
+  "name": "@wonder/env",
+  "version": "0.0.1",
+  "type": "module",
+  "private": true,
+  "scripts": {},
+  "dependencies": {
+    "@wonder/sdk": "workspace:*"
+  },
+  "devDependencies": {
+    "@types/node": "^24.10.1",
+    "typescript": "^5.9.3"
+  }
+}

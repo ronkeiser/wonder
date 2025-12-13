@@ -1,10 +1,8 @@
 /** Workflows RPC resource */
 
-import { eq } from 'drizzle-orm';
-import { ulid } from 'ulid';
 import { ConflictError, NotFoundError, extractDbError } from '~/errors';
-import * as schema from '~/infrastructure/db/schema';
 import { Resource } from '../base';
+import { WorkflowRuns } from '../workflow-runs';
 import * as repo from './repository';
 
 export class Workflows extends Resource {
@@ -170,184 +168,6 @@ export class Workflows extends Resource {
     );
   }
 
-  async createRun(
-    workflowId: string,
-    input: Record<string, unknown>,
-  ): Promise<{
-    workflow_run_id: string;
-    project_id: string;
-    workspace_id: string;
-  }> {
-    this.serviceCtx.logger.info({
-      event_type: 'workflow_run_create_requested',
-      metadata: { workflow_id: workflowId },
-    });
-
-    try {
-      // Get workflow and its definition
-      const result = await repo.getWorkflowWithDef(this.serviceCtx.db, workflowId);
-      if (!result) {
-        this.serviceCtx.logger.warn({
-          event_type: 'workflow_not_found',
-          metadata: { workflow_id: workflowId },
-        });
-        throw new NotFoundError(`Workflow not found: ${workflowId}`, 'workflow', workflowId);
-      }
-
-      const { workflow, workflow_def } = result;
-
-      // Get project to access workspace_id
-      const project = await this.serviceCtx.db
-        .select()
-        .from(schema.projects)
-        .where(eq(schema.projects.id, workflow.project_id))
-        .get();
-      if (!project) {
-        throw new NotFoundError(
-          `Project not found: ${workflow.project_id}`,
-          'project',
-          workflow.project_id,
-        );
-      }
-
-      // Generate workflow_run_id (ULID)
-      const workflowRunId = ulid();
-
-      // Initialize context with input
-      const context = {
-        input,
-        state: {},
-        output: {},
-        artifacts: [],
-      };
-
-      // Initialize with a single token at the initial node
-      const activeTokens = [
-        {
-          id: ulid(),
-          node_id: workflow_def.initial_node_id,
-          status: 'ready',
-          context: {},
-        },
-      ];
-
-      // Create workflow run record (status: waiting until startRun is called)
-      await repo.createWorkflowRun(this.serviceCtx.db, {
-        id: workflowRunId,
-        project_id: workflow.project_id,
-        workflow_id: workflow.id,
-        workflow_def_id: workflow_def.id,
-        workflow_version: workflow_def.version,
-        status: 'waiting',
-        context,
-        active_tokens: activeTokens,
-        durable_object_id: workflowRunId,
-      });
-
-      this.serviceCtx.logger.info({
-        event_type: 'workflow_run_created',
-        metadata: { workflow_id: workflowId, workflow_run_id: workflowRunId },
-      });
-
-      return {
-        workflow_run_id: workflowRunId,
-        project_id: workflow.project_id,
-        workspace_id: project.workspace_id,
-      };
-    } catch (error) {
-      this.serviceCtx.logger.error({
-        event_type: 'workflow_run_create_failed',
-        message: error instanceof Error ? error.message : String(error),
-        metadata: {
-          workflow_id: workflowId,
-          stack: error instanceof Error ? error.stack : undefined,
-        },
-      });
-      throw error;
-    }
-  }
-
-  async startRun(
-    workflowId: string,
-    workflowRunId: string,
-  ): Promise<{
-    durable_object_id: string;
-  }> {
-    this.serviceCtx.logger.info({
-      event_type: 'workflow_run_start_requested',
-      metadata: { workflow_id: workflowId, workflow_run_id: workflowRunId },
-    });
-
-    try {
-      // Get the workflow run
-      const run = await this.serviceCtx.db
-        .select()
-        .from(schema.workflow_runs)
-        .where(eq(schema.workflow_runs.id, workflowRunId))
-        .get();
-
-      if (!run) {
-        throw new NotFoundError(
-          `Workflow run not found: ${workflowRunId}`,
-          'workflow_run',
-          workflowRunId,
-        );
-      }
-
-      // Verify it belongs to this workflow
-      if (run.workflow_id !== workflowId) {
-        throw new ConflictError(
-          `Workflow run ${workflowRunId} does not belong to workflow ${workflowId}`,
-          'workflow_id',
-          'mismatch',
-        );
-      }
-
-      // Get project to access workspace_id
-      const project = await this.serviceCtx.db
-        .select()
-        .from(schema.projects)
-        .where(eq(schema.projects.id, run.project_id))
-        .get();
-      if (!project) {
-        throw new NotFoundError(`Project not found: ${run.project_id}`, 'project', run.project_id);
-      }
-
-      // Update status to running
-      await this.serviceCtx.db
-        .update(schema.workflow_runs)
-        .set({ status: 'running', updated_at: new Date().toISOString() })
-        .where(eq(schema.workflow_runs.id, workflowRunId))
-        .run();
-
-      // Trigger workflow execution via coordinator DO (RPC)
-      const coordinatorId = this.env.COORDINATOR.idFromName(workflowRunId);
-      const coordinator = this.env.COORDINATOR.get(coordinatorId);
-
-      await coordinator.start(workflowRunId);
-
-      this.serviceCtx.logger.info({
-        event_type: 'workflow_run_started',
-        metadata: { workflow_id: workflowId, workflow_run_id: workflowRunId },
-      });
-
-      return {
-        durable_object_id: workflowRunId,
-      };
-    } catch (error) {
-      this.serviceCtx.logger.error({
-        event_type: 'workflow_run_start_failed',
-        message: error instanceof Error ? error.message : String(error),
-        metadata: {
-          workflow_id: workflowId,
-          workflow_run_id: workflowRunId,
-          stack: error instanceof Error ? error.stack : undefined,
-        },
-      });
-      throw error;
-    }
-  }
-
   async start(
     workflowId: string,
     input: Record<string, unknown>,
@@ -355,9 +175,10 @@ export class Workflows extends Resource {
     workflow_run_id: string;
     durable_object_id: string;
   }> {
-    // Convenience method: create + start in one call
-    const { workflow_run_id, project_id, workspace_id } = await this.createRun(workflowId, input);
-    const { durable_object_id } = await this.startRun(workflowId, workflow_run_id);
+    // Convenience method: create + start in one call via WorkflowRuns
+    const workflowRuns = new WorkflowRuns(this.env, this.serviceCtx.executionContext);
+    const { workflow_run_id } = await workflowRuns.create(workflowId, input);
+    const { durable_object_id } = await workflowRuns.start(workflow_run_id, workflowId);
     return { workflow_run_id, durable_object_id };
   }
 }
