@@ -208,6 +208,25 @@ export type OperationEvent =
       };
     }
   | {
+      type: 'operation.context.output_mapping.input';
+      node_ref: string;
+      output_mapping: unknown;
+      task_output: unknown;
+      task_output_keys: string[];
+    }
+  | {
+      type: 'operation.context.output_mapping.skip';
+      reason: 'no_mapping';
+    }
+  | {
+      type: 'operation.context.output_mapping.apply';
+      target_path: string;
+      source_path: string;
+      extracted_value: unknown;
+      current_value: unknown;
+      updated_value: unknown;
+    }
+  | {
       type: 'operation.context.branch_table.create';
       token_id: string;
       table_name: string;

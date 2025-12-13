@@ -111,9 +111,15 @@ export class WorkflowCoordinator extends DurableObject {
 
   /**
    * Handle task result from Executor
+   *
+   * For linear flows: Apply node's output_mapping to write directly to context
+   * For fan-out flows: Branch output was already written by initializeBranchTable
+   *
+   * The distinction is determined by whether this token has a branch_id:
+   * - No branch: Linear flow, use output_mapping to write to context
+   * - Has branch: Fan-out flow, output goes to branch table (handled separately)
    */
   async handleTaskResult(tokenId: string, result: TaskResult): Promise<void> {
-    const sql = this.ctx.storage.sql;
     let workflow_run_id: string | undefined;
 
     try {
@@ -125,16 +131,25 @@ export class WorkflowCoordinator extends DurableObject {
       // Get node for output mapping
       const node = this.defs.getNode(token.node_id);
 
-      // Apply node's output_mapping to transform raw output
-      // e.g., { "greeting": "$.greeting" } extracts result.output_data.greeting -> context.output.greeting
-      const mappedOutput = this.applyOutputMapping(
-        node.output_mapping as Record<string, string> | null,
-        result.output_data,
-        node.ref,
-      );
-
-      // Apply mapped output to context
-      await this.context.applyNodeOutput(mappedOutput);
+      // For linear flows, apply output_mapping to write directly to context
+      // For fan-out flows with branch tokens, output is handled via branch tables
+      if (!token.fan_out_transition_id) {
+        // Linear flow: Apply node's output_mapping to transform and store output
+        // e.g., { "state.result": "$.greeting" } writes result.output_data.greeting to context.state.result
+        this.emitter.emitTrace({
+          type: 'operation.context.output_mapping.input',
+          node_ref: node.ref,
+          output_mapping: node.output_mapping,
+          task_output: result.output_data,
+          task_output_keys: Object.keys(result.output_data),
+        });
+        this.context.applyOutputMapping(
+          node.output_mapping as Record<string, string> | null,
+          result.output_data,
+        );
+      }
+      // Note: Fan-out branch output is written via applyBranchOutput() which is called
+      // during branch creation. The branch output is then merged at synchronization point.
 
       // Emit node completed event
       this.emitter.emit({
@@ -494,54 +509,6 @@ export class WorkflowCoordinator extends DurableObject {
   }
 
   /**
-   * Apply output mapping to transform raw task output
-   *
-   * Mappings are JSONPath-style: { "contextField": "$.rawField" }
-   * e.g., { "greeting": "$.response.greeting" } extracts output.response.greeting
-   *
-   * Output is stored with node ref as prefix to avoid collisions:
-   * { "greeting": "Hello" } -> context.output.greet_node.greeting
-   */
-  private applyOutputMapping(
-    mapping: Record<string, string> | null,
-    rawOutput: Record<string, unknown>,
-    nodeRef: string,
-  ): Record<string, unknown> {
-    // If no mapping, store raw output under node ref
-    if (!mapping) {
-      return { [nodeRef]: rawOutput };
-    }
-
-    const result: Record<string, unknown> = {};
-
-    for (const [targetField, sourcePath] of Object.entries(mapping)) {
-      // Parse JSONPath-style path: $.response.greeting -> ['response', 'greeting']
-      if (!sourcePath.startsWith('$.')) {
-        // Literal value
-        result[targetField] = sourcePath;
-        continue;
-      }
-
-      const pathParts = sourcePath.slice(2).split('.'); // Remove '$.' prefix
-      let value: unknown = rawOutput;
-
-      for (const part of pathParts) {
-        if (value && typeof value === 'object' && part in value) {
-          value = (value as Record<string, unknown>)[part];
-        } else {
-          value = undefined;
-          break;
-        }
-      }
-
-      result[targetField] = value;
-    }
-
-    // Store mapped output under node ref
-    return { [nodeRef]: result };
-  }
-
-  /**
    * Fail workflow due to unrecoverable error
    */
   private async failWorkflow(workflowRunId: string, errorMessage: string): Promise<void> {
@@ -592,12 +559,33 @@ export class WorkflowCoordinator extends DurableObject {
       // Get workflow def for output_mapping
       const workflowDef = this.defs.getWorkflowDef();
 
+      // Log for debugging workflow output mapping
+      this.logger.info({
+        event_type: 'workflow_finalize_debug',
+        message: 'Finalizing workflow',
+        trace_id: workflowRunId,
+        metadata: {
+          context_snapshot: context,
+          output_mapping: workflowDef.output_mapping,
+        },
+      });
+
       // Apply workflow output_mapping to extract final output
       // e.g., { "result": "$.output.greeting" } extracts context.output.greeting -> finalOutput.result
       const finalOutput = this.applyInputMapping(
         workflowDef.output_mapping as Record<string, string> | null,
         context,
       );
+
+      // Log the result of output mapping
+      this.logger.info({
+        event_type: 'workflow_finalize_output',
+        message: 'Workflow output mapped',
+        trace_id: workflowRunId,
+        metadata: {
+          final_output: finalOutput,
+        },
+      });
 
       this.emitter.emitTrace({
         type: 'operation.context.read',

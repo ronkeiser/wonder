@@ -226,19 +226,19 @@ export class DDLGenerator {
 
   /**
    * Build SQL constraints from schema
+   *
+   * Note: JSONSchema's `required` array indicates fields that must be present
+   * in a complete document, but does NOT map to SQL NOT NULL. This allows
+   * incremental writes during workflow execution. Completeness validation
+   * happens at read time via schema validation, not write time via SQL.
    */
   private buildConstraints(
     schema: JSONSchema,
-    isRequired: boolean,
+    _isRequired: boolean,
     columnName: string,
     isJsonColumn = false,
   ): string[] {
     const constraints: string[] = [];
-
-    // NOT NULL for required fields
-    if (isRequired && !schema.nullable) {
-      constraints.push('NOT NULL');
-    }
 
     // Skip other constraints for JSON columns
     if (isJsonColumn) {

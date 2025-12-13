@@ -11,7 +11,7 @@
  *   - get(path) - Read value from context
  *   - set(path, value) - Write value to context
  *   - getSnapshot() - Read-only view for decision logic
- *   - applyNodeOutput(output) - Write validated output
+ *   - applyOutputMapping(mapping, taskOutput) - Write task output via node's output_mapping
  *
  * Branch storage operations (for parallel execution):
  *   - initializeBranchTable(tokenId, schema) - Create branch_output_{tokenId} table
@@ -20,11 +20,18 @@
  *   - mergeBranches(siblings, merge) - Merge branch outputs into main context
  *   - dropBranchTables(tokenIds) - Cleanup branch tables after merge
  *
- * Branch storage design:
- *   - Each token gets separate ephemeral tables prefixed by token ID
- *   - Isolation through table namespacing, not row filtering
- *   - Branch tables created on fan-out, dropped after fan-in merge
- *   - Schema comes from TaskDef.output_schema (via node.task_id)
+ * Data flow design:
+ *
+ * Linear flows (no fan-out):
+ *   - Node.output_mapping specifies where to write task output in context
+ *   - e.g., { "state.result": "$.greeting" } writes task output.greeting to context.state.result
+ *   - Uses applyOutputMapping() to transform and store
+ *
+ * Fan-out flows (parallel branches):
+ *   - Each branch token gets isolated tables: branch_output_{tokenId}
+ *   - Task outputs written via applyBranchOutput()
+ *   - At fan-in: mergeBranches() combines outputs into context using Transition.synchronization.merge
+ *   - Branch tables dropped after merge
  *
  * See docs/architecture/branch-storage.md for complete design.
  */
@@ -48,11 +55,28 @@ export type BranchOutput = {
   output: Record<string, unknown>;
 };
 
+/** Output mapping entry: maps task output field to context path */
+export type OutputMappingEntry = {
+  targetPath: string; // e.g., "state.result" or "output.greeting"
+  value: unknown;
+};
+
 /**
  * ContextManager manages runtime state for a workflow execution.
  *
  * Uses Schema from @wonder/context for validation and SQL generation,
  * with SchemaTable for bound execution against context tables.
+ *
+ * Data flow for linear execution (no fan-out):
+ *   1. Task completes with output
+ *   2. Node's output_mapping transforms task output to context paths
+ *   3. applyOutputMapping() writes directly to schema-driven state/output tables
+ *
+ * Data flow for parallel execution (fan-out):
+ *   1. initializeBranchTable() creates isolated branch_output_{tokenId} table
+ *   2. Task completes, applyBranchOutput() writes to branch table
+ *   3. At fan-in, mergeBranches() reads siblings and writes to main context
+ *   4. dropBranchTables() cleans up
  */
 export class ContextManager {
   private readonly sql: SqlStorage;
@@ -194,32 +218,15 @@ export class ContextManager {
   }
 
   /**
-   * Apply node output to context (merge into output namespace)
-   *
-   * Node outputs are stored under their ref to avoid collisions.
-   * Final output validation happens at workflow finalization.
-   */
-  async applyNodeOutput(output: Record<string, unknown>): Promise<void> {
-    this.loadSchemas();
-
-    // Merge node output into existing output context
-    // This allows multiple nodes to contribute to output
-    const currentOutput = (this.get('output') as Record<string, unknown>) || {};
-    const mergedOutput = { ...currentOutput, ...output };
-
-    this.outputTable!.replace(mergedOutput);
-
-    this.emitter.emitTrace({
-      type: 'operation.context.write',
-      path: 'output',
-      value: mergedOutput,
-    });
-  }
-
-  /**
    * Get read-only snapshot of entire context
+   *
+   * Returns input, state, and output from schema-driven tables.
+   * Branch outputs are stored separately and merged into state/output
+   * via mergeBranches() at fan-in points.
    */
   getSnapshot(): ContextSnapshot {
+    this.loadSchemas();
+
     const snapshot = {
       input: (this.get('input') as Record<string, unknown>) || {},
       state: (this.get('state') as Record<string, unknown>) || {},
@@ -232,6 +239,123 @@ export class ContextManager {
     });
 
     return snapshot;
+  }
+
+  // ============================================================================
+  // Output Mapping (for linear execution)
+  // ============================================================================
+
+  /**
+   * Apply node's output_mapping to write task output to context
+   *
+   * For linear flows (no fan-out), task output is written directly to
+   * schema-driven context tables via the node's output_mapping.
+   *
+   * Mappings are JSONPath-style: { "state.result": "$.response", "output.greeting": "$.message" }
+   * - Target paths (keys) specify where in context to write (state.* or output.*)
+   * - Source paths (values) specify what to extract from task output
+   *
+   * @param outputMapping - Node's output_mapping (target -> source JSONPath)
+   * @param taskOutput - Raw task output from executor
+   */
+  applyOutputMapping(
+    outputMapping: Record<string, string> | null,
+    taskOutput: Record<string, unknown>,
+  ): void {
+    this.loadSchemas();
+
+    if (!outputMapping) {
+      this.emitter.emitTrace({
+        type: 'operation.context.output_mapping.skip',
+        reason: 'no_mapping',
+      });
+      return;
+    }
+
+    for (const [targetPath, sourcePath] of Object.entries(outputMapping)) {
+      // Extract value from task output using source path
+      const value = this.extractValue(taskOutput, sourcePath);
+
+      // Parse target path to get section (state/output) and field path
+      const [section, ...fieldParts] = targetPath.split('.');
+
+      if (section !== 'state' && section !== 'output') {
+        throw new Error(
+          `Invalid output_mapping target '${targetPath}' - must start with 'state.' or 'output.'`,
+        );
+      }
+
+      // Get current context section and update the specific field
+      const currentValue = (this.get(section) as Record<string, unknown>) || {};
+      const updatedValue = this.setNestedValue(currentValue, fieldParts, value);
+
+      // Write back to context
+      this.set(section, updatedValue);
+
+      this.emitter.emitTrace({
+        type: 'operation.context.output_mapping.apply',
+        target_path: targetPath,
+        source_path: sourcePath,
+        extracted_value: value,
+        current_value: currentValue,
+        updated_value: updatedValue,
+      });
+    }
+  }
+
+  /**
+   * Extract value from object using JSONPath-style path
+   * e.g., "$.response.greeting" extracts obj.response.greeting
+   */
+  private extractValue(obj: Record<string, unknown>, path: string): unknown {
+    // Handle literal values (not starting with $.)
+    if (!path.startsWith('$.')) {
+      return path;
+    }
+
+    const pathParts = path.slice(2).split('.'); // Remove '$.' prefix
+    let value: unknown = obj;
+
+    for (const part of pathParts) {
+      if (value && typeof value === 'object' && part in value) {
+        value = (value as Record<string, unknown>)[part];
+      } else {
+        return undefined;
+      }
+    }
+
+    return value;
+  }
+
+  /**
+   * Set nested value in object by path parts
+   * e.g., setNestedValue({}, ['result', 'data'], 'hello') -> { result: { data: 'hello' } }
+   */
+  private setNestedValue(
+    obj: Record<string, unknown>,
+    pathParts: string[],
+    value: unknown,
+  ): Record<string, unknown> {
+    if (pathParts.length === 0) {
+      // No path parts means replace entire object
+      return value as Record<string, unknown>;
+    }
+
+    const result = { ...obj };
+    let current = result;
+
+    for (let i = 0; i < pathParts.length - 1; i++) {
+      const part = pathParts[i];
+      if (!(part in current) || typeof current[part] !== 'object') {
+        current[part] = {};
+      } else {
+        current[part] = { ...(current[part] as Record<string, unknown>) };
+      }
+      current = current[part] as Record<string, unknown>;
+    }
+
+    current[pathParts[pathParts.length - 1]] = value;
+    return result;
   }
 
   /** Get table by path */

@@ -153,8 +153,8 @@ describe('Coordinator - Context Operations', () => {
         { required: ['greeting', 'final_count'] },
       ),
       output_mapping: {
-        greeting: '$.output.process_node.greeting',
-        final_count: '$.output.process_node.processed_count',
+        greeting: '$.output.greeting',
+        final_count: '$.output.processed_count',
       },
       initial_node_ref: 'process_node',
       nodes: [
@@ -168,8 +168,8 @@ describe('Coordinator - Context Operations', () => {
             count: '$.input.count',
           },
           output_mapping: {
-            greeting: '$.greeting',
-            processed_count: '$.processed_count',
+            'output.greeting': '$.greeting',
+            'output.processed_count': '$.processed_count',
           },
         }),
       ],
@@ -278,18 +278,41 @@ describe('Coordinator - Context Operations', () => {
     expect(inputValidation!.payload.error_count).toBe(0);
     console.log('  ✓ operation.context.validate (input validated successfully)');
 
-    // Validate output write (node outputs are stored under their ref)
-    const outputWrite = trace.context.writeAt('output');
+    // Debug: print all trace events to see what's happening with output mapping
+    const outputMappingInput = trace.find('operation.context.output_mapping.input');
+    console.log('\n📊 Output mapping input:', JSON.stringify(outputMappingInput?.payload, null, 2));
+
+    const outputMappingApply = trace.filter('operation.context.output_mapping.apply');
+    console.log('📊 Output mapping apply events:', outputMappingApply.length);
+    outputMappingApply.forEach((e, i) => {
+      console.log(`  [${i}] ${JSON.stringify(e.payload)}`);
+    });
+
+    const outputMappingSkip = trace.find('operation.context.output_mapping.skip');
+    if (outputMappingSkip) {
+      console.log('📊 Output mapping skipped:', JSON.stringify(outputMappingSkip.payload, null, 2));
+    }
+
+    // Validate output write - with new architecture, outputs are written directly to output table
+    // (not nested under node ref like the old approach)
+    const allOutputWrites = trace.context.writes().filter((e) => e.payload.path === 'output');
+    console.log('📊 All output write events:', allOutputWrites.length);
+    allOutputWrites.forEach((e, i) => {
+      console.log(`  [${i}] seq=${e.sequence} value=${JSON.stringify(e.payload.value)}`);
+    });
+
+    // Get the LAST write to output (after applyOutputMapping)
+    const outputWrite = allOutputWrites[allOutputWrites.length - 1];
+    console.log('📊 Final output write event:', JSON.stringify(outputWrite?.payload, null, 2));
+
     expect(outputWrite).toBeDefined();
     expect(outputWrite!.payload.path).toBe('output');
     expect(outputWrite!.payload.value).toBeDefined();
     const outputValue = outputWrite!.payload.value as Record<string, unknown>;
-    // Node output is stored under its ref: process_node
-    expect(outputValue.process_node).toBeDefined();
-    const nodeOutput = outputValue.process_node as Record<string, unknown>;
-    expect(nodeOutput.greeting).toBeDefined();
-    expect(nodeOutput.processed_count).toBeDefined();
-    console.log('  ✓ operation.context.write (output stored under node ref)');
+    // With new architecture, output is written directly (not under node ref)
+    expect(outputValue.greeting).toBeDefined();
+    expect(outputValue.processed_count).toBeDefined();
+    console.log('  ✓ operation.context.write (output stored directly)');
 
     // Validate output was read in snapshot
     const outputReads = contextReads.filter((e) => e.payload.path === 'output');
