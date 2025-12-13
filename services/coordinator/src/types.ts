@@ -8,8 +8,8 @@
  * - Transition config types for synchronization
  */
 
-import type { CreateTokenParams } from './operations/tokens.js';
-import type { TokenStatus } from './schemas.js';
+import type { CreateTokenParams } from './operations/tokens';
+import type { TokenStatus } from './schema';
 
 // ============================================================================
 // Context Types

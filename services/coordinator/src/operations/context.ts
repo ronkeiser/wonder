@@ -38,8 +38,8 @@
 
 import { Schema, type JSONSchema, type SchemaTable } from '@wonder/context';
 import type { Emitter } from '@wonder/events';
-import type { ContextSnapshot } from '../types.js';
-import type { DefinitionManager } from './defs.js';
+import type { ContextSnapshot } from '../types';
+import type { DefinitionManager } from './defs';
 
 /** Merge configuration for fan-in */
 export type MergeConfig = {

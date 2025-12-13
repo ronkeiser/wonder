@@ -16,9 +16,9 @@ import { and, count, eq, inArray, isNull, like } from 'drizzle-orm';
 import { drizzle, type DrizzleSqliteDODatabase } from 'drizzle-orm/durable-sqlite';
 import { ulid } from 'ulid';
 
-import * as schema from '../schemas';
-import { tokens, type TokenStatus } from '../schemas.js';
-import type { DefinitionManager } from './defs.js';
+import * as schema from '../schema';
+import { tokens, type TokenStatus } from '../schema';
+import type { DefinitionManager } from './defs';
 
 /** Token row type inferred from schema */
 export type TokenRow = typeof tokens.$inferSelect;

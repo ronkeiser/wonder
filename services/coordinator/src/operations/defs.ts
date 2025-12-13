@@ -11,9 +11,9 @@ import { and, eq } from 'drizzle-orm';
 import { drizzle, type DrizzleSqliteDODatabase } from 'drizzle-orm/durable-sqlite';
 import { migrate } from 'drizzle-orm/durable-sqlite/migrator';
 
-import migrations from '../migrations/migrations';
-import * as schema from '../schemas';
-import { nodes, transitions, workflow_defs, workflow_runs } from '../schemas.js';
+import * as schema from '../schema';
+import { nodes, transitions, workflow_defs, workflow_runs } from '../schema';
+import migrations from '../schema/migrations';
 
 // Types inferred from schema
 export type WorkflowRunRow = typeof workflow_runs.$inferSelect;

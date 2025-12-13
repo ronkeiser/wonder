@@ -10,8 +10,8 @@
  * - Returns Decision[] for dispatch to execute
  */
 
-import type { SiblingCounts, TokenRow } from '../operations/tokens.js';
-import type { Decision, MergeConfig, SynchronizationConfig, TransitionDef } from '../types.js';
+import type { SiblingCounts, TokenRow } from '../operations/tokens';
+import type { Decision, MergeConfig, SynchronizationConfig, TransitionDef } from '../types';
 
 // ============================================================================
 // Main Synchronization Entry Point

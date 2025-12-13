@@ -20,7 +20,7 @@ export {
   evaluateCondition,
   getMergeConfig as getRoutingMergeConfig,
   getTransitionsWithSynchronization,
-} from './routing.js';
+} from './routing';
 
 // Synchronization: fan-in and merge decisions
 export {
@@ -31,4 +31,4 @@ export {
   getMergeConfig as getSyncMergeConfig,
   hasTimedOut,
   needsMerge,
-} from './synchronization.js';
+} from './synchronization';

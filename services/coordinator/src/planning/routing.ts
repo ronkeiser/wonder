@@ -11,7 +11,7 @@
  * - Spawn count from transition config or foreach collection
  */
 
-import type { TransitionRow } from '../operations/defs.js';
+import type { TransitionRow } from '../operations/defs';
 import type {
   Condition,
   ContextSnapshot,
@@ -22,7 +22,7 @@ import type {
   MergeConfig,
   SynchronizationConfig,
   TransitionDef,
-} from '../types.js';
+} from '../types';
 
 // ============================================================================
 // Main Routing Entry Point

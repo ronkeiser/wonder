@@ -7,14 +7,14 @@
 import type { Emitter } from '@wonder/events';
 import { createLogger, type Logger } from '@wonder/logs';
 import { DurableObject } from 'cloudflare:workers';
-import { applyDecisions, type DispatchContext } from './dispatch/index.js';
-import { ContextManager } from './operations/context.js';
-import { DefinitionManager } from './operations/defs.js';
-import { CoordinatorEmitter } from './operations/events.js';
-import { TokenManager } from './operations/tokens.js';
-import { decideRouting, getTransitionsWithSynchronization } from './planning/index.js';
-import { decideSynchronization } from './planning/synchronization.js';
-import type { TaskResult } from './types.js';
+import { applyDecisions, type DispatchContext } from './dispatch/index';
+import { ContextManager } from './operations/context';
+import { DefinitionManager } from './operations/defs';
+import { CoordinatorEmitter } from './operations/events';
+import { TokenManager } from './operations/tokens';
+import { decideRouting, getTransitionsWithSynchronization } from './planning/index';
+import { decideSynchronization } from './planning/synchronization';
+import type { TaskResult } from './types';
 
 /**
  * WorkflowCoordinator Durable Object

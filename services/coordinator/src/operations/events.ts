@@ -6,7 +6,7 @@
  */
 
 import { createEmitter, type Emitter } from '@wonder/events';
-import type { DefinitionManager } from './defs.js';
+import type { DefinitionManager } from './defs';
 
 /**
  * CoordinatorEmitter wraps the standard Emitter with definition-backed context loading
