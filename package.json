@@ -5,7 +5,7 @@
   "scripts": {
     "test": "vitest run --config packages/test/vitest.config.ts",
     "test:edge": "vitest run --config packages/e2e/vitest.config.ts tests/edge",
-    "types": "pnpm --filter @wonder/env run build-services",
+    "types": "pnpm --filter @wonder/scripts run build-services",
     "typecheck": "pnpm run --parallel --filter \"./services/*\" typecheck",
     "deploy:all": "pnpm -r --filter './services/*' --workspace-concurrency 1 deploy",
     "deploy:coordinator": "wrangler deploy --config services/coordinator/wrangler.jsonc",
