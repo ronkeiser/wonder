@@ -62,17 +62,16 @@ ctx.output.process.count; // ✓ number
 ### Basic Workflow
 
 ```typescript
-import { wonder } from '@wonder/sdk';
-import { z } from 'zod';
+import { wonder, schema as s } from '@wonder/sdk';
 
 const workflow = wonder
   .workflow('greeting-workflow')
   .input({
-    name: z.string(),
-    language: z.enum(['en', 'es', 'fr']),
+    name: s.string(),
+    language: s.string({ enum: ['en', 'es', 'fr'] }),
   })
   .output({
-    greeting: z.string(),
+    greeting: s.string(),
   })
 
   .node('greet', (ctx) => ({
@@ -84,7 +83,7 @@ const workflow = wonder
       bad: ctx.input.foo, // ✗ TYPE ERROR: 'foo' doesn't exist
     },
     output: {
-      greeting: z.string(),
+      greeting: s.string(),
     },
   }))
 
@@ -101,15 +100,15 @@ const workflow = wonder
 const pipeline = wonder
   .workflow('data-pipeline')
   .input({
-    items: z.array(z.string()),
-    threshold: z.number(),
+    items: s.array(s.string()),
+    threshold: s.number(),
   })
   .state({
-    processedCount: z.number(),
+    processedCount: s.number(),
   })
   .output({
-    results: z.array(z.object({ id: z.string(), score: z.number() })),
-    summary: z.string(),
+    results: s.array(s.object({ id: s.string(), score: s.number() })),
+    summary: s.string(),
   })
 
   .node('validate', (ctx) => ({
@@ -119,8 +118,8 @@ const pipeline = wonder
       min: ctx.input.threshold,
     },
     output: {
-      validItems: z.array(z.string()),
-      invalidCount: z.number(),
+      validItems: s.array(s.string()),
+      invalidCount: s.number(),
     },
   }))
 
@@ -132,7 +131,7 @@ const pipeline = wonder
       threshold: ctx.input.threshold,
     },
     output: {
-      results: z.array(z.object({ id: z.string(), score: z.number() })),
+      results: s.array(s.object({ id: s.string(), score: s.number() })),
     },
   }))
 
@@ -142,7 +141,7 @@ const pipeline = wonder
       results: ctx.output.process.results,
     },
     output: {
-      summary: z.string(),
+      summary: s.string(),
     },
   }))
 
@@ -163,20 +162,20 @@ const pipeline = wonder
 const router = wonder
   .workflow('smart-router')
   .input({
-    query: z.string(),
-    priority: z.enum(['low', 'medium', 'high']),
+    query: s.string(),
+    priority: s.string({ enum: ['low', 'medium', 'high'] }),
   })
   .output({
-    response: z.string(),
-    handler: z.string(),
+    response: s.string(),
+    handler: s.string(),
   })
 
   .node('classify', (ctx) => ({
     task: classifyTaskId,
     input: { query: ctx.input.query },
     output: {
-      category: z.enum(['billing', 'technical', 'general']),
-      confidence: z.number(),
+      category: s.string({ enum: ['billing', 'technical', 'general'] }),
+      confidence: s.number(),
     },
   }))
 
@@ -186,27 +185,27 @@ const router = wonder
       query: ctx.input.query,
       category: ctx.output.classify.category,
     },
-    output: { response: z.string() },
+    output: { response: s.string() },
   }))
 
   .node('technical_handler', (ctx) => ({
     task: technicalTaskId,
     input: { query: ctx.input.query },
-    output: { response: z.string() },
+    output: { response: s.string() },
   }))
 
   .node('general_handler', (ctx) => ({
     task: generalTaskId,
     input: { query: ctx.input.query },
-    output: { response: z.string() },
+    output: { response: s.string() },
   }))
 
-  // Conditional transitions with type-safe conditions
+  // Conditional transitions with type-safe expression builder
   .transition('classify', 'billing_handler', {
-    when: (ctx) => ctx.output.classify.category === 'billing',
+    when: (ctx) => ctx.output.classify.category.eq('billing'),
   })
   .transition('classify', 'technical_handler', {
-    when: (ctx) => ctx.output.classify.category === 'technical',
+    when: (ctx) => ctx.output.classify.category.eq('technical'),
   })
   .transition('classify', 'general_handler') // Default fallback
 
@@ -221,24 +220,71 @@ const router = wonder
   .build();
 ```
 
+### Expression Builder
+
+Conditions are built using a type-safe expression API that compiles to CEL:
+
+```typescript
+// Comparison operators
+ctx.output.classify.category.eq('billing'); // category == "billing"
+ctx.output.classify.confidence.gt(0.8); // confidence > 0.8
+ctx.output.classify.confidence.gte(0.8); // confidence >= 0.8
+ctx.output.classify.confidence.lt(0.5); // confidence < 0.5
+ctx.input.priority.neq('low'); // priority != "low"
+ctx.input.priority.in(['high', 'critical']); // priority in ["high", "critical"]
+
+// String operators
+ctx.input.query.contains('refund'); // query.contains("refund")
+ctx.input.query.startsWith('help'); // query.startsWith("help")
+ctx.input.query.matches('^[A-Z]{3}-\\d+$'); // query.matches("^[A-Z]{3}-\\d+$")
+
+// Logical operators
+ctx.output.classify.category.eq('billing').and(ctx.output.classify.confidence.gt(0.8)); // &&
+
+ctx.input.priority.eq('high').or(ctx.input.priority.eq('critical')); // ||
+
+ctx.output.classify.category.eq('billing').not(); // !(...)
+
+// Complex expressions
+ctx.output.classify.confidence
+  .gt(0.8)
+  .and(ctx.input.priority.eq('high').or(ctx.output.classify.category.eq('billing')));
+// confidence > 0.8 && (priority == "high" || category == "billing")
+```
+
+The expression builder:
+
+1. **Type-checks at compile time** — `ctx.output.classify.typo` is a TS error
+2. **Validates operator/type combinations** — `.gt()` only available on numbers
+3. **Generates valid CEL** — No string manipulation errors
+4. **Provides autocomplete** — IDE knows available fields and methods
+
+For rare cases requiring arbitrary CEL, use the escape hatch:
+
+```typescript
+.transition('a', 'b', {
+  whenCEL: "size(input.items) > output.validate.threshold * 2",
+})
+```
+
 ### Fan-Out / Fan-In
 
 ```typescript
 const parallel = wonder
   .workflow('idea-generator')
   .input({
-    topic: z.string(),
-    judgeCount: z.number(),
+    topic: s.string(),
+    judgeCount: s.number(),
   })
   .output({
-    bestIdea: z.string(),
-    scores: z.array(z.number()),
+    bestIdea: s.string(),
+    scores: s.array(s.number()),
   })
 
   .node('generate', (ctx) => ({
     task: generateTaskId,
     input: { topic: ctx.input.topic },
-    output: { ideas: z.array(z.string()) },
+    output: { ideas: s.array(s.string()) },
   }))
 
   // Fan-out: spawn N parallel executions
@@ -250,8 +296,8 @@ const parallel = wonder
       judgeIndex: ctx.tokenIndex, // 0, 1, 2... per instance
     },
     output: {
-      scores: z.array(z.number()),
-      topPick: z.string(),
+      scores: s.array(s.number()),
+      topPick: s.string(),
     },
   }))
 
@@ -264,8 +310,8 @@ const parallel = wonder
       allPicks: ctx.merged.judge.topPick,
     },
     output: {
-      bestIdea: z.string(),
-      finalScores: z.array(z.number()),
+      bestIdea: s.string(),
+      finalScores: s.array(s.number()),
     },
   }))
 
@@ -289,11 +335,14 @@ const parallel = wonder
 3. `.node()` method that adds node output to context type
 4. `.build()` that emits `CreateWorkflowDef`
 
-### Phase 2: Transitions
+### Phase 2: Transitions & Expression Builder
 
 1. `.transition()` with type-safe node ref validation
-2. Conditional transitions with `when` predicate
-3. Priority ordering
+2. Expression builder: `Expr`, `StringFieldExpr`, `NumberFieldExpr`, etc.
+3. Proxy-based `ExprContext` that builds paths and returns typed field expressions
+4. CEL code generation from expression tree
+5. Priority ordering
+6. `whenCEL` escape hatch for complex expressions
 
 ### Phase 3: Fan-Out/Fan-In
 
@@ -309,8 +358,8 @@ Extend to task definitions with step-level type safety:
 ```typescript
 const task = wonder
   .task('write-verified')
-  .input({ path: z.string(), content: z.string() })
-  .output({ success: z.boolean(), hash: z.string() })
+  .input({ path: s.string(), content: s.string() })
+  .output({ success: s.boolean(), hash: s.string() })
 
   .step('write', (ctx) => ({
     action: writeActionId,
@@ -318,13 +367,13 @@ const task = wonder
       filePath: ctx.input.path,
       data: ctx.input.content,
     },
-    output: { bytesWritten: z.number() },
+    output: { bytesWritten: s.number() },
   }))
 
   .step('verify', (ctx) => ({
     action: readActionId,
     input: { filePath: ctx.input.path },
-    output: { content: z.string(), hash: z.string() },
+    output: { content: s.string(), hash: s.string() },
   }))
 
   .returns((ctx) => ({
@@ -338,32 +387,61 @@ const task = wonder
 ## Type Implementation Sketch
 
 ```typescript
+import type { JSONSchema } from '@wonder/context';
+
+// Infer TypeScript type from JSONSchema
+type InferSchema<T extends JSONSchema> = T['type'] extends 'string'
+  ? T['enum'] extends readonly string[]
+    ? T['enum'][number]
+    : string
+  : T['type'] extends 'number' | 'integer'
+    ? number
+    : T['type'] extends 'boolean'
+      ? boolean
+      : T['type'] extends 'array'
+        ? T['items'] extends JSONSchema
+          ? InferSchema<T['items']>[]
+          : unknown[]
+        : T['type'] extends 'object'
+          ? T['properties'] extends Record<string, JSONSchema>
+            ? { [K in keyof T['properties']]: InferSchema<T['properties'][K]> }
+            : Record<string, unknown>
+          : unknown;
+
+// Schema shape: Record<string, JSONSchema>
+type SchemaShape = Record<string, JSONSchema>;
+
+// Infer object type from schema shape
+type InferShape<T extends SchemaShape> = {
+  [K in keyof T]: InferSchema<T[K]>;
+};
+
 // Context type that grows with each node
 type WorkflowContext<
-  TInput extends ZodRawShape,
-  TState extends ZodRawShape,
-  TOutput extends ZodRawShape,
-  TNodes extends Record<string, ZodRawShape>,
+  TInput extends SchemaShape,
+  TState extends SchemaShape,
+  TOutput extends SchemaShape,
+  TNodes extends Record<string, SchemaShape>,
 > = {
-  input: z.infer<z.ZodObject<TInput>>;
-  state: z.infer<z.ZodObject<TState>>;
-  output: { [K in keyof TNodes]: z.infer<z.ZodObject<TNodes[K]>> };
+  input: InferShape<TInput>;
+  state: InferShape<TState>;
+  output: { [K in keyof TNodes]: InferShape<TNodes[K]> };
 };
 
 // Builder with evolving generic
 class WorkflowBuilder<
-  TInput extends ZodRawShape = {},
-  TState extends ZodRawShape = {},
-  TOutput extends ZodRawShape = {},
-  TNodes extends Record<string, ZodRawShape> = {},
+  TInput extends SchemaShape = {},
+  TState extends SchemaShape = {},
+  TOutput extends SchemaShape = {},
+  TNodes extends Record<string, SchemaShape> = {},
 > {
-  input<T extends ZodRawShape>(schema: T): WorkflowBuilder<T, TState, TOutput, TNodes>;
+  input<T extends SchemaShape>(schema: T): WorkflowBuilder<T, TState, TOutput, TNodes>;
 
-  state<T extends ZodRawShape>(schema: T): WorkflowBuilder<TInput, T, TOutput, TNodes>;
+  state<T extends SchemaShape>(schema: T): WorkflowBuilder<TInput, T, TOutput, TNodes>;
 
-  output<T extends ZodRawShape>(schema: T): WorkflowBuilder<TInput, TState, T, TNodes>;
+  output<T extends SchemaShape>(schema: T): WorkflowBuilder<TInput, TState, T, TNodes>;
 
-  node<TRef extends string, TNodeOutput extends ZodRawShape>(
+  node<TRef extends string, TNodeOutput extends SchemaShape>(
     ref: TRef,
     config: (ctx: WorkflowContext<TInput, TState, TOutput, TNodes>) => NodeConfig<TNodeOutput>,
   ): WorkflowBuilder<TInput, TState, TOutput, TNodes & { [K in TRef]: TNodeOutput }>;
@@ -371,6 +449,86 @@ class WorkflowBuilder<
   build(): CreateWorkflowDef;
 }
 ```
+
+### Expression Builder Types
+
+```typescript
+// Base expression that compiles to CEL
+interface Expr {
+  toCEL(): string;
+  and(other: Expr): Expr;
+  or(other: Expr): Expr;
+  not(): Expr;
+}
+
+// Type-safe field reference with operators based on field type
+type FieldExpr<T> = T extends string
+  ? StringFieldExpr
+  : T extends number
+    ? NumberFieldExpr
+    : T extends boolean
+      ? BooleanFieldExpr
+      : T extends Array<infer U>
+        ? ArrayFieldExpr<U>
+        : ObjectFieldExpr<T>;
+
+interface StringFieldExpr extends Expr {
+  eq(value: string): Expr;
+  neq(value: string): Expr;
+  in(values: string[]): Expr;
+  contains(substring: string): Expr;
+  startsWith(prefix: string): Expr;
+  endsWith(suffix: string): Expr;
+  matches(pattern: string): Expr;
+}
+
+interface NumberFieldExpr extends Expr {
+  eq(value: number): Expr;
+  neq(value: number): Expr;
+  gt(value: number): Expr;
+  gte(value: number): Expr;
+  lt(value: number): Expr;
+  lte(value: number): Expr;
+  in(values: number[]): Expr;
+  between(min: number, max: number): Expr;
+}
+
+interface BooleanFieldExpr extends Expr {
+  eq(value: boolean): Expr;
+  isTrue(): Expr; // field == true
+  isFalse(): Expr; // field == false
+}
+
+interface ArrayFieldExpr<T> extends Expr {
+  contains(value: T): Expr;
+  isEmpty(): Expr;
+  isNotEmpty(): Expr;
+  size(): NumberFieldExpr; // Returns number expr for size(field)
+}
+
+// Proxy-based context for transitions
+// Each property access builds the path and returns typed FieldExpr
+type ExprContext<
+  TInput extends SchemaShape,
+  TState extends SchemaShape,
+  TNodes extends Record<string, SchemaShape>,
+> = {
+  input: ExprShape<TInput>;
+  state: ExprShape<TState>;
+  output: { [K in keyof TNodes]: ExprShape<TNodes[K]> };
+};
+
+// Convert schema shape to expression shape
+type ExprShape<T extends SchemaShape> = {
+  [K in keyof T]: FieldExpr<InferSchema<T[K]>>;
+};
+```
+
+The expression context is a Proxy that:
+
+1. Tracks the path as you access properties (`ctx.output.classify.category` → `"output.classify.category"`)
+2. Returns a `FieldExpr` with methods typed to the field's schema type
+3. Each method returns an `Expr` that serializes to CEL
 
 ## Comparison to Alternatives
 
@@ -433,7 +591,7 @@ Both approaches emit the same `CreateWorkflowDef` type, so no backend changes ar
 
 ## Open Questions
 
-1. **Zod dependency** - Use Zod directly or our own `schema.*` helpers?
+1. **~~Zod dependency~~** - ✅ Resolved: Use `@wonder/context` JSONSchema + SDK's `schema.*` helpers
 2. **Async node config** - Should node config callback be async for fetching task metadata?
 3. **Validation mode** - Emit warnings vs errors for type mismatches?
 4. **IDE integration** - How to surface errors in workflow editor UI?
@@ -441,5 +599,5 @@ Both approaches emit the same `CreateWorkflowDef` type, so no backend changes ar
 ## References
 
 - [TypeScript Builder Pattern](https://www.typescriptlang.org/docs/handbook/2/generics.html)
-- [Zod Schema Inference](https://zod.dev/?id=type-inference)
+- [@wonder/context](../packages/context/README.md) - Runtime JSON Schema validation
 - [Effect-TS](https://effect.website/) - Inspiration for type-safe effect systems
