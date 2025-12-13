@@ -11,6 +11,7 @@ import { mkdir, writeFile } from 'node:fs/promises';
 import openapiTS from 'openapi-typescript';
 import ts from 'typescript';
 import { formatClientCode, generateRootClient } from './generate-client.js';
+import { formatTestClientCode } from './generate-test-client.js';
 import { buildRouteTree, type HttpMethod, type PathDefinition } from './parse-paths.js';
 
 const API_URL = process.env.API_URL || 'https://wonder-http.ron-keiser.workers.dev';
@@ -103,11 +104,19 @@ async function generate() {
   const clientStructure = generateRootClient(routeTree);
   const clientOutput = formatClientCode(clientStructure);
 
+  console.log('Generating test client code...');
+  const testClientOutput = formatTestClientCode(clientStructure);
+
   await mkdir(SCHEMA_OUTPUT_DIR, { recursive: true });
 
   const files = [
     { path: `${SCHEMA_OUTPUT_DIR}/schema.d.ts`, content: schemaOutput, label: 'types' },
     { path: `${SCHEMA_OUTPUT_DIR}/client.ts`, content: clientOutput, label: 'client' },
+    {
+      path: `${SCHEMA_OUTPUT_DIR}/test-client.ts`,
+      content: testClientOutput,
+      label: 'test client',
+    },
   ];
 
   await Promise.all(
