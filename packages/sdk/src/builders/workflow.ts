@@ -5,8 +5,15 @@
  */
 
 import type { components } from '../generated/schema';
+import type { EmbeddedNode, EmbeddedWorkflowDef } from './embedded';
+import { WORKFLOW_DEF } from './embedded';
 
 type CreateWorkflowDef = components['schemas']['CreateWorkflowDef'];
+
+/** Input config for workflowDef - accepts embedded nodes */
+type WorkflowDefConfig = Omit<CreateWorkflowDef, 'nodes'> & {
+  nodes: EmbeddedNode[];
+};
 
 /**
  * Create a complete workflow definition
@@ -28,7 +35,7 @@ type CreateWorkflowDef = components['schemas']['CreateWorkflowDef'];
  *   ]
  * });
  */
-export function workflowDef(config: CreateWorkflowDef): CreateWorkflowDef {
+export function workflowDef(config: WorkflowDefConfig): EmbeddedWorkflowDef {
   // Validate that initial_node_ref exists in nodes
   const nodeRefs = new Set(config.nodes.map((n) => n.ref));
   if (!nodeRefs.has(config.initial_node_ref)) {
@@ -55,6 +62,7 @@ export function workflowDef(config: CreateWorkflowDef): CreateWorkflowDef {
   }
 
   return {
+    [WORKFLOW_DEF]: true,
     name: config.name,
     description: config.description,
     input_schema: config.input_schema,

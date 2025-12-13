@@ -2,9 +2,11 @@
  * Task definition builder - Ergonomic helper for creating task definitions
  *
  * Returns a plain typed object that matches CreateTaskDef.
+ * Steps can embed actions for automatic creation by createWorkflow.
  */
 
 import type { components } from '../generated/schema';
+import { type EmbeddedAction, type EmbeddedStep, type EmbeddedTaskDef, TASK_DEF } from './embedded';
 
 type CreateTaskDef = components['schemas']['CreateTaskDef'];
 type CreateStep = components['schemas']['CreateStep'];
@@ -13,6 +15,7 @@ type CreateStep = components['schemas']['CreateStep'];
  * Create a step for a task definition
  *
  * @example
+ * // With action ID (traditional)
  * const myStep = step({
  *   ref: 'call_llm',
  *   ordinal: 0,
@@ -20,13 +23,21 @@ type CreateStep = components['schemas']['CreateStep'];
  *   action_version: 1,
  *   input_mapping: { prompt: '$.input.prompt' },
  *   output_mapping: { response: '$.result.text' },
- *   on_failure: 'abort'
+ * });
+ *
+ * // With embedded action (auto-created by createWorkflow)
+ * const myStep = step({
+ *   ref: 'call_llm',
+ *   ordinal: 0,
+ *   action: action({...}),  // will be created automatically
+ *   action_version: 1,
  * });
  */
 export function step(config: {
   ref: string;
   ordinal: number;
-  action_id: string;
+  action_id?: string;
+  action?: EmbeddedAction;
   action_version: number;
   input_mapping?: Record<string, unknown> | null;
   output_mapping?: Record<string, unknown> | null;
@@ -36,11 +47,15 @@ export function step(config: {
     then: 'continue' | 'skip' | 'succeed' | 'fail';
     else: 'continue' | 'skip' | 'succeed' | 'fail';
   } | null;
-}): CreateStep {
+}): EmbeddedStep {
+  if (!config.action_id && !config.action) {
+    throw new Error('Step must have either action_id or action');
+  }
   return {
     ref: config.ref,
     ordinal: config.ordinal,
     action_id: config.action_id,
+    action: config.action,
     action_version: config.action_version,
     input_mapping: config.input_mapping ?? null,
     output_mapping: config.output_mapping ?? null,
@@ -53,6 +68,7 @@ export function step(config: {
  * Create a task definition
  *
  * @example
+ * // With action IDs (traditional)
  * const myTask = taskDef({
  *   name: 'Write File Verified',
  *   description: 'Write file with read-back verification',
@@ -61,7 +77,24 @@ export function step(config: {
  *   output_schema: schema.object({ success: schema.boolean() }),
  *   steps: [
  *     step({ ref: 'write', ordinal: 0, action_id: 'write-action', action_version: 1 }),
- *     step({ ref: 'verify', ordinal: 1, action_id: 'read-action', action_version: 1 })
+ *   ]
+ * });
+ *
+ * // With embedded actions (auto-created by createWorkflow)
+ * const myTask = taskDef({
+ *   name: 'Summarize',
+ *   input_schema: schema.object({ text: schema.string() }),
+ *   output_schema: schema.object({ summary: schema.string() }),
+ *   steps: [
+ *     step({
+ *       ref: 'summarize',
+ *       ordinal: 0,
+ *       action: action({
+ *         promptSpec: promptSpec({...}),
+ *         ...
+ *       }),
+ *       action_version: 1
+ *     }),
  *   ]
  * });
  */
@@ -74,7 +107,7 @@ export function taskDef(config: {
   tags?: string[];
   input_schema: Record<string, unknown>;
   output_schema: Record<string, unknown>;
-  steps: CreateStep[];
+  steps: EmbeddedStep[];
   retry?: {
     max_attempts: number;
     backoff: 'none' | 'linear' | 'exponential';
@@ -82,7 +115,7 @@ export function taskDef(config: {
     max_delay_ms?: number | null;
   };
   timeout_ms?: number;
-}): CreateTaskDef {
+}): EmbeddedTaskDef {
   // Validate step ordinals are sequential starting from 0
   const ordinals = config.steps.map((s) => s.ordinal).sort((a, b) => a - b);
   for (let i = 0; i < ordinals.length; i++) {
@@ -103,6 +136,7 @@ export function taskDef(config: {
   }
 
   return {
+    [TASK_DEF]: true,
     name: config.name,
     description: config.description,
     version: config.version ?? 1,

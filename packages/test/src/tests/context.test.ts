@@ -1,4 +1,4 @@
-import { node, schema, workflowDef } from '@wonder/sdk';
+import { action, node, promptSpec, schema, step, taskDef, workflowDef } from '@wonder/sdk';
 import { describe, expect, it } from 'vitest';
 import {
   cleanupWorkflowTest,
@@ -9,14 +9,14 @@ import {
 
 describe('Coordinator - Context Operations', () => {
   it('validates context initialization, input validation, and trace events', async () => {
-    // Setup test context
+    // Setup test context (workspace, project, model profile)
     const ctx = await setupTestContext();
 
-    // Define workflow
+    // Define workflow with embedded resources
+    // createWorkflow will auto-create: promptSpec → action → taskDef → workflowDef
     const workflow = workflowDef({
       name: `Context Test Workflow ${Date.now()}`,
       description: 'Workflow to test context operations',
-      project_id: ctx.projectId,
       input_schema: schema.object(
         {
           name: schema.string(),
@@ -44,7 +44,48 @@ describe('Coordinator - Context Operations', () => {
         node({
           ref: 'process_node',
           name: 'Process Input',
-          task_id: ctx.echoTaskId,
+          task: taskDef({
+            name: 'Test Task',
+            description: 'Task that processes input',
+            input_schema: schema.object(
+              { name: schema.string(), count: schema.number() },
+              { required: ['name', 'count'] },
+            ),
+            output_schema: schema.object(
+              { greeting: schema.string(), processed_count: schema.number() },
+              { required: ['greeting', 'processed_count'] },
+            ),
+            steps: [
+              step({
+                ref: 'process',
+                ordinal: 0,
+                action: action({
+                  name: 'Test Action',
+                  description: 'Processes input',
+                  kind: 'llm_call',
+                  implementation: {
+                    prompt_spec: promptSpec({
+                      name: 'Test Prompt',
+                      description: 'Processes input and returns greeting',
+                      template: 'Process: {{name}} (count: {{count}})',
+                      template_language: 'handlebars',
+                      requires: { name: schema.string(), count: schema.number() },
+                      produces: schema.object(
+                        { greeting: schema.string(), processed_count: schema.number() },
+                        { required: ['greeting', 'processed_count'] },
+                      ),
+                    }),
+                  },
+                }),
+                action_version: 1,
+                input_mapping: { name: '$.input.name', count: '$.input.count' },
+                output_mapping: {
+                  'output.greeting': '$.response.greeting',
+                  'output.processed_count': '$.response.processed_count',
+                },
+              }),
+            ],
+          }),
           task_version: 1,
           input_mapping: {
             name: '$.input.name',
@@ -59,7 +100,7 @@ describe('Coordinator - Context Operations', () => {
       transitions: [],
     });
 
-    // Create workflow
+    // Create workflow (auto-creates all embedded resources)
     const setup = await createWorkflow(ctx, workflow);
 
     // Execute workflow
@@ -175,7 +216,7 @@ describe('Coordinator - Context Operations', () => {
 
     console.log('\n✅ Context operations validation complete');
 
-    // Cleanup
+    // Cleanup - resources are automatically tracked via setup.createdResources
     await cleanupWorkflowTest(setup, result.workflowRunId);
   });
 });

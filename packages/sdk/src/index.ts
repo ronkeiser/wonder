@@ -10,7 +10,30 @@ import type { paths } from './generated/schema';
 import { createTestClient as createGeneratedTestClient } from './generated/test-client';
 import { createWorkflowsClient } from './workflows';
 
-export { node, schema, step, taskDef, transition, workflowDef } from './builders';
+export {
+  action,
+  isEmbeddedAction,
+  isEmbeddedModelProfile,
+  isEmbeddedNode,
+  isEmbeddedPromptSpec,
+  isEmbeddedTaskDef,
+  isEmbeddedWorkflowDef,
+  modelProfile,
+  node,
+  promptSpec,
+  schema,
+  step,
+  taskDef,
+  transition,
+  workflowDef,
+  type EmbeddedAction,
+  type EmbeddedModelProfile,
+  type EmbeddedNode,
+  type EmbeddedPromptSpec,
+  type EmbeddedStep,
+  type EmbeddedTaskDef,
+  type EmbeddedWorkflowDef,
+} from './builders';
 
 export interface WonderClient extends Omit<ReturnType<typeof createGeneratedClient>, 'workflows'> {
   // Events client extends generated events with WebSocket capabilities
