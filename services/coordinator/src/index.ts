@@ -168,12 +168,9 @@ export class WorkflowCoordinator extends DurableObject {
       // Get outgoing transitions from completed node
       const transitions = this.defs.getTransitionsFrom(token.node_id);
 
-      // If no transitions, check workflow completion
+      // If no transitions, finalize if no active tokens remain
       if (transitions.length === 0) {
-        const activeCount = this.tokens.getActiveCount(workflow_run_id);
-        if (activeCount === 0) {
-          await this.finalizeWorkflow(workflow_run_id);
-        }
+        await this.checkAndFinalizeWorkflow(workflow_run_id);
         return;
       }
 
@@ -195,12 +192,9 @@ export class WorkflowCoordinator extends DurableObject {
         this.emitter.emitTrace(event);
       }
 
-      // If no routing decisions, check workflow completion
+      // If no routing decisions, finalize if no active tokens remain
       if (routingResult.decisions.length === 0) {
-        const activeCount = this.tokens.getActiveCount(workflow_run_id);
-        if (activeCount === 0) {
-          await this.finalizeWorkflow(workflow_run_id);
-        }
+        await this.checkAndFinalizeWorkflow(workflow_run_id);
         return;
       }
 
@@ -215,41 +209,9 @@ export class WorkflowCoordinator extends DurableObject {
 
       const applyResult = applyDecisions(routingResult.decisions, dispatchCtx);
 
-      // Check for transitions with synchronization requirements
+      // Handle synchronization for created tokens
       const syncTransitions = getTransitionsWithSynchronization(transitions, contextSnapshot);
-
-      // For each created token, check if it needs synchronization
-      for (const createdTokenId of applyResult.tokensCreated) {
-        const createdToken = this.tokens.get(createdTokenId);
-
-        // Find matching sync transition for this token's target node
-        const syncTransition = syncTransitions.find((t) => t.to_node_id === createdToken.node_id);
-
-        if (syncTransition && syncTransition.synchronization) {
-          // Get sibling counts for synchronization check
-          const siblingGroup = syncTransition.synchronization.sibling_group;
-          const siblingCounts = this.tokens.getSiblingCounts(workflow_run_id, siblingGroup);
-
-          // Plan synchronization decisions (returns decisions + trace events)
-          const syncResult = decideSynchronization({
-            token: createdToken,
-            transition: syncTransition,
-            siblingCounts,
-            workflowRunId: workflow_run_id,
-          });
-
-          // Emit trace events from sync planning
-          for (const event of syncResult.events) {
-            this.emitter.emitTrace(event);
-          }
-
-          // Apply sync decisions
-          applyDecisions(syncResult.decisions, dispatchCtx);
-        } else {
-          // No synchronization - mark for dispatch
-          this.tokens.updateStatus(createdTokenId, 'dispatched');
-        }
-      }
+      this.processSynchronization(applyResult.tokensCreated, syncTransitions, dispatchCtx);
 
       // Dispatch any tokens marked for dispatch
       const dispatchedTokens = this.tokens.getMany(
@@ -264,10 +226,7 @@ export class WorkflowCoordinator extends DurableObject {
       }
 
       // Check workflow completion after all routing
-      const activeCount = this.tokens.getActiveCount(workflow_run_id);
-      if (activeCount === 0) {
-        await this.finalizeWorkflow(workflow_run_id);
-      }
+      await this.checkAndFinalizeWorkflow(workflow_run_id);
     } catch (error) {
       this.logger.error({
         event_type: 'coordinator_task_result_failed',
@@ -281,6 +240,57 @@ export class WorkflowCoordinator extends DurableObject {
         },
       });
       throw error;
+    }
+  }
+
+  /**
+   * Check if workflow is complete and finalize if so
+   */
+  private async checkAndFinalizeWorkflow(workflowRunId: string): Promise<void> {
+    const activeCount = this.tokens.getActiveCount(workflowRunId);
+    if (activeCount === 0) {
+      await this.finalizeWorkflow(workflowRunId);
+    }
+  }
+
+  /**
+   * Process synchronization for created tokens
+   */
+  private processSynchronization(
+    createdTokenIds: string[],
+    syncTransitions: ReturnType<typeof getTransitionsWithSynchronization>,
+    dispatchCtx: DispatchContext,
+  ): void {
+    for (const createdTokenId of createdTokenIds) {
+      const createdToken = this.tokens.get(createdTokenId);
+
+      // Find matching sync transition for this token's target node
+      const syncTransition = syncTransitions.find((t) => t.to_node_id === createdToken.node_id);
+
+      if (syncTransition && syncTransition.synchronization) {
+        // Get sibling counts for synchronization check
+        const siblingGroup = syncTransition.synchronization.sibling_group;
+        const siblingCounts = this.tokens.getSiblingCounts(dispatchCtx.workflowRunId, siblingGroup);
+
+        // Plan synchronization decisions (returns decisions + trace events)
+        const syncResult = decideSynchronization({
+          token: createdToken,
+          transition: syncTransition,
+          siblingCounts,
+          workflowRunId: dispatchCtx.workflowRunId,
+        });
+
+        // Emit trace events from sync planning
+        for (const event of syncResult.events) {
+          this.emitter.emitTrace(event);
+        }
+
+        // Apply sync decisions
+        applyDecisions(syncResult.decisions, dispatchCtx);
+      } else {
+        // No synchronization - mark for dispatch
+        this.tokens.updateStatus(createdTokenId, 'dispatched');
+      }
     }
   }
 
@@ -328,7 +338,7 @@ export class WorkflowCoordinator extends DurableObject {
 
       // Check if we should fail the workflow
       // For now, any error fails the workflow
-      await this.failWorkflow(workflow_run_id, errorResult.error.message);
+      this.failWorkflow(workflow_run_id, errorResult.error.message);
     } catch (error) {
       this.logger.error({
         event_type: 'coordinator_task_error_failed',
@@ -428,26 +438,12 @@ export class WorkflowCoordinator extends DurableObject {
   /**
    * Fail workflow due to unrecoverable error
    */
-  private async failWorkflow(workflowRunId: string, errorMessage: string): Promise<void> {
-    try {
-      this.emitter.emit({
-        event_type: 'workflow_failed',
-        message: `Workflow failed: ${errorMessage}`,
-        metadata: { error: errorMessage },
-      });
-    } catch (error) {
-      this.logger.error({
-        event_type: 'coordinator_fail_workflow_failed',
-        message: 'Critical error in failWorkflow()',
-        trace_id: workflowRunId,
-        metadata: {
-          error: error instanceof Error ? error.message : String(error),
-          stack: error instanceof Error ? error.stack : undefined,
-          workflowRunId,
-        },
-      });
-      throw error;
-    }
+  private failWorkflow(workflowRunId: string, errorMessage: string): void {
+    this.emitter.emit({
+      event_type: 'workflow_failed',
+      message: `Workflow failed: ${errorMessage}`,
+      metadata: { error: errorMessage },
+    });
   }
 
   /**
