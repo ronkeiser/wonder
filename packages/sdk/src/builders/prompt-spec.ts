@@ -5,7 +5,7 @@
  * When used with createWorkflow, can be embedded in actions for automatic creation.
  */
 
-import type { JSONSchema } from '@wonder/context';
+import type { JSONSchema } from '@wonder/schemas';
 import type { components } from '../generated/schema';
 import { type EmbeddedPromptSpec, PROMPT_SPEC } from './embedded';
 

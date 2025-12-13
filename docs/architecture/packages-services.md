@@ -16,7 +16,7 @@ Every component in Wonder is either a **package** or a **service**:
 
 ## Packages
 
-### @wonder/context
+### @wonder/schemas
 
 **Purpose:** Schema-driven SQL toolkit for SQLite/D1
 
@@ -47,7 +47,7 @@ Every component in Wonder is either a **package** or a **service**:
 
 **Dependencies:** openapi-fetch, openapi-typescript
 
-**Used by:** External applications, @wonder/test, CLI tools
+**Used by:** External applications, @wonder/e2e, CLI tools
 
 ---
 
@@ -68,7 +68,7 @@ Every component in Wonder is either a **package** or a **service**:
 
 ---
 
-### @wonder/test
+### @wonder/e2e
 
 **Purpose:** End-to-end test suite
 
@@ -237,7 +237,7 @@ Every component in Wonder is either a **package** or a **service**:
 - Action, prompt spec, model profile management
 - Repo metadata (name, project_id, default_branch)
 - D1 storage for all resource metadata
-- Schema validation via @wonder/context
+- Schema validation via @wonder/schemas
 - Version management for definitions
 
 **Storage:** D1 (resources database)
@@ -325,8 +325,8 @@ await env.WORKFLOW_TASKS.send({
 ### Service-to-Package (Import)
 
 ```typescript
-// Coordinator importing @wonder/context
-import { Validator } from '@wonder/context';
+// Coordinator importing @wonder/schemas
+import { Validator } from '@wonder/schemas';
 const validator = new Validator(schema);
 const result = validator.validate(data);
 
@@ -355,10 +355,10 @@ git push wonder main
 
 | Component         | Type    | Deploy Target      | Storage          | Communication                                 |
 | ----------------- | ------- | ------------------ | ---------------- | --------------------------------------------- |
-| @wonder/context   | Package | npm (internal)     | None             | Import                                        |
+| @wonder/e2e       | Package | npm (internal)     | None             | Import                                        |
+| @wonder/schemas   | Package | npm (internal)     | None             | Import                                        |
 | @wonder/sdk       | Package | npm (public)       | None             | Import                                        |
 | @wonder/templates | Package | npm (internal)     | None             | Import                                        |
-| @wonder/test      | Package | npm (internal)     | None             | Import                                        |
 | cache             | Service | Cloudflare Workers | R2               | Workers RPC                                   |
 | containers        | Service | Cloudflare Workers | DO SQLite        | Workers RPC                                   |
 | coordinator       | Service | Cloudflare Workers | DO SQLite, D1    | Workers RPC                                   |

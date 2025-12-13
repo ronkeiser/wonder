@@ -13,7 +13,7 @@
   "dependencies": {
     "@wonder/events": "workspace:*",
     "@wonder/logs": "workspace:*",
-    "@wonder/context": "workspace:*",
+    "@wonder/schemas": "workspace:*",
     "@wonder/resources": "workspace:*",
     "@wonder/templates": "workspace:*",
     "drizzle-orm": "^0.44.7",

@@ -387,7 +387,7 @@ const task = wonder
 ## Type Implementation Sketch
 
 ```typescript
-import type { JSONSchema } from '@wonder/context';
+import type { JSONSchema } from '@wonder/schemas';
 
 // Infer TypeScript type from JSONSchema
 type InferSchema<T extends JSONSchema> = T['type'] extends 'string'
@@ -591,7 +591,7 @@ Both approaches emit the same `CreateWorkflowDef` type, so no backend changes ar
 
 ## Open Questions
 
-1. **~~Zod dependency~~** - ✅ Resolved: Use `@wonder/context` JSONSchema + SDK's `schema.*` helpers
+1. **~~Zod dependency~~** - ✅ Resolved: Use `@wonder/schemas` JSONSchema + SDK's `schema.*` helpers
 2. **Async node config** - Should node config callback be async for fetching task metadata?
 3. **Validation mode** - Emit warnings vs errors for type mismatches?
 4. **IDE integration** - How to surface errors in workflow editor UI?
@@ -599,5 +599,5 @@ Both approaches emit the same `CreateWorkflowDef` type, so no backend changes ar
 ## References
 
 - [TypeScript Builder Pattern](https://www.typescriptlang.org/docs/handbook/2/generics.html)
-- [@wonder/context](../packages/context/README.md) - Runtime JSON Schema validation
+- [@wonder/schemas](../packages/context/README.md) - Runtime JSON Schema validation
 - [Effect-TS](https://effect.website/) - Inspiration for type-safe effect systems

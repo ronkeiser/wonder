@@ -117,7 +117,7 @@
 - Artifact schemas validated on commit
 - Artifacts indexed: D1 for metadata queries, Vectorize for semantic search
 - All entity IDs use ULID format (sortable, timestamp-prefixed, 26 chars)
-- @wonder/context handles all validation, DDL/DML generation (no duplication)
+- @wonder/schemas handles all validation, DDL/DML generation (no duplication)
 
 ## Templates
 

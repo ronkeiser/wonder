@@ -21,7 +21,7 @@ export const TASK_DEF = Symbol('taskDef');
 /** Symbol to mark embedded model profiles */
 export const MODEL_PROFILE = Symbol('modelProfile');
 
-import type { JSONSchema } from '@wonder/context';
+import type { JSONSchema } from '@wonder/schemas';
 import type { components } from '../generated/schema';
 
 type CreatePromptSpec = components['schemas']['CreatePromptSpec'];

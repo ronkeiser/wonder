@@ -1,5 +1,5 @@
 {
-  "name": "@wonder/context",
+  "name": "@wonder/schemas",
   "version": "0.0.1",
   "description": "Runtime schema validation and DDL generation for Wonder",
   "type": "module",

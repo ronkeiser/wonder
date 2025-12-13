@@ -228,7 +228,7 @@ Git objects stored in R2 for durable, versioned content. Immutable once written 
 
 **Primary Key:** `(id, version)` - Enables immutable versioning
 
-Immutable workflow graph definition. Changes create new versions. Context schema drives DO SQLite table generation via `@wonder/context`.
+Immutable workflow graph definition. Changes create new versions. Context schema drives DO SQLite table generation via `@wonder/schemas`.
 
 **Ownership:**
 
@@ -1006,7 +1006,7 @@ pending → dispatched → executing → waiting_for_siblings → completed
 ### Context
 
 **Storage:** DO SQLite (Coordinator)  
-**Schema:** **Dynamic** - Generated from `WorkflowDef.context_schema` via `@wonder/context`
+**Schema:** **Dynamic** - Generated from `WorkflowDef.context_schema` via `@wonder/schemas`
 
 Context is the workflow's runtime state, stored as **normalized SQL tables** (not JSON blobs).
 
@@ -1053,7 +1053,7 @@ CREATE TABLE workflow_context_results (
 - Arrays become separate tables with foreign keys
 - Nested objects flatten to prefixed columns
 - Transition conditions query directly against SQL columns
-- `@wonder/context` DMLGenerator produces INSERT/UPDATE/DELETE statements
+- `@wonder/schemas` DMLGenerator produces INSERT/UPDATE/DELETE statements
 
 **Branch isolation:**
 

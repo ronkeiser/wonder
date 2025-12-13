@@ -36,8 +36,8 @@
  * See docs/architecture/branch-storage.md for complete design.
  */
 
-import { Schema, type JSONSchema, type SchemaTable, type SqlHook } from '@wonder/context';
 import type { Emitter } from '@wonder/events';
+import { Schema, type JSONSchema, type SchemaTable, type SqlHook } from '@wonder/schemas';
 import { composeSqlMessage } from '../helpers/sql.js';
 import type { ContextSnapshot } from '../types';
 import type { DefinitionManager } from './defs';

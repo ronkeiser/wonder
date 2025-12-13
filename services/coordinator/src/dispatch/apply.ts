@@ -11,8 +11,8 @@
  * - Emit trace events for observability
  */
 
-import type { JSONSchema } from '@wonder/context';
 import type { Emitter } from '@wonder/events';
+import type { JSONSchema } from '@wonder/schemas';
 
 import type { ContextManager } from '../operations/context';
 import type { DefinitionManager } from '../operations/defs';

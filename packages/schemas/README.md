@@ -22,7 +22,7 @@ pnpm add @wonder/context
 ## Quick Start
 
 ```typescript
-import { Validator, DDLGenerator, DMLGenerator, CustomTypeRegistry } from '@wonder/context';
+import { Validator, DDLGenerator, DMLGenerator, CustomTypeRegistry } from '@wonder/schemas';
 
 // 1. Define your schema once
 const userSchema = {
@@ -67,7 +67,7 @@ await db
 ### Validation
 
 ```typescript
-import { Validator, validateSchema } from '@wonder/context';
+import { Validator, validateSchema } from '@wonder/schemas';
 
 const schema = {
   type: 'object',
@@ -96,7 +96,7 @@ if (!result.valid) {
 ### DDL Generation
 
 ```typescript
-import { DDLGenerator, CustomTypeRegistry } from '@wonder/context';
+import { DDLGenerator, CustomTypeRegistry } from '@wonder/schemas';
 
 // Define schema
 const schema = {
@@ -136,7 +136,7 @@ CREATE TABLE users_tags (
 ### Custom Types with SQL Mapping
 
 ```typescript
-import { CustomTypeRegistry, Validator, DDLGenerator } from '@wonder/context';
+import { CustomTypeRegistry, Validator, DDLGenerator } from '@wonder/schemas';
 
 // Register custom type with validation and SQL mapping
 const registry = new CustomTypeRegistry();
@@ -167,7 +167,7 @@ const ddl = generator.generateDDL('events');
 ### DML Generation (INSERT/UPDATE/DELETE)
 
 ```typescript
-import { DMLGenerator } from '@wonder/context';
+import { DMLGenerator } from '@wonder/schemas';
 
 const dmlGen = new DMLGenerator(schema, registry);
 

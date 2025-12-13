@@ -79,7 +79,7 @@ async function generate() {
         factory.createImportSpecifier(false, undefined, factory.createIdentifier('JSONSchema')),
       ]),
     ),
-    factory.createStringLiteral('@wonder/context'),
+    factory.createStringLiteral('@wonder/schemas'),
     undefined,
   );
 

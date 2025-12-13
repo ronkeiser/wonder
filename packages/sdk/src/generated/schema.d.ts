@@ -3,7 +3,7 @@
  * Do not make direct changes to the file.
  */
 
-import type { JSONSchema } from "@wonder/context";
+import type { JSONSchema } from "@wonder/schemas";
 export interface paths {
     "/api/workspaces": {
         parameters: {

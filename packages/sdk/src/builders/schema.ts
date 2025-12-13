@@ -1,11 +1,11 @@
 /**
  * Schema builders - Ergonomic helpers for creating JSONSchema objects
  *
- * These return plain typed objects that match JSONSchema from @wonder/context.
+ * These return plain typed objects that match JSONSchema from @wonder/schemas.
  * No magic, just convenience functions for common patterns.
  */
 
-import type { JSONSchema } from '@wonder/context';
+import type { JSONSchema } from '@wonder/schemas';
 
 /**
  * Create a string schema with optional constraints
