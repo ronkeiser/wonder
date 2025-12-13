@@ -329,6 +329,96 @@ export type DispatchEvent =
       type: 'dispatch.decision.apply';
       decision_type: string;
       decision: unknown; // Decision from coordinator
+    }
+  // Error handling
+  | {
+      type: 'dispatch.error';
+      decision_type: string;
+      error: string;
+    }
+  // Decision tracing
+  | {
+      type: 'dispatch.decision.planned';
+      decision_type: string;
+      source: string;
+      token_id?: string;
+      timestamp: number;
+    }
+  // Token operations
+  | {
+      type: 'dispatch.token.created';
+      token_id: string;
+      node_id: string;
+    }
+  | {
+      type: 'dispatch.tokens.batch_created';
+      count: number;
+    }
+  | {
+      type: 'dispatch.token.status_updated';
+      token_id: string;
+      status: string;
+    }
+  | {
+      type: 'dispatch.tokens.batch_status_updated';
+      count: number;
+    }
+  | {
+      type: 'dispatch.token.marked_waiting';
+      token_id: string;
+    }
+  | {
+      type: 'dispatch.token.marked_for_dispatch';
+      token_id: string;
+    }
+  // Context operations
+  | {
+      type: 'dispatch.context.set';
+      path: string;
+    }
+  | {
+      type: 'dispatch.context.output_applied';
+      path: string;
+    }
+  // Branch storage operations
+  | {
+      type: 'dispatch.branch.table_initialized';
+      token_id: string;
+    }
+  | {
+      type: 'dispatch.branch.output_applied';
+      token_id: string;
+    }
+  | {
+      type: 'dispatch.branch.merged';
+      token_ids: string[];
+      target: string;
+      strategy: string;
+    }
+  | {
+      type: 'dispatch.branch.tables_dropped';
+      token_ids: string[];
+    }
+  // Synchronization
+  | {
+      type: 'dispatch.sync.check_requested';
+      token_id: string;
+      transition_id: string;
+    }
+  | {
+      type: 'dispatch.sync.fan_in_activated';
+      node_id: string;
+      fan_in_path: string;
+      merged_count: number;
+    }
+  // Workflow lifecycle
+  | {
+      type: 'dispatch.workflow.completed';
+      has_output: boolean;
+    }
+  | {
+      type: 'dispatch.workflow.failed';
+      error: string;
     };
 
 /**
