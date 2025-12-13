@@ -1,6 +1,6 @@
 import { node, schema, step, taskDef, workflowDef } from '@wonder/sdk';
 import { describe, expect, it } from 'vitest';
-import { testClient, wonder } from '~/client';
+import { wonder } from '~/client';
 
 describe('Test Client Demo', () => {
   /**
@@ -16,18 +16,18 @@ describe('Test Client Demo', () => {
    */
   it('executes a workflow with auto-tracking', async () => {
     // Create infrastructure - resources are auto-unwrapped and auto-tracked
-    const workspace = await testClient.workspaces.create({
+    const workspace = await wonder.test.workspaces.create({
       name: `Test Workspace ${Date.now()}`,
       settings: {},
     });
 
-    const project = await testClient.projects.create({
+    const project = await wonder.test.projects.create({
       workspace_id: workspace.id,
       name: `Test Project ${Date.now()}`,
       settings: {},
     });
 
-    const modelProfile = await testClient.modelProfiles.create({
+    const modelProfile = await wonder.test.modelProfiles.create({
       name: `Test Model ${Date.now()}`,
       provider: 'cloudflare',
       model_id: '@cf/meta/llama-3.1-8b-instruct',
@@ -40,7 +40,7 @@ describe('Test Client Demo', () => {
     });
 
     // Create domain resources - also auto-unwrapped and tracked
-    const promptSpec = await testClient.promptSpecs.create({
+    const promptSpec = await wonder.test.promptSpecs.create({
       version: 1,
       name: 'Echo Input',
       description: 'Echo the input name and count',
@@ -59,7 +59,7 @@ describe('Test Client Demo', () => {
       ),
     });
 
-    const action = await testClient.actions.create({
+    const action = await wonder.test.actions.create({
       version: 1,
       name: 'Echo Action',
       description: 'LLM action that processes input',
@@ -70,7 +70,7 @@ describe('Test Client Demo', () => {
       },
     });
 
-    const task = await testClient.taskDefs.create(
+    const task = await wonder.test.taskDefs.create(
       taskDef({
         name: 'Echo Task',
         description: 'Task that wraps the echo action',
@@ -100,7 +100,7 @@ describe('Test Client Demo', () => {
       }),
     );
 
-    const workflowDefinition = await testClient.workflowDefs.create(
+    const workflowDefinition = await wonder.test.workflowDefs.create(
       workflowDef({
         name: `Test Workflow ${Date.now()}`,
         description: 'Workflow demonstrating test client',
@@ -139,7 +139,7 @@ describe('Test Client Demo', () => {
       }),
     );
 
-    const workflow = await testClient.workflows.create({
+    const workflow = await wonder.test.workflows.create({
       workflow_def_id: workflowDefinition.id,
       project_id: project.id,
       name: `Test Workflow Run ${Date.now()}`,
@@ -154,14 +154,14 @@ describe('Test Client Demo', () => {
     console.log('Workflow output:', result.events);
 
     // Count tracked resources
-    console.log(`📊 Tracked ${testClient.tracker.count} resources for cleanup`);
+    console.log(`📊 Tracked ${wonder.test.tracker.count} resources for cleanup`);
 
     // Track the workflow run for cleanup too
-    testClient.tracker.track({
+    wonder.test.tracker.track({
       delete: () => wonder.workflowRuns(result.workflow_run_id).delete(),
     });
 
     // Single cleanup call - all resources deleted in reverse order (LIFO)
-    await testClient.tracker.cleanup();
+    await wonder.test.tracker.cleanup();
   });
 });
