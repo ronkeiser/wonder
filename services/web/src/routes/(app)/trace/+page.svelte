@@ -9,10 +9,10 @@
   ];
 
   const categoryColorMap: Record<string, string> = {
-    decision: 'var(--indigo)',
-    operation: 'var(--violet)',
+    decision: 'var(--orange)',
+    operation: 'var(--gray-light)',
     dispatch: 'var(--pink)',
-    sql: 'var(--orange)',
+    sql: 'var(--violet)',
   };
 
   function getTraceColor(item: any): string {
@@ -33,11 +33,6 @@
   function renderTraceHeader(item: any) {
     const parts: string[] = [];
 
-    // Add duration if present
-    if (item.duration_ms !== null && item.duration_ms !== undefined) {
-      parts.push(`${item.duration_ms.toFixed(2)}ms`);
-    }
-
     // Add token context if present
     if (item.token_id) {
       parts.push(`token:${item.token_id.slice(-8)}`);
@@ -48,6 +43,22 @@
       parts.push(`node:${item.node_id.slice(-8)}`);
     }
 
+    // Determine the message to display
+    // Priority: item.message > type with context parts > just type
+    let message: string;
+    if (item.message) {
+      message = item.message;
+    } else if (item.duration_ms !== null && item.duration_ms !== undefined) {
+      message = `${item.duration_ms.toFixed(2)}ms`;
+    } else {
+      message = item.type;
+    }
+
+    // Append context parts if we have them
+    if (parts.length > 0) {
+      message = `${message} • ${parts.join(' • ')}`;
+    }
+
     return {
       time: formatTime(item.timestamp),
       badge: {
@@ -55,7 +66,7 @@
         color: categoryColorMap[item.category] || 'var(--gray)',
       },
       identifier: `${item.workflow_run_id.slice(-8)}-${item.sequence}`,
-      message: parts.length > 0 ? parts.join(' • ') : item.type,
+      message,
     };
   }
 

@@ -90,6 +90,17 @@ export function applyDecisions(decisions: Decision[], ctx: DispatchContext): App
     }
   }
 
+  // Emit batch completion trace
+  ctx.emitter.emitTrace({
+    type: 'dispatch.batch.complete',
+    total_decisions: decisions.length,
+    batched_decisions: batched.length,
+    applied: result.applied,
+    tokens_created: result.tokensCreated.length,
+    tokens_dispatched: result.tokensDispatched.length,
+    errors: result.errors.length,
+  });
+
   return result;
 }
 

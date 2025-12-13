@@ -88,6 +88,9 @@ export const traceEvents = sqliteTable(
     // Performance tracking
     duration_ms: real('duration_ms'), // For SQL queries, operation timing
 
+    // Human-readable message (optional, for UI display)
+    message: text('message'),
+
     // Payload (structured data specific to event type)
     payload: text('payload').notNull(), // JSON string - parsed manually in service
   },

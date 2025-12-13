@@ -25,4 +25,36 @@ export API_KEY="ga5jSrsUxsZQtcIT8v1WEUeHhP+2S5o/gNSS7QLEFYM="
 curl -H "X-API-Key: $API_KEY" "https://wonder-http.ron-keiser.workers.dev/api/events/trace?workflow_run_id=run_123"
 ```
 
-Do you understand?
+Trace events are defined in the events service in `services/events/src/types.ts`. Whenever we add new events to the `coordinator` or `executor` services, we need to update the event types.
+
+When ever you make changes to the code in preparation to run a new test, you must deploy the service. The root package.json provide these scripts:
+
+```typescript
+  "scripts": {
+    "test": "vitest run --config packages/test/vitest.config.ts",
+    "test:edge": "vitest run --config packages/test/vitest.config.ts tests/edge",
+    "types": "pnpm run --parallel --filter \"./services/*\" types",
+    "typecheck": "pnpm run --parallel --filter \"./services/*\" typecheck",
+    "deploy:all": "pnpm -r --filter './services/*' --workspace-concurrency 1 deploy",
+    "deploy:coordinator": "wrangler deploy --config services/coordinator/wrangler.jsonc",
+    "deploy:events": "wrangler deploy --config services/events/wrangler.jsonc",
+    "deploy:executor": "wrangler deploy --config services/executor/wrangler.jsonc",
+    "deploy:http": "wrangler deploy --config services/http/wrangler.jsonc",
+    "deploy:logs": "wrangler deploy --config services/logs/wrangler.jsonc",
+    "deploy:resources": "wrangler deploy --config services/resources/wrangler.jsonc",
+    "deploy:web": "pnpm --filter web run deploy"
+  },
+```
+
+Sometimes, it may be necessary for debugging to add logs. For this, use the `@wonder/logs` client, DO NOT use `console.log`. You can query the logs like this:
+
+```bash
+# All logs for a service
+curl "https://wonder-http.ron-keiser.workers.dev/api/logs?service=coordinator"
+
+# Filter by log level
+curl "https://wonder-http.ron-keiser.workers.dev/api/logs?service=coordinator&level=error"
+
+# Filter by trace ID (correlate across services)
+curl "https://wonder-http.ron-keiser.workers.dev/api/logs?trace_id=trace_abc123"
+```

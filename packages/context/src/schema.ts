@@ -28,6 +28,32 @@ export interface SqlExecutor {
 }
 
 /**
+ * Hook for observing SQL execution (tracing, logging, metrics)
+ */
+export interface SqlHook {
+  onQuery?: (query: string, params: unknown[], durationMs: number) => void;
+}
+
+/**
+ * Wraps a SqlExecutor with optional hooks for observability
+ */
+function wrapSqlExecutor(sql: SqlExecutor, hooks?: SqlHook): SqlExecutor {
+  if (!hooks?.onQuery) {
+    return sql;
+  }
+
+  return {
+    exec(query: string, ...args: unknown[]): Iterable<Record<string, unknown>> {
+      const start = performance.now();
+      const result = sql.exec(query, ...args);
+      const duration = performance.now() - start;
+      hooks.onQuery!(query, args, duration);
+      return result;
+    },
+  };
+}
+
+/**
  * Schema wraps a JSONSchema and provides cached access to validation and SQL generation.
  */
 export class Schema {
@@ -114,9 +140,11 @@ export class Schema {
 
   /**
    * Bind this schema to a SQL executor and table name for execution
+   * Optionally accepts hooks for SQL observability (tracing, metrics)
    */
-  bind(sql: SqlExecutor, tableName: string): SchemaTable {
-    return new SchemaTable(this, sql, tableName);
+  bind(sql: SqlExecutor, tableName: string, hooks?: SqlHook): SchemaTable {
+    const wrappedSql = wrapSqlExecutor(sql, hooks);
+    return new SchemaTable(this, wrappedSql, tableName);
   }
 }
 

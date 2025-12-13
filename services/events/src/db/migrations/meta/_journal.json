@@ -36,6 +36,13 @@
       "when": 1765581667801,
       "tag": "0004_round_hydra",
       "breakpoints": true
+    },
+    {
+      "idx": 5,
+      "version": "6",
+      "when": 1765627294749,
+      "tag": "0005_chubby_fabian_cortez",
+      "breakpoints": true
     }
   ]
 }

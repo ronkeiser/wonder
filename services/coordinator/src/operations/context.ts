@@ -36,10 +36,46 @@
  * See docs/architecture/branch-storage.md for complete design.
  */
 
-import { Schema, type JSONSchema, type SchemaTable } from '@wonder/context';
+import { Schema, type JSONSchema, type SchemaTable, type SqlHook } from '@wonder/context';
 import type { Emitter } from '@wonder/events';
 import type { ContextSnapshot } from '../types';
 import type { DefinitionManager } from './defs';
+
+/**
+ * Compose a human-readable message from SQL query
+ * e.g., "SELECT context_input (0ms)"
+ */
+function composeSqlMessage(sql: string, durationMs: number): string {
+  const normalized = sql.trim().toUpperCase();
+
+  // Extract operation (first word)
+  const operation = normalized.split(/\s+/)[0] || 'QUERY';
+
+  // Extract table name based on operation
+  let table = '';
+  if (normalized.startsWith('SELECT')) {
+    const match = sql.match(/FROM\s+(\w+)/i);
+    table = match?.[1] || '';
+  } else if (normalized.startsWith('INSERT')) {
+    const match = sql.match(/INTO\s+(\w+)/i);
+    table = match?.[1] || '';
+  } else if (normalized.startsWith('UPDATE')) {
+    const match = sql.match(/UPDATE\s+(\w+)/i);
+    table = match?.[1] || '';
+  } else if (normalized.startsWith('DELETE')) {
+    const match = sql.match(/FROM\s+(\w+)/i);
+    table = match?.[1] || '';
+  } else if (normalized.startsWith('CREATE')) {
+    const match = sql.match(/TABLE\s+(?:IF\s+NOT\s+EXISTS\s+)?(\w+)/i);
+    table = match?.[1] || '';
+  } else if (normalized.startsWith('DROP')) {
+    const match = sql.match(/TABLE\s+(?:IF\s+EXISTS\s+)?(\w+)/i);
+    table = match?.[1] || '';
+  }
+
+  const duration = Math.round(durationMs * 100) / 100; // 2 decimal places
+  return table ? `${operation} ${table} (${duration}ms)` : `${operation} (${duration}ms)`;
+}
 
 /** Merge configuration for fan-in */
 export type MergeConfig = {
@@ -82,6 +118,7 @@ export class ContextManager {
   private readonly sql: SqlStorage;
   private readonly defs: DefinitionManager;
   private readonly emitter: Emitter;
+  private readonly sqlHook: SqlHook;
 
   /** Bound schema tables (lazy initialized) */
   private inputTable: SchemaTable | null = null;
@@ -95,6 +132,19 @@ export class ContextManager {
     this.sql = sql;
     this.defs = defs;
     this.emitter = emitter;
+
+    // Create SQL hook for tracing
+    this.sqlHook = {
+      onQuery: (query, params, durationMs) => {
+        this.emitter.emitTrace({
+          type: 'sql.query',
+          message: composeSqlMessage(query, durationMs),
+          sql: query,
+          params,
+          duration_ms: durationMs,
+        });
+      },
+    };
   }
 
   /**
@@ -108,12 +158,12 @@ export class ContextManager {
     const inputSchema = new Schema(workflowDef.input_schema as JSONSchema);
     const outputSchema = new Schema(workflowDef.output_schema as JSONSchema);
 
-    this.inputTable = inputSchema.bind(this.sql, 'context_input');
-    this.outputTable = outputSchema.bind(this.sql, 'context_output');
+    this.inputTable = inputSchema.bind(this.sql, 'context_input', this.sqlHook);
+    this.outputTable = outputSchema.bind(this.sql, 'context_output', this.sqlHook);
 
     if (workflowDef.context_schema) {
       const stateSchema = new Schema(workflowDef.context_schema as JSONSchema);
-      this.stateTable = stateSchema.bind(this.sql, 'context_state');
+      this.stateTable = stateSchema.bind(this.sql, 'context_state', this.sqlHook);
     }
 
     this.initialized = true;
@@ -386,7 +436,7 @@ export class ContextManager {
   initializeBranchTable(tokenId: string, outputSchema: JSONSchema): void {
     const tableName = `branch_output_${tokenId}`;
     const schema = new Schema(outputSchema);
-    const table = schema.bind(this.sql, tableName);
+    const table = schema.bind(this.sql, tableName, this.sqlHook);
 
     table.create();
     this.branchTables.set(tokenId, table);
@@ -456,7 +506,7 @@ export class ContextManager {
       if (!table) {
         const tableName = `branch_output_${tokenId}`;
         const schema = new Schema(outputSchema);
-        table = schema.bind(this.sql, tableName);
+        table = schema.bind(this.sql, tableName, this.sqlHook);
       }
 
       const output = table.selectFirst() ?? {};
@@ -482,6 +532,14 @@ export class ContextManager {
    * Called at fan-in after synchronization condition is met
    */
   mergeBranches(branchOutputs: BranchOutput[], merge: MergeConfig): void {
+    this.emitter.emitTrace({
+      type: 'operation.context.merge.start',
+      sibling_count: branchOutputs.length,
+      strategy: merge.strategy,
+      source_path: merge.source,
+      target_path: merge.target,
+    });
+
     // Extract outputs based on source path
     const extractedOutputs = branchOutputs.map((b) => {
       if (merge.source === '_branch.output') {

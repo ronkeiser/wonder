@@ -6,11 +6,12 @@
  *
  * Key principles:
  * - No side effects (pure functions)
- * - Returns Decision[] for dispatch to execute
+ * - Returns { decisions, events } tuple for dispatch to execute and emit
  * - Priority tiers: same priority = parallel, different = sequential
  * - Spawn count from transition config or foreach collection
  */
 
+import type { DecisionEvent } from '@wonder/events';
 import type { TransitionRow } from '../operations/defs';
 import type {
   Condition,
@@ -23,6 +24,12 @@ import type {
   SynchronizationConfig,
   TransitionDef,
 } from '../types';
+
+/** Result from planning functions - decisions to apply and events to emit */
+export type PlanningResult = {
+  decisions: Decision[];
+  events: DecisionEvent[];
+};
 
 // ============================================================================
 // Main Routing Entry Point
@@ -37,6 +44,8 @@ import type {
  * 3. First tier with ANY matches wins; follow ALL matches in that tier
  * 4. For each matched transition, determine spawn count
  * 5. Generate CREATE_TOKEN decisions
+ *
+ * Returns both decisions and trace events for observability.
  */
 export function decideRouting(params: {
   completedTokenId: string;
@@ -45,9 +54,19 @@ export function decideRouting(params: {
   nodeId: string;
   transitions: TransitionRow[];
   context: ContextSnapshot;
-}): Decision[] {
+}): PlanningResult {
   const { completedTokenId, completedTokenPath, workflowRunId, nodeId, transitions, context } =
     params;
+
+  const events: DecisionEvent[] = [];
+  const decisions: Decision[] = [];
+
+  // Emit routing start event
+  events.push({
+    type: 'decision.routing.start',
+    token_id: completedTokenId,
+    node_id: nodeId,
+  });
 
   // Group by priority tier
   const grouped = groupByPriority(transitions);
@@ -57,25 +76,47 @@ export function decideRouting(params: {
   let matchedTransitions: TransitionRow[] = [];
   for (const priority of sortedPriorities) {
     const tier = grouped.get(priority) ?? [];
-    const matches = tier.filter((t) => evaluateCondition(t.condition as Condition | null, context));
 
-    if (matches.length > 0) {
-      matchedTransitions = matches;
-      break;
+    for (const t of tier) {
+      // Emit evaluation event for each transition
+      events.push({
+        type: 'decision.routing.evaluate_transition',
+        transition_id: t.id,
+        condition: t.condition,
+      });
+
+      const matched = evaluateCondition(t.condition as Condition | null, context);
+
+      if (matched) {
+        matchedTransitions.push(t);
+      }
+    }
+
+    if (matchedTransitions.length > 0) {
+      break; // First tier with matches wins
     }
   }
 
   // No matches = no routing (caller handles workflow completion check)
   if (matchedTransitions.length === 0) {
-    return [];
+    events.push({
+      type: 'decision.routing.complete',
+      decisions: [],
+    });
+    return { decisions: [], events };
   }
 
   // Generate CREATE_TOKEN decisions for each match
-  const decisions: Decision[] = [];
-
   for (const transition of matchedTransitions) {
     const spawnCount = determineSpawnCount(transition, context);
     const fanOutTransitionId = spawnCount > 1 ? transition.id : null;
+
+    // Emit transition matched event
+    events.push({
+      type: 'decision.routing.transition_matched',
+      transition_id: transition.id,
+      spawn_count: spawnCount,
+    });
 
     for (let i = 0; i < spawnCount; i++) {
       const pathId = buildPathId(completedTokenPath, nodeId, i, spawnCount);
@@ -95,7 +136,13 @@ export function decideRouting(params: {
     }
   }
 
-  return decisions;
+  // Emit routing complete event
+  events.push({
+    type: 'decision.routing.complete',
+    decisions,
+  });
+
+  return { decisions, events };
 }
 
 /**

@@ -325,7 +325,8 @@ export type OperationEvent =
  * SQL layer events - query performance and debugging
  */
 export type SQLEvent = {
-  type: 'operation.sql.query';
+  type: 'sql.query';
+  message: string; // e.g., "SELECT context_input (0ms)"
   sql: string;
   params: unknown[];
   duration_ms: number;
@@ -343,6 +344,15 @@ export type DispatchEvent =
       type: 'dispatch.batch.group';
       batch_type: string;
       count: number;
+    }
+  | {
+      type: 'dispatch.batch.complete';
+      total_decisions: number;
+      batched_decisions: number;
+      applied: number;
+      tokens_created: number;
+      tokens_dispatched: number;
+      errors: number;
     }
   | {
       type: 'dispatch.decision.apply';

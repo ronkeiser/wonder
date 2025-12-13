@@ -7,11 +7,13 @@
  * Key concepts:
  * - Sibling group: Tokens spawned from the same fan-out transition
  * - Strategy: 'any' (first wins), 'all' (wait for all), m_of_n (quorum)
- * - Returns Decision[] for dispatch to execute
+ * - Returns { decisions, events } tuple for dispatch to execute and emit
  */
 
+import type { DecisionEvent } from '@wonder/events';
 import type { SiblingCounts, TokenRow } from '../operations/tokens';
 import type { Decision, MergeConfig, SynchronizationConfig, TransitionDef } from '../types';
+import type { PlanningResult } from './routing';
 
 // ============================================================================
 // Main Synchronization Entry Point
@@ -27,56 +29,95 @@ import type { Decision, MergeConfig, SynchronizationConfig, TransitionDef } from
  * 3. Strategy 'all' or m_of_n:
  *    - Condition met → ACTIVATE_FAN_IN (merge and proceed)
  *    - Not met → MARK_WAITING
+ *
+ * Returns both decisions and trace events for observability.
  */
 export function decideSynchronization(params: {
   token: TokenRow;
   transition: TransitionDef;
   siblingCounts: SiblingCounts;
   workflowRunId: string;
-}): Decision[] {
+}): PlanningResult {
   const { token, transition, siblingCounts, workflowRunId } = params;
+
+  const events: DecisionEvent[] = [];
+
+  // Emit sync start event
+  events.push({
+    type: 'decision.sync.start',
+    token_id: token.id,
+    sibling_count: siblingCounts.total,
+  });
 
   // No synchronization config → pass through
   if (!transition.synchronization) {
-    return [{ type: 'MARK_FOR_DISPATCH', tokenId: token.id }];
+    return { decisions: [{ type: 'MARK_FOR_DISPATCH', tokenId: token.id }], events };
   }
 
   const sync = transition.synchronization;
 
   // Token not in the specified sibling group → pass through
   if (token.fan_out_transition_id !== sync.sibling_group) {
-    return [{ type: 'MARK_FOR_DISPATCH', tokenId: token.id }];
+    return { decisions: [{ type: 'MARK_FOR_DISPATCH', tokenId: token.id }], events };
   }
 
   // 'any' strategy → first arrival proceeds immediately
   if (sync.strategy === 'any') {
-    return [{ type: 'MARK_FOR_DISPATCH', tokenId: token.id }];
+    return { decisions: [{ type: 'MARK_FOR_DISPATCH', tokenId: token.id }], events };
   }
 
   // Check if synchronization condition is met
+  const strategyStr =
+    typeof sync.strategy === 'object' ? `m_of_n(${sync.strategy.m_of_n})` : sync.strategy;
+  const required =
+    sync.strategy === 'all' ? token.branch_total : (sync.strategy as { m_of_n: number }).m_of_n;
   const conditionMet = checkSyncCondition(sync.strategy, siblingCounts, token.branch_total);
+
+  // Emit condition check event
+  events.push({
+    type: 'decision.sync.check_condition',
+    strategy: strategyStr,
+    completed: siblingCounts.completed,
+    required,
+  });
 
   if (conditionMet) {
     // Condition met → activate fan-in
-    return [
-      {
-        type: 'ACTIVATE_FAN_IN',
-        workflowRunId,
-        nodeId: transition.to_node_id,
-        fanInPath: buildFanInPath(token.path_id),
-        mergedTokenIds: [], // Will be populated by dispatch layer with actual sibling IDs
-      },
-    ];
+    events.push({
+      type: 'decision.sync.activate',
+      merge_config: sync.merge ?? null,
+    });
+
+    return {
+      decisions: [
+        {
+          type: 'ACTIVATE_FAN_IN',
+          workflowRunId,
+          nodeId: transition.to_node_id,
+          fanInPath: buildFanInPath(token.path_id),
+          mergedTokenIds: [], // Will be populated by dispatch layer with actual sibling IDs
+        },
+      ],
+      events,
+    };
   }
 
   // Condition not met → wait
-  return [
-    {
-      type: 'MARK_WAITING',
-      tokenId: token.id,
-      arrivedAt: new Date(),
-    },
-  ];
+  events.push({
+    type: 'decision.sync.wait',
+    reason: `waiting for ${required - siblingCounts.completed} more siblings`,
+  });
+
+  return {
+    decisions: [
+      {
+        type: 'MARK_WAITING',
+        tokenId: token.id,
+        arrivedAt: new Date(),
+      },
+    ],
+    events,
+  };
 }
 
 /**

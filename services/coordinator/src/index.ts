@@ -175,15 +175,8 @@ export class WorkflowCoordinator extends DurableObject {
       // Get context snapshot for routing decisions
       const contextSnapshot = this.context.getSnapshot();
 
-      // Emit routing start trace
-      this.emitter.emitTrace({
-        type: 'decision.routing.start',
-        token_id: tokenId,
-        node_id: token.node_id,
-      });
-
-      // Plan routing decisions
-      const routingDecisions = decideRouting({
+      // Plan routing decisions (returns decisions + trace events)
+      const routingResult = decideRouting({
         completedTokenId: tokenId,
         completedTokenPath: token.path_id,
         workflowRunId: workflow_run_id,
@@ -192,14 +185,13 @@ export class WorkflowCoordinator extends DurableObject {
         context: contextSnapshot,
       });
 
-      // Emit routing complete trace
-      this.emitter.emitTrace({
-        type: 'decision.routing.complete',
-        decisions: routingDecisions,
-      });
+      // Emit trace events from routing planning
+      for (const event of routingResult.events) {
+        this.emitter.emitTrace(event);
+      }
 
       // If no routing decisions, check workflow completion
-      if (routingDecisions.length === 0) {
+      if (routingResult.decisions.length === 0) {
         const activeCount = this.tokens.getActiveCount(workflow_run_id);
         if (activeCount === 0) {
           await this.finalizeWorkflow(workflow_run_id);
@@ -216,7 +208,7 @@ export class WorkflowCoordinator extends DurableObject {
         workflowRunId: workflow_run_id,
       };
 
-      const applyResult = applyDecisions(routingDecisions, dispatchCtx);
+      const applyResult = applyDecisions(routingResult.decisions, dispatchCtx);
 
       // Check for transitions with synchronization requirements
       const syncTransitions = getTransitionsWithSynchronization(transitions, contextSnapshot);
@@ -233,23 +225,21 @@ export class WorkflowCoordinator extends DurableObject {
           const siblingGroup = syncTransition.synchronization.sibling_group;
           const siblingCounts = this.tokens.getSiblingCounts(workflow_run_id, siblingGroup);
 
-          // Emit sync start trace
-          this.emitter.emitTrace({
-            type: 'decision.sync.start',
-            token_id: createdTokenId,
-            sibling_count: siblingCounts.total,
-          });
-
-          // Plan synchronization decisions
-          const syncDecisions = decideSynchronization({
+          // Plan synchronization decisions (returns decisions + trace events)
+          const syncResult = decideSynchronization({
             token: createdToken,
             transition: syncTransition,
             siblingCounts,
             workflowRunId: workflow_run_id,
           });
 
+          // Emit trace events from sync planning
+          for (const event of syncResult.events) {
+            this.emitter.emitTrace(event);
+          }
+
           // Apply sync decisions
-          applyDecisions(syncDecisions, dispatchCtx);
+          applyDecisions(syncResult.decisions, dispatchCtx);
         } else {
           // No synchronization - mark for dispatch
           this.tokens.updateStatus(createdTokenId, 'dispatched');

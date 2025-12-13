@@ -21,7 +21,7 @@ import { getEventCategory } from './types.js';
 // Re-export client and types for consumer convenience
 export { createEmitter } from './client.js';
 export { Streamer } from './streamer.js';
-export type { Emitter } from './types.js';
+export type { DecisionEvent, Emitter } from './types.js';
 
 const STREAMER_NAME = 'events-streamer';
 
@@ -141,6 +141,7 @@ export class EventsService extends WorkerEntrypoint<Env> {
             token_id: event.token_id ?? null,
             node_id: event.node_id ?? null,
             duration_ms: event.duration_ms ?? null,
+            message: 'message' in event ? ((event as { message?: string }).message ?? null) : null,
             payload: JSON.stringify(event),
           };
 
