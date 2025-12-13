@@ -481,3 +481,77 @@ export async function cleanupTestContext(ctx: TestContext) {
   await wonder.projects(ctx.projectId).delete();
   await wonder.workspaces(ctx.workspaceId).delete();
 }
+
+/**
+ * Result from runTestWorkflow
+ */
+export interface TestWorkflowResult {
+  /** Results from executing the workflow */
+  result: Awaited<ReturnType<typeof executeWorkflow>>;
+  /** The setup object with IDs of created resources */
+  setup: WorkflowTestSetup;
+  /** Cleanup function - call this when done */
+  cleanup: () => Promise<void>;
+}
+
+/**
+ * All-in-one helper to scaffold, run, and cleanup a test workflow.
+ *
+ * This is the simplest way to test a workflow:
+ * 1. Creates workspace, project, model profile
+ * 2. Creates all embedded resources (promptSpec → action → taskDef)
+ * 3. Creates and executes the workflow
+ * 4. Returns results and a cleanup function
+ *
+ * @example
+ * const { result, cleanup } = await runTestWorkflow(
+ *   workflowDef({
+ *     name: 'My Test Workflow',
+ *     nodes: [
+ *       node({
+ *         task: taskDef({
+ *           steps: [
+ *             step({
+ *               action: action({
+ *                 implementation: {
+ *                   prompt_spec: promptSpec({...}),
+ *                 }
+ *               }),
+ *             })
+ *           ]
+ *         })
+ *       })
+ *     ]
+ *   }),
+ *   { input: 'data' }
+ * );
+ *
+ * expect(result.status).toBe('completed');
+ * await cleanup();
+ */
+export async function runTestWorkflow(
+  workflow: EmbeddedWorkflowDef,
+  input: unknown,
+  options?: {
+    timeout?: number;
+    idleTimeout?: number;
+  },
+): Promise<TestWorkflowResult> {
+  // Setup infrastructure
+  const ctx = await setupTestContext();
+
+  // Create workflow and all embedded resources
+  const setup = await createWorkflow(ctx, workflow);
+
+  // Execute the workflow
+  const result = await executeWorkflow(setup.workflowId, input, options);
+
+  // Return results with cleanup function
+  return {
+    result,
+    setup,
+    cleanup: async () => {
+      await cleanupWorkflowTest(setup, result.workflowRunId);
+    },
+  };
+}
