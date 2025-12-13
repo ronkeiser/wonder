@@ -34,9 +34,17 @@ workflows.openapi(getWorkflowRoute, async (c) => {
 workflows.openapi(startWorkflowRoute, async (c) => {
   const { id } = c.req.valid('param');
   const input = c.req.valid('json');
-  using workflowsResource = c.env.RESOURCES.workflows();
-  const result = await workflowsResource.start(id, input);
-  return c.json(result, 200);
+
+  // 1. Create workflow run
+  using workflowRunsResource = c.env.RESOURCES.workflowRuns();
+  const { workflow_run_id } = await workflowRunsResource.create(id, input);
+
+  // 2. Start the coordinator DO
+  const coordinatorId = c.env.COORDINATOR.idFromName(workflow_run_id);
+  const coordinator = c.env.COORDINATOR.get(coordinatorId);
+  await coordinator.start(workflow_run_id);
+
+  return c.json({ workflow_run_id, durable_object_id: workflow_run_id }, 200);
 });
 
 /** DELETE /{id} */

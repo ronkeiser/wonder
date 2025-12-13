@@ -2,7 +2,7 @@
 
 import { eq } from 'drizzle-orm';
 import { ulid } from 'ulid';
-import { ConflictError, NotFoundError } from '~/errors';
+import { NotFoundError } from '~/errors';
 import * as schema from '~/infrastructure/db/schema';
 import { Resource } from '../base';
 import * as workflowRepo from '../workflows/repository';
@@ -106,85 +106,27 @@ export class WorkflowRuns extends Resource {
     }
   }
 
-  async start(
+  async updateStatus(
     workflowRunId: string,
-    workflowId?: string,
-  ): Promise<{
-    durable_object_id: string;
-  }> {
-    this.serviceCtx.logger.info({
-      event_type: 'workflow_run_start_requested',
-      metadata: { workflow_id: workflowId, workflow_run_id: workflowRunId },
-    });
+    status: 'running' | 'completed' | 'failed' | 'waiting',
+  ): Promise<void> {
+    return this.withLogging(
+      'updateStatus',
+      { workflow_run_id: workflowRunId, metadata: { workflow_run_id: workflowRunId, status } },
+      async () => {
+        const updated = await repo.updateWorkflowRun(this.serviceCtx.db, workflowRunId, {
+          status,
+        });
 
-    try {
-      // Get the workflow run
-      const run = await this.serviceCtx.db
-        .select()
-        .from(schema.workflow_runs)
-        .where(eq(schema.workflow_runs.id, workflowRunId))
-        .get();
-
-      if (!run) {
-        throw new NotFoundError(
-          `Workflow run not found: ${workflowRunId}`,
-          'workflow_run',
-          workflowRunId,
-        );
-      }
-
-      // Verify it belongs to this workflow (if workflowId provided)
-      if (workflowId && run.workflow_id !== workflowId) {
-        throw new ConflictError(
-          `Workflow run ${workflowRunId} does not belong to workflow ${workflowId}`,
-          'workflow_id',
-          'mismatch',
-        );
-      }
-
-      // Get project to access workspace_id
-      const project = await this.serviceCtx.db
-        .select()
-        .from(schema.projects)
-        .where(eq(schema.projects.id, run.project_id))
-        .get();
-      if (!project) {
-        throw new NotFoundError(`Project not found: ${run.project_id}`, 'project', run.project_id);
-      }
-
-      // Update status to running
-      await this.serviceCtx.db
-        .update(schema.workflow_runs)
-        .set({ status: 'running', updated_at: new Date().toISOString() })
-        .where(eq(schema.workflow_runs.id, workflowRunId))
-        .run();
-
-      // Trigger workflow execution via coordinator DO (RPC)
-      const coordinatorId = this.env.COORDINATOR.idFromName(workflowRunId);
-      const coordinator = this.env.COORDINATOR.get(coordinatorId);
-
-      await coordinator.start(workflowRunId);
-
-      this.serviceCtx.logger.info({
-        event_type: 'workflow_run_started',
-        metadata: { workflow_id: workflowId ?? run.workflow_id, workflow_run_id: workflowRunId },
-      });
-
-      return {
-        durable_object_id: workflowRunId,
-      };
-    } catch (error) {
-      this.serviceCtx.logger.error({
-        event_type: 'workflow_run_start_failed',
-        message: error instanceof Error ? error.message : String(error),
-        metadata: {
-          workflow_id: workflowId,
-          workflow_run_id: workflowRunId,
-          stack: error instanceof Error ? error.stack : undefined,
-        },
-      });
-      throw error;
-    }
+        if (!updated) {
+          throw new NotFoundError(
+            `Workflow run not found: ${workflowRunId}`,
+            'workflow_run',
+            workflowRunId,
+          );
+        }
+      },
+    );
   }
 
   async get(id: string): Promise<{

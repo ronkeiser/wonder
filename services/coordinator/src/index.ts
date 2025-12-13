@@ -57,6 +57,8 @@ export class WorkflowCoordinator extends DurableObject {
 
   /**
    * Start workflow execution
+   * Note: workflow_run_id must be passed because ctx.id.name is undefined inside DO
+   * (see https://github.com/cloudflare/workerd/issues/2240)
    */
   async start(workflow_run_id: string): Promise<void> {
     try {

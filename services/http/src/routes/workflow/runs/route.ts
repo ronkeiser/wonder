@@ -19,8 +19,9 @@ workflowRuns.openapi(createWorkflowRunRoute, async (c) => {
 
 /** POST /{id}/runs/{run_id}/start */
 workflowRuns.openapi(startWorkflowRunRoute, async (c) => {
-  const { id, run_id } = c.req.valid('param');
-  using workflowRunsResource = c.env.RESOURCES.workflowRuns();
-  const result = await workflowRunsResource.start(run_id, id);
-  return c.json(result, 200);
+  const { run_id } = c.req.valid('param');
+  const coordinatorId = c.env.COORDINATOR.idFromName(run_id);
+  const coordinator = c.env.COORDINATOR.get(coordinatorId);
+  await coordinator.start(run_id);
+  return c.json({ durable_object_id: run_id }, 200);
 });

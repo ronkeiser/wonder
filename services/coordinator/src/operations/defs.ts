@@ -51,6 +51,7 @@ export class DefinitionManager {
    * - Runs migrations (idempotent)
    * - Checks if already populated (DO wake-up)
    * - If not, fetches from RESOURCES and inserts
+   * - Updates workflow run status to 'running'
    */
   async initialize(workflow_run_id: string): Promise<void> {
     try {
@@ -78,6 +79,10 @@ export class DefinitionManager {
 
       // Fetch from RESOURCES and insert
       await this.fetchAndInsert(workflow_run_id);
+
+      // Update workflow run status to 'running' in RESOURCES (D1)
+      using workflowRunsResource = this.env.RESOURCES.workflowRuns();
+      await workflowRunsResource.updateStatus(workflow_run_id, 'running');
 
       // Log table counts
       const nodeCount = this.db.select({ id: nodes.id }).from(nodes).all().length;

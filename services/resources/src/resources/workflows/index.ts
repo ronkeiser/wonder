@@ -2,7 +2,6 @@
 
 import { ConflictError, NotFoundError, extractDbError } from '~/errors';
 import { Resource } from '../base';
-import { WorkflowRuns } from '../workflow-runs';
 import * as repo from './repository';
 
 export class Workflows extends Resource {
@@ -166,19 +165,5 @@ export class Workflows extends Resource {
         return { success: true };
       },
     );
-  }
-
-  async start(
-    workflowId: string,
-    input: Record<string, unknown>,
-  ): Promise<{
-    workflow_run_id: string;
-    durable_object_id: string;
-  }> {
-    // Convenience method: create + start in one call via WorkflowRuns
-    const workflowRuns = new WorkflowRuns(this.env, this.serviceCtx.executionContext);
-    const { workflow_run_id } = await workflowRuns.create(workflowId, input);
-    const { durable_object_id } = await workflowRuns.start(workflow_run_id, workflowId);
-    return { workflow_run_id, durable_object_id };
   }
 }
