@@ -275,6 +275,80 @@ export class WorkflowCoordinator extends DurableObject {
   }
 
   /**
+   * Handle task error from Executor
+   *
+   * Called when task execution fails. May trigger retry based on error type.
+   */
+  async handleTaskError(
+    tokenId: string,
+    errorResult: {
+      error: {
+        type: 'step_failure' | 'task_timeout' | 'validation_error';
+        step_ref?: string;
+        message: string;
+        retryable: boolean;
+      };
+      metrics: {
+        duration_ms: number;
+        steps_executed: number;
+      };
+    },
+  ): Promise<void> {
+    let workflow_run_id: string | undefined;
+
+    try {
+      const token = this.tokens.get(tokenId);
+      workflow_run_id = token.workflow_run_id;
+      const node = this.defs.getNode(token.node_id);
+
+      this.logger.warn({
+        event_type: 'task_error_received',
+        message: `Task error: ${errorResult.error.message}`,
+        trace_id: workflow_run_id,
+        metadata: {
+          tokenId,
+          nodeId: node.id,
+          nodeRef: node.ref,
+          error: errorResult.error,
+          metrics: errorResult.metrics,
+        },
+      });
+
+      // TODO: Check retry policy and retry_attempt count
+      // For now, just fail the workflow
+      this.tokens.updateStatus(tokenId, 'failed');
+
+      this.emitter.emit({
+        event_type: 'node_failed',
+        node_id: token.node_id,
+        token_id: tokenId,
+        message: `Task failed: ${errorResult.error.message}`,
+        metadata: {
+          error: errorResult.error,
+          metrics: errorResult.metrics,
+        },
+      });
+
+      // Check if we should fail the workflow
+      // For now, any error fails the workflow
+      await this.failWorkflow(workflow_run_id, errorResult.error.message);
+    } catch (error) {
+      this.logger.error({
+        event_type: 'coordinator_task_error_failed',
+        message: 'Critical error in handleTaskError()',
+        trace_id: workflow_run_id,
+        metadata: {
+          error: error instanceof Error ? error.message : String(error),
+          stack: error instanceof Error ? error.stack : undefined,
+          tokenId,
+          errorResult,
+        },
+      });
+      throw error;
+    }
+  }
+
+  /**
    * Dispatch token to Executor
    *
    * Per the 5-layer execution model (WorkflowDef → Node → TaskDef → Step → ActionDef):
@@ -465,6 +539,41 @@ export class WorkflowCoordinator extends DurableObject {
 
     // Store mapped output under node ref
     return { [nodeRef]: result };
+  }
+
+  /**
+   * Fail workflow due to unrecoverable error
+   */
+  private async failWorkflow(workflowRunId: string, errorMessage: string): Promise<void> {
+    try {
+      this.emitter.emit({
+        event_type: 'workflow_failed',
+        message: `Workflow failed: ${errorMessage}`,
+        metadata: { error: errorMessage },
+      });
+
+      this.logger.error({
+        event_type: 'workflow_failed',
+        message: 'Workflow execution failed',
+        trace_id: workflowRunId,
+        metadata: {
+          workflow_run_id: workflowRunId,
+          error: errorMessage,
+        },
+      });
+    } catch (error) {
+      this.logger.error({
+        event_type: 'coordinator_fail_workflow_failed',
+        message: 'Critical error in failWorkflow()',
+        trace_id: workflowRunId,
+        metadata: {
+          error: error instanceof Error ? error.message : String(error),
+          stack: error instanceof Error ? error.stack : undefined,
+          workflowRunId,
+        },
+      });
+      throw error;
+    }
   }
 
   /**

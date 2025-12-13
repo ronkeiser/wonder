@@ -1463,15 +1463,23 @@ export interface components {
                 /** @example llm_call_node */
                 ref: string;
                 name: string;
-                /** @example send-email */
-                action_id?: string;
+                /** @example my-task */
+                task_id?: string;
                 /** @example 1 */
-                action_version?: number;
+                task_version?: number;
                 input_mapping?: {
                     [key: string]: unknown;
                 };
                 output_mapping?: {
                     [key: string]: unknown;
+                };
+                /**
+                 * @example {
+                 *       "container": "dev_env"
+                 *     }
+                 */
+                resource_bindings?: {
+                    [key: string]: string;
                 };
             }[];
             transitions?: {
@@ -1500,13 +1508,16 @@ export interface components {
             workflow_def_version: number;
             ref: string;
             name: string;
-            action_id: string | null;
-            action_version: number | null;
+            task_id: string | null;
+            task_version: number | null;
             input_mapping: {
                 [key: string]: unknown;
             } | null;
             output_mapping: {
                 [key: string]: unknown;
+            } | null;
+            resource_bindings: {
+                [key: string]: string;
             } | null;
         };
         Transition: {
@@ -1703,7 +1714,25 @@ export interface components {
             } | {
                 /** @enum {string} */
                 type: "operation.context.branch_table.drop";
-                table_name: string;
+                token_ids: string[];
+                tables_dropped: number;
+            } | {
+                /** @enum {string} */
+                type: "operation.context.branch.validate";
+                token_id: string;
+                valid: boolean;
+                error_count: number;
+                errors?: string[];
+            } | {
+                /** @enum {string} */
+                type: "operation.context.branch.write";
+                token_id: string;
+                output?: unknown;
+            } | {
+                /** @enum {string} */
+                type: "operation.context.branch.read_all";
+                token_ids: string[];
+                output_count: number;
             } | {
                 /** @enum {string} */
                 type: "operation.context.merge.start";
@@ -1715,7 +1744,7 @@ export interface components {
                 /** @enum {string} */
                 type: "operation.context.merge.complete";
                 target_path: string;
-                rows_written: number;
+                branch_count: number;
             } | {
                 /** @enum {string} */
                 type: "operation.tokens.create";

@@ -11,6 +11,7 @@
   "services": [
     { "binding": "LOGS", "service": "wonder-logs" },
     { "binding": "EVENTS", "service": "wonder-events" },
+    { "binding": "RESOURCES", "service": "wonder-resources" },
   ],
   "durable_objects": {
     "bindings": [

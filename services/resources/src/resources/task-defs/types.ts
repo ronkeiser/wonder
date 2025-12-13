@@ -2,6 +2,9 @@
 
 import type { RetryConfig, Step } from '../../infrastructure/db/schema';
 
+/** Re-export Step for consumers */
+export type { RetryConfig, Step };
+
 export type TaskDef = {
   id: string;
   version: number;

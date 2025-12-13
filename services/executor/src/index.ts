@@ -1,6 +1,7 @@
 import { createLogger } from '@wonder/logs';
 import type { ModelProfile } from '@wonder/resources/types';
 import { WorkerEntrypoint } from 'cloudflare:workers';
+import { runTask } from './execution/task-runner';
 
 /**
  * Wonder Executor Service
@@ -88,8 +89,6 @@ export default class ExecutorService extends WorkerEntrypoint<Env> {
    * @see docs/architecture/executor.md
    */
   async executeTask(payload: TaskPayload): Promise<void> {
-    const startTime = Date.now();
-
     this.logger.info({
       event_type: 'task_execution_started',
       message: 'Task execution started',
@@ -108,89 +107,54 @@ export default class ExecutorService extends WorkerEntrypoint<Env> {
       using taskDefsResource = this.env.RESOURCES.taskDefs();
       const { task_def } = await taskDefsResource.get(payload.task_id, payload.task_version);
 
-      // TODO: Validate input against task_def.input_schema
-
-      // Initialize task context
-      const context = {
-        input: {
-          ...payload.input,
-          _workflow_run_id: payload.workflow_run_id,
-          _token_id: payload.token_id,
-          _resources: payload.resources || {},
-        },
-        state: {} as Record<string, unknown>,
-        output: {} as Record<string, unknown>,
-      };
-
-      // Execute steps sequentially
-      let stepsExecuted = 0;
-
-      for (const step of task_def.steps.sort(
-        (a: { ordinal: number }, b: { ordinal: number }) => a.ordinal - b.ordinal,
-      )) {
-        this.logger.info({
-          event_type: 'step_execution_started',
-          message: `Executing step: ${step.ref}`,
-          trace_id: payload.workflow_run_id,
-          metadata: {
-            token_id: payload.token_id,
-            step_id: step.id,
-            step_ref: step.ref,
-            step_ordinal: step.ordinal,
-            action_id: step.action_id,
-          },
-        });
-
-        // TODO: Evaluate step.condition
-        // TODO: Apply step.input_mapping
-        // TODO: Load ActionDef and execute
-        // TODO: Apply step.output_mapping
-        // TODO: Handle step.on_failure
-
-        stepsExecuted++;
-      }
-
-      // TODO: Validate output against task_def.output_schema
-
-      const duration = Date.now() - startTime;
-
-      this.logger.info({
-        event_type: 'task_execution_completed',
-        message: 'Task execution completed successfully',
-        trace_id: payload.workflow_run_id,
-        metadata: {
-          token_id: payload.token_id,
-          task_id: payload.task_id,
-          duration_ms: duration,
-          steps_executed: stepsExecuted,
-          output_keys: Object.keys(context.output),
-        },
+      // Execute the task using the task runner
+      const result = await runTask(payload, task_def, {
+        logger: this.logger,
+        env: this.env,
       });
 
       // Callback to coordinator with result
       const coordinatorId = this.env.COORDINATOR.idFromName(payload.workflow_run_id);
       const coordinator = this.env.COORDINATOR.get(coordinatorId);
-      await coordinator.handleTaskResult(payload.token_id, {
-        output_data: context.output,
-      });
-    } catch (error) {
-      const duration = Date.now() - startTime;
 
+      if (result.success) {
+        await coordinator.handleTaskResult(payload.token_id, {
+          output_data: result.output,
+        });
+      } else {
+        // Send error to coordinator (may trigger retry if retryable)
+        await coordinator.handleTaskError(payload.token_id, {
+          error: result.error!,
+          metrics: result.metrics,
+        });
+      }
+    } catch (error) {
       this.logger.error({
         event_type: 'task_execution_failed',
-        message: 'Task execution failed',
+        message: 'Task execution failed with unexpected error',
         trace_id: payload.workflow_run_id,
         metadata: {
           token_id: payload.token_id,
           task_id: payload.task_id,
-          duration_ms: duration,
           error: error instanceof Error ? error.message : String(error),
           stack: error instanceof Error ? error.stack : undefined,
         },
       });
 
-      // TODO: Callback with error result and determine retryable
-      throw error;
+      // Callback with error result
+      const coordinatorId = this.env.COORDINATOR.idFromName(payload.workflow_run_id);
+      const coordinator = this.env.COORDINATOR.get(coordinatorId);
+      await coordinator.handleTaskError(payload.token_id, {
+        error: {
+          type: 'step_failure',
+          message: error instanceof Error ? error.message : String(error),
+          retryable: false,
+        },
+        metrics: {
+          duration_ms: 0,
+          steps_executed: 0,
+        },
+      });
     }
   }
 
