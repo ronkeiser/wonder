@@ -1,30 +1,19 @@
 /**
  * Schema Executor - SQL execution for schema-driven tables
  *
- * Combines DDLGenerator and DMLGenerator with SqlStorage to provide
- * a complete schema-to-SQL interface for Cloudflare Workers DOs.
+ * @deprecated Use Schema.bind() and SchemaTable instead
  */
 
 import type { CustomTypeRegistry } from './custom-types.js';
 import { DDLGenerator, type DDLGeneratorOptions } from './ddl-generator.js';
 import { DMLGenerator, type DMLGeneratorOptions } from './dml-generator.js';
+import type { SqlExecutor } from './schema.js';
 import type { JSONSchema } from './types.js';
 
 export type ExecutorOptions = DDLGeneratorOptions & DMLGeneratorOptions;
 
 /**
- * Minimal interface for SqlStorage-compatible execution.
- * Matches Cloudflare Workers SqlStorage.exec() signature.
- */
-export interface SqlExecutor {
-  exec(query: string, ...args: unknown[]): Iterable<Record<string, unknown>>;
-}
-
-/**
- * SchemaExecutor handles SQL execution for schema-driven tables.
- *
- * Wraps DDL/DML generators with SqlStorage to provide a clean API
- * for table lifecycle management and data operations.
+ * @deprecated Use Schema.bind() and SchemaTable instead
  */
 export class SchemaExecutor {
   private readonly sql: SqlExecutor;

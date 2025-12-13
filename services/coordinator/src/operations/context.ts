@@ -2,37 +2,34 @@
  * Context Operations
  *
  * Schema-driven SQL operations for workflow context and branch storage.
- * Uses @wonder/context primitives (DDLGenerator, DMLGenerator, Validator)
- * to manage both main context tables and branch-isolated tables during
- * parallel execution.
+ * Uses @wonder/context Schema and SchemaTable for table lifecycle and data operations.
  *
  * Structure:
  *
  * Main context operations:
- *   - initialize() - Create main context tables from workflow schema
- *   - initializeWithInput(input) - Validate and insert input data
- *   - get(path) - Read value from main context
- *   - set(path, value) - Write value to main context
+ *   - initialize(input) - Create context tables and store input
+ *   - get(path) - Read value from context
+ *   - set(path, value) - Write value to context
  *   - getSnapshot() - Read-only view for decision logic
+ *   - applyNodeOutput(output) - Write validated output
  *
- * Branch storage operations (extensions for parallel execution - future):
- *   - initializeBranchTable(tokenId, schema) - Create branch_output_{tokenId} tables
- *   - applyNodeOutput(tokenId, output, schema) - Write task output to branch table
- *   - getBranchOutputs(tokenIds, schema) - Read outputs from sibling branch tables
- *   - mergeBranches(siblings, merge, schema) - Merge branch outputs into main context
+ * Branch storage operations (for parallel execution):
+ *   - initializeBranchTable(tokenId, schema) - Create branch_output_{tokenId} table
+ *   - applyBranchOutput(tokenId, output) - Write task output to branch table
+ *   - getBranchOutputs(tokenIds) - Read outputs from sibling branch tables
+ *   - mergeBranches(siblings, merge) - Merge branch outputs into main context
  *   - dropBranchTables(tokenIds) - Cleanup branch tables after merge
  *
  * Branch storage design:
  *   - Each token gets separate ephemeral tables prefixed by token ID
  *   - Isolation through table namespacing, not row filtering
  *   - Branch tables created on fan-out, dropped after fan-in merge
- *   - Nested fan-outs create hierarchical branch tables
+ *   - Schema comes from TaskDef.output_schema (via node.task_id)
  *
  * See docs/architecture/branch-storage.md for complete design.
  */
 
-import type { JSONSchema } from '@wonder/context';
-import { CustomTypeRegistry, SchemaExecutor, Validator } from '@wonder/context';
+import { Schema, type JSONSchema, type SchemaTable } from '@wonder/context';
 import type { Emitter } from '@wonder/events';
 import type { ContextSnapshot } from '../types.js';
 import type { DefinitionManager } from './defs.js';
@@ -40,117 +37,95 @@ import type { DefinitionManager } from './defs.js';
 /**
  * ContextManager manages runtime state for a workflow execution.
  *
- * Encapsulates schema-driven SQL operations with caching for validators
- * and generators. Schemas are loaded from definitions on-demand.
+ * Uses Schema from @wonder/context for validation and SQL generation,
+ * with SchemaTable for bound execution against context tables.
  */
 export class ContextManager {
+  private readonly sql: SqlStorage;
   private readonly defs: DefinitionManager;
   private readonly emitter: Emitter;
-  private readonly customTypes: CustomTypeRegistry;
-  private readonly executor: SchemaExecutor;
 
-  /** Cached schemas loaded from definitions */
-  private inputSchema: JSONSchema | null = null;
-  private contextSchema: JSONSchema | null = null;
-  private outputSchema: JSONSchema | null = null;
+  /** Bound schema tables (lazy initialized) */
+  private inputTable: SchemaTable | null = null;
+  private stateTable: SchemaTable | null = null;
+  private outputTable: SchemaTable | null = null;
 
-  /** Cached validators */
-  private inputValidator: Validator | null = null;
-  private outputValidator: Validator | null = null;
+  /** Track initialization */
+  private initialized = false;
 
   constructor(sql: SqlStorage, defs: DefinitionManager, emitter: Emitter) {
+    this.sql = sql;
     this.defs = defs;
     this.emitter = emitter;
-    this.customTypes = new CustomTypeRegistry();
-    this.executor = new SchemaExecutor(sql, this.customTypes);
   }
 
   /**
-   * Load schemas from definitions (lazy initialization)
+   * Load schemas and bind tables (lazy initialization)
    */
-  private async loadSchemas(): Promise<void> {
-    if (this.inputSchema !== null) {
-      // Already loaded
-      return;
-    }
+  private loadSchemas(): void {
+    if (this.initialized) return;
 
     const workflowDef = this.defs.getWorkflowDef();
 
-    this.inputSchema = workflowDef.input_schema as JSONSchema;
-    this.contextSchema = (workflowDef.context_schema as JSONSchema) ?? null;
-    this.outputSchema = workflowDef.output_schema as JSONSchema;
+    const inputSchema = new Schema(workflowDef.input_schema as JSONSchema);
+    const outputSchema = new Schema(workflowDef.output_schema as JSONSchema);
+
+    this.inputTable = inputSchema.bind(this.sql, 'context_input');
+    this.outputTable = outputSchema.bind(this.sql, 'context_output');
+
+    if (workflowDef.context_schema) {
+      const stateSchema = new Schema(workflowDef.context_schema as JSONSchema);
+      this.stateTable = stateSchema.bind(this.sql, 'context_state');
+    }
+
+    this.initialized = true;
   }
 
   /**
-   * Initialize main context tables from workflow schemas and store input
+   * Initialize context tables and store input
    */
   async initialize(input: Record<string, unknown>): Promise<void> {
-    await this.loadSchemas();
+    this.loadSchemas();
 
     const tablesCreated: string[] = [];
 
-    // Drop existing tables to ensure clean schema
-    this.executor.dropTable('context_input');
-    this.executor.dropTable('context_state');
-    this.executor.dropTable('context_output');
+    // Create tables
+    this.inputTable!.create();
+    tablesCreated.push('context_input');
 
-    // Create input table
-    if (this.inputSchema!.type === 'object') {
-      this.executor.createTable(this.inputSchema!, 'context_input');
-      tablesCreated.push('context_input');
-    }
-
-    // Create state table if context schema provided
-    if (this.contextSchema?.type === 'object') {
-      this.executor.createTable(this.contextSchema, 'context_state');
+    if (this.stateTable) {
+      this.stateTable.create();
       tablesCreated.push('context_state');
     }
 
-    // Create output table from output schema
-    if (this.outputSchema!.type === 'object') {
-      this.executor.createTable(this.outputSchema!, 'context_output');
-      tablesCreated.push('context_output');
-    }
+    this.outputTable!.create();
+    tablesCreated.push('context_output');
 
     this.emitter.emitTrace({
       type: 'operation.context.initialize',
-      has_input_schema: this.inputSchema!.type === 'object',
-      has_context_schema: this.contextSchema?.type === 'object',
+      has_input_schema: true,
+      has_context_schema: this.stateTable !== null,
       table_count: tablesCreated.length,
       tables_created: tablesCreated,
     });
 
     // Validate and store input
-    await this.storeInput(input);
-  }
-
-  /**
-   * Validate and store input data (internal)
-   */
-  private async storeInput(input: Record<string, unknown>): Promise<void> {
-    await this.loadSchemas();
-
-    // Lazy-initialize validator
-    if (!this.inputValidator) {
-      this.inputValidator = new Validator(this.inputSchema!, this.customTypes);
-    }
-
-    const result = this.inputValidator.validate(input);
+    const result = this.inputTable!.validate(input);
 
     this.emitter.emitTrace({
       type: 'operation.context.validate',
       path: 'input',
-      schema_type: this.inputSchema!.type || 'unknown',
+      schema_type: 'object',
       valid: result.valid,
       error_count: result.errors.length,
-      errors: result.errors.slice(0, 5).map((e) => e.message), // First 5 errors
+      errors: result.errors.slice(0, 5).map((e) => e.message),
     });
 
     if (!result.valid) {
       throw new Error(`Input validation failed: ${result.errors.map((e) => e.message).join(', ')}`);
     }
 
-    this.executor.insert(this.inputSchema!, 'context_input', input);
+    this.inputTable!.insert(input);
 
     this.emitter.emitTrace({
       type: 'operation.context.write',
@@ -160,13 +135,13 @@ export class ContextManager {
   }
 
   /**
-   * Read value from context at JSONPath
-   * TODO: Support nested JSONPath reading (e.g., 'state.votes[0].choice')
+   * Read value from context
    */
   get(path: string): unknown {
-    // For now, only support reading 'input', 'state', 'output'
-    const tableName = `context_${path}`;
-    const value = this.executor.selectFirst(tableName) ?? {};
+    this.loadSchemas();
+
+    const table = this.getTable(path);
+    const value = table?.selectFirst() ?? {};
 
     this.emitter.emitTrace({
       type: 'operation.context.read',
@@ -178,26 +153,23 @@ export class ContextManager {
   }
 
   /**
-   * Write value to context at JSONPath
-   * TODO: Support nested JSONPath updates without full table clear
+   * Write value to context
    */
   set(path: string, value: unknown): void {
-    // For now, only support writing to 'state' or 'output'
+    this.loadSchemas();
+
     const [section] = path.split('.');
 
     if (section !== 'state' && section !== 'output') {
       throw new Error(`Cannot write to ${section} - only 'state' and 'output' are writable`);
     }
 
-    const tableName = `context_${section}`;
-    const schema = section === 'state' ? this.contextSchema : this.outputSchema;
+    const table = this.getTable(section);
 
-    // Simple implementation: clear table and insert new value
-    // Future: support JSONPath for nested updates
-    if (typeof value === 'object' && value !== null && schema) {
-      this.executor.replace(schema, tableName, value as Record<string, unknown>);
+    if (typeof value === 'object' && value !== null && table) {
+      table.replace(value as Record<string, unknown>);
     } else {
-      this.executor.deleteAll(tableName);
+      table?.deleteAll();
     }
 
     this.emitter.emitTrace({
@@ -208,23 +180,17 @@ export class ContextManager {
   }
 
   /**
-   * Apply node output to context
-   * Writes task output to context_output table with schema validation
+   * Apply validated output to context
    */
   async applyNodeOutput(output: Record<string, unknown>): Promise<void> {
-    await this.loadSchemas();
+    this.loadSchemas();
 
-    // Lazy-initialize validator
-    if (!this.outputValidator) {
-      this.outputValidator = new Validator(this.outputSchema!, this.customTypes);
-    }
-
-    const result = this.outputValidator.validate(output);
+    const result = this.outputTable!.validate(output);
 
     this.emitter.emitTrace({
       type: 'operation.context.validate',
       path: 'output',
-      schema_type: this.outputSchema!.type || 'unknown',
+      schema_type: 'object',
       valid: result.valid,
       error_count: result.errors.length,
       errors: result.errors.slice(0, 5).map((e) => e.message),
@@ -236,8 +202,7 @@ export class ContextManager {
       );
     }
 
-    // Replace existing output with new
-    this.executor.replace(this.outputSchema!, 'context_output', output);
+    this.outputTable!.replace(output);
 
     this.emitter.emitTrace({
       type: 'operation.context.write',
@@ -247,7 +212,7 @@ export class ContextManager {
   }
 
   /**
-   * Get read-only snapshot of entire context for decision logic
+   * Get read-only snapshot of entire context
    */
   getSnapshot(): ContextSnapshot {
     const snapshot = {
@@ -262,5 +227,19 @@ export class ContextManager {
     });
 
     return snapshot;
+  }
+
+  /** Get table by path */
+  private getTable(path: string): SchemaTable | null {
+    switch (path) {
+      case 'input':
+        return this.inputTable;
+      case 'state':
+        return this.stateTable;
+      case 'output':
+        return this.outputTable;
+      default:
+        return null;
+    }
   }
 }
