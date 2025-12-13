@@ -178,10 +178,11 @@ export class DefinitionManager {
           workflow_def_id: node.workflow_def_id,
           workflow_def_version: node.workflow_def_version,
           name: node.name,
-          action_id: node.action_id,
-          action_version: node.action_version,
+          task_id: node.task_id,
+          task_version: node.task_version,
           input_mapping: node.input_mapping,
           output_mapping: node.output_mapping,
+          resource_bindings: node.resource_bindings,
         })
         .run();
     }

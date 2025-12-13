@@ -114,10 +114,11 @@ export async function createNode(
     workflow_def_id: string;
     workflow_def_version: number;
     name: string;
-    action_id?: string | null;
-    action_version?: number | null;
+    task_id?: string | null;
+    task_version?: number | null;
     input_mapping?: object | null;
     output_mapping?: object | null;
+    resource_bindings?: Record<string, string> | null;
   },
 ): Promise<Node> {
   const row = {
@@ -126,10 +127,11 @@ export async function createNode(
     workflow_def_id: data.workflow_def_id,
     workflow_def_version: data.workflow_def_version,
     name: data.name,
-    action_id: data.action_id ?? null,
-    action_version: data.action_version ?? null,
+    task_id: data.task_id ?? null,
+    task_version: data.task_version ?? null,
     input_mapping: data.input_mapping ?? null,
     output_mapping: data.output_mapping ?? null,
+    resource_bindings: data.resource_bindings ?? null,
   };
 
   await db.insert(nodes).values(row).run();

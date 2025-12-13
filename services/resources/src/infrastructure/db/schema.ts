@@ -151,13 +151,19 @@ export const nodes = sqliteTable(
     workflow_def_id: text('workflow_def_id').notNull(),
     workflow_def_version: integer('workflow_def_version').notNull(),
     name: text('name').notNull(),
-    action_id: text('action_id'),
-    action_version: integer('action_version'),
+
+    // Task execution (5-layer model: WorkflowDef → Node → TaskDef → Step → ActionDef)
+    task_id: text('task_id'),
+    task_version: integer('task_version'),
 
     input_mapping: text('input_mapping', { mode: 'json' }).$type<object>(),
     output_mapping: text('output_mapping', { mode: 'json' }).$type<object>(),
 
-    // No branching logic - nodes only execute actions
+    // Map generic resource names (used by actions/tools) to workflow-specific resource IDs
+    // Example: { "container": "dev_env", "build_env": "build_container" }
+    resource_bindings: text('resource_bindings', { mode: 'json' }).$type<Record<string, string>>(),
+
+    // No branching logic - nodes only execute tasks
     // All branching is specified on transitions
   },
   (table) => [
@@ -167,7 +173,7 @@ export const nodes = sqliteTable(
       foreignColumns: [workflow_defs.id, workflow_defs.version],
     }),
     index('idx_nodes_workflow_def').on(table.workflow_def_id, table.workflow_def_version),
-    index('idx_nodes_action').on(table.action_id, table.action_version),
+    index('idx_nodes_task').on(table.task_id, table.task_version),
     index('idx_nodes_ref').on(table.workflow_def_id, table.workflow_def_version, table.ref),
   ],
 );
@@ -245,6 +251,78 @@ export const actions = sqliteTable(
     updated_at: text('updated_at').notNull(),
   },
   (table) => [primaryKey({ columns: [table.id, table.version] })],
+);
+
+/** TaskDefs - Intermediate layer between Node and Action */
+
+/**
+ * Step: Embedded in TaskDef (not a separate table)
+ * @see docs/architecture/primitives.md
+ */
+export type Step = {
+  id: string; // ULID
+  ref: string; // Human-readable identifier (unique per task)
+  ordinal: number; // Execution order (0-indexed)
+
+  action_id: string; // FK → actions
+  action_version: number;
+
+  input_mapping: object | null; // Map task context → action input
+  output_mapping: object | null; // Map action output → task context
+
+  on_failure: 'abort' | 'retry' | 'continue'; // Default: abort
+
+  condition: {
+    if: string; // Expression evaluated against task context
+    then: 'continue' | 'skip' | 'succeed' | 'fail';
+    else: 'continue' | 'skip' | 'succeed' | 'fail';
+  } | null;
+};
+
+export type RetryConfig = {
+  max_attempts: number;
+  backoff: 'none' | 'linear' | 'exponential';
+  initial_delay_ms: number;
+  max_delay_ms: number | null;
+};
+
+export const task_defs = sqliteTable(
+  'task_defs',
+  {
+    id: text('id').notNull(),
+    version: integer('version').notNull().default(1),
+    name: text('name').notNull(),
+    description: text('description').notNull(),
+
+    // Ownership (exactly one)
+    project_id: text('project_id').references(() => projects.id),
+    library_id: text('library_id'),
+
+    tags: text('tags', { mode: 'json' }).$type<string[]>(),
+
+    input_schema: text('input_schema', { mode: 'json' }).$type<object>().notNull(),
+    output_schema: text('output_schema', { mode: 'json' }).$type<object>().notNull(),
+
+    // Steps are embedded (not a separate table)
+    steps: text('steps', { mode: 'json' }).$type<Step[]>().notNull(),
+
+    retry: text('retry', { mode: 'json' }).$type<RetryConfig>(),
+    timeout_ms: integer('timeout_ms'),
+
+    created_at: text('created_at').notNull(),
+    updated_at: text('updated_at').notNull(),
+  },
+  (table) => [
+    primaryKey({ columns: [table.id, table.version] }),
+    index('idx_task_defs_project').on(table.project_id),
+    index('idx_task_defs_library').on(table.library_id),
+    index('idx_task_defs_name_version').on(
+      table.name,
+      table.project_id,
+      table.library_id,
+      table.version,
+    ),
+  ],
 );
 
 /** AI Primitives */

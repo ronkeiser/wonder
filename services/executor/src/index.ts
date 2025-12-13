@@ -6,14 +6,58 @@ import { WorkerEntrypoint } from 'cloudflare:workers';
  * Wonder Executor Service
  *
  * RPC-based task execution service.
- * Executes actions with strongly-typed interfaces.
+ * Implements the 5-layer execution model: loads TaskDef, iterates Steps, executes Actions.
  */
 
+/**
+ * TaskPayload - from Coordinator per execution-model.md
+ */
+export interface TaskPayload {
+  token_id: string; // For result correlation
+  workflow_run_id: string; // For sub-workflow context
+  task_id: string; // TaskDef to execute
+  task_version: number;
+  input: Record<string, unknown>; // Mapped from workflow context
+
+  // Resource mappings (generic_name → container_do_id)
+  resources?: Record<string, string>;
+
+  // Execution config
+  timeout_ms?: number;
+  retry_attempt?: number; // Current retry count (for retry logic)
+}
+
+/**
+ * TaskResult - to Coordinator per execution-model.md
+ */
+export interface TaskResult {
+  token_id: string;
+  success: boolean;
+  output: Record<string, unknown>;
+
+  error?: {
+    type: 'step_failure' | 'task_timeout' | 'validation_error';
+    step_ref?: string;
+    message: string;
+    retryable: boolean;
+  };
+
+  metrics: {
+    duration_ms: number;
+    steps_executed: number;
+    llm_tokens?: {
+      input: number;
+      output: number;
+      cost_usd: number;
+    };
+  };
+}
+
+// Legacy interface - to be removed after migration
 export interface LLMCallParams {
   model_profile: ModelProfile;
   prompt: string;
-  json_schema?: object; // JSON schema for structured output
-  // Callback info for async execution
+  json_schema?: object;
   workflow_run_id: string;
   token_id: string;
 }
@@ -36,7 +80,124 @@ export default class ExecutorService extends WorkerEntrypoint<Env> {
   }
 
   /**
+   * RPC method - Execute a task (fire-and-forget, calls back to coordinator)
+   *
+   * This is the main entry point for task execution per the 5-layer model.
+   * Loads TaskDef, iterates Steps, executes Actions, and returns result.
+   *
+   * @see docs/architecture/executor.md
+   */
+  async executeTask(payload: TaskPayload): Promise<void> {
+    const startTime = Date.now();
+
+    this.logger.info({
+      event_type: 'task_execution_started',
+      message: 'Task execution started',
+      trace_id: payload.workflow_run_id,
+      metadata: {
+        token_id: payload.token_id,
+        task_id: payload.task_id,
+        task_version: payload.task_version,
+        input_keys: Object.keys(payload.input),
+        has_resources: payload.resources ? Object.keys(payload.resources).length > 0 : false,
+      },
+    });
+
+    try {
+      // Load task definition from Resources
+      using taskDefsResource = this.env.RESOURCES.taskDefs();
+      const { task_def } = await taskDefsResource.get(payload.task_id, payload.task_version);
+
+      // TODO: Validate input against task_def.input_schema
+
+      // Initialize task context
+      const context = {
+        input: {
+          ...payload.input,
+          _workflow_run_id: payload.workflow_run_id,
+          _token_id: payload.token_id,
+          _resources: payload.resources || {},
+        },
+        state: {} as Record<string, unknown>,
+        output: {} as Record<string, unknown>,
+      };
+
+      // Execute steps sequentially
+      let stepsExecuted = 0;
+
+      for (const step of task_def.steps.sort(
+        (a: { ordinal: number }, b: { ordinal: number }) => a.ordinal - b.ordinal,
+      )) {
+        this.logger.info({
+          event_type: 'step_execution_started',
+          message: `Executing step: ${step.ref}`,
+          trace_id: payload.workflow_run_id,
+          metadata: {
+            token_id: payload.token_id,
+            step_id: step.id,
+            step_ref: step.ref,
+            step_ordinal: step.ordinal,
+            action_id: step.action_id,
+          },
+        });
+
+        // TODO: Evaluate step.condition
+        // TODO: Apply step.input_mapping
+        // TODO: Load ActionDef and execute
+        // TODO: Apply step.output_mapping
+        // TODO: Handle step.on_failure
+
+        stepsExecuted++;
+      }
+
+      // TODO: Validate output against task_def.output_schema
+
+      const duration = Date.now() - startTime;
+
+      this.logger.info({
+        event_type: 'task_execution_completed',
+        message: 'Task execution completed successfully',
+        trace_id: payload.workflow_run_id,
+        metadata: {
+          token_id: payload.token_id,
+          task_id: payload.task_id,
+          duration_ms: duration,
+          steps_executed: stepsExecuted,
+          output_keys: Object.keys(context.output),
+        },
+      });
+
+      // Callback to coordinator with result
+      const coordinatorId = this.env.COORDINATOR.idFromName(payload.workflow_run_id);
+      const coordinator = this.env.COORDINATOR.get(coordinatorId);
+      await coordinator.handleTaskResult(payload.token_id, {
+        output_data: context.output,
+      });
+    } catch (error) {
+      const duration = Date.now() - startTime;
+
+      this.logger.error({
+        event_type: 'task_execution_failed',
+        message: 'Task execution failed',
+        trace_id: payload.workflow_run_id,
+        metadata: {
+          token_id: payload.token_id,
+          task_id: payload.task_id,
+          duration_ms: duration,
+          error: error instanceof Error ? error.message : String(error),
+          stack: error instanceof Error ? error.stack : undefined,
+        },
+      });
+
+      // TODO: Callback with error result and determine retryable
+      throw error;
+    }
+  }
+
+  /**
    * RPC method - call LLM with given parameters (fire-and-forget, calls back to coordinator)
+   *
+   * @deprecated Use executeTask instead. This is a legacy method that will be removed.
    */
   async llmCall(params: LLMCallParams): Promise<void> {
     const startTime = Date.now();

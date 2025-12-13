@@ -198,8 +198,8 @@ const myWorkflow = workflowDef({
     node({
       ref: 'generate',
       name: 'Generate Content',
-      action_id: 'llm-call',
-      action_version: 1,
+      task_id: 'llm-call-task',
+      task_version: 1,
       input_mapping: {
         prompt: '$.input.topic',
         tone: '$.input.tone',
@@ -209,7 +209,7 @@ const myWorkflow = workflowDef({
     node({
       ref: 'validate',
       name: 'Validate Output',
-      action_id: 'validator',
+      task_id: 'validator-task',
       input_mapping: {
         content: '$.generate.output',
       },
@@ -274,8 +274,8 @@ import { node } from '@wonder/sdk';
 const myNode = node({
   ref: 'process_data',
   name: 'Process Data',
-  action_id: 'data-processor',
-  action_version: 2,
+  task_id: 'data-processor-task',
+  task_version: 2,
   input_mapping: {
     data: '$.input.rawData',
     config: '$.context.processorConfig',

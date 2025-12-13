@@ -24,11 +24,12 @@ export type Node = {
   workflow_def_id: string;
   workflow_def_version: number;
   name: string;
-  action_id: string | null;
-  action_version: number | null;
+  task_id: string | null;
+  task_version: number | null;
   input_mapping: object | null;
   output_mapping: object | null;
-  // No branching logic - nodes only execute actions
+  resource_bindings: Record<string, string> | null;
+  // No branching logic - nodes only execute tasks
 };
 
 export type Transition = {

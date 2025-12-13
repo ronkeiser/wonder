@@ -20,11 +20,12 @@ export class WorkflowDefs extends Resource {
     nodes: Array<{
       ref: string;
       name: string;
-      action_id?: string;
-      action_version?: number;
+      task_id?: string;
+      task_version?: number;
       input_mapping?: object;
       output_mapping?: object;
-      // No branching logic - nodes only execute actions
+      resource_bindings?: Record<string, string>;
+      // No branching logic - nodes only execute tasks
     }>;
     transitions?: Array<{
       ref?: string;
@@ -172,10 +173,11 @@ export class WorkflowDefs extends Resource {
         workflow_def_id: workflowDef.id,
         workflow_def_version: workflowDef.version,
         name: nodeData.name,
-        action_id: nodeData.action_id,
-        action_version: nodeData.action_version,
+        task_id: nodeData.task_id,
+        task_version: nodeData.task_version,
         input_mapping: nodeData.input_mapping ?? null,
         output_mapping: nodeData.output_mapping ?? null,
+        resource_bindings: nodeData.resource_bindings ?? null,
       });
       refToIdMap.set(nodeData.ref, node.id);
     }

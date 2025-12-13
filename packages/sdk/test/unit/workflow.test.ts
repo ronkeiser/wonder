@@ -20,7 +20,7 @@ describe('workflowDef()', () => {
         node({
           ref: 'start',
           name: 'Start Node',
-          action_id: 'action-1',
+          task_id: 'task-1',
         }),
       ],
     });
@@ -47,7 +47,7 @@ describe('workflowDef()', () => {
         {
           ref: 'start',
           name: 'Start Node',
-          action_id: 'action-1',
+          task_id: 'task-1',
         },
       ],
     });
@@ -158,9 +158,9 @@ describe('workflowDef()', () => {
       context_schema: schema.object({ apiKey: schema.string() }),
       initial_node_ref: 'start',
       nodes: [
-        node({ ref: 'start', name: 'Start', action_id: 'action-1' }),
-        node({ ref: 'middle', name: 'Middle', action_id: 'action-2' }),
-        node({ ref: 'end', name: 'End', action_id: 'action-3' }),
+        node({ ref: 'start', name: 'Start', task_id: 'task-1' }),
+        node({ ref: 'middle', name: 'Middle', task_id: 'task-2' }),
+        node({ ref: 'end', name: 'End', task_id: 'task-3' }),
       ],
       transitions: [
         transition({ from_node_ref: 'start', to_node_ref: 'middle', priority: 1 }),

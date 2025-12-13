@@ -7,10 +7,13 @@
 import type { Emitter } from '@wonder/events';
 import { createLogger, type Logger } from '@wonder/logs';
 import { DurableObject } from 'cloudflare:workers';
+import { applyDecisions, type DispatchContext } from './dispatch/index.js';
 import { ContextManager } from './operations/context.js';
 import { DefinitionManager } from './operations/defs.js';
 import { CoordinatorEmitter } from './operations/events.js';
 import { TokenManager } from './operations/tokens.js';
+import { decideRouting, getTransitionsWithSynchronization } from './planning/index.js';
+import { decideSynchronization } from './planning/synchronization.js';
 import type { TaskResult } from './types.js';
 
 /**
@@ -119,8 +122,19 @@ export class WorkflowCoordinator extends DurableObject {
       const token = this.tokens.get(tokenId);
       workflow_run_id = token.workflow_run_id;
 
-      // Apply task output to context
-      await this.context.applyNodeOutput(result.output_data);
+      // Get node for output mapping
+      const node = this.defs.getNode(token.node_id);
+
+      // Apply node's output_mapping to transform raw output
+      // e.g., { "greeting": "$.greeting" } extracts result.output_data.greeting -> context.output.greeting
+      const mappedOutput = this.applyOutputMapping(
+        node.output_mapping as Record<string, string> | null,
+        result.output_data,
+        node.ref,
+      );
+
+      // Apply mapped output to context
+      await this.context.applyNodeOutput(mappedOutput);
 
       // Emit node completed event
       this.emitter.emit({
@@ -131,21 +145,119 @@ export class WorkflowCoordinator extends DurableObject {
         metadata: { output: result.output_data },
       });
 
-      // Check if workflow is complete (no more active tokens)
-      const activeCount = this.tokens.getActiveCount(workflow_run_id);
+      // Get outgoing transitions from completed node
+      const transitions = this.defs.getTransitionsFrom(token.node_id);
 
+      // If no transitions, check workflow completion
+      if (transitions.length === 0) {
+        const activeCount = this.tokens.getActiveCount(workflow_run_id);
+        if (activeCount === 0) {
+          await this.finalizeWorkflow(workflow_run_id);
+        }
+        return;
+      }
+
+      // Get context snapshot for routing decisions
+      const contextSnapshot = this.context.getSnapshot();
+
+      // Emit routing start trace
       this.emitter.emitTrace({
-        type: 'decision.sync.check_condition',
-        strategy: 'completion_check',
-        completed: 1,
-        required: activeCount,
+        type: 'decision.routing.start',
+        token_id: tokenId,
+        node_id: token.node_id,
       });
 
+      // Plan routing decisions
+      const routingDecisions = decideRouting({
+        completedTokenId: tokenId,
+        completedTokenPath: token.path_id,
+        workflowRunId: workflow_run_id,
+        nodeId: token.node_id,
+        transitions,
+        context: contextSnapshot,
+      });
+
+      // Emit routing complete trace
+      this.emitter.emitTrace({
+        type: 'decision.routing.complete',
+        decisions: routingDecisions,
+      });
+
+      // If no routing decisions, check workflow completion
+      if (routingDecisions.length === 0) {
+        const activeCount = this.tokens.getActiveCount(workflow_run_id);
+        if (activeCount === 0) {
+          await this.finalizeWorkflow(workflow_run_id);
+        }
+        return;
+      }
+
+      // Apply routing decisions (creates tokens)
+      const dispatchCtx: DispatchContext = {
+        tokens: this.tokens,
+        context: this.context,
+        defs: this.defs,
+        emitter: this.emitter,
+        workflowRunId: workflow_run_id,
+      };
+
+      const applyResult = applyDecisions(routingDecisions, dispatchCtx);
+
+      // Check for transitions with synchronization requirements
+      const syncTransitions = getTransitionsWithSynchronization(transitions, contextSnapshot);
+
+      // For each created token, check if it needs synchronization
+      for (const createdTokenId of applyResult.tokensCreated) {
+        const createdToken = this.tokens.get(createdTokenId);
+
+        // Find matching sync transition for this token's target node
+        const syncTransition = syncTransitions.find((t) => t.to_node_id === createdToken.node_id);
+
+        if (syncTransition && syncTransition.synchronization) {
+          // Get sibling counts for synchronization check
+          const siblingGroup = syncTransition.synchronization.sibling_group;
+          const siblingCounts = this.tokens.getSiblingCounts(workflow_run_id, siblingGroup);
+
+          // Emit sync start trace
+          this.emitter.emitTrace({
+            type: 'decision.sync.start',
+            token_id: createdTokenId,
+            sibling_count: siblingCounts.total,
+          });
+
+          // Plan synchronization decisions
+          const syncDecisions = decideSynchronization({
+            token: createdToken,
+            transition: syncTransition,
+            siblingCounts,
+            workflowRunId: workflow_run_id,
+          });
+
+          // Apply sync decisions
+          applyDecisions(syncDecisions, dispatchCtx);
+        } else {
+          // No synchronization - mark for dispatch
+          this.tokens.updateStatus(createdTokenId, 'dispatched');
+        }
+      }
+
+      // Dispatch any tokens marked for dispatch
+      const dispatchedTokens = this.tokens.getMany(
+        applyResult.tokensCreated.filter((id) => {
+          const t = this.tokens.get(id);
+          return t.status === 'dispatched';
+        }),
+      );
+
+      for (const dispatchToken of dispatchedTokens) {
+        await this.dispatchToken(dispatchToken.id);
+      }
+
+      // Check workflow completion after all routing
+      const activeCount = this.tokens.getActiveCount(workflow_run_id);
       if (activeCount === 0) {
         await this.finalizeWorkflow(workflow_run_id);
       }
-
-      // TODO: Implement routing to next nodes via decision logic
     } catch (error) {
       this.logger.error({
         event_type: 'coordinator_task_result_failed',
@@ -164,26 +276,195 @@ export class WorkflowCoordinator extends DurableObject {
 
   /**
    * Dispatch token to Executor
+   *
+   * Per the 5-layer execution model (WorkflowDef → Node → TaskDef → Step → ActionDef):
+   * - Coordinator just sends { task_id, task_version, input, resources } to Executor
+   * - Executor handles everything: loading TaskDef, iterating Steps, executing Actions
    */
   private async dispatchToken(tokenId: string): Promise<void> {
+    const token = this.tokens.get(tokenId);
+    const node = this.defs.getNode(token.node_id);
+
     this.emitter.emitTrace({
       type: 'dispatch.batch.start',
       decision_count: 1,
     });
 
-    const sql = this.ctx.storage.sql;
-
     // Update token status to executing
     this.tokens.updateStatus(tokenId, 'executing');
 
-    // TODO: Dispatch to Executor service instead of completing synchronously
-    // Currently using mock output for testing output validation
-    await this.handleTaskResult(tokenId, {
-      output_data: {
-        greeting: 'Hello from coordinator stub',
-        final_count: 42,
+    // Get context for input mapping
+    const context = this.context.getSnapshot();
+
+    // If node has no task, complete immediately (e.g., pass-through nodes)
+    if (!node.task_id) {
+      this.logger.info({
+        event_type: 'dispatch_no_task',
+        message: 'Node has no task, completing immediately',
+        trace_id: token.workflow_run_id,
+        metadata: { tokenId, nodeId: node.id },
+      });
+      await this.handleTaskResult(tokenId, { output_data: {} });
+      return;
+    }
+
+    // Apply input mapping to get task input
+    const taskInput = this.applyInputMapping(
+      node.input_mapping as Record<string, string> | null,
+      context,
+    );
+
+    // Resolve resource bindings from node to workflow resources
+    // node.resource_bindings: { "container": "dev_env" }
+    // workflowDef.resources: { "dev_env": { type: "container", ... } }
+    // We need to pass the actual container DO IDs (placeholder for now)
+    const resolvedResources = this.resolveResourceBindings(
+      node.resource_bindings as Record<string, string> | null,
+    );
+
+    this.logger.info({
+      event_type: 'dispatch_task',
+      message: 'Dispatching task to Executor',
+      trace_id: token.workflow_run_id,
+      metadata: {
+        tokenId,
+        nodeId: node.id,
+        nodeRef: node.ref,
+        taskId: node.task_id,
+        taskVersion: node.task_version,
+        inputKeys: Object.keys(taskInput),
+        hasResources: Object.keys(resolvedResources).length > 0,
       },
     });
+
+    // Dispatch to Executor (fire-and-forget, Executor calls back)
+    await this.env.EXECUTOR.executeTask({
+      token_id: tokenId,
+      workflow_run_id: token.workflow_run_id,
+      task_id: node.task_id,
+      task_version: node.task_version ?? 1,
+      input: taskInput,
+      resources: resolvedResources,
+    });
+  }
+
+  /**
+   * Resolve resource bindings from generic names to actual container DO IDs
+   *
+   * Node.resource_bindings maps generic names to workflow resource IDs:
+   *   { "container": "dev_env" }
+   *
+   * WorkflowDef.resources defines the actual containers:
+   *   { "dev_env": { type: "container", image: "node:20", ... } }
+   *
+   * At runtime, we resolve to container DO IDs:
+   *   { "container": "container-do-abc123" }
+   */
+  private resolveResourceBindings(bindings: Record<string, string> | null): Record<string, string> {
+    if (!bindings) return {};
+
+    // TODO: Implement actual resource resolution
+    // For now, return empty - containers not yet implemented
+    const resolved: Record<string, string> = {};
+
+    // When containers are implemented, this would:
+    // 1. Get workflowDef.resources
+    // 2. For each binding, find the workflow resource
+    // 3. Resolve to container DO ID
+
+    return resolved;
+  }
+
+  /**
+   * Apply input mapping to context to extract action input
+   *
+   * Mappings are JSONPath-style: { "actionField": "$.context.path" }
+   * e.g., { "name": "$.input.name" } extracts context.input.name
+   */
+  private applyInputMapping(
+    mapping: Record<string, string> | null,
+    context: {
+      input: Record<string, unknown>;
+      state: Record<string, unknown>;
+      output: Record<string, unknown>;
+    },
+  ): Record<string, unknown> {
+    if (!mapping) return {};
+
+    const result: Record<string, unknown> = {};
+
+    for (const [targetField, sourcePath] of Object.entries(mapping)) {
+      // Parse JSONPath-style path: $.input.name -> ['input', 'name']
+      if (!sourcePath.startsWith('$.')) {
+        // Literal value
+        result[targetField] = sourcePath;
+        continue;
+      }
+
+      const pathParts = sourcePath.slice(2).split('.'); // Remove '$.' prefix
+      let value: unknown = context;
+
+      for (const part of pathParts) {
+        if (value && typeof value === 'object' && part in value) {
+          value = (value as Record<string, unknown>)[part];
+        } else {
+          value = undefined;
+          break;
+        }
+      }
+
+      result[targetField] = value;
+    }
+
+    return result;
+  }
+
+  /**
+   * Apply output mapping to transform raw task output
+   *
+   * Mappings are JSONPath-style: { "contextField": "$.rawField" }
+   * e.g., { "greeting": "$.response.greeting" } extracts output.response.greeting
+   *
+   * Output is stored with node ref as prefix to avoid collisions:
+   * { "greeting": "Hello" } -> context.output.greet_node.greeting
+   */
+  private applyOutputMapping(
+    mapping: Record<string, string> | null,
+    rawOutput: Record<string, unknown>,
+    nodeRef: string,
+  ): Record<string, unknown> {
+    // If no mapping, store raw output under node ref
+    if (!mapping) {
+      return { [nodeRef]: rawOutput };
+    }
+
+    const result: Record<string, unknown> = {};
+
+    for (const [targetField, sourcePath] of Object.entries(mapping)) {
+      // Parse JSONPath-style path: $.response.greeting -> ['response', 'greeting']
+      if (!sourcePath.startsWith('$.')) {
+        // Literal value
+        result[targetField] = sourcePath;
+        continue;
+      }
+
+      const pathParts = sourcePath.slice(2).split('.'); // Remove '$.' prefix
+      let value: unknown = rawOutput;
+
+      for (const part of pathParts) {
+        if (value && typeof value === 'object' && part in value) {
+          value = (value as Record<string, unknown>)[part];
+        } else {
+          value = undefined;
+          break;
+        }
+      }
+
+      result[targetField] = value;
+    }
+
+    // Store mapped output under node ref
+    return { [nodeRef]: result };
   }
 
   /**
@@ -199,9 +480,15 @@ export class WorkflowCoordinator extends DurableObject {
       // Get context snapshot
       const context = this.context.getSnapshot();
 
-      // For now, output is already in context.output if tasks produced any
-      // TODO: Apply output_mapping from workflow def to extract final output
-      const finalOutput = context.output;
+      // Get workflow def for output_mapping
+      const workflowDef = this.defs.getWorkflowDef();
+
+      // Apply workflow output_mapping to extract final output
+      // e.g., { "result": "$.output.greeting" } extracts context.output.greeting -> finalOutput.result
+      const finalOutput = this.applyInputMapping(
+        workflowDef.output_mapping as Record<string, string> | null,
+        context,
+      );
 
       this.emitter.emitTrace({
         type: 'operation.context.read',

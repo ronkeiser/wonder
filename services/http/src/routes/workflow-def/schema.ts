@@ -32,10 +32,14 @@ export const CreateWorkflowDefSchema = z
           .regex(/^[a-z_][a-z0-9_]*$/)
           .openapi({ example: 'llm_call_node' }),
         name: z.string().min(1),
-        action_id: z.string().min(1).optional().openapi({ example: 'send-email' }),
-        action_version: z.number().int().positive().optional().openapi({ example: 1 }),
+        task_id: z.string().min(1).optional().openapi({ example: 'my-task' }),
+        task_version: z.number().int().positive().optional().openapi({ example: 1 }),
         input_mapping: z.record(z.string(), z.unknown()).optional(),
         output_mapping: z.record(z.string(), z.unknown()).optional(),
+        resource_bindings: z
+          .record(z.string(), z.string())
+          .optional()
+          .openapi({ example: { container: 'dev_env' } }),
       }),
     ),
     transitions: z
@@ -66,10 +70,11 @@ export const NodeSchema = z
     workflow_def_version: z.number().int(),
     ref: z.string(),
     name: z.string(),
-    action_id: z.string().nullable(),
-    action_version: z.number().int().nullable(),
+    task_id: z.string().nullable(),
+    task_version: z.number().int().nullable(),
     input_mapping: z.record(z.string(), z.unknown()).nullable(),
     output_mapping: z.record(z.string(), z.unknown()).nullable(),
+    resource_bindings: z.record(z.string(), z.string()).nullable(),
   })
   .openapi('Node');
 

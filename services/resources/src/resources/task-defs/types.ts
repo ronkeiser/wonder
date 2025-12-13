@@ -1,0 +1,20 @@
+/** Type definitions for task definitions */
+
+import type { RetryConfig, Step } from '../../infrastructure/db/schema';
+
+export type TaskDef = {
+  id: string;
+  version: number;
+  name: string;
+  description: string;
+  project_id: string | null;
+  library_id: string | null;
+  tags: string[] | null;
+  input_schema: object;
+  output_schema: object;
+  steps: Step[];
+  retry: RetryConfig | null;
+  timeout_ms: number | null;
+  created_at: string;
+  updated_at: string;
+};
