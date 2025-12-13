@@ -4,7 +4,7 @@
  * These are ergonomic helpers for creating workflow definitions.
  * All return plain typed objects - no magic, just convenience.
  *
- * Builders can be nested: promptSpec → action → step → taskDef → node → workflowDef
+ * Builders can be nested: promptSpec → action → step → task → node → workflow
  * When passed to createWorkflow, embedded objects are created in dependency order.
  */
 
@@ -28,6 +28,6 @@ export { modelProfile } from './model-profile';
 export { node } from './node';
 export { promptSpec } from './prompt-spec';
 export { schema } from './schema';
-export { step, taskDef } from './task';
+export { step, task } from './task';
 export { transition } from './transition';
-export { workflowDef } from './workflow';
+export { workflow } from './workflow';

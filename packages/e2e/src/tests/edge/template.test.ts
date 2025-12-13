@@ -1,4 +1,4 @@
-import { action, node, promptSpec, schema, step, taskDef, workflowDef } from '@wonder/sdk';
+import { action, node, promptSpec, schema, step, task, workflow } from '@wonder/sdk';
 import { describe, expect, it } from 'vitest';
 import { runTestWorkflow } from '~/kit';
 
@@ -7,7 +7,7 @@ describe('Coordinator - Simple Workflow Tests', () => {
    * Tests workflow execution with context state management.
    *
    * This test demonstrates:
-   * - Using embedded builders: promptSpec → action → step → taskDef → node → workflowDef
+   * - Using embedded builders: promptSpec → action → step → task → node → workflow
    * - Setting up a workflow with input, state (context), and output schemas
    * - Mapping data between workflow context tables and task execution
    * - Writing to the state table during node execution
@@ -17,7 +17,7 @@ describe('Coordinator - Simple Workflow Tests', () => {
    */
   it('executes a workflow with context state', async () => {
     const { result, cleanup } = await runTestWorkflow(
-      workflowDef({
+      workflow({
         name: `Stateful Workflow ${Date.now()}`,
         description: 'Workflow with context state',
 
@@ -47,7 +47,7 @@ describe('Coordinator - Simple Workflow Tests', () => {
           node({
             ref: 'process',
             name: 'Process',
-            task: taskDef({
+            task: task({
               name: 'Echo Task',
               description: 'Task that wraps the echo action',
               input_schema: schema.object(

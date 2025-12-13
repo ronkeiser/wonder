@@ -81,14 +81,14 @@ export async function setupTestContext(): Promise<TestContext> {
 /**
  * Creates all embedded resources and the workflow.
  *
- * Walks the workflow definition tree, finds embedded objects (promptSpec, action, taskDef),
+ * Walks the workflow definition tree, finds embedded objects (promptSpec, action, task),
  * creates them in dependency order, and wires up the IDs.
  *
  * @example
- * const workflow = workflowDef({
+ * const wf = workflow({
  *   nodes: [
  *     node({
- *       task: taskDef({
+ *       task: task({
  *         steps: [
  *           step({
  *             action: action({
@@ -524,17 +524,17 @@ export interface TestWorkflowResult {
  *
  * This is the simplest way to test a workflow:
  * 1. Creates workspace, project, model profile
- * 2. Creates all embedded resources (promptSpec → action → taskDef)
+ * 2. Creates all embedded resources (promptSpec → action → task)
  * 3. Creates and executes the workflow
  * 4. Returns results and a cleanup function
  *
  * @example
  * const { result, cleanup } = await runTestWorkflow(
- *   workflowDef({
+ *   workflow({
  *     name: 'My Test Workflow',
  *     nodes: [
  *       node({
- *         task: taskDef({
+ *         task: task({
  *           steps: [
  *             step({
  *               action: action({

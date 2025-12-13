@@ -1,4 +1,4 @@
-import { action, node, promptSpec, schema, step, taskDef, workflowDef } from '@wonder/sdk';
+import { action, node, promptSpec, schema as s, step, task, workflow } from '@wonder/sdk';
 import { describe, expect, it } from 'vitest';
 import { runTestWorkflow } from '~/kit';
 
@@ -6,20 +6,81 @@ describe('Coordinator - Context Operations', () => {
   it('validates context initialization, input validation, and trace events', async () => {
     const inputData = { name: 'Alice', count: 42 };
 
+    // Define schemas once, reuse throughout
+    const inputSchema = s.object(
+      { name: s.string(), count: s.number() },
+      { required: ['name', 'count'] },
+    );
+    const outputSchema = s.object(
+      { greeting: s.string(), processed_count: s.number() },
+      { required: ['greeting', 'processed_count'] },
+    );
+
+    // Define the prompt spec
+    const testPrompt = promptSpec({
+      name: 'Test Prompt',
+      description: 'Processes input and returns greeting',
+      template: 'Process: {{name}} (count: {{count}})',
+      template_language: 'handlebars',
+      requires: { name: s.string(), count: s.number() },
+      produces: outputSchema,
+    });
+
+    // Define the action using the prompt spec
+    const testAction = action({
+      name: 'Test Action',
+      description: 'Processes input',
+      kind: 'llm_call',
+      implementation: { prompt_spec: testPrompt },
+    });
+
+    // Define the step using the action
+    const processStep = step({
+      ref: 'process',
+      ordinal: 0,
+      action: testAction,
+      action_version: 1,
+      input_mapping: { name: '$.input.name', count: '$.input.count' },
+      output_mapping: {
+        'output.greeting': '$.response.greeting',
+        'output.processed_count': '$.response.processed_count',
+      },
+    });
+
+    // Define the task using the step
+    const testTask = task({
+      name: 'Test Task',
+      description: 'Task that processes input',
+      input_schema: inputSchema,
+      output_schema: outputSchema,
+      steps: [processStep],
+    });
+
+    // Define the node using the task
+    const processNode = node({
+      ref: 'process_node',
+      name: 'Process Input',
+      task: testTask,
+      task_version: 1,
+      input_mapping: { name: '$.input.name', count: '$.input.count' },
+      output_mapping: {
+        'output.greeting': '$.greeting',
+        'output.processed_count': '$.processed_count',
+      },
+    });
+
+    // Compose into workflow
     const { result, cleanup } = await runTestWorkflow(
-      workflowDef({
+      workflow({
         name: `Context Test Workflow ${Date.now()}`,
         description: 'Workflow to test context operations',
-        input_schema: schema.object(
-          { name: schema.string(), count: schema.number() },
-          { required: ['name', 'count'] },
-        ),
-        context_schema: schema.object({
-          processed: schema.boolean(),
-          intermediate_result: schema.string(),
+        input_schema: inputSchema,
+        context_schema: s.object({
+          processed: s.boolean(),
+          intermediate_result: s.string(),
         }),
-        output_schema: schema.object(
-          { greeting: schema.string(), final_count: schema.number() },
+        output_schema: s.object(
+          { greeting: s.string(), final_count: s.number() },
           { required: ['greeting', 'final_count'] },
         ),
         output_mapping: {
@@ -27,63 +88,7 @@ describe('Coordinator - Context Operations', () => {
           final_count: '$.output.processed_count',
         },
         initial_node_ref: 'process_node',
-        nodes: [
-          node({
-            ref: 'process_node',
-            name: 'Process Input',
-            task: taskDef({
-              name: 'Test Task',
-              description: 'Task that processes input',
-              input_schema: schema.object(
-                { name: schema.string(), count: schema.number() },
-                { required: ['name', 'count'] },
-              ),
-              output_schema: schema.object(
-                { greeting: schema.string(), processed_count: schema.number() },
-                { required: ['greeting', 'processed_count'] },
-              ),
-              steps: [
-                step({
-                  ref: 'process',
-                  ordinal: 0,
-                  action: action({
-                    name: 'Test Action',
-                    description: 'Processes input',
-                    kind: 'llm_call',
-                    implementation: {
-                      prompt_spec: promptSpec({
-                        name: 'Test Prompt',
-                        description: 'Processes input and returns greeting',
-                        template: 'Process: {{name}} (count: {{count}})',
-                        template_language: 'handlebars',
-                        requires: { name: schema.string(), count: schema.number() },
-                        produces: schema.object(
-                          { greeting: schema.string(), processed_count: schema.number() },
-                          { required: ['greeting', 'processed_count'] },
-                        ),
-                      }),
-                    },
-                  }),
-                  action_version: 1,
-                  input_mapping: { name: '$.input.name', count: '$.input.count' },
-                  output_mapping: {
-                    'output.greeting': '$.response.greeting',
-                    'output.processed_count': '$.response.processed_count',
-                  },
-                }),
-              ],
-            }),
-            task_version: 1,
-            input_mapping: {
-              name: '$.input.name',
-              count: '$.input.count',
-            },
-            output_mapping: {
-              'output.greeting': '$.greeting',
-              'output.processed_count': '$.processed_count',
-            },
-          }),
-        ],
+        nodes: [processNode],
         transitions: [],
       }),
       inputData,

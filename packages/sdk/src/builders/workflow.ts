@@ -35,7 +35,7 @@ type WorkflowDefConfig = Omit<CreateWorkflowDef, 'nodes'> & {
  *   ]
  * });
  */
-export function workflowDef(config: WorkflowDefConfig): EmbeddedWorkflowDef {
+export function workflow(config: WorkflowDefConfig): EmbeddedWorkflowDef {
   // Validate that initial_node_ref exists in nodes
   const nodeRefs = new Set(config.nodes.map((n) => n.ref));
   if (!nodeRefs.has(config.initial_node_ref)) {

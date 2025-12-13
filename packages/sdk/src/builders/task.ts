@@ -98,7 +98,7 @@ export function step(config: {
  *   ]
  * });
  */
-export function taskDef(config: {
+export function task(config: {
   name: string;
   description?: string;
   version?: number;
