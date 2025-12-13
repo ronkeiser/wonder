@@ -32,7 +32,7 @@
  */
 
 import type { JSONSchema } from '@wonder/context';
-import { ContextExecutor, CustomTypeRegistry, DMLGenerator, Validator } from '@wonder/context';
+import { CustomTypeRegistry, SchemaExecutor, Validator } from '@wonder/context';
 import type { Emitter } from '@wonder/events';
 import type { ContextSnapshot } from '../types.js';
 import type { DefinitionManager } from './defs.js';
@@ -47,7 +47,7 @@ export class ContextManager {
   private readonly defs: DefinitionManager;
   private readonly emitter: Emitter;
   private readonly customTypes: CustomTypeRegistry;
-  private readonly executor: ContextExecutor;
+  private readonly executor: SchemaExecutor;
 
   /** Cached schemas loaded from definitions */
   private inputSchema: JSONSchema | null = null;
@@ -58,15 +58,11 @@ export class ContextManager {
   private inputValidator: Validator | null = null;
   private outputValidator: Validator | null = null;
 
-  /** Cached DML generators */
-  private inputDMLGenerator: DMLGenerator | null = null;
-  private outputDMLGenerator: DMLGenerator | null = null;
-
   constructor(sql: SqlStorage, defs: DefinitionManager, emitter: Emitter) {
     this.defs = defs;
     this.emitter = emitter;
     this.customTypes = new CustomTypeRegistry();
-    this.executor = new ContextExecutor(sql, this.customTypes);
+    this.executor = new SchemaExecutor(sql, this.customTypes);
   }
 
   /**

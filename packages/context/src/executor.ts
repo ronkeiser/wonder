@@ -1,8 +1,8 @@
 /**
- * Context Executor - SQL execution for schema-driven context tables
+ * Schema Executor - SQL execution for schema-driven tables
  *
  * Combines DDLGenerator and DMLGenerator with SqlStorage to provide
- * a complete context management interface for Cloudflare Workers.
+ * a complete schema-to-SQL interface for Cloudflare Workers DOs.
  */
 
 import type { CustomTypeRegistry } from './custom-types.js';
@@ -21,12 +21,12 @@ export interface SqlExecutor {
 }
 
 /**
- * ContextExecutor handles SQL execution for schema-driven context tables.
+ * SchemaExecutor handles SQL execution for schema-driven tables.
  *
  * Wraps DDL/DML generators with SqlStorage to provide a clean API
  * for table lifecycle management and data operations.
  */
-export class ContextExecutor {
+export class SchemaExecutor {
   private readonly sql: SqlExecutor;
   private readonly customTypes: CustomTypeRegistry;
   private readonly options: ExecutorOptions;
