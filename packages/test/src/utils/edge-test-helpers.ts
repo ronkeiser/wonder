@@ -1,112 +1,8 @@
 import { node, schema, step, taskDef, workflowDef } from '@wonder/sdk';
 import { wonder } from '~/client';
 
-/**
- * Represents a resource that can be deleted.
- */
 export interface Deletable {
   delete: () => Promise<unknown>;
-}
-
-/**
- * Tracks created resources and provides automatic cleanup.
- */
-export class ResourceTracker {
-  private resources: Deletable[] = [];
-
-  /**
-   * Track a resource for cleanup.
-   */
-  track(resource: Deletable): void {
-    this.resources.push(resource);
-  }
-
-  /**
-   * Clean up all tracked resources in reverse order (LIFO).
-   */
-  async cleanup(): Promise<void> {
-    const count = this.resources.length;
-    if (count === 0) {
-      return;
-    }
-
-    console.log(`✨ Cleaning up ${count} resource${count === 1 ? '' : 's'}...`);
-
-    // Reverse order - delete most recently created resources first
-    for (const resource of this.resources.reverse()) {
-      try {
-        await resource.delete();
-      } catch (error) {
-        // Silently continue - resource may already be deleted or cascade deleted
-        console.warn('Failed to delete resource:', error);
-      }
-    }
-    this.resources = [];
-
-    console.log(`🧹 Cleanup complete!`);
-  }
-
-  /**
-   * Get the number of tracked resources.
-   */
-  get count(): number {
-    return this.resources.length;
-  }
-}
-
-/**
- * Create a wonder client wrapper that automatically tracks created resources.
- */
-export function createTrackedClient() {
-  const tracker = new ResourceTracker();
-
-  // Create a proxy that intercepts resource creation
-  const trackedWonder = new Proxy(wonder, {
-    get(target, prop) {
-      const original = (target as any)[prop];
-
-      // Pass through non-collection properties (like camelCase aliases)
-      if (typeof original !== 'function') {
-        return original;
-      }
-
-      // Wrap collection functions (they are callable AND have methods)
-      return new Proxy(original, {
-        get(collectionTarget, collectionProp) {
-          const collectionMethod = (collectionTarget as any)[collectionProp];
-
-          // Intercept create methods
-          if (collectionProp === 'create' && typeof collectionMethod === 'function') {
-            return async (...args: any[]) => {
-              const result = await collectionMethod.apply(collectionTarget, args);
-
-              // Track the created resource for cleanup
-              // Extract ID from response and create deletable
-              // Response format: { workspace_id: "...", workspace: { id: "...", ... } }
-              const keys = Object.keys(result || {});
-              const idKey = keys.find((k) => k.endsWith('_id'));
-              const id = idKey ? (result as any)[idKey] : undefined;
-
-              if (id) {
-                const deletable = (target as any)[prop as string](id);
-                tracker.track(deletable);
-              }
-
-              return result;
-            };
-          }
-
-          return collectionMethod;
-        },
-        // Also proxy the callable function itself (for calling like wonder.workspaces(id))
-        apply(collectionTarget, thisArg, args) {
-          return collectionTarget.apply(thisArg, args);
-        },
-      });
-    },
-  });
-
-  return { wonder: trackedWonder, tracker };
 }
 
 export interface TestContext {
@@ -127,34 +23,24 @@ export interface WorkflowTestSetup extends TestContext {
  * - Model profile
  *
  * Tests should create their own prompt specs, actions, and task definitions.
- *
- * @param client - Optional wonder client to use (defaults to global wonder)
  */
-export async function setupTestContext(client = wonder): Promise<TestContext> {
+export async function setupTestContext(): Promise<TestContext> {
   // Create workspace
-  const workspaceResponse = await client.workspaces.create({
+  const workspaceResponse = await wonder.workspaces.create({
     name: `Test Workspace ${Date.now()}`,
   });
-
-  if (!workspaceResponse?.workspace) {
-    throw new Error('Failed to create workspace');
-  }
   const workspaceId = workspaceResponse.workspace.id;
 
   // Create project
-  const projectResponse = await client.projects.create({
+  const projectResponse = await wonder.projects.create({
     workspace_id: workspaceId,
     name: `Test Project ${Date.now()}`,
     description: 'Test project for workflow tests',
   });
-
-  if (!projectResponse?.project) {
-    throw new Error('Failed to create project');
-  }
   const projectId = projectResponse.project.id;
 
   // Create model profile
-  const modelProfileResponse = await client.modelProfiles.create({
+  const modelProfileResponse = await wonder.modelProfiles.create({
     name: `Test Model Profile ${Date.now()}`,
     provider: 'cloudflare',
     model_id: '@cf/meta/llama-3.1-8b-instruct',
@@ -165,10 +51,6 @@ export async function setupTestContext(client = wonder): Promise<TestContext> {
     cost_per_1k_input_tokens: 0.0,
     cost_per_1k_output_tokens: 0.0,
   });
-
-  if (!modelProfileResponse?.model_profile) {
-    throw new Error('Failed to create model profile');
-  }
   const modelProfileId = modelProfileResponse.model_profile.id;
 
   return {

@@ -1,7 +1,8 @@
 import { node, schema, step, taskDef, workflowDef } from '@wonder/sdk';
 import { describe, expect, it } from 'vitest';
+import { wonder } from '~/client';
 import {
-  createTrackedClient,
+  cleanup,
   createWorkflow,
   executeWorkflow,
   setupTestContext,
@@ -26,11 +27,8 @@ describe('Coordinator - Simple Workflow Tests', () => {
    * 5. Cleanup: Automatically delete all created resources
    */
   it('executes a workflow with context state', async () => {
-    /** Create tracked client that automatically tracks all created resources */
-    const { wonder, tracker } = createTrackedClient();
-
     /** Create base infrastructure (workspace, project, model profile) */
-    const ctx = await setupTestContext(wonder);
+    const ctx = await setupTestContext();
 
     /** Create prompt spec that echoes input */
     const promptSpecResponse = await wonder.promptSpecs.create({
@@ -52,10 +50,6 @@ describe('Coordinator - Simple Workflow Tests', () => {
       ),
     });
 
-    if (!promptSpecResponse?.prompt_spec) {
-      throw new Error('Failed to create prompt spec');
-    }
-
     /** Create LLM action using the prompt spec */
     const actionResponse = await wonder.actions.create({
       version: 1,
@@ -67,10 +61,6 @@ describe('Coordinator - Simple Workflow Tests', () => {
         model_profile_id: ctx.modelProfileId,
       },
     });
-
-    if (!actionResponse?.action) {
-      throw new Error('Failed to create action');
-    }
 
     /** Create task definition that wraps the echo action */
     const taskDefResponse = await wonder.taskDefs.create(
@@ -111,14 +101,6 @@ describe('Coordinator - Simple Workflow Tests', () => {
         ],
       }),
     );
-
-    if (!taskDefResponse?.task_def) {
-      throw new Error('Failed to create task definition');
-    }
-
-    if (!taskDefResponse?.task_def) {
-      throw new Error('Failed to create task definition');
-    }
 
     /**
      * Define the workflow structure.
@@ -221,8 +203,18 @@ describe('Coordinator - Simple Workflow Tests', () => {
 
     /**
      * Cleanup all resources in reverse order of creation.
-     * Resources are automatically tracked by the client proxy.
+     * This ensures referential integrity - child resources deleted before parents.
      */
-    await tracker.cleanup();
+    await cleanup(
+      wonder.workflowRuns(result.workflowRunId),
+      wonder.workflows(setup.workflowId),
+      wonder.workflowDefs(setup.workflowDefId),
+      wonder.taskDefs(taskDefResponse.task_def.id),
+      wonder.actions(actionResponse.action.id),
+      wonder.promptSpecs(promptSpecResponse.prompt_spec.id),
+      wonder.modelProfiles(ctx.modelProfileId),
+      wonder.projects(ctx.projectId),
+      wonder.workspaces(ctx.workspaceId),
+    );
   });
 });
