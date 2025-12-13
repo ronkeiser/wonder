@@ -16,7 +16,6 @@ events.openapi(getEventsRoute, async (c) => {
 });
 
 /** GET /trace - Query trace events */
-// @ts-ignore
 events.openapi(getTraceEventsRoute, async (c) => {
   const query = c.req.valid('query');
   const result = await c.env.EVENTS.getTraceEvents(query);
