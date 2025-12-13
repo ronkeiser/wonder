@@ -399,6 +399,7 @@ export async function cleanup(...resources: (Deletable | undefined | null)[]) {
 /**
  * Cleans up all resources created during a workflow test.
  * Handles both legacy explicit IDs and new createdResources tracking.
+ * Returns the count of resources deleted.
  */
 export async function cleanupWorkflowTest(
   setup: WorkflowTestSetup,
@@ -406,11 +407,14 @@ export async function cleanupWorkflowTest(
   taskDefId?: string,
   actionId?: string,
   promptSpecId?: string,
-) {
+): Promise<number> {
+  let count = 0;
+
   // Delete workflow run
   if (workflowRunId) {
     try {
       await wonder['workflow-runs'](workflowRunId).delete();
+      count++;
     } catch (e) {
       console.warn('Failed to delete workflow run:', e);
     }
@@ -419,6 +423,7 @@ export async function cleanupWorkflowTest(
   // Delete workflow
   try {
     await wonder.workflows(setup.workflowId).delete();
+    count++;
   } catch (e) {
     console.warn('Failed to delete workflow:', e);
   }
@@ -426,6 +431,7 @@ export async function cleanupWorkflowTest(
   // Delete workflow def
   try {
     await wonder['workflow-defs'](setup.workflowDefId).delete();
+    count++;
   } catch (e) {
     console.warn('Failed to delete workflow def:', e);
   }
@@ -436,6 +442,7 @@ export async function cleanupWorkflowTest(
   for (const id of taskDefIds.reverse()) {
     try {
       await wonder['task-defs'](id).delete();
+      count++;
     } catch (e) {
       console.warn('Failed to delete task def:', e);
     }
@@ -447,6 +454,7 @@ export async function cleanupWorkflowTest(
   for (const id of actionIds.reverse()) {
     try {
       await wonder.actions(id).delete();
+      count++;
     } catch (e) {
       console.warn('Failed to delete action:', e);
     }
@@ -458,6 +466,7 @@ export async function cleanupWorkflowTest(
   for (const id of promptSpecIds.reverse()) {
     try {
       await wonder['prompt-specs'](id).delete();
+      count++;
     } catch (e) {
       console.warn('Failed to delete prompt spec:', e);
     }
@@ -466,21 +475,26 @@ export async function cleanupWorkflowTest(
   // Delete model profile, project, workspace
   try {
     await wonder['model-profiles'](setup.modelProfileId).delete();
+    count++;
   } catch (e) {
     console.warn('Failed to delete model profile:', e);
   }
 
   try {
     await wonder.projects(setup.projectId).delete();
+    count++;
   } catch (e) {
     console.warn('Failed to delete project:', e);
   }
 
   try {
     await wonder.workspaces(setup.workspaceId).delete();
+    count++;
   } catch (e) {
     console.warn('Failed to delete workspace:', e);
   }
+
+  return count;
 }
 
 /**
@@ -564,7 +578,8 @@ export async function runTestWorkflow(
     result,
     setup,
     cleanup: async () => {
-      await cleanupWorkflowTest(setup, result.workflowRunId);
+      const count = await cleanupWorkflowTest(setup, result.workflowRunId);
+      console.log(`✨ Cleanup complete (${count} resources)`);
     },
   };
 }

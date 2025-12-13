@@ -1,118 +1,94 @@
 import { action, node, promptSpec, schema, step, taskDef, workflowDef } from '@wonder/sdk';
 import { describe, expect, it } from 'vitest';
-import {
-  cleanupWorkflowTest,
-  createWorkflow,
-  executeWorkflow,
-  setupTestContext,
-} from '~/utils/edge-test-helpers';
+import { runTestWorkflow } from '~/kit';
 
 describe('Coordinator - Context Operations', () => {
   it('validates context initialization, input validation, and trace events', async () => {
-    // Setup test context (workspace, project, model profile)
-    const ctx = await setupTestContext();
+    const inputData = { name: 'Alice', count: 42 };
 
-    // Define workflow with embedded resources
-    // createWorkflow will auto-create: promptSpec → action → taskDef → workflowDef
-    const workflow = workflowDef({
-      name: `Context Test Workflow ${Date.now()}`,
-      description: 'Workflow to test context operations',
-      input_schema: schema.object(
-        {
-          name: schema.string(),
-          count: schema.number(),
+    const { result, cleanup } = await runTestWorkflow(
+      workflowDef({
+        name: `Context Test Workflow ${Date.now()}`,
+        description: 'Workflow to test context operations',
+        input_schema: schema.object(
+          { name: schema.string(), count: schema.number() },
+          { required: ['name', 'count'] },
+        ),
+        context_schema: schema.object({
+          processed: schema.boolean(),
+          intermediate_result: schema.string(),
+        }),
+        output_schema: schema.object(
+          { greeting: schema.string(), final_count: schema.number() },
+          { required: ['greeting', 'final_count'] },
+        ),
+        output_mapping: {
+          greeting: '$.output.greeting',
+          final_count: '$.output.processed_count',
         },
-        { required: ['name', 'count'] },
-      ),
-      context_schema: schema.object({
-        processed: schema.boolean(),
-        intermediate_result: schema.string(),
-      }),
-      output_schema: schema.object(
-        {
-          greeting: schema.string(),
-          final_count: schema.number(),
-        },
-        { required: ['greeting', 'final_count'] },
-      ),
-      output_mapping: {
-        greeting: '$.output.greeting',
-        final_count: '$.output.processed_count',
-      },
-      initial_node_ref: 'process_node',
-      nodes: [
-        node({
-          ref: 'process_node',
-          name: 'Process Input',
-          task: taskDef({
-            name: 'Test Task',
-            description: 'Task that processes input',
-            input_schema: schema.object(
-              { name: schema.string(), count: schema.number() },
-              { required: ['name', 'count'] },
-            ),
-            output_schema: schema.object(
-              { greeting: schema.string(), processed_count: schema.number() },
-              { required: ['greeting', 'processed_count'] },
-            ),
-            steps: [
-              step({
-                ref: 'process',
-                ordinal: 0,
-                action: action({
-                  name: 'Test Action',
-                  description: 'Processes input',
-                  kind: 'llm_call',
-                  implementation: {
-                    prompt_spec: promptSpec({
-                      name: 'Test Prompt',
-                      description: 'Processes input and returns greeting',
-                      template: 'Process: {{name}} (count: {{count}})',
-                      template_language: 'handlebars',
-                      requires: { name: schema.string(), count: schema.number() },
-                      produces: schema.object(
-                        { greeting: schema.string(), processed_count: schema.number() },
-                        { required: ['greeting', 'processed_count'] },
-                      ),
-                    }),
+        initial_node_ref: 'process_node',
+        nodes: [
+          node({
+            ref: 'process_node',
+            name: 'Process Input',
+            task: taskDef({
+              name: 'Test Task',
+              description: 'Task that processes input',
+              input_schema: schema.object(
+                { name: schema.string(), count: schema.number() },
+                { required: ['name', 'count'] },
+              ),
+              output_schema: schema.object(
+                { greeting: schema.string(), processed_count: schema.number() },
+                { required: ['greeting', 'processed_count'] },
+              ),
+              steps: [
+                step({
+                  ref: 'process',
+                  ordinal: 0,
+                  action: action({
+                    name: 'Test Action',
+                    description: 'Processes input',
+                    kind: 'llm_call',
+                    implementation: {
+                      prompt_spec: promptSpec({
+                        name: 'Test Prompt',
+                        description: 'Processes input and returns greeting',
+                        template: 'Process: {{name}} (count: {{count}})',
+                        template_language: 'handlebars',
+                        requires: { name: schema.string(), count: schema.number() },
+                        produces: schema.object(
+                          { greeting: schema.string(), processed_count: schema.number() },
+                          { required: ['greeting', 'processed_count'] },
+                        ),
+                      }),
+                    },
+                  }),
+                  action_version: 1,
+                  input_mapping: { name: '$.input.name', count: '$.input.count' },
+                  output_mapping: {
+                    'output.greeting': '$.response.greeting',
+                    'output.processed_count': '$.response.processed_count',
                   },
                 }),
-                action_version: 1,
-                input_mapping: { name: '$.input.name', count: '$.input.count' },
-                output_mapping: {
-                  'output.greeting': '$.response.greeting',
-                  'output.processed_count': '$.response.processed_count',
-                },
-              }),
-            ],
+              ],
+            }),
+            task_version: 1,
+            input_mapping: {
+              name: '$.input.name',
+              count: '$.input.count',
+            },
+            output_mapping: {
+              'output.greeting': '$.greeting',
+              'output.processed_count': '$.processed_count',
+            },
           }),
-          task_version: 1,
-          input_mapping: {
-            name: '$.input.name',
-            count: '$.input.count',
-          },
-          output_mapping: {
-            'output.greeting': '$.greeting',
-            'output.processed_count': '$.processed_count',
-          },
-        }),
-      ],
-      transitions: [],
-    });
-
-    // Create workflow (auto-creates all embedded resources)
-    const setup = await createWorkflow(ctx, workflow);
-
-    // Execute workflow
-    const inputData = {
-      name: 'Alice',
-      count: 42,
-    };
-
-    const result = await executeWorkflow(setup.workflowId, inputData);
-
-    // Log all events
-    console.log('Events:', JSON.stringify(result.events, null, 2));
+        ],
+        transitions: [],
+      }),
+      inputData,
+      { logEvents: false },
+    );
 
     // Validate execution completed
     expect(result.status).toBe('completed');
@@ -160,7 +136,7 @@ describe('Coordinator - Context Operations', () => {
     console.log(`  ✓ operation.context.read (${contextReads.length} reads)`);
 
     // Check that input was read
-    const inputReads = contextReads.filter((e) => e.payload.path === 'input');
+    const inputReads = trace.context.readsFrom('input');
     expect(inputReads.length).toBeGreaterThan(0);
     expect(inputReads[0].payload.value).toMatchObject(inputData);
     console.log('  ✓ Context read includes input data');
@@ -190,7 +166,7 @@ describe('Coordinator - Context Operations', () => {
 
     // Validate output write - with new architecture, outputs are written directly to output table
     // (not nested under node ref like the old approach)
-    const allOutputWrites = trace.context.writes().filter((e) => e.payload.path === 'output');
+    const allOutputWrites = trace.context.writesTo('output');
     console.log('📊 All output write events:', allOutputWrites.length);
     allOutputWrites.forEach((e, i) => {
       console.log(`  [${i}] seq=${e.sequence} value=${JSON.stringify(e.payload.value)}`);
@@ -210,13 +186,12 @@ describe('Coordinator - Context Operations', () => {
     console.log('  ✓ operation.context.write (output stored directly)');
 
     // Validate output was read in snapshot
-    const outputReads = contextReads.filter((e) => e.payload.path === 'output');
+    const outputReads = trace.context.readsFrom('output');
     expect(outputReads.length).toBeGreaterThan(0);
     console.log('  ✓ Context read includes output data');
 
     console.log('\n✅ Context operations validation complete');
 
-    // Cleanup - resources are automatically tracked via setup.createdResources
-    await cleanupWorkflowTest(setup, result.workflowRunId);
+    await cleanup();
   });
 });

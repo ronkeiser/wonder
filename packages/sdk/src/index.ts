@@ -7,7 +7,6 @@ import createOpenAPIClient from 'openapi-fetch';
 import { EventsClient } from './events';
 import { createClient as createGeneratedClient } from './generated/client';
 import type { paths } from './generated/schema';
-import { createTestClient as createGeneratedTestClient } from './generated/test-client';
 import { createWorkflowsClient } from './workflows';
 
 export {
@@ -82,24 +81,4 @@ export function createClient(
     DELETE: baseClient.DELETE.bind(baseClient),
     PATCH: baseClient.PATCH.bind(baseClient),
   };
-}
-
-/**
- * Create a test client for integration tests
- *
- * The test client automatically unwraps responses and tracks created resources
- * for cleanup. Use this in integration tests instead of the standard client.
- *
- * @param baseUrl - The base URL for the API
- * @param apiKey - The API key for authentication
- */
-export function createTestClient(
-  baseUrl: string = process.env.RESOURCES_URL || 'https://wonder-http.ron-keiser.workers.dev',
-  apiKey?: string,
-) {
-  const baseClient = createOpenAPIClient<paths>({
-    baseUrl,
-    headers: apiKey ? { 'X-API-Key': apiKey } : {},
-  });
-  return createGeneratedTestClient(baseClient);
 }

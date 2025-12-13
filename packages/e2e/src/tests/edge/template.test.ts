@@ -1,6 +1,6 @@
 import { action, node, promptSpec, schema, step, taskDef, workflowDef } from '@wonder/sdk';
 import { describe, expect, it } from 'vitest';
-import { runTestWorkflow } from '~/utils/edge-test-helpers';
+import { runTestWorkflow } from '~/kit';
 
 describe('Coordinator - Simple Workflow Tests', () => {
   /**
