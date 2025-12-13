@@ -109,14 +109,13 @@ describe('Coordinator - Simple Workflow Tests', () => {
         transitions: [],
       }),
       { name: 'Charlie', count: 123 },
+      { logEvents: false },
     );
-
-    console.log('Events:', JSON.stringify(result.events, null, 2));
 
     expect(result.status).toBe('completed');
 
     // Verify state was written during execution
-    const stateWrites = result.trace.context.writes().filter((e) => e.payload.path === 'state');
+    const stateWrites = result.trace.context.writesTo('state');
     expect(stateWrites.length).toBeGreaterThan(0);
 
     await cleanup();

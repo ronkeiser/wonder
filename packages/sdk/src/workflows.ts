@@ -22,6 +22,9 @@ export interface StreamOptions {
   /** Predicate to determine when to close connection (in addition to workflow completion/failure) */
   until?: (event: EventEntry) => boolean;
 
+  /** Callback invoked for each event as it arrives (before collection) */
+  onEvent?: (event: EventEntry | TraceEventEntry) => void;
+
   /** Total timeout in milliseconds */
   timeout?: number;
 
@@ -67,6 +70,7 @@ export function createWorkflowsClient(
     const {
       subscribe = {},
       until,
+      onEvent,
       timeout = DEFAULT_TIMEOUT_MS,
       idleTimeout = DEFAULT_IDLE_TIMEOUT_MS,
       gracePeriod = DEFAULT_GRACE_PERIOD_MS,
@@ -127,6 +131,11 @@ export function createWorkflowsClient(
 
       const eventCallback = (event: InternalEvent) => {
         resetIdleTimer();
+
+        // Invoke onEvent callback if provided
+        if (onEvent) {
+          onEvent(event as EventEntry | TraceEventEntry);
+        }
 
         // Collect events by stream type
         if (event.stream === 'trace') {

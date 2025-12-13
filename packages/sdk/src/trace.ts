@@ -234,6 +234,16 @@ export class TraceEventCollection {
           (e) => e.type === 'operation.context.write' && e.payload.path === path,
         ) as TypedTraceEvent<TracePayloads.ContextWrite> | undefined;
       },
+      writesTo(path: string): TypedTraceEvent<TracePayloads.ContextWrite>[] {
+        return self
+          .filter<TracePayloads.ContextWrite>('operation.context.write')
+          .filter((e) => e.payload.path === path);
+      },
+      readsFrom(path: string): TypedTraceEvent<TracePayloads.ContextRead>[] {
+        return self
+          .filter<TracePayloads.ContextRead>('operation.context.read')
+          .filter((e) => e.payload.path === path);
+      },
       validate(): TypedTraceEvent<TracePayloads.ContextValidate> | undefined {
         return self.find<TracePayloads.ContextValidate>('operation.context.validate');
       },

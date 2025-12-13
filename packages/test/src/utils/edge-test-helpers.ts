@@ -352,11 +352,22 @@ export async function executeWorkflow(
   options?: {
     timeout?: number;
     idleTimeout?: number;
+    /** Log events to console as they arrive */
+    logEvents?: boolean;
   },
 ) {
   const result = await wonder.workflows(workflowId).stream(inputData, {
     timeout: options?.timeout ?? 60000,
     idleTimeout: options?.idleTimeout ?? 10000,
+    onEvent: options?.logEvents
+      ? (event) => {
+          if ('event_type' in event) {
+            console.log(`📨 ${event.event_type}`, JSON.stringify(event.metadata ?? {}, null, 2));
+          } else if ('type' in event) {
+            console.log(`🔍 ${event.type}`, JSON.stringify(event.payload ?? {}, null, 2));
+          }
+        }
+      : undefined,
   });
 
   return {
@@ -535,6 +546,8 @@ export async function runTestWorkflow(
   options?: {
     timeout?: number;
     idleTimeout?: number;
+    /** Log events to console as they arrive */
+    logEvents?: boolean;
   },
 ): Promise<TestWorkflowResult> {
   // Setup infrastructure
