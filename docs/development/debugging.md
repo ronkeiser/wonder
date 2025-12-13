@@ -33,7 +33,7 @@ When ever you make changes to the code in preparation to run a new test, you mus
   "scripts": {
     "test": "vitest run --config packages/test/vitest.config.ts",
     "test:edge": "vitest run --config packages/test/vitest.config.ts tests/edge",
-    "types": "pnpm run --parallel --filter \"./services/*\" types",
+    "types": "pnpm --filter @wonder/env run build-services",
     "typecheck": "pnpm run --parallel --filter \"./services/*\" typecheck",
     "deploy:all": "pnpm -r --filter './services/*' --workspace-concurrency 1 deploy",
     "deploy:coordinator": "wrangler deploy --config services/coordinator/wrangler.jsonc",
@@ -58,3 +58,9 @@ curl "https://wonder-http.ron-keiser.workers.dev/api/logs?service=coordinator&le
 # Filter by trace ID (correlate across services)
 curl "https://wonder-http.ron-keiser.workers.dev/api/logs?trace_id=trace_abc123"
 ```
+
+After making edits, before announcing completion of work, you MUST run a typecheck. You can do this by running `pnpm typecheck` at the root.
+
+If you changed any of the RPC signatures of any of the services, you must regenerate the types with `pnpm types`.
+
+Do you understand?
