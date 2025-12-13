@@ -34,6 +34,20 @@ import type { Emitter } from '@wonder/events';
 import type { ContextSnapshot } from '../types.js';
 import type { DefinitionManager } from './defs.js';
 
+/** Merge configuration for fan-in */
+export type MergeConfig = {
+  source: string;
+  target: string;
+  strategy: 'append' | 'merge_object' | 'keyed_by_branch' | 'last_wins';
+};
+
+/** Branch output with metadata */
+export type BranchOutput = {
+  tokenId: string;
+  branchIndex: number;
+  output: Record<string, unknown>;
+};
+
 /**
  * ContextManager manages runtime state for a workflow execution.
  *
@@ -241,5 +255,199 @@ export class ContextManager {
       default:
         return null;
     }
+  }
+
+  // ============================================================================
+  // Branch Storage Operations (for parallel execution)
+  // ============================================================================
+
+  /** Cache of branch tables by token ID */
+  private branchTables = new Map<string, SchemaTable>();
+
+  /**
+   * Create a branch output table for a token
+   * Called during fan-out when token is created
+   */
+  initializeBranchTable(tokenId: string, outputSchema: JSONSchema): void {
+    const tableName = `branch_output_${tokenId}`;
+    const schema = new Schema(outputSchema);
+    const table = schema.bind(this.sql, tableName);
+
+    table.create();
+    this.branchTables.set(tokenId, table);
+
+    this.emitter.emitTrace({
+      type: 'operation.context.branch_table.create',
+      token_id: tokenId,
+      table_name: tableName,
+      schema_type: outputSchema.type as string,
+    });
+  }
+
+  /**
+   * Write task output to a token's branch table
+   * Called when task completes during fan-out execution
+   */
+  applyBranchOutput(tokenId: string, output: Record<string, unknown>): void {
+    const table = this.branchTables.get(tokenId);
+
+    if (!table) {
+      throw new Error(`Branch table not found for token ${tokenId}`);
+    }
+
+    const result = table.validate(output);
+
+    this.emitter.emitTrace({
+      type: 'operation.context.branch.validate',
+      token_id: tokenId,
+      valid: result.valid,
+      error_count: result.errors.length,
+      errors: result.errors.slice(0, 5).map((e) => e.message),
+    });
+
+    if (!result.valid) {
+      throw new Error(
+        `Branch output validation failed: ${result.errors.map((e) => e.message).join(', ')}`,
+      );
+    }
+
+    table.insert(output);
+
+    this.emitter.emitTrace({
+      type: 'operation.context.branch.write',
+      token_id: tokenId,
+      output,
+    });
+  }
+
+  /**
+   * Read outputs from sibling branch tables
+   * Called during fan-in to collect all branch results
+   */
+  getBranchOutputs(
+    tokenIds: string[],
+    branchIndices: number[],
+    outputSchema: JSONSchema,
+  ): BranchOutput[] {
+    const outputs: BranchOutput[] = [];
+
+    for (let i = 0; i < tokenIds.length; i++) {
+      const tokenId = tokenIds[i];
+      const branchIndex = branchIndices[i];
+
+      // Get cached table or create reader for existing table
+      let table = this.branchTables.get(tokenId);
+
+      if (!table) {
+        const tableName = `branch_output_${tokenId}`;
+        const schema = new Schema(outputSchema);
+        table = schema.bind(this.sql, tableName);
+      }
+
+      const output = table.selectFirst() ?? {};
+
+      outputs.push({
+        tokenId,
+        branchIndex,
+        output,
+      });
+    }
+
+    this.emitter.emitTrace({
+      type: 'operation.context.branch.read_all',
+      token_ids: tokenIds,
+      output_count: outputs.length,
+    });
+
+    return outputs;
+  }
+
+  /**
+   * Merge branch outputs into main context
+   * Called at fan-in after synchronization condition is met
+   */
+  mergeBranches(branchOutputs: BranchOutput[], merge: MergeConfig): void {
+    // Extract outputs based on source path
+    const extractedOutputs = branchOutputs.map((b) => {
+      if (merge.source === '_branch.output') {
+        return b;
+      }
+      // Extract nested path from output (e.g., '_branch.output.choice')
+      const path = merge.source.replace('_branch.output.', '');
+      return {
+        ...b,
+        output: { [path]: this.getNestedValue(b.output, path) },
+      };
+    });
+
+    // Apply merge strategy
+    let merged: unknown;
+
+    switch (merge.strategy) {
+      case 'append':
+        // Collect all outputs into array, ordered by branch index
+        merged = extractedOutputs
+          .sort((a, b) => a.branchIndex - b.branchIndex)
+          .map((b) => b.output);
+        break;
+
+      case 'merge_object':
+        // Shallow merge all outputs (last wins for conflicts)
+        merged = Object.assign({}, ...extractedOutputs.map((b) => b.output));
+        break;
+
+      case 'keyed_by_branch':
+        // Object keyed by branch index
+        merged = Object.fromEntries(
+          extractedOutputs.map((b) => [b.branchIndex.toString(), b.output]),
+        );
+        break;
+
+      case 'last_wins':
+        // Take last completed (highest branch index)
+        const sorted = extractedOutputs.sort((a, b) => b.branchIndex - a.branchIndex);
+        merged = sorted[0]?.output ?? {};
+        break;
+    }
+
+    // Write to target path in context
+    this.set(merge.target, merged);
+
+    this.emitter.emitTrace({
+      type: 'operation.context.merge.complete',
+      target_path: merge.target,
+      branch_count: branchOutputs.length,
+    });
+  }
+
+  /**
+   * Drop branch tables after merge (cleanup)
+   */
+  dropBranchTables(tokenIds: string[]): void {
+    for (const tokenId of tokenIds) {
+      const tableName = `branch_output_${tokenId}`;
+
+      // Drop the table
+      this.sql.exec(`DROP TABLE IF EXISTS ${tableName};`);
+
+      // Remove from cache
+      this.branchTables.delete(tokenId);
+    }
+
+    this.emitter.emitTrace({
+      type: 'operation.context.branch_table.drop',
+      token_ids: tokenIds,
+      tables_dropped: tokenIds.length,
+    });
+  }
+
+  /** Get nested value from object by dot-separated path */
+  private getNestedValue(obj: Record<string, unknown>, path: string): unknown {
+    return path.split('.').reduce((current: unknown, key) => {
+      if (current && typeof current === 'object') {
+        return (current as Record<string, unknown>)[key];
+      }
+      return undefined;
+    }, obj);
   }
 }

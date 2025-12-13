@@ -215,7 +215,25 @@ export type OperationEvent =
     }
   | {
       type: 'operation.context.branch_table.drop';
-      table_name: string;
+      token_ids: string[];
+      tables_dropped: number;
+    }
+  | {
+      type: 'operation.context.branch.validate';
+      token_id: string;
+      valid: boolean;
+      error_count: number;
+      errors?: string[];
+    }
+  | {
+      type: 'operation.context.branch.write';
+      token_id: string;
+      output: unknown;
+    }
+  | {
+      type: 'operation.context.branch.read_all';
+      token_ids: string[];
+      output_count: number;
     }
   | {
       type: 'operation.context.merge.start';
@@ -227,7 +245,7 @@ export type OperationEvent =
   | {
       type: 'operation.context.merge.complete';
       target_path: string;
-      rows_written: number;
+      branch_count: number;
     }
   | {
       type: 'operation.tokens.create';

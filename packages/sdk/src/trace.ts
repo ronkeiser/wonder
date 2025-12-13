@@ -57,10 +57,34 @@ export namespace TracePayloads {
   export interface BranchTableCreate {
     token_id: string;
     table_name: string;
+    schema_type: string;
   }
 
   export interface BranchTableDrop {
-    table_name: string;
+    token_ids: string[];
+    tables_dropped: number;
+  }
+
+  export interface BranchValidate {
+    token_id: string;
+    valid: boolean;
+    error_count: number;
+    errors?: string[];
+  }
+
+  export interface BranchWrite {
+    token_id: string;
+    output: unknown;
+  }
+
+  export interface BranchReadAll {
+    token_ids: string[];
+    output_count: number;
+  }
+
+  export interface MergeComplete {
+    target_path: string;
+    branch_count: number;
   }
 
   export interface TokenCreate {
@@ -267,10 +291,24 @@ export class TraceEventCollection {
       drops(): TypedTraceEvent<TracePayloads.BranchTableDrop>[] {
         return self.filter<TracePayloads.BranchTableDrop>('operation.context.branch_table.drop');
       },
+      validates(): TypedTraceEvent<TracePayloads.BranchValidate>[] {
+        return self.filter<TracePayloads.BranchValidate>('operation.context.branch.validate');
+      },
+      writes(): TypedTraceEvent<TracePayloads.BranchWrite>[] {
+        return self.filter<TracePayloads.BranchWrite>('operation.context.branch.write');
+      },
+      reads(): TypedTraceEvent<TracePayloads.BranchReadAll>[] {
+        return self.filter<TracePayloads.BranchReadAll>('operation.context.branch.read_all');
+      },
+      merges(): TypedTraceEvent<TracePayloads.MergeComplete>[] {
+        return self.filter<TracePayloads.MergeComplete>('operation.context.merge.complete');
+      },
       lifecycle(): Map<string, { created: boolean; dropped: boolean }> {
         const tables = new Map<string, { created: boolean; dropped: boolean }>();
 
-        for (const event of self.filter('operation.context.branch_table.create')) {
+        for (const event of self.filter<TracePayloads.BranchTableCreate>(
+          'operation.context.branch_table.create',
+        )) {
           const name = event.payload.table_name;
           if (!tables.has(name)) {
             tables.set(name, { created: false, dropped: false });
@@ -278,12 +316,17 @@ export class TraceEventCollection {
           tables.get(name)!.created = true;
         }
 
-        for (const event of self.filter('operation.context.branch_table.drop')) {
-          const name = event.payload.table_name;
-          if (!tables.has(name)) {
-            tables.set(name, { created: false, dropped: false });
+        for (const event of self.filter<TracePayloads.BranchTableDrop>(
+          'operation.context.branch_table.drop',
+        )) {
+          // Drop events now include multiple token_ids
+          for (const tokenId of event.payload.token_ids) {
+            const name = `branch_output_${tokenId}`;
+            if (!tables.has(name)) {
+              tables.set(name, { created: false, dropped: false });
+            }
+            tables.get(name)!.dropped = true;
           }
-          tables.get(name)!.dropped = true;
         }
 
         return tables;

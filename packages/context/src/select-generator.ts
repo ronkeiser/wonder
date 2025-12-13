@@ -7,8 +7,8 @@
  * - Converting SQLite types back to JS types (0/1 → boolean)
  */
 
-import type { JSONSchema } from './types.js';
 import type { SqlExecutor } from './schema.js';
+import type { JSONSchema } from './types.js';
 
 export type SelectGeneratorOptions = {
   /** Strategy used for nested objects in DDL (must match) */
@@ -88,11 +88,13 @@ export class SelectGenerator {
       } else if (fieldSchema.type === 'array' && this.options.arrayStrategy === 'json') {
         // Parse JSON array
         const jsonValue = flatRow[columnName];
-        result[fieldName] = typeof jsonValue === 'string' ? JSON.parse(jsonValue) : jsonValue ?? [];
+        result[fieldName] =
+          typeof jsonValue === 'string' ? JSON.parse(jsonValue) : (jsonValue ?? []);
       } else if (fieldSchema.type === 'object' && this.options.nestedObjectStrategy === 'json') {
         // Parse JSON object
         const jsonValue = flatRow[columnName];
-        result[fieldName] = typeof jsonValue === 'string' ? JSON.parse(jsonValue) : jsonValue ?? {};
+        result[fieldName] =
+          typeof jsonValue === 'string' ? JSON.parse(jsonValue) : (jsonValue ?? {});
       } else if (fieldSchema.type === 'boolean') {
         // Convert SQLite 0/1 back to boolean
         result[fieldName] = flatRow[columnName] === 1;
