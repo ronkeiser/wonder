@@ -23,29 +23,32 @@ The coordinator enhances this with a **Decision Layer** where decision logic is 
 coordinator/src/
 ├── index.ts                    # DO class (Actor) - thin orchestrator
 ├── types.ts                    # Decision type definitions
-├── schemas.ts                  # Drizzle table schemas (imports from @wonder/resources)
-├── events.ts                   # Event emission (workflow + trace events)
-├── trace.ts                    # SQL instrumentation for trace events
-├── migrations/                 # DO SQLite migrations (drizzle-kit generated)
-│   ├── 0000_*.sql              # Initial schema (FK constraints stripped)
-│   ├── meta/                   # Drizzle migration metadata
-│   └── migrations.ts           # Bundles SQL for runtime migrator
+├── schema/                     # Drizzle table schemas
+│   ├── index.ts                # Schema exports
+│   └── migrations/             # DO SQLite migrations (drizzle-kit generated)
+│       ├── 0000_*.sql          # Initial schema (FK constraints stripped)
+│       └── meta/               # Drizzle migration metadata
+├── helpers/                    # Pure utility functions
+│   ├── index.ts                # Helper exports
+│   └── sql.ts                  # SQL tracing utilities
 ├── planning/                   # Pure logic - returns Decision[]
+│   ├── index.ts                # Planning exports
 │   ├── routing.ts              # Transition evaluation
 │   ├── synchronization.ts      # Fan-in logic
-│   ├── branching.ts            # Branch control logic
 │   ├── completion.ts           # Workflow finalization
-│   └── conditions.ts           # Condition evaluation (CEL future)
+│   ├── branching.ts            # Branch control logic (TODO)
+│   └── conditions.ts           # Condition evaluation (CEL future, TODO)
 ├── operations/                 # Actor operations - SQL and RPC
 │   ├── tokens.ts               # Token CRUD + queries
 │   ├── context.ts              # Context CRUD + snapshots
-│   ├── artifacts.ts            # Artifact staging
 │   ├── defs.ts                 # Workflow definitions - copies from RESOURCES on init
-│   └── events.ts               # Event emission coordination
+│   ├── events.ts               # Event emission coordination
+│   └── artifacts.ts            # Artifact staging (TODO)
 └── dispatch/                   # Decision dispatch (convert to operations)
+    ├── index.ts                # Dispatch exports
     ├── apply.ts                # Main decision dispatcher
     ├── batch.ts                # Decision batching optimization
-    └── cache.ts                # DO-level caching
+    └── cache.ts                # DO-level caching (TODO)
 ```
 
 ## Decision Types (types.ts)

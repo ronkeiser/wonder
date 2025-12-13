@@ -34,3 +34,11 @@ export {
   hasTimedOut,
   needsMerge,
 } from './synchronization';
+
+// Completion: workflow finalization and output extraction
+export {
+  applyInputMapping,
+  extractFinalOutput,
+  extractValueFromContext,
+  type CompletionResult,
+} from './completion';

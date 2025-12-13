@@ -38,9 +38,9 @@
 
 import { Schema, type JSONSchema, type SchemaTable, type SqlHook } from '@wonder/context';
 import type { Emitter } from '@wonder/events';
+import { composeSqlMessage } from '../helpers/sql.js';
 import type { ContextSnapshot } from '../types';
 import type { DefinitionManager } from './defs';
-import { composeSqlMessage } from './sql.js';
 
 /** Merge configuration for fan-in */
 export type MergeConfig = {

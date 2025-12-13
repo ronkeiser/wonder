@@ -168,6 +168,29 @@ export type DecisionEvent =
   | {
       type: 'decision.sync.activate';
       merge_config: unknown;
+    }
+  // Completion events
+  | {
+      type: 'decision.completion.start';
+      output_mapping: Record<string, string> | null;
+      context_keys: {
+        input: string[];
+        state: string[];
+        output: string[];
+      };
+    }
+  | {
+      type: 'decision.completion.no_mapping';
+    }
+  | {
+      type: 'decision.completion.extract';
+      target_field: string;
+      source_path: string;
+      extracted_value: unknown;
+    }
+  | {
+      type: 'decision.completion.complete';
+      final_output: Record<string, unknown>;
     };
 
 /**

@@ -12,7 +12,12 @@ import { ContextManager } from './operations/context';
 import { DefinitionManager } from './operations/defs';
 import { CoordinatorEmitter } from './operations/events';
 import { TokenManager } from './operations/tokens';
-import { decideRouting, getTransitionsWithSynchronization } from './planning/index';
+import {
+  applyInputMapping,
+  decideRouting,
+  extractFinalOutput,
+  getTransitionsWithSynchronization,
+} from './planning/index';
 import { decideSynchronization } from './planning/synchronization';
 import type { TaskResult } from './types';
 
@@ -306,19 +311,6 @@ export class WorkflowCoordinator extends DurableObject {
       workflow_run_id = token.workflow_run_id;
       const node = this.defs.getNode(token.node_id);
 
-      this.logger.warn({
-        event_type: 'task_error_received',
-        message: `Task error: ${errorResult.error.message}`,
-        trace_id: workflow_run_id,
-        metadata: {
-          tokenId,
-          nodeId: node.id,
-          nodeRef: node.ref,
-          error: errorResult.error,
-          metrics: errorResult.metrics,
-        },
-      });
-
       // TODO: Check retry policy and retry_attempt count
       // For now, just fail the workflow
       this.tokens.updateStatus(tokenId, 'failed');
@@ -377,18 +369,12 @@ export class WorkflowCoordinator extends DurableObject {
 
     // If node has no task, complete immediately (e.g., pass-through nodes)
     if (!node.task_id) {
-      this.logger.info({
-        event_type: 'dispatch_no_task',
-        message: 'Node has no task, completing immediately',
-        trace_id: token.workflow_run_id,
-        metadata: { tokenId, nodeId: node.id },
-      });
       await this.handleTaskResult(tokenId, { output_data: {} });
       return;
     }
 
-    // Apply input mapping to get task input
-    const taskInput = this.applyInputMapping(
+    // Apply input mapping to get task input (pure function from planning/completion)
+    const taskInput = applyInputMapping(
       node.input_mapping as Record<string, string> | null,
       context,
     );
@@ -400,21 +386,6 @@ export class WorkflowCoordinator extends DurableObject {
     const resolvedResources = this.resolveResourceBindings(
       node.resource_bindings as Record<string, string> | null,
     );
-
-    this.logger.info({
-      event_type: 'dispatch_task',
-      message: 'Dispatching task to Executor',
-      trace_id: token.workflow_run_id,
-      metadata: {
-        tokenId,
-        nodeId: node.id,
-        nodeRef: node.ref,
-        taskId: node.task_id,
-        taskVersion: node.task_version,
-        inputKeys: Object.keys(taskInput),
-        hasResources: Object.keys(resolvedResources).length > 0,
-      },
-    });
 
     // Dispatch to Executor (fire-and-forget, Executor calls back)
     await this.env.EXECUTOR.executeTask({
@@ -455,50 +426,6 @@ export class WorkflowCoordinator extends DurableObject {
   }
 
   /**
-   * Apply input mapping to context to extract action input
-   *
-   * Mappings are JSONPath-style: { "actionField": "$.context.path" }
-   * e.g., { "name": "$.input.name" } extracts context.input.name
-   */
-  private applyInputMapping(
-    mapping: Record<string, string> | null,
-    context: {
-      input: Record<string, unknown>;
-      state: Record<string, unknown>;
-      output: Record<string, unknown>;
-    },
-  ): Record<string, unknown> {
-    if (!mapping) return {};
-
-    const result: Record<string, unknown> = {};
-
-    for (const [targetField, sourcePath] of Object.entries(mapping)) {
-      // Parse JSONPath-style path: $.input.name -> ['input', 'name']
-      if (!sourcePath.startsWith('$.')) {
-        // Literal value
-        result[targetField] = sourcePath;
-        continue;
-      }
-
-      const pathParts = sourcePath.slice(2).split('.'); // Remove '$.' prefix
-      let value: unknown = context;
-
-      for (const part of pathParts) {
-        if (value && typeof value === 'object' && part in value) {
-          value = (value as Record<string, unknown>)[part];
-        } else {
-          value = undefined;
-          break;
-        }
-      }
-
-      result[targetField] = value;
-    }
-
-    return result;
-  }
-
-  /**
    * Fail workflow due to unrecoverable error
    */
   private async failWorkflow(workflowRunId: string, errorMessage: string): Promise<void> {
@@ -507,16 +434,6 @@ export class WorkflowCoordinator extends DurableObject {
         event_type: 'workflow_failed',
         message: `Workflow failed: ${errorMessage}`,
         metadata: { error: errorMessage },
-      });
-
-      this.logger.error({
-        event_type: 'workflow_failed',
-        message: 'Workflow execution failed',
-        trace_id: workflowRunId,
-        metadata: {
-          workflow_run_id: workflowRunId,
-          error: errorMessage,
-        },
       });
     } catch (error) {
       this.logger.error({
@@ -538,50 +455,22 @@ export class WorkflowCoordinator extends DurableObject {
    */
   private async finalizeWorkflow(workflowRunId: string): Promise<void> {
     try {
-      this.emitter.emitTrace({
-        type: 'decision.sync.activate',
-        merge_config: { workflow_run_id: workflowRunId },
-      });
-
-      // Get context snapshot
+      // Get context snapshot and workflow def
       const context = this.context.getSnapshot();
-
-      // Get workflow def for output_mapping
       const workflowDef = this.defs.getWorkflowDef();
 
-      // Log for debugging workflow output mapping
-      this.logger.info({
-        event_type: 'workflow_finalize_debug',
-        message: 'Finalizing workflow',
-        trace_id: workflowRunId,
-        metadata: {
-          context_snapshot: context,
-          output_mapping: workflowDef.output_mapping,
-        },
-      });
-
-      // Apply workflow output_mapping to extract final output
-      // e.g., { "result": "$.output.greeting" } extracts context.output.greeting -> finalOutput.result
-      const finalOutput = this.applyInputMapping(
+      // Extract final output using pure planning function
+      const completionResult = extractFinalOutput(
         workflowDef.output_mapping as Record<string, string> | null,
         context,
       );
 
-      // Log the result of output mapping
-      this.logger.info({
-        event_type: 'workflow_finalize_output',
-        message: 'Workflow output mapped',
-        trace_id: workflowRunId,
-        metadata: {
-          final_output: finalOutput,
-        },
-      });
+      // Emit trace events from completion planning
+      for (const event of completionResult.events) {
+        this.emitter.emitTrace(event);
+      }
 
-      this.emitter.emitTrace({
-        type: 'operation.context.read',
-        path: 'output',
-        value: finalOutput,
-      });
+      const finalOutput = completionResult.output;
 
       // Emit workflow completed event
       this.emitter.emit({
