@@ -14,12 +14,12 @@
 import type { JSONSchema } from '@wonder/context';
 import type { Emitter } from '@wonder/events';
 
-import type { ContextManager } from '../operations/context.js';
-import type { DefinitionManager } from '../operations/defs.js';
-import type { TokenManager } from '../operations/tokens.js';
-import type { Decision, TracedDecision } from '../types.js';
+import type { ContextManager } from '../operations/context';
+import type { DefinitionManager } from '../operations/defs';
+import type { TokenManager } from '../operations/tokens';
+import type { Decision, TracedDecision } from '../types';
 
-import { batchDecisions } from './batch.js';
+import { batchDecisions } from './batch';
 
 // ============================================================================
 // Types

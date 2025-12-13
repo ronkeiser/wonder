@@ -16,7 +16,7 @@ export {
   applyTracedDecisions,
   type ApplyResult,
   type DispatchContext,
-} from './apply.js';
+} from './apply';
 
 // Batch: optimize decision lists
 export {
@@ -25,4 +25,4 @@ export {
   extractAffectedTokenIds,
   groupByType,
   isBatchable,
-} from './batch.js';
+} from './batch';

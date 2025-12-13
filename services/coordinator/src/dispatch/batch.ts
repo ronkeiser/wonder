@@ -11,9 +11,9 @@
  * - Order is preserved for non-batchable decisions
  */
 
-import type { CreateTokenParams } from '../operations/tokens.js';
-import type { TokenStatus } from '../schemas.js';
-import type { Decision } from '../types.js';
+import type { CreateTokenParams } from '../operations/tokens';
+import type { TokenStatus } from '../schema';
+import type { Decision } from '../types';
 
 // ============================================================================
 // Main Batching Entry Point
