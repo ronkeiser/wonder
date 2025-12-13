@@ -3,7 +3,7 @@
 import { ConflictError, NotFoundError, extractDbError } from '~/errors';
 import { Resource } from '../base';
 import * as repo from './repository';
-import type { ModelProfile } from './types.js';
+import type { ModelId, ModelProfile } from './types.js';
 
 type ModelProvider = 'anthropic' | 'openai' | 'google' | 'cloudflare' | 'local';
 
@@ -11,7 +11,7 @@ export class ModelProfiles extends Resource {
   async create(data: {
     name: string;
     provider: ModelProvider;
-    model_id: string;
+    model_id: ModelId;
     parameters?: object;
     execution_config?: object;
     cost_per_1k_input_tokens?: number;
@@ -22,7 +22,7 @@ export class ModelProfiles extends Resource {
       id: string;
       name: string;
       provider: ModelProvider;
-      model_id: string;
+      model_id: ModelId;
       parameters: object | null;
       execution_config: object | null;
       cost_per_1k_input_tokens: number;
@@ -37,7 +37,6 @@ export class ModelProfiles extends Resource {
           const profile = await repo.createModelProfile(this.serviceCtx.db, {
             name: data.name,
             provider: data.provider,
-            // @ts-ignore - model_id comes as string from API, needs validation
             model_id: data.model_id,
             parameters: (data.parameters ?? {}) as object,
             execution_config: data.execution_config ?? null,
@@ -87,7 +86,7 @@ export class ModelProfiles extends Resource {
       id: string;
       name: string;
       provider: ModelProvider;
-      model_id: string;
+      model_id: ModelId;
       parameters: object | null;
       execution_config: object | null;
       cost_per_1k_input_tokens: number;
