@@ -34,6 +34,8 @@ export {
   type EmbeddedWorkflowDef,
 } from './builders';
 
+export { ApiError } from './generated/client';
+
 export interface WonderClient extends Omit<ReturnType<typeof createGeneratedClient>, 'workflows'> {
   // Events client extends generated events with WebSocket capabilities
   events: EventsClient;

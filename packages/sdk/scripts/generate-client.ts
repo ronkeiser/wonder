@@ -214,8 +214,9 @@ function formatMethod(
   const returnType = buildResponseType(method.originalPath, method.verb, method.successStatusCode);
 
   return `${indent}${method.name}: async (${params.join(', ')}): Promise<${returnType}> => {
-${indent}  const response = await baseClient.${method.verb.toUpperCase()}(\`${method.path}\`, ${bodyParam});
-${indent}  return response.data;
+${indent}  const { data, error } = await baseClient.${method.verb.toUpperCase()}(\`${method.path}\`, ${bodyParam});
+${indent}  if (error) throw new ApiError(\`${method.verb.toUpperCase()} ${method.path} failed\`, error);
+${indent}  return data;
 ${indent}}`;
 }
 
@@ -305,6 +306,24 @@ export function formatClientCode(structure: ClientStructure): string {
 
   // Imports
   lines.push("import type { paths } from './schema.js';");
+  lines.push('');
+
+  // ApiError class
+  lines.push('/**');
+  lines.push(' * Error thrown when an API request fails');
+  lines.push(' */');
+  lines.push('export class ApiError extends Error {');
+  lines.push('  constructor(');
+  lines.push('    message: string,');
+  lines.push('    public readonly details: unknown,');
+  lines.push('  ) {');
+  lines.push(
+    '    const detailsStr = typeof details === "object" ? JSON.stringify(details, null, 2) : String(details);',
+  );
+  lines.push('    super(`${message}\\n${detailsStr}`);');
+  lines.push('    this.name = "ApiError";');
+  lines.push('  }');
+  lines.push('}');
   lines.push('');
 
   // Create client function

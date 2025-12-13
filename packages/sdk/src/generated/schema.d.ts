@@ -1495,7 +1495,8 @@ export interface components {
             name: string;
             /** @enum {string} */
             provider: "anthropic" | "openai" | "google" | "cloudflare" | "local";
-            model_id: string;
+            /** @enum {string} */
+            model_id: "@cf/meta/llama-4-scout-17b-16e-instruct" | "@cf/meta/llama-3.3-70b-instruct-fp8-fast" | "@cf/openai/gpt-oss-120b" | "@cf/openai/gpt-oss-20b" | "anthropic-dummy" | "openai-dummy" | "google-dummy" | "local-dummy";
             parameters?: unknown;
             execution_config?: unknown;
             cost_per_1k_input_tokens: number;
@@ -1516,8 +1517,11 @@ export interface components {
              * @enum {string}
              */
             provider: "anthropic" | "openai" | "google" | "cloudflare" | "local";
-            /** @example gpt-4 */
-            model_id: string;
+            /**
+             * @example @cf/meta/llama-4-scout-17b-16e-instruct
+             * @enum {string}
+             */
+            model_id: "@cf/meta/llama-4-scout-17b-16e-instruct" | "@cf/meta/llama-3.3-70b-instruct-fp8-fast" | "@cf/openai/gpt-oss-120b" | "@cf/openai/gpt-oss-20b" | "anthropic-dummy" | "openai-dummy" | "google-dummy" | "local-dummy";
             /**
              * @example {
              *       "temperature": 0.7
@@ -1994,6 +1998,32 @@ export interface components {
                 merge_config?: unknown;
             } | {
                 /** @enum {string} */
+                type: "decision.completion.start";
+                output_mapping: {
+                    [key: string]: string;
+                } | null;
+                context_keys: {
+                    input: string[];
+                    state: string[];
+                    output: string[];
+                };
+            } | {
+                /** @enum {string} */
+                type: "decision.completion.no_mapping";
+            } | {
+                /** @enum {string} */
+                type: "decision.completion.extract";
+                target_field: string;
+                source_path: string;
+                extracted_value?: unknown;
+            } | {
+                /** @enum {string} */
+                type: "decision.completion.complete";
+                final_output: {
+                    [key: string]: unknown;
+                };
+            } | {
+                /** @enum {string} */
                 type: "operation.context.initialize";
                 has_input_schema: boolean;
                 has_context_schema: boolean;
@@ -2017,6 +2047,34 @@ export interface components {
                 type: "operation.context.write";
                 path: string;
                 value?: unknown;
+            } | {
+                /** @enum {string} */
+                type: "operation.context.snapshot";
+                snapshot: {
+                    input?: unknown;
+                    state?: unknown;
+                    output?: unknown;
+                };
+            } | {
+                /** @enum {string} */
+                type: "operation.context.output_mapping.input";
+                node_ref: string;
+                output_mapping?: unknown;
+                task_output?: unknown;
+                task_output_keys: string[];
+            } | {
+                /** @enum {string} */
+                type: "operation.context.output_mapping.skip";
+                /** @enum {string} */
+                reason: "no_mapping";
+            } | {
+                /** @enum {string} */
+                type: "operation.context.output_mapping.apply";
+                target_path: string;
+                source_path: string;
+                extracted_value?: unknown;
+                current_value?: unknown;
+                updated_value?: unknown;
             } | {
                 /** @enum {string} */
                 type: "operation.context.branch_table.create";
@@ -2072,7 +2130,52 @@ export interface components {
                 to: string;
             } | {
                 /** @enum {string} */
-                type: "operation.sql.query";
+                type: "operation.metadata.table_init";
+                message: string;
+            } | {
+                /** @enum {string} */
+                type: "operation.metadata.table_init_error";
+                message: string;
+                error: string;
+            } | {
+                /** @enum {string} */
+                type: "operation.metadata.cache_hit";
+                /** @enum {string} */
+                resource: "workflow_run" | "workflow_def";
+                /** @enum {string} */
+                level: "memory" | "sql";
+                workflow_run_id?: string;
+                workflow_def_id?: string;
+            } | {
+                /** @enum {string} */
+                type: "operation.metadata.cache_miss";
+                /** @enum {string} */
+                resource: "workflow_run" | "workflow_def";
+                workflow_run_id: string;
+            } | {
+                /** @enum {string} */
+                type: "operation.metadata.fetch_start";
+                workflow_run_id: string;
+            } | {
+                /** @enum {string} */
+                type: "operation.metadata.fetch_success";
+                workflow_run_id: string;
+                workflow_def_id: string;
+                duration_ms: number;
+            } | {
+                /** @enum {string} */
+                type: "operation.metadata.fetch_error";
+                workflow_run_id: string;
+                error: string;
+            } | {
+                /** @enum {string} */
+                type: "operation.metadata.save";
+                workflow_run_id: string;
+                workflow_def_id: string;
+            } | {
+                /** @enum {string} */
+                type: "sql.query";
+                message: string;
                 sql: string;
                 params: unknown[];
                 duration_ms: number;
@@ -2087,9 +2190,101 @@ export interface components {
                 count: number;
             } | {
                 /** @enum {string} */
+                type: "dispatch.batch.complete";
+                total_decisions: number;
+                batched_decisions: number;
+                applied: number;
+                tokens_created: number;
+                tokens_dispatched: number;
+                errors: number;
+            } | {
+                /** @enum {string} */
                 type: "dispatch.decision.apply";
                 decision_type: string;
                 decision?: unknown;
+            } | {
+                /** @enum {string} */
+                type: "dispatch.error";
+                decision_type: string;
+                error: string;
+            } | {
+                /** @enum {string} */
+                type: "dispatch.decision.planned";
+                decision_type: string;
+                source: string;
+                token_id?: string;
+                timestamp: number;
+            } | {
+                /** @enum {string} */
+                type: "dispatch.token.created";
+                token_id: string;
+                node_id: string;
+            } | {
+                /** @enum {string} */
+                type: "dispatch.tokens.batch_created";
+                count: number;
+            } | {
+                /** @enum {string} */
+                type: "dispatch.token.status_updated";
+                token_id: string;
+                status: string;
+            } | {
+                /** @enum {string} */
+                type: "dispatch.tokens.batch_status_updated";
+                count: number;
+            } | {
+                /** @enum {string} */
+                type: "dispatch.token.marked_waiting";
+                token_id: string;
+            } | {
+                /** @enum {string} */
+                type: "dispatch.token.marked_for_dispatch";
+                token_id: string;
+            } | {
+                /** @enum {string} */
+                type: "dispatch.context.set";
+                path: string;
+            } | {
+                /** @enum {string} */
+                type: "dispatch.context.output_applied";
+                path: string;
+            } | {
+                /** @enum {string} */
+                type: "dispatch.branch.table_initialized";
+                token_id: string;
+            } | {
+                /** @enum {string} */
+                type: "dispatch.branch.output_applied";
+                token_id: string;
+            } | {
+                /** @enum {string} */
+                type: "dispatch.branch.merged";
+                token_ids: string[];
+                target: string;
+                strategy: string;
+            } | {
+                /** @enum {string} */
+                type: "dispatch.branch.tables_dropped";
+                token_ids: string[];
+            } | {
+                /** @enum {string} */
+                type: "dispatch.sync.check_requested";
+                token_id: string;
+                transition_id: string;
+            } | {
+                /** @enum {string} */
+                type: "dispatch.sync.fan_in_activated";
+                node_id: string;
+                fan_in_path: string;
+                merged_count: number;
+            } | {
+                /** @enum {string} */
+                type: "dispatch.workflow.completed";
+                has_output: boolean;
+            } | {
+                /** @enum {string} */
+                type: "dispatch.workflow.failed";
+                error: string;
             };
         };
         TraceEventsResponse: {

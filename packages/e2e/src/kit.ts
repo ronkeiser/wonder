@@ -61,7 +61,7 @@ export async function setupTestContext(): Promise<TestContext> {
   const modelProfileResponse = await wonder.modelProfiles.create({
     name: `Test Model Profile ${Date.now()}`,
     provider: 'cloudflare',
-    model_id: '@cf/meta/llama-3.1-8b-instruct',
+    model_id: '@cf/meta/llama-4-scout-17b-16e-instruct',
     parameters: {
       max_tokens: 512,
       temperature: 1.0,
