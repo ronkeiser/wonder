@@ -9,7 +9,7 @@
   ];
 
   const categoryColorMap: Record<string, string> = {
-    decision: 'var(--orange)',
+    decision: 'var(--green)',
     operation: 'var(--gray-light)',
     dispatch: 'var(--pink)',
     sql: 'var(--violet)',

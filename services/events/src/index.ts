@@ -204,7 +204,7 @@ export class EventsService extends WorkerEntrypoint<Env> {
             : undefined,
         ),
       )
-      .orderBy(traceEvents.sequence)
+      .orderBy(desc(traceEvents.timestamp))
       .limit(options.limit || 1000);
 
     // Manually parse JSON payloads
