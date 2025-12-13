@@ -32,7 +32,7 @@
  */
 
 import type { JSONSchema } from '@wonder/context';
-import { CustomTypeRegistry, DDLGenerator, DMLGenerator, Validator } from '@wonder/context';
+import { ContextExecutor, CustomTypeRegistry, DMLGenerator, Validator } from '@wonder/context';
 import type { Emitter } from '@wonder/events';
 import type { ContextSnapshot } from '../types.js';
 import type { DefinitionManager } from './defs.js';
@@ -44,29 +44,29 @@ import type { DefinitionManager } from './defs.js';
  * and generators. Schemas are loaded from definitions on-demand.
  */
 export class ContextManager {
-  private readonly sql: SqlStorage;
   private readonly defs: DefinitionManager;
   private readonly emitter: Emitter;
   private readonly customTypes: CustomTypeRegistry;
+  private readonly executor: ContextExecutor;
 
-  // Cached schemas loaded from definitions
+  /** Cached schemas loaded from definitions */
   private inputSchema: JSONSchema | null = null;
   private contextSchema: JSONSchema | null = null;
   private outputSchema: JSONSchema | null = null;
 
-  // Cached validators and generators
+  /** Cached validators */
   private inputValidator: Validator | null = null;
-  private contextValidator: Validator | null = null;
   private outputValidator: Validator | null = null;
+
+  /** Cached DML generators */
   private inputDMLGenerator: DMLGenerator | null = null;
-  private contextDMLGenerator: DMLGenerator | null = null;
   private outputDMLGenerator: DMLGenerator | null = null;
 
   constructor(sql: SqlStorage, defs: DefinitionManager, emitter: Emitter) {
-    this.sql = sql;
     this.defs = defs;
     this.emitter = emitter;
     this.customTypes = new CustomTypeRegistry();
+    this.executor = new ContextExecutor(sql, this.customTypes);
   }
 
   /**
@@ -91,38 +91,28 @@ export class ContextManager {
   async initialize(input: Record<string, unknown>): Promise<void> {
     await this.loadSchemas();
 
-    let tableCount = 0;
     const tablesCreated: string[] = [];
 
     // Drop existing tables to ensure clean schema
-    this.sql.exec('DROP TABLE IF EXISTS context_input');
-    this.sql.exec('DROP TABLE IF EXISTS context_state');
-    this.sql.exec('DROP TABLE IF EXISTS context_output');
+    this.executor.dropTable('context_input');
+    this.executor.dropTable('context_state');
+    this.executor.dropTable('context_output');
 
     // Create input table
     if (this.inputSchema!.type === 'object') {
-      const ddlGen = new DDLGenerator(this.inputSchema!, this.customTypes);
-      const ddl = ddlGen.generateDDL('context_input');
-      this.sql.exec(ddl);
-      tableCount++;
+      this.executor.createTable(this.inputSchema!, 'context_input');
       tablesCreated.push('context_input');
     }
 
     // Create state table if context schema provided
     if (this.contextSchema?.type === 'object') {
-      const ddlGen = new DDLGenerator(this.contextSchema, this.customTypes);
-      const ddl = ddlGen.generateDDL('context_state');
-      this.sql.exec(ddl);
-      tableCount++;
+      this.executor.createTable(this.contextSchema, 'context_state');
       tablesCreated.push('context_state');
     }
 
     // Create output table from output schema
     if (this.outputSchema!.type === 'object') {
-      const ddlGen = new DDLGenerator(this.outputSchema!, this.customTypes);
-      const ddl = ddlGen.generateDDL('context_output');
-      this.sql.exec(ddl);
-      tableCount++;
+      this.executor.createTable(this.outputSchema!, 'context_output');
       tablesCreated.push('context_output');
     }
 
@@ -130,7 +120,7 @@ export class ContextManager {
       type: 'operation.context.initialize',
       has_input_schema: this.inputSchema!.type === 'object',
       has_context_schema: this.contextSchema?.type === 'object',
-      table_count: tableCount,
+      table_count: tablesCreated.length,
       tables_created: tablesCreated,
     });
 
@@ -164,16 +154,7 @@ export class ContextManager {
       throw new Error(`Input validation failed: ${result.errors.map((e) => e.message).join(', ')}`);
     }
 
-    // Lazy-initialize DML generator
-    if (!this.inputDMLGenerator) {
-      this.inputDMLGenerator = new DMLGenerator(this.inputSchema!, this.customTypes);
-    }
-
-    const { statements, values } = this.inputDMLGenerator.generateInsert('context_input', input);
-
-    for (let i = 0; i < statements.length; i++) {
-      this.sql.exec(statements[i], ...values[i]);
-    }
+    this.executor.insert(this.inputSchema!, 'context_input', input);
 
     this.emitter.emitTrace({
       type: 'operation.context.write',
@@ -189,37 +170,15 @@ export class ContextManager {
   get(path: string): unknown {
     // For now, only support reading 'input', 'state', 'output'
     const tableName = `context_${path}`;
+    const value = this.executor.selectFirst(tableName) ?? {};
 
-    try {
-      const result = this.sql.exec(`SELECT * FROM ${tableName} LIMIT 1;`);
-      const rows = [...result];
+    this.emitter.emitTrace({
+      type: 'operation.context.read',
+      path,
+      value,
+    });
 
-      if (rows.length === 0) {
-        this.emitter.emitTrace({
-          type: 'operation.context.read',
-          path,
-          value: {},
-        });
-        return {};
-      }
-
-      // Return first row (we only have one row per context table in simple case)
-      const value = rows[0];
-      this.emitter.emitTrace({
-        type: 'operation.context.read',
-        path,
-        value,
-      });
-      return value;
-    } catch (error) {
-      // Table might not exist (e.g., context_state when no context_schema defined)
-      this.emitter.emitTrace({
-        type: 'operation.context.read',
-        path,
-        value: {},
-      });
-      return {};
-    }
+    return value;
   }
 
   /**
@@ -228,29 +187,21 @@ export class ContextManager {
    */
   set(path: string, value: unknown): void {
     // For now, only support writing to 'state' or 'output'
-    const [section, ...rest] = path.split('.');
+    const [section] = path.split('.');
 
     if (section !== 'state' && section !== 'output') {
       throw new Error(`Cannot write to ${section} - only 'state' and 'output' are writable`);
     }
 
     const tableName = `context_${section}`;
+    const schema = section === 'state' ? this.contextSchema : this.outputSchema;
 
     // Simple implementation: clear table and insert new value
     // Future: support JSONPath for nested updates
-    this.sql.exec(`DELETE FROM ${tableName};`);
-
-    if (typeof value === 'object' && value !== null) {
-      // For now, insert as single row with flattened columns
-      const obj = value as Record<string, unknown>;
-      const columns = Object.keys(obj);
-      const placeholders = columns.map(() => '?').join(', ');
-      const values = Object.values(obj);
-
-      this.sql.exec(
-        `INSERT INTO ${tableName} (${columns.join(', ')}) VALUES (${placeholders});`,
-        values,
-      );
+    if (typeof value === 'object' && value !== null && schema) {
+      this.executor.replace(schema, tableName, value as Record<string, unknown>);
+    } else {
+      this.executor.deleteAll(tableName);
     }
 
     this.emitter.emitTrace({
@@ -289,19 +240,8 @@ export class ContextManager {
       );
     }
 
-    // Lazy-initialize DML generator
-    if (!this.outputDMLGenerator) {
-      this.outputDMLGenerator = new DMLGenerator(this.outputSchema!, this.customTypes);
-    }
-
-    // Clear existing output and insert new
-    this.sql.exec('DELETE FROM context_output;');
-
-    const { statements, values } = this.outputDMLGenerator.generateInsert('context_output', output);
-
-    for (let i = 0; i < statements.length; i++) {
-      this.sql.exec(statements[i], ...values[i]);
-    }
+    // Replace existing output with new
+    this.executor.replace(this.outputSchema!, 'context_output', output);
 
     this.emitter.emitTrace({
       type: 'operation.context.write',
