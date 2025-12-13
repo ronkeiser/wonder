@@ -6,6 +6,7 @@
   "scripts": {
     "test": "vitest run",
     "test:watch": "vitest",
+    "test:ui": "vitest --ui",
     "test:edge": "vitest run src/tests/edge.test.ts"
   },
   "dependencies": {
@@ -13,6 +14,7 @@
   },
   "devDependencies": {
     "@types/node": "^24.10.1",
+    "@vitest/ui": "^3.2.4",
     "openapi-fetch": "^0.15.0",
     "openapi-typescript": "^7.10.1",
     "tsx": "^4.20.6",
