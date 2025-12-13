@@ -40,42 +40,7 @@ import { Schema, type JSONSchema, type SchemaTable, type SqlHook } from '@wonder
 import type { Emitter } from '@wonder/events';
 import type { ContextSnapshot } from '../types';
 import type { DefinitionManager } from './defs';
-
-/**
- * Compose a human-readable message from SQL query
- * e.g., "SELECT context_input (0ms)"
- */
-function composeSqlMessage(sql: string, durationMs: number): string {
-  const normalized = sql.trim().toUpperCase();
-
-  // Extract operation (first word)
-  const operation = normalized.split(/\s+/)[0] || 'QUERY';
-
-  // Extract table name based on operation
-  let table = '';
-  if (normalized.startsWith('SELECT')) {
-    const match = sql.match(/FROM\s+(\w+)/i);
-    table = match?.[1] || '';
-  } else if (normalized.startsWith('INSERT')) {
-    const match = sql.match(/INTO\s+(\w+)/i);
-    table = match?.[1] || '';
-  } else if (normalized.startsWith('UPDATE')) {
-    const match = sql.match(/UPDATE\s+(\w+)/i);
-    table = match?.[1] || '';
-  } else if (normalized.startsWith('DELETE')) {
-    const match = sql.match(/FROM\s+(\w+)/i);
-    table = match?.[1] || '';
-  } else if (normalized.startsWith('CREATE')) {
-    const match = sql.match(/TABLE\s+(?:IF\s+NOT\s+EXISTS\s+)?(\w+)/i);
-    table = match?.[1] || '';
-  } else if (normalized.startsWith('DROP')) {
-    const match = sql.match(/TABLE\s+(?:IF\s+EXISTS\s+)?(\w+)/i);
-    table = match?.[1] || '';
-  }
-
-  const duration = Math.round(durationMs * 100) / 100; // 2 decimal places
-  return table ? `${operation} ${table} (${duration}ms)` : `${operation} (${duration}ms)`;
-}
+import { composeSqlMessage } from './sql.js';
 
 /** Merge configuration for fan-in */
 export type MergeConfig = {
