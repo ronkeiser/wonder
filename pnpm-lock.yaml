@@ -129,7 +129,7 @@ importers:
         specifier: ^3.2.4
         version: 3.2.4(@types/node@24.10.1)(@vitest/ui@3.2.4)(jiti@2.6.1)(lightningcss@1.30.2)(tsx@4.21.0)(yaml@2.8.1)
 
-  packages/wflow:
+  packages/wflow/core:
     dependencies:
       yaml:
         specifier: ^2.3.4
@@ -142,11 +142,11 @@ importers:
         specifier: ^1.1.0
         version: 1.6.1(@types/node@24.10.1)(lightningcss@1.30.2)
 
-  packages/wflow-lsp:
+  packages/wflow/lsp:
     dependencies:
       '@wonder/wflow':
         specifier: workspace:*
-        version: link:../wflow
+        version: link:../core
       vscode-languageserver:
         specifier: ^9.0.1
         version: 9.0.1
@@ -164,7 +164,7 @@ importers:
         specifier: ^5.3.3
         version: 5.9.3
 
-  packages/wflow-vscode:
+  packages/wflow/vscode:
     dependencies:
       vscode-languageclient:
         specifier: ^9.0.1

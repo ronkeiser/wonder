@@ -11,7 +11,7 @@ let client: LanguageClient;
 
 export function activate(context: ExtensionContext) {
   // Path to the LSP server
-  const serverModule = path.join(context.extensionPath, '..', 'wflow-lsp', 'dist', 'server.js');
+  const serverModule = path.join(context.extensionPath, '..', 'lsp', 'dist', 'server.js');
 
   const serverOptions: ServerOptions = {
     run: { module: serverModule, transport: TransportKind.ipc },
