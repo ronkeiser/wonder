@@ -47,7 +47,7 @@ Every component in Wonder is either a **package** or a **service**:
 
 **Dependencies:** openapi-fetch, openapi-typescript
 
-**Used by:** External applications, @wonder/e2e, CLI tools
+**Used by:** External applications, @wonder/tests, CLI tools
 
 ---
 
@@ -68,7 +68,7 @@ Every component in Wonder is either a **package** or a **service**:
 
 ---
 
-### @wonder/e2e
+### @wonder/tests
 
 **Purpose:** End-to-end test suite
 
@@ -355,7 +355,7 @@ git push wonder main
 
 | Component         | Type    | Deploy Target      | Storage          | Communication                                 |
 | ----------------- | ------- | ------------------ | ---------------- | --------------------------------------------- |
-| @wonder/e2e       | Package | npm (internal)     | None             | Import                                        |
+| @wonder/tests     | Package | npm (internal)     | None             | Import                                        |
 | @wonder/schemas   | Package | npm (internal)     | None             | Import                                        |
 | @wonder/sdk       | Package | npm (public)       | None             | Import                                        |
 | @wonder/templates | Package | npm (internal)     | None             | Import                                        |

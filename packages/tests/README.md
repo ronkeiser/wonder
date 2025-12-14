@@ -1,4 +1,4 @@
-# @wonder/e2e
+# @wonder/tests
 
 End-to-end tests for the Wonder workflow platform.
 
@@ -109,7 +109,7 @@ trace.task.complete();
 
 ```bash
 # Run all tests
-pnpm --filter @wonder/e2e test
+pnpm --filter @wonder/tests test
 
 # Run with event logging
 # (set logEvents: true in test options)
