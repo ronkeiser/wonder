@@ -26,4 +26,4 @@ pnpm-debug.log*
 worker-configuration.d.ts
 
 # Local symlink folders
-docs/onboarding/
+onboarding/
