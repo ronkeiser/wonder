@@ -14,7 +14,8 @@
     "deploy:http": "wrangler deploy --config services/http/wrangler.jsonc",
     "deploy:logs": "wrangler deploy --config services/logs/wrangler.jsonc",
     "deploy:resources": "wrangler deploy --config services/resources/wrangler.jsonc",
-    "deploy:web": "pnpm --filter web run deploy"
+    "deploy:web": "pnpm --filter web run deploy",
+    "gen:sdk": "pnpm --filter @wonder/sdk run generate"
   },
   "engines": {
     "node": ">=24.0.0",

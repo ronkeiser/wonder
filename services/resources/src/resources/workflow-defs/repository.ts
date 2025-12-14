@@ -46,6 +46,49 @@ export async function createWorkflowDef(
   return row;
 }
 
+/**
+ * Create a workflow def with a pre-generated ID.
+ * Used when we need to know all IDs upfront for ref resolution.
+ */
+export async function createWorkflowDefWithId(
+  db: DrizzleD1Database,
+  data: {
+    id: string;
+    name: string;
+    description: string;
+    project_id?: string | null;
+    library_id?: string | null;
+    tags?: string[] | null;
+    input_schema: object;
+    output_schema: object;
+    output_mapping?: object | null;
+    context_schema?: object | null;
+    initial_node_id: string | null;
+  },
+): Promise<WorkflowDef> {
+  const now = new Date().toISOString();
+
+  const row = {
+    id: data.id,
+    version: 1,
+    name: data.name,
+    description: data.description,
+    project_id: data.project_id ?? null,
+    library_id: data.library_id ?? null,
+    tags: data.tags ?? null,
+    input_schema: data.input_schema,
+    output_schema: data.output_schema,
+    output_mapping: data.output_mapping ?? null,
+    context_schema: data.context_schema ?? null,
+    initial_node_id: data.initial_node_id,
+    created_at: now,
+    updated_at: now,
+  };
+
+  await db.insert(workflow_defs).values(row).run();
+  return row;
+}
+
 export async function getWorkflowDef(
   db: DrizzleD1Database,
   id: string,
@@ -138,6 +181,42 @@ export async function createNode(
   return row;
 }
 
+/**
+ * Create a node with a pre-generated ID.
+ * Used when we need to know all IDs upfront for ref resolution.
+ */
+export async function createNodeWithId(
+  db: DrizzleD1Database,
+  data: {
+    id: string;
+    ref: string;
+    workflow_def_id: string;
+    workflow_def_version: number;
+    name: string;
+    task_id?: string | null;
+    task_version?: number | null;
+    input_mapping?: object | null;
+    output_mapping?: object | null;
+    resource_bindings?: Record<string, string> | null;
+  },
+): Promise<Node> {
+  const row = {
+    id: data.id,
+    ref: data.ref,
+    workflow_def_id: data.workflow_def_id,
+    workflow_def_version: data.workflow_def_version,
+    name: data.name,
+    task_id: data.task_id ?? null,
+    task_version: data.task_version ?? null,
+    input_mapping: data.input_mapping ?? null,
+    output_mapping: data.output_mapping ?? null,
+    resource_bindings: data.resource_bindings ?? null,
+  };
+
+  await db.insert(nodes).values(row).run();
+  return row;
+}
+
 export async function getNode(
   db: DrizzleD1Database,
   workflowDefId: string,
@@ -187,6 +266,46 @@ export async function createTransition(
 ): Promise<Transition> {
   const row = {
     id: ulid(),
+    ref: data.ref ?? null,
+    workflow_def_id: data.workflow_def_id,
+    workflow_def_version: data.workflow_def_version,
+    from_node_id: data.from_node_id,
+    to_node_id: data.to_node_id,
+    priority: data.priority,
+    condition: data.condition ?? null,
+    spawn_count: data.spawn_count ?? null,
+    foreach: data.foreach ?? null,
+    synchronization: data.synchronization ?? null,
+    loop_config: data.loop_config ?? null,
+  };
+
+  await db.insert(transitions).values(row).run();
+  return row as Transition;
+}
+
+/**
+ * Create a transition with a pre-generated ID.
+ * Used when we need to know all IDs upfront for ref resolution.
+ */
+export async function createTransitionWithId(
+  db: DrizzleD1Database,
+  data: {
+    id: string;
+    ref?: string | null;
+    workflow_def_id: string;
+    workflow_def_version: number;
+    from_node_id: string;
+    to_node_id: string;
+    priority: number;
+    condition?: object | null;
+    spawn_count?: number | null;
+    foreach?: object | null;
+    synchronization?: object | null;
+    loop_config?: object | null;
+  },
+): Promise<Transition> {
+  const row = {
+    id: data.id,
     ref: data.ref ?? null,
     workflow_def_id: data.workflow_def_id,
     workflow_def_version: data.workflow_def_version,

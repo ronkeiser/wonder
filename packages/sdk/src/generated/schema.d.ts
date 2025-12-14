@@ -2122,6 +2122,9 @@ export interface components {
                 node_id: string;
                 task_id: string;
                 parent_token_id: string | null;
+                fan_out_transition_id: string | null;
+                branch_index: number;
+                branch_total: number;
             } | {
                 /** @enum {string} */
                 type: "operation.tokens.update_status";

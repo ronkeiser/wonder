@@ -11,7 +11,7 @@ All API endpoints require an API key in the `X-API-Key` header. The key is store
 export API_KEY="ga5jSrsUxsZQtcIT8v1WEUeHhP+2S5o/gNSS7QLEFYM="
 
 # Include in all requests
-curl -H "X-API-Key: $API_KEY" "https://api.wflow.app/logs?limit=10"
+curl -H "X-API-Key: $API_KEY" "https://api.wflow.app/api/logs?limit=10"
 ```
 
 All curl examples below assume you've exported the `API_KEY` environment variable.
@@ -24,19 +24,19 @@ Business-level events (workflow started, node completed, etc.):
 
 ```bash
 # All events for a workflow run
-curl "https://api.wflow.app/events?workflow_run_id=run_123"
+curl "https://api.wflow.app/api/events?workflow_run_id=run_123"
 
 # Filter by event type
-curl "https://api.wflow.app/events?workflow_run_id=run_123&event_type=node_completed"
+curl "https://api.wflow.app/api/events?workflow_run_id=run_123&event_type=node_completed"
 
 # Filter by node
-curl "https://api.wflow.app/events?workflow_run_id=run_123&node_id=process_step"
+curl "https://api.wflow.app/api/events?workflow_run_id=run_123&node_id=process_step"
 
 # Filter by token (specific execution branch)
-curl "https://api.wflow.app/events?token_id=tok_abc123"
+curl "https://api.wflow.app/api/events?token_id=tok_abc123"
 
 # Pagination
-curl "https://api.wflow.app/events?workflow_run_id=run_123&limit=50&after_sequence=100"
+curl "https://api.wflow.app/api/events?workflow_run_id=run_123&limit=50&after_sequence=100"
 ```
 
 **Query Parameters:**
@@ -57,22 +57,22 @@ Internal execution events (decision logic, SQL queries, operations):
 
 ```bash
 # All trace events for a workflow run (ordered by sequence)
-curl "https://api.wflow.app/events/trace?workflow_run_id=run_123"
+curl "https://api.wflow.app/api/events/trace?workflow_run_id=run_123"
 
 # Filter by category (decision/operation/dispatch/sql)
-curl "https://api.wflow.app/events/trace?workflow_run_id=run_123&category=decision"
+curl "https://api.wflow.app/api/events/trace?workflow_run_id=run_123&category=decision"
 
 # Filter by event type
-curl "https://api.wflow.app/events/trace?workflow_run_id=run_123&type=decision.routing.start"
+curl "https://api.wflow.app/api/events/trace?workflow_run_id=run_123&type=decision.routing.start"
 
 # Find slow SQL queries
-curl "https://api.wflow.app/events/trace?workflow_run_id=run_123&category=sql&min_duration_ms=50"
+curl "https://api.wflow.app/api/events/trace?workflow_run_id=run_123&category=sql&min_duration_ms=50"
 
 # Debug specific token
-curl "https://api.wflow.app/events/trace?token_id=tok_abc123"
+curl "https://api.wflow.app/api/events/trace?token_id=tok_abc123"
 
 # Performance profiling
-curl "https://api.wflow.app/events/trace?workspace_id=ws_123&min_duration_ms=100&limit=50"
+curl "https://api.wflow.app/api/events/trace?workspace_id=ws_123&min_duration_ms=100&limit=50"
 ```
 
 **Query Parameters:**
@@ -93,16 +93,16 @@ Service-level logs (errors, warnings, debug info):
 
 ```bash
 # All logs for a service
-curl "https://api.wflow.app/logs?service=coordinator"
+curl "https://api.wflow.app/api/logs?service=coordinator"
 
 # Filter by log level
-curl "https://api.wflow.app/logs?service=coordinator&level=error"
+curl "https://api.wflow.app/api/logs?service=coordinator&level=error"
 
 # Filter by trace ID (correlate across services)
-curl "https://api.wflow.app/logs?trace_id=trace_abc123"
+curl "https://api.wflow.app/api/logs?trace_id=trace_abc123"
 
 # Filter by workspace/project
-curl "https://api.wflow.app/logs?workspace_id=ws_123&level=error"
+curl "https://api.wflow.app/api/logs?workspace_id=ws_123&level=error"
 ```
 
 **Query Parameters:**
@@ -123,53 +123,53 @@ curl "https://api.wflow.app/logs?workspace_id=ws_123&level=error"
 
 ```bash
 # 1. Get workflow events (high-level flow)
-curl "https://api.wflow.app/events?workflow_run_id=run_123&limit=1000" | jq '.events[] | {event_type, node_id, token_id}'
+curl "https://api.wflow.app/api/events?workflow_run_id=run_123&limit=1000" | jq '.events[] | {event_type, node_id, token_id}'
 
 # 2. Get trace events (internal decisions)
-curl "https://api.wflow.app/events/trace?workflow_run_id=run_123&category=decision" | jq '.events[] | {type, payload}'
+curl "https://api.wflow.app/api/events/trace?workflow_run_id=run_123&category=decision" | jq '.events[] | {type, payload}'
 
 # 3. Check for errors
-curl "https://api.wflow.app/logs?trace_id=run_123&level=error"
+curl "https://api.wflow.app/api/logs?trace_id=run_123&level=error"
 ```
 
 ### Debug Slow Workflows
 
 ```bash
 # Find slow SQL queries
-curl "https://api.wflow.app/events/trace?workflow_run_id=run_123&category=sql&min_duration_ms=50" | jq '.events[] | {type, duration_ms, payload}'
+curl "https://api.wflow.app/api/events/trace?workflow_run_id=run_123&category=sql&min_duration_ms=50" | jq '.events[] | {type, duration_ms, payload}'
 
 # Find slow operations
-curl "https://api.wflow.app/events/trace?workflow_run_id=run_123&min_duration_ms=100" | jq '.events[] | {type, category, duration_ms}'
+curl "https://api.wflow.app/api/events/trace?workflow_run_id=run_123&min_duration_ms=100" | jq '.events[] | {type, category, duration_ms}'
 ```
 
 ### Debug Synchronization Issues
 
 ```bash
 # Get all synchronization events
-curl "https://api.wflow.app/events/trace?workflow_run_id=run_123&type=decision.sync.start"
+curl "https://api.wflow.app/api/events/trace?workflow_run_id=run_123&type=decision.sync.start"
 
 # Get branch table lifecycle
-curl "https://api.wflow.app/events/trace?workflow_run_id=run_123" | jq '.events[] | select(.type | contains("branch_table"))'
+curl "https://api.wflow.app/api/events/trace?workflow_run_id=run_123" | jq '.events[] | select(.type | contains("branch_table"))'
 ```
 
 ### Debug Specific Token (Branch)
 
 ```bash
 # Trace single branch execution
-curl "https://api.wflow.app/events?token_id=tok_abc123" | jq '.events[] | {sequence_number, event_type, node_id}'
+curl "https://api.wflow.app/api/events?token_id=tok_abc123" | jq '.events[] | {sequence_number, event_type, node_id}'
 
 # Internal operations for token
-curl "https://api.wflow.app/events/trace?token_id=tok_abc123" | jq '.events[] | {sequence, type, payload}'
+curl "https://api.wflow.app/api/events/trace?token_id=tok_abc123" | jq '.events[] | {sequence, type, payload}'
 ```
 
 ### Production Issue Investigation
 
 ```bash
 # Find recent errors across workspace
-curl "https://api.wflow.app/logs?workspace_id=ws_123&level=error&limit=100"
+curl "https://api.wflow.app/api/logs?workspace_id=ws_123&level=error&limit=100"
 
 # Find workflows with slow queries
-curl "https://api.wflow.app/events/trace?workspace_id=ws_123&category=sql&min_duration_ms=100" | jq 'group_by(.workflow_run_id) | map({workflow_run_id: .[0].workflow_run_id, slow_queries: length})'
+curl "https://api.wflow.app/api/events/trace?workspace_id=ws_123&category=sql&min_duration_ms=100" | jq 'group_by(.workflow_run_id) | map({workflow_run_id: .[0].workflow_run_id, slow_queries: length})'
 ```
 
 ## Response Format
