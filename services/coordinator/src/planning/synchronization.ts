@@ -281,33 +281,6 @@ export function getMergeConfig(transition: TransitionDef): MergeConfig | null {
   return transition.synchronization?.merge ?? null;
 }
 
-/**
- * Create decisions for merging branch outputs.
- * Called by dispatch layer after ACTIVATE_FAN_IN.
- */
-export function decideMerge(params: {
-  siblingTokenIds: string[];
-  branchIndices: number[];
-  merge: MergeConfig;
-  outputSchema: object;
-}): Decision[] {
-  const { siblingTokenIds, branchIndices, merge, outputSchema } = params;
-
-  return [
-    {
-      type: 'MERGE_BRANCHES',
-      tokenIds: siblingTokenIds,
-      branchIndices,
-      outputSchema,
-      merge,
-    },
-    {
-      type: 'DROP_BRANCH_TABLES',
-      tokenIds: siblingTokenIds,
-    },
-  ];
-}
-
 // ============================================================================
 // Timeout Handling
 // ============================================================================

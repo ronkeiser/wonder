@@ -188,6 +188,10 @@ export function getTransitionsWithSynchronization(
 // Condition Evaluation
 // ============================================================================
 
+// TODO: Implement CEL expression evaluation. Spec (branching.md) says
+// "CEL expressions available as fallback for complex logic not covered
+// by structured conditions." Currently throws "not yet supported".
+
 /**
  * Evaluate a condition against context.
  * Returns true if condition is null/undefined (unconditional).

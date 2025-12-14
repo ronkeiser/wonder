@@ -168,8 +168,7 @@ function extractFinalOutput(
 **Does:**
 
 1. Evaluates output_mapping against context
-2. Handles branch collections (.\_branches paths)
-3. Returns final output object
+2. Returns final output object
 
 **Returns:** Final output for workflow run.
 
