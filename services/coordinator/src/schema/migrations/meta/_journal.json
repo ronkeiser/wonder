@@ -15,6 +15,13 @@
       "when": 1765616141637,
       "tag": "0001_cheerful_norman_osborn",
       "breakpoints": true
+    },
+    {
+      "idx": 2,
+      "version": "6",
+      "when": 1734184800000,
+      "tag": "0002_fan_in_unique_constraint",
+      "breakpoints": true
     }
   ]
 }

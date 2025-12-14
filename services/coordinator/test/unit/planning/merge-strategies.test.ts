@@ -9,6 +9,7 @@
  */
 
 import { describe, expect, test } from 'vitest';
+import { applyMergeStrategy } from '../../../src/planning/merge';
 
 describe('applyMergeStrategy', () => {
   const branchOutputs = [
@@ -176,11 +177,3 @@ describe('applyMergeStrategy', () => {
     });
   });
 });
-
-// Placeholder for implementation to be tested
-function applyMergeStrategy(
-  branchOutputs: Array<{ tokenId: string; branchIndex: number; output: any }>,
-  strategy: 'append' | 'merge_object' | 'keyed_by_branch' | 'last_wins',
-): any {
-  throw new Error('Not implemented');
-}

@@ -446,7 +446,7 @@ function groupByPriority(transitions: TransitionRow[]): Map<number, TransitionRo
 /**
  * Convert TransitionRow to TransitionDef for type-safe planning.
  */
-function toTransitionDef(row: TransitionRow): TransitionDef {
+export function toTransitionDef(row: TransitionRow): TransitionDef {
   return {
     id: row.id,
     ref: row.ref,

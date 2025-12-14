@@ -6,6 +6,7 @@
  */
 import type { Emitter } from '@wonder/events';
 import { createLogger, type Logger } from '@wonder/logs';
+import type { JSONSchema } from '@wonder/schemas';
 import { DurableObject } from 'cloudflare:workers';
 import { applyDecisions, type DispatchContext } from './dispatch/index';
 import { ContextManager } from './operations/context';
@@ -17,9 +18,10 @@ import {
   decideRouting,
   extractFinalOutput,
   getTransitionsWithSynchronization,
+  toTransitionDef,
 } from './planning/index';
 import { decideSynchronization } from './planning/synchronization';
-import type { TaskResult } from './types';
+import type { Decision, TaskResult, TransitionDef } from './types';
 
 /**
  * WorkflowCoordinator Durable Object
@@ -120,11 +122,11 @@ export class WorkflowCoordinator extends DurableObject {
    * Handle task result from Executor
    *
    * For linear flows: Apply node's output_mapping to write directly to context
-   * For fan-out flows: Branch output was already written by initializeBranchTable
+   * For fan-out flows: Write to branch table, then check if siblings can merge
    *
-   * The distinction is determined by whether this token has a branch_id:
-   * - No branch: Linear flow, use output_mapping to write to context
-   * - Has branch: Fan-out flow, output goes to branch table (handled separately)
+   * The distinction is determined by whether this token has fan_out_transition_id:
+   * - No fan-out: Linear flow, use output_mapping to write to context
+   * - Has fan-out: Branch flow, output goes to branch table for later merge
    */
   async handleTaskResult(tokenId: string, result: TaskResult): Promise<void> {
     let workflow_run_id: string | undefined;
@@ -138,9 +140,11 @@ export class WorkflowCoordinator extends DurableObject {
       // Get node for output mapping
       const node = this.defs.getNode(token.node_id);
 
-      // For linear flows, apply output_mapping to write directly to context
-      // For fan-out flows with branch tokens, output is handled via branch tables
-      if (!token.fan_out_transition_id) {
+      // Handle output based on flow type
+      if (token.fan_out_transition_id) {
+        // Fan-out flow: Write to branch table
+        await this.handleBranchOutput(token, node, result.output_data);
+      } else {
         // Linear flow: Apply node's output_mapping to transform and store output
         // e.g., { "state.result": "$.greeting" } writes result.output_data.greeting to context.state.result
         this.emitter.emitTrace({
@@ -155,8 +159,6 @@ export class WorkflowCoordinator extends DurableObject {
           result.output_data,
         );
       }
-      // Note: Fan-out branch output is written via applyBranchOutput() which is called
-      // during branch creation. The branch output is then merged at synchronization point.
 
       // Emit node completed event
       this.emitter.emit({
@@ -245,6 +247,136 @@ export class WorkflowCoordinator extends DurableObject {
   }
 
   /**
+   * Handle branch output for fan-out tokens
+   *
+   * 1. Fetch TaskDef to get output_schema
+   * 2. Initialize branch table (lazy - creates if not exists)
+   * 3. Write task output to branch table
+   * 4. Check if sibling completion triggers fan-in
+   */
+  private async handleBranchOutput(
+    token: ReturnType<TokenManager['get']>,
+    node: ReturnType<DefinitionManager['getNode']>,
+    output: Record<string, unknown>,
+  ): Promise<void> {
+    // Fetch TaskDef to get output schema
+    if (!node.task_id) {
+      this.logger.debug({
+        event_type: 'branch_output_skip',
+        message: 'No task_id on node - skipping branch output',
+        metadata: { token_id: token.id, node_id: node.id },
+      });
+      return;
+    }
+
+    const taskDefsResource = this.env.RESOURCES.taskDefs();
+    const { task_def: taskDef } = await taskDefsResource.get(node.task_id, node.task_version ?? 1);
+
+    if (!taskDef.output_schema) {
+      this.logger.debug({
+        event_type: 'branch_output_skip',
+        message: 'No output_schema on TaskDef - skipping branch output',
+        metadata: { token_id: token.id, task_id: taskDef.id },
+      });
+      return;
+    }
+
+    // Initialize branch table (creates if not exists)
+    this.context.initializeBranchTable(token.id, taskDef.output_schema as JSONSchema);
+
+    // Write output to branch table
+    this.context.applyBranchOutput(token.id, output);
+
+    this.emitter.emitTrace({
+      type: 'operation.context.branch.write',
+      token_id: token.id,
+      output,
+    });
+
+    // Check if this completion triggers fan-in for waiting siblings
+    await this.checkSiblingCompletion(token);
+  }
+
+  /**
+   * Check if a completed branch token triggers fan-in for waiting siblings
+   *
+   * When a fan-out token completes:
+   * 1. Find tokens waiting for this sibling group
+   * 2. Re-evaluate synchronization condition
+   * 3. If condition now met, trigger fan-in activation
+   */
+  private async checkSiblingCompletion(
+    completedToken: ReturnType<TokenManager['get']>,
+  ): Promise<void> {
+    if (!completedToken.fan_out_transition_id) {
+      return; // Not a fan-out token, nothing to check
+    }
+
+    const workflowRunId = completedToken.workflow_run_id;
+
+    // Get the transition that spawned this fan-out
+    const fanOutTransition = this.defs.getTransition(completedToken.fan_out_transition_id);
+    if (!fanOutTransition) {
+      return;
+    }
+
+    // Find the next transition (from the same source node) that has synchronization
+    const outboundTransitions = this.defs.getTransitionsFrom(fanOutTransition.from_node_id);
+    const syncTransitionRow = outboundTransitions.find((t) => {
+      const sync = t.synchronization as { sibling_group?: string } | null;
+      return sync?.sibling_group === fanOutTransition.id;
+    });
+
+    if (!syncTransitionRow || !syncTransitionRow.synchronization) {
+      return; // No sync transition for this fan-out group
+    }
+
+    // Cast synchronization to typed config
+    const syncTransition = toTransitionDef(syncTransitionRow);
+    const siblingGroup = syncTransition.synchronization!.sibling_group;
+
+    // Check for tokens waiting for this sibling group
+    const waitingTokens = this.tokens.getWaitingTokens(workflowRunId, siblingGroup);
+    if (waitingTokens.length === 0) {
+      return; // No one waiting yet
+    }
+
+    // Re-evaluate synchronization with current sibling counts
+    const siblingCounts = this.tokens.getSiblingCounts(workflowRunId, siblingGroup);
+
+    const dispatchCtx: DispatchContext = {
+      tokens: this.tokens,
+      context: this.context,
+      defs: this.defs,
+      emitter: this.emitter,
+      workflowRunId,
+    };
+
+    // Check if any waiting token should now activate fan-in
+    // We only need to check one (they all have the same view of siblings)
+    const waitingToken = waitingTokens[0];
+
+    const syncResult = decideSynchronization({
+      token: waitingToken,
+      transition: syncTransition,
+      siblingCounts,
+      workflowRunId,
+    });
+
+    // Emit trace events
+    for (const event of syncResult.events) {
+      this.emitter.emitTrace(event);
+    }
+
+    // Process any ACTIVATE_FAN_IN decisions
+    for (const decision of syncResult.decisions) {
+      if (decision.type === 'ACTIVATE_FAN_IN') {
+        await this.handleActivateFanIn(decision, syncTransition, dispatchCtx);
+      }
+    }
+  }
+
+  /**
    * Check if workflow is complete and finalize if so
    */
   private async checkAndFinalizeWorkflow(workflowRunId: string): Promise<void> {
@@ -257,11 +389,11 @@ export class WorkflowCoordinator extends DurableObject {
   /**
    * Process synchronization for created tokens
    */
-  private processSynchronization(
+  private async processSynchronization(
     createdTokenIds: string[],
     syncTransitions: ReturnType<typeof getTransitionsWithSynchronization>,
     dispatchCtx: DispatchContext,
-  ): void {
+  ): Promise<void> {
     for (const createdTokenId of createdTokenIds) {
       const createdToken = this.tokens.get(createdTokenId);
 
@@ -286,13 +418,147 @@ export class WorkflowCoordinator extends DurableObject {
           this.emitter.emitTrace(event);
         }
 
-        // Apply sync decisions
-        applyDecisions(syncResult.decisions, dispatchCtx);
+        // Process decisions - handle ACTIVATE_FAN_IN specially (needs async operations)
+        for (const decision of syncResult.decisions) {
+          if (decision.type === 'ACTIVATE_FAN_IN') {
+            await this.handleActivateFanIn(decision, syncTransition, dispatchCtx);
+          } else {
+            applyDecisions([decision], dispatchCtx);
+          }
+        }
       } else {
         // No synchronization - mark for dispatch
         this.tokens.updateStatus(createdTokenId, 'dispatched');
       }
     }
+  }
+
+  /**
+   * Handle ACTIVATE_FAN_IN decision
+   *
+   * This is called when synchronization condition is met:
+   * 1. Try to activate (race-safe via SQL constraint)
+   * 2. If won the race:
+   *    - Query all completed siblings
+   *    - Fetch TaskDef for output schema
+   *    - Merge branch outputs
+   *    - Drop branch tables
+   *    - Create continuation token
+   *    - Mark waiting siblings as completed
+   */
+  private async handleActivateFanIn(
+    decision: Extract<Decision, { type: 'ACTIVATE_FAN_IN' }>,
+    transition: TransitionDef,
+    dispatchCtx: DispatchContext,
+  ): Promise<void> {
+    const { workflowRunId, nodeId, fanInPath } = decision;
+
+    // Try to activate - first caller wins
+    const activated = this.tokens.tryActivateFanIn({
+      workflowRunId,
+      fanInPath,
+      activatedByTokenId: decision.mergedTokenIds[0] ?? 'unknown',
+    });
+
+    if (!activated) {
+      // Another token already activated this fan-in
+      this.logger.debug({
+        event_type: 'fan_in_race_lost',
+        message: 'Another token already activated this fan-in',
+        metadata: { fan_in_path: fanInPath },
+      });
+      return;
+    }
+
+    // We won the race - proceed with merge
+    this.emitter.emitTrace({
+      type: 'dispatch.sync.fan_in_activated',
+      fan_in_path: fanInPath,
+      node_id: nodeId,
+      merged_count: decision.mergedTokenIds.length,
+    });
+
+    const sync = transition.synchronization;
+    if (!sync) {
+      return; // Should not happen
+    }
+
+    // Get all completed siblings
+    const siblings = this.tokens.getSiblings(workflowRunId, sync.sibling_group);
+    const completedSiblings = siblings.filter((s) => s.status === 'completed');
+    const waitingSiblings = siblings.filter((s) => s.status === 'waiting_for_siblings');
+
+    if (completedSiblings.length === 0) {
+      this.logger.debug({
+        event_type: 'fan_in_no_completed',
+        message: 'No completed siblings found',
+        metadata: { fan_in_path: fanInPath },
+      });
+      return;
+    }
+
+    // Get merge config
+    const mergeConfig = sync.merge;
+    if (mergeConfig) {
+      // Fetch TaskDef to get output schema (from the source node of the fan-out transition)
+      const sourceNode = this.defs.getNode(transition.from_node_id);
+
+      if (sourceNode.task_id) {
+        const taskDefsResource = this.env.RESOURCES.taskDefs();
+        const { task_def: taskDef } = await taskDefsResource.get(
+          sourceNode.task_id,
+          sourceNode.task_version ?? 1,
+        );
+
+        if (taskDef.output_schema) {
+          // Get branch outputs
+          const branchOutputs = this.context.getBranchOutputs(
+            completedSiblings.map((s) => s.id),
+            completedSiblings.map((s) => s.branch_index),
+            taskDef.output_schema as JSONSchema,
+          );
+
+          // Merge into context
+          this.context.mergeBranches(branchOutputs, mergeConfig);
+
+          this.emitter.emitTrace({
+            type: 'dispatch.branch.merged',
+            token_ids: completedSiblings.map((s) => s.id),
+            target: mergeConfig.target,
+            strategy: mergeConfig.strategy,
+          });
+        }
+      }
+
+      // Drop branch tables
+      this.context.dropBranchTables(completedSiblings.map((s) => s.id));
+    }
+
+    // Mark waiting siblings as completed (absorbed by merge)
+    if (waitingSiblings.length > 0) {
+      this.tokens.completeMany(waitingSiblings.map((s) => s.id));
+    }
+
+    // Create continuation token to proceed to next node
+    const firstSibling = completedSiblings[0];
+    const continuationTokenId = this.tokens.create({
+      workflow_run_id: workflowRunId,
+      node_id: nodeId,
+      parent_token_id: firstSibling.parent_token_id,
+      path_id: fanInPath,
+      fan_out_transition_id: null, // Merged token is not part of a fan-out
+      branch_index: 0,
+      branch_total: 1,
+    });
+
+    // Mark for dispatch
+    this.tokens.updateStatus(continuationTokenId, 'dispatched');
+
+    this.emitter.emitTrace({
+      type: 'dispatch.token.created',
+      token_id: continuationTokenId,
+      node_id: nodeId,
+    });
   }
 
   /**

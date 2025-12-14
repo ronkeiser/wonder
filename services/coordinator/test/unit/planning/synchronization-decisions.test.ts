@@ -1,42 +1,19 @@
 /**
  * Unit tests for synchronization decision logic (pure)
  *
- * Tests planning/synchronization.ts decide() function
- * Input: { token, transition, siblings, workflow }
- * Output: Decision[] (UPDATE_TOKEN_STATUS for wait | ACTIVATE_FAN_IN_TOKEN + optional SET_CONTEXT)
+ * Tests planning/synchronization.ts decideSynchronization() function
+ * which determines fan-in behavior when tokens arrive at sync points.
  */
 
 import { describe, expect, test } from 'vitest';
-import type { WorkflowDefRow } from '../../../src/operations/defs';
-import type { TokenRow } from '../../../src/operations/tokens';
-import type { Decision, TransitionDef } from '../../../src/types';
+import type { SiblingCounts, TokenRow } from '../../../src/operations/tokens';
+import {
+  decideOnSiblingCompletion,
+  decideSynchronization,
+} from '../../../src/planning/synchronization';
+import type { TransitionDef } from '../../../src/types';
 
-// Function under test (to be implemented)
-declare function decide(params: {
-  token: TokenRow;
-  transition: TransitionDef;
-  siblings: TokenRow[];
-  workflow: WorkflowDefRow;
-}): Decision[];
-
-describe('synchronization.decide()', () => {
-  const workflow: WorkflowDefRow = {
-    id: 'wf_1',
-    name: 'Test Workflow',
-    description: 'Test description',
-    version: 1,
-    project_id: null,
-    library_id: null,
-    tags: null,
-    input_schema: {},
-    output_schema: {},
-    output_mapping: null,
-    context_schema: null,
-    initial_node_id: null,
-    created_at: '2025-12-14T10:00:00Z',
-    updated_at: '2025-12-14T10:00:00Z',
-  };
-
+describe('decideSynchronization()', () => {
   const baseToken: TokenRow = {
     id: 'tok_collect_1',
     workflow_run_id: 'run_1',
@@ -53,7 +30,7 @@ describe('synchronization.decide()', () => {
   };
 
   describe('no synchronization configured', () => {
-    test('returns empty decisions (routing handles dispatch)', () => {
+    test('returns MARK_FOR_DISPATCH (routing handles dispatch)', () => {
       const transition: TransitionDef = {
         id: 'trans_1',
         from_node_id: 'node_question',
@@ -64,20 +41,20 @@ describe('synchronization.decide()', () => {
         synchronization: null,
       };
 
-      const decisions = decide({
+      const result = decideSynchronization({
         token: baseToken,
         transition,
-        siblings: [],
-        workflow,
+        siblingCounts: { total: 0, completed: 0, failed: 0, waiting: 0, terminal: 0 },
+        workflowRunId: 'run_1',
       });
 
-      // No synchronization = routing already marked for dispatch
-      expect(decisions).toEqual([]);
+      // No synchronization = MARK_FOR_DISPATCH
+      expect(result.decisions).toEqual([{ type: 'MARK_FOR_DISPATCH', tokenId: 'tok_collect_1' }]);
     });
   });
 
   describe('sibling group filtering', () => {
-    test('returns empty if token not in specified sibling group', () => {
+    test('returns MARK_FOR_DISPATCH if token not in specified sibling group', () => {
       const transition: TransitionDef = {
         id: 'trans_1',
         from_node_id: 'node_question',
@@ -94,15 +71,15 @@ describe('synchronization.decide()', () => {
         },
       };
 
-      const decisions = decide({
+      const result = decideSynchronization({
         token: baseToken,
         transition,
-        siblings: [],
-        workflow,
+        siblingCounts: { total: 3, completed: 0, failed: 0, waiting: 0, terminal: 0 },
+        workflowRunId: 'run_1',
       });
 
-      // Token not in sibling group, no synchronization needed
-      expect(decisions).toEqual([]);
+      // Token not in sibling group, passes through with MARK_FOR_DISPATCH
+      expect(result.decisions).toEqual([{ type: 'MARK_FOR_DISPATCH', tokenId: 'tok_collect_1' }]);
     });
 
     test('evaluates synchronization if token matches sibling group', () => {
@@ -122,26 +99,21 @@ describe('synchronization.decide()', () => {
         },
       };
 
-      const siblings: TokenRow[] = [
-        { ...baseToken, id: 'tok_q1', node_id: 'node_question', status: 'completed' },
-        { ...baseToken, id: 'tok_q2', node_id: 'node_question', status: 'completed' },
-        { ...baseToken, id: 'tok_q3', node_id: 'node_question', status: 'pending' },
-      ];
-
-      const decisions = decide({
+      // Not all siblings completed yet
+      const result = decideSynchronization({
         token: baseToken,
         transition,
-        siblings,
-        workflow,
+        siblingCounts: { total: 3, completed: 2, failed: 0, waiting: 0, terminal: 2 },
+        workflowRunId: 'run_1',
       });
 
-      // Should return decision (wait or activate)
-      expect(decisions.length).toBeGreaterThan(0);
+      // Should return MARK_WAITING since not all siblings done
+      expect(result.decisions).toContainEqual(expect.objectContaining({ type: 'MARK_WAITING' }));
     });
   });
 
   describe('strategy: all', () => {
-    const transition: TransitionDef = {
+    const makeTransition = (): TransitionDef => ({
       id: 'trans_1',
       from_node_id: 'node_question',
       to_node_id: 'node_collect',
@@ -155,78 +127,45 @@ describe('synchronization.decide()', () => {
         on_timeout: 'fail',
         merge: undefined,
       },
-    };
-
-    test('waits when not all siblings completed', () => {
-      const siblings: TokenRow[] = [
-        { ...baseToken, id: 'tok_q1', node_id: 'node_question', status: 'completed' },
-        { ...baseToken, id: 'tok_q2', node_id: 'node_question', status: 'completed' },
-        { ...baseToken, id: 'tok_q3', node_id: 'node_question', status: 'executing' },
-      ];
-
-      const decisions = decide({
-        token: baseToken,
-        transition,
-        siblings,
-        workflow,
-      });
-
-      expect(decisions).toContainEqual(
-        expect.objectContaining({
-          type: 'UPDATE_TOKEN_STATUS',
-          tokenId: 'tok_collect_1',
-          status: 'waiting_for_siblings',
-        }),
-      );
     });
 
-    test('activates when all siblings in terminal states', () => {
-      const siblings: TokenRow[] = [
-        { ...baseToken, id: 'tok_q1', node_id: 'node_question', status: 'completed' },
-        { ...baseToken, id: 'tok_q2', node_id: 'node_question', status: 'completed' },
-        { ...baseToken, id: 'tok_q3', node_id: 'node_question', status: 'completed' },
-      ];
-
-      const decisions = decide({
+    test('waits when not all siblings completed', () => {
+      const result = decideSynchronization({
         token: baseToken,
-        transition,
-        siblings,
-        workflow,
+        transition: makeTransition(),
+        siblingCounts: { total: 3, completed: 2, failed: 0, waiting: 0, terminal: 2 },
+        workflowRunId: 'run_1',
       });
 
-      expect(decisions).toContainEqual(
-        expect.objectContaining({
-          type: 'ACTIVATE_FAN_IN_TOKEN',
-          nodeId: 'node_collect',
-        }),
-      );
+      expect(result.decisions).toContainEqual(expect.objectContaining({ type: 'MARK_WAITING' }));
+    });
+
+    test('activates fan-in when all siblings in terminal states', () => {
+      const result = decideSynchronization({
+        token: baseToken,
+        transition: makeTransition(),
+        siblingCounts: { total: 3, completed: 3, failed: 0, waiting: 0, terminal: 3 },
+        workflowRunId: 'run_1',
+      });
+
+      expect(result.decisions).toContainEqual(expect.objectContaining({ type: 'ACTIVATE_FAN_IN' }));
     });
 
     test('includes failed siblings in terminal count', () => {
-      const siblings: TokenRow[] = [
-        { ...baseToken, id: 'tok_q1', node_id: 'node_question', status: 'completed' },
-        { ...baseToken, id: 'tok_q2', node_id: 'node_question', status: 'failed' },
-        { ...baseToken, id: 'tok_q3', node_id: 'node_question', status: 'completed' },
-      ];
-
-      const decisions = decide({
+      const result = decideSynchronization({
         token: baseToken,
-        transition,
-        siblings,
-        workflow,
+        transition: makeTransition(),
+        siblingCounts: { total: 3, completed: 2, failed: 1, waiting: 0, terminal: 3 },
+        workflowRunId: 'run_1',
       });
 
-      // All terminal = activate
-      expect(decisions).toContainEqual(
-        expect.objectContaining({
-          type: 'ACTIVATE_FAN_IN_TOKEN',
-        }),
-      );
+      // 2 completed + 1 failed = 3 terminal = all done
+      expect(result.decisions).toContainEqual(expect.objectContaining({ type: 'ACTIVATE_FAN_IN' }));
     });
   });
 
   describe('strategy: any', () => {
-    const transition: TransitionDef = {
+    const makeTransition = (): TransitionDef => ({
       id: 'trans_1',
       from_node_id: 'node_question',
       to_node_id: 'node_collect',
@@ -240,54 +179,23 @@ describe('synchronization.decide()', () => {
         on_timeout: 'fail',
         merge: undefined,
       },
-    };
-
-    test('activates immediately on first completion', () => {
-      const siblings: TokenRow[] = [
-        { ...baseToken, id: 'tok_q1', node_id: 'node_question', status: 'completed' },
-        { ...baseToken, id: 'tok_q2', node_id: 'node_question', status: 'executing' },
-        { ...baseToken, id: 'tok_q3', node_id: 'node_question', status: 'pending' },
-      ];
-
-      const decisions = decide({
-        token: baseToken,
-        transition,
-        siblings,
-        workflow,
-      });
-
-      expect(decisions).toContainEqual(
-        expect.objectContaining({
-          type: 'ACTIVATE_FAN_IN_TOKEN',
-        }),
-      );
     });
 
-    test('waits if no siblings completed yet', () => {
-      const siblings: TokenRow[] = [
-        { ...baseToken, id: 'tok_q1', node_id: 'node_question', status: 'executing' },
-        { ...baseToken, id: 'tok_q2', node_id: 'node_question', status: 'executing' },
-        { ...baseToken, id: 'tok_q3', node_id: 'node_question', status: 'pending' },
-      ];
-
-      const decisions = decide({
+    test('dispatches immediately on first arrival', () => {
+      const result = decideSynchronization({
         token: baseToken,
-        transition,
-        siblings,
-        workflow,
+        transition: makeTransition(),
+        siblingCounts: { total: 3, completed: 0, failed: 0, waiting: 0, terminal: 0 },
+        workflowRunId: 'run_1',
       });
 
-      expect(decisions).toContainEqual(
-        expect.objectContaining({
-          type: 'UPDATE_TOKEN_STATUS',
-          status: 'waiting_for_siblings',
-        }),
-      );
+      // 'any' strategy = dispatch immediately
+      expect(result.decisions).toEqual([{ type: 'MARK_FOR_DISPATCH', tokenId: 'tok_collect_1' }]);
     });
   });
 
   describe('strategy: m_of_n', () => {
-    const transition: TransitionDef = {
+    const makeTransition = (m: number): TransitionDef => ({
       id: 'trans_1',
       from_node_id: 'node_question',
       to_node_id: 'node_collect',
@@ -295,162 +203,131 @@ describe('synchronization.decide()', () => {
       condition: null,
       spawn_count: null,
       synchronization: {
-        strategy: { m_of_n: 3 },
+        strategy: { m_of_n: m },
         sibling_group: 'start_to_question',
         timeout_ms: null,
         on_timeout: 'fail',
         merge: undefined,
       },
-    };
+    });
 
     test('waits when fewer than M siblings completed', () => {
-      const siblings: TokenRow[] = [
-        { ...baseToken, id: 'tok_q1', node_id: 'node_question', status: 'completed' },
-        { ...baseToken, id: 'tok_q2', node_id: 'node_question', status: 'completed' },
-        { ...baseToken, id: 'tok_q3', node_id: 'node_question', status: 'executing' },
-        { ...baseToken, id: 'tok_q4', node_id: 'node_question', status: 'pending' },
-        { ...baseToken, id: 'tok_q5', node_id: 'node_question', status: 'pending' },
-      ];
-
-      const decisions = decide({
+      const result = decideSynchronization({
         token: baseToken,
-        transition,
-        siblings,
-        workflow,
+        transition: makeTransition(2),
+        siblingCounts: { total: 3, completed: 1, failed: 0, waiting: 0, terminal: 1 },
+        workflowRunId: 'run_1',
       });
 
-      expect(decisions).toContainEqual(
-        expect.objectContaining({
-          type: 'UPDATE_TOKEN_STATUS',
-          status: 'waiting_for_siblings',
-        }),
-      );
+      expect(result.decisions).toContainEqual(expect.objectContaining({ type: 'MARK_WAITING' }));
     });
 
     test('activates when M siblings completed', () => {
-      const siblings: TokenRow[] = [
-        { ...baseToken, id: 'tok_q1', node_id: 'node_question', status: 'completed' },
-        { ...baseToken, id: 'tok_q2', node_id: 'node_question', status: 'completed' },
-        { ...baseToken, id: 'tok_q3', node_id: 'node_question', status: 'completed' },
-        { ...baseToken, id: 'tok_q4', node_id: 'node_question', status: 'executing' },
-        { ...baseToken, id: 'tok_q5', node_id: 'node_question', status: 'pending' },
-      ];
-
-      const decisions = decide({
+      const result = decideSynchronization({
         token: baseToken,
-        transition,
-        siblings,
-        workflow,
+        transition: makeTransition(2),
+        siblingCounts: { total: 3, completed: 2, failed: 0, waiting: 0, terminal: 2 },
+        workflowRunId: 'run_1',
       });
 
-      expect(decisions).toContainEqual(
-        expect.objectContaining({
-          type: 'ACTIVATE_FAN_IN_TOKEN',
-        }),
-      );
+      expect(result.decisions).toContainEqual(expect.objectContaining({ type: 'ACTIVATE_FAN_IN' }));
     });
 
-    test('counts failed siblings toward M', () => {
-      const siblings: TokenRow[] = [
-        { ...baseToken, id: 'tok_q1', node_id: 'node_question', status: 'completed' },
-        { ...baseToken, id: 'tok_q2', node_id: 'node_question', status: 'failed' },
-        { ...baseToken, id: 'tok_q3', node_id: 'node_question', status: 'completed' },
-        { ...baseToken, id: 'tok_q4', node_id: 'node_question', status: 'executing' },
-        { ...baseToken, id: 'tok_q5', node_id: 'node_question', status: 'pending' },
-      ];
-
-      const decisions = decide({
+    test('requires M successful completions (not just terminals)', () => {
+      // m_of_n counts only completed (successful) tokens, not failed
+      const result = decideSynchronization({
         token: baseToken,
-        transition,
-        siblings,
-        workflow,
+        transition: makeTransition(2), // M = 2
+        siblingCounts: { total: 3, completed: 1, failed: 1, waiting: 0, terminal: 2 },
+        workflowRunId: 'run_1',
       });
 
-      // 3 terminal (2 completed + 1 failed) = activate
-      expect(decisions).toContainEqual(
-        expect.objectContaining({
-          type: 'ACTIVATE_FAN_IN_TOKEN',
-        }),
-      );
+      // 1 completed < M=2, so should wait despite 2 terminals
+      expect(result.decisions).toContainEqual(expect.objectContaining({ type: 'MARK_WAITING' }));
+    });
+
+    test('activates when M successful completions reached', () => {
+      const result = decideSynchronization({
+        token: baseToken,
+        transition: makeTransition(2), // M = 2
+        siblingCounts: { total: 3, completed: 2, failed: 1, waiting: 0, terminal: 3 },
+        workflowRunId: 'run_1',
+      });
+
+      // 2 completed >= M=2, activates even with failures
+      expect(result.decisions).toContainEqual(expect.objectContaining({ type: 'ACTIVATE_FAN_IN' }));
     });
   });
+});
 
-  describe('merge configuration', () => {
-    test('includes SET_CONTEXT decision when merge specified', () => {
-      const transition: TransitionDef = {
-        id: 'trans_1',
-        from_node_id: 'node_question',
-        to_node_id: 'node_collect',
-        priority: 1,
-        condition: null,
-        spawn_count: null,
-        synchronization: {
-          strategy: 'all',
-          sibling_group: 'start_to_question',
-          timeout_ms: null,
-          on_timeout: 'fail',
-          merge: {
-            source: '_branch.output',
-            target: 'state.all_answers',
-            strategy: 'append',
-          },
-        },
-      };
+describe('decideOnSiblingCompletion()', () => {
+  const baseToken: TokenRow = {
+    id: 'tok_q1',
+    workflow_run_id: 'run_1',
+    node_id: 'node_question',
+    parent_token_id: null,
+    path_id: 'root.question.0',
+    fan_out_transition_id: 'start_to_question',
+    branch_index: 0,
+    branch_total: 3,
+    status: 'completed',
+    created_at: new Date('2025-12-14T10:00:00Z'),
+    updated_at: new Date('2025-12-14T10:00:00Z'),
+    arrived_at: null,
+  };
 
-      const siblings: TokenRow[] = [
-        { ...baseToken, id: 'tok_q1', node_id: 'node_question', status: 'completed' },
-        { ...baseToken, id: 'tok_q2', node_id: 'node_question', status: 'completed' },
-        { ...baseToken, id: 'tok_q3', node_id: 'node_question', status: 'completed' },
-      ];
+  const makeTransition = (): TransitionDef => ({
+    id: 'trans_1',
+    from_node_id: 'node_question',
+    to_node_id: 'node_collect',
+    priority: 1,
+    condition: null,
+    spawn_count: null,
+    synchronization: {
+      strategy: 'all',
+      sibling_group: 'start_to_question',
+      timeout_ms: null,
+      on_timeout: 'fail',
+      merge: undefined,
+    },
+  });
 
-      const decisions = decide({
-        token: baseToken,
-        transition,
-        siblings,
-        workflow,
-      });
+  test('returns empty when condition not met', () => {
+    const waitingToken: TokenRow = {
+      ...baseToken,
+      id: 'tok_collect_1',
+      node_id: 'node_collect',
+      status: 'waiting_for_siblings',
+    };
 
-      expect(decisions).toContainEqual(
-        expect.objectContaining({
-          type: 'SET_CONTEXT',
-          path: 'state.all_answers',
-          // value will be merged outputs
-        }),
-      );
+    const decisions = decideOnSiblingCompletion({
+      completedToken: baseToken,
+      waitingTokens: [waitingToken],
+      transition: makeTransition(),
+      siblingCounts: { total: 3, completed: 2, failed: 0, waiting: 1, terminal: 2 },
+      workflowRunId: 'run_1',
     });
 
-    test('skips SET_CONTEXT when merge is null', () => {
-      const transition: TransitionDef = {
-        id: 'trans_1',
-        from_node_id: 'node_question',
-        to_node_id: 'node_collect',
-        priority: 1,
-        condition: null,
-        spawn_count: null,
-        synchronization: {
-          strategy: 'all',
-          sibling_group: 'start_to_question',
-          timeout_ms: null,
-          on_timeout: 'fail',
-          merge: undefined,
-        },
-      };
+    // Not all siblings complete yet
+    expect(decisions).toEqual([]);
+  });
 
-      const siblings: TokenRow[] = [
-        { ...baseToken, id: 'tok_q1', node_id: 'node_question', status: 'completed' },
-        { ...baseToken, id: 'tok_q2', node_id: 'node_question', status: 'completed' },
-        { ...baseToken, id: 'tok_q3', node_id: 'node_question', status: 'completed' },
-      ];
+  test('activates fan-in when condition met', () => {
+    const waitingToken: TokenRow = {
+      ...baseToken,
+      id: 'tok_collect_1',
+      node_id: 'node_collect',
+      status: 'waiting_for_siblings',
+    };
 
-      const decisions = decide({
-        token: baseToken,
-        transition,
-        siblings,
-        workflow,
-      });
-
-      const setContextDecisions = decisions.filter((d) => d.type === 'SET_CONTEXT');
-      expect(setContextDecisions).toHaveLength(0);
+    const decisions = decideOnSiblingCompletion({
+      completedToken: baseToken,
+      waitingTokens: [waitingToken],
+      transition: makeTransition(),
+      siblingCounts: { total: 3, completed: 3, failed: 0, waiting: 0, terminal: 3 },
+      workflowRunId: 'run_1',
     });
+
+    expect(decisions).toContainEqual(expect.objectContaining({ type: 'ACTIVATE_FAN_IN' }));
   });
 });

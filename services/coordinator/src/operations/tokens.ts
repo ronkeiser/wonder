@@ -17,7 +17,7 @@ import { drizzle, type DrizzleSqliteDODatabase } from 'drizzle-orm/durable-sqlit
 import { ulid } from 'ulid';
 
 import * as schema from '../schema';
-import { tokens, type TokenStatus } from '../schema';
+import { fan_ins, tokens, type TokenStatus } from '../schema';
 import type { DefinitionManager } from './defs';
 
 /** Token row type inferred from schema */
@@ -374,5 +374,146 @@ export class TokenManager {
     }
     // No fan-out: don't extend path
     return parentPath;
+  }
+
+  // ============================================================================
+  // Fan-In Operations (race-safe synchronization)
+  // ============================================================================
+
+  /** Fan-in row type inferred from schema */
+  // Note: Exported type is at module level
+
+  /**
+   * Try to create a fan-in record for this path.
+   * Returns true if this call created the record (won the race).
+   * Returns false if a record already exists (another token won).
+   *
+   * Uses INSERT OR IGNORE with unique constraint for race safety.
+   */
+  tryCreateFanIn(params: {
+    workflowRunId: string;
+    nodeId: string;
+    fanInPath: string;
+    transitionId: string;
+    tokenId: string;
+  }): boolean {
+    const { workflowRunId, nodeId, fanInPath, transitionId, tokenId } = params;
+    const fanInId = ulid();
+    const now = new Date();
+
+    try {
+      // INSERT OR IGNORE - if unique constraint violated, nothing happens
+      this.db
+        .insert(fan_ins)
+        .values({
+          id: fanInId,
+          workflow_run_id: workflowRunId,
+          node_id: nodeId,
+          fan_in_path: fanInPath,
+          status: 'waiting',
+          transition_id: transitionId,
+          first_arrival_at: now,
+        })
+        .onConflictDoNothing()
+        .run();
+
+      // Check if our insert succeeded by querying
+      const result = this.db
+        .select()
+        .from(fan_ins)
+        .where(and(eq(fan_ins.workflow_run_id, workflowRunId), eq(fan_ins.fan_in_path, fanInPath)))
+        .limit(1)
+        .all();
+
+      const created = result.length > 0 && result[0].id === fanInId;
+
+      // Debug trace - consider using emitter or structured logging
+      if (created) {
+        console.log('[fan_in] Created fan-in record', {
+          fan_in_path: fanInPath,
+          token_id: tokenId,
+        });
+      }
+
+      return created;
+    } catch (error) {
+      // Constraint violation means another token already created it
+      console.log('[fan_in] Creation failed (already exists)', {
+        fan_in_path: fanInPath,
+        token_id: tokenId,
+        error: error instanceof Error ? error.message : String(error),
+      });
+      return false;
+    }
+  }
+
+  /**
+   * Try to activate a fan-in (transition from 'waiting' to 'activated').
+   * Returns true if this call activated it (won the race).
+   * Returns false if already activated (another token won).
+   *
+   * Uses UPDATE with status='waiting' condition for race safety.
+   * Verifies activation by checking if this token is recorded as activator.
+   */
+  tryActivateFanIn(params: {
+    workflowRunId: string;
+    fanInPath: string;
+    activatedByTokenId: string;
+  }): boolean {
+    const { workflowRunId, fanInPath, activatedByTokenId } = params;
+    const now = new Date();
+
+    // UPDATE ... WHERE status='waiting' - only succeeds if not already activated
+    this.db
+      .update(fan_ins)
+      .set({
+        status: 'activated',
+        activated_at: now,
+        activated_by_token_id: activatedByTokenId,
+      })
+      .where(
+        and(
+          eq(fan_ins.workflow_run_id, workflowRunId),
+          eq(fan_ins.fan_in_path, fanInPath),
+          eq(fan_ins.status, 'waiting'),
+        ),
+      )
+      .run();
+
+    // Check if we activated it by verifying our token ID is recorded
+    const result = this.db
+      .select()
+      .from(fan_ins)
+      .where(and(eq(fan_ins.workflow_run_id, workflowRunId), eq(fan_ins.fan_in_path, fanInPath)))
+      .limit(1)
+      .all();
+
+    const activated =
+      result.length > 0 &&
+      result[0].status === 'activated' &&
+      result[0].activated_by_token_id === activatedByTokenId;
+
+    // Debug trace - consider using emitter or structured logging
+    console.log('[fan_in] Activation attempt', {
+      fan_in_path: fanInPath,
+      token_id: activatedByTokenId,
+      activated,
+    });
+
+    return activated;
+  }
+
+  /**
+   * Get fan-in record for a path
+   */
+  getFanIn(workflowRunId: string, fanInPath: string): typeof fan_ins.$inferSelect | null {
+    const result = this.db
+      .select()
+      .from(fan_ins)
+      .where(and(eq(fan_ins.workflow_run_id, workflowRunId), eq(fan_ins.fan_in_path, fanInPath)))
+      .limit(1)
+      .all();
+
+    return result[0] ?? null;
   }
 }

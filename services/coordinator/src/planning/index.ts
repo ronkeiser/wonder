@@ -21,6 +21,7 @@ export {
   evaluateCondition,
   getMergeConfig as getRoutingMergeConfig,
   getTransitionsWithSynchronization,
+  toTransitionDef,
   type PlanningResult,
 } from './routing';
 

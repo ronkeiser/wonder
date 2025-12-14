@@ -82,10 +82,12 @@ export const fan_ins = sqliteTable(
 
     first_arrival_at: integer('first_arrival_at', { mode: 'timestamp_ms' }).notNull(),
     activated_at: integer('activated_at', { mode: 'timestamp_ms' }),
+    activated_by_token_id: text('activated_by_token_id'),
   },
   (table) => [
     index('idx_fan_ins_workflow_run').on(table.workflow_run_id),
     index('idx_fan_ins_path').on(table.fan_in_path),
+    index('idx_fan_ins_unique_path').on(table.workflow_run_id, table.fan_in_path),
   ],
 );
 

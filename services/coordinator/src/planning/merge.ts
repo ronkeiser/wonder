@@ -1,0 +1,60 @@
+/**
+ * Merge Strategy Functions
+ *
+ * Pure functions for merging branch outputs during fan-in operations.
+ * These are extracted to enable unit testing without D1 dependencies.
+ */
+
+export type MergeStrategy = 'append' | 'merge_object' | 'keyed_by_branch' | 'last_wins';
+
+export interface BranchOutput {
+  tokenId: string;
+  branchIndex: number;
+  output: unknown;
+}
+
+/**
+ * Apply merge strategy to collect branch outputs into a single value.
+ *
+ * Strategies:
+ * - append: Collect all outputs into array, ordered by branch index
+ * - merge_object: Shallow merge all outputs (last wins for conflicts)
+ * - keyed_by_branch: Object keyed by branch index
+ * - last_wins: Take output from highest branch index
+ *
+ * @param branchOutputs - Array of branch outputs with token ID, index, and output
+ * @param strategy - The merge strategy to apply
+ * @returns Merged value according to strategy
+ */
+export function applyMergeStrategy(
+  branchOutputs: BranchOutput[],
+  strategy: MergeStrategy,
+): unknown {
+  // Sort by branch index for consistent ordering
+  const sorted = [...branchOutputs].sort((a, b) => a.branchIndex - b.branchIndex);
+
+  switch (strategy) {
+    case 'append':
+      // Collect all outputs into array, ordered by branch index
+      return sorted.map((b) => b.output);
+
+    case 'merge_object':
+      // Shallow merge all outputs (last wins for conflicts)
+      return Object.assign({}, ...sorted.map((b) => b.output));
+
+    case 'keyed_by_branch':
+      // Object keyed by branch index
+      return Object.fromEntries(sorted.map((b) => [b.branchIndex.toString(), b.output]));
+
+    case 'last_wins':
+      // Take last completed (highest branch index)
+      if (branchOutputs.length === 0) {
+        return {};
+      }
+      const lastBranch = sorted[sorted.length - 1];
+      return lastBranch?.output ?? {};
+
+    default:
+      throw new Error(`Unknown merge strategy: ${strategy}`);
+  }
+}

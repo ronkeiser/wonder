@@ -8,13 +8,13 @@
     "deploy": "wrangler deploy",
     "typecheck": "tsc --noEmit",
     "db:generate": "drizzle-kit generate",
-    "test": "vitest"
+    "test": "vitest run"
   },
   "dependencies": {
     "@wonder/events": "workspace:*",
     "@wonder/logs": "workspace:*",
-    "@wonder/schemas": "workspace:*",
     "@wonder/resources": "workspace:*",
+    "@wonder/schemas": "workspace:*",
     "@wonder/templates": "workspace:*",
     "drizzle-orm": "^0.44.7",
     "ulid": "^3.0.2"
@@ -24,7 +24,7 @@
     "@types/node": "^22.10.2",
     "drizzle-kit": "^0.31.7",
     "typescript": "^5.9.3",
-    "vitest": "^2.1.8",
+    "vitest": "^3.2.4",
     "wrangler": "^4.51.0"
   }
 }

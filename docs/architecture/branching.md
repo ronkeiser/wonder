@@ -267,6 +267,17 @@ When a token arrives at a node via a transition with synchronization:
 - `all`: Wait for all siblings from the specified transition; one merged token proceeds
 - `{ m_of_n: number }`: Wait for M siblings (partial quorum); one merged token proceeds after M arrive; remaining siblings continue independently
 
+> **Addendum: Strategy-Specific Condition Evaluation**
+>
+> Each strategy evaluates a different condition in step 4 above:
+> - `any`: Always proceed (first arrival wins)
+> - `all`: Proceed when `terminal_count >= branch_total` (all siblings finished, regardless of success/failure)
+> - `{ m_of_n: M }`: Proceed when `completed_count >= M` (M siblings **succeeded** with usable outputs)
+>
+> The distinction matters: `all` needs to know everyone is *done* before assessing results (failed branches may still inform downstream decisions). `m_of_n` needs M *usable outputs* to merge—a failed branch doesn't contribute a vote.
+>
+> Merge operations only include outputs from **completed** siblings. Failed/cancelled/timed-out branches do not produce mergeable outputs.
+
 **Example: Multiple fan-out groups converging**
 
 ```typescript
