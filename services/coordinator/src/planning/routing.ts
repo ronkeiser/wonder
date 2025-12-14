@@ -13,6 +13,7 @@
 
 import type { DecisionEvent } from '@wonder/events';
 import type { TransitionRow } from '../operations/defs';
+import type { TokenRow } from '../operations/tokens';
 import type {
   Condition,
   ContextSnapshot,
@@ -48,15 +49,15 @@ export type PlanningResult = {
  * Returns both decisions and trace events for observability.
  */
 export function decideRouting(params: {
-  completedTokenId: string;
-  completedTokenPath: string;
+  completedToken: TokenRow;
   workflowRunId: string;
   nodeId: string;
   transitions: TransitionRow[];
   context: ContextSnapshot;
 }): PlanningResult {
-  const { completedTokenId, completedTokenPath, workflowRunId, nodeId, transitions, context } =
-    params;
+  const { completedToken, workflowRunId, nodeId, transitions, context } = params;
+  const completedTokenId = completedToken.id;
+  const completedTokenPath = completedToken.path_id;
 
   const events: DecisionEvent[] = [];
   const decisions: Decision[] = [];
@@ -109,7 +110,19 @@ export function decideRouting(params: {
   // Generate CREATE_TOKEN decisions for each match
   for (const transition of matchedTransitions) {
     const spawnCount = determineSpawnCount(transition, context);
-    const fanOutTransitionId = spawnCount > 1 ? transition.id : null;
+
+    // Determine if this creates a new sibling group or inherits parent's
+    const isNewFanOut = spawnCount > 1;
+    const fanOutTransitionId = isNewFanOut ? transition.id : completedToken.fan_out_transition_id;
+    const branchTotal = isNewFanOut ? spawnCount : completedToken.branch_total;
+
+    // DEBUG: Log spawn_count and fan_out_transition_id
+    console.log('[ROUTING] transition:', {
+      id: transition.id,
+      spawn_count_field: transition.spawn_count,
+      determined_spawn_count: spawnCount,
+      fan_out_transition_id: fanOutTransitionId,
+    });
 
     // Emit transition matched event
     events.push({
@@ -130,7 +143,7 @@ export function decideRouting(params: {
           path_id: pathId,
           fan_out_transition_id: fanOutTransitionId,
           branch_index: i,
-          branch_total: spawnCount,
+          branch_total: branchTotal,
         },
       });
     }

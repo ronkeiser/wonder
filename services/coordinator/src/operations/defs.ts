@@ -81,7 +81,7 @@ export class DefinitionManager {
       await this.fetchAndInsert(workflow_run_id);
 
       // Update workflow run status to 'running' in RESOURCES (D1)
-      using workflowRunsResource = this.env.RESOURCES.workflowRuns();
+      const workflowRunsResource = this.env.RESOURCES.workflowRuns();
       await workflowRunsResource.updateStatus(workflow_run_id, 'running');
 
       // Log table counts
@@ -119,16 +119,31 @@ export class DefinitionManager {
    */
   private async fetchAndInsert(workflowRunId: string): Promise<void> {
     // 1. Fetch workflow run
-    using workflowRunsResource = this.env.RESOURCES.workflowRuns();
+    const workflowRunsResource = this.env.RESOURCES.workflowRuns();
     const runResponse = await workflowRunsResource.get(workflowRunId);
     const run = runResponse.workflow_run;
 
     // 2. Fetch workflow def with nodes and transitions
-    using workflowDefsResource = this.env.RESOURCES.workflowDefs();
+    const workflowDefsResource = this.env.RESOURCES.workflowDefs();
     const defResponse = await workflowDefsResource.get(run.workflow_def_id, run.workflow_version);
     const def = defResponse.workflow_def;
     const nodesList = defResponse.nodes;
     const transitionsList = defResponse.transitions;
+
+    // DEBUG: Log transitions from RESOURCES
+    this.logger.info({
+      event_type: 'defs_transitions_from_resources',
+      message: 'Transitions fetched from RESOURCES',
+      trace_id: workflowRunId,
+      metadata: {
+        transitions: transitionsList.map((t: { id: string; ref: string | null; spawn_count: number | null; synchronization: object | null }) => ({
+          id: t.id,
+          ref: t.ref,
+          spawn_count: t.spawn_count,
+          synchronization: t.synchronization,
+        })),
+      },
+    });
 
     // 3. Insert workflow run
     this.db
@@ -194,6 +209,12 @@ export class DefinitionManager {
 
     // 6. Insert transitions
     for (const transition of transitionsList) {
+      console.log('[COORDINATOR] Inserting transition from RESOURCES:', {
+        id: transition.id,
+        ref: transition.ref,
+        spawn_count: transition.spawn_count,
+        synchronization: transition.synchronization,
+      });
       this.db
         .insert(transitions)
         .values({

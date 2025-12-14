@@ -55,7 +55,13 @@ export const CreateWorkflowDefSchema = z
           condition: z.record(z.string(), z.unknown()).optional(),
           spawn_count: z.number().int().optional(),
           foreach: z.record(z.string(), z.unknown()).optional(),
-          synchronization: z.record(z.string(), z.unknown()).optional(),
+          synchronization: z
+            .object({
+              strategy: z.string(),
+              sibling_group: z.string(),
+              merge: z.record(z.string(), z.unknown()).optional(),
+            })
+            .optional(),
           loop_config: z.record(z.string(), z.unknown()).optional(),
         }),
       )

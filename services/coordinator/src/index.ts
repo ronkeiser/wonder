@@ -181,8 +181,7 @@ export class WorkflowCoordinator extends DurableObject {
 
       // Plan routing decisions (returns decisions + trace events)
       const routingResult = decideRouting({
-        completedTokenId: tokenId,
-        completedTokenPath: token.path_id,
+        completedToken: token,
         workflowRunId: workflow_run_id,
         nodeId: token.node_id,
         transitions,

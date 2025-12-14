@@ -56,8 +56,21 @@ export function decideSynchronization(params: {
 
   const sync = transition.synchronization;
 
+  // DEBUG: Emit sibling_group comparison event
+  events.push({
+    type: 'decision.sync.sibling_group_check',
+    token_fan_out_transition_id: token.fan_out_transition_id,
+    sync_sibling_group: sync.sibling_group,
+    matches: token.fan_out_transition_id === sync.sibling_group,
+  } as any);
+
   // Token not in the specified sibling group → pass through
   if (token.fan_out_transition_id !== sync.sibling_group) {
+    events.push({
+      type: 'decision.sync.skipped_wrong_sibling_group',
+      token_fan_out_transition_id: token.fan_out_transition_id,
+      sync_sibling_group: sync.sibling_group,
+    } as any);
     return { decisions: [{ type: 'MARK_FOR_DISPATCH', tokenId: token.id }], events };
   }
 
