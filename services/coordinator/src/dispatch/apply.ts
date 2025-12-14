@@ -69,11 +69,11 @@ export function applyDecisions(decisions: Decision[], ctx: DispatchContext): App
 
       result.applied++;
 
-      if (outcome.tokenId) {
-        result.tokensCreated.push(outcome.tokenId);
+      if (outcome.createdTokens) {
+        result.tokensCreated.push(...outcome.createdTokens);
       }
-      if (outcome.dispatched) {
-        result.tokensDispatched.push(...outcome.dispatched);
+      if (outcome.dispatchedTokens) {
+        result.tokensDispatched.push(...outcome.dispatchedTokens);
       }
     } catch (error) {
       result.errors.push({
@@ -132,8 +132,8 @@ export function applyTracedDecisions(traced: TracedDecision[], ctx: DispatchCont
 // ============================================================================
 
 type ApplyOutcome = {
-  tokenId?: string;
-  dispatched?: string[];
+  createdTokens?: string[];
+  dispatchedTokens?: string[];
 };
 
 /**
@@ -149,7 +149,7 @@ function applyOne(decision: Decision, ctx: DispatchContext): ApplyOutcome {
         token_id: tokenId,
         node_id: decision.params.node_id,
       });
-      return { tokenId };
+      return { createdTokens: [tokenId] };
     }
 
     case 'BATCH_CREATE_TOKENS': {
@@ -162,7 +162,7 @@ function applyOne(decision: Decision, ctx: DispatchContext): ApplyOutcome {
         type: 'dispatch.tokens.batch_created',
         count: tokenIds.length,
       });
-      return { dispatched: tokenIds };
+      return { createdTokens: tokenIds };
     }
 
     case 'UPDATE_TOKEN_STATUS': {
@@ -201,7 +201,7 @@ function applyOne(decision: Decision, ctx: DispatchContext): ApplyOutcome {
         type: 'dispatch.token.marked_for_dispatch',
         token_id: decision.tokenId,
       });
-      return { dispatched: [decision.tokenId] };
+      return { dispatchedTokens: [decision.tokenId] };
     }
 
     // Context operations
