@@ -1110,79 +1110,16 @@ coverage:
 
 ---
 
-## CLI Commands
+## CLI
 
-The `wflow` CLI provides commands for validation, execution, and testing:
+See [cli.md](./cli.md) for the full CLI reference including:
 
-```bash
-# Validation
-wflow validate                    # Validate all files in current directory
-wflow validate ./workflows/       # Validate specific directory
-wflow validate ./my.wflow         # Validate specific file
-wflow validate --strict           # Treat warnings as errors
-
-# Execution
-wflow run ./ideation.wflow --input '{"topic": "AI", "count": 3}'
-wflow run ./ideation.wflow --input-file ./input.json
-wflow run ./ideation.wflow --watch          # Re-run on file changes
-wflow run ./ideation.wflow --dry-run        # Validate without executing
-
-# Testing
-wflow test                        # Run all .test files
-wflow test ./tests/               # Run tests in directory
-wflow test ./ideation.test       # Run specific test file
-wflow test --filter "happy_path"  # Run tests matching pattern
-wflow test --tags ci              # Run tests with specific tags
-wflow test --coverage             # Generate coverage report
-wflow test --update-snapshots     # Update snapshot files
-wflow test --watch                # Re-run on file changes
-
-# Export
-wflow export ./ideation.wflow --format json    # Export as JSON
-wflow export ./ideation.wflow --format ts      # Generate TypeScript SDK code
-wflow export ./ideation.wflow --format diagram # Generate Mermaid diagram
-
-# Development
-wflow init                        # Initialize new project
-wflow init workflow my-workflow   # Create new workflow from template
-wflow init task my-task           # Create new task from template
-wflow lsp                         # Start language server (for editor integration)
-```
-
-### Test Output
-
-```
-$ wflow test ./tests/ideation.test
-
-  ideation-tests
-    ✓ generates_correct_count (234ms)
-    ✓ handles_empty_topic (12ms)
-    ✓ task_generates_ideas (156ms)
-
-  3 passing (402ms)
-  0 failing
-
-  Coverage:
-    Nodes:    100% (3/3)
-    Branches:  75% (3/4)
-    Actions:  100% (2/2)
-```
-
-### Watch Mode
-
-```
-$ wflow test --watch
-
-  Watching for changes...
-
-  [12:34:56] File changed: workflows/ideation.wflow
-  [12:34:56] Re-running affected tests...
-
-    ✓ generates_correct_count (234ms)
-    ✓ handles_empty_topic (12ms)
-
-  2 passing (246ms)
-```
+- `wflow check` — Check files for errors and warnings
+- `wflow validate` — Deep validation with schema resolution
+- `wflow run` — Execute workflows
+- `wflow test` — Run test suites
+- `wflow export` — Export to JSON, TypeScript, or diagrams
+- `wflow init` — Scaffold new projects and files
 
 ---
 
