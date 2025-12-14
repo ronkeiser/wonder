@@ -720,8 +720,8 @@ version: 2
 description: Generate creative ideas for a given topic
 
 imports:
-  llm_call: "@library/actions/llm-call"
-  format: "./format-output.action"
+  llm_call: '@library/actions/llm-call'
+  format: './format-output.action'
 
 input_schema:
   type: object
@@ -783,18 +783,18 @@ output_schema:
 execution:
   type: http
   method: POST
-  url: "https://api.openai.com/v1/chat/completions"
+  url: 'https://api.openai.com/v1/chat/completions'
   headers:
-    Authorization: "Bearer {{env.OPENAI_API_KEY}}"
+    Authorization: 'Bearer {{env.OPENAI_API_KEY}}'
   body:
-    model: "{{input.model}}"
+    model: '{{input.model}}'
     messages:
       - role: user
-        content: "{{input.prompt}}"
-    temperature: "{{input.temperature}}"
+        content: '{{input.prompt}}'
+    temperature: '{{input.temperature}}'
   response_mapping:
-    response: "$.choices[0].message.content"
-    tokens_used: "$.usage.total_tokens"
+    response: '$.choices[0].message.content'
+    tokens_used: '$.usage.total_tokens'
 ```
 
 ### Import Syntax
@@ -804,15 +804,16 @@ All file types support the same import system:
 ```yaml
 imports:
   # Relative imports - resolved from current file's directory
-  local_task: "./subtasks/helper.task"
-  sibling: "../shared/common.action"
+  local_task: './subtasks/helper.task'
+  sibling: '../shared/common.action'
 
   # Package imports - resolved from package registry
-  library_task: "@library/ideation/generate"
-  project_action: "@project/custom/my-action"
+  library_task: '@library/ideation/generate'
+  project_action: '@project/custom/my-action'
 ```
 
 **Resolution rules:**
+
 - Relative paths (`./`, `../`) resolve from the importing file's directory
 - `@library/` paths resolve to the shared library registry
 - `@project/` paths resolve to the current project's definitions
@@ -832,9 +833,9 @@ test_suite: ideation-tests
 description: Tests for the ideation workflow
 
 imports:
-  ideation: "./workflows/ideation-pipeline.wflow"
-  generate: "./tasks/generate-ideas.task"
-  llm_call: "@library/actions/llm-call"
+  ideation: './workflows/ideation-pipeline.wflow'
+  generate: './tasks/generate-ideas.task'
+  llm_call: '@library/actions/llm-call'
 
 mocks:
   llm_call:
@@ -846,7 +847,7 @@ tests:
     description: Should generate the requested number of ideas
     target: ideation
     input:
-      topic: "sustainable energy"
+      topic: 'sustainable energy'
       count: 3
     timeout_ms: 5000
     assert:
@@ -861,7 +862,7 @@ tests:
     description: Should fail gracefully with empty topic
     target: ideation
     input:
-      topic: ""
+      topic: ''
       count: 5
     assert:
       status: failed
@@ -871,34 +872,34 @@ tests:
     description: Test the generate task directly
     target: generate
     input:
-      topic: "AI applications"
+      topic: 'AI applications'
     assert:
       output.ideas:
-        contains: "AI"
+        contains: 'AI'
 ```
 
 ### Test Structure
 
-| Field | Type | Description |
-|-------|------|-------------|
-| `test_suite` | string | Name of the test suite |
-| `description` | string | Human-readable description |
-| `imports` | Record | Import workflows, tasks, actions to test |
-| `mocks` | Record | Mock definitions for actions |
-| `fixtures` | Record | Reusable test data |
-| `tests` | Record | Test case definitions |
+| Field         | Type   | Description                              |
+| ------------- | ------ | ---------------------------------------- |
+| `test_suite`  | string | Name of the test suite                   |
+| `description` | string | Human-readable description               |
+| `imports`     | Record | Import workflows, tasks, actions to test |
+| `mocks`       | Record | Mock definitions for actions             |
+| `fixtures`    | Record | Reusable test data                       |
+| `tests`       | Record | Test case definitions                    |
 
 ### Test Case Fields
 
-| Field | Type | Description |
-|-------|------|-------------|
-| `description` | string | What this test verifies |
-| `target` | string | Import alias of workflow/task/action to test |
-| `input` | object | Input data for the target |
-| `context` | object | Initial context (workflows only) |
-| `mocks` | Record | Test-specific mock overrides |
-| `timeout_ms` | number | Maximum execution time |
-| `assert` | object | Assertions to verify |
+| Field         | Type   | Description                                  |
+| ------------- | ------ | -------------------------------------------- |
+| `description` | string | What this test verifies                      |
+| `target`      | string | Import alias of workflow/task/action to test |
+| `input`       | object | Input data for the target                    |
+| `context`     | object | Initial context (workflows only)             |
+| `mocks`       | Record | Test-specific mock overrides                 |
+| `timeout_ms`  | number | Maximum execution time                       |
+| `assert`      | object | Assertions to verify                         |
 
 ### Assertion Syntax
 
@@ -908,7 +909,7 @@ Assertions use a path-based syntax with assertion primitives:
 assert:
   # Simple equality
   status: completed
-  output.winner: "idea-3"
+  output.winner: 'idea-3'
 
   # Numeric comparisons
   output.confidence:
@@ -917,7 +918,7 @@ assert:
 
   # String assertions
   output.summary:
-    contains: "energy"
+    contains: 'energy'
     matches: "^[A-Z].*\\.$"
     not_empty: true
 
@@ -945,27 +946,27 @@ assert:
 
 ### Assertion Primitives
 
-| Primitive | Applies To | Description |
-|-----------|------------|-------------|
-| `eq` | any | Exact equality (implicit when value given directly) |
-| `not_eq` | any | Not equal |
-| `gt`, `gte` | number | Greater than (or equal) |
-| `lt`, `lte` | number | Less than (or equal) |
-| `contains` | string, array | Substring or element containment |
-| `not_contains` | string, array | Does not contain |
-| `matches` | string | Regex match |
-| `starts_with` | string | String prefix |
-| `ends_with` | string | String suffix |
-| `length` | string, array | Exact length |
-| `min_length` | string, array | Minimum length |
-| `max_length` | string, array | Maximum length |
-| `type` | any | Type check (string, number, boolean, array, object, null) |
-| `exists` | any | Path exists (true) or not (false) |
-| `not_empty` | string, array, object | Has content |
-| `has_keys` | object | Required keys present |
-| `every` | array | All elements match nested assertions |
-| `some` | array | At least one element matches |
-| `not` | any | Negate nested assertion |
+| Primitive      | Applies To            | Description                                               |
+| -------------- | --------------------- | --------------------------------------------------------- |
+| `eq`           | any                   | Exact equality (implicit when value given directly)       |
+| `not_eq`       | any                   | Not equal                                                 |
+| `gt`, `gte`    | number                | Greater than (or equal)                                   |
+| `lt`, `lte`    | number                | Less than (or equal)                                      |
+| `contains`     | string, array         | Substring or element containment                          |
+| `not_contains` | string, array         | Does not contain                                          |
+| `matches`      | string                | Regex match                                               |
+| `starts_with`  | string                | String prefix                                             |
+| `ends_with`    | string                | String suffix                                             |
+| `length`       | string, array         | Exact length                                              |
+| `min_length`   | string, array         | Minimum length                                            |
+| `max_length`   | string, array         | Maximum length                                            |
+| `type`         | any                   | Type check (string, number, boolean, array, object, null) |
+| `exists`       | any                   | Path exists (true) or not (false)                         |
+| `not_empty`    | string, array, object | Has content                                               |
+| `has_keys`     | object                | Required keys present                                     |
+| `every`        | array                 | All elements match nested assertions                      |
+| `some`         | array                 | At least one element matches                              |
+| `not`          | any                   | Negate nested assertion                                   |
 
 ### Mocks
 
@@ -975,30 +976,30 @@ Mocks replace action execution with predefined responses:
 mocks:
   # Simple response mock
   llm_call:
-    response: "Mocked response"
+    response: 'Mocked response'
     tokens_used: 100
 
   # Conditional mocks
   http_fetch:
     when:
       input.url:
-        contains: "api.example.com"
+        contains: 'api.example.com'
     then:
       status: 200
-      body: { data: "mocked" }
+      body: { data: 'mocked' }
 
   # Sequence mocks (different response each call)
   retry_action:
     sequence:
-      - error: "Connection failed"
-      - error: "Connection failed"
-      - response: "Success on third try"
+      - error: 'Connection failed'
+      - error: 'Connection failed'
+      - response: 'Success on third try'
 
   # Error mocks
   flaky_service:
     error:
       code: TIMEOUT
-      message: "Service unavailable"
+      message: 'Service unavailable'
 ```
 
 ### Fixtures
@@ -1008,11 +1009,11 @@ Reusable test data:
 ```yaml
 fixtures:
   valid_topic:
-    topic: "renewable energy"
+    topic: 'renewable energy'
     count: 5
 
   large_input:
-    topic: "comprehensive analysis of global economic trends"
+    topic: 'comprehensive analysis of global economic trends'
     count: 20
 
 tests:
@@ -1036,7 +1037,7 @@ tests:
 hooks:
   before_all:
     - action: setup_database
-      input: { schema: "test" }
+      input: { schema: 'test' }
 
   before_each:
     - action: clear_cache
@@ -1084,7 +1085,7 @@ tests:
   output_structure:
     target: ideation
     input:
-      topic: "test"
+      topic: 'test'
       count: 1
     assert:
       output:
@@ -1102,9 +1103,9 @@ coverage:
     - ideation
     - generate
   thresholds:
-    nodes: 80      # % of workflow nodes executed
-    branches: 70   # % of conditional branches taken
-    actions: 90    # % of actions invoked
+    nodes: 80 # % of workflow nodes executed
+    branches: 70 # % of conditional branches taken
+    actions: 90 # % of actions invoked
 ```
 
 ---
