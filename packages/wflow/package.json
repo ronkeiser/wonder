@@ -1,0 +1,19 @@
+{
+  "name": "@wonder/wflow",
+  "version": "0.0.1",
+  "description": "Core parsing and analysis for .wflow workflow definitions",
+  "main": "dist/index.js",
+  "types": "dist/index.d.ts",
+  "scripts": {
+    "build": "tsc",
+    "watch": "tsc -w",
+    "test": "vitest"
+  },
+  "dependencies": {
+    "yaml": "^2.3.4"
+  },
+  "devDependencies": {
+    "typescript": "^5.3.3",
+    "vitest": "^1.1.0"
+  }
+}

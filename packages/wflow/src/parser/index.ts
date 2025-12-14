@@ -1,0 +1,173 @@
+import { parse as parseYaml } from 'yaml';
+import type {
+  ActionDocument,
+  AnyDocument,
+  FileType,
+  TaskDocument,
+  WflowDocument,
+} from '../types/ast.js';
+
+/**
+ * Resolved import information
+ */
+export interface ResolvedImport {
+  alias: string;
+  path: string;
+  resolvedUri: string | null; // null if file doesn't exist
+  fileType: FileType;
+  line: number;
+}
+
+/**
+ * Map of imports in a document
+ */
+export interface ImportsMap {
+  byAlias: Map<string, ResolvedImport>;
+  all: ResolvedImport[];
+}
+
+/**
+ * Parse result with document and metadata
+ */
+export interface ParseResult<T extends AnyDocument = AnyDocument> {
+  document: T | null;
+  imports: ImportsMap;
+  fileType: FileType;
+  error?: Error;
+}
+
+/**
+ * Get file type from path/URI
+ */
+export function getFileType(pathOrUri: string): FileType {
+  if (pathOrUri.endsWith('.wflow')) return 'wflow';
+  if (pathOrUri.endsWith('.task')) return 'task';
+  if (pathOrUri.endsWith('.action')) return 'action';
+  if (pathOrUri.endsWith('.wtest')) return 'wtest';
+  return 'unknown';
+}
+
+/**
+ * Escape special regex characters in a string
+ */
+export function escapeRegex(str: string): string {
+  return str.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+}
+
+/**
+ * Parse imports from a document's imports section
+ */
+export function parseImports(
+  imports: Record<string, string> | undefined,
+  lines: string[],
+  resolveImportPath?: (importPath: string) => string | null,
+): ImportsMap {
+  const result: ImportsMap = {
+    byAlias: new Map(),
+    all: [],
+  };
+
+  if (!imports || typeof imports !== 'object') return result;
+
+  for (const [alias, path] of Object.entries(imports)) {
+    if (typeof path !== 'string') continue;
+
+    // Find the line where this import is defined
+    const line = lines.findIndex((l) => {
+      const regex = new RegExp(`^\\s*${escapeRegex(alias)}\\s*:\\s*`);
+      return regex.test(l);
+    });
+
+    const resolvedUri = resolveImportPath ? resolveImportPath(path) : null;
+    const fileType = getFileType(path);
+
+    const resolved: ResolvedImport = {
+      alias,
+      path,
+      resolvedUri,
+      fileType,
+      line: line !== -1 ? line : 0,
+    };
+
+    result.byAlias.set(alias, resolved);
+    result.all.push(resolved);
+  }
+
+  return result;
+}
+
+/**
+ * Parse a YAML document
+ */
+export function parseDocument<T extends AnyDocument>(
+  text: string,
+  uri: string,
+  resolveImportPath?: (importPath: string) => string | null,
+): ParseResult<T> {
+  const fileType = getFileType(uri);
+  const lines = text.split('\n');
+
+  try {
+    const document = parseYaml(text) as T | null;
+
+    if (!document) {
+      return {
+        document: null,
+        imports: { byAlias: new Map(), all: [] },
+        fileType,
+      };
+    }
+
+    const imports = parseImports(
+      (document as { imports?: Record<string, string> }).imports,
+      lines,
+      resolveImportPath,
+    );
+
+    return {
+      document,
+      imports,
+      fileType,
+    };
+  } catch (e) {
+    return {
+      document: null,
+      imports: { byAlias: new Map(), all: [] },
+      fileType,
+      error: e as Error,
+    };
+  }
+}
+
+/**
+ * Parse a workflow document
+ */
+export function parseWorkflow(
+  text: string,
+  uri: string,
+  resolveImportPath?: (importPath: string) => string | null,
+): ParseResult<WflowDocument> {
+  return parseDocument<WflowDocument>(text, uri, resolveImportPath);
+}
+
+/**
+ * Parse a task document
+ */
+export function parseTask(
+  text: string,
+  uri: string,
+  resolveImportPath?: (importPath: string) => string | null,
+): ParseResult<TaskDocument> {
+  return parseDocument<TaskDocument>(text, uri, resolveImportPath);
+}
+
+/**
+ * Parse an action document
+ */
+export function parseAction(
+  text: string,
+  uri: string,
+  resolveImportPath?: (importPath: string) => string | null,
+): ParseResult<ActionDocument> {
+  return parseDocument<ActionDocument>(text, uri, resolveImportPath);
+}
