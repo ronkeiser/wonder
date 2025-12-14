@@ -2,9 +2,11 @@
 workflow: test-workflow
 version: 1
 description: A simple test workflow
+unknown_top_level: oops           # ⚠️ Should warn: unknown property in workflow
 
 input_schema:
   type: object
+  bad_schema_prop: test             # ⚠️ Should warn: unknown JSON Schema property
   properties:
     name: { type: string }
     count: { type: integer }
@@ -15,6 +17,7 @@ context_schema:
   properties:
     greeting: { type: string }
     processed_count: { type: integer }
+    orphan_data: { type: string }        # Valid schema, but never written to
 
 output_schema:
   type: object
@@ -24,10 +27,10 @@ output_schema:
 
 nodes:
   start:
-    ref: start
     name: Start Node
     task_id: "@library/example/start"
     task_version: 1
+    bad_node_prop: test             # ⚠️ Should warn: unknown property in node
     input_mapping:
       name: "$.input.name"
       count: "$.input.count"
@@ -35,7 +38,6 @@ nodes:
       "state.greeting": "$.greeting"
 
   process:
-    ref: process
     name: Process Node
     task_id: "@library/example/process"
     task_version: 1
@@ -47,37 +49,59 @@ nodes:
       "state.bad_write": "$.foo"         # ❌ Should error: path doesn't exist
 
   finish:
-    ref: finish
     name: Finish Node
     task_id: "@library/example/finish"
     task_version: 1
     input_mapping:
       greeting: "$.state.greeting"
       count: "$.state.processed_count"
+      orphan: "$.state.orphan_data"      # ❌ Should error: never written by any predecessor
     output_mapping:
       "output.result": "$.final_message"
 
 transitions:
-  - ref: start_to_process
+  start_to_process:
     from_node_ref: start
     to_node_ref: process
     priority: 0
 
-  - ref: process_to_finish
+  process_to_finish:
     from_node_ref: process
     to_node_ref: finish
     priority: 0
 
   # These should show red squigglies - undefined node refs
-  - ref: bad_transition_1
+  bad_transition_1:
     from_node_ref: process
     to_node_ref: oops
     priority: 0
 
-  - ref: bad_transition_2
+  bad_transition_2:
     from_node_ref: invalid
     to_node_ref: finish
     priority: 0
+
+  # Test sibling_group validation
+  fan_in_test:
+    from_node_ref: process
+    to_node_ref: finish
+    priority: 1
+    synchronization:
+      strategy: all
+      sibling_group: nonexistent_transition  # ❌ Should error: transition doesn't exist
+      merge:
+        source: "_branch.output"
+        target: "state.results"
+        strategy: append
+
+  # Test foreach.collection validation
+  foreach_test:
+    from_node_ref: start
+    to_node_ref: process
+    priority: 1
+    foreach:
+      collection: bad_path               # ❌ Should error: must be state.* path
+      item_var: item
 
 initial_node_ref: start
 timeout_ms: 60000
