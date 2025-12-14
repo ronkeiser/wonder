@@ -6,7 +6,7 @@
     ".": "./src/index.ts"
   },
   "scripts": {
-    "generate": "tsx scripts/generate.ts",
+    "generate": "tsx --env-file=../../.env scripts/generate.ts",
     "test": "vitest --run",
     "test:watch": "vitest"
   },

@@ -5,7 +5,7 @@
 
 import type { JSONSchema } from "@wonder/schemas";
 export interface paths {
-    "/api/workspaces": {
+    "/workspaces": {
         parameters: {
             query?: never;
             header?: never;
@@ -66,7 +66,7 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
-    "/api/workspaces/{id}": {
+    "/workspaces/{id}": {
         parameters: {
             query?: never;
             header?: never;
@@ -151,7 +151,7 @@ export interface paths {
         };
         trace?: never;
     };
-    "/api/projects": {
+    "/projects": {
         parameters: {
             query?: never;
             header?: never;
@@ -190,7 +190,7 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
-    "/api/projects/{id}": {
+    "/projects/{id}": {
         parameters: {
             query?: never;
             header?: never;
@@ -250,7 +250,7 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
-    "/api/actions": {
+    "/actions": {
         parameters: {
             query?: never;
             header?: never;
@@ -289,7 +289,7 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
-    "/api/actions/{id}": {
+    "/actions/{id}": {
         parameters: {
             query?: never;
             header?: never;
@@ -349,7 +349,7 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
-    "/api/prompt-specs": {
+    "/prompt-specs": {
         parameters: {
             query?: never;
             header?: never;
@@ -388,7 +388,7 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
-    "/api/prompt-specs/{id}": {
+    "/prompt-specs/{id}": {
         parameters: {
             query?: never;
             header?: never;
@@ -448,7 +448,7 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
-    "/api/model-profiles": {
+    "/model-profiles": {
         parameters: {
             query?: never;
             header?: never;
@@ -510,7 +510,7 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
-    "/api/model-profiles/{id}": {
+    "/model-profiles/{id}": {
         parameters: {
             query?: never;
             header?: never;
@@ -570,7 +570,7 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
-    "/api/task-defs": {
+    "/task-defs": {
         parameters: {
             query?: never;
             header?: never;
@@ -632,7 +632,7 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
-    "/api/task-defs/{id}": {
+    "/task-defs/{id}": {
         parameters: {
             query?: never;
             header?: never;
@@ -696,7 +696,7 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
-    "/api/workflow-defs": {
+    "/workflow-defs": {
         parameters: {
             query?: never;
             header?: never;
@@ -735,7 +735,7 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
-    "/api/workflow-defs/{id}": {
+    "/workflow-defs/{id}": {
         parameters: {
             query?: never;
             header?: never;
@@ -797,7 +797,7 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
-    "/api/workflows": {
+    "/workflows": {
         parameters: {
             query?: never;
             header?: never;
@@ -836,7 +836,7 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
-    "/api/workflows/{id}": {
+    "/workflows/{id}": {
         parameters: {
             query?: never;
             header?: never;
@@ -894,7 +894,7 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
-    "/api/workflows/{id}/start": {
+    "/workflows/{id}/start": {
         parameters: {
             query?: never;
             header?: never;
@@ -946,7 +946,7 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
-    "/api/workflows/{id}/runs": {
+    "/workflows/{id}/runs": {
         parameters: {
             query?: never;
             header?: never;
@@ -996,7 +996,7 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
-    "/api/workflows/{id}/runs/{run_id}/start": {
+    "/workflows/{id}/runs/{run_id}/start": {
         parameters: {
             query?: never;
             header?: never;
@@ -1043,7 +1043,7 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
-    "/api/workflow-runs/{id}/stream": {
+    "/workflow-runs/{id}/stream": {
         parameters: {
             query?: never;
             header?: never;
@@ -1090,7 +1090,7 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
-    "/api/workflow-runs/{id}": {
+    "/workflow-runs/{id}": {
         parameters: {
             query?: never;
             header?: never;
@@ -1127,7 +1127,7 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
-    "/api/events": {
+    "/events": {
         parameters: {
             query?: never;
             header?: never;
@@ -1172,7 +1172,7 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
-    "/api/events/trace": {
+    "/events/trace": {
         parameters: {
             query?: never;
             header?: never;
@@ -1217,7 +1217,7 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
-    "/api/logs": {
+    "/logs": {
         parameters: {
             query?: never;
             header?: never;

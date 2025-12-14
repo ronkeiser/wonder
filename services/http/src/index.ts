@@ -33,21 +33,21 @@ app.use('/*', cors());
 app.get('/health', (c) => c.text('OK'));
 
 // API key authentication for all API routes
-app.use('/api/*', auth);
+app.use('/*', auth);
 
 // Mount resource routes
 const routes = app
-  .route('/api/workspaces', workspaces)
-  .route('/api/projects', projects)
-  .route('/api/actions', actions)
-  .route('/api/prompt-specs', promptSpecs)
-  .route('/api/model-profiles', modelProfiles)
-  .route('/api/task-defs', taskDefs)
-  .route('/api/workflow-defs', workflowDefs)
-  .route('/api/workflows', workflows)
-  .route('/api/workflow-runs', workflowRuns)
-  .route('/api/events', events)
-  .route('/api/logs', logs);
+  .route('/workspaces', workspaces)
+  .route('/projects', projects)
+  .route('/actions', actions)
+  .route('/prompt-specs', promptSpecs)
+  .route('/model-profiles', modelProfiles)
+  .route('/task-defs', taskDefs)
+  .route('/workflow-defs', workflowDefs)
+  .route('/workflows', workflows)
+  .route('/workflow-runs', workflowRuns)
+  .route('/events', events)
+  .route('/logs', logs);
 
 // OpenAPI documentation
 routes.doc('/doc', {
