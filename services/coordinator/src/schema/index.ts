@@ -88,3 +88,17 @@ export const fan_ins = sqliteTable(
     index('idx_fan_ins_path').on(table.fan_in_path),
   ],
 );
+
+/**
+ * Workflow Status
+ *
+ * Single-row table tracking the workflow run's lifecycle status.
+ * Used to guard against double finalization and track overall state.
+ */
+export type WorkflowStatus = 'running' | 'completed' | 'failed' | 'timed_out' | 'cancelled';
+
+export const workflow_status = sqliteTable('workflow_status', {
+  workflow_run_id: text('workflow_run_id').primaryKey(),
+  status: text('status').$type<WorkflowStatus>().notNull(),
+  updated_at: integer('updated_at', { mode: 'timestamp_ms' }).notNull(),
+});

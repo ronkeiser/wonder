@@ -26,8 +26,8 @@ export type TokenRow = typeof tokens.$inferSelect;
 /** Terminal states where token execution is finished */
 const TERMINAL_STATES: TokenStatus[] = ['completed', 'failed', 'timed_out', 'cancelled'];
 
-/** Active states where token is still executing */
-const ACTIVE_STATES: TokenStatus[] = ['pending', 'dispatched', 'executing'];
+/** Active states where token is still in flight (not terminal) */
+const ACTIVE_STATES: TokenStatus[] = ['pending', 'dispatched', 'executing', 'waiting_for_siblings'];
 
 /** Parameters for creating a new token */
 export type CreateTokenParams = {

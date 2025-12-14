@@ -227,8 +227,8 @@ export class WorkflowCoordinator extends DurableObject {
         await this.dispatchToken(dispatchToken.id);
       }
 
-      // Check workflow completion after all routing
-      await this.checkAndFinalizeWorkflow(workflow_run_id);
+      // Note: No finalization check here. Dispatched tokens handle their own
+      // finalization when they complete (via the no-transitions or no-routing paths).
     } catch (error) {
       this.logger.error({
         event_type: 'coordinator_task_result_failed',
