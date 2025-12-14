@@ -3,7 +3,7 @@
   "version": "0.0.1",
   "private": true,
   "scripts": {
-    "test": "vitest run --config packages/test/vitest.config.ts",
+    "test": "vitest run --config packages/tests/vitest.config.ts",
     "test:edge": "vitest run --config packages/tests/vitest.config.ts tests/edge",
     "types": "pnpm --filter @wonder/scripts run build-services",
     "typecheck": "pnpm run --parallel --filter \"./services/*\" typecheck",
