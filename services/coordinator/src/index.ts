@@ -224,9 +224,7 @@ export class WorkflowCoordinator extends DurableObject {
         }),
       );
 
-      for (const dispatchToken of dispatchedTokens) {
-        await this.dispatchToken(dispatchToken.id);
-      }
+      await Promise.all(dispatchedTokens.map((token) => this.dispatchToken(token.id)));
 
       // Note: No finalization check here. Dispatched tokens handle their own
       // finalization when they complete (via the no-transitions or no-routing paths).
@@ -665,14 +663,16 @@ export class WorkflowCoordinator extends DurableObject {
     );
 
     // Dispatch to Executor (fire-and-forget, Executor calls back)
-    await this.env.EXECUTOR.executeTask({
-      token_id: tokenId,
-      workflow_run_id: token.workflow_run_id,
-      task_id: node.task_id,
-      task_version: node.task_version ?? 1,
-      input: taskInput,
-      resources: resolvedResources,
-    });
+    this.ctx.waitUntil(
+      this.env.EXECUTOR.executeTask({
+        token_id: tokenId,
+        workflow_run_id: token.workflow_run_id,
+        task_id: node.task_id,
+        task_version: node.task_version ?? 1,
+        input: taskInput,
+        resources: resolvedResources,
+      }),
+    );
   }
 
   /**
