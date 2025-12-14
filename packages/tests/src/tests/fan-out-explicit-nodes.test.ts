@@ -12,27 +12,27 @@ import { describe, expect, it } from 'vitest';
 import { runTestWorkflow } from '~/kit';
 
 /**
- * Fan-Out Trivia Workflow Test
+ * Fan-Out Explicit Nodes Test
  *
- * Tests the coordinator's ability to fan out to multiple parallel nodes.
+ * Tests the coordinator's ability to fan out to multiple explicit parallel nodes.
  *
  * Workflow structure:
- *   [start_node] → [trivia_1]
- *                → [trivia_2]  → [collect_node] → (complete)
- *                → [trivia_3]
+ *   [start_node] → [worker_1]
+ *                → [worker_2]  → [collect_node] → (complete)
+ *                → [worker_3]
  *
  * Data flow:
- * - Start node: receives topic, fans out to 3 trivia nodes
- * - Trivia nodes 1-3: each generates a unique question + answer (run in parallel)
+ * - Start node: receives input, fans out to 3 worker nodes via separate transitions
+ * - Worker nodes 1-3: each runs independently (in parallel)
  * - Collect node: waits for all 3, aggregates into final output
  *
  * This proves:
- * 1. Fan-out: single node triggers multiple downstream nodes
- * 2. Parallel execution: all 3 trivia nodes run concurrently
+ * 1. Fan-out: single node triggers multiple downstream nodes via multiple transitions
+ * 2. Parallel execution: all 3 worker nodes run concurrently
  * 3. Fan-in: collect node waits for all siblings to complete
- * 4. Data aggregation: final output contains all 3 Q&A pairs
+ * 4. Data aggregation: final output contains results from all branches
  */
-describe('Coordinator - Fan-Out Trivia Workflow', () => {
+describe('Coordinator - Fan-Out Explicit Nodes', () => {
   it('fans out to 3 parallel trivia generators and collects results', async () => {
     const inputData = { topic: 'ancient history' };
 

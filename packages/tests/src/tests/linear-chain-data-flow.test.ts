@@ -12,7 +12,7 @@ import { describe, expect, it } from 'vitest';
 import { runTestWorkflow } from '~/kit';
 
 /**
- * Trivia Chain Workflow Test
+ * Linear Chain Data Flow Test
  *
  * Tests a 3-node linear workflow where each node depends on specific
  * data from previous nodes, proving proper data isolation and flow.
@@ -30,8 +30,8 @@ import { runTestWorkflow } from '~/kit';
  * 2. Nodes can selectively read from state (node 2 doesn't see answer)
  * 3. Later nodes can aggregate data from multiple previous nodes
  */
-describe('Coordinator - Trivia Chain Workflow', () => {
-  it('executes trivia question/guess/judge chain with proper data isolation', async () => {
+describe('Coordinator - Linear Chain Data Flow', () => {
+  it('executes 3-node chain with selective data access between nodes', async () => {
     const inputData = { topic: 'pets' };
 
     // =========================================================================
