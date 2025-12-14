@@ -10,7 +10,7 @@ import { createClient } from '../../src/index.js';
  * Note: These tests require the Events service to be running.
  */
 describe('WebSocket Event Client', () => {
-  const BASE_URL = process.env.API_URL || 'https://wonder-http.ron-keiser.workers.dev';
+  const BASE_URL = process.env.API_URL || 'https://api.wflow.app';
 
   it('should create events client', () => {
     const wonder = createClient(BASE_URL);
@@ -121,7 +121,7 @@ describe('WebSocket Event Client', () => {
 });
 
 describe('WebSocket Connection Management', () => {
-  const BASE_URL = process.env.API_URL || 'https://wonder-http.ron-keiser.workers.dev';
+  const BASE_URL = process.env.API_URL || 'https://api.wflow.app';
 
   it('should allow closing and reopening connections', async () => {
     const wonder = createClient(BASE_URL);

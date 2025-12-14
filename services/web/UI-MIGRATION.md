@@ -89,9 +89,9 @@ pnpm run deploy
 
 ## URLs
 
-- Production: https://wonder-web.ron-keiser.workers.dev
-- Events UI: https://wonder-web.ron-keiser.workers.dev/events
-- Logs UI: https://wonder-web.ron-keiser.workers.dev/logs
+- Production: https://www.wflow.app
+- Events UI: https://www.wflow.app/events
+- Logs UI: https://www.wflow.app/logs
 
 ## Status
 

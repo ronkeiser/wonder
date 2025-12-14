@@ -540,8 +540,7 @@ export async function loadTestFile(
   }
 
   // Create API client
-  const baseUrl =
-    options.baseUrl || process.env.WONDER_API_URL || 'https://wonder-http.ron-keiser.workers.dev';
+  const baseUrl = options.baseUrl || process.env.WONDER_API_URL || 'https://api.wflow.app';
   const apiKey = options.apiKey || process.env.WONDER_API_KEY || process.env.API_KEY;
   const client = createClient(baseUrl, apiKey);
 

@@ -20,7 +20,7 @@
     },
   ],
   "vars": {
-    "HTTP_URL": "https://wonder-http.ron-keiser.workers.dev",
+    "HTTP_URL": "https://api.wflow.app",
   },
   "observability": {
     "enabled": false,

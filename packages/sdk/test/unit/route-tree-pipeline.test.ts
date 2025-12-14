@@ -110,7 +110,7 @@ describe('Route tree generation in pipeline', () => {
   });
 
   it('should work with real OpenAPI spec structure', async () => {
-    const apiUrl = process.env.API_URL || 'https://wonder-http.ron-keiser.workers.dev';
+    const apiUrl = process.env.API_URL || 'https://api.wflow.app';
     const response = await fetch(`${apiUrl}/doc`);
     const spec = await response.json();
     const paths = spec.paths;

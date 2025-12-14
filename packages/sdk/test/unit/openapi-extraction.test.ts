@@ -8,7 +8,7 @@ import { describe, expect, it } from 'vitest';
 
 describe('OpenAPI spec extraction', () => {
   it('should fetch and parse OpenAPI spec', async () => {
-    const apiUrl = process.env.API_URL || 'https://wonder-http.ron-keiser.workers.dev';
+    const apiUrl = process.env.API_URL || 'https://api.wflow.app';
     const response = await fetch(`${apiUrl}/doc`);
     const spec = await response.json();
 
@@ -18,7 +18,7 @@ describe('OpenAPI spec extraction', () => {
   });
 
   it('should extract paths from OpenAPI spec', async () => {
-    const apiUrl = process.env.API_URL || 'https://wonder-http.ron-keiser.workers.dev';
+    const apiUrl = process.env.API_URL || 'https://api.wflow.app';
     const response = await fetch(`${apiUrl}/doc`);
     const spec = await response.json();
     const paths = spec.paths;
@@ -29,7 +29,7 @@ describe('OpenAPI spec extraction', () => {
   });
 
   it('should have expected Wonder API paths', async () => {
-    const apiUrl = process.env.API_URL || 'https://wonder-http.ron-keiser.workers.dev';
+    const apiUrl = process.env.API_URL || 'https://api.wflow.app';
     const response = await fetch(`${apiUrl}/doc`);
     const spec = await response.json();
     const paths = spec.paths;
@@ -44,7 +44,7 @@ describe('OpenAPI spec extraction', () => {
   });
 
   it('should have methods on paths', async () => {
-    const apiUrl = process.env.API_URL || 'https://wonder-http.ron-keiser.workers.dev';
+    const apiUrl = process.env.API_URL || 'https://api.wflow.app';
     const response = await fetch(`${apiUrl}/doc`);
     const spec = await response.json();
     const paths = spec.paths;

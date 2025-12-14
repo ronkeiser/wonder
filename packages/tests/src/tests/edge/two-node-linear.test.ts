@@ -154,9 +154,10 @@ describe('Coordinator - Two Node Linear Workflow', () => {
         greeting: '$.state.greeting',
         count: '$.input.count',
       },
+      // Output mapping targets must match output_schema column names
       output_mapping: {
-        'output.message': '$.message',
-        'output.doubled_count': '$.doubled_count',
+        'output.final_message': '$.message',
+        'output.final_count': '$.doubled_count',
       },
     });
 
@@ -183,9 +184,11 @@ describe('Coordinator - Two Node Linear Workflow', () => {
           greeting: s.string(),
         }),
         output_schema: workflowOutputSchema,
+        // Node writes to output.final_message and output.final_count directly
+        // so we read from those same paths
         output_mapping: {
-          final_message: '$.output.message',
-          final_count: '$.output.doubled_count',
+          final_message: '$.output.final_message',
+          final_count: '$.output.final_count',
         },
         initial_node_ref: 'process_node',
         nodes: [processNode, transformNode],

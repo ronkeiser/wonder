@@ -4,7 +4,7 @@
  * Quick test to verify the web service UIs are accessible
  */
 
-const BASE_URL = 'https://wonder-web.ron-keiser.workers.dev';
+const BASE_URL = 'https://www.wflow.app';
 
 async function testUI(path, expectedTitle) {
   console.log(`\n🧪 Testing ${path}...`);

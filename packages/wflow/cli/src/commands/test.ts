@@ -20,7 +20,7 @@ export const testCommand = new Command('test')
   .option('--no-color', 'Disable colored output')
   .option('-v, --verbose', 'Verbose output')
   .option('--api-key <key>', 'Wonder API key (or set WONDER_API_KEY env var)')
-  .option('--api-url <url>', 'Wonder API URL (default: https://wonder-http.ron-keiser.workers.dev)')
+  .option('--api-url <url>', 'Wonder API URL (default: https://api.wflow.app)')
   .action(async (paths: string[], options) => {
     try {
       // Find all test files

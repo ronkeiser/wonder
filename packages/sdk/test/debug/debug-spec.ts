@@ -4,7 +4,7 @@
  * Step 1: Verify the OpenAPI Spec
  */
 
-const API_URL = process.env.API_URL || 'https://wonder-http.ron-keiser.workers.dev';
+const API_URL = process.env.API_URL || 'https://api.wflow.app';
 
 async function debugSpec() {
   console.log('=== Step 1: Verify OpenAPI Spec ===\n');
@@ -12,13 +12,13 @@ async function debugSpec() {
 
   try {
     const response = await fetch(`${API_URL}/doc`);
-    
+
     if (!response.ok) {
       console.error(`❌ HTTP Error: ${response.status} ${response.statusText}`);
       process.exit(1);
     }
 
-    const spec = await response.json() as any;
+    const spec = (await response.json()) as any;
 
     console.log('✓ Spec fetched successfully\n');
 
@@ -47,8 +47,8 @@ async function debugSpec() {
     // Show first 10 paths
     console.log('First 10 paths:');
     paths.slice(0, 10).forEach((path) => {
-      const methods = Object.keys(spec.paths[path]).filter(
-        m => ['get', 'post', 'put', 'patch', 'delete'].includes(m)
+      const methods = Object.keys(spec.paths[path]).filter((m) =>
+        ['get', 'post', 'put', 'patch', 'delete'].includes(m),
       );
       console.log(`  ${path}`);
       console.log(`    Methods: ${methods.join(', ')}`);
@@ -60,12 +60,7 @@ async function debugSpec() {
 
     // Check for expected Wonder API paths
     console.log('\nChecking for expected paths:');
-    const expectedPaths = [
-      '/workspaces',
-      '/workspaces/{workspaceId}',
-      '/projects',
-      '/workflows',
-    ];
+    const expectedPaths = ['/workspaces', '/workspaces/{workspaceId}', '/projects', '/workflows'];
 
     expectedPaths.forEach((path) => {
       const exists = paths.includes(path);
@@ -81,7 +76,7 @@ async function debugSpec() {
     paths.forEach((path) => {
       const params = (path.match(/\{[^}]+\}/g) || []).length;
       const segments = path.split('/').filter(Boolean).length;
-      
+
       if (params > 0) withParams++;
       if (params > 1) withMultipleParams++;
       if (segments > deepestNesting) deepestNesting = segments;
@@ -94,7 +89,7 @@ async function debugSpec() {
     // Show method distribution
     console.log('\nHTTP method distribution:');
     const methodCounts: Record<string, number> = {};
-    
+
     paths.forEach((path) => {
       Object.keys(spec.paths[path]).forEach((method) => {
         if (['get', 'post', 'put', 'patch', 'delete'].includes(method)) {
@@ -103,9 +98,11 @@ async function debugSpec() {
       });
     });
 
-    Object.entries(methodCounts).sort((a, b) => b[1] - a[1]).forEach(([method, count]) => {
-      console.log(`  ${method.toUpperCase()}: ${count}`);
-    });
+    Object.entries(methodCounts)
+      .sort((a, b) => b[1] - a[1])
+      .forEach(([method, count]) => {
+        console.log(`  ${method.toUpperCase()}: ${count}`);
+      });
 
     // Write spec to file for inspection
     const fs = await import('node:fs/promises');
@@ -115,7 +112,6 @@ async function debugSpec() {
 
     console.log('\n=== Step 1 Complete ===');
     console.log('Spec is valid and contains paths. Ready for parsing.\n');
-
   } catch (error) {
     console.error('❌ Error fetching spec:', error);
     process.exit(1);

@@ -19,7 +19,7 @@ The SDK provides a unified client with four integrated layers:
 ```typescript
 import { createClient } from '@wonder/sdk';
 
-const wonder = createClient('https://wonder-http.ron-keiser.workers.dev');
+const wonder = createClient('https://api.wflow.app');
 
 // Resource client - CRUD operations
 const workspaces = await wonder.workspaces.list();
@@ -36,7 +36,7 @@ const response = await wonder.GET('/api/custom-endpoint', {});
 ```typescript
 import { createClient } from '@wonder/sdk';
 
-const wonder = createClient('https://wonder-http.ron-keiser.workers.dev');
+const wonder = createClient('https://api.wflow.app');
 
 // List resources
 const workspacesResponse = await wonder.workspaces.list();
@@ -68,7 +68,7 @@ The SDK uses a two-phase workflow execution to guarantee zero event loss:
 ```typescript
 import { createClient } from '@wonder/sdk';
 
-const wonder = createClient('https://wonder-http.ron-keiser.workers.dev');
+const wonder = createClient('https://api.wflow.app');
 
 // Stream workflow execution with all events
 const result = await wonder.workflows(workflowId).stream(
@@ -120,7 +120,7 @@ For more control over event streaming:
 ```typescript
 import { createClient } from '@wonder/sdk';
 
-const wonder = createClient('https://wonder-http.ron-keiser.workers.dev');
+const wonder = createClient('https://api.wflow.app');
 
 // Wait for workflow completion
 const status = await wonder.events.waitForCompletion('run_id', { timeout: 60000 });
@@ -157,7 +157,7 @@ Access the underlying HTTP client for custom requests:
 ```typescript
 import { createClient } from '@wonder/sdk';
 
-const wonder = createClient('https://wonder-http.ron-keiser.workers.dev');
+const wonder = createClient('https://api.wflow.app');
 
 // Raw GET
 const response = await wonder.GET('/api/workspaces', {});
@@ -458,7 +458,7 @@ pnpm test
 
 ### Environment Variables
 
-- `API_URL` - Base URL for the Wonder API (default: `https://wonder-http.ron-keiser.workers.dev`)
+- `API_URL` - Base URL for the Wonder API (default: `https://api.wflow.app`)
 
 ## Architecture
 

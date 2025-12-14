@@ -57,7 +57,7 @@ export interface WonderClient extends Omit<ReturnType<typeof createGeneratedClie
  * @param apiKey - The API key for authentication
  */
 export function createClient(
-  baseUrl: string = process.env.RESOURCES_URL || 'https://wonder-http.ron-keiser.workers.dev',
+  baseUrl: string = process.env.RESOURCES_URL || 'https://api.wflow.app',
   apiKey?: string,
 ): WonderClient {
   const baseClient = createOpenAPIClient<paths>({

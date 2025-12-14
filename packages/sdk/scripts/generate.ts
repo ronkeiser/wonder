@@ -13,7 +13,7 @@ import ts from 'typescript';
 import { formatClientCode, generateRootClient } from './generate-client.js';
 import { buildRouteTree, type HttpMethod, type PathDefinition } from './parse-paths.js';
 
-const API_URL = process.env.API_URL || 'https://wonder-http.ron-keiser.workers.dev';
+const API_URL = process.env.API_URL || 'https://api.wflow.app';
 const DOC_URL = `${API_URL}/doc`;
 const HTTP_METHODS = ['get', 'post', 'put', 'patch', 'delete'] as const;
 const SCHEMA_OUTPUT_DIR = 'src/generated';
