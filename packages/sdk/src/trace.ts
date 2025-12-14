@@ -123,6 +123,25 @@ export namespace TracePayloads {
   export interface RoutingComplete {
     decisions: any[];
   }
+
+  export interface CompletionStart {
+    output_mapping: Record<string, string> | null;
+    context_keys: {
+      input: string[];
+      state: string[];
+      output: string[];
+    };
+  }
+
+  export interface CompletionExtract {
+    target_field: string;
+    source_path: string;
+    extracted_value: unknown;
+  }
+
+  export interface CompletionComplete {
+    final_output: Record<string, unknown>;
+  }
 }
 
 /**
@@ -270,6 +289,10 @@ export class TraceEventCollection {
       creates(): TypedTraceEvent<TracePayloads.TokenCreate>[] {
         return self.filter<TracePayloads.TokenCreate>('operation.tokens.create');
       },
+      /** Alias for creates() */
+      creations(): TypedTraceEvent<TracePayloads.TokenCreate>[] {
+        return this.creates();
+      },
       created(tokenId: string): TypedTraceEvent<TracePayloads.TokenCreate> | undefined {
         return self.findWhere(
           (e) => e.type === 'operation.tokens.create' && e.payload.token_id === tokenId,
@@ -279,10 +302,17 @@ export class TraceEventCollection {
         return self.filter<TracePayloads.TokenUpdateStatus>('operation.tokens.update_status');
       },
       statusTransitions(tokenId: string): string[] {
-        return self
-          .byToken(tokenId)
-          .filter((e) => e.type === 'operation.tokens.update_status')
-          .map((e) => `${e.payload.from}→${e.payload.to}`);
+        const updates = self
+          .filter<TracePayloads.TokenUpdateStatus>('operation.tokens.update_status')
+          .filter((e) => e.payload.token_id === tokenId)
+          .sort((a, b) => a.sequence - b.sequence);
+        if (updates.length === 0) return [];
+        // Return list of status names in order
+        const statuses = [updates[0].payload.from];
+        for (const u of updates) {
+          statuses.push(u.payload.to);
+        }
+        return statuses;
       },
     };
   }
@@ -387,6 +417,27 @@ export class TraceEventCollection {
       },
       completions(): TypedTraceEvent<TracePayloads.RoutingComplete>[] {
         return self.filter<TracePayloads.RoutingComplete>('decision.routing.complete');
+      },
+    };
+  }
+
+  /**
+   * Completion/finalization operations
+   */
+  get completion() {
+    const self = this;
+    return {
+      start(): TypedTraceEvent<TracePayloads.CompletionStart> | undefined {
+        return self.find<TracePayloads.CompletionStart>('decision.completion.start');
+      },
+      extracts(): TypedTraceEvent<TracePayloads.CompletionExtract>[] {
+        return self.filter<TracePayloads.CompletionExtract>('decision.completion.extract');
+      },
+      complete(): TypedTraceEvent<TracePayloads.CompletionComplete> | undefined {
+        return self.find<TracePayloads.CompletionComplete>('decision.completion.complete');
+      },
+      noMapping(): boolean {
+        return self.has('decision.completion.no_mapping');
       },
     };
   }
