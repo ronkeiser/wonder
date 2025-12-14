@@ -6,67 +6,6 @@
 import type { paths } from './schema.js';
 
 /**
- * Format a Zod error into a readable string
- */
-function formatZodError(zodMessage: string): string {
-  try {
-    const issues = JSON.parse(zodMessage) as Array<{
-      code?: string;
-      path?: (string | number)[];
-      message?: string;
-      values?: string[];
-    }>;
-
-    if (!Array.isArray(issues)) return zodMessage;
-
-    return issues
-      .map((issue, i) => {
-        const parts: string[] = [];
-        const path = issue.path?.length ? issue.path.join('.') : '(root)';
-        parts.push(`  [${i + 1}] Path: ${path}`);
-        if (issue.code) parts.push(`      Code: ${issue.code}`);
-        if (issue.message) parts.push(`      ${issue.message}`);
-        if (issue.values?.length) {
-          parts.push(`      Valid options:`);
-          issue.values.forEach((v) => parts.push(`        - ${v}`));
-        }
-        return parts.join('\n');
-      })
-      .join('\n\n');
-  } catch {
-    return zodMessage;
-  }
-}
-
-/**
- * Format API error details into a readable string
- */
-function formatErrorDetails(details: unknown): string {
-  if (typeof details !== 'object' || details === null) {
-    return String(details);
-  }
-
-  const obj = details as Record<string, unknown>;
-
-  // Handle standard API error format: { success: false, error: { name, message } }
-  if (obj.success === false && typeof obj.error === 'object' && obj.error !== null) {
-    const err = obj.error as Record<string, unknown>;
-    const name = err.name as string | undefined;
-    const message = err.message as string | undefined;
-
-    if (name === 'ZodError' && message) {
-      return `Validation Error (ZodError):\n${formatZodError(message)}`;
-    }
-
-    if (name && message) {
-      return `${name}: ${message}`;
-    }
-  }
-
-  return JSON.stringify(details, null, 2);
-}
-
-/**
  * Error thrown when an API request fails
  */
 export class ApiError extends Error {
@@ -74,8 +13,9 @@ export class ApiError extends Error {
     message: string,
     public readonly details: unknown,
   ) {
-    super(`${message}\n${formatErrorDetails(details)}`);
-    this.name = 'ApiError';
+    const detailsStr = typeof details === "object" ? JSON.stringify(details, null, 2) : String(details);
+    super(`${message}\n${detailsStr}`);
+    this.name = "ApiError";
   }
 }
 
@@ -87,397 +27,235 @@ export function createClient(baseClient: any) {
   const client = {
     workspaces: Object.assign(
       (id: string) => ({
-        get: async (
-          options?: any,
-        ): Promise<
-          paths['/api/workspaces/{id}']['get']['responses']['200']['content']['application/json']
-        > => {
-          const { data, error } = await baseClient.GET(`/api/workspaces/${id}`, {});
-          if (error) throw new ApiError(`GET /api/workspaces/${id} failed`, error);
-          return data;
-        },
-        delete: async (
-          options?: any,
-        ): Promise<
-          paths['/api/workspaces/{id}']['delete']['responses']['200']['content']['application/json']
-        > => {
-          const { data, error } = await baseClient.DELETE(`/api/workspaces/${id}`, {});
-          if (error) throw new ApiError(`DELETE /api/workspaces/${id} failed`, error);
-          return data;
-        },
-        patch: async (
-          body: NonNullable<
-            paths['/api/workspaces/{id}']['patch']['requestBody']
-          >['content']['application/json'],
-          options?: any,
-        ): Promise<
-          paths['/api/workspaces/{id}']['patch']['responses']['200']['content']['application/json']
-        > => {
-          const { data, error } = await baseClient.PATCH(`/api/workspaces/${id}`, { body });
-          if (error) throw new ApiError(`PATCH /api/workspaces/${id} failed`, error);
-          return data;
-        },
-      }),
+          get: async (options?: any): Promise<paths['/api/workspaces/{id}']['get']['responses']['200']['content']['application/json']> => {
+            const { data, error } = await baseClient.GET(`/api/workspaces/${id}`, {});
+            if (error) throw new ApiError(`GET /api/workspaces/${id} failed`, error);
+            return data;
+          },
+          delete: async (options?: any): Promise<paths['/api/workspaces/{id}']['delete']['responses']['200']['content']['application/json']> => {
+            const { data, error } = await baseClient.DELETE(`/api/workspaces/${id}`, {});
+            if (error) throw new ApiError(`DELETE /api/workspaces/${id} failed`, error);
+            return data;
+          },
+          patch: async (body: NonNullable<paths['/api/workspaces/{id}']['patch']['requestBody']>['content']['application/json'], options?: any): Promise<paths['/api/workspaces/{id}']['patch']['responses']['200']['content']['application/json']> => {
+            const { data, error } = await baseClient.PATCH(`/api/workspaces/${id}`, { body });
+            if (error) throw new ApiError(`PATCH /api/workspaces/${id} failed`, error);
+            return data;
+          }
+        }),
       {
-        list: async (
-          options?: any,
-        ): Promise<
-          paths['/api/workspaces']['get']['responses']['200']['content']['application/json']
-        > => {
+        list: async (options?: any): Promise<paths['/api/workspaces']['get']['responses']['200']['content']['application/json']> => {
           const { data, error } = await baseClient.GET(`/api/workspaces`, {});
           if (error) throw new ApiError(`GET /api/workspaces failed`, error);
           return data;
         },
-        create: async (
-          body: NonNullable<
-            paths['/api/workspaces']['post']['requestBody']
-          >['content']['application/json'],
-          options?: any,
-        ): Promise<
-          paths['/api/workspaces']['post']['responses']['201']['content']['application/json']
-        > => {
+        create: async (body: NonNullable<paths['/api/workspaces']['post']['requestBody']>['content']['application/json'], options?: any): Promise<paths['/api/workspaces']['post']['responses']['201']['content']['application/json']> => {
           const { data, error } = await baseClient.POST(`/api/workspaces`, { body });
           if (error) throw new ApiError(`POST /api/workspaces failed`, error);
           return data;
-        },
-      },
+        }
+      }
     ),
     projects: Object.assign(
       (id: string) => ({
-        get: async (
-          options?: any,
-        ): Promise<
-          paths['/api/projects/{id}']['get']['responses']['200']['content']['application/json']
-        > => {
-          const { data, error } = await baseClient.GET(`/api/projects/${id}`, {});
-          if (error) throw new ApiError(`GET /api/projects/${id} failed`, error);
-          return data;
-        },
-        delete: async (
-          options?: any,
-        ): Promise<
-          paths['/api/projects/{id}']['delete']['responses']['200']['content']['application/json']
-        > => {
-          const { data, error } = await baseClient.DELETE(`/api/projects/${id}`, {});
-          if (error) throw new ApiError(`DELETE /api/projects/${id} failed`, error);
-          return data;
-        },
-      }),
+          get: async (options?: any): Promise<paths['/api/projects/{id}']['get']['responses']['200']['content']['application/json']> => {
+            const { data, error } = await baseClient.GET(`/api/projects/${id}`, {});
+            if (error) throw new ApiError(`GET /api/projects/${id} failed`, error);
+            return data;
+          },
+          delete: async (options?: any): Promise<paths['/api/projects/{id}']['delete']['responses']['200']['content']['application/json']> => {
+            const { data, error } = await baseClient.DELETE(`/api/projects/${id}`, {});
+            if (error) throw new ApiError(`DELETE /api/projects/${id} failed`, error);
+            return data;
+          }
+        }),
       {
-        create: async (
-          body: NonNullable<
-            paths['/api/projects']['post']['requestBody']
-          >['content']['application/json'],
-          options?: any,
-        ): Promise<
-          paths['/api/projects']['post']['responses']['201']['content']['application/json']
-        > => {
+        create: async (body: NonNullable<paths['/api/projects']['post']['requestBody']>['content']['application/json'], options?: any): Promise<paths['/api/projects']['post']['responses']['201']['content']['application/json']> => {
           const { data, error } = await baseClient.POST(`/api/projects`, { body });
           if (error) throw new ApiError(`POST /api/projects failed`, error);
           return data;
-        },
-      },
+        }
+      }
     ),
     actions: Object.assign(
       (id: string) => ({
-        get: async (
-          options?: any,
-        ): Promise<
-          paths['/api/actions/{id}']['get']['responses']['200']['content']['application/json']
-        > => {
-          const { data, error } = await baseClient.GET(`/api/actions/${id}`, {});
-          if (error) throw new ApiError(`GET /api/actions/${id} failed`, error);
-          return data;
-        },
-        delete: async (
-          options?: any,
-        ): Promise<
-          paths['/api/actions/{id}']['delete']['responses']['200']['content']['application/json']
-        > => {
-          const { data, error } = await baseClient.DELETE(`/api/actions/${id}`, {});
-          if (error) throw new ApiError(`DELETE /api/actions/${id} failed`, error);
-          return data;
-        },
-      }),
+          get: async (options?: any): Promise<paths['/api/actions/{id}']['get']['responses']['200']['content']['application/json']> => {
+            const { data, error } = await baseClient.GET(`/api/actions/${id}`, {});
+            if (error) throw new ApiError(`GET /api/actions/${id} failed`, error);
+            return data;
+          },
+          delete: async (options?: any): Promise<paths['/api/actions/{id}']['delete']['responses']['200']['content']['application/json']> => {
+            const { data, error } = await baseClient.DELETE(`/api/actions/${id}`, {});
+            if (error) throw new ApiError(`DELETE /api/actions/${id} failed`, error);
+            return data;
+          }
+        }),
       {
-        create: async (
-          body: NonNullable<
-            paths['/api/actions']['post']['requestBody']
-          >['content']['application/json'],
-          options?: any,
-        ): Promise<
-          paths['/api/actions']['post']['responses']['201']['content']['application/json']
-        > => {
+        create: async (body: NonNullable<paths['/api/actions']['post']['requestBody']>['content']['application/json'], options?: any): Promise<paths['/api/actions']['post']['responses']['201']['content']['application/json']> => {
           const { data, error } = await baseClient.POST(`/api/actions`, { body });
           if (error) throw new ApiError(`POST /api/actions failed`, error);
           return data;
-        },
-      },
+        }
+      }
     ),
-    'prompt-specs': Object.assign(
+    "prompt-specs": Object.assign(
       (id: string) => ({
-        get: async (
-          options?: any,
-        ): Promise<
-          paths['/api/prompt-specs/{id}']['get']['responses']['200']['content']['application/json']
-        > => {
-          const { data, error } = await baseClient.GET(`/api/prompt-specs/${id}`, {});
-          if (error) throw new ApiError(`GET /api/prompt-specs/${id} failed`, error);
-          return data;
-        },
-        delete: async (
-          options?: any,
-        ): Promise<
-          paths['/api/prompt-specs/{id}']['delete']['responses']['200']['content']['application/json']
-        > => {
-          const { data, error } = await baseClient.DELETE(`/api/prompt-specs/${id}`, {});
-          if (error) throw new ApiError(`DELETE /api/prompt-specs/${id} failed`, error);
-          return data;
-        },
-      }),
+          get: async (options?: any): Promise<paths['/api/prompt-specs/{id}']['get']['responses']['200']['content']['application/json']> => {
+            const { data, error } = await baseClient.GET(`/api/prompt-specs/${id}`, {});
+            if (error) throw new ApiError(`GET /api/prompt-specs/${id} failed`, error);
+            return data;
+          },
+          delete: async (options?: any): Promise<paths['/api/prompt-specs/{id}']['delete']['responses']['200']['content']['application/json']> => {
+            const { data, error } = await baseClient.DELETE(`/api/prompt-specs/${id}`, {});
+            if (error) throw new ApiError(`DELETE /api/prompt-specs/${id} failed`, error);
+            return data;
+          }
+        }),
       {
-        create: async (
-          body: NonNullable<
-            paths['/api/prompt-specs']['post']['requestBody']
-          >['content']['application/json'],
-          options?: any,
-        ): Promise<
-          paths['/api/prompt-specs']['post']['responses']['201']['content']['application/json']
-        > => {
+        create: async (body: NonNullable<paths['/api/prompt-specs']['post']['requestBody']>['content']['application/json'], options?: any): Promise<paths['/api/prompt-specs']['post']['responses']['201']['content']['application/json']> => {
           const { data, error } = await baseClient.POST(`/api/prompt-specs`, { body });
           if (error) throw new ApiError(`POST /api/prompt-specs failed`, error);
           return data;
-        },
-      },
+        }
+      }
     ),
-    'model-profiles': Object.assign(
+    "model-profiles": Object.assign(
       (id: string) => ({
-        get: async (
-          options?: any,
-        ): Promise<
-          paths['/api/model-profiles/{id}']['get']['responses']['200']['content']['application/json']
-        > => {
-          const { data, error } = await baseClient.GET(`/api/model-profiles/${id}`, {});
-          if (error) throw new ApiError(`GET /api/model-profiles/${id} failed`, error);
-          return data;
-        },
-        delete: async (
-          options?: any,
-        ): Promise<
-          paths['/api/model-profiles/{id}']['delete']['responses']['200']['content']['application/json']
-        > => {
-          const { data, error } = await baseClient.DELETE(`/api/model-profiles/${id}`, {});
-          if (error) throw new ApiError(`DELETE /api/model-profiles/${id} failed`, error);
-          return data;
-        },
-      }),
+          get: async (options?: any): Promise<paths['/api/model-profiles/{id}']['get']['responses']['200']['content']['application/json']> => {
+            const { data, error } = await baseClient.GET(`/api/model-profiles/${id}`, {});
+            if (error) throw new ApiError(`GET /api/model-profiles/${id} failed`, error);
+            return data;
+          },
+          delete: async (options?: any): Promise<paths['/api/model-profiles/{id}']['delete']['responses']['200']['content']['application/json']> => {
+            const { data, error } = await baseClient.DELETE(`/api/model-profiles/${id}`, {});
+            if (error) throw new ApiError(`DELETE /api/model-profiles/${id} failed`, error);
+            return data;
+          }
+        }),
       {
-        list: async (
-          options?: any,
-        ): Promise<
-          paths['/api/model-profiles']['get']['responses']['200']['content']['application/json']
-        > => {
+        list: async (options?: any): Promise<paths['/api/model-profiles']['get']['responses']['200']['content']['application/json']> => {
           const { data, error } = await baseClient.GET(`/api/model-profiles`, {});
           if (error) throw new ApiError(`GET /api/model-profiles failed`, error);
           return data;
         },
-        create: async (
-          body: NonNullable<
-            paths['/api/model-profiles']['post']['requestBody']
-          >['content']['application/json'],
-          options?: any,
-        ): Promise<
-          paths['/api/model-profiles']['post']['responses']['201']['content']['application/json']
-        > => {
+        create: async (body: NonNullable<paths['/api/model-profiles']['post']['requestBody']>['content']['application/json'], options?: any): Promise<paths['/api/model-profiles']['post']['responses']['201']['content']['application/json']> => {
           const { data, error } = await baseClient.POST(`/api/model-profiles`, { body });
           if (error) throw new ApiError(`POST /api/model-profiles failed`, error);
           return data;
-        },
-      },
+        }
+      }
     ),
-    'task-defs': Object.assign(
+    "task-defs": Object.assign(
       (id: string) => ({
-        get: async (
-          options?: any,
-        ): Promise<
-          paths['/api/task-defs/{id}']['get']['responses']['200']['content']['application/json']
-        > => {
-          const { data, error } = await baseClient.GET(`/api/task-defs/${id}`, {});
-          if (error) throw new ApiError(`GET /api/task-defs/${id} failed`, error);
-          return data;
-        },
-        delete: async (
-          options?: any,
-        ): Promise<
-          paths['/api/task-defs/{id}']['delete']['responses']['200']['content']['application/json']
-        > => {
-          const { data, error } = await baseClient.DELETE(`/api/task-defs/${id}`, {});
-          if (error) throw new ApiError(`DELETE /api/task-defs/${id} failed`, error);
-          return data;
-        },
-      }),
+          get: async (options?: any): Promise<paths['/api/task-defs/{id}']['get']['responses']['200']['content']['application/json']> => {
+            const { data, error } = await baseClient.GET(`/api/task-defs/${id}`, {});
+            if (error) throw new ApiError(`GET /api/task-defs/${id} failed`, error);
+            return data;
+          },
+          delete: async (options?: any): Promise<paths['/api/task-defs/{id}']['delete']['responses']['200']['content']['application/json']> => {
+            const { data, error } = await baseClient.DELETE(`/api/task-defs/${id}`, {});
+            if (error) throw new ApiError(`DELETE /api/task-defs/${id} failed`, error);
+            return data;
+          }
+        }),
       {
-        create: async (
-          body: NonNullable<
-            paths['/api/task-defs']['post']['requestBody']
-          >['content']['application/json'],
-          options?: any,
-        ): Promise<
-          paths['/api/task-defs']['post']['responses']['201']['content']['application/json']
-        > => {
+        create: async (body: NonNullable<paths['/api/task-defs']['post']['requestBody']>['content']['application/json'], options?: any): Promise<paths['/api/task-defs']['post']['responses']['201']['content']['application/json']> => {
           const { data, error } = await baseClient.POST(`/api/task-defs`, { body });
           if (error) throw new ApiError(`POST /api/task-defs failed`, error);
           return data;
         },
-        list: async (
-          options?: any,
-        ): Promise<
-          paths['/api/task-defs']['get']['responses']['200']['content']['application/json']
-        > => {
+        list: async (options?: any): Promise<paths['/api/task-defs']['get']['responses']['200']['content']['application/json']> => {
           const { data, error } = await baseClient.GET(`/api/task-defs`, {});
           if (error) throw new ApiError(`GET /api/task-defs failed`, error);
           return data;
-        },
-      },
+        }
+      }
     ),
-    'workflow-defs': Object.assign(
+    "workflow-defs": Object.assign(
       (id: string) => ({
-        get: async (
-          options?: any,
-        ): Promise<
-          paths['/api/workflow-defs/{id}']['get']['responses']['200']['content']['application/json']
-        > => {
-          const { data, error } = await baseClient.GET(`/api/workflow-defs/${id}`, {});
-          if (error) throw new ApiError(`GET /api/workflow-defs/${id} failed`, error);
-          return data;
-        },
-        delete: async (
-          options?: any,
-        ): Promise<
-          paths['/api/workflow-defs/{id}']['delete']['responses']['200']['content']['application/json']
-        > => {
-          const { data, error } = await baseClient.DELETE(`/api/workflow-defs/${id}`, {});
-          if (error) throw new ApiError(`DELETE /api/workflow-defs/${id} failed`, error);
-          return data;
-        },
-      }),
+          get: async (options?: any): Promise<paths['/api/workflow-defs/{id}']['get']['responses']['200']['content']['application/json']> => {
+            const { data, error } = await baseClient.GET(`/api/workflow-defs/${id}`, {});
+            if (error) throw new ApiError(`GET /api/workflow-defs/${id} failed`, error);
+            return data;
+          },
+          delete: async (options?: any): Promise<paths['/api/workflow-defs/{id}']['delete']['responses']['200']['content']['application/json']> => {
+            const { data, error } = await baseClient.DELETE(`/api/workflow-defs/${id}`, {});
+            if (error) throw new ApiError(`DELETE /api/workflow-defs/${id} failed`, error);
+            return data;
+          }
+        }),
       {
-        create: async (
-          body: NonNullable<
-            paths['/api/workflow-defs']['post']['requestBody']
-          >['content']['application/json'],
-          options?: any,
-        ): Promise<
-          paths['/api/workflow-defs']['post']['responses']['201']['content']['application/json']
-        > => {
+        create: async (body: NonNullable<paths['/api/workflow-defs']['post']['requestBody']>['content']['application/json'], options?: any): Promise<paths['/api/workflow-defs']['post']['responses']['201']['content']['application/json']> => {
           const { data, error } = await baseClient.POST(`/api/workflow-defs`, { body });
           if (error) throw new ApiError(`POST /api/workflow-defs failed`, error);
           return data;
-        },
-      },
+        }
+      }
     ),
     workflows: Object.assign(
       (id: string) => ({
-        get: async (
-          options?: any,
-        ): Promise<
-          paths['/api/workflows/{id}']['get']['responses']['200']['content']['application/json']
-        > => {
-          const { data, error } = await baseClient.GET(`/api/workflows/${id}`, {});
-          if (error) throw new ApiError(`GET /api/workflows/${id} failed`, error);
-          return data;
-        },
-        delete: async (
-          options?: any,
-        ): Promise<
-          paths['/api/workflows/{id}']['delete']['responses']['200']['content']['application/json']
-        > => {
-          const { data, error } = await baseClient.DELETE(`/api/workflows/${id}`, {});
-          if (error) throw new ApiError(`DELETE /api/workflows/${id} failed`, error);
-          return data;
-        },
-        start: async (
-          body: NonNullable<
-            paths['/api/workflows/{id}/start']['post']['requestBody']
-          >['content']['application/json'],
-          options?: any,
-        ): Promise<
-          paths['/api/workflows/{id}/start']['post']['responses']['200']['content']['application/json']
-        > => {
-          const { data, error } = await baseClient.POST(`/api/workflows/${id}/start`, { body });
-          if (error) throw new ApiError(`POST /api/workflows/${id}/start failed`, error);
-          return data;
-        },
-        create: async (
-          body: NonNullable<
-            paths['/api/workflows/{id}/runs']['post']['requestBody']
-          >['content']['application/json'],
-          options?: any,
-        ): Promise<
-          paths['/api/workflows/{id}/runs']['post']['responses']['201']['content']['application/json']
-        > => {
-          const { data, error } = await baseClient.POST(`/api/workflows/${id}/runs`, { body });
-          if (error) throw new ApiError(`POST /api/workflows/${id}/runs failed`, error);
-          return data;
-        },
-      }),
+          get: async (options?: any): Promise<paths['/api/workflows/{id}']['get']['responses']['200']['content']['application/json']> => {
+            const { data, error } = await baseClient.GET(`/api/workflows/${id}`, {});
+            if (error) throw new ApiError(`GET /api/workflows/${id} failed`, error);
+            return data;
+          },
+          delete: async (options?: any): Promise<paths['/api/workflows/{id}']['delete']['responses']['200']['content']['application/json']> => {
+            const { data, error } = await baseClient.DELETE(`/api/workflows/${id}`, {});
+            if (error) throw new ApiError(`DELETE /api/workflows/${id} failed`, error);
+            return data;
+          },
+          start: async (body: NonNullable<paths['/api/workflows/{id}/start']['post']['requestBody']>['content']['application/json'], options?: any): Promise<paths['/api/workflows/{id}/start']['post']['responses']['200']['content']['application/json']> => {
+            const { data, error } = await baseClient.POST(`/api/workflows/${id}/start`, { body });
+            if (error) throw new ApiError(`POST /api/workflows/${id}/start failed`, error);
+            return data;
+          },
+          create: async (body: NonNullable<paths['/api/workflows/{id}/runs']['post']['requestBody']>['content']['application/json'], options?: any): Promise<paths['/api/workflows/{id}/runs']['post']['responses']['201']['content']['application/json']> => {
+            const { data, error } = await baseClient.POST(`/api/workflows/${id}/runs`, { body });
+            if (error) throw new ApiError(`POST /api/workflows/${id}/runs failed`, error);
+            return data;
+          }
+        }),
       {
-        create: async (
-          body: NonNullable<
-            paths['/api/workflows']['post']['requestBody']
-          >['content']['application/json'],
-          options?: any,
-        ): Promise<
-          paths['/api/workflows']['post']['responses']['201']['content']['application/json']
-        > => {
+        create: async (body: NonNullable<paths['/api/workflows']['post']['requestBody']>['content']['application/json'], options?: any): Promise<paths['/api/workflows']['post']['responses']['201']['content']['application/json']> => {
           const { data, error } = await baseClient.POST(`/api/workflows`, { body });
           if (error) throw new ApiError(`POST /api/workflows failed`, error);
           return data;
-        },
-      },
+        }
+      }
     ),
-    'workflow-runs': Object.assign(
+    "workflow-runs": Object.assign(
       (id: string) => ({
-        delete: async (
-          options?: any,
-        ): Promise<
-          paths['/api/workflow-runs/{id}']['delete']['responses']['200']['content']['application/json']
-        > => {
-          const { data, error } = await baseClient.DELETE(`/api/workflow-runs/${id}`, {});
-          if (error) throw new ApiError(`DELETE /api/workflow-runs/${id} failed`, error);
-          return data;
-        },
-      }),
-      {},
+          delete: async (options?: any): Promise<paths['/api/workflow-runs/{id}']['delete']['responses']['200']['content']['application/json']> => {
+            const { data, error } = await baseClient.DELETE(`/api/workflow-runs/${id}`, {});
+            if (error) throw new ApiError(`DELETE /api/workflow-runs/${id} failed`, error);
+            return data;
+          }
+        }),
+      {
+      }
     ),
     events: {
-      list: async (
-        options?: any,
-      ): Promise<
-        paths['/api/events']['get']['responses']['200']['content']['application/json']
-      > => {
+      list: async (options?: any): Promise<paths['/api/events']['get']['responses']['200']['content']['application/json']> => {
         const { data, error } = await baseClient.GET(`/api/events`, {});
         if (error) throw new ApiError(`GET /api/events failed`, error);
         return data;
-      },
+      }
     },
     logs: {
-      list: async (
-        options?: any,
-      ): Promise<paths['/api/logs']['get']['responses']['200']['content']['application/json']> => {
+      list: async (options?: any): Promise<paths['/api/logs']['get']['responses']['200']['content']['application/json']> => {
         const { data, error } = await baseClient.GET(`/api/logs`, {});
         if (error) throw new ApiError(`GET /api/logs failed`, error);
         return data;
-      },
-    },
+      }
+    }
   };
 
   // Add camelCase aliases for kebab-case properties
   return Object.assign(client, {
-    promptSpecs: client['prompt-specs'],
-    modelProfiles: client['model-profiles'],
-    taskDefs: client['task-defs'],
-    workflowDefs: client['workflow-defs'],
-    workflowRuns: client['workflow-runs'],
+    promptSpecs: client["prompt-specs"],
+    modelProfiles: client["model-profiles"],
+    taskDefs: client["task-defs"],
+    workflowDefs: client["workflow-defs"],
+    workflowRuns: client["workflow-runs"]
   });
 }

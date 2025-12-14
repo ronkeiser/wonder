@@ -13,6 +13,12 @@
       "service": "wonder-http",
     },
   ],
+  "routes": [
+    {
+      "pattern": "wflow.app",
+      "custom_domain": true,
+    },
+  ],
   "vars": {
     "HTTP_URL": "https://wonder-http.ron-keiser.workers.dev",
   },

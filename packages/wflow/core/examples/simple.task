@@ -1,0 +1,31 @@
+# Simple task for testing
+imports:
+  format: "./simple.action"
+
+task: simple-task
+version: 1
+description: A simple task that formats input
+
+input_schema:
+  type: object
+  properties:
+    name:
+      type: string
+  required: [name]
+
+output_schema:
+  type: object
+  properties:
+    greeting:
+      type: string
+  required: [greeting]
+
+steps:
+  - ref: format_greeting
+    ordinal: 0
+    action_id: format
+    action_version: 1
+    input_mapping:
+      name: "$.input.name"
+    output_mapping:
+      "output.greeting": "$.result"

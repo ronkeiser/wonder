@@ -3,7 +3,9 @@ import type {
   ActionDocument,
   AnyDocument,
   FileType,
+  RunDocument,
   TaskDocument,
+  TestDocument,
   WflowDocument,
 } from '../types/ast.js';
 
@@ -171,4 +173,26 @@ export function parseAction(
   resolveImportPath?: (importPath: string) => string | null,
 ): ParseResult<ActionDocument> {
   return parseDocument<ActionDocument>(text, uri, resolveImportPath);
+}
+
+/**
+ * Parse a test document
+ */
+export function parseTest(
+  text: string,
+  uri: string,
+  resolveImportPath?: (importPath: string) => string | null,
+): ParseResult<TestDocument> {
+  return parseDocument<TestDocument>(text, uri, resolveImportPath);
+}
+
+/**
+ * Parse a run document
+ */
+export function parseRun(
+  text: string,
+  uri: string,
+  resolveImportPath?: (importPath: string) => string | null,
+): ParseResult<RunDocument> {
+  return parseDocument<RunDocument>(text, uri, resolveImportPath);
 }

@@ -1,0 +1,18 @@
+# Test file for the greeting workflow
+
+test_suite: greeting-tests
+description: Tests for the greeting workflow
+
+imports:
+  workflow: "./greeting.wflow"
+
+tests:
+  greets_user:
+    description: Should greet a user by name
+    target: workflow
+    input:
+      name: "Ronhaldo"
+    assert:
+      output.message:
+        type: string
+        contains: "Ronhaldo"

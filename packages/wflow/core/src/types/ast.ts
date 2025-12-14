@@ -218,10 +218,279 @@ export interface ActionDocument {
 }
 
 // =============================================================================
+// Test Types
+// =============================================================================
+
+/**
+ * Assertion primitives for test validation
+ */
+export type AssertionPrimitive =
+  | 'eq'
+  | 'not_eq'
+  | 'gt'
+  | 'gte'
+  | 'lt'
+  | 'lte'
+  | 'contains'
+  | 'not_contains'
+  | 'matches'
+  | 'starts_with'
+  | 'ends_with'
+  | 'length'
+  | 'min_length'
+  | 'max_length'
+  | 'type'
+  | 'exists'
+  | 'not_empty'
+  | 'has_keys'
+  | 'every'
+  | 'some'
+  | 'not';
+
+/**
+ * Single assertion declaration
+ * Can be a primitive value (implicit eq) or an object with assertion type
+ */
+export type AssertionValue = string | number | boolean | null | AssertionObject | AssertionValue[];
+
+export interface AssertionObject {
+  eq?: unknown;
+  not_eq?: unknown;
+  gt?: number;
+  gte?: number;
+  lt?: number;
+  lte?: number;
+  contains?: string | unknown;
+  not_contains?: string | unknown;
+  matches?: string;
+  starts_with?: string;
+  ends_with?: string;
+  length?: number;
+  min_length?: number;
+  max_length?: number;
+  type?: 'string' | 'number' | 'boolean' | 'array' | 'object' | 'null';
+  exists?: boolean;
+  not_empty?: boolean;
+  has_keys?: string[];
+  every?: AssertionValue;
+  some?: AssertionValue;
+  not?: AssertionValue;
+}
+
+/**
+ * Assertions map - path to assertion value
+ */
+export type AssertionsDecl = Record<string, AssertionValue>;
+
+/**
+ * Mock response configuration
+ */
+export interface MockResponseDecl {
+  /** Static response data */
+  returns?: unknown;
+  /** Sequence of responses for multiple calls */
+  sequence?: unknown[];
+  /** Conditional responses based on input */
+  when?: Array<{
+    input: Record<string, unknown>;
+    returns: unknown;
+  }>;
+  /** Simulate failure */
+  throws?: {
+    type: string;
+    message: string;
+  };
+  /** Delay before responding (ms) */
+  delay_ms?: number;
+}
+
+/**
+ * Mock declaration for an action
+ */
+export interface MockDecl {
+  /** The action being mocked (import alias) */
+  action?: string;
+  /** Mock response configuration */
+  response?: MockResponseDecl;
+  /** Track call count and arguments */
+  track_calls?: boolean;
+  _loc?: SourceLocation;
+}
+
+/**
+ * Fixture declaration - reusable test data
+ */
+export interface FixtureDecl {
+  [key: string]: unknown;
+}
+
+/**
+ * Single test case
+ */
+export interface TestCaseDecl {
+  /** Human-readable description */
+  description?: string;
+  /** Import alias of workflow/task/action to test */
+  target: string;
+  /** Input data for the target */
+  input?: Record<string, unknown>;
+  /** Initial context state (workflows only) */
+  context?: Record<string, unknown>;
+  /** Test-specific mock overrides */
+  mocks?: Record<string, MockDecl | MockResponseDecl>;
+  /** Maximum execution time */
+  timeout_ms?: number;
+  /** Assertions to verify */
+  assert?: AssertionsDecl;
+  /** Expected output for snapshot testing */
+  snapshot?: boolean | string;
+  /** Tags for filtering */
+  tags?: string[];
+  /** Skip this test */
+  skip?: boolean;
+  /** Only run this test */
+  only?: boolean;
+  _loc?: SourceLocation;
+}
+
+/**
+ * Test group for organizing related tests
+ */
+export interface TestGroupDecl {
+  description?: string;
+  tests: string[];
+  tags?: string[];
+  _loc?: SourceLocation;
+}
+
+/**
+ * Lifecycle hooks
+ */
+export interface TestHooksDecl {
+  before_all?: Array<{
+    action: string;
+    input?: Record<string, unknown>;
+  }>;
+  after_all?: Array<{
+    action: string;
+    input?: Record<string, unknown>;
+  }>;
+  before_each?: Array<{
+    action: string;
+    input?: Record<string, unknown>;
+  }>;
+  after_each?: Array<{
+    action: string;
+    input?: Record<string, unknown>;
+  }>;
+}
+
+/**
+ * Test configuration
+ */
+export interface TestConfigDecl {
+  parallel?: boolean;
+  max_concurrent?: number;
+  timeout_ms?: number;
+  fail_fast?: boolean;
+}
+
+/**
+ * Coverage configuration
+ */
+export interface TestCoverageDecl {
+  targets?: string[];
+  thresholds?: {
+    nodes?: number;
+    branches?: number;
+    actions?: number;
+  };
+}
+
+/**
+ * Test document (.test file)
+ */
+export interface TestDocument {
+  imports?: Record<string, string>;
+  test_suite?: string;
+  description?: string;
+  /** Mock definitions for actions */
+  mocks?: Record<string, MockDecl | MockResponseDecl>;
+  /** Reusable test data */
+  fixtures?: Record<string, FixtureDecl>;
+  /** Test case definitions */
+  tests?: Record<string, TestCaseDecl>;
+  /** Test groups */
+  groups?: Record<string, TestGroupDecl>;
+  /** Lifecycle hooks */
+  hooks?: TestHooksDecl;
+  /** Run configuration */
+  config?: TestConfigDecl;
+  /** Coverage configuration */
+  coverage?: TestCoverageDecl;
+  _loc?: SourceLocation;
+}
+
+// =============================================================================
+// Run Types
+// =============================================================================
+
+/**
+ * Environment-specific overrides
+ */
+export interface EnvironmentOverrideDecl {
+  input?: Record<string, unknown>;
+  resource_bindings?: Record<string, string>;
+  timeout_ms?: number;
+  priority?: 'low' | 'normal' | 'high';
+}
+
+/**
+ * Run document (.run file)
+ */
+export interface RunDocument {
+  imports?: Record<string, string>;
+  run?: string;
+  description?: string;
+  /** Path to workflow */
+  workflow?: string;
+  /** Project ID this run belongs to */
+  project_id?: string;
+  /** Execution environment */
+  environment?: 'development' | 'staging' | 'production';
+  /** Input data */
+  input?: Record<string, unknown>;
+  /** Path to input file */
+  input_file?: string;
+  /** Initial context state */
+  context?: Record<string, unknown>;
+  /** Override resource bindings */
+  resource_bindings?: Record<string, string>;
+  /** Override timeout */
+  timeout_ms?: number;
+  /** Execution priority */
+  priority?: 'low' | 'normal' | 'high';
+  /** Idempotency key */
+  idempotency_key?: string;
+  /** Tags for filtering */
+  tags?: string[];
+  /** Arbitrary metadata */
+  metadata?: Record<string, unknown>;
+  /** Environment-specific overrides */
+  environments?: Record<string, EnvironmentOverrideDecl>;
+  _loc?: SourceLocation;
+}
+
+// =============================================================================
 // Union type for any document
 // =============================================================================
 
-export type AnyDocument = WflowDocument | TaskDocument | ActionDocument;
+export type AnyDocument =
+  | WflowDocument
+  | TaskDocument
+  | ActionDocument
+  | TestDocument
+  | RunDocument;
 
 /**
  * Detected file type from extension

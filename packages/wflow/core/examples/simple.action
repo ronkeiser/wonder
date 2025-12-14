@@ -1,0 +1,25 @@
+# Simple action for testing
+action: format-action
+version: 1
+description: Formats a greeting
+
+kind: context
+
+requires:
+  type: object
+  properties:
+    name:
+      type: string
+  required: [name]
+
+produces:
+  type: object
+  properties:
+    result:
+      type: string
+  required: [result]
+
+implementation:
+  updates:
+    - path: "$.result"
+      expr: "'Hello, ' + name + '!'"

@@ -28,31 +28,49 @@ export type {
   ActionKind,
   ActionRetryPolicy,
   AnyDocument,
+  // Test types
+  AssertionObject,
+  AssertionPrimitive,
+  AssertionValue,
+  AssertionsDecl,
   ConditionDecl,
   Diagnostic,
   DiagnosticRelatedInformation,
-  // Diagnostic types
-  DiagnosticSeverity,
+  // Run types
+  EnvironmentOverrideDecl,
   FileType,
+  FixtureDecl,
   ForeachConfig,
   // AST types
   JSONSchemaProperty,
   LoopConfig,
   MergeConfig,
+  MockDecl,
+  MockResponseDecl,
   NodeDecl,
   Position,
   Range,
   ResourceDecl,
   RetryConfig,
+  RunDocument,
   SourceLocation,
   StepCondition,
   StepDecl,
   SyncConfig,
   TaskDocument,
+  TestCaseDecl,
+  TestConfigDecl,
+  TestCoverageDecl,
+  TestDocument,
+  TestGroupDecl,
+  TestHooksDecl,
   TransitionDecl,
   ValidationResult,
   WflowDocument,
 } from './types/index.js';
+
+// DiagnosticSeverity is an enum, needs value export
+export { DiagnosticSeverity } from './types/index.js';
 
 // Parser
 export {
@@ -61,7 +79,9 @@ export {
   parseAction,
   parseDocument,
   parseImports,
+  parseRun,
   parseTask,
+  parseTest,
   parseWorkflow,
   type ImportsMap,
   type ParseResult,
@@ -117,3 +137,19 @@ export {
   type DataFlowAnalysis,
   type PathWriter,
 } from './analyzer/dataflow.js';
+
+// Analyzer - Test
+export {
+  ASSERTION_PRIMITIVES,
+  MOCK_DECL_ALLOWED_PROPS,
+  MOCK_RESPONSE_ALLOWED_PROPS,
+  TEST_CASE_ALLOWED_PROPS,
+  TEST_CONFIG_ALLOWED_PROPS,
+  TEST_COVERAGE_ALLOWED_PROPS,
+  TEST_DOCUMENT_ALLOWED_PROPS,
+  TEST_HOOKS_ALLOWED_PROPS,
+  analyzeTestDocument,
+  getTestsToRun,
+  validateTestDocument,
+  type TestAnalysis,
+} from './analyzer/test.js';

@@ -12,6 +12,16 @@ type CreateModelProfile = components['schemas']['CreateModelProfile'];
 
 type ModelProvider = 'anthropic' | 'openai' | 'google' | 'cloudflare' | 'local';
 
+type ModelId =
+  | '@cf/meta/llama-4-scout-17b-16e-instruct'
+  | '@cf/meta/llama-3.3-70b-instruct-fp8-fast'
+  | '@cf/openai/gpt-oss-120b'
+  | '@cf/openai/gpt-oss-20b'
+  | 'anthropic-dummy'
+  | 'openai-dummy'
+  | 'google-dummy'
+  | 'local-dummy';
+
 /**
  * Create a model profile
  *
@@ -35,7 +45,7 @@ type ModelProvider = 'anthropic' | 'openai' | 'google' | 'cloudflare' | 'local';
 export function modelProfile(config: {
   name: string;
   provider: ModelProvider;
-  model_id: string;
+  model_id: ModelId;
   parameters: Record<string, unknown>;
   execution_config?: Record<string, unknown>;
   cost_per_1k_input_tokens?: number;

@@ -1,0 +1,28 @@
+# Simple echo action
+action: hello
+version: 1
+description: A simple action that echoes a greeting
+
+input_schema:
+  type: object
+  properties:
+    name:
+      type: string
+  required: [name]
+
+output_schema:
+  type: object
+  properties:
+    greeting:
+      type: string
+  required: [greeting]
+
+execution:
+  type: prompt
+  model:
+    provider: cloudflare
+    id: "@cf/meta/llama-3.3-70b-instruct-fp8-fast"
+  system: "You are a friendly assistant."
+  user: "Say hello to {{name}} in one short sentence."
+  output_map:
+    greeting: "$.response"

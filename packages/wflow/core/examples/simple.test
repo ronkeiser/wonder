@@ -1,0 +1,62 @@
+# Simple test file demonstrating the wflow test runner
+
+test_suite: simple-tests
+description: Tests for the simple greeting task
+
+imports:
+  simple_task: "./simple.task"
+  format_action: "./simple.action"
+
+mocks:
+  format:
+    returns:
+      result: "Hello, World!"
+
+tests:
+  greets_correctly:
+    description: Should format a greeting
+    target: simple_task
+    input:
+      name: "World"
+    assert:
+      output.greeting: "Hello, World!"
+
+  greets_with_name:
+    description: Should use the provided name
+    target: simple_task
+    input:
+      name: "Alice"
+    mocks:
+      format:
+        returns:
+          result: "Hello, Alice!"
+    assert:
+      output.greeting:
+        starts_with: "Hello"
+        contains: "Alice"
+
+  handles_empty_name:
+    description: Should handle empty name
+    target: simple_task
+    input:
+      name: ""
+    mocks:
+      format:
+        returns:
+          result: "Hello, !"
+    assert:
+      output.greeting:
+        type: string
+        not_empty: true
+
+  skipped_example:
+    description: This test is skipped
+    target: simple_task
+    skip: true
+    input:
+      name: "Skip"
+    assert:
+      output.greeting: "never checked"
+
+config:
+  timeout_ms: 5000

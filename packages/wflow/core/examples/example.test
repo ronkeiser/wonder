@@ -1,0 +1,81 @@
+# Example test file for the generate-ideas task
+
+test_suite: generate-ideas-tests
+description: Tests for the idea generation task
+
+imports:
+  task: "./test.task"
+  llm_action: "./test.action"
+  context_action: "./test.action"
+
+mocks:
+  # Mock the LLM action
+  llm_action:
+    returns:
+      response: "1. Solar panels on every roof\n2. Wind turbines in urban areas"
+      tokens_used: 150
+      model: "gpt-4"
+  
+  # Mock the context action (used in task steps)
+  context_action:
+    returns:
+      result: "Generate ideas about renewable energy"
+
+  # Also need to mock 'context' which is the action_id in the task steps
+  context:
+    returns:
+      result: "Generate ideas about: {topic}"
+
+  # And 'llm' for the second step
+  llm:
+    returns:
+      response: "Here are some ideas:\n1. First idea\n2. Second idea"
+      tokens_used: 100
+      model: "gpt-4"
+
+fixtures:
+  basic_topic:
+    topic: "renewable energy"
+    count: 5
+
+tests:
+  generates_ideas_successfully:
+    description: Should generate ideas for a given topic
+    target: task
+    input:
+      topic: "renewable energy"
+      count: 2
+    assert:
+      output:
+        type: object
+
+  handles_custom_count:
+    description: Should respect the count parameter
+    target: task
+    input:
+      topic: "AI applications"
+      count: 3
+    mocks:
+      llm:
+        returns:
+          response: "1. Healthcare\n2. Education\n3. Transportation"
+          tokens_used: 100
+          model: "gpt-4"
+    assert:
+      output:
+        type: object
+
+  skipped_test:
+    description: This test is skipped
+    target: task
+    skip: true
+    input:
+      topic: "skipped"
+    assert:
+      output.ideas:
+        length: 0
+
+config:
+  parallel: false
+  timeout_ms: 5000
+  fail_fast: false

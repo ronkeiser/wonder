@@ -1,0 +1,44 @@
+# Simple greeting workflow - mirrors context.test.ts pattern
+imports:
+  greet_task: "./greet.task"
+
+workflow: greeting-workflow
+version: 1
+description: A simple workflow that greets people
+
+initial_node_ref: greet
+
+input_schema:
+  type: object
+  properties:
+    name:
+      type: string
+  required: [name]
+
+context_schema:
+  type: object
+  properties:
+    intermediate:
+      type: string
+
+output_schema:
+  type: object
+  properties:
+    message:
+      type: string
+  required: [message]
+
+output_mapping:
+  message: "$.output.message"
+
+nodes:
+  greet:
+    name: Greet User
+    task_id: greet_task
+    task_version: 1
+    input_mapping:
+      name: "$.input.name"
+    output_mapping:
+      "output.message": "$.message"
+
+transitions: []

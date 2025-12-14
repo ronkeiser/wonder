@@ -1,0 +1,28 @@
+# Simple greeting task
+task: greet
+version: 1
+description: A task that greets someone
+
+imports:
+  hello: "./hello.action"
+
+input_schema:
+  type: object
+  properties:
+    name:
+      type: string
+  required: [name]
+
+output_schema:
+  type: object
+  properties:
+    message:
+      type: string
+  required: [message]
+
+steps:
+  - action_id: hello
+    input_map:
+      name: "$.input.name"
+    output_map:
+      "output.message": "$.response.greeting"
