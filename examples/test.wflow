@@ -41,8 +41,10 @@ nodes:
     task_version: 1
     input_mapping:
       greeting: "$.state.greeting"
+      bad_read: "$.state.nonexistent"    # ❌ Should error: path doesn't exist
     output_mapping:
       "state.processed_count": "$.count"
+      "state.bad_write": "$.foo"         # ❌ Should error: path doesn't exist
 
   finish:
     ref: finish
