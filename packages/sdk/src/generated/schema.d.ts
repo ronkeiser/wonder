@@ -1811,7 +1811,11 @@ export interface components {
                     [key: string]: unknown;
                 };
                 synchronization?: {
-                    [key: string]: unknown;
+                    strategy: string;
+                    sibling_group: string;
+                    merge?: {
+                        [key: string]: unknown;
+                    };
                 };
                 loop_config?: {
                     [key: string]: unknown;

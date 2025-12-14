@@ -136,12 +136,19 @@ export class DefinitionManager {
       message: 'Transitions fetched from RESOURCES',
       trace_id: workflowRunId,
       metadata: {
-        transitions: transitionsList.map((t: { id: string; ref: string | null; spawn_count: number | null; synchronization: object | null }) => ({
-          id: t.id,
-          ref: t.ref,
-          spawn_count: t.spawn_count,
-          synchronization: t.synchronization,
-        })),
+        transitions: transitionsList.map(
+          (t: {
+            id: string;
+            ref: string | null;
+            spawn_count: number | null;
+            synchronization: object | null;
+          }) => ({
+            id: t.id,
+            ref: t.ref,
+            spawn_count: t.spawn_count,
+            synchronization: t.synchronization,
+          }),
+        ),
       },
     });
 
