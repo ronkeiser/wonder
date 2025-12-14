@@ -24,3 +24,6 @@ pnpm-debug.log*
 # TypeScript
 *.tsbuildinfo
 worker-configuration.d.ts
+
+# Local symlink folders
+docs/onboarding/
