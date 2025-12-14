@@ -1,0 +1,82 @@
+# Example workflow for testing the LSP
+workflow: test-workflow
+version: 1
+description: A simple test workflow
+
+input_schema:
+  type: object
+  properties:
+    name: { type: string }
+    count: { type: integer }
+  required: [name, count]
+
+context_schema:
+  type: object
+  properties:
+    greeting: { type: string }
+    processed_count: { type: integer }
+
+output_schema:
+  type: object
+  properties:
+    result: { type: string }
+  required: [result]
+
+nodes:
+  start:
+    ref: start
+    name: Start Node
+    task_id: "@library/example/start"
+    task_version: 1
+    input_mapping:
+      name: "$.input.name"
+      count: "$.input.count"
+    output_mapping:
+      "state.greeting": "$.greeting"
+
+  process:
+    ref: process
+    name: Process Node
+    task_id: "@library/example/process"
+    task_version: 1
+    input_mapping:
+      greeting: "$.state.greeting"
+    output_mapping:
+      "state.processed_count": "$.count"
+
+  finish:
+    ref: finish
+    name: Finish Node
+    task_id: "@library/example/finish"
+    task_version: 1
+    input_mapping:
+      greeting: "$.state.greeting"
+      count: "$.state.processed_count"
+    output_mapping:
+      "output.result": "$.final_message"
+
+transitions:
+  - ref: start_to_process
+    from_node_ref: start
+    to_node_ref: process
+    priority: 0
+
+  - ref: process_to_finish
+    from_node_ref: process
+    to_node_ref: finish
+    priority: 0
+
+  # These should show red squigglies - undefined node refs
+  - ref: bad_transition_1
+    from_node_ref: process
+    to_node_ref: oops
+    priority: 0
+
+  - ref: bad_transition_2
+    from_node_ref: invalid
+    to_node_ref: finish
+    priority: 0
+
+initial_node_ref: start
+timeout_ms: 60000
+on_timeout: fail

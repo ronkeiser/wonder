@@ -1,0 +1,45 @@
+{
+  "$schema": "https://raw.githubusercontent.com/martinring/tmlanguage/master/tmlanguage.json",
+  "name": "Wonder Workflow",
+  "scopeName": "source.wflow",
+  "patterns": [
+    { "include": "#comments" },
+    { "include": "#keywords" },
+    { "include": "#strings" },
+    { "include": "#numbers" },
+    { "include": "#transitions" },
+    { "include": "#references" },
+    { "include": "#paths" }
+  ],
+  "repository": {
+    "comments": {
+      "match": "#.*$",
+      "name": "comment.line.number-sign.wflow"
+    },
+    "keywords": {
+      "match": "\\b(workflow|version|description|schemas|nodes|transitions|initial|timeout|on_timeout|task|reads|writes|resources|when|loop|spawn|sync|input|context|output)\\b",
+      "name": "keyword.control.wflow"
+    },
+    "strings": {
+      "begin": "\"",
+      "end": "\"",
+      "name": "string.quoted.double.wflow"
+    },
+    "numbers": {
+      "match": "\\b[0-9]+\\b",
+      "name": "constant.numeric.wflow"
+    },
+    "transitions": {
+      "match": "->",
+      "name": "keyword.operator.transition.wflow"
+    },
+    "references": {
+      "match": "@[a-zA-Z_][a-zA-Z0-9_/.-]*",
+      "name": "entity.name.tag.reference.wflow"
+    },
+    "paths": {
+      "match": "\\b(input|context|output)\\.[a-zA-Z_][a-zA-Z0-9_.]*",
+      "name": "variable.other.path.wflow"
+    }
+  }
+}

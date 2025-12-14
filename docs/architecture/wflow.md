@@ -4,19 +4,21 @@ A declarative DSL for defining Wonder workflows with IDE-powered validation. Fil
 
 ## Motivation
 
-Workflow definitions have a graph structure: **nodes** declare what they read/write, but **transitions** determine execution order. This creates a validation challenge—when Node B reads `context.scores`, we need to verify that some predecessor node actually writes it.
+Workflow definitions have a graph structure: **nodes** define mappings between workflow context and task I/O, while **transitions** determine execution order and control flow. This creates a validation challenge—when a node's `input_mapping` references `$.state.scores`, we need to verify that some predecessor node's `output_mapping` actually writes to that path.
 
 TypeScript's type system can validate individual mappings, but graph-aware data flow analysis requires understanding the full topology. A custom DSL with LSP support provides:
 
 - **Real-time diagnostics** as you type (not after `tsc`)
 - **Graph-aware validation** ("this path may not be written when this node executes")
 - **Domain-specific errors** instead of cryptic type errors
-- **Autocomplete** for paths, node references, task references
+- **Autocomplete** for JSONPath expressions, node references, task references
 - **Hover documentation** showing types and data flow
 
 ---
 
 ## File Format
+
+The `.wflow` format is a direct YAML representation of the primitives defined in [primitives.md](./primitives.md).
 
 ### Basic Structure
 
@@ -27,143 +29,206 @@ workflow: ideation-pipeline
 version: 1
 description: Generate and rank ideas
 
-schemas:
-  input:
-    topic: string
-    count: integer
+input_schema:
+  type: object
+  properties:
+    topic: { type: string }
+    count: { type: integer }
+  required: [topic, count]
 
-  context:
-    ideas: string[]
-    scores: number[]
-    selected_idea: string?     # Optional (nullable)
+context_schema:
+  type: object
+  properties:
+    ideas: { type: array, items: { type: string } }
+    scores: { type: array, items: { type: number } }
 
-  output:
-    winner: string
-    confidence: number
+output_schema:
+  type: object
+  properties:
+    winner: { type: string }
+    confidence: { type: number }
+  required: [winner]
 
 resources:
   dev_env:
     type: container
-    image: node:20
-    repo: @project/main
-    branch: main
+    image: 'node:20'
+    repo_id: '@project/main'
+    base_branch: main
+    merge_on_success: true
+    merge_strategy: rebase
 
 nodes:
   ideate:
-    task: @library/ideation/generate
-    version: 2                          # Pin task version
-    reads: [input.topic, input.count]
-    writes: [context.ideas]
-    resources:
-      container: dev_env                # Bind resource
+    ref: ideate
+    name: Generate Ideas
+    task_id: '@library/ideation/generate'
+    task_version: 2
+    input_mapping:
+      topic: '$.input.topic'
+      count: '$.input.count'
+    output_mapping:
+      'state.ideas': '$.ideas'
+    resource_bindings:
+      container: dev_env
 
   judge:
-    task: @library/ideation/judge
-    reads: [context.ideas]
-    writes: [context.scores]
+    ref: judge
+    name: Judge Ideas
+    task_id: '@library/ideation/judge'
+    task_version: 1
+    input_mapping:
+      ideas: '$.state.ideas'
+    output_mapping:
+      'state.scores': '$.scores'
 
   rank:
-    task: @library/ideation/rank
-    reads: [context.ideas, context.scores]
-    writes: [output.winner, output.confidence]
+    ref: rank
+    name: Rank Results
+    task_id: '@library/ideation/rank'
+    task_version: 1
+    input_mapping:
+      ideas: '$.state.ideas'
+      scores: '$.state.scores'
+    output_mapping:
+      'output.winner': '$.winner'
+      'output.confidence': '$.confidence'
 
 transitions:
-  - ideate -> judge
+  - ref: ideate_to_judge
+    from_node_ref: ideate
+    to_node_ref: judge
+    priority: 0
 
-  - judge -> rank:
-      when: length(context.scores) > 0
+  - ref: judge_to_rank
+    from_node_ref: judge
+    to_node_ref: rank
+    priority: 0
+    condition:
+      type: expression
+      expr: 'length(state.scores) > 0'
 
-  - judge -> ideate:                    # Retry loop
-      when: length(context.scores) == 0
-      loop:
-        max: 3
+  - ref: judge_retry
+    from_node_ref: judge
+    to_node_ref: ideate
+    priority: 1
+    condition:
+      type: expression
+      expr: 'length(state.scores) == 0'
+    loop_config:
+      max_iterations: 3
 
-  - rank -> end:
-      when: output.confidence > 0.8
+  - ref: rank_to_end
+    from_node_ref: rank
+    to_node_ref: null # Terminal
+    priority: 0
 
-  - rank -> judge:                      # Low confidence retry
-      when: output.confidence <= 0.8
-
-initial: ideate
-timeout: 5m
+initial_node_ref: ideate
+timeout_ms: 300000
 on_timeout: human_gate
 ```
 
-### Type System
+### Mapping to Primitives
 
-```
-Primitives:    string, integer, number, boolean
-Nullable:      string?, number?
-Arrays:        string[], {id: string, score: number}[]
-Objects:       {name: string, age: integer}
-References:    @library/path/to/task, @project/repo-name
-Expressions:   length(x) > 0, x == "value", x.field != null
-Durations:     5m, 30s, 1h
-```
+| .wflow field                  | Primitive                     | Notes                    |
+| ----------------------------- | ----------------------------- | ------------------------ |
+| `workflow`                    | `WorkflowDef.name`            |                          |
+| `version`                     | `WorkflowDef.version`         |                          |
+| `input_schema`                | `WorkflowDef.input_schema`    | JSONSchema               |
+| `context_schema`              | `WorkflowDef.context_schema`  | JSONSchema               |
+| `output_schema`               | `WorkflowDef.output_schema`   | JSONSchema               |
+| `resources`                   | `WorkflowDef.resources`       | ResourceDeclaration map  |
+| `nodes.<ref>`                 | `Node`                        | Key becomes `ref`        |
+| `nodes.<ref>.task_id`         | `Node.task_id`                | Resolved to ULID         |
+| `nodes.<ref>.input_mapping`   | `Node.input_mapping`          | JSONPath expressions     |
+| `nodes.<ref>.output_mapping`  | `Node.output_mapping`         | JSONPath expressions     |
+| `transitions[].from_node_ref` | `Transition.from_node_id`     | Resolved to ULID         |
+| `transitions[].to_node_ref`   | `Transition.to_node_id`       | Resolved to ULID         |
+| `transitions[].condition`     | `Transition.condition`        | Structured or expression |
+| `initial_node_ref`            | `WorkflowDef.initial_node_id` | Resolved to ULID         |
 
-### Transition Syntax
+### Condition Types
 
-Simple transitions use arrow syntax:
+Conditions on transitions can be structured (queryable) or expressions:
 
 ```yaml
-transitions:
-  - ideate -> judge # Unconditional
+# Structured condition (queryable, optimizable)
+condition:
+  type: structured
+  definition:
+    type: comparison
+    left: { type: field, path: "state.approved" }
+    operator: "=="
+    right: { type: literal, value: true }
 
-  - judge -> rank: # With options
-      when: context.scores.length > 0
-      priority: 1
+# Expression condition (flexible, SQL-like)
+condition:
+  type: expression
+  expr: "approved == true AND priority > 5"
 ```
 
-Advanced transitions support fan-out, fan-in, and loops:
+### Fan-out and Fan-in
 
 ```yaml
 transitions:
   # Fan-out: spawn parallel tokens
-  - generate -> process:
-      spawn: 5 # Fixed count
+  - ref: fan_out
+    from_node_ref: generate
+    to_node_ref: process
+    priority: 0
+    spawn_count: 5 # Fixed count
 
-  - generate -> process:
-      foreach: context.items # Dynamic count
-      as: item
+  # Fan-out: dynamic iteration
+  - ref: foreach_items
+    from_node_ref: generate
+    to_node_ref: process
+    priority: 0
+    foreach:
+      collection: 'state.items'
+      item_var: 'item'
 
   # Fan-in: synchronize parallel tokens
-  - process -> aggregate:
-      sync:
-        strategy: all # Wait for all siblings
-        merge:
-          source: _branch.result
-          target: context.results
-          strategy: append
-
-  # Loops with limits
-  - refine -> evaluate:
-      loop:
-        max: 5
-        timeout: 10m
+  - ref: fan_in
+    from_node_ref: process
+    to_node_ref: aggregate
+    priority: 0
+    synchronization:
+      strategy: all
+      sibling_group: fan_out # References the fan-out transition ref
+      timeout_ms: 60000
+      on_timeout: fail
+      merge:
+        source: '_branch.output'
+        target: 'state.results'
+        strategy: append
 ```
 
 ---
 
 ## Validation Rules
 
-### 1. Path Validity
+### 1. JSONPath Validity
 
-Every path in `reads` and `writes` must exist in the declared schemas.
+Every JSONPath in `input_mapping` values and `output_mapping` keys must reference valid schema paths.
 
 ```yaml
 nodes:
   judge:
-    reads: [context.ideaz] # ❌ Error: Path 'context.ideaz' does not exist. Did you mean 'context.ideas'?
+    input_mapping:
+      ideas: '$.state.ideaz' # ❌ Error: Path '$.state.ideaz' does not exist. Did you mean '$.state.ideas'?
+    output_mapping:
+      'state.scorse': '$.scores' # ❌ Error: Path 'state.scorse' does not exist in context_schema
 ```
 
 ### 2. Data Flow Soundness
 
-Every path a node reads must be guaranteed to be written by a predecessor.
+Every path a node reads via `input_mapping` must be guaranteed written by a predecessor's `output_mapping`.
 
 ```yaml
 nodes:
   rank:
-    reads: [context.scores] # ❌ Error: 'context.scores' is not written by any predecessor of 'rank'
+    input_mapping:
+      scores: '$.state.scores' # ❌ Error: '$.state.scores' is not written by any predecessor of 'rank'
 ```
 
 ### 3. Conditional Write Warnings
@@ -172,22 +237,30 @@ When a path is only written on conditional branches, reading nodes get warnings.
 
 ```yaml
 transitions:
-  - judge -> rank:
-      when: approved == true
-  - judge -> skip:
-      when: approved == false
+  - from_node_ref: judge
+    to_node_ref: rank
+    condition: { type: expression, expr: 'approved == true' }
+  - from_node_ref: judge
+    to_node_ref: skip
+    condition: { type: expression, expr: 'approved == false' }
 
 nodes:
   finalize:
-    reads: [context.result] # ⚠️ Warning: 'context.result' only written on conditional path through 'rank'
+    input_mapping:
+      result: '$.state.result' # ⚠️ Warning: '$.state.result' only written on conditional path through 'rank'
 ```
 
 ### 4. Graph Integrity
 
-- **Unreachable nodes**: Nodes not reachable from `initial`
-- **Cycles without loop config**: Cycles must have explicit `loop` configuration
-- **Missing nodes**: Transitions referencing undefined nodes
+- **Unreachable nodes**: Nodes not reachable from `initial_node_ref`
+- **Cycles without loop_config**: Cycles must have explicit `loop_config`
+- **Missing nodes**: Transitions referencing undefined node refs
 - **Orphan writes**: Writes to paths never read by any node
+
+### 5. Task Schema Compatibility
+
+- **input_mapping keys** must match the referenced task's `input_schema`
+- **output_mapping values** must match the referenced task's `output_schema`
 
 ---
 
@@ -198,10 +271,10 @@ nodes:
 Real-time error highlighting as you type:
 
 ```
-Error: Path 'context.ideaz' does not exist in schemas
-  → Did you mean 'context.ideas'?
+Error: Path '$.state.ideaz' does not exist in context_schema
+  → Did you mean '$.state.ideas'?
 
-Error: Node 'rank' reads 'context.scores' but no guaranteed predecessor writes it
+Error: Node 'rank' reads '$.state.scores' but no guaranteed predecessor writes it
   → Possible writers: ['judge'] (conditional)
 
 Warning: Node 'cleanup' is not reachable from initial node 'ideate'
@@ -209,51 +282,52 @@ Warning: Node 'cleanup' is not reachable from initial node 'ideate'
 
 ### Autocomplete
 
-Trigger autocomplete with `.`, `@`, or `[`:
+Trigger autocomplete with `$`, `.`, or `@`:
 
 ```yaml
 nodes:
   rank:
-    reads: [context.|]  # Popup: ideas, scores, selected_idea
+    input_mapping:
+      ideas: '$.state.|' # Popup: ideas, scores
 
   process:
-    task: @library/|    # Popup: ideation/, analysis/, transforms/
+    task_id: '@library/|' # Popup: ideation/, analysis/, transforms/
 ```
 
 ### Hover Information
 
-Hover over any path or node reference:
+Hover over any JSONPath or node reference:
 
 ```
-context.ideas
+$.state.ideas
 ─────────────
 Type: string[]
-Written by: ideate
-Read by: judge, rank
+Written by: ideate (output_mapping)
+Read by: judge, rank (input_mapping)
 ```
 
 ```
 @library/ideation/generate
 ──────────────────────────
 Task: Generate Ideas
-Input: { topic: string, count: integer }
-Output: { ideas: string[] }
+Input Schema: { topic: string, count: integer }
+Output Schema: { ideas: string[] }
 Version: 2 (latest: 3)
 ```
 
 ### Go to Definition
 
 - Click `@library/ideation/generate` → Jump to task definition
-- Click `dev_env` in resource binding → Jump to resource declaration
+- Click `dev_env` in resource_bindings → Jump to resource declaration
 - Click `judge` in transition → Jump to node definition
 
 ### Find All References
 
-Right-click on `context.ideas`:
+Right-click on `$.state.ideas`:
 
-- `ideate` — writes
-- `judge` — reads
-- `rank` — reads
+- `ideate` — writes via output_mapping
+- `judge` — reads via input_mapping
+- `rank` — reads via input_mapping
 
 ---
 
@@ -347,40 +421,50 @@ interface WflowDocument {
   workflow: string;
   version: number;
   description?: string;
-  schemas: SchemaBlock;
+
+  input_schema: JSONSchema;
+  context_schema: JSONSchema;
+  output_schema: JSONSchema;
+
   resources?: Record<string, ResourceDecl>;
   nodes: Record<string, NodeDecl>;
   transitions: TransitionDecl[];
-  initial: string;
-  timeout?: Duration;
+
+  initial_node_ref: string;
+  timeout_ms?: number;
   on_timeout?: 'human_gate' | 'fail' | 'cancel_all';
+
   _loc: SourceLocation;
 }
 
 interface NodeDecl {
-  task: TaskRef;
-  version?: number;
-  reads: PathRef[];
-  writes: PathRef[];
-  resources?: Record<string, string>;
+  ref: string;
+  name: string;
+  task_id: string;
+  task_version: number;
+  input_mapping: Record<string, string> | null; // task input key → JSONPath
+  output_mapping: Record<string, string> | null; // context path → JSONPath
+  resource_bindings?: Record<string, string>;
   _loc: SourceLocation;
 }
 
 interface TransitionDecl {
-  from: string;
-  to: string;
-  when?: Expression;
-  priority?: number;
-  loop?: LoopConfig;
-  spawn?: number | ForeachConfig;
-  sync?: SyncConfig;
+  ref?: string;
+  from_node_ref: string;
+  to_node_ref: string | null; // null = terminal
+  priority: number;
+  condition?: ConditionDecl;
+  spawn_count?: number;
+  foreach?: ForeachConfig;
+  synchronization?: SyncConfig;
+  loop_config?: LoopConfig;
   _loc: SourceLocation;
 }
 
-interface PathRef {
-  segments: string[]; // ['context', 'ideas']
-  raw: string; // 'context.ideas'
-  _loc: SourceLocation;
+interface ConditionDecl {
+  type: 'structured' | 'expression';
+  definition?: StructuredCondition; // when type = 'structured'
+  expr?: string; // when type = 'expression'
 }
 
 interface SourceLocation {
@@ -427,15 +511,15 @@ interface DataFlowAnalysis {
 
 ## Data Flow Algorithm
 
-The key validation is ensuring reads are satisfied by writes. Algorithm:
+The key validation is ensuring input_mapping reads are satisfied by output_mapping writes. Algorithm:
 
 ```typescript
 function analyzeDataFlow(doc: WflowDocument, graph: GraphAnalysis): DataFlowAnalysis {
-  const availableReads = new Map<string, Set<string>>();
+  const availableWrites = new Map<string, Set<string>>();
   const writers = new Map<string, string[]>();
 
   // Input paths are always available
-  const inputPaths = extractPaths(doc.schemas.input, 'input');
+  const inputPaths = extractPaths(doc.input_schema, 'input');
 
   // Process nodes in topological order
   for (const nodeRef of topologicalOrder(graph)) {
@@ -446,10 +530,10 @@ function analyzeDataFlow(doc: WflowDocument, graph: GraphAnalysis): DataFlowAnal
       const predNode = doc.nodes[pred];
       const transition = findTransition(doc, pred, nodeRef);
 
-      if (!transition.when) {
-        // Unconditional: writes are guaranteed
-        for (const write of predNode.writes) {
-          available.add(write.raw);
+      if (!transition.condition) {
+        // Unconditional: output_mapping writes are guaranteed
+        for (const [contextPath] of Object.entries(predNode.output_mapping || {})) {
+          available.add(contextPath);
         }
       } else {
         // Conditional: track as maybe-undefined
@@ -457,16 +541,39 @@ function analyzeDataFlow(doc: WflowDocument, graph: GraphAnalysis): DataFlowAnal
       }
     }
 
-    availableReads.set(nodeRef, available);
+    availableWrites.set(nodeRef, available);
 
     // Track writers for hover info
-    for (const write of doc.nodes[nodeRef].writes) {
-      const existing = writers.get(write.raw) || [];
-      writers.set(write.raw, [...existing, nodeRef]);
+    for (const [contextPath] of Object.entries(doc.nodes[nodeRef].output_mapping || {})) {
+      const existing = writers.get(contextPath) || [];
+      writers.set(contextPath, [...existing, nodeRef]);
     }
   }
 
-  return { availableReads, writers, maybeUndefined };
+  return { availableWrites, writers, maybeUndefined };
+}
+
+function validateNodeInputs(doc: WflowDocument, dataFlow: DataFlowAnalysis): Diagnostic[] {
+  const diagnostics: Diagnostic[] = [];
+
+  for (const [nodeRef, node] of Object.entries(doc.nodes)) {
+    const available = dataFlow.availableWrites.get(nodeRef)!;
+
+    for (const [, jsonPath] of Object.entries(node.input_mapping || {})) {
+      // Extract context path from JSONPath (e.g., "$.state.ideas" → "state.ideas")
+      const contextPath = jsonPath.replace(/^\$\./, '');
+
+      if (!available.has(contextPath) && !contextPath.startsWith('input.')) {
+        diagnostics.push({
+          message: `'${jsonPath}' may not be written when '${nodeRef}' executes`,
+          severity: 'error',
+          // ... location info
+        });
+      }
+    }
+  }
+
+  return diagnostics;
 }
 ```
 
@@ -532,10 +639,10 @@ The transform phase:
 
 ### Phase 4: Data Flow Analysis
 
-- Track reads/writes per node
-- Compute available paths at each node
+- Track output_mapping writes per node
+- Compute available paths at each node based on predecessors
 - Handle conditional branches (intersection vs union)
-- Generate "may be undefined" warnings
+- Generate "may be undefined" warnings for input_mapping reads
 
 ### Phase 5: LSP Diagnostics
 
@@ -545,7 +652,8 @@ The transform phase:
 
 ### Phase 6: LSP Completions
 
-- Path autocomplete in `reads`/`writes` arrays
+- JSONPath autocomplete in `input_mapping` values
+- Context path autocomplete in `output_mapping` keys
 - Node reference autocomplete in transitions
 - Task reference autocomplete (`@library/...`)
 - Resource reference autocomplete
@@ -565,8 +673,8 @@ The transform phase:
 ### Phase 9: Runtime Integration
 
 - Transform `.wflow` AST to runtime primitives
-- Resolve `@library/...` references
-- Generate `input_mapping`/`output_mapping` from `reads`/`writes`
+- Resolve `@library/...` and `@project/...` references to ULIDs
+- Validate task schemas match input_mapping/output_mapping
 - Persist to D1 via Resources service
 
 ---

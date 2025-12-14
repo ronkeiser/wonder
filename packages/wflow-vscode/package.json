@@ -1,0 +1,51 @@
+{
+  "name": "wflow-vscode",
+  "displayName": "Wonder Workflow DSL",
+  "description": "Language support for .wflow workflow definitions",
+  "version": "0.0.1",
+  "publisher": "wonder",
+  "engines": {
+    "vscode": "^1.85.0"
+  },
+  "categories": [
+    "Programming Languages"
+  ],
+  "activationEvents": [
+    "onLanguage:wflow"
+  ],
+  "main": "./dist/extension.js",
+  "contributes": {
+    "languages": [
+      {
+        "id": "wflow",
+        "aliases": [
+          "Wonder Workflow",
+          "wflow"
+        ],
+        "extensions": [
+          ".wflow"
+        ],
+        "configuration": "./language-configuration.json"
+      }
+    ],
+    "grammars": [
+      {
+        "language": "wflow",
+        "scopeName": "source.wflow",
+        "path": "./syntaxes/wflow.tmLanguage.json"
+      }
+    ]
+  },
+  "scripts": {
+    "build": "tsc",
+    "watch": "tsc -w",
+    "vscode:prepublish": "pnpm run build"
+  },
+  "dependencies": {
+    "vscode-languageclient": "^9.0.1"
+  },
+  "devDependencies": {
+    "@types/vscode": "^1.85.0",
+    "typescript": "^5.3.3"
+  }
+}
