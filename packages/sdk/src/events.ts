@@ -78,8 +78,8 @@ export class EventsClient {
 
   // HTTP query method from generated client
   list: (
-    options?: paths['/api/events']['get']['parameters']['query'],
-  ) => Promise<paths['/api/events']['get']['responses']['200']['content']['application/json']>;
+    options?: paths['/events']['get']['parameters']['query'],
+  ) => Promise<paths['/events']['get']['responses']['200']['content']['application/json']>;
 
   constructor(baseUrl: string, sdk: Client<paths>) {
     this.wsUrl = this.convertToWebSocketUrl(baseUrl);
@@ -87,7 +87,7 @@ export class EventsClient {
 
     // Bind the HTTP list method
     this.list = async (options?) => {
-      const response = await this.sdk.GET('/api/events', { params: { query: options || {} } });
+      const response = await this.sdk.GET('/events', { params: { query: options || {} } });
       return response.data!;
     };
   }
@@ -138,7 +138,7 @@ export class EventsClient {
    * Subscribe to event/trace stream via WebSocket with server-side filtering
    */
   async subscribe(subscriptions: Subscription[]): Promise<EventStreamSubscription> {
-    const url = `${this.wsUrl}/api/events/stream`;
+    const url = `${this.wsUrl}/events/stream`;
     const ws = new WebSocket(url);
 
     const callbacks = new Map(subscriptions.map((s) => [s.id, s.callback]));

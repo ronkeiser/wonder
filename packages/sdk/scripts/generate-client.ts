@@ -6,7 +6,6 @@
 
 import { HttpMethod, NodeType, RouteNode } from './parse-paths';
 
-const API_PREFIX = '/api/';
 const CONTENT_TYPE = 'application/json';
 const DEFAULT_STATUS_CODE = '200';
 
@@ -42,7 +41,7 @@ export function buildPathTemplate(node: RouteNode): string {
     const segment = current.type === NodeType.Param ? `\${${current.name}}` : current.name;
     segments.unshift(segment);
   }
-  return API_PREFIX + segments.join('/');
+  return '/' + segments.join('/');
 }
 
 /**

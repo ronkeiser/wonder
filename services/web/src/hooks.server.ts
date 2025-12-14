@@ -29,6 +29,9 @@ export const handle: Handle = async ({ event, resolve }) => {
       return new Response('HTTP service not available', { status: 503 });
     }
 
+    // Strip /api prefix - the HTTP service doesn't use it
+    const backendPath = event.url.pathname.replace(/^\/api/, '');
+
     // Check if this is a WebSocket upgrade
     const isWebSocket = event.request.headers.get('upgrade')?.toLowerCase() === 'websocket';
 
@@ -40,8 +43,11 @@ export const handle: Handle = async ({ event, resolve }) => {
 
     // Use service binding if available
     if (httpService) {
+      // Build new URL with stripped /api prefix
+      const originalUrl = new URL(event.request.url);
+      const proxyUrl = new URL(backendPath + originalUrl.search, originalUrl.origin);
       return httpService.fetch(
-        new Request(event.request.url, {
+        new Request(proxyUrl, {
           method: event.request.method,
           headers,
           body: event.request.body,
@@ -50,7 +56,7 @@ export const handle: Handle = async ({ event, resolve }) => {
     }
 
     // Local development fallback: use HTTP_URL
-    const url = new URL(event.url.pathname + event.url.search, httpUrl!);
+    const url = new URL(backendPath + event.url.search, httpUrl!);
     if (isWebSocket) {
       url.protocol = url.protocol === 'https:' ? 'wss:' : 'ws:';
     }

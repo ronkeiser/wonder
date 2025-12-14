@@ -77,7 +77,7 @@ export function createWorkflowsClient(
     } = options;
 
     // Phase 1: Create the workflow run (doesn't start execution)
-    const createResponse = await sdk.POST('/api/workflows/{id}/runs', {
+    const createResponse = await sdk.POST('/workflows/{id}/runs', {
       params: { path: { id: workflowId } },
       body: { input: input as Record<string, unknown> },
     });
@@ -185,7 +185,7 @@ export function createWorkflowsClient(
           // Small delay to ensure WebSocket handshake completes
           setTimeout(async () => {
             try {
-              await sdk.POST('/api/workflows/{id}/runs/{run_id}/start', {
+              await sdk.POST('/workflows/{id}/runs/{run_id}/start', {
                 params: { path: { id: workflowId, run_id: workflow_run_id } },
               });
             } catch (error) {

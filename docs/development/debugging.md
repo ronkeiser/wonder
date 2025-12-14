@@ -62,3 +62,7 @@ curl "https://api.wflow.app/logs?trace_id=trace_abc123"
 After making edits, before announcing completion of work, you MUST run a typecheck. You can do this by running `pnpm typecheck` at the root.
 
 If you changed any of the RPC signatures of any of the services, you must regenerate the types with `pnpm types`.
+
+INSTRUCTION:
+
+Run the edge test, then query the events for the last minute to get the workflow_run_id. You can then use that id to perform any other queries you need.
