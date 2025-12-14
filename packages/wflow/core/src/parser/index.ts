@@ -43,7 +43,8 @@ export function getFileType(pathOrUri: string): FileType {
   if (pathOrUri.endsWith('.wflow')) return 'wflow';
   if (pathOrUri.endsWith('.task')) return 'task';
   if (pathOrUri.endsWith('.action')) return 'action';
-  if (pathOrUri.endsWith('.wtest')) return 'wtest';
+  if (pathOrUri.endsWith('.test')) return 'test';
+  if (pathOrUri.endsWith('.run')) return 'run';
   return 'unknown';
 }
 

@@ -383,7 +383,7 @@ packages/
         wflow-parser.ts       # .wflow specific
         wtask-parser.ts       # .task specific
         waction-parser.ts     # .action specific
-        wtest-parser.ts       # .wtest specific
+        test-parser.ts       # .test specific
       analyzer/               # Graph analysis, validation
         schema-validator.ts
         path-validator.ts
@@ -418,7 +418,7 @@ packages/
       wflow.tmLanguage.json   # Workflow grammar
       wtask.tmLanguage.json   # Task grammar
       waction.tmLanguage.json # Action grammar
-      wtest.tmLanguage.json   # Test grammar
+      test.tmLanguage.json   # Test grammar
     language-configuration.json
     package.json
 
@@ -706,7 +706,7 @@ The transform phase:
 
 ## Related File Types
 
-The DSL includes three definition file types (`.wflow`, `.task`, `.action`) and one test file type (`.wtest`). All share the same import syntax and LSP features.
+The DSL includes three definition file types (`.wflow`, `.task`, `.action`) and one test file type (`.test`). All share the same import syntax and LSP features.
 
 ### .task — Task Definitions
 
@@ -820,14 +820,14 @@ imports:
 
 ---
 
-## .wtest — Test Definitions
+## .test — Test Definitions
 
-`.wtest` files define declarative tests for workflows, tasks, and actions. The LSP provides the same validation, completions, and hover support as definition files.
+`.test` files define declarative tests for workflows, tasks, and actions. The LSP provides the same validation, completions, and hover support as definition files.
 
 ### Basic Structure
 
 ```yaml
-# tests/ideation.wtest
+# tests/ideation.test
 
 test_suite: ideation-tests
 description: Tests for the ideation workflow
@@ -1128,9 +1128,9 @@ wflow run ./ideation.wflow --watch          # Re-run on file changes
 wflow run ./ideation.wflow --dry-run        # Validate without executing
 
 # Testing
-wflow test                        # Run all .wtest files
+wflow test                        # Run all .test files
 wflow test ./tests/               # Run tests in directory
-wflow test ./ideation.wtest       # Run specific test file
+wflow test ./ideation.test       # Run specific test file
 wflow test --filter "happy_path"  # Run tests matching pattern
 wflow test --tags ci              # Run tests with specific tags
 wflow test --coverage             # Generate coverage report
@@ -1152,7 +1152,7 @@ wflow lsp                         # Start language server (for editor integratio
 ### Test Output
 
 ```
-$ wflow test ./tests/ideation.wtest
+$ wflow test ./tests/ideation.test
 
   ideation-tests
     ✓ generates_correct_count (234ms)

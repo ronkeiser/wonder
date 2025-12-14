@@ -226,4 +226,4 @@ export type AnyDocument = WflowDocument | TaskDocument | ActionDocument;
 /**
  * Detected file type from extension
  */
-export type FileType = 'wflow' | 'task' | 'action' | 'wtest' | 'unknown';
+export type FileType = 'wflow' | 'task' | 'action' | 'test' | 'run' | 'unknown';
