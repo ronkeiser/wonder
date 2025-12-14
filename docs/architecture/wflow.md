@@ -380,14 +380,24 @@ packages/
       parser/                 # YAML → AST
         index.ts
         yaml-adapter.ts
+        wflow-parser.ts       # .wflow specific
+        wtask-parser.ts       # .task specific
+        waction-parser.ts     # .action specific
+        wtest-parser.ts       # .wtest specific
       analyzer/               # Graph analysis, validation
         schema-validator.ts
         path-validator.ts
         graph.ts
         dataflow.ts
+      runner/                 # Test execution
+        executor.ts
+        mock-registry.ts
+        assertion-engine.ts
+        coverage.ts
       types/                  # TypeScript types for the AST
         ast.ts
         diagnostics.ts
+        test-types.ts
       index.ts                # Public API
 
   wflow-lsp/                  # Language Server
@@ -405,9 +415,24 @@ packages/
     src/
       extension.ts            # Extension entry
     syntaxes/
-      wflow.tmLanguage.json   # TextMate grammar
+      wflow.tmLanguage.json   # Workflow grammar
+      wtask.tmLanguage.json   # Task grammar
+      waction.tmLanguage.json # Action grammar
+      wtest.tmLanguage.json   # Test grammar
     language-configuration.json
     package.json
+
+  wflow-cli/                  # CLI Tool
+    src/
+      commands/
+        validate.ts
+        run.ts
+        test.ts
+        export.ts
+        init.ts
+      index.ts
+    bin/
+      wflow.ts
 ```
 
 ---
@@ -679,11 +704,494 @@ The transform phase:
 
 ---
 
+## Related File Types
+
+The DSL includes three definition file types (`.wflow`, `.task`, `.action`) and one test file type (`.wtest`). All share the same import syntax and LSP features.
+
+### .task — Task Definitions
+
+Tasks define discrete units of work that workflows orchestrate. A task contains steps that reference actions.
+
+```yaml
+# tasks/generate-ideas.task
+
+task: generate-ideas
+version: 2
+description: Generate creative ideas for a given topic
+
+imports:
+  llm_call: "@library/actions/llm-call"
+  format: "./format-output.action"
+
+input_schema:
+  type: object
+  properties:
+    topic: { type: string }
+    count: { type: integer, default: 5 }
+  required: [topic]
+
+output_schema:
+  type: object
+  properties:
+    ideas: { type: array, items: { type: string } }
+  required: [ideas]
+
+steps:
+  generate:
+    name: Generate via LLM
+    action_id: llm_call
+    action_version: 1
+    config:
+      model: gpt-4
+      temperature: 0.8
+      prompt_template: |
+        Generate {{count}} creative ideas about: {{topic}}
+
+  format:
+    name: Format Output
+    action_id: format
+    action_version: 1
+    depends_on: [generate]
+```
+
+### .action — Action Definitions
+
+Actions are the atomic units of execution—actual code or API calls that do work.
+
+```yaml
+# actions/llm-call.action
+
+action: llm-call
+version: 1
+description: Make an LLM API call
+
+input_schema:
+  type: object
+  properties:
+    model: { type: string }
+    prompt: { type: string }
+    temperature: { type: number, default: 0.7 }
+  required: [model, prompt]
+
+output_schema:
+  type: object
+  properties:
+    response: { type: string }
+    tokens_used: { type: integer }
+  required: [response]
+
+execution:
+  type: http
+  method: POST
+  url: "https://api.openai.com/v1/chat/completions"
+  headers:
+    Authorization: "Bearer {{env.OPENAI_API_KEY}}"
+  body:
+    model: "{{input.model}}"
+    messages:
+      - role: user
+        content: "{{input.prompt}}"
+    temperature: "{{input.temperature}}"
+  response_mapping:
+    response: "$.choices[0].message.content"
+    tokens_used: "$.usage.total_tokens"
+```
+
+### Import Syntax
+
+All file types support the same import system:
+
+```yaml
+imports:
+  # Relative imports - resolved from current file's directory
+  local_task: "./subtasks/helper.task"
+  sibling: "../shared/common.action"
+
+  # Package imports - resolved from package registry
+  library_task: "@library/ideation/generate"
+  project_action: "@project/custom/my-action"
+```
+
+**Resolution rules:**
+- Relative paths (`./`, `../`) resolve from the importing file's directory
+- `@library/` paths resolve to the shared library registry
+- `@project/` paths resolve to the current project's definitions
+
+---
+
+## .wtest — Test Definitions
+
+`.wtest` files define declarative tests for workflows, tasks, and actions. The LSP provides the same validation, completions, and hover support as definition files.
+
+### Basic Structure
+
+```yaml
+# tests/ideation.wtest
+
+test_suite: ideation-tests
+description: Tests for the ideation workflow
+
+imports:
+  ideation: "./workflows/ideation-pipeline.wflow"
+  generate: "./tasks/generate-ideas.task"
+  llm_call: "@library/actions/llm-call"
+
+mocks:
+  llm_call:
+    response: "Mock idea 1\nMock idea 2\nMock idea 3"
+    tokens_used: 150
+
+tests:
+  generates_correct_count:
+    description: Should generate the requested number of ideas
+    target: ideation
+    input:
+      topic: "sustainable energy"
+      count: 3
+    timeout_ms: 5000
+    assert:
+      status: completed
+      output.ideas:
+        length: 3
+      output.ideas[0]:
+        type: string
+        not_empty: true
+
+  handles_empty_topic:
+    description: Should fail gracefully with empty topic
+    target: ideation
+    input:
+      topic: ""
+      count: 5
+    assert:
+      status: failed
+      error.code: VALIDATION_ERROR
+
+  task_generates_ideas:
+    description: Test the generate task directly
+    target: generate
+    input:
+      topic: "AI applications"
+    assert:
+      output.ideas:
+        contains: "AI"
+```
+
+### Test Structure
+
+| Field | Type | Description |
+|-------|------|-------------|
+| `test_suite` | string | Name of the test suite |
+| `description` | string | Human-readable description |
+| `imports` | Record | Import workflows, tasks, actions to test |
+| `mocks` | Record | Mock definitions for actions |
+| `fixtures` | Record | Reusable test data |
+| `tests` | Record | Test case definitions |
+
+### Test Case Fields
+
+| Field | Type | Description |
+|-------|------|-------------|
+| `description` | string | What this test verifies |
+| `target` | string | Import alias of workflow/task/action to test |
+| `input` | object | Input data for the target |
+| `context` | object | Initial context (workflows only) |
+| `mocks` | Record | Test-specific mock overrides |
+| `timeout_ms` | number | Maximum execution time |
+| `assert` | object | Assertions to verify |
+
+### Assertion Syntax
+
+Assertions use a path-based syntax with assertion primitives:
+
+```yaml
+assert:
+  # Simple equality
+  status: completed
+  output.winner: "idea-3"
+
+  # Numeric comparisons
+  output.confidence:
+    gt: 0.5
+    lte: 1.0
+
+  # String assertions
+  output.summary:
+    contains: "energy"
+    matches: "^[A-Z].*\\.$"
+    not_empty: true
+
+  # Array assertions
+  output.ideas:
+    length: 3
+    every:
+      type: string
+      not_empty: true
+
+  # Object assertions
+  output.metadata:
+    has_keys: [created_at, version]
+    type: object
+
+  # Existence
+  output.optional_field:
+    exists: false
+
+  # Negation
+  error:
+    not:
+      exists: true
+```
+
+### Assertion Primitives
+
+| Primitive | Applies To | Description |
+|-----------|------------|-------------|
+| `eq` | any | Exact equality (implicit when value given directly) |
+| `not_eq` | any | Not equal |
+| `gt`, `gte` | number | Greater than (or equal) |
+| `lt`, `lte` | number | Less than (or equal) |
+| `contains` | string, array | Substring or element containment |
+| `not_contains` | string, array | Does not contain |
+| `matches` | string | Regex match |
+| `starts_with` | string | String prefix |
+| `ends_with` | string | String suffix |
+| `length` | string, array | Exact length |
+| `min_length` | string, array | Minimum length |
+| `max_length` | string, array | Maximum length |
+| `type` | any | Type check (string, number, boolean, array, object, null) |
+| `exists` | any | Path exists (true) or not (false) |
+| `not_empty` | string, array, object | Has content |
+| `has_keys` | object | Required keys present |
+| `every` | array | All elements match nested assertions |
+| `some` | array | At least one element matches |
+| `not` | any | Negate nested assertion |
+
+### Mocks
+
+Mocks replace action execution with predefined responses:
+
+```yaml
+mocks:
+  # Simple response mock
+  llm_call:
+    response: "Mocked response"
+    tokens_used: 100
+
+  # Conditional mocks
+  http_fetch:
+    when:
+      input.url:
+        contains: "api.example.com"
+    then:
+      status: 200
+      body: { data: "mocked" }
+
+  # Sequence mocks (different response each call)
+  retry_action:
+    sequence:
+      - error: "Connection failed"
+      - error: "Connection failed"
+      - response: "Success on third try"
+
+  # Error mocks
+  flaky_service:
+    error:
+      code: TIMEOUT
+      message: "Service unavailable"
+```
+
+### Fixtures
+
+Reusable test data:
+
+```yaml
+fixtures:
+  valid_topic:
+    topic: "renewable energy"
+    count: 5
+
+  large_input:
+    topic: "comprehensive analysis of global economic trends"
+    count: 20
+
+tests:
+  basic_generation:
+    target: ideation
+    input: $fixtures.valid_topic
+    assert:
+      status: completed
+
+  handles_large_input:
+    target: ideation
+    input: $fixtures.large_input
+    timeout_ms: 30000
+    assert:
+      status: completed
+```
+
+### Lifecycle Hooks
+
+```yaml
+hooks:
+  before_all:
+    - action: setup_database
+      input: { schema: "test" }
+
+  before_each:
+    - action: clear_cache
+
+  after_each:
+    - action: log_result
+      input:
+        test_name: $test.name
+        status: $test.status
+
+  after_all:
+    - action: cleanup_database
+```
+
+### Test Organization
+
+```yaml
+# Group related tests
+groups:
+  happy_path:
+    tests: [generates_correct_count, formats_output]
+    tags: [smoke, ci]
+
+  error_handling:
+    tests: [handles_empty_topic, handles_invalid_count]
+    tags: [error, ci]
+
+  performance:
+    tests: [handles_large_input]
+    tags: [perf]
+    skip_ci: true
+
+# Run configuration
+config:
+  parallel: true
+  max_concurrent: 4
+  retry_failed: 2
+  fail_fast: false
+```
+
+### Snapshot Testing
+
+```yaml
+tests:
+  output_structure:
+    target: ideation
+    input:
+      topic: "test"
+      count: 1
+    assert:
+      output:
+        snapshot: ideation-output-v1
+        # First run creates snapshot, subsequent runs compare
+```
+
+Snapshots are stored in `__snapshots__/` adjacent to the test file.
+
+### Coverage
+
+```yaml
+coverage:
+  targets:
+    - ideation
+    - generate
+  thresholds:
+    nodes: 80      # % of workflow nodes executed
+    branches: 70   # % of conditional branches taken
+    actions: 90    # % of actions invoked
+```
+
+---
+
+## CLI Commands
+
+The `wflow` CLI provides commands for validation, execution, and testing:
+
+```bash
+# Validation
+wflow validate                    # Validate all files in current directory
+wflow validate ./workflows/       # Validate specific directory
+wflow validate ./my.wflow         # Validate specific file
+wflow validate --strict           # Treat warnings as errors
+
+# Execution
+wflow run ./ideation.wflow --input '{"topic": "AI", "count": 3}'
+wflow run ./ideation.wflow --input-file ./input.json
+wflow run ./ideation.wflow --watch          # Re-run on file changes
+wflow run ./ideation.wflow --dry-run        # Validate without executing
+
+# Testing
+wflow test                        # Run all .wtest files
+wflow test ./tests/               # Run tests in directory
+wflow test ./ideation.wtest       # Run specific test file
+wflow test --filter "happy_path"  # Run tests matching pattern
+wflow test --tags ci              # Run tests with specific tags
+wflow test --coverage             # Generate coverage report
+wflow test --update-snapshots     # Update snapshot files
+wflow test --watch                # Re-run on file changes
+
+# Export
+wflow export ./ideation.wflow --format json    # Export as JSON
+wflow export ./ideation.wflow --format ts      # Generate TypeScript SDK code
+wflow export ./ideation.wflow --format diagram # Generate Mermaid diagram
+
+# Development
+wflow init                        # Initialize new project
+wflow init workflow my-workflow   # Create new workflow from template
+wflow init task my-task           # Create new task from template
+wflow lsp                         # Start language server (for editor integration)
+```
+
+### Test Output
+
+```
+$ wflow test ./tests/ideation.wtest
+
+  ideation-tests
+    ✓ generates_correct_count (234ms)
+    ✓ handles_empty_topic (12ms)
+    ✓ task_generates_ideas (156ms)
+
+  3 passing (402ms)
+  0 failing
+
+  Coverage:
+    Nodes:    100% (3/3)
+    Branches:  75% (3/4)
+    Actions:  100% (2/2)
+```
+
+### Watch Mode
+
+```
+$ wflow test --watch
+
+  Watching for changes...
+
+  [12:34:56] File changed: workflows/ideation.wflow
+  [12:34:56] Re-running affected tests...
+
+    ✓ generates_correct_count (234ms)
+    ✓ handles_empty_topic (12ms)
+
+  2 passing (246ms)
+```
+
+---
+
 ## Future Enhancements
 
 - **Graph visualization** — Webview panel showing workflow as interactive DAG
 - **Live simulation** — Step through execution with sample data
 - **Refactoring** — Rename node, extract sub-workflow
 - **Schema inference** — Infer schemas from task definitions
-- **Multi-file support** — Import nodes/schemas from other `.wflow` files
 - **Migration tooling** — Convert TypeScript SDK builders to `.wflow`
+- **Property-based testing** — Generate random inputs within schema constraints
+- **Mutation testing** — Verify test quality by injecting faults
+- **Time travel debugging** — Replay workflow execution step by step

@@ -1,14 +1,19 @@
+import { existsSync } from 'fs';
+import { dirname, isAbsolute, resolve } from 'path';
+import { fileURLToPath, pathToFileURL } from 'url';
 import { TextDocument } from 'vscode-languageserver-textdocument';
 import {
   CompletionItem,
   CompletionItemKind,
   createConnection,
+  Definition,
   Diagnostic,
   DiagnosticSeverity,
   Hover,
   InitializeParams,
   InitializeResult,
   InsertTextFormat,
+  Location,
   MarkupKind,
   ProposedFeatures,
   SemanticTokensBuilder,
@@ -30,19 +35,112 @@ const legend: SemanticTokensLegend = {
   tokenModifiers,
 };
 
+// Import resolution types
+interface ResolvedImport {
+  alias: string;
+  path: string;
+  resolvedUri: string | null; // null if file doesn't exist
+  fileType: 'task' | 'action' | 'wflow' | 'unknown';
+  line: number;
+}
+
+interface ImportsMap {
+  byAlias: Map<string, ResolvedImport>;
+  all: ResolvedImport[];
+}
+
+// Cache of resolved imports per document URI
+const importCache = new Map<string, ImportsMap>();
+
+// Resolve an import path relative to a document
+function resolveImportPath(importPath: string, documentUri: string): string | null {
+  try {
+    const documentPath = fileURLToPath(documentUri);
+    const documentDir = dirname(documentPath);
+
+    // Handle relative imports
+    if (importPath.startsWith('./') || importPath.startsWith('../')) {
+      const resolved = resolve(documentDir, importPath);
+      return existsSync(resolved) ? pathToFileURL(resolved).href : null;
+    }
+
+    // Handle package imports (@library/..., @project/...)
+    // TODO: Implement package resolution from workspace config
+    // For now, just check if it looks like a package path
+    if (importPath.startsWith('@')) {
+      // Could resolve from workspace root or configured paths
+      // For now, return the path as-is to indicate it's a valid package ref
+      return `package:${importPath}`;
+    }
+
+    return null;
+  } catch {
+    return null;
+  }
+}
+
+// Get file type from path
+function getFileTypeFromPath(path: string): 'task' | 'action' | 'wflow' | 'unknown' {
+  if (path.endsWith('.task')) return 'task';
+  if (path.endsWith('.action')) return 'action';
+  if (path.endsWith('.wflow')) return 'wflow';
+  return 'unknown';
+}
+
+// Parse imports from a document
+function parseImports(
+  imports: Record<string, string> | undefined,
+  documentUri: string,
+  lines: string[],
+): ImportsMap {
+  const result: ImportsMap = {
+    byAlias: new Map(),
+    all: [],
+  };
+
+  if (!imports || typeof imports !== 'object') return result;
+
+  for (const [alias, path] of Object.entries(imports)) {
+    if (typeof path !== 'string') continue;
+
+    // Find the line where this import is defined
+    const line = lines.findIndex((l) => {
+      const regex = new RegExp(`^\\s*${escapeRegex(alias)}\\s*:\\s*`);
+      return regex.test(l);
+    });
+
+    const resolvedUri = resolveImportPath(path, documentUri);
+    const fileType = getFileTypeFromPath(path);
+
+    const resolved: ResolvedImport = {
+      alias,
+      path,
+      resolvedUri,
+      fileType,
+      line: line !== -1 ? line : 0,
+    };
+
+    result.byAlias.set(alias, resolved);
+    result.all.push(resolved);
+  }
+
+  return result;
+}
+
 connection.onInitialize((_params: InitializeParams): InitializeResult => {
   return {
     capabilities: {
       textDocumentSync: TextDocumentSyncKind.Incremental,
       hoverProvider: true,
       completionProvider: {
-        triggerCharacters: ['.', ':', '$', '"'],
+        triggerCharacters: ['.', ':', '$', '"', '/'],
         resolveProvider: false,
       },
       semanticTokensProvider: {
         legend,
         full: true,
       },
+      definitionProvider: true,
     },
   };
 });
@@ -57,9 +155,9 @@ connection.onHover((params): Hover | null => {
   if (!document) return null;
 
   const text = document.getText();
-  let parsed: WflowDoc;
+  let parsed: WflowDoc | TaskDoc | ActionDoc;
   try {
-    parsed = parseYaml(text) as WflowDoc;
+    parsed = parseYaml(text) as WflowDoc | TaskDoc | ActionDoc;
   } catch {
     return null;
   }
@@ -76,17 +174,35 @@ connection.onHover((params): Hover | null => {
 
   const word = line.substring(wordRange.start, wordRange.end);
 
-  // Check if hovering over a node ref
-  if (parsed.nodes && parsed.nodes[word]) {
-    const node = parsed.nodes[word];
-    return createNodeHover(word, node);
+  // Check if hovering over an import alias (in task_id or action_id)
+  const imports = importCache.get(document.uri);
+  if (imports) {
+    const imp = imports.byAlias.get(word);
+    if (imp) {
+      // Check context - is this a task_id, action_id, or import definition?
+      const isTaskIdRef = line.includes('task_id:');
+      const isActionIdRef = line.includes('action_id:');
+      const isImportDef = line.match(new RegExp(`^\\s*${escapeRegex(word)}\\s*:`));
+
+      if (isTaskIdRef || isActionIdRef || isImportDef) {
+        return createImportHover(imp);
+      }
+    }
+  }
+
+  // Check if hovering over a node ref (workflows only)
+  const wflowDoc = parsed as WflowDoc;
+  if (wflowDoc.nodes && wflowDoc.nodes[word]) {
+    const node = wflowDoc.nodes[word];
+    return createNodeHover(word, node, imports);
   }
 
   // Check if hovering over a JSONPath ($.input.*, $.state.*)
   const jsonPathMatch = word.match(/^\$\.(input|state)\.(.+)$/);
   if (jsonPathMatch) {
     const [, schemaType, pathRest] = jsonPathMatch;
-    const schema = schemaType === 'input' ? parsed.input_schema : parsed.context_schema;
+    const wflow = parsed as WflowDoc;
+    const schema = schemaType === 'input' ? wflow.input_schema : wflow.context_schema;
     return createPathHover(word, pathRest, schema, schemaType);
   }
 
@@ -94,8 +210,66 @@ connection.onHover((params): Hover | null => {
   const contextPathMatch = word.match(/^(state|output)\.(.+)$/);
   if (contextPathMatch) {
     const [, schemaType, pathRest] = contextPathMatch;
-    const schema = schemaType === 'state' ? parsed.context_schema : parsed.output_schema;
+    const wflow = parsed as WflowDoc;
+    const schema = schemaType === 'state' ? wflow.context_schema : wflow.output_schema;
     return createPathHover(word, pathRest, schema, schemaType);
+  }
+
+  return null;
+});
+
+// Go-to-definition handler
+connection.onDefinition((params): Definition | null => {
+  const document = documents.get(params.textDocument.uri);
+  if (!document) return null;
+
+  const text = document.getText();
+  const lines = text.split('\n');
+  const line = lines[params.position.line];
+  if (!line) return null;
+
+  const wordRange = getWordRangeAtPosition(line, params.position.character);
+  if (!wordRange) return null;
+
+  const word = line.substring(wordRange.start, wordRange.end);
+
+  // Check if it's an import reference
+  const imports = importCache.get(document.uri);
+  if (imports) {
+    const imp = imports.byAlias.get(word);
+    if (imp && imp.resolvedUri && !imp.resolvedUri.startsWith('package:')) {
+      // Go to the imported file
+      return Location.create(imp.resolvedUri, {
+        start: { line: 0, character: 0 },
+        end: { line: 0, character: 0 },
+      });
+    }
+  }
+
+  // Check if it's a node ref - go to its definition
+  let parsed: WflowDoc;
+  try {
+    parsed = parseYaml(text) as WflowDoc;
+  } catch {
+    return null;
+  }
+  if (!parsed?.nodes) return null;
+
+  // Is this word a node ref?
+  if (parsed.nodes[word]) {
+    // Find the line where this node is defined
+    const nodeDefLine = lines.findIndex((l) => {
+      const regex = new RegExp(`^\\s{2}${escapeRegex(word)}\\s*:`);
+      return regex.test(l);
+    });
+    if (nodeDefLine !== -1) {
+      const nodeLine = lines[nodeDefLine];
+      const charStart = nodeLine.indexOf(word);
+      return Location.create(document.uri, {
+        start: { line: nodeDefLine, character: charStart },
+        end: { line: nodeDefLine, character: charStart + word.length },
+      });
+    }
   }
 
   return null;
@@ -122,7 +296,7 @@ function getWordRangeAtPosition(
   return { start, end };
 }
 
-function createNodeHover(nodeRef: string, node: NodeDecl): Hover {
+function createNodeHover(nodeRef: string, node: NodeDecl, imports?: ImportsMap): Hover {
   const lines: string[] = [];
 
   lines.push(`### Node: \`${nodeRef}\``);
@@ -132,7 +306,13 @@ function createNodeHover(nodeRef: string, node: NodeDecl): Hover {
   lines.push('');
 
   if (node.task_id) {
-    lines.push(`**Task:** \`${node.task_id}\` v${node.task_version || 1}`);
+    // Check if task_id is an imported alias
+    const imp = imports?.byAlias.get(node.task_id);
+    if (imp) {
+      lines.push(`**Task:** \`${node.task_id}\` → \`${imp.path}\` v${node.task_version || 1}`);
+    } else {
+      lines.push(`**Task:** \`${node.task_id}\` v${node.task_version || 1}`);
+    }
   }
 
   if (node.input_mapping && Object.keys(node.input_mapping).length > 0) {
@@ -149,6 +329,32 @@ function createNodeHover(nodeRef: string, node: NodeDecl): Hover {
     for (const [contextPath, taskOutput] of Object.entries(node.output_mapping)) {
       lines.push(`- \`${contextPath}\` ← \`${taskOutput}\``);
     }
+  }
+
+  return {
+    contents: {
+      kind: MarkupKind.Markdown,
+      value: lines.join('\n'),
+    },
+  };
+}
+
+function createImportHover(imp: ResolvedImport): Hover {
+  const lines: string[] = [];
+
+  lines.push(`### Import: \`${imp.alias}\``);
+  lines.push('');
+  lines.push(`**Path:** \`${imp.path}\``);
+  lines.push(`**Type:** ${imp.fileType}`);
+
+  if (imp.resolvedUri) {
+    if (imp.resolvedUri.startsWith('package:')) {
+      lines.push(`**Status:** Package reference (${imp.resolvedUri.slice(8)})`);
+    } else {
+      lines.push(`**Status:** ✓ File exists`);
+    }
+  } else {
+    lines.push(`**Status:** ✗ File not found`);
   }
 
   return {
@@ -238,10 +444,23 @@ connection.onCompletion((params): CompletionItem[] => {
   const indent = line.length - line.trimStart().length;
   const trimmed = linePrefix.trim();
 
+  // Get imports for this document
+  const imports = importCache.get(uri);
+
   // Top-level completions (indent 0)
   if (indent === 0 && !trimmed.includes(':')) {
+    const baseItems: CompletionItem[] = [
+      {
+        label: 'imports',
+        kind: CompletionItemKind.Keyword,
+        insertText: 'imports:\n  ',
+        detail: 'Import tasks, actions, or workflows',
+      },
+    ];
+
     if (isTask) {
       return [
+        ...baseItems,
         { label: 'task', kind: CompletionItemKind.Keyword, insertText: 'task: ' },
         { label: 'version', kind: CompletionItemKind.Keyword, insertText: 'version: ' },
         { label: 'name', kind: CompletionItemKind.Keyword, insertText: 'name: ' },
@@ -271,6 +490,7 @@ connection.onCompletion((params): CompletionItem[] => {
       ];
     } else if (isAction) {
       return [
+        ...baseItems,
         { label: 'action', kind: CompletionItemKind.Keyword, insertText: 'action: ' },
         { label: 'version', kind: CompletionItemKind.Keyword, insertText: 'version: ' },
         { label: 'name', kind: CompletionItemKind.Keyword, insertText: 'name: ' },
@@ -304,6 +524,7 @@ connection.onCompletion((params): CompletionItem[] => {
       ];
     } else {
       return [
+        ...baseItems,
         { label: 'workflow', kind: CompletionItemKind.Keyword, insertText: 'workflow: ' },
         { label: 'version', kind: CompletionItemKind.Keyword, insertText: 'version: ' },
         { label: 'description', kind: CompletionItemKind.Keyword, insertText: 'description: ' },
@@ -349,6 +570,36 @@ connection.onCompletion((params): CompletionItem[] => {
       { label: 'metric', kind: CompletionItemKind.EnumMember, detail: 'Emit metric' },
       { label: 'human', kind: CompletionItemKind.EnumMember, detail: 'Human approval' },
     ];
+  }
+
+  // action_id completions - suggest imported actions
+  if (isTask && trimmed.match(/^action_id\s*:\s*/)) {
+    if (imports) {
+      const actionImports = imports.all.filter(
+        (imp) => imp.fileType === 'action' || imp.fileType === 'unknown',
+      );
+      return actionImports.map((imp) => ({
+        label: imp.alias,
+        kind: CompletionItemKind.Reference,
+        detail: imp.path,
+      }));
+    }
+    return [];
+  }
+
+  // task_id completions - suggest imported tasks
+  if (isWorkflow && trimmed.match(/^task_id\s*:\s*/)) {
+    if (imports) {
+      const taskImports = imports.all.filter(
+        (imp) => imp.fileType === 'task' || imp.fileType === 'unknown',
+      );
+      return taskImports.map((imp) => ({
+        label: imp.alias,
+        kind: CompletionItemKind.Reference,
+        detail: imp.path,
+      }));
+    }
+    return [];
   }
 
   // Task step completions
@@ -591,15 +842,19 @@ connection.onCompletion((params): CompletionItem[] => {
   return [];
 });
 
-// Semantic tokens handler - highlights node/transition refs only in valid contexts
+// Semantic tokens handler - highlights node/transition refs and import aliases
 connection.onRequest('textDocument/semanticTokens/full', (params) => {
   const document = documents.get(params.textDocument.uri);
   if (!document) return { data: [] };
 
   const text = document.getText();
-  let parsed: WflowDoc;
+  const uri = document.uri;
+  const isWorkflow = uri.endsWith('.wflow');
+  const isTask = uri.endsWith('.task');
+
+  let parsed: WflowDoc | TaskDoc;
   try {
-    parsed = parseYaml(text) as WflowDoc;
+    parsed = parseYaml(text) as WflowDoc | TaskDoc;
   } catch {
     return { data: [] };
   }
@@ -614,75 +869,146 @@ connection.onRequest('textDocument/semanticTokens/full', (params) => {
   }> = [];
   const lines = text.split('\n');
 
-  // Collect all node refs and transition refs
-  const nodeRefs = new Set(Object.keys(parsed.nodes || {}));
-  const transitionRefs = new Set(Object.keys(parsed.transitions || {}));
+  // Get imports for this document
+  const imports = importCache.get(uri);
+  const importAliases = imports ? new Set(imports.byAlias.keys()) : new Set<string>();
 
-  // Track which section we're in
-  let currentSection: 'none' | 'nodes' | 'transitions' | 'other' = 'none';
-  let sectionIndent = 0;
+  // For workflows, also highlight node/transition refs
+  if (isWorkflow) {
+    const wflowDoc = parsed as WflowDoc;
 
-  for (let lineNum = 0; lineNum < lines.length; lineNum++) {
-    const line = lines[lineNum];
-    const trimmed = line.trim();
-    if (!trimmed || trimmed.startsWith('#')) continue;
+    // Collect all node refs and transition refs
+    const nodeRefs = new Set(Object.keys(wflowDoc.nodes || {}));
+    const transitionRefs = new Set(Object.keys(wflowDoc.transitions || {}));
 
-    const lineIndent = line.length - line.trimStart().length;
+    // Track which section we're in
+    let currentSection: 'none' | 'nodes' | 'transitions' | 'imports' | 'other' = 'none';
 
-    // Detect top-level section changes
-    if (lineIndent === 0) {
-      if (trimmed.startsWith('nodes:')) {
-        currentSection = 'nodes';
-        sectionIndent = 0;
-      } else if (trimmed.startsWith('transitions:')) {
-        currentSection = 'transitions';
-        sectionIndent = 0;
-      } else if (trimmed.startsWith('initial_node_ref:')) {
-        // Highlight the value after initial_node_ref:
-        const match = line.match(/initial_node_ref:\s*(\S+)/);
-        if (match && nodeRefs.has(match[1])) {
-          const col = line.indexOf(match[1]);
-          tokens.push({ line: lineNum, col, length: match[1].length, type: 0, modifier: 0 });
+    for (let lineNum = 0; lineNum < lines.length; lineNum++) {
+      const line = lines[lineNum];
+      const trimmed = line.trim();
+      if (!trimmed || trimmed.startsWith('#')) continue;
+
+      const lineIndent = line.length - line.trimStart().length;
+
+      // Highlight task_id values that are imports
+      const taskIdMatch = trimmed.match(/^task_id:\s*(\S+)/);
+      if (taskIdMatch && importAliases.has(taskIdMatch[1])) {
+        const col = line.lastIndexOf(taskIdMatch[1]);
+        tokens.push({ line: lineNum, col, length: taskIdMatch[1].length, type: 2, modifier: 0 }); // variable
+      }
+
+      // Detect top-level section changes
+      if (lineIndent === 0) {
+        if (trimmed.startsWith('nodes:')) {
+          currentSection = 'nodes';
+        } else if (trimmed.startsWith('transitions:')) {
+          currentSection = 'transitions';
+        } else if (trimmed.startsWith('imports:')) {
+          currentSection = 'imports';
+        } else if (trimmed.startsWith('initial_node_ref:')) {
+          // Highlight the value after initial_node_ref:
+          const match = line.match(/initial_node_ref:\s*(\S+)/);
+          if (match && nodeRefs.has(match[1])) {
+            const col = line.indexOf(match[1]);
+            tokens.push({ line: lineNum, col, length: match[1].length, type: 0, modifier: 0 });
+          }
+          currentSection = 'other';
+        } else {
+          currentSection = 'other';
         }
-        currentSection = 'other';
-      } else {
-        currentSection = 'other';
+        continue;
       }
-      continue;
-    }
 
-    // Inside nodes section - highlight node definition keys at indent level 2
-    if (currentSection === 'nodes' && lineIndent === 2) {
-      const keyMatch = trimmed.match(/^(\w+):/);
-      if (keyMatch && nodeRefs.has(keyMatch[1])) {
-        const col = line.indexOf(keyMatch[1]);
-        tokens.push({ line: lineNum, col, length: keyMatch[1].length, type: 0, modifier: 1 }); // definition
-      }
-    }
-
-    // Inside transitions section
-    if (currentSection === 'transitions') {
-      // Transition definition keys at indent level 2
-      if (lineIndent === 2) {
+      // Inside imports section - highlight import aliases at indent level 2
+      if (currentSection === 'imports' && lineIndent === 2) {
         const keyMatch = trimmed.match(/^(\w+):/);
-        if (keyMatch && transitionRefs.has(keyMatch[1])) {
+        if (keyMatch && importAliases.has(keyMatch[1])) {
           const col = line.indexOf(keyMatch[1]);
-          tokens.push({ line: lineNum, col, length: keyMatch[1].length, type: 1, modifier: 1 }); // definition
+          tokens.push({ line: lineNum, col, length: keyMatch[1].length, type: 2, modifier: 1 }); // variable, definition
         }
       }
 
-      // from_node_ref / to_node_ref values
-      const nodeRefMatch = trimmed.match(/^(from_node_ref|to_node_ref):\s*(\S+)/);
-      if (nodeRefMatch && nodeRefs.has(nodeRefMatch[2])) {
-        const col = line.lastIndexOf(nodeRefMatch[2]);
-        tokens.push({ line: lineNum, col, length: nodeRefMatch[2].length, type: 0, modifier: 0 });
+      // Inside nodes section - highlight node definition keys at indent level 2
+      if (currentSection === 'nodes' && lineIndent === 2) {
+        const keyMatch = trimmed.match(/^(\w+):/);
+        if (keyMatch && nodeRefs.has(keyMatch[1])) {
+          const col = line.indexOf(keyMatch[1]);
+          tokens.push({ line: lineNum, col, length: keyMatch[1].length, type: 0, modifier: 1 }); // definition
+        }
       }
 
-      // sibling_group value (transition ref)
-      const siblingMatch = trimmed.match(/^sibling_group:\s*(\S+)/);
-      if (siblingMatch && transitionRefs.has(siblingMatch[1])) {
-        const col = line.lastIndexOf(siblingMatch[1]);
-        tokens.push({ line: lineNum, col, length: siblingMatch[1].length, type: 1, modifier: 0 });
+      // Inside transitions section
+      if (currentSection === 'transitions') {
+        // Transition definition keys at indent level 2
+        if (lineIndent === 2) {
+          const keyMatch = trimmed.match(/^(\w+):/);
+          if (keyMatch && transitionRefs.has(keyMatch[1])) {
+            const col = line.indexOf(keyMatch[1]);
+            tokens.push({ line: lineNum, col, length: keyMatch[1].length, type: 1, modifier: 1 }); // definition
+          }
+        }
+
+        // from_node_ref / to_node_ref values
+        const nodeRefMatch = trimmed.match(/^(from_node_ref|to_node_ref):\s*(\S+)/);
+        if (nodeRefMatch && nodeRefs.has(nodeRefMatch[2])) {
+          const col = line.lastIndexOf(nodeRefMatch[2]);
+          tokens.push({ line: lineNum, col, length: nodeRefMatch[2].length, type: 0, modifier: 0 });
+        }
+
+        // sibling_group value (transition ref)
+        const siblingMatch = trimmed.match(/^sibling_group:\s*(\S+)/);
+        if (siblingMatch && transitionRefs.has(siblingMatch[1])) {
+          const col = line.lastIndexOf(siblingMatch[1]);
+          tokens.push({ line: lineNum, col, length: siblingMatch[1].length, type: 1, modifier: 0 });
+        }
+      }
+    }
+  }
+
+  // For tasks, highlight action_id imports
+  if (isTask) {
+    for (let lineNum = 0; lineNum < lines.length; lineNum++) {
+      const line = lines[lineNum];
+      const trimmed = line.trim();
+      if (!trimmed || trimmed.startsWith('#')) continue;
+
+      const lineIndent = line.length - line.trimStart().length;
+
+      // Highlight action_id values that are imports
+      const actionIdMatch = trimmed.match(/^action_id:\s*(\S+)/);
+      if (actionIdMatch && importAliases.has(actionIdMatch[1])) {
+        const col = line.lastIndexOf(actionIdMatch[1]);
+        tokens.push({ line: lineNum, col, length: actionIdMatch[1].length, type: 2, modifier: 0 }); // variable
+      }
+
+      // Highlight import alias definitions
+      if (lineIndent === 2 && trimmed.match(/^imports\s*:/)) {
+        // We're in imports section
+      }
+    }
+
+    // Also scan for import definitions
+    let inImports = false;
+    for (let lineNum = 0; lineNum < lines.length; lineNum++) {
+      const line = lines[lineNum];
+      const trimmed = line.trim();
+      const lineIndent = line.length - line.trimStart().length;
+
+      if (lineIndent === 0 && trimmed.startsWith('imports:')) {
+        inImports = true;
+        continue;
+      }
+      if (lineIndent === 0 && !trimmed.startsWith('#')) {
+        inImports = false;
+        continue;
+      }
+      if (inImports && lineIndent === 2) {
+        const keyMatch = trimmed.match(/^(\w+):/);
+        if (keyMatch && importAliases.has(keyMatch[1])) {
+          const col = line.indexOf(keyMatch[1]);
+          tokens.push({ line: lineNum, col, length: keyMatch[1].length, type: 2, modifier: 1 }); // variable, definition
+        }
       }
     }
   }
@@ -738,6 +1064,7 @@ interface NodeDecl {
 }
 
 interface WflowDoc {
+  imports?: Record<string, string>;
   workflow?: string;
   version?: number;
   description?: string;
@@ -753,6 +1080,7 @@ interface WflowDoc {
 
 // Allowed properties per primitive - based on primitives.md
 const WORKFLOW_ALLOWED_PROPS = new Set([
+  'imports',
   'workflow',
   'version',
   'description',
@@ -819,6 +1147,7 @@ interface StepDecl {
 }
 
 interface TaskDoc {
+  imports?: Record<string, string>;
   task?: string;
   version?: number;
   name?: string;
@@ -850,6 +1179,7 @@ type ActionKind =
   | 'human';
 
 interface ActionDoc {
+  imports?: Record<string, string>;
   action?: string;
   version?: number;
   name?: string;
@@ -876,6 +1206,7 @@ interface ActionDoc {
 
 // Allowed properties for TaskDef
 const TASK_ALLOWED_PROPS = new Set([
+  'imports',
   'task',
   'version',
   'name',
@@ -910,6 +1241,7 @@ const RETRY_ALLOWED_PROPS = new Set([
 
 // Allowed properties for ActionDef
 const ACTION_ALLOWED_PROPS = new Set([
+  'imports',
   'action',
   'version',
   'name',
@@ -1349,25 +1681,104 @@ function validateDocument(document: TextDocument): void {
   }
 
   if (!parsed) {
+    importCache.delete(uri);
     connection.sendDiagnostics({ uri: document.uri, diagnostics: [] });
     return;
   }
 
   const lines = text.split('\n');
 
+  // Parse and cache imports
+  const parsedDoc = parsed as { imports?: Record<string, string> };
+  const imports = parseImports(parsedDoc.imports, uri, lines);
+  importCache.set(uri, imports);
+
+  // Validate imports exist
+  validateImports(imports, lines, diagnostics);
+
   // Route to appropriate validator
   if (isTask) {
-    validateTaskDocument(parsed as TaskDoc, lines, diagnostics);
+    validateTaskDocument(parsed as TaskDoc, lines, diagnostics, imports, uri);
   } else if (isAction) {
-    validateActionDocument(parsed as ActionDoc, lines, diagnostics);
+    validateActionDocument(parsed as ActionDoc, lines, diagnostics, imports);
   } else if (isWorkflow) {
-    validateWorkflowDocument(parsed as WflowDoc, lines, diagnostics);
+    validateWorkflowDocument(parsed as WflowDoc, lines, diagnostics, imports, uri);
   }
 
   connection.sendDiagnostics({ uri: document.uri, diagnostics });
 }
 
-function validateTaskDocument(parsed: TaskDoc, lines: string[], diagnostics: Diagnostic[]): void {
+// Validate that all imports resolve to existing files
+function validateImports(imports: ImportsMap, lines: string[], diagnostics: Diagnostic[]): void {
+  for (const imp of imports.all) {
+    if (!imp.resolvedUri) {
+      const lineIndex = imp.line;
+      const line = lines[lineIndex];
+      const pathStart = line.indexOf(imp.path);
+
+      diagnostics.push({
+        severity: DiagnosticSeverity.Error,
+        range: {
+          start: { line: lineIndex, character: pathStart },
+          end: { line: lineIndex, character: pathStart + imp.path.length },
+        },
+        message: `Import path '${imp.path}' not found`,
+        source: 'wflow',
+      });
+    } else if (imp.fileType === 'unknown' && !imp.resolvedUri.startsWith('package:')) {
+      // Warn if file type can't be determined
+      const lineIndex = imp.line;
+      const line = lines[lineIndex];
+      const pathStart = line.indexOf(imp.path);
+
+      diagnostics.push({
+        severity: DiagnosticSeverity.Warning,
+        range: {
+          start: { line: lineIndex, character: pathStart },
+          end: { line: lineIndex, character: pathStart + imp.path.length },
+        },
+        message: `Import path '${imp.path}' has unknown file type. Expected .task, .action, or .wflow`,
+        source: 'wflow',
+      });
+    }
+  }
+}
+
+// Track used imports and report unused ones
+function validateUnusedImports(
+  imports: ImportsMap,
+  usedAliases: Set<string>,
+  lines: string[],
+  diagnostics: Diagnostic[],
+): void {
+  for (const imp of imports.all) {
+    if (!usedAliases.has(imp.alias)) {
+      const lineIndex = imp.line;
+      const line = lines[lineIndex];
+      const aliasStart = line.indexOf(imp.alias);
+
+      diagnostics.push({
+        severity: DiagnosticSeverity.Warning,
+        range: {
+          start: { line: lineIndex, character: aliasStart },
+          end: { line: lineIndex, character: aliasStart + imp.alias.length },
+        },
+        message: `Unused import '${imp.alias}'`,
+        source: 'wflow',
+      });
+    }
+  }
+}
+
+function validateTaskDocument(
+  parsed: TaskDoc,
+  lines: string[],
+  diagnostics: Diagnostic[],
+  imports: ImportsMap,
+  documentUri: string,
+): void {
+  const usedImports = new Set<string>();
+
   // SCHEMA VALIDATION: Check for unknown properties
   validateUnknownProps(
     parsed as Record<string, unknown>,
@@ -1425,6 +1836,57 @@ function validateTaskDocument(parsed: TaskDoc, lines: string[], diagnostics: Dia
         stepStartLine,
       );
 
+      // Validate action_id reference
+      if (step.action_id && typeof step.action_id === 'string') {
+        const imp = imports.byAlias.get(step.action_id);
+        if (imp) {
+          usedImports.add(step.action_id);
+          // Validate it's an action file
+          if (imp.fileType !== 'action' && imp.fileType !== 'unknown') {
+            const lineIndex = findLineContainingAfter(lines, 'action_id:', stepStartLine);
+            if (lineIndex !== -1) {
+              const line = lines[lineIndex];
+              const charIndex = line.indexOf(step.action_id);
+              diagnostics.push({
+                severity: DiagnosticSeverity.Error,
+                range: {
+                  start: { line: lineIndex, character: charIndex },
+                  end: { line: lineIndex, character: charIndex + step.action_id.length },
+                },
+                message: `Import '${step.action_id}' resolves to a ${imp.fileType} file, but action_id requires an action`,
+                source: 'wflow',
+              });
+            }
+          }
+        } else if (!step.action_id.startsWith('@')) {
+          // Not imported and not a package path - error
+          const lineIndex = findLineContainingAfter(lines, 'action_id:', stepStartLine);
+          if (lineIndex !== -1) {
+            const line = lines[lineIndex];
+            const charIndex = line.indexOf(step.action_id);
+            const availableImports = [...imports.byAlias.keys()].filter((alias) => {
+              const i = imports.byAlias.get(alias);
+              return i?.fileType === 'action' || i?.fileType === 'unknown';
+            });
+            let message = `Action '${step.action_id}' is not imported.`;
+            if (availableImports.length > 0) {
+              message += ` Available actions: ${availableImports.join(', ')}`;
+            } else {
+              message += ` Add an import at the top of the file.`;
+            }
+            diagnostics.push({
+              severity: DiagnosticSeverity.Error,
+              range: {
+                start: { line: lineIndex, character: charIndex },
+                end: { line: lineIndex, character: charIndex + step.action_id.length },
+              },
+              message,
+              source: 'wflow',
+            });
+          }
+        }
+      }
+
       // Track step refs for duplicate detection
       if (step.ref) {
         if (stepRefs.has(step.ref)) {
@@ -1459,13 +1921,20 @@ function validateTaskDocument(parsed: TaskDoc, lines: string[], diagnostics: Dia
       }
     }
   }
+
+  // Report unused imports
+  validateUnusedImports(imports, usedImports, lines, diagnostics);
 }
 
 function validateActionDocument(
   parsed: ActionDoc,
   lines: string[],
   diagnostics: Diagnostic[],
+  imports: ImportsMap,
 ): void {
+  // Actions might import other actions for workflow kind, track usage
+  const usedImports = new Set<string>();
+
   // SCHEMA VALIDATION: Check for unknown properties
   validateUnknownProps(
     parsed as Record<string, unknown>,
@@ -1561,13 +2030,20 @@ function validateActionDocument(
       }
     }
   }
+
+  // Report unused imports
+  validateUnusedImports(imports, usedImports, lines, diagnostics);
 }
 
 function validateWorkflowDocument(
   parsed: WflowDoc,
   lines: string[],
   diagnostics: Diagnostic[],
+  imports: ImportsMap,
+  documentUri: string,
 ): void {
+  const usedImports = new Set<string>();
+
   // SCHEMA VALIDATION: Check for unknown properties
   validateUnknownProps(
     parsed as Record<string, unknown>,
@@ -1619,6 +2095,57 @@ function validateWorkflowDocument(
         diagnostics,
         nodeStartLine !== -1 ? nodeStartLine : 0,
       );
+
+      // Validate task_id reference against imports
+      if (node.task_id && typeof node.task_id === 'string') {
+        const imp = imports.byAlias.get(node.task_id);
+        if (imp) {
+          usedImports.add(node.task_id);
+          // Validate it's a task file
+          if (imp.fileType !== 'task' && imp.fileType !== 'unknown') {
+            const lineIndex = findLineContainingAfter(lines, 'task_id:', nodeStartLine);
+            if (lineIndex !== -1) {
+              const line = lines[lineIndex];
+              const charIndex = line.indexOf(node.task_id);
+              diagnostics.push({
+                severity: DiagnosticSeverity.Error,
+                range: {
+                  start: { line: lineIndex, character: charIndex },
+                  end: { line: lineIndex, character: charIndex + node.task_id.length },
+                },
+                message: `Import '${node.task_id}' resolves to a ${imp.fileType} file, but task_id requires a task`,
+                source: 'wflow',
+              });
+            }
+          }
+        } else if (!node.task_id.startsWith('@')) {
+          // Not imported and not a package path - error
+          const lineIndex = findLineContainingAfter(lines, 'task_id:', nodeStartLine);
+          if (lineIndex !== -1) {
+            const line = lines[lineIndex];
+            const charIndex = line.indexOf(node.task_id);
+            const availableImports = [...imports.byAlias.keys()].filter((alias) => {
+              const i = imports.byAlias.get(alias);
+              return i?.fileType === 'task' || i?.fileType === 'unknown';
+            });
+            let message = `Task '${node.task_id}' is not imported.`;
+            if (availableImports.length > 0) {
+              message += ` Available tasks: ${availableImports.join(', ')}`;
+            } else {
+              message += ` Add an import at the top of the file.`;
+            }
+            diagnostics.push({
+              severity: DiagnosticSeverity.Error,
+              range: {
+                start: { line: lineIndex, character: charIndex },
+                end: { line: lineIndex, character: charIndex + node.task_id.length },
+              },
+              message,
+              source: 'wflow',
+            });
+          }
+        }
+      }
     }
   }
 
@@ -2033,6 +2560,9 @@ function validateWorkflowDocument(
       }
     }
   }
+
+  // Report unused imports
+  validateUnusedImports(imports, usedImports, lines, diagnostics);
 }
 
 function findLineContaining(text: string, search: string): number {

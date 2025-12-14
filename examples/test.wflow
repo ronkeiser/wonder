@@ -1,4 +1,9 @@
 # Example workflow for testing the LSP
+imports:
+  start_task: "./test.task"
+  process_task: "./tasks/process.task"
+  missing_task: "./not-found.task"
+
 workflow: test-workflow
 version: 1
 description: A simple test workflow
@@ -28,7 +33,7 @@ output_schema:
 nodes:
   start:
     name: Start Node
-    task_id: "@library/example/start"
+    task_id: start_task
     task_version: 1
     bad_node_prop: test             # ⚠️ Should warn: unknown property in node
     input_mapping:
@@ -39,7 +44,7 @@ nodes:
 
   process:
     name: Process Node
-    task_id: "@library/example/process"
+    task_id: process_task
     task_version: 1
     input_mapping:
       greeting: "$.state.greeting"
@@ -50,7 +55,7 @@ nodes:
 
   finish:
     name: Finish Node
-    task_id: "@library/example/finish"
+    task_id: start_task
     task_version: 1
     input_mapping:
       greeting: "$.state.greeting"
@@ -59,10 +64,10 @@ nodes:
     output_mapping:
       "output.result": "$.final_message"
 
-  # This node is unreachable - no transitions lead to it
+  # This node uses an unimported task - should error
   orphan_node:
     name: Orphan Node
-    task_id: "@library/example/orphan"
+    task_id: not_imported_task
     task_version: 1
     input_mapping:
       greeting: "$.state.greeting"

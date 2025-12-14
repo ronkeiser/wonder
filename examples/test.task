@@ -1,4 +1,9 @@
 # Example task for testing the LSP
+imports:
+  context: "./test.action"
+  llm: "./actions/llm.action"
+  missing: "./not-found.action"
+
 task: generate-ideas
 version: 1
 name: Generate Ideas Task
@@ -36,7 +41,7 @@ output_schema:
 steps:
   - ref: prepare_prompt
     ordinal: 0
-    action_id: "@library/core/context"
+    action_id: context
     action_version: 1
     input_mapping:
       template: "$.input.topic"
@@ -45,7 +50,7 @@ steps:
 
   - ref: call_llm
     ordinal: 1
-    action_id: "@library/core/llm"
+    action_id: llm
     action_version: 1
     input_mapping:
       prompt: "$.state.prompt"
@@ -56,7 +61,7 @@ steps:
 
   - ref: parse_output
     ordinal: 2
-    action_id: "@library/core/context"
+    action_id: context
     action_version: 1
     input_mapping:
       raw: "$.state.raw_ideas"
@@ -68,12 +73,11 @@ steps:
       then: continue
       else: fail
 
-  # This step has an unknown property - should warn
+  # This step uses an unimported action - should error
   - ref: bad_step
     ordinal: 3
-    action_id: "@library/core/noop"
+    action_id: not_imported
     action_version: 1
-    unknown_step_prop: test    # ⚠️ Should warn
 
 retry:
   max_attempts: 3
