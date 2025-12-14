@@ -24,6 +24,28 @@
           ".wflow"
         ],
         "configuration": "./language-configuration.json"
+      },
+      {
+        "id": "wtask",
+        "aliases": [
+          "Wonder Task",
+          "wtask"
+        ],
+        "extensions": [
+          ".task"
+        ],
+        "configuration": "./language-configuration.json"
+      },
+      {
+        "id": "waction",
+        "aliases": [
+          "Wonder Action",
+          "waction"
+        ],
+        "extensions": [
+          ".action"
+        ],
+        "configuration": "./language-configuration.json"
       }
     ],
     "grammars": [
@@ -31,6 +53,57 @@
         "language": "wflow",
         "scopeName": "source.wflow",
         "path": "./syntaxes/wflow.tmLanguage.json"
+      },
+      {
+        "language": "wtask",
+        "scopeName": "source.wtask",
+        "path": "./syntaxes/wtask.tmLanguage.json"
+      },
+      {
+        "language": "waction",
+        "scopeName": "source.waction",
+        "path": "./syntaxes/waction.tmLanguage.json"
+      }
+    ],
+    "semanticTokenScopes": [
+      {
+        "language": "wflow",
+        "scopes": {
+          "function": [
+            "entity.name.function.node.wflow"
+          ],
+          "function.declaration": [
+            "entity.name.function.node.wflow"
+          ],
+          "class": [
+            "entity.name.class.transition.wflow"
+          ],
+          "class.declaration": [
+            "entity.name.class.transition.wflow"
+          ]
+        }
+      },
+      {
+        "language": "wtask",
+        "scopes": {
+          "function": [
+            "entity.name.function.step.wtask"
+          ],
+          "function.declaration": [
+            "entity.name.function.step.wtask"
+          ]
+        }
+      },
+      {
+        "language": "waction",
+        "scopes": {
+          "function": [
+            "entity.name.function.action.waction"
+          ],
+          "function.declaration": [
+            "entity.name.function.action.waction"
+          ]
+        }
       }
     ]
   },

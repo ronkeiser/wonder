@@ -1,0 +1,75 @@
+{
+  "$schema": "https://raw.githubusercontent.com/martinring/tmlanguage/master/tmlanguage.json",
+  "name": "Wonder Task",
+  "scopeName": "source.wtask",
+  "patterns": [
+    { "include": "#comments" },
+    { "include": "#top-level-keys" },
+    { "include": "#steps-section" },
+    { "include": "#nested-keys" },
+    { "include": "#strings" },
+    { "include": "#numbers" },
+    { "include": "#booleans" },
+    { "include": "#null" },
+    { "include": "#references" }
+  ],
+  "repository": {
+    "comments": {
+      "match": "#.*$",
+      "name": "comment.line.number-sign.wtask"
+    },
+    "top-level-keys": {
+      "match": "^(task|version|name|description|tags|input_schema|output_schema|retry|timeout_ms)\\s*:",
+      "captures": {
+        "1": { "name": "keyword.control.wtask" }
+      }
+    },
+    "steps-section": {
+      "begin": "^(steps)\\s*:",
+      "beginCaptures": {
+        "1": { "name": "keyword.control.wtask" }
+      },
+      "end": "^(?=\\S)",
+      "patterns": [
+        { "include": "#comments" },
+        { "include": "#nested-keys" },
+        { "include": "#strings" },
+        { "include": "#numbers" },
+        { "include": "#booleans" },
+        { "include": "#references" }
+      ]
+    },
+    "nested-keys": {
+      "match": "^\\s+(ref|ordinal|action_id|action_version|input_mapping|output_mapping|on_failure|condition|if|then|else|max_attempts|backoff|initial_delay_ms|max_delay_ms|type|properties|required|items)\\s*:",
+      "captures": {
+        "1": { "name": "support.type.property-name.wtask" }
+      }
+    },
+    "strings": {
+      "begin": "\"",
+      "end": "\"",
+      "name": "string.quoted.double.wtask",
+      "patterns": [{ "include": "#jsonpath-in-string" }]
+    },
+    "jsonpath-in-string": {
+      "match": "\\$\\.(input|state|output)\\.[a-zA-Z_][a-zA-Z0-9_.]*",
+      "name": "variable.other.jsonpath.wtask"
+    },
+    "numbers": {
+      "match": "\\b[0-9]+\\b",
+      "name": "constant.numeric.wtask"
+    },
+    "booleans": {
+      "match": "\\b(true|false)\\b",
+      "name": "constant.language.boolean.wtask"
+    },
+    "null": {
+      "match": "\\bnull\\b",
+      "name": "constant.language.null.wtask"
+    },
+    "references": {
+      "match": "@[a-zA-Z_][a-zA-Z0-9_/.-]*",
+      "name": "entity.name.tag.reference.wtask"
+    }
+  }
+}

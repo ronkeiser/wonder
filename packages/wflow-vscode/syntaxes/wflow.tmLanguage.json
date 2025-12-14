@@ -4,42 +4,87 @@
   "scopeName": "source.wflow",
   "patterns": [
     { "include": "#comments" },
-    { "include": "#keywords" },
+    { "include": "#nodes-section" },
+    { "include": "#transitions-section" },
+    { "include": "#top-level-keys" },
+    { "include": "#nested-keys" },
     { "include": "#strings" },
     { "include": "#numbers" },
-    { "include": "#transitions" },
-    { "include": "#references" },
-    { "include": "#paths" }
+    { "include": "#booleans" },
+    { "include": "#null" },
+    { "include": "#references" }
   ],
   "repository": {
     "comments": {
       "match": "#.*$",
       "name": "comment.line.number-sign.wflow"
     },
-    "keywords": {
-      "match": "\\b(workflow|version|description|schemas|nodes|transitions|initial|timeout|on_timeout|task|reads|writes|resources|when|loop|spawn|sync|input|context|output)\\b",
-      "name": "keyword.control.wflow"
+    "top-level-keys": {
+      "match": "^(workflow|version|description|input_schema|context_schema|output_schema|initial_node_ref|timeout_ms|on_timeout)\\s*:",
+      "captures": {
+        "1": { "name": "keyword.control.wflow" }
+      }
+    },
+    "nodes-section": {
+      "begin": "^(nodes)\\s*:",
+      "beginCaptures": {
+        "1": { "name": "keyword.control.wflow" }
+      },
+      "end": "^(?=\\S)",
+      "patterns": [
+        { "include": "#comments" },
+        { "include": "#nested-keys" },
+        { "include": "#strings" },
+        { "include": "#numbers" },
+        { "include": "#booleans" },
+        { "include": "#references" }
+      ]
+    },
+    "transitions-section": {
+      "begin": "^(transitions)\\s*:",
+      "beginCaptures": {
+        "1": { "name": "keyword.control.wflow" }
+      },
+      "end": "^(?=\\S)",
+      "patterns": [
+        { "include": "#comments" },
+        { "include": "#nested-keys" },
+        { "include": "#strings" },
+        { "include": "#numbers" },
+        { "include": "#booleans" }
+      ]
+    },
+    "nested-keys": {
+      "match": "^\\s+(name|task_id|task_version|input_mapping|output_mapping|resource_bindings|priority|condition|spawn_count|foreach|synchronization|loop_config|type|properties|required|items|strategy|merge|source|target|collection|item_var|expr|definition|reads|from_node_ref|to_node_ref|sibling_group)\\s*:",
+      "captures": {
+        "1": { "name": "support.type.property-name.wflow" }
+      }
     },
     "strings": {
       "begin": "\"",
       "end": "\"",
-      "name": "string.quoted.double.wflow"
+      "name": "string.quoted.double.wflow",
+      "patterns": [{ "include": "#jsonpath-in-string" }]
+    },
+    "jsonpath-in-string": {
+      "match": "\\$\\.(input|state|output)\\.[a-zA-Z_][a-zA-Z0-9_.]*",
+      "name": "variable.other.jsonpath.wflow"
     },
     "numbers": {
       "match": "\\b[0-9]+\\b",
       "name": "constant.numeric.wflow"
     },
-    "transitions": {
-      "match": "->",
-      "name": "keyword.operator.transition.wflow"
+    "booleans": {
+      "match": "\\b(true|false)\\b",
+      "name": "constant.language.boolean.wflow"
+    },
+    "null": {
+      "match": "\\bnull\\b",
+      "name": "constant.language.null.wflow"
     },
     "references": {
       "match": "@[a-zA-Z_][a-zA-Z0-9_/.-]*",
       "name": "entity.name.tag.reference.wflow"
-    },
-    "paths": {
-      "match": "\\b(input|context|output)\\.[a-zA-Z_][a-zA-Z0-9_.]*",
-      "name": "variable.other.path.wflow"
     }
   }
 }

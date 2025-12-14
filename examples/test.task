@@ -1,0 +1,87 @@
+# Example task for testing the LSP
+task: generate-ideas
+version: 1
+name: Generate Ideas Task
+description: A task that generates creative ideas using an LLM
+
+tags:
+  - ideation
+  - creative
+  - llm
+
+input_schema:
+  type: object
+  properties:
+    topic:
+      type: string
+      description: The topic to generate ideas about
+    count:
+      type: integer
+      minimum: 1
+      maximum: 20
+      default: 5
+  required: [topic]
+
+output_schema:
+  type: object
+  properties:
+    ideas:
+      type: array
+      items:
+        type: string
+    confidence:
+      type: number
+  required: [ideas]
+
+steps:
+  - ref: prepare_prompt
+    ordinal: 0
+    action_id: "@library/core/context"
+    action_version: 1
+    input_mapping:
+      template: "$.input.topic"
+    output_mapping:
+      "state.prompt": "$.result"
+
+  - ref: call_llm
+    ordinal: 1
+    action_id: "@library/core/llm"
+    action_version: 1
+    input_mapping:
+      prompt: "$.state.prompt"
+      count: "$.input.count"
+    output_mapping:
+      "state.raw_ideas": "$.response"
+    on_failure: retry
+
+  - ref: parse_output
+    ordinal: 2
+    action_id: "@library/core/context"
+    action_version: 1
+    input_mapping:
+      raw: "$.state.raw_ideas"
+    output_mapping:
+      "output.ideas": "$.parsed"
+      "output.confidence": "$.score"
+    condition:
+      if: "length(state.raw_ideas) > 0"
+      then: continue
+      else: fail
+
+  # This step has an unknown property - should warn
+  - ref: bad_step
+    ordinal: 3
+    action_id: "@library/core/noop"
+    action_version: 1
+    unknown_step_prop: test    # ⚠️ Should warn
+
+retry:
+  max_attempts: 3
+  backoff: exponential
+  initial_delay_ms: 1000
+  max_delay_ms: 30000
+
+timeout_ms: 120000
+
+# Unknown top-level property - should warn
+unknown_task_prop: oops

@@ -1,0 +1,57 @@
+# Example action for testing the LSP
+action: llm-completion
+version: 1
+name: LLM Completion Action
+description: Executes an LLM completion request
+
+kind: llm
+
+requires:
+  type: object
+  properties:
+    prompt:
+      type: string
+      description: The prompt to send to the LLM
+    temperature:
+      type: number
+      minimum: 0
+      maximum: 2
+    max_tokens:
+      type: integer
+  required: [prompt]
+
+produces:
+  type: object
+  properties:
+    response:
+      type: string
+    tokens_used:
+      type: integer
+    model:
+      type: string
+  required: [response]
+
+implementation:
+  prompt_spec_id: "@library/prompts/creative"
+  model_profile_id: "@project/profiles/fast"
+  # Unknown implementation prop for llm kind - should warn
+  bad_impl_prop: oops
+
+execution:
+  timeout_ms: 30000
+  retry_policy:
+    max_attempts: 3
+    backoff: exponential
+    initial_delay_ms: 500
+    max_delay_ms: 10000
+    retryable_errors:
+      - rate_limit
+      - timeout
+      - 5xx
+
+idempotency:
+  key_template: "{{input.prompt}}"
+  ttl_seconds: 3600
+
+# Unknown top-level property - should warn
+unknown_action_prop: test

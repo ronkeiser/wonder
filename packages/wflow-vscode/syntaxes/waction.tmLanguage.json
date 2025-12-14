@@ -1,0 +1,76 @@
+{
+  "$schema": "https://raw.githubusercontent.com/martinring/tmlanguage/master/tmlanguage.json",
+  "name": "Wonder Action",
+  "scopeName": "source.waction",
+  "patterns": [
+    { "include": "#comments" },
+    { "include": "#top-level-keys" },
+    { "include": "#implementation-section" },
+    { "include": "#nested-keys" },
+    { "include": "#strings" },
+    { "include": "#numbers" },
+    { "include": "#booleans" },
+    { "include": "#null" },
+    { "include": "#references" }
+  ],
+  "repository": {
+    "comments": {
+      "match": "#.*$",
+      "name": "comment.line.number-sign.waction"
+    },
+    "top-level-keys": {
+      "match": "^(action|version|name|description|kind|requires|produces|execution|idempotency)\\s*:",
+      "captures": {
+        "1": { "name": "keyword.control.waction" }
+      }
+    },
+    "implementation-section": {
+      "begin": "^(implementation)\\s*:",
+      "beginCaptures": {
+        "1": { "name": "keyword.control.waction" }
+      },
+      "end": "^(?=\\S)",
+      "patterns": [
+        { "include": "#comments" },
+        { "include": "#kind-specific-keys" },
+        { "include": "#strings" },
+        { "include": "#numbers" },
+        { "include": "#booleans" },
+        { "include": "#references" }
+      ]
+    },
+    "kind-specific-keys": {
+      "match": "^\\s+(prompt_spec_id|model_profile_id|mcp_server_id|tool_name|tool_version|url_template|method|headers|body_template|command_template|working_dir|resource_name|workflow_def_id|inherit_artifacts|pass_resources|on_failure|updates|path|expr|vector_index_id|top_k|similarity_threshold|metric_name|value|dimensions)\\s*:",
+      "captures": {
+        "1": { "name": "support.type.property-name.waction" }
+      }
+    },
+    "nested-keys": {
+      "match": "^\\s+(type|properties|required|items|timeout_ms|retry_policy|max_attempts|backoff|initial_delay_ms|max_delay_ms|retryable_errors|key_template|ttl_seconds)\\s*:",
+      "captures": {
+        "1": { "name": "support.type.property-name.waction" }
+      }
+    },
+    "strings": {
+      "begin": "\"",
+      "end": "\"",
+      "name": "string.quoted.double.waction"
+    },
+    "numbers": {
+      "match": "\\b[0-9]+\\b",
+      "name": "constant.numeric.waction"
+    },
+    "booleans": {
+      "match": "\\b(true|false)\\b",
+      "name": "constant.language.boolean.waction"
+    },
+    "null": {
+      "match": "\\bnull\\b",
+      "name": "constant.language.null.waction"
+    },
+    "references": {
+      "match": "@[a-zA-Z_][a-zA-Z0-9_/.-]*",
+      "name": "entity.name.tag.reference.waction"
+    }
+  }
+}

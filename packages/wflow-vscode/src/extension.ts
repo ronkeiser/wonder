@@ -19,7 +19,11 @@ export function activate(context: ExtensionContext) {
   };
 
   const clientOptions: LanguageClientOptions = {
-    documentSelector: [{ scheme: 'file', language: 'wflow' }],
+    documentSelector: [
+      { scheme: 'file', language: 'wflow' },
+      { scheme: 'file', language: 'wtask' },
+      { scheme: 'file', language: 'waction' },
+    ],
   };
 
   client = new LanguageClient(

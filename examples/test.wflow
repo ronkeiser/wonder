@@ -59,6 +59,16 @@ nodes:
     output_mapping:
       "output.result": "$.final_message"
 
+  # This node is unreachable - no transitions lead to it
+  orphan_node:
+    name: Orphan Node
+    task_id: "@library/example/orphan"
+    task_version: 1
+    input_mapping:
+      greeting: "$.state.greeting"
+    output_mapping:
+      "state.orphan_data": "$.result"
+
 transitions:
   start_to_process:
     from_node_ref: start
@@ -68,6 +78,12 @@ transitions:
   process_to_finish:
     from_node_ref: process
     to_node_ref: finish
+    priority: 0
+
+  # This creates a cycle: finish → start → process → finish
+  finish_to_start:
+    from_node_ref: finish
+    to_node_ref: start
     priority: 0
 
   # These should show red squigglies - undefined node refs

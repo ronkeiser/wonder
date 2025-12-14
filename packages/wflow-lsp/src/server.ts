@@ -1,13 +1,18 @@
 import { TextDocument } from 'vscode-languageserver-textdocument';
 import {
+  CompletionItem,
+  CompletionItemKind,
   createConnection,
   Diagnostic,
   DiagnosticSeverity,
   Hover,
   InitializeParams,
   InitializeResult,
+  InsertTextFormat,
   MarkupKind,
   ProposedFeatures,
+  SemanticTokensBuilder,
+  SemanticTokensLegend,
   TextDocuments,
   TextDocumentSyncKind,
 } from 'vscode-languageserver/node';
@@ -16,11 +21,28 @@ import { parse as parseYaml } from 'yaml';
 const connection = createConnection(ProposedFeatures.all);
 const documents = new TextDocuments(TextDocument);
 
+// Semantic token types - these map to VS Code's built-in token types
+const tokenTypes = ['function', 'class', 'variable', 'property'];
+const tokenModifiers = ['declaration', 'definition'];
+
+const legend: SemanticTokensLegend = {
+  tokenTypes,
+  tokenModifiers,
+};
+
 connection.onInitialize((_params: InitializeParams): InitializeResult => {
   return {
     capabilities: {
       textDocumentSync: TextDocumentSyncKind.Incremental,
       hoverProvider: true,
+      completionProvider: {
+        triggerCharacters: ['.', ':', '$', '"'],
+        resolveProvider: false,
+      },
+      semanticTokensProvider: {
+        legend,
+        full: true,
+      },
     },
   };
 });
@@ -79,7 +101,10 @@ connection.onHover((params): Hover | null => {
   return null;
 });
 
-function getWordRangeAtPosition(line: string, character: number): { start: number; end: number } | null {
+function getWordRangeAtPosition(
+  line: string,
+  character: number,
+): { start: number; end: number } | null {
   // Extend word to include $, ., and alphanumeric/underscore (for JSONPath)
   const wordChars = /[\w$._-]/;
 
@@ -138,7 +163,7 @@ function createPathHover(
   fullPath: string,
   pathRest: string,
   schema: JSONSchemaProperty | undefined,
-  schemaType: string
+  schemaType: string,
 ): Hover | null {
   if (!schema) {
     return {
@@ -192,6 +217,486 @@ function createPathHover(
     },
   };
 }
+
+// Completion handler
+connection.onCompletion((params): CompletionItem[] => {
+  const document = documents.get(params.textDocument.uri);
+  if (!document) return [];
+
+  const uri = document.uri;
+  const text = document.getText();
+  const lines = text.split('\n');
+  const line = lines[params.position.line];
+  const linePrefix = line.substring(0, params.position.character);
+
+  // Detect file type
+  const isTask = uri.endsWith('.task');
+  const isAction = uri.endsWith('.action');
+  const isWorkflow = uri.endsWith('.wflow');
+
+  // Determine context based on line content and indentation
+  const indent = line.length - line.trimStart().length;
+  const trimmed = linePrefix.trim();
+
+  // Top-level completions (indent 0)
+  if (indent === 0 && !trimmed.includes(':')) {
+    if (isTask) {
+      return [
+        { label: 'task', kind: CompletionItemKind.Keyword, insertText: 'task: ' },
+        { label: 'version', kind: CompletionItemKind.Keyword, insertText: 'version: ' },
+        { label: 'name', kind: CompletionItemKind.Keyword, insertText: 'name: ' },
+        { label: 'description', kind: CompletionItemKind.Keyword, insertText: 'description: ' },
+        { label: 'tags', kind: CompletionItemKind.Keyword, insertText: 'tags:\n  - ' },
+        {
+          label: 'input_schema',
+          kind: CompletionItemKind.Keyword,
+          insertText: 'input_schema:\n  type: object\n  properties:\n    ',
+        },
+        {
+          label: 'output_schema',
+          kind: CompletionItemKind.Keyword,
+          insertText: 'output_schema:\n  type: object\n  properties:\n    ',
+        },
+        {
+          label: 'steps',
+          kind: CompletionItemKind.Keyword,
+          insertText: 'steps:\n  - ref: \n    ordinal: 0\n    action_id: ',
+        },
+        {
+          label: 'retry',
+          kind: CompletionItemKind.Keyword,
+          insertText: 'retry:\n  max_attempts: 3\n  backoff: exponential\n  initial_delay_ms: 1000',
+        },
+        { label: 'timeout_ms', kind: CompletionItemKind.Keyword, insertText: 'timeout_ms: ' },
+      ];
+    } else if (isAction) {
+      return [
+        { label: 'action', kind: CompletionItemKind.Keyword, insertText: 'action: ' },
+        { label: 'version', kind: CompletionItemKind.Keyword, insertText: 'version: ' },
+        { label: 'name', kind: CompletionItemKind.Keyword, insertText: 'name: ' },
+        { label: 'description', kind: CompletionItemKind.Keyword, insertText: 'description: ' },
+        { label: 'kind', kind: CompletionItemKind.Keyword, insertText: 'kind: ' },
+        {
+          label: 'requires',
+          kind: CompletionItemKind.Keyword,
+          insertText: 'requires:\n  type: object\n  properties:\n    ',
+        },
+        {
+          label: 'produces',
+          kind: CompletionItemKind.Keyword,
+          insertText: 'produces:\n  type: object\n  properties:\n    ',
+        },
+        {
+          label: 'implementation',
+          kind: CompletionItemKind.Keyword,
+          insertText: 'implementation:\n  ',
+        },
+        {
+          label: 'execution',
+          kind: CompletionItemKind.Keyword,
+          insertText: 'execution:\n  timeout_ms: \n  retry_policy:\n    max_attempts: 3',
+        },
+        {
+          label: 'idempotency',
+          kind: CompletionItemKind.Keyword,
+          insertText: 'idempotency:\n  key_template: \n  ttl_seconds: ',
+        },
+      ];
+    } else {
+      return [
+        { label: 'workflow', kind: CompletionItemKind.Keyword, insertText: 'workflow: ' },
+        { label: 'version', kind: CompletionItemKind.Keyword, insertText: 'version: ' },
+        { label: 'description', kind: CompletionItemKind.Keyword, insertText: 'description: ' },
+        {
+          label: 'input_schema',
+          kind: CompletionItemKind.Keyword,
+          insertText: 'input_schema:\n  type: object\n  properties:\n    ',
+        },
+        {
+          label: 'context_schema',
+          kind: CompletionItemKind.Keyword,
+          insertText: 'context_schema:\n  type: object\n  properties:\n    ',
+        },
+        {
+          label: 'output_schema',
+          kind: CompletionItemKind.Keyword,
+          insertText: 'output_schema:\n  type: object\n  properties:\n    ',
+        },
+        { label: 'nodes', kind: CompletionItemKind.Keyword, insertText: 'nodes:\n  ' },
+        { label: 'transitions', kind: CompletionItemKind.Keyword, insertText: 'transitions:\n  ' },
+        {
+          label: 'initial_node_ref',
+          kind: CompletionItemKind.Keyword,
+          insertText: 'initial_node_ref: ',
+        },
+        { label: 'timeout_ms', kind: CompletionItemKind.Keyword, insertText: 'timeout_ms: ' },
+        { label: 'on_timeout', kind: CompletionItemKind.Keyword, insertText: 'on_timeout: ' },
+      ];
+    }
+  }
+
+  // Action kind completions
+  if (isAction && trimmed.startsWith('kind:')) {
+    return [
+      { label: 'llm', kind: CompletionItemKind.EnumMember, detail: 'LLM inference' },
+      { label: 'mcp', kind: CompletionItemKind.EnumMember, detail: 'MCP tool call' },
+      { label: 'http', kind: CompletionItemKind.EnumMember, detail: 'HTTP API call' },
+      { label: 'tool', kind: CompletionItemKind.EnumMember, detail: 'Standard library tool' },
+      { label: 'shell', kind: CompletionItemKind.EnumMember, detail: 'Shell command' },
+      { label: 'workflow', kind: CompletionItemKind.EnumMember, detail: 'Sub-workflow' },
+      { label: 'context', kind: CompletionItemKind.EnumMember, detail: 'Context transformation' },
+      { label: 'vector', kind: CompletionItemKind.EnumMember, detail: 'Vector search' },
+      { label: 'metric', kind: CompletionItemKind.EnumMember, detail: 'Emit metric' },
+      { label: 'human', kind: CompletionItemKind.EnumMember, detail: 'Human approval' },
+    ];
+  }
+
+  // Task step completions
+  if (isTask) {
+    // Inside steps array
+    let inSteps = false;
+    for (let i = params.position.line - 1; i >= 0; i--) {
+      const prevLine = lines[i];
+      if (prevLine.match(/^steps\s*:/)) {
+        inSteps = true;
+        break;
+      }
+      if (prevLine.match(/^\S/) && !prevLine.startsWith('#')) {
+        break;
+      }
+    }
+
+    if (inSteps && indent >= 4 && !trimmed.includes(':')) {
+      return [
+        { label: 'ref', kind: CompletionItemKind.Property, insertText: 'ref: ' },
+        { label: 'ordinal', kind: CompletionItemKind.Property, insertText: 'ordinal: ' },
+        { label: 'action_id', kind: CompletionItemKind.Property, insertText: 'action_id: ' },
+        {
+          label: 'action_version',
+          kind: CompletionItemKind.Property,
+          insertText: 'action_version: ',
+        },
+        {
+          label: 'input_mapping',
+          kind: CompletionItemKind.Property,
+          insertText: 'input_mapping:\n      ',
+        },
+        {
+          label: 'output_mapping',
+          kind: CompletionItemKind.Property,
+          insertText: 'output_mapping:\n      ',
+        },
+        { label: 'on_failure', kind: CompletionItemKind.Property, insertText: 'on_failure: ' },
+        {
+          label: 'condition',
+          kind: CompletionItemKind.Property,
+          insertText: 'condition:\n      if: \n      then: continue\n      else: skip',
+        },
+      ];
+    }
+
+    // on_failure value completions
+    if (trimmed.startsWith('on_failure:')) {
+      return [
+        { label: 'abort', kind: CompletionItemKind.EnumMember, detail: 'Task fails immediately' },
+        { label: 'retry', kind: CompletionItemKind.EnumMember, detail: 'Restart task from step 0' },
+        {
+          label: 'continue',
+          kind: CompletionItemKind.EnumMember,
+          detail: 'Ignore failure, proceed',
+        },
+      ];
+    }
+
+    // backoff value completions
+    if (trimmed.startsWith('backoff:')) {
+      return [
+        { label: 'none', kind: CompletionItemKind.EnumMember },
+        { label: 'linear', kind: CompletionItemKind.EnumMember },
+        { label: 'exponential', kind: CompletionItemKind.EnumMember },
+      ];
+    }
+  }
+
+  // Workflow-specific completions
+  if (isWorkflow) {
+    let parsed: WflowDoc;
+    try {
+      parsed = parseYaml(text) as WflowDoc;
+    } catch {
+      parsed = {} as WflowDoc;
+    }
+
+    // Extract valid paths from schemas
+    const inputPaths = extractPaths(parsed.input_schema, 'input');
+    const contextPaths = extractPaths(parsed.context_schema, 'state');
+    const outputPaths = extractPaths(parsed.output_schema, 'output');
+    const nodeRefs = Object.keys(parsed.nodes || {});
+    const transitionRefs = Object.keys(parsed.transitions || {});
+
+    // initial_node_ref value completions
+    if (trimmed.startsWith('initial_node_ref:')) {
+      return nodeRefs.map((ref) => ({
+        label: ref,
+        kind: CompletionItemKind.Reference,
+      }));
+    }
+
+    // Detect which section we're in
+    let inNodes = false;
+    let inTransitions = false;
+    for (let i = params.position.line - 1; i >= 0; i--) {
+      const prevLine = lines[i];
+      if (prevLine.match(/^nodes\s*:/)) {
+        inNodes = true;
+        break;
+      }
+      if (prevLine.match(/^transitions\s*:/)) {
+        inTransitions = true;
+        break;
+      }
+      if (prevLine.match(/^\S/) && !prevLine.startsWith('#')) {
+        break;
+      }
+    }
+
+    // Node property completions (indent 4)
+    if (inNodes && indent === 4 && !trimmed.includes(':')) {
+      return [
+        { label: 'name', kind: CompletionItemKind.Property, insertText: 'name: ' },
+        { label: 'task_id', kind: CompletionItemKind.Property, insertText: 'task_id: ' },
+        { label: 'task_version', kind: CompletionItemKind.Property, insertText: 'task_version: ' },
+        {
+          label: 'input_mapping',
+          kind: CompletionItemKind.Property,
+          insertText: 'input_mapping:\n      ',
+        },
+        {
+          label: 'output_mapping',
+          kind: CompletionItemKind.Property,
+          insertText: 'output_mapping:\n      ',
+        },
+        {
+          label: 'resource_bindings',
+          kind: CompletionItemKind.Property,
+          insertText: 'resource_bindings:\n      ',
+        },
+      ];
+    }
+
+    // Transition property completions (indent 4)
+    if (inTransitions && indent === 4 && !trimmed.includes(':')) {
+      return [
+        {
+          label: 'from_node_ref',
+          kind: CompletionItemKind.Property,
+          insertText: 'from_node_ref: ',
+        },
+        { label: 'to_node_ref', kind: CompletionItemKind.Property, insertText: 'to_node_ref: ' },
+        { label: 'priority', kind: CompletionItemKind.Property, insertText: 'priority: ' },
+        {
+          label: 'condition',
+          kind: CompletionItemKind.Property,
+          insertText: 'condition:\n      type: ',
+        },
+        { label: 'spawn_count', kind: CompletionItemKind.Property, insertText: 'spawn_count: ' },
+        {
+          label: 'foreach',
+          kind: CompletionItemKind.Property,
+          insertText: 'foreach:\n      collection: \n      item_var: ',
+        },
+        {
+          label: 'synchronization',
+          kind: CompletionItemKind.Property,
+          insertText: 'synchronization:\n      strategy: ',
+        },
+      ];
+    }
+
+    // from_node_ref / to_node_ref value completions
+    if (trimmed.match(/^(from_node_ref|to_node_ref)\s*:\s*/)) {
+      return nodeRefs.map((ref) => ({
+        label: ref,
+        kind: CompletionItemKind.Reference,
+      }));
+    }
+
+    // sibling_group value completions
+    if (trimmed.match(/^sibling_group\s*:\s*/)) {
+      return transitionRefs.map((ref) => ({
+        label: ref,
+        kind: CompletionItemKind.Reference,
+      }));
+    }
+
+    // JSONPath completions for input_mapping values ($.input.* or $.state.*)
+    if (trimmed.includes('"$.') || trimmed.endsWith('"$')) {
+      const items: CompletionItem[] = [];
+      for (const path of inputPaths) {
+        items.push({
+          label: `$.${path}`,
+          kind: CompletionItemKind.Value,
+          insertText: `$.${path}"`,
+        });
+      }
+      for (const path of contextPaths) {
+        items.push({
+          label: `$.${path}`,
+          kind: CompletionItemKind.Value,
+          insertText: `$.${path}"`,
+        });
+      }
+      return items;
+    }
+
+    // output_mapping key completions (state.* or output.*)
+    if (inNodes && indent === 6 && linePrefix.includes('output_mapping')) {
+      const items: CompletionItem[] = [];
+      for (const path of contextPaths) {
+        items.push({
+          label: path,
+          kind: CompletionItemKind.Property,
+          insertText: `"${path}": `,
+        });
+      }
+      for (const path of outputPaths) {
+        items.push({
+          label: path,
+          kind: CompletionItemKind.Property,
+          insertText: `"${path}": `,
+        });
+      }
+      return items;
+    }
+
+    // General output_mapping context path completions
+    if (trimmed.startsWith('"state.') || trimmed.startsWith('"output.')) {
+      const items: CompletionItem[] = [];
+      for (const path of contextPaths) {
+        items.push({
+          label: path,
+          kind: CompletionItemKind.Property,
+        });
+      }
+      for (const path of outputPaths) {
+        items.push({
+          label: path,
+          kind: CompletionItemKind.Property,
+        });
+      }
+      return items;
+    }
+  }
+
+  return [];
+});
+
+// Semantic tokens handler - highlights node/transition refs only in valid contexts
+connection.onRequest('textDocument/semanticTokens/full', (params) => {
+  const document = documents.get(params.textDocument.uri);
+  if (!document) return { data: [] };
+
+  const text = document.getText();
+  let parsed: WflowDoc;
+  try {
+    parsed = parseYaml(text) as WflowDoc;
+  } catch {
+    return { data: [] };
+  }
+  if (!parsed) return { data: [] };
+
+  const tokens: Array<{
+    line: number;
+    col: number;
+    length: number;
+    type: number;
+    modifier: number;
+  }> = [];
+  const lines = text.split('\n');
+
+  // Collect all node refs and transition refs
+  const nodeRefs = new Set(Object.keys(parsed.nodes || {}));
+  const transitionRefs = new Set(Object.keys(parsed.transitions || {}));
+
+  // Track which section we're in
+  let currentSection: 'none' | 'nodes' | 'transitions' | 'other' = 'none';
+  let sectionIndent = 0;
+
+  for (let lineNum = 0; lineNum < lines.length; lineNum++) {
+    const line = lines[lineNum];
+    const trimmed = line.trim();
+    if (!trimmed || trimmed.startsWith('#')) continue;
+
+    const lineIndent = line.length - line.trimStart().length;
+
+    // Detect top-level section changes
+    if (lineIndent === 0) {
+      if (trimmed.startsWith('nodes:')) {
+        currentSection = 'nodes';
+        sectionIndent = 0;
+      } else if (trimmed.startsWith('transitions:')) {
+        currentSection = 'transitions';
+        sectionIndent = 0;
+      } else if (trimmed.startsWith('initial_node_ref:')) {
+        // Highlight the value after initial_node_ref:
+        const match = line.match(/initial_node_ref:\s*(\S+)/);
+        if (match && nodeRefs.has(match[1])) {
+          const col = line.indexOf(match[1]);
+          tokens.push({ line: lineNum, col, length: match[1].length, type: 0, modifier: 0 });
+        }
+        currentSection = 'other';
+      } else {
+        currentSection = 'other';
+      }
+      continue;
+    }
+
+    // Inside nodes section - highlight node definition keys at indent level 2
+    if (currentSection === 'nodes' && lineIndent === 2) {
+      const keyMatch = trimmed.match(/^(\w+):/);
+      if (keyMatch && nodeRefs.has(keyMatch[1])) {
+        const col = line.indexOf(keyMatch[1]);
+        tokens.push({ line: lineNum, col, length: keyMatch[1].length, type: 0, modifier: 1 }); // definition
+      }
+    }
+
+    // Inside transitions section
+    if (currentSection === 'transitions') {
+      // Transition definition keys at indent level 2
+      if (lineIndent === 2) {
+        const keyMatch = trimmed.match(/^(\w+):/);
+        if (keyMatch && transitionRefs.has(keyMatch[1])) {
+          const col = line.indexOf(keyMatch[1]);
+          tokens.push({ line: lineNum, col, length: keyMatch[1].length, type: 1, modifier: 1 }); // definition
+        }
+      }
+
+      // from_node_ref / to_node_ref values
+      const nodeRefMatch = trimmed.match(/^(from_node_ref|to_node_ref):\s*(\S+)/);
+      if (nodeRefMatch && nodeRefs.has(nodeRefMatch[2])) {
+        const col = line.lastIndexOf(nodeRefMatch[2]);
+        tokens.push({ line: lineNum, col, length: nodeRefMatch[2].length, type: 0, modifier: 0 });
+      }
+
+      // sibling_group value (transition ref)
+      const siblingMatch = trimmed.match(/^sibling_group:\s*(\S+)/);
+      if (siblingMatch && transitionRefs.has(siblingMatch[1])) {
+        const col = line.lastIndexOf(siblingMatch[1]);
+        tokens.push({ line: lineNum, col, length: siblingMatch[1].length, type: 1, modifier: 0 });
+      }
+    }
+  }
+
+  // Sort tokens by position (required by semantic tokens protocol)
+  tokens.sort((a, b) => a.line - b.line || a.col - b.col);
+
+  const builder = new SemanticTokensBuilder();
+  for (const t of tokens) {
+    builder.push(t.line, t.col, t.length, t.type, t.modifier);
+  }
+
+  return builder.build();
+});
 
 interface TransitionDecl {
   // Note: 'ref' is NOT a field - the YAML map key IS the ref
@@ -296,6 +801,158 @@ const SYNCHRONIZATION_ALLOWED_PROPS = new Set([
 ]);
 
 const MERGE_ALLOWED_PROPS = new Set(['source', 'target', 'strategy']);
+
+// TaskDef types
+interface StepDecl {
+  ref?: string;
+  ordinal?: number;
+  action_id?: string;
+  action_version?: number;
+  input_mapping?: Record<string, string>;
+  output_mapping?: Record<string, string>;
+  on_failure?: 'abort' | 'retry' | 'continue';
+  condition?: {
+    if: string;
+    then: 'continue' | 'skip' | 'succeed' | 'fail';
+    else: 'continue' | 'skip' | 'succeed' | 'fail';
+  };
+}
+
+interface TaskDoc {
+  task?: string;
+  version?: number;
+  name?: string;
+  description?: string;
+  tags?: string[];
+  input_schema?: JSONSchemaProperty;
+  output_schema?: JSONSchemaProperty;
+  steps?: StepDecl[];
+  retry?: {
+    max_attempts: number;
+    backoff: 'none' | 'linear' | 'exponential';
+    initial_delay_ms: number;
+    max_delay_ms?: number;
+  };
+  timeout_ms?: number;
+}
+
+// ActionDef types
+type ActionKind =
+  | 'llm'
+  | 'mcp'
+  | 'http'
+  | 'tool'
+  | 'shell'
+  | 'workflow'
+  | 'context'
+  | 'vector'
+  | 'metric'
+  | 'human';
+
+interface ActionDoc {
+  action?: string;
+  version?: number;
+  name?: string;
+  description?: string;
+  kind?: ActionKind;
+  implementation?: Record<string, unknown>;
+  requires?: JSONSchemaProperty;
+  produces?: JSONSchemaProperty;
+  execution?: {
+    timeout_ms?: number;
+    retry_policy?: {
+      max_attempts: number;
+      backoff: 'none' | 'linear' | 'exponential';
+      initial_delay_ms: number;
+      max_delay_ms?: number;
+      retryable_errors?: string[];
+    };
+  };
+  idempotency?: {
+    key_template: string;
+    ttl_seconds?: number;
+  };
+}
+
+// Allowed properties for TaskDef
+const TASK_ALLOWED_PROPS = new Set([
+  'task',
+  'version',
+  'name',
+  'description',
+  'tags',
+  'input_schema',
+  'output_schema',
+  'steps',
+  'retry',
+  'timeout_ms',
+]);
+
+const STEP_ALLOWED_PROPS = new Set([
+  'ref',
+  'ordinal',
+  'action_id',
+  'action_version',
+  'input_mapping',
+  'output_mapping',
+  'on_failure',
+  'condition',
+]);
+
+const STEP_CONDITION_ALLOWED_PROPS = new Set(['if', 'then', 'else']);
+
+const RETRY_ALLOWED_PROPS = new Set([
+  'max_attempts',
+  'backoff',
+  'initial_delay_ms',
+  'max_delay_ms',
+]);
+
+// Allowed properties for ActionDef
+const ACTION_ALLOWED_PROPS = new Set([
+  'action',
+  'version',
+  'name',
+  'description',
+  'kind',
+  'implementation',
+  'requires',
+  'produces',
+  'execution',
+  'idempotency',
+]);
+
+const ACTION_EXECUTION_ALLOWED_PROPS = new Set(['timeout_ms', 'retry_policy']);
+
+const ACTION_RETRY_POLICY_ALLOWED_PROPS = new Set([
+  'max_attempts',
+  'backoff',
+  'initial_delay_ms',
+  'max_delay_ms',
+  'retryable_errors',
+]);
+
+const ACTION_IDEMPOTENCY_ALLOWED_PROPS = new Set(['key_template', 'ttl_seconds']);
+
+// Kind-specific implementation properties
+const IMPLEMENTATION_PROPS_BY_KIND: Record<string, Set<string>> = {
+  llm: new Set(['prompt_spec_id', 'model_profile_id']),
+  mcp: new Set(['mcp_server_id', 'tool_name']),
+  http: new Set(['url_template', 'method', 'headers', 'body_template']),
+  tool: new Set(['tool_name', 'tool_version']),
+  shell: new Set(['command_template', 'working_dir', 'resource_name']),
+  workflow: new Set([
+    'workflow_def_id',
+    'version',
+    'inherit_artifacts',
+    'pass_resources',
+    'on_failure',
+  ]),
+  context: new Set(['updates']),
+  vector: new Set(['vector_index_id', 'top_k', 'similarity_threshold']),
+  metric: new Set(['metric_name', 'value', 'dimensions']),
+  human: new Set(['prompt', 'timeout_ms', 'on_timeout']),
+};
 
 // JSON Schema allowed properties (subset we support)
 const JSON_SCHEMA_ALLOWED_PROPS = new Set([
@@ -407,6 +1064,44 @@ function buildGraph(doc: WflowDoc): GraphAnalysis {
   return { adjacency, predecessors };
 }
 
+// Detect cycles using DFS - returns array of cycles found (each cycle is array of node refs)
+function detectCycles(graph: GraphAnalysis): string[][] {
+  const cycles: string[][] = [];
+  const visited = new Set<string>();
+  const recursionStack = new Set<string>();
+  const path: string[] = [];
+
+  function dfs(node: string): void {
+    visited.add(node);
+    recursionStack.add(node);
+    path.push(node);
+
+    for (const successor of graph.adjacency.get(node) || []) {
+      if (!visited.has(successor)) {
+        dfs(successor);
+      } else if (recursionStack.has(successor)) {
+        // Found a cycle - extract the cycle from path
+        const cycleStart = path.indexOf(successor);
+        const cycle = path.slice(cycleStart);
+        cycle.push(successor); // Complete the cycle
+        cycles.push(cycle);
+      }
+    }
+
+    path.pop();
+    recursionStack.delete(node);
+  }
+
+  // Run DFS from each unvisited node
+  for (const node of graph.adjacency.keys()) {
+    if (!visited.has(node)) {
+      dfs(node);
+    }
+  }
+
+  return cycles;
+}
+
 // Topological sort (Kahn's algorithm) - returns nodes in execution order
 function topologicalSort(doc: WflowDoc, graph: GraphAnalysis): string[] {
   const inDegree = new Map<string, number>();
@@ -446,7 +1141,11 @@ function topologicalSort(doc: WflowDoc, graph: GraphAnalysis): string[] {
 }
 
 // Analyze data flow - which paths are available at each node
-function analyzeDataFlow(doc: WflowDoc, graph: GraphAnalysis, inputPaths: Set<string>): DataFlowAnalysis {
+function analyzeDataFlow(
+  doc: WflowDoc,
+  graph: GraphAnalysis,
+  inputPaths: Set<string>,
+): DataFlowAnalysis {
   const availableWrites = new Map<string, Set<string>>();
   const writers = new Map<string, { nodeRef: string; conditional: boolean }[]>();
 
@@ -520,7 +1219,7 @@ function validateUnknownProps(
   context: string,
   lines: string[],
   diagnostics: Diagnostic[],
-  startLine: number = 0
+  startLine: number = 0,
 ): void {
   for (const key of Object.keys(obj)) {
     if (!allowed.has(key)) {
@@ -559,22 +1258,34 @@ function validateJsonSchema(
   schema: Record<string, unknown>,
   context: string,
   lines: string[],
-  diagnostics: Diagnostic[]
+  diagnostics: Diagnostic[],
 ): void {
   validateUnknownProps(schema, JSON_SCHEMA_ALLOWED_PROPS, context, lines, diagnostics);
 
   // Recursively validate nested properties
   if (schema.properties && typeof schema.properties === 'object') {
-    for (const [propName, propSchema] of Object.entries(schema.properties as Record<string, unknown>)) {
+    for (const [propName, propSchema] of Object.entries(
+      schema.properties as Record<string, unknown>,
+    )) {
       if (propSchema && typeof propSchema === 'object') {
-        validateJsonSchema(propSchema as Record<string, unknown>, `${context}.properties.${propName}`, lines, diagnostics);
+        validateJsonSchema(
+          propSchema as Record<string, unknown>,
+          `${context}.properties.${propName}`,
+          lines,
+          diagnostics,
+        );
       }
     }
   }
 
   // Validate items schema (for arrays)
   if (schema.items && typeof schema.items === 'object') {
-    validateJsonSchema(schema.items as Record<string, unknown>, `${context}.items`, lines, diagnostics);
+    validateJsonSchema(
+      schema.items as Record<string, unknown>,
+      `${context}.items`,
+      lines,
+      diagnostics,
+    );
   }
 
   // Validate additionalProperties if it's a schema object
@@ -583,7 +1294,7 @@ function validateJsonSchema(
       schema.additionalProperties as Record<string, unknown>,
       `${context}.additionalProperties`,
       lines,
-      diagnostics
+      diagnostics,
     );
   }
 
@@ -592,7 +1303,12 @@ function validateJsonSchema(
     if (Array.isArray(schema[combiner])) {
       (schema[combiner] as unknown[]).forEach((subSchema, idx) => {
         if (subSchema && typeof subSchema === 'object') {
-          validateJsonSchema(subSchema as Record<string, unknown>, `${context}.${combiner}[${idx}]`, lines, diagnostics);
+          validateJsonSchema(
+            subSchema as Record<string, unknown>,
+            `${context}.${combiner}[${idx}]`,
+            lines,
+            diagnostics,
+          );
         }
       });
     }
@@ -606,11 +1322,17 @@ function validateJsonSchema(
 
 function validateDocument(document: TextDocument): void {
   const text = document.getText();
+  const uri = document.uri;
   const diagnostics: Diagnostic[] = [];
 
-  let parsed: WflowDoc;
+  // Detect file type from extension
+  const isTask = uri.endsWith('.task');
+  const isAction = uri.endsWith('.action');
+  const isWorkflow = uri.endsWith('.wflow');
+
+  let parsed: unknown;
   try {
-    parsed = parseYaml(text) as WflowDoc;
+    parsed = parseYaml(text);
   } catch (e) {
     const error = e as Error;
     diagnostics.push({
@@ -633,18 +1355,252 @@ function validateDocument(document: TextDocument): void {
 
   const lines = text.split('\n');
 
+  // Route to appropriate validator
+  if (isTask) {
+    validateTaskDocument(parsed as TaskDoc, lines, diagnostics);
+  } else if (isAction) {
+    validateActionDocument(parsed as ActionDoc, lines, diagnostics);
+  } else if (isWorkflow) {
+    validateWorkflowDocument(parsed as WflowDoc, lines, diagnostics);
+  }
+
+  connection.sendDiagnostics({ uri: document.uri, diagnostics });
+}
+
+function validateTaskDocument(parsed: TaskDoc, lines: string[], diagnostics: Diagnostic[]): void {
   // SCHEMA VALIDATION: Check for unknown properties
-  validateUnknownProps(parsed as Record<string, unknown>, WORKFLOW_ALLOWED_PROPS, 'workflow', lines, diagnostics);
+  validateUnknownProps(
+    parsed as Record<string, unknown>,
+    TASK_ALLOWED_PROPS,
+    'task',
+    lines,
+    diagnostics,
+  );
+
+  // Validate JSON Schema properties
+  if (parsed.input_schema && typeof parsed.input_schema === 'object') {
+    validateJsonSchema(
+      parsed.input_schema as Record<string, unknown>,
+      'input_schema',
+      lines,
+      diagnostics,
+    );
+  }
+  if (parsed.output_schema && typeof parsed.output_schema === 'object') {
+    validateJsonSchema(
+      parsed.output_schema as Record<string, unknown>,
+      'output_schema',
+      lines,
+      diagnostics,
+    );
+  }
+
+  // Validate retry
+  if (parsed.retry && typeof parsed.retry === 'object') {
+    validateUnknownProps(
+      parsed.retry as Record<string, unknown>,
+      RETRY_ALLOWED_PROPS,
+      'retry',
+      lines,
+      diagnostics,
+    );
+  }
+
+  // Validate steps
+  const stepRefs = new Set<string>();
+  if (Array.isArray(parsed.steps)) {
+    for (let i = 0; i < parsed.steps.length; i++) {
+      const step = parsed.steps[i];
+      if (!step || typeof step !== 'object') continue;
+
+      // Find step start line
+      const stepStartLine = findStepLine(lines, i, step.ref);
+
+      validateUnknownProps(
+        step as Record<string, unknown>,
+        STEP_ALLOWED_PROPS,
+        `step[${i}]`,
+        lines,
+        diagnostics,
+        stepStartLine,
+      );
+
+      // Track step refs for duplicate detection
+      if (step.ref) {
+        if (stepRefs.has(step.ref)) {
+          const lineIndex = findLineContainingAfter(lines, `ref:`, stepStartLine);
+          if (lineIndex !== -1) {
+            const line = lines[lineIndex];
+            const charIndex = line.indexOf(step.ref);
+            diagnostics.push({
+              severity: DiagnosticSeverity.Error,
+              range: {
+                start: { line: lineIndex, character: charIndex },
+                end: { line: lineIndex, character: charIndex + step.ref.length },
+              },
+              message: `Duplicate step ref '${step.ref}'`,
+              source: 'wflow',
+            });
+          }
+        }
+        stepRefs.add(step.ref);
+      }
+
+      // Validate step condition
+      if (step.condition && typeof step.condition === 'object') {
+        validateUnknownProps(
+          step.condition as Record<string, unknown>,
+          STEP_CONDITION_ALLOWED_PROPS,
+          `step[${i}].condition`,
+          lines,
+          diagnostics,
+          stepStartLine,
+        );
+      }
+    }
+  }
+}
+
+function validateActionDocument(
+  parsed: ActionDoc,
+  lines: string[],
+  diagnostics: Diagnostic[],
+): void {
+  // SCHEMA VALIDATION: Check for unknown properties
+  validateUnknownProps(
+    parsed as Record<string, unknown>,
+    ACTION_ALLOWED_PROPS,
+    'action',
+    lines,
+    diagnostics,
+  );
+
+  // Validate JSON Schema properties
+  if (parsed.requires && typeof parsed.requires === 'object') {
+    validateJsonSchema(parsed.requires as Record<string, unknown>, 'requires', lines, diagnostics);
+  }
+  if (parsed.produces && typeof parsed.produces === 'object') {
+    validateJsonSchema(parsed.produces as Record<string, unknown>, 'produces', lines, diagnostics);
+  }
+
+  // Validate execution
+  if (parsed.execution && typeof parsed.execution === 'object') {
+    validateUnknownProps(
+      parsed.execution as Record<string, unknown>,
+      ACTION_EXECUTION_ALLOWED_PROPS,
+      'execution',
+      lines,
+      diagnostics,
+    );
+
+    // Validate retry_policy
+    if (parsed.execution.retry_policy && typeof parsed.execution.retry_policy === 'object') {
+      validateUnknownProps(
+        parsed.execution.retry_policy as Record<string, unknown>,
+        ACTION_RETRY_POLICY_ALLOWED_PROPS,
+        'execution.retry_policy',
+        lines,
+        diagnostics,
+      );
+    }
+  }
+
+  // Validate idempotency
+  if (parsed.idempotency && typeof parsed.idempotency === 'object') {
+    validateUnknownProps(
+      parsed.idempotency as Record<string, unknown>,
+      ACTION_IDEMPOTENCY_ALLOWED_PROPS,
+      'idempotency',
+      lines,
+      diagnostics,
+    );
+  }
+
+  // Validate kind-specific implementation properties
+  if (parsed.kind && parsed.implementation && typeof parsed.implementation === 'object') {
+    const allowedProps = IMPLEMENTATION_PROPS_BY_KIND[parsed.kind];
+    if (allowedProps) {
+      validateUnknownProps(
+        parsed.implementation as Record<string, unknown>,
+        allowedProps,
+        `implementation (kind: ${parsed.kind})`,
+        lines,
+        diagnostics,
+      );
+    }
+  }
+
+  // Validate kind is valid
+  if (parsed.kind) {
+    const validKinds = [
+      'llm',
+      'mcp',
+      'http',
+      'tool',
+      'shell',
+      'workflow',
+      'context',
+      'vector',
+      'metric',
+      'human',
+    ];
+    if (!validKinds.includes(parsed.kind)) {
+      const lineIndex = lines.findIndex((line) => line.includes('kind:'));
+      if (lineIndex !== -1) {
+        const line = lines[lineIndex];
+        const charIndex = line.indexOf(parsed.kind);
+        diagnostics.push({
+          severity: DiagnosticSeverity.Error,
+          range: {
+            start: { line: lineIndex, character: charIndex },
+            end: { line: lineIndex, character: charIndex + parsed.kind.length },
+          },
+          message: `Invalid action kind '${parsed.kind}'. Valid kinds: ${validKinds.join(', ')}`,
+          source: 'wflow',
+        });
+      }
+    }
+  }
+}
+
+function validateWorkflowDocument(
+  parsed: WflowDoc,
+  lines: string[],
+  diagnostics: Diagnostic[],
+): void {
+  // SCHEMA VALIDATION: Check for unknown properties
+  validateUnknownProps(
+    parsed as Record<string, unknown>,
+    WORKFLOW_ALLOWED_PROPS,
+    'workflow',
+    lines,
+    diagnostics,
+  );
 
   // Validate JSON Schema properties in input_schema, context_schema, output_schema
   if (parsed.input_schema && typeof parsed.input_schema === 'object') {
-    validateJsonSchema(parsed.input_schema as Record<string, unknown>, 'input_schema', lines, diagnostics);
+    validateJsonSchema(
+      parsed.input_schema as Record<string, unknown>,
+      'input_schema',
+      lines,
+      diagnostics,
+    );
   }
   if (parsed.context_schema && typeof parsed.context_schema === 'object') {
-    validateJsonSchema(parsed.context_schema as Record<string, unknown>, 'context_schema', lines, diagnostics);
+    validateJsonSchema(
+      parsed.context_schema as Record<string, unknown>,
+      'context_schema',
+      lines,
+      diagnostics,
+    );
   }
   if (parsed.output_schema && typeof parsed.output_schema === 'object') {
-    validateJsonSchema(parsed.output_schema as Record<string, unknown>, 'output_schema', lines, diagnostics);
+    validateJsonSchema(
+      parsed.output_schema as Record<string, unknown>,
+      'output_schema',
+      lines,
+      diagnostics,
+    );
   }
 
   // Validate node properties
@@ -661,7 +1617,7 @@ function validateDocument(document: TextDocument): void {
         `node '${nodeRef}'`,
         lines,
         diagnostics,
-        nodeStartLine !== -1 ? nodeStartLine : 0
+        nodeStartLine !== -1 ? nodeStartLine : 0,
       );
     }
   }
@@ -681,7 +1637,7 @@ function validateDocument(document: TextDocument): void {
         `transition '${transitionRef}'`,
         lines,
         diagnostics,
-        transitionStartLine !== -1 ? transitionStartLine : 0
+        transitionStartLine !== -1 ? transitionStartLine : 0,
       );
 
       // Validate condition sub-object
@@ -692,7 +1648,7 @@ function validateDocument(document: TextDocument): void {
           `condition in transition '${transitionRef}'`,
           lines,
           diagnostics,
-          transitionStartLine !== -1 ? transitionStartLine : 0
+          transitionStartLine !== -1 ? transitionStartLine : 0,
         );
       }
 
@@ -704,7 +1660,7 @@ function validateDocument(document: TextDocument): void {
           `foreach in transition '${transitionRef}'`,
           lines,
           diagnostics,
-          transitionStartLine !== -1 ? transitionStartLine : 0
+          transitionStartLine !== -1 ? transitionStartLine : 0,
         );
       }
 
@@ -717,7 +1673,7 @@ function validateDocument(document: TextDocument): void {
           `synchronization in transition '${transitionRef}'`,
           lines,
           diagnostics,
-          transitionStartLine !== -1 ? transitionStartLine : 0
+          transitionStartLine !== -1 ? transitionStartLine : 0,
         );
 
         // Validate merge sub-object
@@ -728,7 +1684,7 @@ function validateDocument(document: TextDocument): void {
             `merge in transition '${transitionRef}'`,
             lines,
             diagnostics,
-            transitionStartLine !== -1 ? transitionStartLine : 0
+            transitionStartLine !== -1 ? transitionStartLine : 0,
           );
         }
       }
@@ -751,7 +1707,7 @@ function validateDocument(document: TextDocument): void {
 
   // Validate initial_node_ref
   if (parsed.initial_node_ref && !nodeRefs.has(parsed.initial_node_ref)) {
-    const lineIndex = findLineContaining(text, 'initial_node_ref:');
+    const lineIndex = lines.findIndex((line) => line.includes('initial_node_ref:'));
     if (lineIndex !== -1) {
       const line = lines[lineIndex];
       const charIndex = line.indexOf(parsed.initial_node_ref);
@@ -950,6 +1906,74 @@ function validateDocument(document: TextDocument): void {
   const graph = buildGraph(parsed);
   const dataFlow = analyzeDataFlow(parsed, graph, inputPaths);
 
+  // REACHABILITY ANALYSIS: Find unreachable nodes
+  if (parsed.initial_node_ref && nodeRefs.has(parsed.initial_node_ref)) {
+    const reachable = new Set<string>();
+    const queue: string[] = [parsed.initial_node_ref];
+
+    while (queue.length > 0) {
+      const current = queue.shift()!;
+      if (reachable.has(current)) continue;
+      reachable.add(current);
+
+      // Add all successors to the queue
+      for (const successor of graph.adjacency.get(current) || []) {
+        if (!reachable.has(successor)) {
+          queue.push(successor);
+        }
+      }
+    }
+
+    // Report unreachable nodes
+    for (const nodeRef of nodeRefs) {
+      if (!reachable.has(nodeRef)) {
+        // Find the line where this node is defined
+        const lineIndex = lines.findIndex((line) => {
+          const regex = new RegExp(`^\\s{2}${escapeRegex(nodeRef)}\\s*:`);
+          return regex.test(line);
+        });
+        if (lineIndex !== -1) {
+          const line = lines[lineIndex];
+          const charIndex = line.indexOf(nodeRef);
+          diagnostics.push({
+            severity: DiagnosticSeverity.Warning,
+            range: {
+              start: { line: lineIndex, character: charIndex },
+              end: { line: lineIndex, character: charIndex + nodeRef.length },
+            },
+            message: `Node '${nodeRef}' is unreachable from initial node '${parsed.initial_node_ref}'`,
+            source: 'wflow',
+          });
+        }
+      }
+    }
+  }
+
+  // CYCLE DETECTION: Find cycles in the workflow graph
+  const cycles = detectCycles(graph);
+  for (const cycle of cycles) {
+    // Report error on the first node in the cycle
+    const firstNode = cycle[0];
+    const lineIndex = lines.findIndex((line) => {
+      const regex = new RegExp(`^\\s{2}${escapeRegex(firstNode)}\\s*:`);
+      return regex.test(line);
+    });
+    if (lineIndex !== -1) {
+      const line = lines[lineIndex];
+      const charIndex = line.indexOf(firstNode);
+      const cycleStr = cycle.join(' → ');
+      diagnostics.push({
+        severity: DiagnosticSeverity.Error,
+        range: {
+          start: { line: lineIndex, character: charIndex },
+          end: { line: lineIndex, character: charIndex + firstNode.length },
+        },
+        message: `Cycle detected: ${cycleStr}`,
+        source: 'wflow',
+      });
+    }
+  }
+
   for (const [nodeRef, node] of Object.entries(parsed.nodes || {})) {
     if (!node?.input_mapping) continue;
 
@@ -1009,13 +2033,38 @@ function validateDocument(document: TextDocument): void {
       }
     }
   }
-
-  connection.sendDiagnostics({ uri: document.uri, diagnostics });
 }
 
 function findLineContaining(text: string, search: string): number {
   const lines = text.split('\n');
   return lines.findIndex((line) => line.includes(search));
+}
+
+function findLineContainingAfter(lines: string[], search: string, startLine: number): number {
+  for (let i = startLine; i < lines.length; i++) {
+    if (lines[i].includes(search)) return i;
+  }
+  return -1;
+}
+
+function findStepLine(lines: string[], stepIndex: number, stepRef?: string): number {
+  // Try to find by ref first
+  if (stepRef) {
+    for (let i = 0; i < lines.length; i++) {
+      if (lines[i].match(new RegExp(`^\\s*-?\\s*ref:\\s*${escapeRegex(stepRef)}`))) {
+        return i;
+      }
+    }
+  }
+  // Fall back to finding the nth step (array item)
+  let stepCount = 0;
+  for (let i = 0; i < lines.length; i++) {
+    if (lines[i].match(/^\s*-\s/)) {
+      if (stepCount === stepIndex) return i;
+      stepCount++;
+    }
+  }
+  return 0;
 }
 
 function findTransitionFieldLine(lines: string[], value: string, field: string): number {
