@@ -8,7 +8,7 @@
  */
 
 import { mkdir, writeFile } from 'node:fs/promises';
-import openapiTS from 'openapi-typescript';
+import openapiTS, { type OpenAPI3 } from 'openapi-typescript';
 import ts from 'typescript';
 import { formatClientCode, generateRootClient } from './generate-client.js';
 import { buildRouteTree, type HttpMethod, type PathDefinition } from './parse-paths.js';
@@ -65,7 +65,7 @@ async function generate() {
   console.log(`Fetching OpenAPI spec from ${DOC_URL}...`);
 
   const response = await fetch(DOC_URL, fetchOptions);
-  const spec = (await response.json()) as { paths: Record<string, Record<string, any>> };
+  const spec = (await response.json()) as OpenAPI3;
 
   const { factory } = ts;
   const ast = await openapiTS(spec, {
@@ -103,7 +103,7 @@ async function generate() {
     AUTO_GENERATED_HEADER + printNode(importStatement) + '\n' + ast.map(printNode).join('\n\n');
 
   console.log('Parsing API routes...');
-  const pathDefs = convertOpenApiPaths(spec.paths);
+  const pathDefs = convertOpenApiPaths(spec.paths ?? {});
   const routeTree = buildRouteTree(pathDefs);
 
   console.log('Generating client code...');
