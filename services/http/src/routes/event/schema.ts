@@ -195,6 +195,9 @@ const TraceEventPayloadSchema = z.discriminatedUnion('type', [
     node_id: z.string(),
     task_id: z.string(),
     parent_token_id: z.string().nullable(),
+    fan_out_transition_id: z.string().nullable(),
+    branch_index: z.number(),
+    branch_total: z.number(),
   }),
   z.object({
     type: z.literal('operation.tokens.update_status'),

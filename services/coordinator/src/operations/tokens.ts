@@ -96,6 +96,9 @@ export class TokenManager {
       node_id: params.node_id,
       task_id: params.node_id,
       parent_token_id: params.parent_token_id,
+      fan_out_transition_id: params.fan_out_transition_id,
+      branch_index: params.branch_index,
+      branch_total: params.branch_total,
     });
 
     return tokenId;

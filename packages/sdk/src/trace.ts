@@ -91,6 +91,9 @@ export namespace TracePayloads {
     token_id: string;
     node_id: string;
     parent_token_id: string | null;
+    fan_out_transition_id: string | null;
+    branch_index: number;
+    branch_total: number;
   }
 
   export interface TokenUpdateStatus {

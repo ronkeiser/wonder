@@ -295,6 +295,9 @@ export type OperationEvent =
       node_id: string;
       task_id: string; // What task this token will execute
       parent_token_id: string | null;
+      fan_out_transition_id: string | null;
+      branch_index: number;
+      branch_total: number;
     }
   | {
       type: 'operation.tokens.update_status';
