@@ -1,8 +1,10 @@
 import {
   action,
+  END,
   node,
   promptSpec,
   schema as s,
+  START,
   step,
   task,
   transition,
@@ -39,9 +41,6 @@ describe('Coordinator - Fan-Out Trivia Questions', () => {
     // =========================================================================
     const inputSchema = s.object({ topic: s.string() }, { required: ['topic'] });
 
-    // Start node just passes through the topic
-    const startSchema = s.object({ topic: s.string() }, { required: ['topic'] });
-
     // Each question node outputs a question and answer
     const questionSchema = s.object(
       {
@@ -66,23 +65,13 @@ describe('Coordinator - Fan-Out Trivia Questions', () => {
     );
 
     // =========================================================================
-    // Start Node - Passes topic through
+    // Start Node - Pure placeholder, does nothing
     // =========================================================================
-    const startPrompt = promptSpec({
-      name: 'Start Prompt',
-      description: 'Passes through topic',
-      template:
-        'You are starting a trivia generation workflow for topic: {{topic}}. Return JSON with "topic": "{{topic}}"',
-      template_language: 'handlebars',
-      requires: { topic: s.string() },
-      produces: startSchema,
-    });
-
     const startAction = action({
       name: 'Start Action',
-      description: 'Passes topic',
-      kind: 'llm_call',
-      implementation: { prompt_spec: startPrompt },
+      description: 'No-op',
+      kind: 'update_context',
+      implementation: {},
     });
 
     const startStep = step({
@@ -90,15 +79,15 @@ describe('Coordinator - Fan-Out Trivia Questions', () => {
       ordinal: 0,
       action: startAction,
       action_version: 1,
-      input_mapping: { topic: '$.input.topic' },
-      output_mapping: { 'output.topic': '$.response.topic' },
+      input_mapping: {},
+      output_mapping: {},
     });
 
     const startTask = task({
       name: 'Start Task',
-      description: 'Task that passes topic',
-      input_schema: s.object({ topic: s.string() }, { required: ['topic'] }),
-      output_schema: startSchema,
+      description: 'No-op',
+      input_schema: s.object({}),
+      output_schema: s.object({}),
       steps: [startStep],
     });
 
@@ -107,8 +96,8 @@ describe('Coordinator - Fan-Out Trivia Questions', () => {
       name: 'Start',
       task: startTask,
       task_version: 1,
-      input_mapping: { topic: '$.input.topic' },
-      output_mapping: { 'state.topic': '$.topic' },
+      input_mapping: {},
+      output_mapping: {},
     });
 
     // =========================================================================
@@ -161,7 +150,7 @@ Return JSON with:
       name: 'Generate Question',
       task: questionTask,
       task_version: 1,
-      input_mapping: { topic: '$.state.topic' },
+      input_mapping: { topic: '$.input.topic' }, // Read directly from input
       // Branch output - each instance writes to branch_output_{token_id}
       output_mapping: {
         'output.question': '$.question',
@@ -170,13 +159,12 @@ Return JSON with:
     });
 
     // =========================================================================
-    // Collect Node - Pass-through after fan-in (no LLM needed)
-    // The merge already wrote data to state.all_trivia, so this node
-    // just copies it to output for the workflow to consume.
+    // Collect Node - Pure placeholder, does nothing
+    // The merge already wrote data to output.trivia
     // =========================================================================
     const collectAction = action({
       name: 'Collect Action',
-      description: 'Pass-through after merge',
+      description: 'No-op',
       kind: 'update_context',
       implementation: {},
     });
@@ -192,7 +180,7 @@ Return JSON with:
 
     const collectTask = task({
       name: 'Collect Task',
-      description: 'Pass-through task after fan-in merge',
+      description: 'No-op',
       input_schema: s.object({}),
       output_schema: s.object({}),
       steps: [collectStep],
@@ -208,8 +196,14 @@ Return JSON with:
     });
 
     // =========================================================================
-    // Transitions - spawn_count for fan-out, synchronization for fan-in
+    // Transitions - using START/END sockets
     // =========================================================================
+    const startTransition = transition({
+      from_node_ref: START,
+      to_node_ref: 'start_node',
+      priority: 1,
+    });
+
     const startToQuestion = transition({
       ref: 'start_to_question',
       from_node_ref: 'start_node',
@@ -234,6 +228,12 @@ Return JSON with:
       },
     });
 
+    const endTransition = transition({
+      from_node_ref: 'collect_node',
+      to_node_ref: END,
+      priority: 1,
+    });
+
     // =========================================================================
     // Workflow
     // =========================================================================
@@ -242,17 +242,15 @@ Return JSON with:
         name: `Fan-Out Trivia Questions ${Date.now()}`,
         description: 'Tests spawn_count to generate multiple trivia questions',
         input_schema: inputSchema,
-        context_schema: s.object({
-          topic: s.string(),
-        }),
+        context_schema: s.object({}),
         output_schema: workflowOutputSchema,
         output_mapping: {
-          topic: '$.state.topic',
+          topic: '$.input.topic', // Read directly from input
           trivia: '$.output.trivia', // Read from output (populated by merge)
         },
-        initial_node_ref: 'start_node',
+        // No initial_node_ref needed - derived from START transition
         nodes: [startNode, questionNode, collectNode],
-        transitions: [startToQuestion, questionToCollect],
+        transitions: [startTransition, startToQuestion, questionToCollect, endTransition],
       }),
       inputData,
       { logEvents: false },
