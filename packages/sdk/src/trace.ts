@@ -38,6 +38,16 @@ export namespace TracePayloads {
     value: unknown;
   }
 
+  export interface ContextSetField {
+    path: string;
+    value: unknown;
+  }
+
+  export interface ContextReplaceSection {
+    section: string;
+    data: unknown;
+  }
+
   export interface ContextValidate {
     path: string;
     schema_type: string;
@@ -243,23 +253,78 @@ export class TraceEventCollection {
       reads(): TypedTraceEvent<TracePayloads.ContextRead>[] {
         return self.filter<TracePayloads.ContextRead>('operation.context.read');
       },
+      /** @deprecated Use setFields() or replaceSections() instead */
       writes(): TypedTraceEvent<TracePayloads.ContextWrite>[] {
-        return self.filter<TracePayloads.ContextWrite>('operation.context.write');
+        // For backwards compatibility, combine set_field events (they have path+value)
+        return self
+          .filter<TracePayloads.ContextSetField>('operation.context.set_field')
+          .map((e) => ({ ...e, payload: { path: e.payload.path, value: e.payload.value } }));
+      },
+      setFields(): TypedTraceEvent<TracePayloads.ContextSetField>[] {
+        return self.filter<TracePayloads.ContextSetField>('operation.context.set_field');
+      },
+      replaceSections(): TypedTraceEvent<TracePayloads.ContextReplaceSection>[] {
+        return self.filter<TracePayloads.ContextReplaceSection>('operation.context.replace_section');
       },
       readAt(path: string): TypedTraceEvent<TracePayloads.ContextRead> | undefined {
         return self.findWhere(
           (e) => e.type === 'operation.context.read' && e.payload.path === path,
         ) as TypedTraceEvent<TracePayloads.ContextRead> | undefined;
       },
+      /** @deprecated Use setFieldAt() or replaceSectionAt() instead */
       writeAt(path: string): TypedTraceEvent<TracePayloads.ContextWrite> | undefined {
-        return self.findWhere(
-          (e) => e.type === 'operation.context.write' && e.payload.path === path,
-        ) as TypedTraceEvent<TracePayloads.ContextWrite> | undefined;
+        // First look for set_field events with matching path
+        const setFieldEvent = self.findWhere(
+          (e) => e.type === 'operation.context.set_field' && e.payload.path === path,
+        ) as TypedTraceEvent<TracePayloads.ContextSetField> | undefined;
+        if (setFieldEvent) {
+          return {
+            ...setFieldEvent,
+            payload: { path: setFieldEvent.payload.path, value: setFieldEvent.payload.value },
+          };
+        }
+        // Also check for replace_section events (for section-level writes like 'input')
+        const replaceSectionEvent = self.findWhere(
+          (e) => e.type === 'operation.context.replace_section' && e.payload.section === path,
+        ) as TypedTraceEvent<TracePayloads.ContextReplaceSection> | undefined;
+        if (replaceSectionEvent) {
+          return {
+            ...replaceSectionEvent,
+            payload: { path: replaceSectionEvent.payload.section, value: replaceSectionEvent.payload.data },
+          };
+        }
+        return undefined;
       },
+      setFieldAt(path: string): TypedTraceEvent<TracePayloads.ContextSetField> | undefined {
+        return self.findWhere(
+          (e) => e.type === 'operation.context.set_field' && e.payload.path === path,
+        ) as TypedTraceEvent<TracePayloads.ContextSetField> | undefined;
+      },
+      replaceSectionAt(
+        section: string,
+      ): TypedTraceEvent<TracePayloads.ContextReplaceSection> | undefined {
+        return self.findWhere(
+          (e) => e.type === 'operation.context.replace_section' && e.payload.section === section,
+        ) as TypedTraceEvent<TracePayloads.ContextReplaceSection> | undefined;
+      },
+      /** @deprecated Use setFieldsTo() instead */
       writesTo(path: string): TypedTraceEvent<TracePayloads.ContextWrite>[] {
+        // Look for set_field events where path starts with the given prefix
+        const setFieldEvents = self
+          .filter<TracePayloads.ContextSetField>('operation.context.set_field')
+          .filter((e) => e.payload.path === path || e.payload.path.startsWith(path + '.'))
+          .map((e) => ({ ...e, payload: { path: e.payload.path, value: e.payload.value } }));
+        // Also check for replace_section events (for section-level writes like 'input')
+        const replaceSectionEvents = self
+          .filter<TracePayloads.ContextReplaceSection>('operation.context.replace_section')
+          .filter((e) => e.payload.section === path)
+          .map((e) => ({ ...e, payload: { path: e.payload.section, value: e.payload.data } }));
+        return [...setFieldEvents, ...replaceSectionEvents];
+      },
+      setFieldsTo(path: string): TypedTraceEvent<TracePayloads.ContextSetField>[] {
         return self
-          .filter<TracePayloads.ContextWrite>('operation.context.write')
-          .filter((e) => e.payload.path === path);
+          .filter<TracePayloads.ContextSetField>('operation.context.set_field')
+          .filter((e) => e.payload.path === path || e.payload.path.startsWith(path + '.'));
       },
       readsFrom(path: string): TypedTraceEvent<TracePayloads.ContextRead>[] {
         return self

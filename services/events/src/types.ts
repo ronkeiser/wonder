@@ -229,7 +229,12 @@ export type OperationEvent =
       value: unknown;
     }
   | {
-      type: 'operation.context.write';
+      type: 'operation.context.replace_section';
+      section: string;
+      data: unknown;
+    }
+  | {
+      type: 'operation.context.set_field';
       path: string;
       value: unknown;
     }
@@ -257,8 +262,6 @@ export type OperationEvent =
       target_path: string;
       source_path: string;
       extracted_value: unknown;
-      current_value: unknown;
-      updated_value: unknown;
     }
   | {
       type: 'operation.context.branch_table.create';

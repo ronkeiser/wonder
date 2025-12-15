@@ -181,24 +181,50 @@ export class ContextManager {
     this.inputTable!.insert(input);
 
     this.emitter.emitTrace({
-      type: 'operation.context.write',
-      path: 'input',
-      value: input,
+      type: 'operation.context.replace_section',
+      section: 'input',
+      data: input,
     });
   }
 
+  // ============================================================================
+  // Path Parsing (pure utilities)
+  // ============================================================================
+
   /**
-   * Read value from context
+   * Parse a dot-notation path into section and field parts
+   * e.g., "state.all_trivia.items" → { section: "state", fieldParts: ["all_trivia", "items"] }
    */
-  get(path: string): unknown {
+  private parsePath(path: string): { section: string; fieldParts: string[] } {
+    const [section, ...fieldParts] = path.split('.');
+    return { section, fieldParts };
+  }
+
+  /**
+   * Validate that a section is writable
+   */
+  private assertWritableSection(section: string): void {
+    if (section !== 'state' && section !== 'output') {
+      throw new Error(`Cannot write to '${section}' - only 'state' and 'output' are writable`);
+    }
+  }
+
+  // ============================================================================
+  // Read Operations
+  // ============================================================================
+
+  /**
+   * Read entire section from context
+   */
+  getSection(section: string): Record<string, unknown> {
     this.loadSchemas();
 
-    const table = this.getTable(path);
-    const value = table?.selectFirst() ?? {};
+    const table = this.getTable(section);
+    const value = (table?.selectFirst() as Record<string, unknown>) ?? {};
 
     this.emitter.emitTrace({
       type: 'operation.context.read',
-      path,
+      path: section,
       value,
     });
 
@@ -206,36 +232,67 @@ export class ContextManager {
   }
 
   /**
-   * Write value to context
-   * Supports nested paths like "state.all_trivia" to update specific fields
+   * Read value from context (supports nested paths for backwards compat)
    */
-  set(path: string, value: unknown): void {
-    this.loadSchemas();
+  get(path: string): unknown {
+    const { section, fieldParts } = this.parsePath(path);
+    const sectionData = this.getSection(section);
 
-    const [section, ...fieldParts] = path.split('.');
-
-    if (section !== 'state' && section !== 'output') {
-      throw new Error(`Cannot write to ${section} - only 'state' and 'output' are writable`);
+    if (fieldParts.length === 0) {
+      return sectionData;
     }
+
+    return this.getNestedValue(sectionData, fieldParts.join('.'));
+  }
+
+  // ============================================================================
+  // Write Operations
+  // ============================================================================
+
+  /**
+   * Replace an entire section with new data
+   * Use when you have the complete object to store (e.g., after merge)
+   */
+  replaceSection(section: string, data: Record<string, unknown>): void {
+    this.loadSchemas();
+    this.assertWritableSection(section);
 
     const table = this.getTable(section);
-
-    if (fieldParts.length > 0) {
-      // Nested path - get current value, update nested field, write back
-      const currentValue = (this.get(section) as Record<string, unknown>) || {};
-      const updatedValue = this.setNestedValue(currentValue, fieldParts, value);
-      if (table) {
-        table.replace(updatedValue);
-      }
-    } else if (typeof value === 'object' && value !== null && table) {
-      // Top-level section - replace entire table
-      table.replace(value as Record<string, unknown>);
-    } else {
-      table?.deleteAll();
+    if (!table) {
+      throw new Error(`No table for section '${section}' - context_schema may be missing`);
     }
 
+    table.replace(data);
+
     this.emitter.emitTrace({
-      type: 'operation.context.write',
+      type: 'operation.context.replace_section',
+      section,
+      data,
+    });
+  }
+
+  /**
+   * Set a field within a section (read-modify-write)
+   * Use for nested paths like "state.all_trivia" or "output.result"
+   */
+  setField(path: string, value: unknown): void {
+    this.loadSchemas();
+
+    const { section, fieldParts } = this.parsePath(path);
+    this.assertWritableSection(section);
+
+    const table = this.getTable(section);
+    if (!table) {
+      throw new Error(`No table for section '${section}' - context_schema may be missing`);
+    }
+
+    // Read current section, update nested field, write back
+    const currentData = this.getSection(section);
+    const updatedData = this.setNestedValue(currentData, fieldParts, value);
+    table.replace(updatedData);
+
+    this.emitter.emitTrace({
+      type: 'operation.context.set_field',
       path,
       value,
     });
@@ -252,9 +309,9 @@ export class ContextManager {
     this.loadSchemas();
 
     const snapshot = {
-      input: (this.get('input') as Record<string, unknown>) || {},
-      state: (this.get('state') as Record<string, unknown>) || {},
-      output: (this.get('output') as Record<string, unknown>) || {},
+      input: this.getSection('input'),
+      state: this.getSection('state'),
+      output: this.getSection('output'),
     };
 
     this.emitter.emitTrace({
@@ -300,29 +357,14 @@ export class ContextManager {
       // Extract value from task output using source path
       const value = this.extractValue(taskOutput, sourcePath);
 
-      // Parse target path to get section (state/output) and field path
-      const [section, ...fieldParts] = targetPath.split('.');
-
-      if (section !== 'state' && section !== 'output') {
-        throw new Error(
-          `Invalid output_mapping target '${targetPath}' - must start with 'state.' or 'output.'`,
-        );
-      }
-
-      // Get current context section and update the specific field
-      const currentValue = (this.get(section) as Record<string, unknown>) || {};
-      const updatedValue = this.setNestedValue(currentValue, fieldParts, value);
-
-      // Write back to context
-      this.set(section, updatedValue);
+      // Use setField for the write (handles path parsing and read-modify-write)
+      this.setField(targetPath, value);
 
       this.emitter.emitTrace({
         type: 'operation.context.output_mapping.apply',
         target_path: targetPath,
         source_path: sourcePath,
         extracted_value: value,
-        current_value: currentValue,
-        updated_value: updatedValue,
       });
     }
   }
@@ -557,8 +599,8 @@ export class ContextManager {
         break;
     }
 
-    // Write to target path in context
-    this.set(merge.target, merged);
+    // Write to target path in context (setField handles nested paths)
+    this.setField(merge.target, merged);
 
     this.emitter.emitTrace({
       type: 'operation.context.merge.complete',

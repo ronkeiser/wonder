@@ -230,17 +230,14 @@ describe('Coordinator - Two Node Linear Workflow', () => {
     console.log(`  ✓ ${transitionMatches.length} transition(s) matched`);
 
     // 7. CRITICAL: Extract the code that node 1 generated and wrote to state
-    const stateWrites = trace.context.writesTo('state');
-    const codeWrite = stateWrites.find((w) => {
-      const value = w.payload.value as Record<string, unknown>;
-      return value && 'generated_code' in value;
-    });
+    // With setField, values are written to granular paths like state.generated_code
+    const codeWrite = trace.context.setFieldAt('state.generated_code');
     expect(codeWrite).toBeDefined();
-    const generatedCode = (codeWrite!.payload.value as Record<string, string>).generated_code;
+    const generatedCode = codeWrite!.payload.value as string;
     console.log(`  ✓ Node 1 generated code: "${generatedCode}"`);
 
     // 8. Output mapping applied for second node (writes to output)
-    const outputWrites = trace.context.writesTo('output');
+    const outputWrites = trace.context.setFieldsTo('output');
     expect(outputWrites.length).toBeGreaterThan(0);
     console.log('  ✓ Second node wrote to output');
 

@@ -206,7 +206,7 @@ function applyOne(decision: Decision, ctx: DispatchContext): ApplyOutcome {
 
     // Context operations
     case 'SET_CONTEXT': {
-      ctx.context.set(decision.path, decision.value);
+      ctx.context.setField(decision.path, decision.value);
       ctx.emitter.emitTrace({
         type: 'dispatch.context.set',
         path: decision.path,
@@ -215,9 +215,8 @@ function applyOne(decision: Decision, ctx: DispatchContext): ApplyOutcome {
     }
 
     case 'APPLY_OUTPUT': {
-      // APPLY_OUTPUT writes to a path in context - use set() directly
-      // The decision.path indicates where to write, decision.output is the value
-      ctx.context.set(decision.path, decision.output);
+      // APPLY_OUTPUT writes to a path in context - use setField for nested paths
+      ctx.context.setField(decision.path, decision.output);
       ctx.emitter.emitTrace({
         type: 'dispatch.context.output_applied',
         path: decision.path,

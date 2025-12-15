@@ -324,34 +324,20 @@ Be lenient with minor spelling differences or equivalent answers.`,
     console.log(`  ✓ ${transitionMatches.length} transitions matched`);
 
     // 4. Extract data written to state at each step
-    const stateWrites = trace.context.writesTo('state');
-
-    // Find the last state write that contains question (it accumulates)
-    const questionWrite = [...stateWrites].reverse().find((w) => {
-      const value = w.payload.value as Record<string, unknown>;
-      return value && 'question' in value;
-    });
+    // With setField, individual fields are written to granular paths
+    const questionWrite = trace.context.setFieldAt('state.question');
     expect(questionWrite).toBeDefined();
-    const questionState = questionWrite!.payload.value as Record<string, string>;
-    const question = questionState.question;
+    const question = questionWrite!.payload.value as string;
     console.log(`  ✓ Node 1 generated question: "${question}"`);
 
-    // Find correct_answer - may be in same write or accumulated later
-    const answerWrite = [...stateWrites].reverse().find((w) => {
-      const value = w.payload.value as Record<string, unknown>;
-      return value && 'correct_answer' in value;
-    });
+    const answerWrite = trace.context.setFieldAt('state.correct_answer');
     expect(answerWrite).toBeDefined();
-    const correctAnswer = (answerWrite!.payload.value as Record<string, string>).correct_answer;
+    const correctAnswer = answerWrite!.payload.value as string;
     console.log(`  ✓ Node 1 generated answer: "${correctAnswer}"`);
 
-    // Node 2 wrote guess - find last write with guess
-    const guessWrite = [...stateWrites].reverse().find((w) => {
-      const value = w.payload.value as Record<string, unknown>;
-      return value && 'guess' in value;
-    });
+    const guessWrite = trace.context.setFieldAt('state.guess');
     expect(guessWrite).toBeDefined();
-    const guess = (guessWrite!.payload.value as Record<string, string>).guess;
+    const guess = guessWrite!.payload.value as string;
     console.log(`  ✓ Node 2 guessed: "${guess}"`);
 
     // 5. Final output contains all data

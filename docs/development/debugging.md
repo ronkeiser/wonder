@@ -63,6 +63,6 @@ After making edits, before announcing completion of work, you MUST run a typeche
 
 If you changed any of the RPC signatures of any of the services, you must regenerate the types with `pnpm types`.
 
-INSTRUCTION:
+_How to get the workflow_run_id:_
 
 Run the edge test, then query the events for the last minute to get the workflow_run_id. You can then use that id to perform any other queries you need.

@@ -391,15 +391,10 @@ Return a JSON object echoing all 6 values exactly:
     expect(routingMatches.length).toBeGreaterThanOrEqual(3);
     console.log(`  ✓ ${routingMatches.length} transition matches (includes fan-out)`);
 
-    // 4. Extract all Q&A from state
-    const stateWrites = trace.context.writesTo('state');
-
+    // 4. Extract all Q&A from state using setFieldAt
     const getStateValue = (key: string): string => {
-      const write = [...stateWrites].reverse().find((w) => {
-        const value = w.payload.value as Record<string, unknown>;
-        return value && key in value;
-      });
-      return write ? (write.payload.value as Record<string, string>)[key] : '';
+      const write = trace.context.setFieldAt(`state.${key}`);
+      return write ? (write.payload.value as string) : '';
     };
 
     const q1 = getStateValue('question_1');

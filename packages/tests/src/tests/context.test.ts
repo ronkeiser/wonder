@@ -169,26 +169,22 @@ describe('Coordinator - Context Operations', () => {
       console.log('📊 Output mapping skipped:', JSON.stringify(outputMappingSkip.payload, null, 2));
     }
 
-    // Validate output write - with new architecture, outputs are written directly to output table
-    // (not nested under node ref like the old approach)
-    const allOutputWrites = trace.context.writesTo('output');
-    console.log('📊 All output write events:', allOutputWrites.length);
-    allOutputWrites.forEach((e, i) => {
-      console.log(`  [${i}] seq=${e.sequence} value=${JSON.stringify(e.payload.value)}`);
+    // Validate output writes - with new setField architecture, individual fields are written
+    const outputSetFields = trace.context.setFieldsTo('output');
+    console.log('📊 All output setField events:', outputSetFields.length);
+    outputSetFields.forEach((e, i) => {
+      console.log(`  [${i}] seq=${e.sequence} path=${e.payload.path} value=${JSON.stringify(e.payload.value)}`);
     });
 
-    // Get the LAST write to output (after applyOutputMapping)
-    const outputWrite = allOutputWrites[allOutputWrites.length - 1];
-    console.log('📊 Final output write event:', JSON.stringify(outputWrite?.payload, null, 2));
-
-    expect(outputWrite).toBeDefined();
-    expect(outputWrite!.payload.path).toBe('output');
-    expect(outputWrite!.payload.value).toBeDefined();
-    const outputValue = outputWrite!.payload.value as Record<string, unknown>;
-    // With new architecture, output is written directly (not under node ref)
-    expect(outputValue.greeting).toBeDefined();
-    expect(outputValue.processed_count).toBeDefined();
-    console.log('  ✓ operation.context.write (output stored directly)');
+    // Check for both output field writes
+    const greetingWrite = trace.context.setFieldAt('output.greeting');
+    const processedCountWrite = trace.context.setFieldAt('output.processed_count');
+    
+    expect(greetingWrite).toBeDefined();
+    expect(greetingWrite!.payload.value).toBe('Hello Alice');
+    expect(processedCountWrite).toBeDefined();
+    expect(processedCountWrite!.payload.value).toBe(42);
+    console.log('  ✓ operation.context.set_field (output fields stored)');
 
     // Validate output was read in snapshot
     const outputReads = trace.context.readsFrom('output');

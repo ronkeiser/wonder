@@ -128,7 +128,12 @@ const TraceEventPayloadSchema = z.discriminatedUnion('type', [
     value: z.unknown(),
   }),
   z.object({
-    type: z.literal('operation.context.write'),
+    type: z.literal('operation.context.replace_section'),
+    section: z.string(),
+    data: z.unknown(),
+  }),
+  z.object({
+    type: z.literal('operation.context.set_field'),
     path: z.string(),
     value: z.unknown(),
   }),
@@ -156,8 +161,6 @@ const TraceEventPayloadSchema = z.discriminatedUnion('type', [
     target_path: z.string(),
     source_path: z.string(),
     extracted_value: z.unknown(),
-    current_value: z.unknown(),
-    updated_value: z.unknown(),
   }),
   z.object({
     type: z.literal('operation.context.branch_table.create'),
