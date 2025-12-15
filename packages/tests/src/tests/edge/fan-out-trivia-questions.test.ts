@@ -51,19 +51,6 @@ describe('Coordinator - Fan-Out Trivia Questions', () => {
       { required: ['question', 'answer'] },
     );
 
-    // Collect node gathers all Q&A pairs
-    const collectSchema = s.object(
-      {
-        trivia: s.array(
-          s.object(
-            { question: s.string(), answer: s.string() },
-            { required: ['question', 'answer'] },
-          ),
-        ),
-      },
-      { required: ['trivia'] },
-    );
-
     // Workflow output
     const workflowOutputSchema = s.object(
       {
@@ -183,38 +170,15 @@ Return JSON with:
     });
 
     // =========================================================================
-    // Collect Node - Gathers all Q&A pairs
+    // Collect Node - Pass-through after fan-in (no LLM needed)
+    // The merge already wrote data to state.all_trivia, so this node
+    // just copies it to output for the workflow to consume.
     // =========================================================================
-    const collectPrompt = promptSpec({
-      name: 'Collect Prompt',
-      description: 'Collects trivia questions',
-      template: `You have received {{trivia.length}} trivia questions about a topic.
-
-Here are the questions and answers:
-{{#each trivia}}
-Q{{@index}}: {{this.question}}
-A{{@index}}: {{this.answer}}
-{{/each}}
-
-Return the collected trivia as JSON with:
-- "trivia": an array of objects, each with "question" and "answer" fields`,
-      template_language: 'handlebars',
-      requires: {
-        trivia: s.array(
-          s.object(
-            { question: s.string(), answer: s.string() },
-            { required: ['question', 'answer'] },
-          ),
-        ),
-      },
-      produces: collectSchema,
-    });
-
     const collectAction = action({
       name: 'Collect Action',
-      description: 'Collects Q&A pairs',
-      kind: 'llm_call',
-      implementation: { prompt_spec: collectPrompt },
+      description: 'Pass-through after merge',
+      kind: 'update_context',
+      implementation: {},
     });
 
     const collectStep = step({
@@ -222,25 +186,15 @@ Return the collected trivia as JSON with:
       ordinal: 0,
       action: collectAction,
       action_version: 1,
-      input_mapping: { trivia: '$.input.trivia' },
-      output_mapping: { 'output.trivia': '$.response.trivia' },
+      input_mapping: {},
+      output_mapping: {},
     });
 
     const collectTask = task({
       name: 'Collect Task',
-      description: 'Task that collects trivia',
-      input_schema: s.object(
-        {
-          trivia: s.array(
-            s.object(
-              { question: s.string(), answer: s.string() },
-              { required: ['question', 'answer'] },
-            ),
-          ),
-        },
-        { required: ['trivia'] },
-      ),
-      output_schema: collectSchema,
+      description: 'Pass-through task after fan-in merge',
+      input_schema: s.object({}),
+      output_schema: s.object({}),
       steps: [collectStep],
     });
 
@@ -249,8 +203,8 @@ Return the collected trivia as JSON with:
       name: 'Collect Trivia',
       task: collectTask,
       task_version: 1,
-      input_mapping: { trivia: '$.state.all_trivia' },
-      output_mapping: { 'output.trivia': '$.trivia' },
+      input_mapping: {},
+      output_mapping: {},
     });
 
     // =========================================================================
@@ -274,7 +228,7 @@ Return the collected trivia as JSON with:
         sibling_group: 'start_to_question', // Match tokens from spawn_count transition
         merge: {
           source: '_branch.output', // Extract full output (question + answer) from each branch
-          target: 'state.all_trivia', // Write merged array to state
+          target: 'output.trivia', // Write merged array to output
           strategy: 'append', // Collect into array
         },
       },
@@ -290,17 +244,11 @@ Return the collected trivia as JSON with:
         input_schema: inputSchema,
         context_schema: s.object({
           topic: s.string(),
-          all_trivia: s.array(
-            s.object(
-              { question: s.string(), answer: s.string() },
-              { required: ['question', 'answer'] },
-            ),
-          ),
         }),
         output_schema: workflowOutputSchema,
         output_mapping: {
           topic: '$.state.topic',
-          trivia: '$.output.trivia',
+          trivia: '$.output.trivia', // Read from output (populated by merge)
         },
         initial_node_ref: 'start_node',
         nodes: [startNode, questionNode, collectNode],

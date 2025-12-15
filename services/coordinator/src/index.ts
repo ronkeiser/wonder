@@ -160,13 +160,19 @@ export class WorkflowCoordinator extends DurableObject {
         );
       }
 
+      // Get context output after all mappings applied
+      const contextOutput = this.context.get('output');
+
       // Emit node completed event
       this.emitter.emit({
         event_type: 'node_completed',
         node_id: token.node_id,
         token_id: tokenId,
         message: 'Node completed',
-        metadata: { output: result.output_data },
+        metadata: {
+          output: result.output_data,
+          context_output: contextOutput, // Include full output context for observability
+        },
       });
 
       // Get outgoing transitions from completed node
