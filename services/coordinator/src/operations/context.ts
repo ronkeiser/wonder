@@ -207,11 +207,12 @@ export class ContextManager {
 
   /**
    * Write value to context
+   * Supports nested paths like "state.all_trivia" to update specific fields
    */
   set(path: string, value: unknown): void {
     this.loadSchemas();
 
-    const [section] = path.split('.');
+    const [section, ...fieldParts] = path.split('.');
 
     if (section !== 'state' && section !== 'output') {
       throw new Error(`Cannot write to ${section} - only 'state' and 'output' are writable`);
@@ -219,7 +220,15 @@ export class ContextManager {
 
     const table = this.getTable(section);
 
-    if (typeof value === 'object' && value !== null && table) {
+    if (fieldParts.length > 0) {
+      // Nested path - get current value, update nested field, write back
+      const currentValue = (this.get(section) as Record<string, unknown>) || {};
+      const updatedValue = this.setNestedValue(currentValue, fieldParts, value);
+      if (table) {
+        table.replace(updatedValue);
+      }
+    } else if (typeof value === 'object' && value !== null && table) {
+      // Top-level section - replace entire table
       table.replace(value as Record<string, unknown>);
     } else {
       table?.deleteAll();

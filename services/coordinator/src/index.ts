@@ -214,7 +214,7 @@ export class WorkflowCoordinator extends DurableObject {
 
       // Handle synchronization for created tokens
       const syncTransitions = getTransitionsWithSynchronization(transitions, contextSnapshot);
-      this.processSynchronization(applyResult.tokensCreated, syncTransitions, dispatchCtx);
+      await this.processSynchronization(applyResult.tokensCreated, syncTransitions, dispatchCtx);
 
       // Dispatch any tokens marked for dispatch
       const dispatchedTokens = this.tokens.getMany(
@@ -369,7 +369,7 @@ export class WorkflowCoordinator extends DurableObject {
     // Process any ACTIVATE_FAN_IN decisions
     for (const decision of syncResult.decisions) {
       if (decision.type === 'ACTIVATE_FAN_IN') {
-        await this.handleActivateFanIn(decision, syncTransition, dispatchCtx);
+        await this.handleActivateFanIn(decision, syncTransition, dispatchCtx, waitingToken.id);
       }
     }
   }
@@ -419,7 +419,7 @@ export class WorkflowCoordinator extends DurableObject {
         // Process decisions - handle ACTIVATE_FAN_IN specially (needs async operations)
         for (const decision of syncResult.decisions) {
           if (decision.type === 'ACTIVATE_FAN_IN') {
-            await this.handleActivateFanIn(decision, syncTransition, dispatchCtx);
+            await this.handleActivateFanIn(decision, syncTransition, dispatchCtx, createdTokenId);
           } else {
             applyDecisions([decision], dispatchCtx);
           }
@@ -448,18 +448,44 @@ export class WorkflowCoordinator extends DurableObject {
     decision: Extract<Decision, { type: 'ACTIVATE_FAN_IN' }>,
     transition: TransitionDef,
     dispatchCtx: DispatchContext,
+    triggeringTokenId: string,
   ): Promise<void> {
     const { workflowRunId, nodeId, fanInPath } = decision;
 
+    this.emitter.emitTrace({
+      type: 'debug.fan_in.start',
+      workflow_run_id: workflowRunId,
+      node_id: nodeId,
+      fan_in_path: fanInPath,
+    });
+
+    // First ensure the fan-in record exists (create if not present)
+    // This handles the race where all tokens arrive at sync point simultaneously
+    this.tokens.tryCreateFanIn({
+      workflowRunId,
+      nodeId,
+      fanInPath,
+      transitionId: transition.id,
+      tokenId: triggeringTokenId,
+    });
+
     // Try to activate - first caller wins
+    // Use the triggering token ID for race-safe deduplication
     const activated = this.tokens.tryActivateFanIn({
       workflowRunId,
       fanInPath,
-      activatedByTokenId: decision.mergedTokenIds[0] ?? 'unknown',
+      activatedByTokenId: triggeringTokenId,
+    });
+
+    this.emitter.emitTrace({
+      type: 'debug.fan_in.try_activate_result',
+      activated,
     });
 
     if (!activated) {
       // Another token already activated this fan-in
+      // Mark the triggering token as completed (absorbed by the winning token's fan-in)
+      this.tokens.updateStatus(triggeringTokenId, 'completed');
       this.logger.debug({
         event_type: 'fan_in_race_lost',
         message: 'Another token already activated this fan-in',
@@ -537,6 +563,9 @@ export class WorkflowCoordinator extends DurableObject {
       this.tokens.completeMany(waitingSiblings.map((s) => s.id));
     }
 
+    // Mark the triggering token as completed (it activated the fan-in but is now absorbed)
+    this.tokens.updateStatus(triggeringTokenId, 'completed');
+
     // Create continuation token to proceed to next node
     const firstSibling = completedSiblings[0];
     const continuationTokenId = this.tokens.create({
@@ -549,14 +578,14 @@ export class WorkflowCoordinator extends DurableObject {
       branch_total: 1,
     });
 
-    // Mark for dispatch
-    this.tokens.updateStatus(continuationTokenId, 'dispatched');
-
     this.emitter.emitTrace({
       type: 'dispatch.token.created',
       token_id: continuationTokenId,
       node_id: nodeId,
     });
+
+    // Actually dispatch the token to the executor
+    await this.dispatchToken(continuationTokenId);
   }
 
   /**

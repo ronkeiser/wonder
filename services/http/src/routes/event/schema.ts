@@ -72,6 +72,17 @@ const TraceEventPayloadSchema = z.discriminatedUnion('type', [
     type: z.literal('decision.sync.activate'),
     merge_config: z.unknown(),
   }),
+  z.object({
+    type: z.literal('decision.sync.sibling_group_check'),
+    token_fan_out_transition_id: z.string().nullable(),
+    sync_sibling_group: z.string(),
+    matches: z.boolean(),
+  }),
+  z.object({
+    type: z.literal('decision.sync.skipped_wrong_sibling_group'),
+    token_fan_out_transition_id: z.string().nullable(),
+    sync_sibling_group: z.string(),
+  }),
   // Decision events - completion
   z.object({
     type: z.literal('decision.completion.start'),
@@ -367,6 +378,17 @@ const TraceEventPayloadSchema = z.discriminatedUnion('type', [
     type: z.literal('dispatch.workflow.failed'),
     error: z.string(),
   }),
+  // Debug events - fan-in debugging
+  z.object({
+    type: z.literal('debug.fan_in.start'),
+    workflow_run_id: z.string(),
+    node_id: z.string(),
+    fan_in_path: z.string(),
+  }),
+  z.object({
+    type: z.literal('debug.fan_in.try_activate_result'),
+    activated: z.boolean(),
+  }),
 ]);
 
 export const TraceEventEntrySchema = z
@@ -375,7 +397,7 @@ export const TraceEventEntrySchema = z
     sequence: z.number(),
     timestamp: z.number(),
     type: z.string(),
-    category: z.enum(['decision', 'operation', 'dispatch', 'sql']),
+    category: z.enum(['decision', 'operation', 'dispatch', 'sql', 'debug']),
     workflow_run_id: z.string(),
     token_id: z.string().nullable(),
     node_id: z.string().nullable(),

@@ -169,6 +169,17 @@ export type DecisionEvent =
       type: 'decision.sync.activate';
       merge_config: unknown;
     }
+  | {
+      type: 'decision.sync.sibling_group_check';
+      token_fan_out_transition_id: string | null;
+      sync_sibling_group: string;
+      matches: boolean;
+    }
+  | {
+      type: 'decision.sync.skipped_wrong_sibling_group';
+      token_fan_out_transition_id: string | null;
+      sync_sibling_group: string;
+    }
   // Completion events
   | {
       type: 'decision.completion.start';
@@ -477,15 +488,36 @@ export type DispatchEvent =
     };
 
 /**
+ * Debug events - for internal debugging and troubleshooting
+ */
+export type DebugEvent =
+  | {
+      type: 'debug.fan_in.start';
+      workflow_run_id: string;
+      node_id: string;
+      fan_in_path: string;
+    }
+  | {
+      type: 'debug.fan_in.try_activate_result';
+      activated: boolean;
+    };
+
+/**
  * All trace event input types
  */
-export type TraceEventInput = (DecisionEvent | OperationEvent | SQLEvent | DispatchEvent) &
+export type TraceEventInput = (
+  | DecisionEvent
+  | OperationEvent
+  | SQLEvent
+  | DispatchEvent
+  | DebugEvent
+) &
   TraceEventInputBase;
 
 /**
  * Event category extracted from type
  */
-export type TraceEventCategory = 'decision' | 'operation' | 'dispatch' | 'sql';
+export type TraceEventCategory = 'decision' | 'operation' | 'dispatch' | 'sql' | 'debug';
 
 /**
  * Extract category from event type string
@@ -496,7 +528,8 @@ export function getEventCategory(type: string): TraceEventCategory {
     category === 'decision' ||
     category === 'operation' ||
     category === 'dispatch' ||
-    category === 'sql'
+    category === 'sql' ||
+    category === 'debug'
   ) {
     return category;
   }

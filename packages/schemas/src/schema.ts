@@ -132,6 +132,13 @@ export class Schema {
   }
 
   /**
+   * Generate DELETE ALL statements (handles cascade for array tables)
+   */
+  generateDeleteAll(tableName: string): string[] {
+    return this.dmlGenerator.generateDelete(tableName, '1=1');
+  }
+
+  /**
    * Read first row from table and reconstruct as structured object
    */
   readFirst(sql: SqlExecutor, tableName: string): Record<string, unknown> | null {
@@ -183,19 +190,40 @@ export class SchemaTable {
 
   /**
    * Insert data into the table
+   * Handles array tables with proper parent ID substitution
    */
   insert(data: Record<string, unknown>): void {
     const { statements, values } = this.schema.generateInsert(this.tableName, data);
-    for (let i = 0; i < statements.length; i++) {
-      this.sql.exec(statements[i], ...values[i]);
+
+    if (statements.length === 0) return;
+
+    // Execute first statement (main table insert)
+    this.sql.exec(statements[0], ...values[0]);
+
+    // If there are more statements (array tables), get parent ID and substitute
+    if (statements.length > 1) {
+      // Get the last inserted rowid
+      const result = [...this.sql.exec('SELECT last_insert_rowid() as id')];
+      const parentId = result[0]?.id;
+
+      // Execute remaining statements with parent ID substituted
+      for (let i = 1; i < statements.length; i++) {
+        const stmt = statements[i].replace(/\{\{PARENT_ID\}\}/g, String(parentId));
+        // Also replace {{PARENT_ID}} in values array
+        const vals = values[i].map((v) => (v === '{{PARENT_ID}}' ? parentId : v));
+        this.sql.exec(stmt, ...vals);
+      }
     }
   }
 
   /**
-   * Delete all rows from the table
+   * Delete all rows from the table (handles cascade for array tables)
    */
   deleteAll(): void {
-    this.sql.exec(`DELETE FROM ${this.tableName};`);
+    const statements = this.schema.generateDeleteAll(this.tableName);
+    for (const stmt of statements) {
+      this.sql.exec(stmt);
+    }
   }
 
   /**

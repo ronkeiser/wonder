@@ -13,10 +13,11 @@
   const colorMap: Record<string, string> = {
     workflow_started: 'var(--pink)',
     workflow_completed: 'var(--green)',
-    workflow_failed: 'var(--orange)',
+    workflow_failed: 'var(--red)',
     task_started: 'var(--blue)',
     task_completed: 'var(--indigo)',
     task_failed: 'var(--violet)',
+    node_failed: 'var(--orange)',
     node_completed: 'var(--gray-light)',
   };
 

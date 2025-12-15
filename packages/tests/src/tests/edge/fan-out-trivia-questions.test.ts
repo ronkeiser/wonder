@@ -321,7 +321,11 @@ Return the collected trivia as JSON with:
 
     const { trace } = result;
 
-    // 2. Correct number of tokens: 1 start + 3 questions + 1 collect
+    // 2. Correct number of tokens:
+    // - 1 start_node
+    // - 3 question_node (spawned by fan-out)
+    // - 3 collect_node waiting tokens (one per arriving sibling at sync point)
+    // - 1 collect_node continuation token (after fan-in activates)
     const tokenCreations = trace.tokens.creations();
     console.log(`  Token creations (${tokenCreations.length}):`);
     for (const tc of tokenCreations) {
@@ -329,32 +333,48 @@ Return the collected trivia as JSON with:
         `    - node_id: ${tc.payload.node_id}, branch_index: ${tc.payload.branch_index}, fan_out: ${tc.payload.fan_out_transition_id}`,
       );
     }
-    expect(tokenCreations.length).toBe(5);
-    console.log(`  ✓ ${tokenCreations.length} tokens created (1 start + 3 questions + 1 collect)`);
+    expect(tokenCreations.length).toBe(8);
+    console.log(`  ✓ ${tokenCreations.length} tokens created`);
 
-    // 3. Verify spawn_count in routing
+    // 3. Verify spawn_count in routing (fan-out creates 3 question tokens)
     const routingMatches = trace.routing.matches();
-    const startRouting = routingMatches.find((m) =>
-      m.payload.transition_id?.includes('start_to_question'),
-    );
-    expect(startRouting).toBeDefined();
-    expect(startRouting?.payload.spawn_count).toBe(3);
+    const fanOutRouting = routingMatches.find((m) => m.payload.spawn_count === 3);
+    expect(fanOutRouting).toBeDefined();
     console.log('  ✓ Spawn count: 3 tokens created from single transition');
 
     // 4. Verify all 3 question generators share fan_out_transition_id
-    const questionTokens = tokenCreations.slice(1, 4); // Tokens 2-4 are question generators
-    const fanOutIds = questionTokens.map((t) => t.payload.fan_out_transition_id);
+    // Filter to get only the original fan-out tokens (those with distinct branch indices)
+    const fanOutTokens = tokenCreations.filter(
+      (t) => t.payload.fan_out_transition_id === fanOutRouting?.payload.transition_id,
+    );
+    // Group by node_id to separate question_node tokens from collect_node tokens
+    const tokensByNode = new Map<string, typeof fanOutTokens>();
+    for (const t of fanOutTokens) {
+      const nodeId = t.payload.node_id;
+      if (!tokensByNode.has(nodeId)) {
+        tokensByNode.set(nodeId, []);
+      }
+      tokensByNode.get(nodeId)!.push(t);
+    }
+    // The question_node is the one with 3 tokens with distinct branch indices (0, 1, 2)
+    const questionTokens = Array.from(tokensByNode.values()).find(
+      (tokens) =>
+        tokens.length === 3 && new Set(tokens.map((t) => t.payload.branch_index)).size === 3,
+    );
+    expect(questionTokens).toBeDefined();
+
+    const fanOutIds = questionTokens!.map((t) => t.payload.fan_out_transition_id);
     const uniqueFanOutIds = new Set(fanOutIds.filter((id) => id !== null));
     expect(uniqueFanOutIds.size).toBe(1);
     console.log('  ✓ All 3 question generators share same fan_out_transition_id');
 
-    // 5. Verify branch indices
-    const branchIndices = questionTokens.map((t) => t.payload.branch_index);
+    // 5. Verify branch indices (should have 0, 1, 2)
+    const branchIndices = questionTokens!.map((t) => t.payload.branch_index).sort();
     expect(branchIndices).toEqual([0, 1, 2]);
     console.log('  ✓ Branch indices: 0-2');
 
     // 6. Verify branch_total
-    const branchTotals = questionTokens.map((t) => t.payload.branch_total);
+    const branchTotals = questionTokens!.map((t) => t.payload.branch_total);
     expect(branchTotals.every((total) => total === 3)).toBe(true);
     console.log('  ✓ Branch total: 3 for all question generators');
 

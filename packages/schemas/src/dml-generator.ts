@@ -57,6 +57,11 @@ export class DMLGenerator {
       const placeholders = columns.map(() => '?').join(', ');
       statements.push(`INSERT INTO ${tableName} (${columns.join(', ')}) VALUES (${placeholders});`);
       values.push(vals);
+    } else {
+      // Even with no scalar columns, we need a row for FK references from array tables
+      // Use SQLite's default values syntax
+      statements.push(`INSERT INTO ${tableName} DEFAULT VALUES;`);
+      values.push([]);
     }
 
     // Generate array table inserts
