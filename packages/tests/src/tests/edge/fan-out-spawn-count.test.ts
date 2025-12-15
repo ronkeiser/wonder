@@ -1,10 +1,8 @@
 import {
   action,
-  END,
   node,
   promptSpec,
   schema as s,
-  START,
   step,
   task,
   transition,
@@ -196,14 +194,8 @@ Return JSON with:
     });
 
     // =========================================================================
-    // Transitions - using START/END sockets
+    // Transitions
     // =========================================================================
-    const startTransition = transition({
-      from_node_ref: START,
-      to_node_ref: 'start_node',
-      priority: 1,
-    });
-
     const startToQuestion = transition({
       ref: 'start_to_question',
       from_node_ref: 'start_node',
@@ -228,12 +220,6 @@ Return JSON with:
       },
     });
 
-    const endTransition = transition({
-      from_node_ref: 'collect_node',
-      to_node_ref: END,
-      priority: 1,
-    });
-
     // =========================================================================
     // Workflow
     // =========================================================================
@@ -245,12 +231,12 @@ Return JSON with:
         context_schema: s.object({}),
         output_schema: workflowOutputSchema,
         output_mapping: {
-          topic: '$.input.topic', // Read directly from input
-          trivia: '$.output.trivia', // Read from output (populated by merge)
+          topic: '$.input.topic',
+          trivia: '$.output.trivia',
         },
-        // No initial_node_ref needed - derived from START transition
+        initial_node_ref: 'start_node',
         nodes: [startNode, questionNode, collectNode],
-        transitions: [startTransition, startToQuestion, questionToCollect, endTransition],
+        transitions: [startToQuestion, questionToCollect],
       }),
       inputData,
       { logEvents: false },
