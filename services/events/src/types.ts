@@ -303,6 +303,13 @@ export type OperationEvent =
       errors?: string[];
     }
   | {
+      type: 'operation.context.branch.read';
+      token_id: string;
+      branch_index: number;
+      output: unknown;
+      from_cache: boolean;
+    }
+  | {
       type: 'operation.context.branch.written'; // was: write
       token_id: string;
       output: unknown;

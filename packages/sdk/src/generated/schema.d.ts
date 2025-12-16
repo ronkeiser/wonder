@@ -1366,7 +1366,7 @@ export interface components {
             description: string;
             version: number;
             /** @enum {string} */
-            kind: "llm_call" | "mcp_tool" | "http_request" | "human_input" | "update_context" | "write_artifact" | "workflow_call" | "vector_search" | "emit_metric";
+            kind: "llm_call" | "mcp_tool" | "http_request" | "human_input" | "update_context" | "write_artifact" | "workflow_call" | "vector_search" | "emit_metric" | "mock";
             implementation: {
                 [key: string]: unknown;
             };
@@ -1403,7 +1403,7 @@ export interface components {
              * @example llm_call
              * @enum {string}
              */
-            kind: "llm_call" | "mcp_tool" | "http_request" | "human_input" | "update_context" | "write_artifact" | "workflow_call" | "vector_search" | "emit_metric";
+            kind: "llm_call" | "mcp_tool" | "http_request" | "human_input" | "update_context" | "write_artifact" | "workflow_call" | "vector_search" | "emit_metric" | "mock";
             /**
              * @example {
              *       "model": "gpt-4"
@@ -2128,6 +2128,13 @@ export interface components {
                 errors?: string[];
             } | {
                 /** @enum {string} */
+                type: "operation.context.branch.read";
+                token_id: string;
+                branch_index: number;
+                output?: unknown;
+                from_cache: boolean;
+            } | {
+                /** @enum {string} */
                 type: "operation.context.branch.written";
                 token_id: string;
                 output?: unknown;
@@ -2236,6 +2243,25 @@ export interface components {
                 source: string;
                 token_id?: string;
                 timestamp: number;
+            } | {
+                /** @enum {string} */
+                type: "dispatch.task.input_mapping.context";
+                token_id: string;
+                node_id: string;
+                context_keys: {
+                    input: string[];
+                    state: string[];
+                    output: string[];
+                };
+            } | {
+                /** @enum {string} */
+                type: "dispatch.task.input_mapping.applied";
+                token_id: string;
+                node_id: string;
+                input_mapping?: unknown;
+                task_input: {
+                    [key: string]: unknown;
+                };
             } | {
                 /** @enum {string} */
                 type: "dispatch.error";

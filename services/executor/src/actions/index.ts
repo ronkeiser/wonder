@@ -9,6 +9,7 @@
 import type { Logger } from '@wonder/logs';
 import type { Action } from '@wonder/resources/types';
 import { executeLLMAction } from './llm';
+import { executeMockAction } from './mock';
 import type { ActionDeps, ActionInput, ActionOutput } from './types';
 
 export interface DispatchActionParams {
@@ -91,6 +92,9 @@ export async function dispatchAction(
     case 'emit_metric':
       // TODO: Implement metric emission action handler
       return notImplemented(action, context, logger);
+
+    case 'mock':
+      return executeMockAction(actionInput, deps);
 
     default: {
       const _exhaustive: never = action.kind;

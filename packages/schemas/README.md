@@ -11,7 +11,8 @@ Complete schema-driven SQL toolkit: validation, DDL generation, and DML generati
 - ❌ **Rich errors**: JSON Pointer paths, collect all errors, detailed error codes
 - 🗄️ **DDL generation**: Generate SQLite CREATE TABLE statements from schemas
 - 💾 **DML generation**: Generate INSERT, UPDATE, DELETE statements with proper parameterization
-- 🔗 **Unified package**: Single schema definition drives validation, DDL, and DML
+- 🎲 **Mock data generation**: Generate random data conforming to schemas (for testing)
+- 🔗 **Unified package**: Single schema definition drives validation, DDL, DML, and mocks
 
 ## Installation
 
@@ -217,6 +218,39 @@ const deleteStatements = dmlGen.generateDelete('users', 'id = ?');
 // Returns: [DELETE FROM users_tags..., DELETE FROM users...]
 ```
 
+### Mock Data Generation
+
+```typescript
+import { generateMockData } from '@wonder/schemas';
+
+const schema = {
+  type: 'object',
+  properties: {
+    name: { type: 'string', minLength: 3, maxLength: 20 },
+    age: { type: 'integer', minimum: 18, maximum: 99 },
+    email: { type: 'string', pattern: '@' },
+    tags: { type: 'array', items: { type: 'string' }, minItems: 1, maxItems: 3 },
+    status: { type: 'string', enum: ['active', 'inactive', 'pending'] },
+  },
+  required: ['name', 'age'],
+};
+
+// Generate random data
+const mockData = generateMockData(schema);
+// { name: 'xK7mPq2nL', age: 47, email: 'abc@def.com', tags: ['qrs', 'tuv'], status: 'active' }
+
+// Generate deterministic data with seed
+const deterministicData = generateMockData(schema, { seed: 12345 });
+// Always produces the same output for the same seed
+
+// Custom options
+const customMock = generateMockData(schema, {
+  seed: 42,
+  stringLength: { min: 10, max: 20 },
+  arrayLength: { min: 2, max: 5 },
+});
+```
+
 ### Advanced: DDL & DML Generation Options
 
 ```typescript
@@ -398,6 +432,7 @@ for (let i = 1; i < statements.length; i++) {
 ### Functions
 
 - **`validateSchema(data, schema, customTypes?, options?)`** - Exception-driven validation
+- **`generateMockData(schema, options?)`** - Generate random data conforming to schema
 
 ### Types
 

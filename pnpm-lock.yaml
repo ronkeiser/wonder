@@ -302,6 +302,9 @@ importers:
       '@wonder/resources':
         specifier: workspace:*
         version: link:../resources
+      '@wonder/schemas':
+        specifier: workspace:*
+        version: link:../../packages/schemas
       '@wonder/templates':
         specifier: workspace:*
         version: link:../../packages/templates

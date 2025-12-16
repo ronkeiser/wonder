@@ -20,6 +20,7 @@ export const CreateActionSchema = z
         'workflow_call',
         'vector_search',
         'emit_metric',
+        'mock',
       ])
       .openapi({ example: 'llm_call' }),
     implementation: z.record(z.string(), z.unknown()).openapi({ example: { model: 'gpt-4' } }),
@@ -46,6 +47,7 @@ export const ActionSchema = z
       'workflow_call',
       'vector_search',
       'emit_metric',
+      'mock',
     ]),
     implementation: z.record(z.string(), z.unknown()),
     requires: z.record(z.string(), z.unknown()).nullable(),

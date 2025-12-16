@@ -12,6 +12,7 @@
   "dependencies": {
     "@wonder/logs": "workspace:*",
     "@wonder/resources": "workspace:*",
+    "@wonder/schemas": "workspace:*",
     "@wonder/templates": "workspace:*"
   },
   "devDependencies": {

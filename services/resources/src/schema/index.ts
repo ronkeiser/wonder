@@ -237,6 +237,7 @@ export const actions = sqliteTable(
         'workflow_call',
         'vector_search',
         'emit_metric',
+        'mock',
       ],
     }).notNull(),
 

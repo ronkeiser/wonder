@@ -195,6 +195,13 @@ const TraceEventPayloadSchema = z.discriminatedUnion('type', [
     errors: z.array(z.string()).optional(),
   }),
   z.object({
+    type: z.literal('operation.context.branch.read'),
+    token_id: z.string(),
+    branch_index: z.number(),
+    output: z.unknown(),
+    from_cache: z.boolean(),
+  }),
+  z.object({
     type: z.literal('operation.context.branch.written'),
     token_id: z.string(),
     output: z.unknown(),

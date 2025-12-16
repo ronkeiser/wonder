@@ -13,7 +13,8 @@ type ActionKind =
   | 'write_artifact'
   | 'workflow_call'
   | 'vector_search'
-  | 'emit_metric';
+  | 'emit_metric'
+  | 'mock';
 
 export class Actions extends Resource {
   async create(data: {

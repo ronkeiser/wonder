@@ -4,6 +4,7 @@ export * from './constraints.js';
 export * from './custom-types.js';
 export * from './ddl-generator.js';
 export * from './dml-generator.js';
+export * from './mock-generator.js';
 export * from './schema.js';
 export * from './select-generator.js';
 export * from './types.js';

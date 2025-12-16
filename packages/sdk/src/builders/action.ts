@@ -24,7 +24,8 @@ type ActionKind =
   | 'write_artifact'
   | 'workflow_call'
   | 'vector_search'
-  | 'emit_metric';
+  | 'emit_metric'
+  | 'mock';
 
 /**
  * Create an action definition
