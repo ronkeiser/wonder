@@ -91,7 +91,7 @@ export class TokenManager {
       .run();
 
     this.emitter.emitTrace({
-      type: 'operation.tokens.create',
+      type: 'operation.tokens.created',
       token_id: tokenId,
       node_id: params.node_id,
       task_id: params.node_id,
@@ -133,8 +133,9 @@ export class TokenManager {
       .run();
 
     this.emitter.emitTrace({
-      type: 'operation.tokens.update_status',
+      type: 'operation.tokens.status_updated',
       token_id: tokenId,
+      node_id: token.node_id,
       from: token.status,
       to: status,
     });
@@ -218,8 +219,9 @@ export class TokenManager {
       .run();
 
     this.emitter.emitTrace({
-      type: 'operation.tokens.update_status',
+      type: 'operation.tokens.status_updated',
       token_id: tokenId,
+      node_id: token.node_id,
       from: token.status,
       to: 'waiting_for_siblings',
     });
@@ -320,8 +322,9 @@ export class TokenManager {
 
     for (const tokenId of tokenIds) {
       this.emitter.emitTrace({
-        type: 'operation.tokens.update_status',
+        type: 'operation.tokens.status_updated',
         token_id: tokenId,
+        node_id: this.get(tokenId).node_id,
         from: 'waiting_for_siblings',
         to: 'completed',
       });
@@ -347,8 +350,9 @@ export class TokenManager {
 
     for (const tokenId of tokenIds) {
       this.emitter.emitTrace({
-        type: 'operation.tokens.update_status',
+        type: 'operation.tokens.status_updated',
         token_id: tokenId,
+        node_id: this.get(tokenId).node_id,
         from: 'executing',
         to: 'cancelled',
       });

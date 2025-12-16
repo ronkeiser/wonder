@@ -155,7 +155,7 @@ export class ContextManager {
     tablesCreated.push('context_output');
 
     this.emitter.emitTrace({
-      type: 'operation.context.initialize',
+      type: 'operation.context.initialized',
       has_input_schema: true,
       has_context_schema: this.stateTable !== null,
       table_count: tablesCreated.length,
@@ -181,7 +181,7 @@ export class ContextManager {
     this.inputTable!.insert(input);
 
     this.emitter.emitTrace({
-      type: 'operation.context.replace_section',
+      type: 'operation.context.section_replaced',
       section: 'input',
       data: input,
     });
@@ -265,7 +265,7 @@ export class ContextManager {
     table.replace(data);
 
     this.emitter.emitTrace({
-      type: 'operation.context.replace_section',
+      type: 'operation.context.section_replaced',
       section,
       data,
     });
@@ -292,7 +292,7 @@ export class ContextManager {
     table.replace(updatedData);
 
     this.emitter.emitTrace({
-      type: 'operation.context.set_field',
+      type: 'operation.context.field_set',
       path,
       value,
     });
@@ -347,14 +347,14 @@ export class ContextManager {
 
     // Emit start event with input context
     this.emitter.emitTrace({
-      type: 'operation.context.output_mapping.start',
+      type: 'operation.context.output_mapping.started',
       output_mapping: outputMapping,
       task_output_keys: Object.keys(taskOutput),
     });
 
     if (!outputMapping) {
       this.emitter.emitTrace({
-        type: 'operation.context.output_mapping.skip',
+        type: 'operation.context.output_mapping.skipped',
         reason: 'no_mapping',
       });
       return;
@@ -368,7 +368,7 @@ export class ContextManager {
       this.setField(targetPath, value);
 
       this.emitter.emitTrace({
-        type: 'operation.context.output_mapping.apply',
+        type: 'operation.context.output_mapping.applied',
         target_path: targetPath,
         source_path: sourcePath,
         extracted_value: value,
@@ -465,7 +465,7 @@ export class ContextManager {
     this.branchTables.set(tokenId, table);
 
     this.emitter.emitTrace({
-      type: 'operation.context.branch_table.create',
+      type: 'operation.context.branch_table.created',
       token_id: tokenId,
       table_name: tableName,
       schema_type: outputSchema.type as string,
@@ -502,7 +502,7 @@ export class ContextManager {
     table.insert(output);
 
     this.emitter.emitTrace({
-      type: 'operation.context.branch.write',
+      type: 'operation.context.branch.written',
       token_id: tokenId,
       output,
     });
@@ -542,7 +542,7 @@ export class ContextManager {
     }
 
     this.emitter.emitTrace({
-      type: 'operation.context.branch.read_all',
+      type: 'operation.context.branches_read',
       token_ids: tokenIds,
       output_count: outputs.length,
     });
@@ -556,7 +556,7 @@ export class ContextManager {
    */
   mergeBranches(branchOutputs: BranchOutput[], merge: MergeConfig): void {
     this.emitter.emitTrace({
-      type: 'operation.context.merge.start',
+      type: 'operation.context.merge.started',
       sibling_count: branchOutputs.length,
       strategy: merge.strategy,
       source_path: merge.source,
@@ -610,7 +610,7 @@ export class ContextManager {
     this.setField(merge.target, merged);
 
     this.emitter.emitTrace({
-      type: 'operation.context.merge.complete',
+      type: 'operation.context.merged',
       target_path: merge.target,
       branch_count: branchOutputs.length,
     });
@@ -631,7 +631,7 @@ export class ContextManager {
     }
 
     this.emitter.emitTrace({
-      type: 'operation.context.branch_table.drop',
+      type: 'operation.context.branch_table.dropped',
       token_ids: tokenIds,
       tables_dropped: tokenIds.length,
     });

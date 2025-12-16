@@ -174,11 +174,6 @@ function applyOne(decision: Decision, ctx: DispatchContext): ApplyOutcome {
     // Token operations
     case 'CREATE_TOKEN': {
       const tokenId = ctx.tokens.create(decision.params);
-      ctx.emitter.emitTrace({
-        type: 'dispatch.token.created',
-        token_id: tokenId,
-        node_id: decision.params.node_id,
-      });
       return { createdTokens: [tokenId] };
     }
 
@@ -188,20 +183,11 @@ function applyOne(decision: Decision, ctx: DispatchContext): ApplyOutcome {
         const tokenId = ctx.tokens.create(params);
         tokenIds.push(tokenId);
       }
-      ctx.emitter.emitTrace({
-        type: 'dispatch.tokens.batch_created',
-        count: tokenIds.length,
-      });
       return { createdTokens: tokenIds };
     }
 
     case 'UPDATE_TOKEN_STATUS': {
       ctx.tokens.updateStatus(decision.tokenId, decision.status);
-      ctx.emitter.emitTrace({
-        type: 'dispatch.token.status_updated',
-        token_id: decision.tokenId,
-        status: decision.status,
-      });
       return {};
     }
 
@@ -209,67 +195,40 @@ function applyOne(decision: Decision, ctx: DispatchContext): ApplyOutcome {
       for (const update of decision.updates) {
         ctx.tokens.updateStatus(update.tokenId, update.status);
       }
-      ctx.emitter.emitTrace({
-        type: 'dispatch.tokens.batch_status_updated',
-        count: decision.updates.length,
-      });
       return {};
     }
 
     case 'MARK_WAITING': {
       ctx.tokens.markWaitingForSiblings(decision.tokenId, decision.arrivedAt);
-      ctx.emitter.emitTrace({
-        type: 'dispatch.token.marked_waiting',
-        token_id: decision.tokenId,
-      });
       return {};
     }
 
     case 'MARK_FOR_DISPATCH': {
       ctx.tokens.updateStatus(decision.tokenId, 'dispatched');
-      ctx.emitter.emitTrace({
-        type: 'dispatch.token.marked_for_dispatch',
-        token_id: decision.tokenId,
-      });
       return { dispatchedTokens: [decision.tokenId] };
     }
 
     // Context operations
     case 'SET_CONTEXT': {
       ctx.context.setField(decision.path, decision.value);
-      ctx.emitter.emitTrace({
-        type: 'dispatch.context.set',
-        path: decision.path,
-      });
       return {};
     }
 
     case 'APPLY_OUTPUT': {
       // APPLY_OUTPUT writes to a path in context - use setField for nested paths
       ctx.context.setField(decision.path, decision.output);
-      ctx.emitter.emitTrace({
-        type: 'dispatch.context.output_applied',
-        path: decision.path,
-      });
       return {};
     }
 
     // Branch storage operations
     case 'INIT_BRANCH_TABLE': {
       ctx.context.initializeBranchTable(decision.tokenId, decision.outputSchema as JSONSchema);
-      ctx.emitter.emitTrace({
-        type: 'dispatch.branch.table_initialized',
-        token_id: decision.tokenId,
-      });
+
       return {};
     }
 
     case 'APPLY_BRANCH_OUTPUT': {
       ctx.context.applyBranchOutput(decision.tokenId, decision.output);
-      ctx.emitter.emitTrace({
-        type: 'dispatch.branch.output_applied',
-        token_id: decision.tokenId,
-      });
       return {};
     }
 
@@ -281,21 +240,11 @@ function applyOne(decision: Decision, ctx: DispatchContext): ApplyOutcome {
         decision.outputSchema as JSONSchema,
       );
       ctx.context.mergeBranches(branchOutputs, decision.merge);
-      ctx.emitter.emitTrace({
-        type: 'dispatch.branch.merged',
-        token_ids: decision.tokenIds,
-        target: decision.merge.target,
-        strategy: decision.merge.strategy,
-      });
       return {};
     }
 
     case 'DROP_BRANCH_TABLES': {
       ctx.context.dropBranchTables(decision.tokenIds);
-      ctx.emitter.emitTrace({
-        type: 'dispatch.branch.tables_dropped',
-        token_ids: decision.tokenIds,
-      });
       return {};
     }
 
@@ -303,11 +252,6 @@ function applyOne(decision: Decision, ctx: DispatchContext): ApplyOutcome {
     case 'CHECK_SYNCHRONIZATION': {
       // This is a meta-decision that triggers synchronization planning
       // The actual planning happens in the coordinator's main loop
-      ctx.emitter.emitTrace({
-        type: 'dispatch.sync.check_requested',
-        token_id: decision.tokenId,
-        transition_id: decision.transition.id,
-      });
       return {};
     }
 

@@ -87,17 +87,17 @@ export namespace TracePayloads {
     output: unknown;
   }
 
-  export interface BranchReadAll {
+  export interface BranchesRead {
     token_ids: string[];
     output_count: number;
   }
 
-  export interface MergeComplete {
+  export interface Merged {
     target_path: string;
     branch_count: number;
   }
 
-  export interface TokenCreate {
+  export interface TokenCreated {
     token_id: string;
     node_id: string;
     parent_token_id: string | null;
@@ -106,8 +106,9 @@ export namespace TracePayloads {
     branch_total: number;
   }
 
-  export interface TokenUpdateStatus {
+  export interface TokenStatusUpdated {
     token_id: string;
+    node_id?: string;
     from: string;
     to: string;
   }
@@ -248,7 +249,7 @@ export class TraceEventCollection {
     const self = this;
     return {
       initialize(): TypedTraceEvent<TracePayloads.ContextInitialize> | undefined {
-        return self.find<TracePayloads.ContextInitialize>('operation.context.initialize');
+        return self.find<TracePayloads.ContextInitialize>('operation.context.initialized');
       },
       reads(): TypedTraceEvent<TracePayloads.ContextRead>[] {
         return self.filter<TracePayloads.ContextRead>('operation.context.read');
@@ -257,15 +258,15 @@ export class TraceEventCollection {
       writes(): TypedTraceEvent<TracePayloads.ContextWrite>[] {
         // For backwards compatibility, combine set_field events (they have path+value)
         return self
-          .filter<TracePayloads.ContextSetField>('operation.context.set_field')
+          .filter<TracePayloads.ContextSetField>('operation.context.field_set')
           .map((e) => ({ ...e, payload: { path: e.payload.path, value: e.payload.value } }));
       },
       setFields(): TypedTraceEvent<TracePayloads.ContextSetField>[] {
-        return self.filter<TracePayloads.ContextSetField>('operation.context.set_field');
+        return self.filter<TracePayloads.ContextSetField>('operation.context.field_set');
       },
       replaceSections(): TypedTraceEvent<TracePayloads.ContextReplaceSection>[] {
         return self.filter<TracePayloads.ContextReplaceSection>(
-          'operation.context.replace_section',
+          'operation.context.section_replaced',
         );
       },
       readAt(path: string): TypedTraceEvent<TracePayloads.ContextRead> | undefined {
@@ -277,7 +278,7 @@ export class TraceEventCollection {
       writeAt(path: string): TypedTraceEvent<TracePayloads.ContextWrite> | undefined {
         // First look for set_field events with matching path
         const setFieldEvent = self.findWhere(
-          (e) => e.type === 'operation.context.set_field' && e.payload.path === path,
+          (e) => e.type === 'operation.context.field_set' && e.payload.path === path,
         ) as TypedTraceEvent<TracePayloads.ContextSetField> | undefined;
         if (setFieldEvent) {
           return {
@@ -287,7 +288,7 @@ export class TraceEventCollection {
         }
         // Also check for replace_section events (for section-level writes like 'input')
         const replaceSectionEvent = self.findWhere(
-          (e) => e.type === 'operation.context.replace_section' && e.payload.section === path,
+          (e) => e.type === 'operation.context.section_replaced' && e.payload.section === path,
         ) as TypedTraceEvent<TracePayloads.ContextReplaceSection> | undefined;
         if (replaceSectionEvent) {
           return {
@@ -302,33 +303,33 @@ export class TraceEventCollection {
       },
       setFieldAt(path: string): TypedTraceEvent<TracePayloads.ContextSetField> | undefined {
         return self.findWhere(
-          (e) => e.type === 'operation.context.set_field' && e.payload.path === path,
+          (e) => e.type === 'operation.context.field_set' && e.payload.path === path,
         ) as TypedTraceEvent<TracePayloads.ContextSetField> | undefined;
       },
       replaceSectionAt(
         section: string,
       ): TypedTraceEvent<TracePayloads.ContextReplaceSection> | undefined {
         return self.findWhere(
-          (e) => e.type === 'operation.context.replace_section' && e.payload.section === section,
+          (e) => e.type === 'operation.context.section_replaced' && e.payload.section === section,
         ) as TypedTraceEvent<TracePayloads.ContextReplaceSection> | undefined;
       },
       /** @deprecated Use setFieldsTo() instead */
       writesTo(path: string): TypedTraceEvent<TracePayloads.ContextWrite>[] {
         // Look for set_field events where path starts with the given prefix
         const setFieldEvents = self
-          .filter<TracePayloads.ContextSetField>('operation.context.set_field')
+          .filter<TracePayloads.ContextSetField>('operation.context.field_set')
           .filter((e) => e.payload.path === path || e.payload.path.startsWith(path + '.'))
           .map((e) => ({ ...e, payload: { path: e.payload.path, value: e.payload.value } }));
         // Also check for replace_section events (for section-level writes like 'input')
         const replaceSectionEvents = self
-          .filter<TracePayloads.ContextReplaceSection>('operation.context.replace_section')
+          .filter<TracePayloads.ContextReplaceSection>('operation.context.section_replaced')
           .filter((e) => e.payload.section === path)
           .map((e) => ({ ...e, payload: { path: e.payload.section, value: e.payload.data } }));
         return [...setFieldEvents, ...replaceSectionEvents];
       },
       setFieldsTo(path: string): TypedTraceEvent<TracePayloads.ContextSetField>[] {
         return self
-          .filter<TracePayloads.ContextSetField>('operation.context.set_field')
+          .filter<TracePayloads.ContextSetField>('operation.context.field_set')
           .filter((e) => e.payload.path === path || e.payload.path.startsWith(path + '.'));
       },
       readsFrom(path: string): TypedTraceEvent<TracePayloads.ContextRead>[] {
@@ -359,24 +360,24 @@ export class TraceEventCollection {
   get tokens() {
     const self = this;
     return {
-      creates(): TypedTraceEvent<TracePayloads.TokenCreate>[] {
-        return self.filter<TracePayloads.TokenCreate>('operation.tokens.create');
+      creates(): TypedTraceEvent<TracePayloads.TokenCreated>[] {
+        return self.filter<TracePayloads.TokenCreated>('operation.tokens.created');
       },
       /** Alias for creates() */
-      creations(): TypedTraceEvent<TracePayloads.TokenCreate>[] {
+      creations(): TypedTraceEvent<TracePayloads.TokenCreated>[] {
         return this.creates();
       },
-      created(tokenId: string): TypedTraceEvent<TracePayloads.TokenCreate> | undefined {
+      created(tokenId: string): TypedTraceEvent<TracePayloads.TokenCreated> | undefined {
         return self.findWhere(
-          (e) => e.type === 'operation.tokens.create' && e.payload.token_id === tokenId,
-        ) as TypedTraceEvent<TracePayloads.TokenCreate> | undefined;
+          (e) => e.type === 'operation.tokens.created' && e.payload.token_id === tokenId,
+        ) as TypedTraceEvent<TracePayloads.TokenCreated> | undefined;
       },
-      statusUpdates(): TypedTraceEvent<TracePayloads.TokenUpdateStatus>[] {
-        return self.filter<TracePayloads.TokenUpdateStatus>('operation.tokens.update_status');
+      statusUpdates(): TypedTraceEvent<TracePayloads.TokenStatusUpdated>[] {
+        return self.filter<TracePayloads.TokenStatusUpdated>('operation.tokens.status_updated');
       },
       statusTransitions(tokenId: string): string[] {
         const updates = self
-          .filter<TracePayloads.TokenUpdateStatus>('operation.tokens.update_status')
+          .filter<TracePayloads.TokenStatusUpdated>('operation.tokens.status_updated')
           .filter((e) => e.payload.token_id === tokenId)
           .sort((a, b) => a.sequence - b.sequence);
         if (updates.length === 0) return [];
@@ -398,29 +399,29 @@ export class TraceEventCollection {
     return {
       creates(): TypedTraceEvent<TracePayloads.BranchTableCreate>[] {
         return self.filter<TracePayloads.BranchTableCreate>(
-          'operation.context.branch_table.create',
+          'operation.context.branch_table.created',
         );
       },
       drops(): TypedTraceEvent<TracePayloads.BranchTableDrop>[] {
-        return self.filter<TracePayloads.BranchTableDrop>('operation.context.branch_table.drop');
+        return self.filter<TracePayloads.BranchTableDrop>('operation.context.branch_table.dropped');
       },
       validates(): TypedTraceEvent<TracePayloads.BranchValidate>[] {
         return self.filter<TracePayloads.BranchValidate>('operation.context.branch.validate');
       },
       writes(): TypedTraceEvent<TracePayloads.BranchWrite>[] {
-        return self.filter<TracePayloads.BranchWrite>('operation.context.branch.write');
+        return self.filter<TracePayloads.BranchWrite>('operation.context.branch.written');
       },
-      reads(): TypedTraceEvent<TracePayloads.BranchReadAll>[] {
-        return self.filter<TracePayloads.BranchReadAll>('operation.context.branch.read_all');
+      reads(): TypedTraceEvent<TracePayloads.BranchesRead>[] {
+        return self.filter<TracePayloads.BranchesRead>('operation.context.branches_read');
       },
-      merges(): TypedTraceEvent<TracePayloads.MergeComplete>[] {
-        return self.filter<TracePayloads.MergeComplete>('operation.context.merge.complete');
+      merges(): TypedTraceEvent<TracePayloads.Merged>[] {
+        return self.filter<TracePayloads.Merged>('operation.context.merged');
       },
       lifecycle(): Map<string, { created: boolean; dropped: boolean }> {
         const tables = new Map<string, { created: boolean; dropped: boolean }>();
 
         for (const event of self.filter<TracePayloads.BranchTableCreate>(
-          'operation.context.branch_table.create',
+          'operation.context.branch_table.created',
         )) {
           const name = event.payload.table_name;
           if (!tables.has(name)) {
@@ -430,7 +431,7 @@ export class TraceEventCollection {
         }
 
         for (const event of self.filter<TracePayloads.BranchTableDrop>(
-          'operation.context.branch_table.drop',
+          'operation.context.branch_table.dropped',
         )) {
           // Drop events now include multiple token_ids
           for (const tokenId of event.payload.token_ids) {

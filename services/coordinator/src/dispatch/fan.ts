@@ -78,7 +78,7 @@ export async function handleBranchOutput(
   ctx.context.applyBranchOutput(token.id, output);
 
   ctx.emitter.emitTrace({
-    type: 'operation.context.branch.write',
+    type: 'operation.context.branch.written',
     token_id: token.id,
     output,
   });
@@ -347,13 +347,6 @@ export async function activateFanIn(
 
         // Merge into context
         ctx.context.mergeBranches(branchOutputs, mergeConfig);
-
-        ctx.emitter.emitTrace({
-          type: 'dispatch.branch.merged',
-          token_ids: completedSiblings.map((s) => s.id),
-          target: mergeConfig.target,
-          strategy: mergeConfig.strategy,
-        });
       }
     }
 

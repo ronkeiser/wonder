@@ -225,7 +225,7 @@ export type DecisionEvent =
  */
 export type OperationEvent =
   | {
-      type: 'operation.context.initialize';
+      type: 'operation.context.initialized'; // was: initialize
       has_input_schema: boolean;
       has_context_schema: boolean;
       table_count: number;
@@ -245,12 +245,12 @@ export type OperationEvent =
       value: unknown;
     }
   | {
-      type: 'operation.context.replace_section';
+      type: 'operation.context.section_replaced'; // was: replace_section
       section: string;
       data: unknown;
     }
   | {
-      type: 'operation.context.set_field';
+      type: 'operation.context.field_set'; // was: set_field
       path: string;
       value: unknown;
     }
@@ -263,28 +263,28 @@ export type OperationEvent =
       };
     }
   | {
-      type: 'operation.context.output_mapping.start';
+      type: 'operation.context.output_mapping.started'; // was: start
       output_mapping: Record<string, string> | null;
       task_output_keys: string[];
     }
   | {
-      type: 'operation.context.output_mapping.skip';
+      type: 'operation.context.output_mapping.skipped'; // was: skip
       reason: 'no_mapping';
     }
   | {
-      type: 'operation.context.output_mapping.apply';
+      type: 'operation.context.output_mapping.applied'; // was: apply
       target_path: string;
       source_path: string;
       extracted_value: unknown;
     }
   | {
-      type: 'operation.context.branch_table.create';
+      type: 'operation.context.branch_table.created'; // was: create
       token_id: string;
       table_name: string;
       schema_type: string; // Schema type that drove table creation
     }
   | {
-      type: 'operation.context.branch_table.drop';
+      type: 'operation.context.branch_table.dropped'; // was: drop
       token_ids: string[];
       tables_dropped: number;
     }
@@ -296,29 +296,29 @@ export type OperationEvent =
       errors?: string[];
     }
   | {
-      type: 'operation.context.branch.write';
+      type: 'operation.context.branch.written'; // was: write
       token_id: string;
       output: unknown;
     }
   | {
-      type: 'operation.context.branch.read_all';
+      type: 'operation.context.branches_read'; // was: branch.read_all
       token_ids: string[];
       output_count: number;
     }
   | {
-      type: 'operation.context.merge.start';
+      type: 'operation.context.merge.started'; // was: merge.start
       sibling_count: number;
       strategy: string;
       source_path: string; // e.g., '_branch.output'
       target_path: string; // e.g., 'state.votes'
     }
   | {
-      type: 'operation.context.merge.complete';
+      type: 'operation.context.merged'; // was: merge.complete
       target_path: string;
       branch_count: number;
     }
   | {
-      type: 'operation.tokens.create';
+      type: 'operation.tokens.created'; // was: create
       token_id: string;
       node_id: string;
       task_id: string; // What task this token will execute
@@ -328,8 +328,9 @@ export type OperationEvent =
       branch_total: number;
     }
   | {
-      type: 'operation.tokens.update_status';
+      type: 'operation.tokens.status_updated'; // was: update_status
       token_id: string;
+      node_id?: string;
       from: string;
       to: string;
     }
@@ -388,16 +389,15 @@ export type SQLEvent = {
 
 /**
  * Dispatch layer events - decision batching and application
+ *
+ * Note: Duplicate token/context/branch events have been removed.
+ * Those are now emitted only at the operation layer.
  */
 export type DispatchEvent =
+  // Batching
   | {
       type: 'dispatch.batch.start';
       decision_count: number;
-    }
-  | {
-      type: 'dispatch.batch.group';
-      batch_type: string;
-      count: number;
     }
   | {
       type: 'dispatch.batch.complete';
@@ -407,17 +407,7 @@ export type DispatchEvent =
       tokens_created: number;
       tokens_dispatched: number;
       errors: number;
-    }
-  | {
-      type: 'dispatch.decision.apply';
-      decision_type: string;
-      decision: unknown; // Decision from coordinator
-    }
-  // Error handling
-  | {
-      type: 'dispatch.error';
-      decision_type: string;
-      error: string;
+      duration_ms?: number;
     }
   // Decision tracing
   | {
@@ -427,67 +417,13 @@ export type DispatchEvent =
       token_id?: string;
       timestamp: number;
     }
-  // Token operations
+  // Error handling
   | {
-      type: 'dispatch.token.created';
-      token_id: string;
-      node_id: string;
+      type: 'dispatch.error';
+      decision_type: string;
+      error: string;
     }
-  | {
-      type: 'dispatch.tokens.batch_created';
-      count: number;
-    }
-  | {
-      type: 'dispatch.token.status_updated';
-      token_id: string;
-      status: string;
-    }
-  | {
-      type: 'dispatch.tokens.batch_status_updated';
-      count: number;
-    }
-  | {
-      type: 'dispatch.token.marked_waiting';
-      token_id: string;
-    }
-  | {
-      type: 'dispatch.token.marked_for_dispatch';
-      token_id: string;
-    }
-  // Context operations
-  | {
-      type: 'dispatch.context.set';
-      path: string;
-    }
-  | {
-      type: 'dispatch.context.output_applied';
-      path: string;
-    }
-  // Branch storage operations
-  | {
-      type: 'dispatch.branch.table_initialized';
-      token_id: string;
-    }
-  | {
-      type: 'dispatch.branch.output_applied';
-      token_id: string;
-    }
-  | {
-      type: 'dispatch.branch.merged';
-      token_ids: string[];
-      target: string;
-      strategy: string;
-    }
-  | {
-      type: 'dispatch.branch.tables_dropped';
-      token_ids: string[];
-    }
-  // Synchronization
-  | {
-      type: 'dispatch.sync.check_requested';
-      token_id: string;
-      transition_id: string;
-    }
+  // Synchronization (orchestration-level only)
   | {
       type: 'dispatch.sync.fan_in_activated';
       node_id: string;

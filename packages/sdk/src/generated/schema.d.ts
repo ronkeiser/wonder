@@ -2054,7 +2054,7 @@ export interface components {
                 };
             } | {
                 /** @enum {string} */
-                type: "operation.context.initialize";
+                type: "operation.context.initialized";
                 has_input_schema: boolean;
                 has_context_schema: boolean;
                 table_count: number;
@@ -2074,12 +2074,12 @@ export interface components {
                 value?: unknown;
             } | {
                 /** @enum {string} */
-                type: "operation.context.replace_section";
+                type: "operation.context.section_replaced";
                 section: string;
                 data?: unknown;
             } | {
                 /** @enum {string} */
-                type: "operation.context.set_field";
+                type: "operation.context.field_set";
                 path: string;
                 value?: unknown;
             } | {
@@ -2092,31 +2092,31 @@ export interface components {
                 };
             } | {
                 /** @enum {string} */
-                type: "operation.context.output_mapping.start";
+                type: "operation.context.output_mapping.started";
                 output_mapping: {
                     [key: string]: string;
                 } | null;
                 task_output_keys: string[];
             } | {
                 /** @enum {string} */
-                type: "operation.context.output_mapping.skip";
+                type: "operation.context.output_mapping.skipped";
                 /** @enum {string} */
                 reason: "no_mapping";
             } | {
                 /** @enum {string} */
-                type: "operation.context.output_mapping.apply";
+                type: "operation.context.output_mapping.applied";
                 target_path: string;
                 source_path: string;
                 extracted_value?: unknown;
             } | {
                 /** @enum {string} */
-                type: "operation.context.branch_table.create";
+                type: "operation.context.branch_table.created";
                 token_id: string;
                 table_name: string;
                 schema_type: string;
             } | {
                 /** @enum {string} */
-                type: "operation.context.branch_table.drop";
+                type: "operation.context.branch_table.dropped";
                 token_ids: string[];
                 tables_dropped: number;
             } | {
@@ -2128,29 +2128,29 @@ export interface components {
                 errors?: string[];
             } | {
                 /** @enum {string} */
-                type: "operation.context.branch.write";
+                type: "operation.context.branch.written";
                 token_id: string;
                 output?: unknown;
             } | {
                 /** @enum {string} */
-                type: "operation.context.branch.read_all";
+                type: "operation.context.branches_read";
                 token_ids: string[];
                 output_count: number;
             } | {
                 /** @enum {string} */
-                type: "operation.context.merge.start";
+                type: "operation.context.merge.started";
                 sibling_count: number;
                 strategy: string;
                 source_path: string;
                 target_path: string;
             } | {
                 /** @enum {string} */
-                type: "operation.context.merge.complete";
+                type: "operation.context.merged";
                 target_path: string;
                 branch_count: number;
             } | {
                 /** @enum {string} */
-                type: "operation.tokens.create";
+                type: "operation.tokens.created";
                 token_id: string;
                 node_id: string;
                 task_id: string;
@@ -2160,8 +2160,9 @@ export interface components {
                 branch_total: number;
             } | {
                 /** @enum {string} */
-                type: "operation.tokens.update_status";
+                type: "operation.tokens.status_updated";
                 token_id: string;
+                node_id?: string;
                 from: string;
                 to: string;
             } | {
@@ -2221,11 +2222,6 @@ export interface components {
                 decision_count: number;
             } | {
                 /** @enum {string} */
-                type: "dispatch.batch.group";
-                batch_type: string;
-                count: number;
-            } | {
-                /** @enum {string} */
                 type: "dispatch.batch.complete";
                 total_decisions: number;
                 batched_decisions: number;
@@ -2233,16 +2229,7 @@ export interface components {
                 tokens_created: number;
                 tokens_dispatched: number;
                 errors: number;
-            } | {
-                /** @enum {string} */
-                type: "dispatch.decision.apply";
-                decision_type: string;
-                decision?: unknown;
-            } | {
-                /** @enum {string} */
-                type: "dispatch.error";
-                decision_type: string;
-                error: string;
+                duration_ms?: number;
             } | {
                 /** @enum {string} */
                 type: "dispatch.decision.planned";
@@ -2252,61 +2239,9 @@ export interface components {
                 timestamp: number;
             } | {
                 /** @enum {string} */
-                type: "dispatch.token.created";
-                token_id: string;
-                node_id: string;
-            } | {
-                /** @enum {string} */
-                type: "dispatch.tokens.batch_created";
-                count: number;
-            } | {
-                /** @enum {string} */
-                type: "dispatch.token.status_updated";
-                token_id: string;
-                status: string;
-            } | {
-                /** @enum {string} */
-                type: "dispatch.tokens.batch_status_updated";
-                count: number;
-            } | {
-                /** @enum {string} */
-                type: "dispatch.token.marked_waiting";
-                token_id: string;
-            } | {
-                /** @enum {string} */
-                type: "dispatch.token.marked_for_dispatch";
-                token_id: string;
-            } | {
-                /** @enum {string} */
-                type: "dispatch.context.set";
-                path: string;
-            } | {
-                /** @enum {string} */
-                type: "dispatch.context.output_applied";
-                path: string;
-            } | {
-                /** @enum {string} */
-                type: "dispatch.branch.table_initialized";
-                token_id: string;
-            } | {
-                /** @enum {string} */
-                type: "dispatch.branch.output_applied";
-                token_id: string;
-            } | {
-                /** @enum {string} */
-                type: "dispatch.branch.merged";
-                token_ids: string[];
-                target: string;
-                strategy: string;
-            } | {
-                /** @enum {string} */
-                type: "dispatch.branch.tables_dropped";
-                token_ids: string[];
-            } | {
-                /** @enum {string} */
-                type: "dispatch.sync.check_requested";
-                token_id: string;
-                transition_id: string;
+                type: "dispatch.error";
+                decision_type: string;
+                error: string;
             } | {
                 /** @enum {string} */
                 type: "dispatch.sync.fan_in_activated";

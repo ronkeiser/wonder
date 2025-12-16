@@ -124,7 +124,7 @@ const TraceEventPayloadSchema = z.discriminatedUnion('type', [
   }),
   // Operation events - context
   z.object({
-    type: z.literal('operation.context.initialize'),
+    type: z.literal('operation.context.initialized'),
     has_input_schema: z.boolean(),
     has_context_schema: z.boolean(),
     table_count: z.number(),
@@ -144,12 +144,12 @@ const TraceEventPayloadSchema = z.discriminatedUnion('type', [
     value: z.unknown(),
   }),
   z.object({
-    type: z.literal('operation.context.replace_section'),
+    type: z.literal('operation.context.section_replaced'),
     section: z.string(),
     data: z.unknown(),
   }),
   z.object({
-    type: z.literal('operation.context.set_field'),
+    type: z.literal('operation.context.field_set'),
     path: z.string(),
     value: z.unknown(),
   }),
@@ -162,28 +162,28 @@ const TraceEventPayloadSchema = z.discriminatedUnion('type', [
     }),
   }),
   z.object({
-    type: z.literal('operation.context.output_mapping.start'),
+    type: z.literal('operation.context.output_mapping.started'),
     output_mapping: z.record(z.string(), z.string()).nullable(),
     task_output_keys: z.array(z.string()),
   }),
   z.object({
-    type: z.literal('operation.context.output_mapping.skip'),
+    type: z.literal('operation.context.output_mapping.skipped'),
     reason: z.literal('no_mapping'),
   }),
   z.object({
-    type: z.literal('operation.context.output_mapping.apply'),
+    type: z.literal('operation.context.output_mapping.applied'),
     target_path: z.string(),
     source_path: z.string(),
     extracted_value: z.unknown(),
   }),
   z.object({
-    type: z.literal('operation.context.branch_table.create'),
+    type: z.literal('operation.context.branch_table.created'),
     token_id: z.string(),
     table_name: z.string(),
     schema_type: z.string(),
   }),
   z.object({
-    type: z.literal('operation.context.branch_table.drop'),
+    type: z.literal('operation.context.branch_table.dropped'),
     token_ids: z.array(z.string()),
     tables_dropped: z.number(),
   }),
@@ -195,30 +195,30 @@ const TraceEventPayloadSchema = z.discriminatedUnion('type', [
     errors: z.array(z.string()).optional(),
   }),
   z.object({
-    type: z.literal('operation.context.branch.write'),
+    type: z.literal('operation.context.branch.written'),
     token_id: z.string(),
     output: z.unknown(),
   }),
   z.object({
-    type: z.literal('operation.context.branch.read_all'),
+    type: z.literal('operation.context.branches_read'),
     token_ids: z.array(z.string()),
     output_count: z.number(),
   }),
   z.object({
-    type: z.literal('operation.context.merge.start'),
+    type: z.literal('operation.context.merge.started'),
     sibling_count: z.number(),
     strategy: z.string(),
     source_path: z.string(),
     target_path: z.string(),
   }),
   z.object({
-    type: z.literal('operation.context.merge.complete'),
+    type: z.literal('operation.context.merged'),
     target_path: z.string(),
     branch_count: z.number(),
   }),
   // Operation events - tokens
   z.object({
-    type: z.literal('operation.tokens.create'),
+    type: z.literal('operation.tokens.created'),
     token_id: z.string(),
     node_id: z.string(),
     task_id: z.string(),
@@ -228,8 +228,9 @@ const TraceEventPayloadSchema = z.discriminatedUnion('type', [
     branch_total: z.number(),
   }),
   z.object({
-    type: z.literal('operation.tokens.update_status'),
+    type: z.literal('operation.tokens.status_updated'),
     token_id: z.string(),
+    node_id: z.string().optional(),
     from: z.string(),
     to: z.string(),
   }),
@@ -283,15 +284,10 @@ const TraceEventPayloadSchema = z.discriminatedUnion('type', [
     params: z.array(z.unknown()),
     duration_ms: z.number(),
   }),
-  // Dispatch events - batch
+  // Dispatch events - batching
   z.object({
     type: z.literal('dispatch.batch.start'),
     decision_count: z.number(),
-  }),
-  z.object({
-    type: z.literal('dispatch.batch.group'),
-    batch_type: z.string(),
-    count: z.number(),
   }),
   z.object({
     type: z.literal('dispatch.batch.complete'),
@@ -301,17 +297,9 @@ const TraceEventPayloadSchema = z.discriminatedUnion('type', [
     tokens_created: z.number(),
     tokens_dispatched: z.number(),
     errors: z.number(),
+    duration_ms: z.number().optional(),
   }),
-  z.object({
-    type: z.literal('dispatch.decision.apply'),
-    decision_type: z.string(),
-    decision: z.unknown(),
-  }),
-  z.object({
-    type: z.literal('dispatch.error'),
-    decision_type: z.string(),
-    error: z.string(),
-  }),
+  // Dispatch events - decision tracking
   z.object({
     type: z.literal('dispatch.decision.planned'),
     decision_type: z.string(),
@@ -319,67 +307,13 @@ const TraceEventPayloadSchema = z.discriminatedUnion('type', [
     token_id: z.string().optional(),
     timestamp: z.number(),
   }),
-  // Dispatch events - token operations
+  // Dispatch events - error handling
   z.object({
-    type: z.literal('dispatch.token.created'),
-    token_id: z.string(),
-    node_id: z.string(),
-  }),
-  z.object({
-    type: z.literal('dispatch.tokens.batch_created'),
-    count: z.number(),
-  }),
-  z.object({
-    type: z.literal('dispatch.token.status_updated'),
-    token_id: z.string(),
-    status: z.string(),
-  }),
-  z.object({
-    type: z.literal('dispatch.tokens.batch_status_updated'),
-    count: z.number(),
-  }),
-  z.object({
-    type: z.literal('dispatch.token.marked_waiting'),
-    token_id: z.string(),
-  }),
-  z.object({
-    type: z.literal('dispatch.token.marked_for_dispatch'),
-    token_id: z.string(),
-  }),
-  // Dispatch events - context operations
-  z.object({
-    type: z.literal('dispatch.context.set'),
-    path: z.string(),
-  }),
-  z.object({
-    type: z.literal('dispatch.context.output_applied'),
-    path: z.string(),
-  }),
-  // Dispatch events - branch storage
-  z.object({
-    type: z.literal('dispatch.branch.table_initialized'),
-    token_id: z.string(),
-  }),
-  z.object({
-    type: z.literal('dispatch.branch.output_applied'),
-    token_id: z.string(),
-  }),
-  z.object({
-    type: z.literal('dispatch.branch.merged'),
-    token_ids: z.array(z.string()),
-    target: z.string(),
-    strategy: z.string(),
-  }),
-  z.object({
-    type: z.literal('dispatch.branch.tables_dropped'),
-    token_ids: z.array(z.string()),
+    type: z.literal('dispatch.error'),
+    decision_type: z.string(),
+    error: z.string(),
   }),
   // Dispatch events - synchronization
-  z.object({
-    type: z.literal('dispatch.sync.check_requested'),
-    token_id: z.string(),
-    transition_id: z.string(),
-  }),
   z.object({
     type: z.literal('dispatch.sync.fan_in_activated'),
     node_id: z.string(),
