@@ -19,7 +19,6 @@ export {
   buildPathId,
   decideRouting,
   evaluateCondition,
-  getMergeConfig as getRoutingMergeConfig,
   getTransitionsWithSynchronization,
   toTransitionDef,
   type PlanningResult,
@@ -31,7 +30,7 @@ export {
   decideOnSiblingCompletion,
   decideOnTimeout,
   decideSynchronization,
-  getMergeConfig as getSyncMergeConfig,
+  getMergeConfig,
   hasTimedOut,
   needsMerge,
 } from './synchronization';

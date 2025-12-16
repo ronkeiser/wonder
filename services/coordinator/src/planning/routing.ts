@@ -455,11 +455,3 @@ export function toTransitionDef(row: TransitionRow): TransitionDef {
     synchronization: row.synchronization as SynchronizationConfig | null,
   };
 }
-
-/**
- * Extract merge config from transition synchronization.
- * Useful for dispatch layer when merging branches.
- */
-export function getMergeConfig(transition: TransitionDef): MergeConfig | null {
-  return transition.synchronization?.merge ?? null;
-}
