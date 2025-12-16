@@ -3,7 +3,7 @@
 import { eq } from 'drizzle-orm';
 import type { DrizzleD1Database } from 'drizzle-orm/d1';
 import { ulid } from 'ulid';
-import { project_settings, projects } from '~/infrastructure/db/schema';
+import { project_settings, projects } from '~/schema';
 import type { Project, ProjectSettings } from './types';
 
 type ProjectRow = typeof projects.$inferSelect;

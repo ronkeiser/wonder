@@ -3,7 +3,7 @@
 import { eq } from 'drizzle-orm';
 import type { DrizzleD1Database } from 'drizzle-orm/d1';
 import { ulid } from 'ulid';
-import { model_profiles } from '~/infrastructure/db/schema';
+import { model_profiles } from '~/schema';
 import type { ModelProfile } from './types';
 
 type NewModelProfile = Omit<typeof model_profiles.$inferInsert, 'id'>;

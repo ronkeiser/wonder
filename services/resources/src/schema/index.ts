@@ -11,7 +11,7 @@ import {
   text,
   unique,
 } from 'drizzle-orm/sqlite-core';
-import type { ModelId, ModelProfile } from '../../resources/model-profiles/types.js';
+import type { ModelId, ModelProfile } from '../resources/model-profiles/types';
 
 /** Type definitions for JSON columns */
 

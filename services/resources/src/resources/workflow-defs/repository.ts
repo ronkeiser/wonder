@@ -3,7 +3,7 @@
 import { and, eq } from 'drizzle-orm';
 import type { DrizzleD1Database } from 'drizzle-orm/d1';
 import { ulid } from 'ulid';
-import { nodes, transitions, workflow_defs } from '~/infrastructure/db/schema';
+import { nodes, transitions, workflow_defs } from '~/schema';
 import type { Node, Transition, WorkflowDef } from './types';
 
 /** WorkflowDef */

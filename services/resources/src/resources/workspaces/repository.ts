@@ -3,7 +3,7 @@
 import { eq } from 'drizzle-orm';
 import type { DrizzleD1Database } from 'drizzle-orm/d1';
 import { ulid } from 'ulid';
-import { workspace_settings, workspaces } from '~/infrastructure/db/schema';
+import { workspace_settings, workspaces } from '~/schema';
 import type { Workspace, WorkspaceSettings } from './types';
 
 type WorkspaceRow = typeof workspaces.$inferSelect;

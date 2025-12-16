@@ -3,7 +3,7 @@
 import { eq } from 'drizzle-orm';
 import { ulid } from 'ulid';
 import { NotFoundError } from '~/errors';
-import * as schema from '~/infrastructure/db/schema';
+import * as schema from '~/schema';
 import { Resource } from '../base';
 import * as workflowRepo from '../workflows/repository';
 import * as repo from './repository';

@@ -2,7 +2,7 @@
 
 import { eq } from 'drizzle-orm';
 import type { DrizzleD1Database } from 'drizzle-orm/d1';
-import { projects, workflow_runs } from '~/infrastructure/db/schema';
+import { projects, workflow_runs } from '~/schema';
 
 type WorkflowRun = typeof workflow_runs.$inferSelect;
 

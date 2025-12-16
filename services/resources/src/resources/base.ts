@@ -1,7 +1,7 @@
 import { createLogger } from '@wonder/logs';
 import { RpcTarget } from 'cloudflare:workers';
 import { drizzle } from 'drizzle-orm/d1';
-import type { ServiceContext } from '~/infrastructure/context';
+import type { ServiceContext } from '~/context';
 
 /**
  * Base RPC resource with pre-configured service context

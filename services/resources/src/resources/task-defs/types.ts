@@ -1,6 +1,6 @@
 /** Type definitions for task definitions */
 
-import type { RetryConfig, Step } from '../../infrastructure/db/schema';
+import type { RetryConfig, Step } from '../../schema';
 
 /** Re-export Step for consumers */
 export type { RetryConfig, Step };

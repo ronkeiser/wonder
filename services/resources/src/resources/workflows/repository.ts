@@ -3,7 +3,7 @@
 import { and, desc, eq } from 'drizzle-orm';
 import type { DrizzleD1Database } from 'drizzle-orm/d1';
 import { ulid } from 'ulid';
-import { workflow_defs, workflow_runs, workflows } from '~/infrastructure/db/schema';
+import { workflow_defs, workflow_runs, workflows } from '~/schema';
 import type { Workflow, WorkflowRun } from './types';
 
 type NewWorkflow = Omit<typeof workflows.$inferInsert, 'id' | 'created_at' | 'updated_at'>;

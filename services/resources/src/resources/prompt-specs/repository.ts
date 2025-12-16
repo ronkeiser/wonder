@@ -3,7 +3,7 @@
 import { and, desc, eq } from 'drizzle-orm';
 import type { DrizzleD1Database } from 'drizzle-orm/d1';
 import { ulid } from 'ulid';
-import { prompt_specs } from '~/infrastructure/db/schema';
+import { prompt_specs } from '~/schema';
 import type { PromptSpec } from './types';
 
 type NewPromptSpec = Omit<typeof prompt_specs.$inferInsert, 'id' | 'created_at' | 'updated_at'>;

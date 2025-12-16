@@ -2,7 +2,7 @@
 
 import { ulid } from 'ulid';
 import { ConflictError, NotFoundError, extractDbError } from '~/errors';
-import type { RetryConfig, Step } from '../../infrastructure/db/schema';
+import type { RetryConfig, Step } from '../../schema';
 import { Resource } from '../base';
 import * as repo from './repository';
 import type { TaskDef } from './types';
