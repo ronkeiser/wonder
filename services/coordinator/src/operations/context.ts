@@ -38,7 +38,6 @@
 
 import type { Emitter } from '@wonder/events';
 import { Schema, type JSONSchema, type SchemaTable, type SqlHook } from '@wonder/schemas';
-import { composeSqlMessage } from '../helpers/sql.js';
 import type { ContextSnapshot } from '../types';
 import type { DefinitionManager } from './defs';
 
@@ -103,7 +102,6 @@ export class ContextManager {
       onQuery: (query, params, durationMs) => {
         this.emitter.emitTrace({
           type: 'sql.query',
-          message: composeSqlMessage(query, durationMs),
           sql: query,
           params,
           duration_ms: durationMs,

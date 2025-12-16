@@ -279,7 +279,6 @@ const TraceEventPayloadSchema = z.discriminatedUnion('type', [
   // SQL events
   z.object({
     type: z.literal('sql.query'),
-    message: z.string(),
     sql: z.string(),
     params: z.array(z.unknown()),
     duration_ms: z.number(),

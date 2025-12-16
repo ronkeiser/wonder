@@ -44,12 +44,9 @@
     }
 
     // Determine the message to display
-    // Priority: item.message > type with context parts > just type
     let message: string;
-    if (item.message) {
-      message = item.message;
-    } else if (item.duration_ms !== null && item.duration_ms !== undefined) {
-      message = `${item.duration_ms.toFixed(2)}ms`;
+    if (item.category === 'sql' && item.payload?.sql) {
+      message = item.payload.sql;
     } else {
       message = item.type;
     }

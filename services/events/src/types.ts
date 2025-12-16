@@ -388,7 +388,6 @@ export type OperationEvent =
  */
 export type SQLEvent = {
   type: 'sql.query';
-  message: string; // e.g., "SELECT context_input (0ms)"
   sql: string;
   params: unknown[];
   duration_ms: number;
