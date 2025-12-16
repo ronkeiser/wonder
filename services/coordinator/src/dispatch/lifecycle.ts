@@ -101,7 +101,7 @@ export async function startWorkflow(ctx: DispatchContext): Promise<void> {
  *
  * Called when task execution fails. May trigger retry based on error type.
  */
-export function handleTaskError(
+export function processTaskError(
   ctx: DispatchContext,
   tokenId: string,
   errorResult: TaskErrorResult,

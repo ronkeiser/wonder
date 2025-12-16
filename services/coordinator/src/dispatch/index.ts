@@ -43,4 +43,4 @@ export {
 export { dispatchToken, processTaskResult } from './task';
 
 // Lifecycle: workflow start, error handling, failure
-export { failWorkflow, handleTaskError, startWorkflow, type TaskErrorResult } from './lifecycle';
+export { failWorkflow, processTaskError, startWorkflow, type TaskErrorResult } from './lifecycle';

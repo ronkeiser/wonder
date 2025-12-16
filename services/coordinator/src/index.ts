@@ -14,7 +14,7 @@ import { createLogger, type Logger } from '@wonder/logs';
 import { DurableObject } from 'cloudflare:workers';
 import {
   type DispatchContext,
-  handleTaskError as dispatchHandleTaskError,
+  processTaskError,
   processTaskResult,
   startWorkflow,
   type TaskErrorResult,
@@ -155,7 +155,7 @@ export class WorkflowCoordinator extends DurableObject {
 
       // Delegate to lifecycle module
       const ctx = this.getDispatchContext(workflow_run_id);
-      dispatchHandleTaskError(ctx, tokenId, errorResult);
+      processTaskError(ctx, tokenId, errorResult);
     } catch (error) {
       this.logger.error({
         event_type: 'coordinator_task_error_failed',
