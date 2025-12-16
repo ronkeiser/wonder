@@ -21,8 +21,8 @@ export const loggerMiddleware = createMiddleware<HttpEnv>(async (c, next) => {
   const requestId = ulid();
 
   const logger = createLogger(c.executionCtx, c.env.LOGS, {
-    service: 'http',
-    environment: c.env.ENVIRONMENT ?? 'local',
+    service: c.env.SERVICE,
+    environment: c.env.ENVIRONMENT,
   });
 
   c.set('logger', logger);

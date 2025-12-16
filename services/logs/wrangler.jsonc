@@ -27,6 +27,10 @@
       "new_classes": ["Streamer"],
     },
   ],
+  "vars": {
+    "SERVICE": "logs",
+    "ENVIRONMENT": "development",
+  },
   "observability": {
     "enabled": false,
   },

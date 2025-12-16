@@ -40,8 +40,8 @@ export class DefinitionManager {
     this.db = drizzle(ctx.storage, { schema });
     this.env = env;
     this.logger = createLogger(ctx, env.LOGS, {
-      service: 'coordinator',
-      environment: 'development',
+      service: env.SERVICE,
+      environment: env.ENVIRONMENT,
     });
   }
 

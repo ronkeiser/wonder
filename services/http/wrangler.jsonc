@@ -4,6 +4,7 @@
   "main": "src/index.ts",
   "compatibility_date": "2025-11-18",
   "vars": {
+    "SERVICE": "http",
     "ENVIRONMENT": "development",
   },
   "services": [

@@ -32,8 +32,8 @@ const STREAMER_NAME = 'events-streamer';
 export class EventsService extends WorkerEntrypoint<Env> {
   private db = drizzle(this.env.DB);
   private logger: Logger = createLogger(this.ctx, this.env.LOGS, {
-    service: 'events',
-    environment: 'development',
+    service: this.env.SERVICE,
+    environment: this.env.ENVIRONMENT,
   });
 
   /**

@@ -25,4 +25,8 @@
   "observability": {
     "enabled": false,
   },
+  "vars": {
+    "SERVICE": "executor",
+    "ENVIRONMENT": "development",
+  },
 }

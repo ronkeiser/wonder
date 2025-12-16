@@ -72,8 +72,8 @@ export interface LLMCallResult {
  */
 export default class ExecutorService extends WorkerEntrypoint<Env> {
   private logger = createLogger(this.ctx, this.env.LOGS, {
-    service: 'executor',
-    environment: 'production',
+    service: this.env.SERVICE,
+    environment: this.env.ENVIRONMENT,
   });
 
   constructor(ctx: ExecutionContext, env: Env) {

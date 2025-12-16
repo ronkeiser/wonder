@@ -27,6 +27,10 @@
       },
     ],
   },
+  "vars": {
+    "SERVICE": "events",
+    "ENVIRONMENT": "development",
+  },
   "migrations": [
     {
       "tag": "v1",

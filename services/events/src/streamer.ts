@@ -54,8 +54,8 @@ export class Streamer extends DurableObject<Env> {
   constructor(ctx: DurableObjectState, env: Env) {
     super(ctx, env);
     this.logger = createLogger(ctx, env.LOGS, {
-      service: 'events-streamer',
-      environment: 'development',
+      service: `${env.SERVICE}-streamer`,
+      environment: env.ENVIRONMENT,
     });
   }
 
