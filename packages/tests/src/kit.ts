@@ -565,12 +565,14 @@ export async function runTestWorkflow(
   },
 ): Promise<TestWorkflowResult> {
   // Setup infrastructure
+  console.log('🔧 Setting up test project...');
   const ctx = await setupTestContext();
 
   // Create workflow and all embedded resources
   const setup = await createWorkflow(ctx, workflow);
 
   // Execute the workflow
+  console.log('🚀 Starting workflow execution...');
   const result = await executeWorkflow(setup.workflowId, input, options);
 
   // Return results with cleanup function
@@ -578,6 +580,7 @@ export async function runTestWorkflow(
     result,
     setup,
     cleanup: async () => {
+      console.log('🧹 Starting cleanup...');
       const count = await cleanupWorkflowTest(setup, result.workflowRunId);
       console.log(`✨ Cleanup complete (${count} resources)`);
     },

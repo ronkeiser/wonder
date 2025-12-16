@@ -264,7 +264,9 @@ export class TraceEventCollection {
         return self.filter<TracePayloads.ContextSetField>('operation.context.set_field');
       },
       replaceSections(): TypedTraceEvent<TracePayloads.ContextReplaceSection>[] {
-        return self.filter<TracePayloads.ContextReplaceSection>('operation.context.replace_section');
+        return self.filter<TracePayloads.ContextReplaceSection>(
+          'operation.context.replace_section',
+        );
       },
       readAt(path: string): TypedTraceEvent<TracePayloads.ContextRead> | undefined {
         return self.findWhere(
@@ -290,7 +292,10 @@ export class TraceEventCollection {
         if (replaceSectionEvent) {
           return {
             ...replaceSectionEvent,
-            payload: { path: replaceSectionEvent.payload.section, value: replaceSectionEvent.payload.data },
+            payload: {
+              path: replaceSectionEvent.payload.section,
+              value: replaceSectionEvent.payload.data,
+            },
           };
         }
         return undefined;

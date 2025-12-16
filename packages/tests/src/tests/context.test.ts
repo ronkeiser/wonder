@@ -173,13 +173,15 @@ describe('Coordinator - Context Operations', () => {
     const outputSetFields = trace.context.setFieldsTo('output');
     console.log('📊 All output setField events:', outputSetFields.length);
     outputSetFields.forEach((e, i) => {
-      console.log(`  [${i}] seq=${e.sequence} path=${e.payload.path} value=${JSON.stringify(e.payload.value)}`);
+      console.log(
+        `  [${i}] seq=${e.sequence} path=${e.payload.path} value=${JSON.stringify(e.payload.value)}`,
+      );
     });
 
     // Check for both output field writes
     const greetingWrite = trace.context.setFieldAt('output.greeting');
     const processedCountWrite = trace.context.setFieldAt('output.processed_count');
-    
+
     expect(greetingWrite).toBeDefined();
     expect(greetingWrite!.payload.value).toBe('Hello Alice');
     expect(processedCountWrite).toBeDefined();
