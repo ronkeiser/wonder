@@ -4,7 +4,6 @@
  * This worker serves the Wonder API and exports Durable Object classes.
  */
 import { WorkerEntrypoint } from 'cloudflare:workers';
-import { handleFetch } from './handlers/fetch';
 import { Actions } from './resources/actions';
 import { ModelProfiles } from './resources/model-profiles';
 import { Projects } from './resources/projects';
@@ -66,8 +65,8 @@ class WonderResources extends WorkerEntrypoint<Env> {
   }
 
   /** HTTP fetch handler */
-  async fetch(request: Request): Promise<Response> {
-    return handleFetch(request, this.env, this.ctx);
+  fetch(): Response {
+    return new Response('OK');
   }
 }
 

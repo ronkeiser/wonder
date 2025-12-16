@@ -16,10 +16,6 @@ export interface ServiceContext {
 
   /** Execution context for async operations */
   executionContext: ExecutionContext;
-
-  // Future dependencies to be added:
-  // vectorize: Vectorize;
-  // r2: R2Bucket;
 }
 
 /**
