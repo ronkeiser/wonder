@@ -66,7 +66,10 @@ export async function dispatchAction(
       return notImplemented(action, context, logger);
 
     case 'update_context':
-      // Update context is handled by output mapping, just pass through
+      // TODO: Implement expression evaluation per primitives.md
+      // Currently a pass-through stub. Should evaluate implementation.updates[].expr
+      // against input to enable computation (math, string ops, conditionals).
+      // Output mapping alone cannot compute derived values (e.g., average of scores).
       return {
         success: true,
         output: input,
