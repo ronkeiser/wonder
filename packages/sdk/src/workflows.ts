@@ -145,13 +145,13 @@ export function createWorkflowsClient(
         }
 
         // Check for terminal conditions (only applies to EventEntry, not TraceEventEntry)
-        if ('event_type' in event && event.event_type === 'workflow_completed') {
+        if ('event_type' in event && event.event_type === 'workflow.completed') {
           // Wait for grace period to collect any in-flight events before closing
           setTimeout(() => resolveWithCleanup('completed'), gracePeriod);
           return;
         }
 
-        if ('event_type' in event && event.event_type === 'workflow_failed') {
+        if ('event_type' in event && event.event_type === 'workflow.failed') {
           // Wait for grace period to collect any in-flight events before closing
           setTimeout(() => resolveWithCleanup('failed'), gracePeriod);
           return;

@@ -2,37 +2,44 @@
 
 /**
  * Workflow event types for execution tracking
+ *
+ * Naming convention: category.action (dot notation)
+ * - workflow.* - Workflow lifecycle events
+ * - task.* - Task execution events
+ * - token.* - Token lifecycle events
+ * - context.* - Context state changes
+ * - fan_out.* / fan_in.* - Parallel execution events
+ * - branches.* - Branch merge events
  */
 export type EventType =
   // Workflow lifecycle
-  | 'workflow_started'
-  | 'workflow_completed'
-  | 'workflow_failed'
-  // Node execution
-  | 'node_started'
-  | 'node_completed'
-  | 'node_failed'
+  | 'workflow.started'
+  | 'workflow.completed'
+  | 'workflow.failed'
+  // Task execution
+  | 'task.dispatched'
+  | 'task.completed'
+  | 'task.failed'
   // Token lifecycle
-  | 'token_spawned'
-  | 'token_dispatched'
-  | 'token_completed'
-  | 'token_failed'
-  | 'token_cancelled'
-  // Parallelism synchronization
-  | 'fan_in_waiting'
-  | 'fan_in_completed'
+  | 'token.created'
+  | 'token.completed'
+  | 'token.failed'
+  | 'token.waiting'
+  // Context updates
+  | 'context.updated'
+  | 'context.output_applied'
+  // Fan-out/Fan-in
+  | 'fan_out.started'
+  | 'fan_in.completed'
+  | 'branches.merged'
   // Sub-workflows
-  | 'subworkflow_started'
-  | 'subworkflow_completed'
-  | 'subworkflow_failed'
-  // Actions
-  | 'llm_call_started'
-  | 'llm_call_completed'
-  | 'llm_call_failed'
-  // State changes
-  | 'transition_evaluated'
-  | 'context_updated'
-  | 'artifact_written';
+  | 'subworkflow.started'
+  | 'subworkflow.completed'
+  | 'subworkflow.failed'
+  // Actions (LLM calls)
+  | 'llm.started'
+  | 'llm.completed'
+  | 'llm.failed';
 
 /**
  * Context required for emitting events - provided by coordinator

@@ -41,6 +41,17 @@ export async function dispatchToken(ctx: DispatchContext, tokenId: string): Prom
   // Update token status to executing
   ctx.tokens.updateStatus(tokenId, 'executing');
 
+  // Emit workflow event for task dispatch
+  ctx.emitter.emit({
+    event_type: 'task.dispatched',
+    message: 'Task dispatched to executor',
+    metadata: {
+      token_id: tokenId,
+      task_id: node.task_id ?? 'none',
+      node_id: node.id,
+    },
+  });
+
   // Get context for input mapping
   const context = ctx.context.getSnapshot();
 
@@ -118,15 +129,16 @@ export async function processTaskResult(
   // Get context output after all mappings applied
   const contextOutput = ctx.context.get('output');
 
-  // Emit node completed event
+  // Emit task completed workflow event
   ctx.emitter.emit({
-    event_type: 'node_completed',
-    node_id: token.node_id,
-    token_id: tokenId,
-    message: 'Node completed',
+    event_type: 'task.completed',
+    message: 'Task completed successfully',
     metadata: {
+      token_id: tokenId,
+      task_id: node.task_id ?? 'none',
+      node_id: node.id,
       output: result.output_data,
-      context_output: contextOutput, // Include full output context for observability
+      context_output: contextOutput,
     },
   });
 
@@ -233,7 +245,7 @@ async function finalizeWorkflow(ctx: DispatchContext): Promise<void> {
 
     // Emit workflow completed event
     ctx.emitter.emit({
-      event_type: 'workflow_completed',
+      event_type: 'workflow.completed',
       message: 'Workflow completed',
       metadata: { output: finalOutput },
     });

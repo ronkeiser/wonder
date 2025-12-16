@@ -61,11 +61,13 @@ A decision describes what you _want_ to happen. An event records what _actually 
 
 **Examples:**
 
-- `event_type=token_spawned` - Result of `CREATE_TOKEN` decision
-- `event_type=context_updated` - Result of `UPDATE_CONTEXT` decision
-- `event_type=task_dispatched` - Result of `DISPATCH_TASK` decision
-- `event_type=workflow_completed` - Result of `COMPLETE_WORKFLOW` decision
-- `event_type=llm_call_completed` - Result of executor actor completing task
+- `event_type=token.created` - Result of `CREATE_TOKEN` decision
+- `event_type=context.updated` - Result of `SET_CONTEXT` decision
+- `event_type=task.dispatched` - Result of token dispatch operation
+- `event_type=task.completed` - Result of executor completing task
+- `event_type=workflow.completed` - Result of `COMPLETE_WORKFLOW` decision
+- `event_type=fan_out.started` - Result of `BATCH_CREATE_TOKENS` decision
+- `event_type=fan_in.completed` - Result of `ACTIVATE_FAN_IN` decision
 
 **Key Characteristics:**
 
@@ -73,7 +75,9 @@ A decision describes what you _want_ to happen. An event records what _actually 
 - Emitted AFTER decision execution succeeds
 - Workflow-specific context (workflow_run_id, token_id, node_id)
 - Enables replay, audit, cost tracking, performance analysis
-- **Most events correspond to a successful decision execution**### 3. Logs (Operational Debugging)
+- **Most events correspond to a successful decision execution**
+- Namespaced format: `category.action` (e.g., `token.created`, `workflow.started`)
+- Legacy events: `node_completed`, `node_failed` kept for backward compatibility### 3. Logs (Operational Debugging)
 
 **Purpose:** Debug service problems, track operations, investigate errors
 
@@ -162,34 +166,48 @@ executeDecisions(decisions) {
 
 Most decisions produce a corresponding event when successfully executed:
 
-| Decision                            | Event (Result)       | Log (If Failed)              |
-| ----------------------------------- | -------------------- | ---------------------------- |
-| `CREATE_TOKEN`                      | `token_spawned`      | `token_creation_failed`      |
-| `UPDATE_CONTEXT`                    | `context_updated`    | `context_update_failed`      |
-| `DISPATCH_TASK`                     | `task_dispatched`    | `task_dispatch_failed`       |
-| `COMPLETE_WORKFLOW`                 | `workflow_completed` | `workflow_completion_failed` |
-| `CANCEL_TOKEN`                      | `token_cancelled`    | `token_cancellation_failed`  |
-| `MERGE_TOKENS`                      | `tokens_merged`      | `merge_failed`               |
-| (None - external system completion) | `llm_call_completed` | `llm_call_failed`            |
-| (None - external system completion) | `node_completed`     | `node_failed`                |
+| Decision              | Workflow Event (emit)    | Trace Event (emitTrace)                |
+| --------------------- | ------------------------ | -------------------------------------- |
+| `CREATE_TOKEN`        | `token.created`          | `operation.tokens.created`             |
+| `BATCH_CREATE_TOKENS` | `fan_out.started`        | `operation.tokens.created` (per token) |
+| `UPDATE_TOKEN_STATUS` | `token.completed`¹       | `operation.tokens.status_updated`      |
+|                       | `token.failed`¹          |                                        |
+| `MARK_WAITING`        | `token.waiting`          | —                                      |
+| `MARK_FOR_DISPATCH`   | `task.dispatched`        | `dispatch.batch.start`                 |
+| `SET_CONTEXT`         | `context.updated`        | —                                      |
+| `APPLY_OUTPUT`        | `context.output_applied` | —                                      |
+| `MERGE_BRANCHES`      | `branches.merged`        | —                                      |
+| `ACTIVATE_FAN_IN`     | `fan_in.completed`       | —                                      |
+| `COMPLETE_WORKFLOW`   | `workflow.completed`     | —                                      |
+| `FAIL_WORKFLOW`       | `workflow.failed`        | —                                      |
+| (Executor callback)   | `task.completed`         | —                                      |
+| (Executor callback)   | `task.failed`            | —                                      |
+| (Initialization)      | `workflow.started`       | —                                      |
 
-**Key Pattern:** Decision (command) → Execution → Event (outcome) or Log (error)
+¹ Only emitted for terminal states (completed, failed)
+
+**Key Pattern:** Decision (command) → Execution → Workflow Event (outcome) + Trace Event (operation details)
 
 ## Decision Matrix
 
-| Scenario                      | Decision?           | Event?              | Log?                   |
-| ----------------------------- | ------------------- | ------------------- | ---------------------- |
-| Router decides to spawn token | ✅ CREATE_TOKEN     | ❌ (not yet done)   | ❌                     |
-| Token actually created        | ❌ (already done)   | ✅ token_spawned    | ❌                     |
-| Token creation fails          | ❌ (failed)         | ❌                  | ✅ SQL error           |
-| Router decides context update | ✅ UPDATE_CONTEXT   | ❌ (not yet done)   | ❌                     |
-| Context updated in DB         | ❌ (already done)   | ✅ context_updated  | ❌                     |
-| Node execution completed      | ❌ (external)       | ✅ node_completed   | ❌                     |
-| Coordinator DO created        | ❌ (not workflow)   | ❌                  | ✅ Service lifecycle   |
-| Workflow run started          | ❌ (initialization) | ✅ workflow_started | ✅ Operation received  |
-| Executor task received        | ❌ (not workflow)   | ❌                  | ✅ Service tracking    |
-| RPC timeout                   | ❌ (infrastructure) | ❌                  | ✅ Infrastructure fail |
-| Database query slow           | ❌ (infrastructure) | ❌                  | ✅ Performance issue   |
+| Scenario                       | Decision?              | Workflow Event?     | Trace Event?                          |
+| ------------------------------ | ---------------------- | ------------------- | ------------------------------------- |
+| Router decides to spawn token  | ✅ CREATE_TOKEN        | ❌ (not yet done)   | ❌                                    |
+| Token actually created         | ❌ (already done)      | ✅ token.created    | ✅ operation.tokens.created           |
+| Token creation fails           | ❌ (failed)            | ❌                  | ✅ dispatch.error                     |
+| Router decides context update  | ✅ SET_CONTEXT         | ❌ (not yet done)   | ❌                                    |
+| Context updated in DB          | ❌ (already done)      | ✅ context.updated  | ✅ operation.context.field_set        |
+| Task completed                 | ❌ (external)          | ✅ task.completed   | ❌                                    |
+| Node execution completed       | ❌ (external)          | ✅ node_completed²  | ❌                                    |
+| Coordinator DO created         | ❌ (not workflow)      | ❌                  | ✅ Log (service lifecycle)            |
+| Workflow run started           | ❌ (initialization)    | ✅ workflow.started | ✅ Log + operation traces             |
+| Executor task received         | ❌ (not workflow)      | ❌                  | ✅ Log (service tracking)             |
+| RPC timeout                    | ❌ (infrastructure)    | ❌                  | ✅ Log (infrastructure fail)          |
+| Database query slow            | ❌ (infrastructure)    | ❌                  | ✅ Log + sql.query trace              |
+| Fan-out spawns multiple tokens | ✅ BATCH_CREATE_TOKENS | ✅ fan_out.started  | ✅ operation.tokens.created (per tok) |
+| Siblings merge at fan-in       | ✅ ACTIVATE_FAN_IN     | ✅ fan_in.completed | ❌                                    |
+
+² Legacy event kept for backward compatibility
 
 ## Service Responsibilities
 
@@ -227,26 +245,29 @@ Most decisions produce a corresponding event when successfully executed:
 
 1. **Decision:** ✅ `CREATE_TOKEN` - Router returns pure data
 2. **Execution:** Coordinator executes `tokens.create()` (actor state mutation)
-3. **Event:** ✅ `token_spawned` - Result of successful execution
-4. **Log:** Only if execution failed (SQL error, etc.)
+3. **Workflow Event:** ✅ `token.created` - Result of successful execution
+4. **Trace Event:** ✅ `operation.tokens.created` - Low-level operation details
+5. **Log:** Only if execution failed (SQL error, etc.)
 
 ### "Context update lifecycle"
 
-1. **Decision:** ✅ `UPDATE_CONTEXT` - Router returns pure data
+1. **Decision:** ✅ `SET_CONTEXT` - Router returns pure data
 2. **Execution:** Coordinator writes to SQL (actor state mutation)
-3. **Event:** ✅ `context_updated` - Result of successful write
-4. **Log:** Only if write failed
+3. **Workflow Event:** ✅ `context.updated` - Result of successful write
+4. **Trace Event:** ✅ `operation.context.field_set` - Operation details
+5. **Log:** Only if write failed
 
 ### "Workflow run started"
 
 - **Decision:** None (initialization, not from a decision function)
-- **Event:** ✅ `workflow_started` - Execution began
+- **Workflow Event:** ✅ `workflow.started` - Execution began
 - **Log:** ✅ Coordinator received start request (service operation)
 
-### "Node execution failed"
+### "Task execution failed"
 
 - **Decision:** None (failure is observed, not commanded)
-- **Event:** ✅ `node_failed` - Workflow history (what happened)
+- **Workflow Event:** ✅ `task.failed` - Workflow history (what happened)
+- **Legacy Event:** ✅ `node_failed` - Backward compatibility
 - **Log:** ✅ Infrastructure failure details (why it happened)
 
 ### "Validation error in workflow input"
@@ -311,17 +332,22 @@ Decisions are never stored, so they can't be queried. They exist only as:
 -- Complete execution history for a run
 WHERE workflow_run_id = 'run_xyz789' ORDER BY sequence_number
 
--- LLM cost analysis
-WHERE event_type = 'llm_call_completed'
+-- Task execution cost analysis
+WHERE event_type IN ('task.dispatched', 'task.completed', 'task.failed')
   AND timestamp > ?
   GROUP BY workspace_id
 
 -- Fan-out performance
-WHERE event_type IN ('token_spawned', 'fan_in_complete')
+WHERE event_type IN ('fan_out.started', 'fan_in.completed')
   AND workflow_run_id = 'run_xyz789'
 
 -- Context modifications over time
-WHERE event_type = 'context_updated'
+WHERE event_type IN ('context.updated', 'context.output_applied')
+  AND workflow_run_id = 'run_xyz789'
+  ORDER BY sequence_number
+
+-- Token lifecycle tracking
+WHERE event_type LIKE 'token.%'
   AND workflow_run_id = 'run_xyz789'
   ORDER BY sequence_number
 ```
@@ -349,7 +375,8 @@ WHERE event_type LIKE '%rpc%' AND level = 'error'
    - Event = outcome (what happened after executing the decision)
    - Most decisions produce a corresponding event
    - Decisions without events: Filtered or rejected before execution
-   - Events without decisions: External observations (node_completed from executor actor)
+   - Events without decisions: External observations (`task.completed` from executor actor)
+   - **Two event layers**: Workflow events (`emit()`) for user-facing milestones, trace events (`emitTrace()`) for debugging
 
 2. **Tense matters**:
    - Decisions: Future/declarative (what to do)
@@ -373,20 +400,28 @@ WHERE event_type LIKE '%rpc%' AND level = 'error'
 
 6. **Purpose matters**:
    - Decisions: Enable pure, testable decision logic (no actors needed)
-   - Events: Record execution outcomes, enable replay, audit, cost tracking
+   - Workflow Events: Record execution milestones, enable replay, audit, cost tracking (user-facing)
+   - Trace Events: Debug decision planning, performance metrics, low-level operations (developer-facing)
    - Logs: Enable service debugging, infrastructure monitoring
 
-7. **The canonical flow**:
+7. **Naming convention**:
+   - Workflow Events: Namespaced format `category.action` (e.g., `token.created`, `workflow.started`)
+   - Trace Events: Namespaced format `category.subcategory.action` (e.g., `operation.tokens.created`, `decision.routing.start`)
+   - Logs: `event_type` with service context (e.g., `service=coordinator, event_type=do_alarm_failed`)
+
+8. **The canonical flow**:
 
    ```
-   Decision (data) → Execute (actor message) → Event (result) | Log (error)
+   Decision (data) → Execute (actor message) → Workflow Event (milestone) + Trace Event (operation) | Log (error)
    ```
 
    - Don't emit events before execution (return decisions instead)
    - Don't put workflow execution outcomes in logs (use events)
    - Don't store decisions (they're ephemeral data)
+   - Emit both workflow events (user-facing) and trace events (debugging) when appropriate
 
-8. **Ownership**:
+9. **Ownership**:
    - Decisions: Returned by Router, TaskManager decision functions
-   - Events: Emitted only by Coordinator (after executing decisions as actor messages)
+   - Workflow Events: Emitted only by Coordinator (after executing decisions as actor messages)
+   - Trace Events: Emitted by Coordinator operations and dispatch layer
    - Logs: Emitted by all services

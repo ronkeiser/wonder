@@ -2,23 +2,57 @@
   import StreamViewer from '$lib/components/StreamViewer.svelte';
 
   const eventTypeOptions = [
-    { value: 'workflow_started', label: 'workflow_started' },
-    { value: 'workflow_completed', label: 'workflow_completed' },
-    { value: 'workflow_failed', label: 'workflow_failed' },
-    { value: 'task_started', label: 'task_started' },
-    { value: 'task_completed', label: 'task_completed' },
-    { value: 'task_failed', label: 'task_failed' },
+    // Workflow lifecycle
+    { value: 'workflow.started', label: 'workflow.started' },
+    { value: 'workflow.completed', label: 'workflow.completed' },
+    { value: 'workflow.failed', label: 'workflow.failed' },
+
+    // Task execution
+    { value: 'task.dispatched', label: 'task.dispatched' },
+    { value: 'task.completed', label: 'task.completed' },
+    { value: 'task.failed', label: 'task.failed' },
+
+    // Token lifecycle
+    { value: 'token.created', label: 'token.created' },
+    { value: 'token.completed', label: 'token.completed' },
+    { value: 'token.failed', label: 'token.failed' },
+    { value: 'token.waiting', label: 'token.waiting' },
+
+    // Context updates
+    { value: 'context.updated', label: 'context.updated' },
+    { value: 'context.output_applied', label: 'context.output_applied' },
+
+    // Fan-out/Fan-in
+    { value: 'fan_out.started', label: 'fan_out.started' },
+    { value: 'fan_in.completed', label: 'fan_in.completed' },
+    { value: 'branches.merged', label: 'branches.merged' },
   ];
 
   const colorMap: Record<string, string> = {
-    workflow_started: 'var(--pink)',
-    workflow_completed: 'var(--green)',
-    workflow_failed: 'var(--red)',
-    task_started: 'var(--blue)',
-    task_completed: 'var(--indigo)',
-    task_failed: 'var(--violet)',
-    node_failed: 'var(--orange)',
-    node_completed: 'var(--gray-light)',
+    // Workflow lifecycle - pink/green/red family
+    'workflow.started': 'var(--pink)',
+    'workflow.completed': 'var(--green)',
+    'workflow.failed': 'var(--red)',
+
+    // Task execution - blue/indigo/violet family
+    'task.dispatched': 'var(--blue)',
+    'task.completed': 'var(--indigo)',
+    'task.failed': 'var(--violet)',
+
+    // Token lifecycle - teal/cyan/orange family
+    'token.created': 'var(--teal)',
+    'token.completed': 'var(--cyan)',
+    'token.failed': 'var(--orange)',
+    'token.waiting': 'var(--yellow)',
+
+    // Context updates - purple family
+    'context.updated': 'var(--purple)',
+    'context.output_applied': 'var(--purple-light)',
+
+    // Fan-out/Fan-in - lime/emerald family (parallel execution)
+    'fan_out.started': 'var(--lime)',
+    'fan_in.completed': 'var(--emerald)',
+    'branches.merged': 'var(--emerald-light)',
   };
 
   function getEventColor(item: any): string {

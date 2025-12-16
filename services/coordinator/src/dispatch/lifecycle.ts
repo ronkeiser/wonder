@@ -59,7 +59,7 @@ export async function startWorkflow(ctx: DispatchContext): Promise<void> {
 
   // Emit workflow started event
   ctx.emitter.emit({
-    event_type: 'workflow_started',
+    event_type: 'workflow.started',
     message: 'Workflow started',
     metadata: { input },
   });
@@ -113,12 +113,14 @@ export function handleTaskError(
   // For now, just fail the workflow
   ctx.tokens.updateStatus(tokenId, 'failed');
 
+  // Emit task failed workflow event
   ctx.emitter.emit({
-    event_type: 'node_failed',
-    node_id: token.node_id,
-    token_id: tokenId,
+    event_type: 'task.failed',
     message: `Task failed: ${errorResult.error.message}`,
     metadata: {
+      token_id: tokenId,
+      task_id: _node.task_id ?? 'none',
+      node_id: token.node_id,
       error: errorResult.error,
       metrics: errorResult.metrics,
     },
@@ -138,7 +140,7 @@ export function handleTaskError(
  */
 export function failWorkflow(ctx: DispatchContext, errorMessage: string): void {
   ctx.emitter.emit({
-    event_type: 'workflow_failed',
+    event_type: 'workflow.failed',
     message: `Workflow failed: ${errorMessage}`,
     metadata: { error: errorMessage },
   });
