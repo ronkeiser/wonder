@@ -8,17 +8,17 @@ import { cors } from 'hono/cors';
 import { auth } from './middleware/auth';
 import { errorLoggerMiddleware } from './middleware/error';
 import { loggerMiddleware } from './middleware/logger';
-import { actions } from './routes/action/route';
-import { events } from './routes/event/route';
-import { logs } from './routes/log/route';
-import { modelProfiles } from './routes/model-profile/route';
-import { projects } from './routes/project/route';
-import { promptSpecs } from './routes/prompt-spec/route';
-import { taskDefs } from './routes/task-def/route';
-import { workflowDefs } from './routes/workflow-def/route';
-import { workflowRuns } from './routes/workflow-run/route';
-import { workflows } from './routes/workflow/route';
-import { workspaces } from './routes/workspace/route';
+import { actions } from './routes/actions/route';
+import { events } from './routes/events/route';
+import { logs } from './routes/logs/route';
+import { modelProfiles } from './routes/model-profiles/route';
+import { projects } from './routes/projects/route';
+import { promptSpecs } from './routes/prompt-specs/route';
+import { taskDefs } from './routes/task-defs/route';
+import { workflowDefs } from './routes/workflow-defs/route';
+import { workflowRuns } from './routes/workflow-runs/route';
+import { workflows } from './routes/workflows/route';
+import { workspaces } from './routes/workspaces/route';
 import type { HttpEnv } from './types';
 
 const app = new OpenAPIHono<HttpEnv>({
