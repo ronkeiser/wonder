@@ -2,8 +2,8 @@ import { WorkerEntrypoint } from 'cloudflare:workers';
 import { and, desc, eq } from 'drizzle-orm';
 import { drizzle } from 'drizzle-orm/d1';
 import { ulid } from 'ulid';
-import { logs } from './db/schema.js';
-import type { GetLogsOptions, LogContext, LogLevel, Logger, LoggerInput } from './types.js';
+import { logs } from './schema';
+import type { GetLogsOptions, LogContext, LogLevel, Logger, LoggerInput } from './types';
 
 export { createLogger } from './client.js';
 export { Streamer } from './streamer';

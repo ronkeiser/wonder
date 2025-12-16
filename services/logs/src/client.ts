@@ -1,5 +1,5 @@
 import { ulid } from 'ulid';
-import type { LogContext, Logger, LoggerInput, LogLevel } from './types.js';
+import type { LogContext, Logger, LoggerInput, LogLevel } from './types';
 
 /**
  * Create a logger instance that wraps the LOGS service binding
