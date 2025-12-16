@@ -50,6 +50,7 @@ export class WorkflowCoordinator extends DurableObject {
 
     // Initialize emitter with DefinitionManager
     this.emitter = new CoordinatorEmitter(
+      this.logger,
       this.defs,
       this.env.EVENTS,
       this.env.TRACE_EVENTS_ENABLED === 'true',

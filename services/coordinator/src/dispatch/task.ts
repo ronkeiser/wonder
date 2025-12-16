@@ -12,6 +12,7 @@
 import {
   applyInputMapping,
   decideRouting,
+  extractFinalOutput,
   getTransitionsWithSynchronization,
 } from '../planning/index';
 import type { TaskResult } from '../types';
@@ -218,11 +219,7 @@ async function checkAndFinalizeWorkflow(ctx: DispatchContext): Promise<void> {
 
 /**
  * Finalize workflow and extract output
- *
- * Note: This is imported from lifecycle.ts to avoid circular deps.
- * For now, inline the implementation.
  */
-import { extractFinalOutput } from '../planning/index';
 
 async function finalizeWorkflow(ctx: DispatchContext): Promise<void> {
   try {

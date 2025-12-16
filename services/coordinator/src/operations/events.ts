@@ -6,6 +6,7 @@
  */
 
 import { createEmitter, type Emitter } from '@wonder/events';
+import type { Logger } from '@wonder/logs';
 import type { DefinitionManager } from './defs';
 
 /**
@@ -16,12 +17,19 @@ import type { DefinitionManager } from './defs';
  * definitions are available, matching the pattern used by ContextManager.
  */
 export class CoordinatorEmitter implements Emitter {
+  private readonly logger: Logger;
   private readonly defs: DefinitionManager;
   private readonly eventsService: Env['EVENTS'];
   private readonly traceEnabled: 'true' | 'false';
   private cachedEmitter: Emitter | null = null;
 
-  constructor(defs: DefinitionManager, eventsService: Env['EVENTS'], traceEnabled: boolean) {
+  constructor(
+    logger: Logger,
+    defs: DefinitionManager,
+    eventsService: Env['EVENTS'],
+    traceEnabled: boolean,
+  ) {
+    this.logger = logger;
     this.defs = defs;
     this.eventsService = eventsService;
     this.traceEnabled = traceEnabled ? 'true' : 'false';
@@ -55,9 +63,13 @@ export class CoordinatorEmitter implements Emitter {
       return this.cachedEmitter;
     } catch (error) {
       // Can't use this.cachedEmitter.emitTrace here as it's not initialized yet
-      console.error('[CoordinatorEmitter] FATAL: Failed to load context from metadata:', {
-        error: error instanceof Error ? error.message : String(error),
-        stack: error instanceof Error ? error.stack : undefined,
+      this.logger.error({
+        event_type: 'emitter_init_failed',
+        message: 'Failed to load context from metadata',
+        metadata: {
+          error: error instanceof Error ? error.message : String(error),
+          stack: error instanceof Error ? error.stack : undefined,
+        },
       });
       throw error;
     }
@@ -67,13 +79,34 @@ export class CoordinatorEmitter implements Emitter {
    * Emit a workflow event
    */
   emit(event: Parameters<Emitter['emit']>[0]): void {
-    void this.getEmitter().then((emitter) => emitter.emit(event));
+    void this.getEmitter()
+      .then((emitter) => emitter.emit(event))
+      .catch((error) => {
+        this.logger.error({
+          event_type: 'emit_failed',
+          message: 'Failed to emit event',
+          metadata: {
+            target_event_type: event.event_type,
+            error: error instanceof Error ? error.message : String(error),
+          },
+        });
+      });
   }
 
   /**
    * Emit trace event(s) for debugging
    */
   emitTrace(event: Parameters<Emitter['emitTrace']>[0]): void {
-    void this.getEmitter().then((emitter) => emitter.emitTrace(event));
+    void this.getEmitter()
+      .then((emitter) => emitter.emitTrace(event))
+      .catch((error) => {
+        this.logger.error({
+          event_type: 'emit_trace_failed',
+          message: 'Failed to emit trace',
+          metadata: {
+            error: error instanceof Error ? error.message : String(error),
+          },
+        });
+      });
   }
 }

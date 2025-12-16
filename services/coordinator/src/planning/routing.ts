@@ -116,14 +116,6 @@ export function decideRouting(params: {
     const fanOutTransitionId = isNewFanOut ? transition.id : completedToken.fan_out_transition_id;
     const branchTotal = isNewFanOut ? spawnCount : completedToken.branch_total;
 
-    // DEBUG: Log spawn_count and fan_out_transition_id
-    console.log('[ROUTING] transition:', {
-      id: transition.id,
-      spawn_count_field: transition.spawn_count,
-      determined_spawn_count: spawnCount,
-      fan_out_transition_id: fanOutTransitionId,
-    });
-
     // Emit transition matched event
     events.push({
       type: 'decision.routing.transition_matched',

@@ -130,28 +130,6 @@ export class DefinitionManager {
     const nodesList = defResponse.nodes;
     const transitionsList = defResponse.transitions;
 
-    // DEBUG: Log transitions from RESOURCES
-    this.logger.info({
-      event_type: 'defs_transitions_from_resources',
-      message: 'Transitions fetched from RESOURCES',
-      trace_id: workflowRunId,
-      metadata: {
-        transitions: transitionsList.map(
-          (t: {
-            id: string;
-            ref: string | null;
-            spawn_count: number | null;
-            synchronization: object | null;
-          }) => ({
-            id: t.id,
-            ref: t.ref,
-            spawn_count: t.spawn_count,
-            synchronization: t.synchronization,
-          }),
-        ),
-      },
-    });
-
     // 3. Insert workflow run
     this.db
       .insert(workflow_runs)
@@ -216,12 +194,6 @@ export class DefinitionManager {
 
     // 6. Insert transitions
     for (const transition of transitionsList) {
-      console.log('[COORDINATOR] Inserting transition from RESOURCES:', {
-        id: transition.id,
-        ref: transition.ref,
-        spawn_count: transition.spawn_count,
-        synchronization: transition.synchronization,
-      });
       this.db
         .insert(transitions)
         .values({

@@ -309,6 +309,10 @@ export class TokenManager {
   completeMany(tokenIds: string[]): void {
     if (tokenIds.length === 0) return;
 
+    // Batch-fetch tokens before update for tracing (avoid N+1 queries)
+    const tokensBefore = this.getMany(tokenIds);
+    const tokenMap = new Map(tokensBefore.map((t) => [t.id, t]));
+
     const now = new Date();
 
     this.db
@@ -321,10 +325,11 @@ export class TokenManager {
       .run();
 
     for (const tokenId of tokenIds) {
+      const token = tokenMap.get(tokenId);
       this.emitter.emitTrace({
         type: 'operation.tokens.status_updated',
         token_id: tokenId,
-        node_id: this.get(tokenId).node_id,
+        node_id: token?.node_id ?? 'unknown',
         from: 'waiting_for_siblings',
         to: 'completed',
       });
@@ -334,8 +339,12 @@ export class TokenManager {
   /**
    * Cancel tokens (for early completion patterns)
    */
-  cancelMany(tokenIds: string[], reason?: string): void {
+  cancelMany(tokenIds: string[], _reason?: string): void {
     if (tokenIds.length === 0) return;
+
+    // Batch-fetch tokens before update for tracing (avoid N+1 queries)
+    const tokensBefore = this.getMany(tokenIds);
+    const tokenMap = new Map(tokensBefore.map((t) => [t.id, t]));
 
     const now = new Date();
 
@@ -349,11 +358,12 @@ export class TokenManager {
       .run();
 
     for (const tokenId of tokenIds) {
+      const token = tokenMap.get(tokenId);
       this.emitter.emitTrace({
         type: 'operation.tokens.status_updated',
         token_id: tokenId,
-        node_id: this.get(tokenId).node_id,
-        from: 'executing',
+        node_id: token?.node_id ?? 'unknown',
+        from: token?.status ?? 'unknown',
         to: 'cancelled',
       });
     }
@@ -431,22 +441,9 @@ export class TokenManager {
 
       const created = result.length > 0 && result[0].id === fanInId;
 
-      // Debug trace - consider using emitter or structured logging
-      if (created) {
-        console.log('[fan_in] Created fan-in record', {
-          fan_in_path: fanInPath,
-          token_id: tokenId,
-        });
-      }
-
       return created;
     } catch (error) {
       // Constraint violation means another token already created it
-      console.log('[fan_in] Creation failed (already exists)', {
-        fan_in_path: fanInPath,
-        token_id: tokenId,
-        error: error instanceof Error ? error.message : String(error),
-      });
       return false;
     }
   }
@@ -496,13 +493,6 @@ export class TokenManager {
       result.length > 0 &&
       result[0].status === 'activated' &&
       result[0].activated_by_token_id === activatedByTokenId;
-
-    // Debug trace - consider using emitter or structured logging
-    console.log('[fan_in] Activation attempt', {
-      fan_in_path: fanInPath,
-      token_id: activatedByTokenId,
-      activated,
-    });
 
     return activated;
   }
