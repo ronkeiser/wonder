@@ -248,6 +248,7 @@ const customMock = generateMockData(schema, {
   seed: 42,
   stringLength: { min: 10, max: 20 },
   arrayLength: { min: 2, max: 5 },
+  delay: { min_ms: 100, max_ms: 500 }, // Simulate execution delay (useful for timeout testing)
 });
 ```
 

@@ -22,6 +22,9 @@ export interface MockOptions {
 
   /** Maximum depth for nested objects (prevents infinite recursion) */
   maxDepth?: number;
+
+  /** Simulate execution delay (useful for timeout/performance testing) */
+  delay?: { min_ms: number; max_ms: number };
 }
 
 /**

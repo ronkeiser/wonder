@@ -56,6 +56,13 @@ export async function executeMockAction(
   }
 
   try {
+    // Apply configured delay if specified
+    if (implementation.options?.delay) {
+      const { min_ms, max_ms } = implementation.options.delay;
+      const delayMs = Math.floor(Math.random() * (max_ms - min_ms + 1)) + min_ms;
+      await new Promise((resolve) => setTimeout(resolve, delayMs));
+    }
+
     // Generate mock data
     const mockData = generateMockData(implementation.schema, implementation.options);
 
@@ -71,6 +78,7 @@ export async function executeMockAction(
         duration_ms: duration,
         schema_type: implementation.schema.type,
         has_seed: implementation.options?.seed !== undefined,
+        has_delay: implementation.options?.delay !== undefined,
       },
     });
 
