@@ -21,7 +21,9 @@ describe('DDLGenerator', () => {
 
       expect(ddl).toContain('CREATE TABLE users');
       expect(ddl).toContain('id INTEGER PRIMARY KEY AUTOINCREMENT');
-      expect(ddl).toContain('name TEXT NOT NULL');
+      // Note: required fields don't get NOT NULL - workflows write incrementally,
+      // completeness is validated at read time, not write time
+      expect(ddl).toContain('name TEXT');
       expect(ddl).toContain('active INTEGER');
     });
 

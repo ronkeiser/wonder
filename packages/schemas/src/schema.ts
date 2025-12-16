@@ -174,243 +174,63 @@ export class Schema {
  * SchemaTable - A schema bound to a specific table for execution
  */
 export class SchemaTable {
+  private readonly inserter: SchemaInserter;
+
   constructor(
     private readonly schema: Schema,
     private readonly sql: SqlExecutor,
     private readonly tableName: string,
-  ) {}
+  ) {
+    this.inserter = new SchemaInserter(sql);
+  }
 
-  /**
-   * Get the underlying JSON schema
-   */
+  /** Get the underlying JSON schema */
   getSchema(): JSONSchema {
     return this.schema.getJsonSchema();
   }
 
-  /**
-   * Validate data against the schema
-   */
+  /** Validate data against the schema */
   validate(data: unknown): ValidationResult {
     return this.schema.validate(data);
   }
 
-  /**
-   * Create the table (DROP IF EXISTS + CREATE)
-   */
+  /** Create the table (DROP IF EXISTS + CREATE) */
   create(): void {
     this.drop();
-    const ddl = this.schema.generateDDL(this.tableName);
-    this.sql.exec(ddl);
+    this.sql.exec(this.schema.generateDDL(this.tableName));
   }
 
-  /**
-   * Drop the table if it exists
-   */
+  /** Drop the table if it exists */
   drop(): void {
     this.sql.exec(`DROP TABLE IF EXISTS ${this.tableName};`);
   }
 
-  /**
-   * Drop the table and all its array tables in dependency order
-   * (children first, then parent) to respect FK constraints
-   */
+  /** Drop all tables (parent + array children) in FK-safe order */
   dropAll(): void {
-    const statements = this.schema.generateDropAll(this.tableName);
-    for (const stmt of statements) {
+    for (const stmt of this.schema.generateDropAll(this.tableName)) {
       this.sql.exec(stmt);
     }
   }
 
-  /**
-   * Insert data into the table with full recursive array support.
-   * Handles nested arrays at any depth.
-   */
+  /** Insert data with full nested array support */
   insert(data: Record<string, unknown>): void {
-    this.insertObject(this.tableName, this.getSchema(), data, null, null);
+    this.inserter.insert(this.tableName, this.getSchema(), data);
   }
 
-  /**
-   * Insert an object into a table, returning its ID.
-   * Handles scalars, flattened nested objects, and arrays recursively.
-   */
-  private insertObject(
-    tableName: string,
-    schema: JSONSchema,
-    data: Record<string, unknown>,
-    parentFkColumn: string | null,
-    parentId: number | null,
-  ): number {
-    if (schema.type !== 'object' || !schema.properties) {
-      throw new Error('Insert requires an object schema');
-    }
-
-    const columns: string[] = [];
-    const values: unknown[] = [];
-
-    // Add FK to parent if this is an array item
-    if (parentFkColumn !== null && parentId !== null) {
-      columns.push(parentFkColumn, '"index"');
-      values.push(parentId, data.__index ?? 0);
-    }
-
-    // Collect scalar columns (arrays handled after insert)
-    this.collectScalarColumns(schema, data, '', columns, values);
-
-    // Insert row
-    const rowId = this.execInsert(tableName, columns, values);
-
-    // Insert arrays (top-level and inside nested objects)
-    this.insertArrays(tableName, schema, data, '', rowId);
-
-    return rowId;
-  }
-
-  /**
-   * Collect scalar columns from an object schema, flattening nested objects.
-   */
-  private collectScalarColumns(
-    schema: JSONSchema,
-    data: Record<string, unknown>,
-    prefix: string,
-    columns: string[],
-    values: unknown[],
-  ): void {
-    if (!schema.properties) return;
-
-    for (const [fieldName, fieldSchema] of Object.entries(schema.properties)) {
-      const value = data[fieldName];
-      if (value === undefined) continue;
-
-      const columnName = prefix ? `${prefix}_${fieldName}` : fieldName;
-
-      switch (fieldSchema.type) {
-        case 'object':
-          this.collectScalarColumns(
-            fieldSchema,
-            value as Record<string, unknown>,
-            columnName,
-            columns,
-            values,
-          );
-          break;
-        case 'array':
-          // Skip - handled separately
-          break;
-        case 'boolean':
-          columns.push(columnName);
-          values.push(value ? 1 : 0);
-          break;
-        default:
-          columns.push(columnName);
-          values.push(value);
-      }
-    }
-  }
-
-  /**
-   * Insert arrays found in schema, including those nested inside flattened objects.
-   */
-  private insertArrays(
-    parentTableName: string,
-    schema: JSONSchema,
-    data: Record<string, unknown>,
-    prefix: string,
-    parentId: number,
-  ): void {
-    if (!schema.properties) return;
-
-    for (const [fieldName, fieldSchema] of Object.entries(schema.properties)) {
-      const value = data[fieldName];
-      if (value === undefined) continue;
-
-      const pathName = prefix ? `${prefix}_${fieldName}` : fieldName;
-
-      if (fieldSchema.type === 'object') {
-        // Recurse into nested objects to find arrays
-        this.insertArrays(
-          parentTableName,
-          fieldSchema,
-          value as Record<string, unknown>,
-          pathName,
-          parentId,
-        );
-      } else if (fieldSchema.type === 'array' && fieldSchema.items && Array.isArray(value)) {
-        this.insertArray(parentTableName, pathName, fieldSchema.items, value, parentId);
-      }
-    }
-  }
-
-  /**
-   * Insert an array into its child table.
-   */
-  private insertArray(
-    parentTableName: string,
-    arrayFieldPath: string,
-    itemSchema: JSONSchema,
-    items: unknown[],
-    parentId: number,
-  ): void {
-    const arrayTableName = `${parentTableName}_${arrayFieldPath}`;
-    const fkColumn = `${parentTableName}_id`;
-
-    for (let index = 0; index < items.length; index++) {
-      const item = items[index];
-
-      if (itemSchema.type === 'object') {
-        // Object array - recursive insert
-        const itemData = { ...(item as Record<string, unknown>), __index: index };
-        this.insertObject(arrayTableName, itemSchema, itemData, fkColumn, parentId);
-      } else {
-        // Scalar array
-        this.sql.exec(
-          `INSERT INTO ${arrayTableName} (${fkColumn}, "index", value) VALUES (?, ?, ?);`,
-          parentId,
-          index,
-          item,
-        );
-      }
-    }
-  }
-
-  /**
-   * Execute an INSERT and return the new row's ID.
-   */
-  private execInsert(tableName: string, columns: string[], values: unknown[]): number {
-    if (columns.length > 0) {
-      const placeholders = columns.map(() => '?').join(', ');
-      this.sql.exec(
-        `INSERT INTO ${tableName} (${columns.join(', ')}) VALUES (${placeholders});`,
-        ...values,
-      );
-    } else {
-      this.sql.exec(`INSERT INTO ${tableName} DEFAULT VALUES;`);
-    }
-
-    const result = [...this.sql.exec('SELECT last_insert_rowid() as id')];
-    return result[0]?.id as number;
-  }
-
-  /**
-   * Delete all rows from the table (handles cascade for array tables)
-   */
+  /** Delete all rows (handles cascade for array tables) */
   deleteAll(): void {
-    const statements = this.schema.generateDeleteAll(this.tableName);
-    for (const stmt of statements) {
+    for (const stmt of this.schema.generateDeleteAll(this.tableName)) {
       this.sql.exec(stmt);
     }
   }
 
-  /**
-   * Replace all data (delete + insert)
-   */
+  /** Replace all data (delete + insert) */
   replace(data: Record<string, unknown>): void {
     this.deleteAll();
     this.insert(data);
   }
 
-  /**
-   * Select the first row from the table (schema-aware reconstruction)
-   */
+  /** Select the first row (schema-aware reconstruction) */
   selectFirst<T = Record<string, unknown>>(): T | null {
     try {
       return this.schema.readFirst(this.sql, this.tableName) as T | null;
@@ -419,9 +239,7 @@ export class SchemaTable {
     }
   }
 
-  /**
-   * Check if the table exists
-   */
+  /** Check if the table exists */
   exists(): boolean {
     try {
       const result = this.sql.exec(
@@ -432,5 +250,160 @@ export class SchemaTable {
     } catch {
       return false;
     }
+  }
+}
+
+// ============================================================================
+// SchemaInserter - Handles recursive insertion of schema-driven data
+// ============================================================================
+
+/**
+ * Handles inserting data into schema-driven tables with full nested array support.
+ * Separated from SchemaTable to keep insertion logic isolated and testable.
+ */
+class SchemaInserter {
+  constructor(private readonly sql: SqlExecutor) {}
+
+  /** Insert data into a table, handling nested objects and arrays recursively */
+  insert(tableName: string, schema: JSONSchema, data: Record<string, unknown>): number {
+    return this.insertRow(tableName, schema, data, null);
+  }
+
+  /** Insert a row and its nested arrays, returning the row ID */
+  private insertRow(
+    tableName: string,
+    schema: JSONSchema,
+    data: Record<string, unknown>,
+    arrayContext: { fkColumn: string; parentId: number; index: number } | null,
+  ): number {
+    if (schema.type !== 'object' || !schema.properties) {
+      throw new Error('Insert requires an object schema');
+    }
+
+    // Build columns/values
+    const columns: string[] = [];
+    const values: unknown[] = [];
+
+    if (arrayContext) {
+      columns.push(arrayContext.fkColumn, '"index"');
+      values.push(arrayContext.parentId, arrayContext.index);
+    }
+
+    this.collectScalars(schema, data, '', columns, values);
+
+    // Insert and get ID
+    const rowId = this.exec(tableName, columns, values);
+
+    // Insert child arrays
+    this.insertChildArrays(tableName, schema, data, '', rowId);
+
+    return rowId;
+  }
+
+  /** Collect scalar columns, flattening nested objects */
+  private collectScalars(
+    schema: JSONSchema,
+    data: Record<string, unknown>,
+    prefix: string,
+    columns: string[],
+    values: unknown[],
+  ): void {
+    if (!schema.properties) return;
+
+    for (const [field, fieldSchema] of Object.entries(schema.properties)) {
+      const value = data[field];
+      if (value === undefined) continue;
+
+      const col = prefix ? `${prefix}_${field}` : field;
+
+      switch (fieldSchema.type) {
+        case 'object':
+          this.collectScalars(fieldSchema, value as Record<string, unknown>, col, columns, values);
+          break;
+        case 'array':
+          break; // Handled separately
+        case 'boolean':
+          columns.push(col);
+          values.push(value ? 1 : 0);
+          break;
+        default:
+          columns.push(col);
+          values.push(value);
+      }
+    }
+  }
+
+  /** Find and insert arrays (including those nested in flattened objects) */
+  private insertChildArrays(
+    parentTable: string,
+    schema: JSONSchema,
+    data: Record<string, unknown>,
+    prefix: string,
+    parentId: number,
+  ): void {
+    if (!schema.properties) return;
+
+    for (const [field, fieldSchema] of Object.entries(schema.properties)) {
+      const value = data[field];
+      if (value === undefined) continue;
+
+      const path = prefix ? `${prefix}_${field}` : field;
+
+      if (fieldSchema.type === 'object') {
+        this.insertChildArrays(
+          parentTable,
+          fieldSchema,
+          value as Record<string, unknown>,
+          path,
+          parentId,
+        );
+      } else if (fieldSchema.type === 'array' && fieldSchema.items && Array.isArray(value)) {
+        this.insertArrayItems(parentTable, path, fieldSchema.items, value, parentId);
+      }
+    }
+  }
+
+  /** Insert array items into child table */
+  private insertArrayItems(
+    parentTable: string,
+    fieldPath: string,
+    itemSchema: JSONSchema,
+    items: unknown[],
+    parentId: number,
+  ): void {
+    const childTable = `${parentTable}_${fieldPath}`;
+    const fkColumn = `${parentTable}_id`;
+
+    for (let i = 0; i < items.length; i++) {
+      if (itemSchema.type === 'object') {
+        this.insertRow(childTable, itemSchema, items[i] as Record<string, unknown>, {
+          fkColumn,
+          parentId,
+          index: i,
+        });
+      } else {
+        this.sql.exec(
+          `INSERT INTO ${childTable} (${fkColumn}, "index", value) VALUES (?, ?, ?);`,
+          parentId,
+          i,
+          items[i],
+        );
+      }
+    }
+  }
+
+  /** Execute INSERT, return new row ID */
+  private exec(table: string, columns: string[], values: unknown[]): number {
+    if (columns.length > 0) {
+      const placeholders = columns.map(() => '?').join(', ');
+      this.sql.exec(
+        `INSERT INTO ${table} (${columns.join(', ')}) VALUES (${placeholders});`,
+        ...values,
+      );
+    } else {
+      this.sql.exec(`INSERT INTO ${table} DEFAULT VALUES;`);
+    }
+    const result = [...this.sql.exec('SELECT last_insert_rowid() as id')];
+    return result[0]?.id as number;
   }
 }

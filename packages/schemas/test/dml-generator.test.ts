@@ -446,8 +446,11 @@ describe('DMLGenerator', () => {
       const generator = new DMLGenerator(schema, new CustomTypeRegistry());
       const result = generator.generateInsert('users', {});
 
-      expect(result.statements).toHaveLength(0);
-      expect(result.values).toHaveLength(0);
+      // Empty data still creates a row (gets an ID back)
+      expect(result.statements).toHaveLength(1);
+      expect(result.statements[0]).toBe('INSERT INTO users DEFAULT VALUES;');
+      expect(result.values).toHaveLength(1);
+      expect(result.values[0]).toHaveLength(0);
     });
 
     it('should throw error for non-object schema', () => {
@@ -471,7 +474,9 @@ describe('DMLGenerator', () => {
       const generator = new DMLGenerator(schema, new CustomTypeRegistry());
       const result = generator.generateInsert('empty', {});
 
-      expect(result.statements).toHaveLength(0);
+      // Schema with no properties still creates a row (gets an ID back)
+      expect(result.statements).toHaveLength(1);
+      expect(result.statements[0]).toBe('INSERT INTO empty DEFAULT VALUES;');
     });
 
     it('should handle mixed field types', () => {
