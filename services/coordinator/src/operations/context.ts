@@ -1,39 +1,6 @@
 /**
- * Context Operations
- *
  * Schema-driven SQL operations for workflow context and branch storage.
- * Uses @wonder/context Schema and SchemaTable for table lifecycle and data operations.
- *
- * Structure:
- *
- * Main context operations:
- *   - initialize(input) - Create context tables and store input
- *   - get(path) - Read value from context
- *   - set(path, value) - Write value to context
- *   - getSnapshot() - Read-only view for decision logic
- *   - applyOutputMapping(mapping, taskOutput) - Write task output via node's output_mapping
- *
- * Branch storage operations (for parallel execution):
- *   - initializeBranchTable(tokenId, schema) - Create branch_output_{tokenId} table
- *   - applyBranchOutput(tokenId, output) - Write task output to branch table
- *   - getBranchOutputs(tokenIds) - Read outputs from sibling branch tables
- *   - mergeBranches(siblings, merge) - Merge branch outputs into main context
- *   - dropBranchTables(tokenIds) - Cleanup branch tables after merge
- *
- * Data flow design:
- *
- * Linear flows (no fan-out):
- *   - Node.output_mapping specifies where to write task output in context
- *   - e.g., { "state.result": "$.greeting" } writes task output.greeting to context.state.result
- *   - Uses applyOutputMapping() to transform and store
- *
- * Fan-out flows (parallel branches):
- *   - Each branch token gets isolated tables: branch_output_{tokenId}
- *   - Task outputs written via applyBranchOutput()
- *   - At fan-in: mergeBranches() combines outputs into context using Transition.synchronization.merge
- *   - Branch tables dropped after merge
- *
- * See docs/architecture/branch-storage.md for complete design.
+ * See docs/architecture/branch-storage.md for design details.
  */
 
 import type { Emitter } from '@wonder/events';
