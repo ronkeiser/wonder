@@ -30,32 +30,36 @@ export class LogsService extends WorkerEntrypoint<Env> {
   }
 
   /**
-   * Internal method - writes log to D1
+   * Internal method - writes log to D1 with console fallback
    */
   private write(context: LogContext, level: LogLevel, input: LoggerInput): void {
+    const logEntry = {
+      id: input.id || ulid(),
+      timestamp: input.timestamp || Date.now(),
+      level,
+      ...context,
+      ...input,
+      message: input.message || input.event_type,
+      metadata: JSON.stringify(input.metadata || {}),
+    };
+
+    // Write to D1 with console fallback (prevents infinite loops if D1 fails)
+    this.ctx.waitUntil(
+      this.db
+        .insert(logs)
+        .values(logEntry)
+        .catch((e) => {
+          console.error('[logs:fallback]', JSON.stringify({ level, ...context, ...input }), e);
+        }),
+    );
+
+    // Best-effort WebSocket broadcast
     this.ctx.waitUntil(
       (async () => {
-        const logEntry = {
-          id: input.id || ulid(), // Use client-provided ID, fallback to generating one
-          timestamp: input.timestamp || Date.now(), // Use client-provided timestamp
-          level,
-          ...context,
-          ...input,
-          message: input.message || input.event_type, // Default message to event_type if not provided
-          metadata: JSON.stringify(input.metadata || {}),
-        };
-
-        await this.db.insert(logs).values(logEntry);
-
-        // Broadcast to connected WebSocket clients
-        try {
-          const id = this.env.STREAMER.idFromName('logs-streamer');
-          const stub = this.env.STREAMER.get(id);
-          await stub.broadcast(logEntry);
-        } catch (error) {
-          console.error('Failed to broadcast log to WebSocket clients:', error);
-        }
-      })(),
+        const id = this.env.STREAMER.idFromName('logs-streamer');
+        const stub = this.env.STREAMER.get(id);
+        await stub.broadcast(logEntry);
+      })().catch(() => {}),
     );
   }
 

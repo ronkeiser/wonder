@@ -1,3 +1,4 @@
+import { createLogger, type Logger } from '@wonder/logs';
 import { DurableObject } from 'cloudflare:workers';
 import type { BroadcastEventEntry, BroadcastTraceEventEntry } from './types';
 
@@ -47,7 +48,17 @@ interface Subscription {
 /**
  * Durable Object for managing WebSocket connections to stream events in real-time
  */
-export class Streamer extends DurableObject {
+export class Streamer extends DurableObject<Env> {
+  private logger: Logger;
+
+  constructor(ctx: DurableObjectState, env: Env) {
+    super(ctx, env);
+    this.logger = createLogger(ctx, env.LOGS, {
+      service: 'events-streamer',
+      environment: 'development',
+    });
+  }
+
   /**
    * Handle WebSocket upgrade and initial connection
    */
@@ -99,7 +110,7 @@ export class Streamer extends DurableObject {
         ws.serializeAttachment(subsObj);
       }
     } catch (error) {
-      console.error('Error handling WebSocket message:', error);
+      this.logger.error({ message: 'Error handling WebSocket message', metadata: { error } });
       ws.send(
         JSON.stringify({
           type: 'error',
@@ -130,7 +141,10 @@ export class Streamer extends DurableObject {
               }),
             );
           } catch (error) {
-            console.error('Error broadcasting event to WebSocket:', error);
+            this.logger.error({
+              message: 'Error broadcasting event to WebSocket',
+              metadata: { error },
+            });
           }
         }
       }
@@ -158,7 +172,10 @@ export class Streamer extends DurableObject {
               }),
             );
           } catch (error) {
-            console.error('Error broadcasting trace event to WebSocket:', error);
+            this.logger.error({
+              message: 'Error broadcasting trace event to WebSocket',
+              metadata: { error },
+            });
           }
         }
       }
@@ -213,6 +230,6 @@ export class Streamer extends DurableObject {
    * Handle WebSocket error events
    */
   webSocketError(ws: WebSocket, error: unknown): void {
-    console.error('WebSocket error:', error);
+    this.logger.error({ message: 'WebSocket error', metadata: { error } });
   }
 }

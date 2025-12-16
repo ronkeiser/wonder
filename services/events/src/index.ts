@@ -1,3 +1,4 @@
+import { createLogger, type Logger } from '@wonder/logs';
 import { WorkerEntrypoint } from 'cloudflare:workers';
 import { and, desc, eq, gte } from 'drizzle-orm';
 import { drizzle } from 'drizzle-orm/d1';
@@ -30,6 +31,10 @@ const STREAMER_NAME = 'events-streamer';
  */
 export class EventsService extends WorkerEntrypoint<Env> {
   private db = drizzle(this.env.DB);
+  private logger: Logger = createLogger(this.ctx, this.env.LOGS, {
+    service: 'events',
+    environment: 'development',
+  });
 
   /**
    * Broadcast event to WebSocket clients
@@ -40,7 +45,10 @@ export class EventsService extends WorkerEntrypoint<Env> {
       const stub = this.env.STREAMER.get(id);
       await stub.broadcast(event);
     } catch (error) {
-      console.error('[EVENTS] Failed to broadcast event to WebSocket clients:', error);
+      this.logger.error({
+        message: 'Failed to broadcast event to WebSocket clients',
+        metadata: { error },
+      });
     }
   }
 
@@ -53,7 +61,10 @@ export class EventsService extends WorkerEntrypoint<Env> {
       const stub = this.env.STREAMER.get(id);
       await stub.broadcastTraceEvent(event);
     } catch (error) {
-      console.error('[EVENTS] Failed to broadcast trace event to WebSocket clients:', error);
+      this.logger.error({
+        message: 'Failed to broadcast trace event to WebSocket clients',
+        metadata: { error },
+      });
     }
   }
 
@@ -92,7 +103,10 @@ export class EventsService extends WorkerEntrypoint<Env> {
             metadata: input.metadata || {},
           });
         } catch (error) {
-          console.error('[EVENTS] Failed to insert event:', error, { context, input });
+          this.logger.error({
+            message: 'Failed to insert event',
+            metadata: { error, context, input },
+          });
         }
       })(),
     );
@@ -153,7 +167,7 @@ export class EventsService extends WorkerEntrypoint<Env> {
             payload: event,
           });
         } catch (error) {
-          console.error('[EVENTS] Failed to insert trace event:', error);
+          this.logger.error({ message: 'Failed to insert trace event', metadata: { error } });
         }
       })(),
     );
@@ -174,7 +188,7 @@ export class EventsService extends WorkerEntrypoint<Env> {
 
           await this.db.insert(traceEvents).values(batchWithStringPayloads);
         } catch (error) {
-          console.error('[EVENTS] Failed to insert trace events:', error);
+          this.logger.error({ message: 'Failed to insert trace events', metadata: { error } });
         }
       })(),
     );

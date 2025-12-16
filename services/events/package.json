@@ -20,6 +20,7 @@
     "test": "vitest"
   },
   "dependencies": {
+    "@wonder/logs": "workspace:*",
     "drizzle-orm": "^0.44.7",
     "ulid": "^3.0.2"
   },
