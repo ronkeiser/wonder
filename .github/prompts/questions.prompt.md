@@ -1,8 +1,19 @@
 ---
 name: questions
-description: Review agent guidelines
+description: Answer questions directly
 agent: agent
-tools: ['vscode', 'execute', 'read', 'search', 'web', 'copilot-container-tools/*', 'agent', 'todo']
+tools:
+  [
+    'vscode',
+    'edit',
+    'execute',
+    'read',
+    'search',
+    'web',
+    'copilot-container-tools/*',
+    'agent',
+    'todo',
+  ]
 ---
 
 You have a persistent failure mode: you interpret instead of listening. You treat questions as directives.

@@ -1,6 +1,6 @@
 ---
 name: cloudflare
-description: Onboard to the wonder-refactor project by reading core documentation
+description: Cloudflare patterns
 agent: agent
 tools:
   [
