@@ -180,6 +180,22 @@ export type DecisionEvent =
       token_fan_out_transition_id: string | null;
       sync_sibling_group: string;
     }
+  // Lifecycle events
+  | {
+      type: 'decision.lifecycle.start';
+      workflow_run_id: string;
+      initial_node_id: string;
+    }
+  | {
+      type: 'decision.lifecycle.root_token_planned';
+      node_id: string;
+    }
+  | {
+      type: 'decision.sync.continuation';
+      workflow_run_id: string;
+      node_id: string;
+      fan_in_path: string;
+    }
   // Completion events
   | {
       type: 'decision.completion.start';

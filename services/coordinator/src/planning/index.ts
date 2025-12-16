@@ -27,6 +27,7 @@ export {
 
 // Synchronization: fan-in and merge decisions
 export {
+  decideFanInContinuation,
   decideOnSiblingCompletion,
   decideOnTimeout,
   decideSynchronization,
@@ -34,6 +35,9 @@ export {
   hasTimedOut,
   needsMerge,
 } from './synchronization';
+
+// Lifecycle: workflow start, completion, and failure
+export { decideWorkflowStart } from './lifecycle';
 
 // Completion: workflow finalization and output extraction
 export {

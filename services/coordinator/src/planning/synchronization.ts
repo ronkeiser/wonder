@@ -371,3 +371,51 @@ export function hasTimedOut(
   const elapsedMs = Date.now() - oldestWaitingTimestamp.getTime();
   return elapsedMs >= transition.synchronization.timeout_ms;
 }
+
+// ============================================================================
+// Fan-In Continuation
+// ============================================================================
+
+/**
+ * Decide fan-in continuation token creation.
+ *
+ * After fan-in merges sibling tokens, create a continuation token
+ * to proceed execution at the target node.
+ *
+ * Returns both decisions and trace events for observability.
+ */
+export function decideFanInContinuation(params: {
+  workflowRunId: string;
+  nodeId: string;
+  fanInPath: string;
+  parentTokenId: string;
+}): PlanningResult {
+  const { workflowRunId, nodeId, fanInPath, parentTokenId } = params;
+
+  const events: DecisionEvent[] = [];
+  const decisions: Decision[] = [];
+
+  // Emit fan-in continuation planning event
+  events.push({
+    type: 'decision.sync.continuation',
+    workflow_run_id: workflowRunId,
+    node_id: nodeId,
+    fan_in_path: fanInPath,
+  });
+
+  // Create continuation token to proceed after merge
+  decisions.push({
+    type: 'CREATE_TOKEN',
+    params: {
+      workflow_run_id: workflowRunId,
+      node_id: nodeId,
+      parent_token_id: parentTokenId,
+      path_id: fanInPath,
+      fan_out_transition_id: null, // Merged token is not part of a fan-out
+      branch_index: 0,
+      branch_total: 1,
+    },
+  });
+
+  return { decisions, events };
+}

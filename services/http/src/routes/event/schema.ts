@@ -83,6 +83,22 @@ const TraceEventPayloadSchema = z.discriminatedUnion('type', [
     token_fan_out_transition_id: z.string().nullable(),
     sync_sibling_group: z.string(),
   }),
+  // Decision events - lifecycle
+  z.object({
+    type: z.literal('decision.lifecycle.start'),
+    workflow_run_id: z.string(),
+    initial_node_id: z.string(),
+  }),
+  z.object({
+    type: z.literal('decision.lifecycle.root_token_planned'),
+    node_id: z.string(),
+  }),
+  z.object({
+    type: z.literal('decision.sync.continuation'),
+    workflow_run_id: z.string(),
+    node_id: z.string(),
+    fan_in_path: z.string(),
+  }),
   // Decision events - completion
   z.object({
     type: z.literal('decision.completion.start'),

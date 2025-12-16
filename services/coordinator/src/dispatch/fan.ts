@@ -16,7 +16,7 @@
 import type { JSONSchema } from '@wonder/schemas';
 import type { DefinitionManager } from '../operations/defs';
 import type { TokenManager } from '../operations/tokens';
-import { toTransitionDef } from '../planning/index';
+import { decideFanInContinuation, toTransitionDef } from '../planning/index';
 import { decideSynchronization } from '../planning/synchronization';
 import type { Decision, TransitionDef } from '../types';
 import { applyDecisions, type DispatchContext } from './apply';
@@ -381,23 +381,34 @@ export async function activateFanIn(
   // Mark the triggering token as completed (it activated the fan-in but is now absorbed)
   ctx.tokens.updateStatus(triggeringTokenId, 'completed');
 
-  // Create continuation token to proceed to next node
+  // Plan continuation token creation (pure function)
   const firstSibling = completedSiblings[0];
-  const continuationTokenId = ctx.tokens.create({
-    workflow_run_id: workflowRunId,
-    node_id: nodeId,
-    parent_token_id: firstSibling.parent_token_id,
-    path_id: fanInPath,
-    fan_out_transition_id: null, // Merged token is not part of a fan-out
-    branch_index: 0,
-    branch_total: 1,
+  const continuationResult = decideFanInContinuation({
+    workflowRunId,
+    nodeId,
+    fanInPath,
+    parentTokenId: firstSibling.parent_token_id ?? '',
   });
 
-  ctx.emitter.emitTrace({
-    type: 'dispatch.token.created',
-    token_id: continuationTokenId,
-    node_id: nodeId,
-  });
+  // Emit trace events from planning
+  for (const event of continuationResult.events) {
+    ctx.emitter.emitTrace(event);
+  }
+
+  // Apply planning decisions (creates continuation token)
+  const applyResult = applyDecisions(continuationResult.decisions, ctx);
+
+  // Get the created continuation token ID
+  if (applyResult.tokensCreated.length === 0) {
+    ctx.logger.debug({
+      event_type: 'fan_in_no_continuation',
+      message: 'No continuation token created',
+      metadata: { fan_in_path: fanInPath },
+    });
+    return null;
+  }
+
+  const continuationTokenId = applyResult.tokensCreated[0];
 
   // Return continuation token ID for caller to dispatch
   return continuationTokenId;

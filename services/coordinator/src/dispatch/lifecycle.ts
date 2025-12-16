@@ -9,7 +9,8 @@
  * - Fail workflow on unrecoverable errors
  */
 
-import type { DispatchContext } from './apply';
+import { decideWorkflowStart } from '../planning/index';
+import { applyDecisions, type DispatchContext } from './apply';
 import { dispatchToken } from './task';
 
 // ============================================================================
@@ -39,8 +40,9 @@ export type TaskErrorResult = {
  *
  * 1. Get workflow run and definition
  * 2. Initialize context tables with input
- * 3. Create initial token
- * 4. Dispatch first token
+ * 3. Plan initial token creation
+ * 4. Apply planning decisions
+ * 5. Dispatch first token
  */
 export async function startWorkflow(ctx: DispatchContext): Promise<void> {
   // Get definitions for token creation and input
@@ -65,16 +67,26 @@ export async function startWorkflow(ctx: DispatchContext): Promise<void> {
   // Initialize context tables and store input
   await ctx.context.initialize(input);
 
-  // Create initial token
-  const tokenId = ctx.tokens.create({
-    workflow_run_id: workflowRun.id,
-    node_id: workflowDef.initial_node_id!,
-    parent_token_id: null,
-    path_id: 'root',
-    fan_out_transition_id: null,
-    branch_index: 0,
-    branch_total: 1,
+  // Plan initial token creation (pure function)
+  const startResult = decideWorkflowStart({
+    workflowRunId: workflowRun.id,
+    initialNodeId: workflowDef.initial_node_id!,
   });
+
+  // Emit trace events from planning
+  for (const event of startResult.events) {
+    ctx.emitter.emitTrace(event);
+  }
+
+  // Apply planning decisions (creates token)
+  const applyResult = applyDecisions(startResult.decisions, ctx);
+
+  // Get the created token ID
+  if (applyResult.tokensCreated.length === 0) {
+    throw new Error('Failed to create initial token');
+  }
+
+  const tokenId = applyResult.tokensCreated[0];
 
   // Dispatch token (start execution)
   await dispatchToken(ctx, tokenId);
