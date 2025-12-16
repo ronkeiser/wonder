@@ -194,6 +194,21 @@
     navigator.clipboard.writeText(text);
   }
 
+  let copyAllStatus = $state<'idle' | 'copied'>('idle');
+  let copyAllTimeout: ReturnType<typeof setTimeout> | null = null;
+
+  function copyAllToClipboard() {
+    const text = JSON.stringify(items, null, 2);
+    navigator.clipboard.writeText(text);
+
+    // Show feedback
+    copyAllStatus = 'copied';
+    if (copyAllTimeout) clearTimeout(copyAllTimeout);
+    copyAllTimeout = setTimeout(() => {
+      copyAllStatus = 'idle';
+    }, 2000);
+  }
+
   onMount(() => {
     // Load filters from URL params
     const urlParams = new URLSearchParams(window.location.search);
@@ -289,6 +304,32 @@
           ></path>
         </svg>
         Pretty
+      </button>
+
+      <button
+        class="copy-all-btn"
+        class:copied={copyAllStatus === 'copied'}
+        onclick={copyAllToClipboard}
+        disabled={items.length === 0}
+      >
+        {#if copyAllStatus === 'copied'}
+          <svg viewBox="0 0 16 16" fill="currentColor">
+            <path
+              d="M13.78 4.22a.75.75 0 0 1 0 1.06l-7.25 7.25a.75.75 0 0 1-1.06 0L2.22 9.28a.75.75 0 0 1 1.06-1.06L6 10.94l6.72-6.72a.75.75 0 0 1 1.06 0Z"
+            ></path>
+          </svg>
+          Copied!
+        {:else}
+          <svg viewBox="0 0 16 16" fill="currentColor">
+            <path
+              d="M0 6.75C0 5.784.784 5 1.75 5h1.5a.75.75 0 0 1 0 1.5h-1.5a.25.25 0 0 0-.25.25v7.5c0 .138.112.25.25.25h7.5a.25.25 0 0 0 .25-.25v-1.5a.75.75 0 0 1 1.5 0v1.5A1.75 1.75 0 0 1 9.25 16h-7.5A1.75 1.75 0 0 1 0 14.25Z"
+            ></path>
+            <path
+              d="M5 1.75C5 .784 5.784 0 6.75 0h7.5C15.216 0 16 .784 16 1.75v7.5A1.75 1.75 0 0 1 14.25 11h-7.5A1.75 1.75 0 0 1 5 9.25Zm1.75-.25a.25.25 0 0 0-.25.25v7.5c0 .138.112.25.25.25h7.5a.25.25 0 0 0 .25-.25v-7.5a.25.25 0 0 0-.25-.25Z"
+            ></path>
+          </svg>
+          Copy All ({items.length})
+        {/if}
       </button>
 
       <button class="refresh-btn" onclick={() => filterItemsByTime(timeFilterMinutes)}>
@@ -449,6 +490,54 @@
   .pretty-print-toggle.active {
     background: var(--accent);
     color: #000;
+  }
+
+  .copy-all-btn {
+    padding: 0.375rem 0.75rem;
+    background: var(--bg-tertiary);
+    border: none;
+    border-radius: 6px;
+    color: var(--text-primary);
+    cursor: pointer;
+    font-size: 0.875rem;
+    font-family: inherit;
+    display: flex;
+    align-items: center;
+    gap: 0.375rem;
+    transition:
+      background 0.1s,
+      transform 0.1s;
+  }
+
+  .copy-all-btn svg {
+    width: 14px;
+    height: 14px;
+  }
+
+  .copy-all-btn:hover:not(:disabled) {
+    background: var(--bg-hover);
+  }
+
+  .copy-all-btn:focus {
+    outline: none;
+  }
+
+  .copy-all-btn:focus-visible {
+    box-shadow: 0 0 0 2px var(--accent-emphasis);
+  }
+
+  .copy-all-btn:active:not(:disabled) {
+    transform: scale(0.95);
+  }
+
+  .copy-all-btn:disabled {
+    opacity: 0.5;
+    cursor: not-allowed;
+  }
+
+  .copy-all-btn.copied {
+    background: var(--green);
+    color: #fff;
   }
 
   .refresh-btn {
