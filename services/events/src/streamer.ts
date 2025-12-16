@@ -1,5 +1,5 @@
 import { DurableObject } from 'cloudflare:workers';
-import type { BroadcastEventEntry, BroadcastTraceEventEntry } from './types.js';
+import type { BroadcastEventEntry, BroadcastTraceEventEntry } from './types';
 
 /**
  * Subscription filter for server-side event filtering

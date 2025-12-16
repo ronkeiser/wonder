@@ -2,7 +2,7 @@ import { WorkerEntrypoint } from 'cloudflare:workers';
 import { and, desc, eq, gte } from 'drizzle-orm';
 import { drizzle } from 'drizzle-orm/d1';
 import { ulid } from 'ulid';
-import { traceEvents, workflowEvents } from './db/schema.js';
+import { traceEvents, workflowEvents } from './schema';
 import type {
   BroadcastEventEntry,
   BroadcastTraceEventEntry,

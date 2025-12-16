@@ -4,7 +4,7 @@ import type {
   EventInput,
   TraceEventContext,
   TraceEventInput,
-} from './types.js';
+} from './types';
 
 /**
  * Create an event emitter that wraps the EVENTS service binding
