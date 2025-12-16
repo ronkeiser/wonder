@@ -108,4 +108,6 @@ If you changed any of the RPC signatures of any of the services, you must regene
 
 ## Getting the Workflow Run ID
 
-Run the edge test, then query the events for the last minute to get the workflow_run_id. You can then use that id to perform any other queries you need.
+The test helpers will output the Workflow Run ID when the workflow completes.
+
+If you don't see the run id from the output, run the edge test, then query the events for the last minute to get the workflow_run_id. You can then use that id to perform any other queries you need.
