@@ -3,10 +3,11 @@
  */
 
 import { OpenAPIHono } from '@hono/zod-openapi';
+import type { HttpEnv } from '~/types';
 import { deleteWorkflowRunRoute, streamWorkflowRunRoute } from './spec';
 
 /** /workflow-runs */
-export const workflowRuns = new OpenAPIHono<{ Bindings: Env }>();
+export const workflowRuns = new OpenAPIHono<HttpEnv>();
 
 /** GET /{id}/stream */
 workflowRuns.openapi(streamWorkflowRunRoute, async (c) => {

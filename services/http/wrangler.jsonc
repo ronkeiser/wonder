@@ -3,6 +3,9 @@
   "name": "wonder-http",
   "main": "src/index.ts",
   "compatibility_date": "2025-11-18",
+  "vars": {
+    "ENVIRONMENT": "development",
+  },
   "services": [
     {
       "binding": "RESOURCES",

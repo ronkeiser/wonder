@@ -3,10 +3,11 @@
  */
 
 import { OpenAPIHono } from '@hono/zod-openapi';
+import type { HttpEnv } from '~/types';
 import { createActionRoute, deleteActionRoute, getActionRoute } from './spec';
 
 /** /actions */
-export const actions = new OpenAPIHono<{ Bindings: Env }>();
+export const actions = new OpenAPIHono<HttpEnv>();
 
 /** POST / */
 actions.openapi(createActionRoute, async (c) => {

@@ -3,10 +3,11 @@
  */
 
 import { OpenAPIHono } from '@hono/zod-openapi';
+import type { HttpEnv } from '~/types';
 import { getEventsRoute, getTraceEventsRoute } from './spec';
 
 /** /events */
-export const events = new OpenAPIHono<{ Bindings: Env }>();
+export const events = new OpenAPIHono<HttpEnv>();
 
 /** GET / - Query workflow events */
 events.openapi(getEventsRoute, async (c) => {

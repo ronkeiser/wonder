@@ -3,16 +3,17 @@
  */
 
 import { OpenAPIHono } from '@hono/zod-openapi';
+import type { HttpEnv } from '~/types';
 import {
-    createWorkspaceRoute,
-    deleteWorkspaceRoute,
-    getWorkspaceRoute,
-    listWorkspacesRoute,
-    updateWorkspaceRoute,
+  createWorkspaceRoute,
+  deleteWorkspaceRoute,
+  getWorkspaceRoute,
+  listWorkspacesRoute,
+  updateWorkspaceRoute,
 } from './spec';
 
 /** /workspaces */
-export const workspaces = new OpenAPIHono<{ Bindings: Env }>();
+export const workspaces = new OpenAPIHono<HttpEnv>();
 
 /** GET / */
 workspaces.openapi(listWorkspacesRoute, async (c) => {

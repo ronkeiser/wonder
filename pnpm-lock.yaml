@@ -321,12 +321,15 @@ importers:
       '@hono/zod-openapi':
         specifier: ^1.1.5
         version: 1.1.5(hono@4.10.7)(zod@4.1.13)
+      '@wonder/logs':
+        specifier: workspace:*
+        version: link:../logs
       hono:
         specifier: ^4.10.7
         version: 4.10.7
       ulid:
-        specifier: ^2.3.0
-        version: 2.4.0
+        specifier: ^3.0.1
+        version: 3.0.2
       zod:
         specifier: ^4.1.13
         version: 4.1.13
@@ -2778,10 +2781,6 @@ packages:
     engines: {node: '>=0.8.0'}
     hasBin: true
 
-  ulid@2.4.0:
-    resolution: {integrity: sha512-fIRiVTJNcSRmXKPZtGzFQv9WRrZ3M9eoptl/teFJvjOzmpU+/K/JH6HZ8deBfb5vMEpicJcLn7JmvdknlMq7Zg==}
-    hasBin: true
-
   ulid@3.0.2:
     resolution: {integrity: sha512-yu26mwteFYzBAot7KVMqFGCVpsF6g8wXfJzQUHvu1no3+rRRSFcSV2nKeYvNPLD2J4b08jYBDhHUjeH0ygIl9w==}
     hasBin: true
@@ -3102,7 +3101,7 @@ snapshots:
       devalue: 5.5.0
       miniflare: 4.20251125.0
       semver: 7.7.3
-      vitest: 3.2.4(@types/node@22.19.3)(@vitest/ui@3.2.4)(jiti@2.6.1)(lightningcss@1.30.2)(tsx@4.21.0)(yaml@2.8.1)
+      vitest: 3.2.4(@types/node@24.10.1)(@vitest/ui@3.2.4)(jiti@2.6.1)(lightningcss@1.30.2)(tsx@4.21.0)(yaml@2.8.1)
       wrangler: 4.51.0(@cloudflare/workers-types@4.20251127.0)
       zod: 3.25.76
     transitivePeerDependencies:
@@ -4976,8 +4975,6 @@ snapshots:
 
   uglify-js@3.19.3:
     optional: true
-
-  ulid@2.4.0: {}
 
   ulid@3.0.2: {}
 

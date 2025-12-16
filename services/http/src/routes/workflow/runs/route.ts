@@ -3,10 +3,11 @@
  */
 
 import { OpenAPIHono } from '@hono/zod-openapi';
+import type { HttpEnv } from '~/types';
 import { createWorkflowRunRoute, startWorkflowRunRoute } from './spec';
 
 /** /{id}/runs */
-export const workflowRuns = new OpenAPIHono<{ Bindings: Env }>();
+export const workflowRuns = new OpenAPIHono<HttpEnv>();
 
 /** POST /{id}/runs */
 workflowRuns.openapi(createWorkflowRunRoute, async (c) => {

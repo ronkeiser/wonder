@@ -3,6 +3,7 @@
  */
 
 import { OpenAPIHono } from '@hono/zod-openapi';
+import type { HttpEnv } from '~/types';
 import {
   createModelProfileRoute,
   deleteModelProfileRoute,
@@ -13,7 +14,7 @@ import {
 /**
  * /model-profiles
  */
-export const modelProfiles = new OpenAPIHono<{ Bindings: Env }>();
+export const modelProfiles = new OpenAPIHono<HttpEnv>();
 
 /**
  * GET /

@@ -3,10 +3,11 @@
  */
 
 import { OpenAPIHono } from '@hono/zod-openapi';
+import type { HttpEnv } from '~/types';
 import { getLogsRoute } from './spec';
 
 /** /logs */
-export const logs = new OpenAPIHono<{ Bindings: Env }>();
+export const logs = new OpenAPIHono<HttpEnv>();
 
 /** GET / */
 logs.openapi(getLogsRoute, async (c) => {

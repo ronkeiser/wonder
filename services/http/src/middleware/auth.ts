@@ -4,6 +4,7 @@
  */
 
 import type { Context, Next } from 'hono';
+import type { HttpEnv } from '~/types';
 
 /**
  * Middleware to require API key authentication
@@ -11,7 +12,7 @@ import type { Context, Next } from 'hono';
  *
  * WebSocket upgrades are allowed through - auth will be handled in the ws package
  */
-export async function auth(c: Context<{ Bindings: Env }>, next: Next): Promise<Response | void> {
+export async function auth(c: Context<HttpEnv>, next: Next): Promise<Response | void> {
   // Allow WebSocket upgrades through without auth
   const upgrade = c.req.header('Upgrade');
   if (upgrade?.toLowerCase() === 'websocket') {

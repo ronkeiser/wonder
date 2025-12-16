@@ -3,10 +3,11 @@
  */
 
 import { OpenAPIHono } from '@hono/zod-openapi';
+import type { HttpEnv } from '~/types';
 import { createTaskDefRoute, deleteTaskDefRoute, getTaskDefRoute, listTaskDefsRoute } from './spec';
 
 /** /task-defs */
-export const taskDefs = new OpenAPIHono<{ Bindings: Env }>();
+export const taskDefs = new OpenAPIHono<HttpEnv>();
 
 /** POST / */
 taskDefs.openapi(createTaskDefRoute, async (c) => {

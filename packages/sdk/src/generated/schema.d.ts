@@ -2212,7 +2212,6 @@ export interface components {
             } | {
                 /** @enum {string} */
                 type: "sql.query";
-                message: string;
                 sql: string;
                 params: unknown[];
                 duration_ms: number;

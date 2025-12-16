@@ -6,6 +6,8 @@
 import { OpenAPIHono } from '@hono/zod-openapi';
 import { cors } from 'hono/cors';
 import { auth } from './middleware/auth';
+import { errorLoggerMiddleware } from './middleware/error';
+import { loggerMiddleware } from './middleware/logger';
 import { actions } from './routes/action/route';
 import { events } from './routes/event/route';
 import { logs } from './routes/log/route';
@@ -17,10 +19,17 @@ import { workflowDefs } from './routes/workflow-def/route';
 import { workflowRuns } from './routes/workflow-run/route';
 import { workflows } from './routes/workflow/route';
 import { workspaces } from './routes/workspace/route';
+import type { HttpEnv } from './types';
 
-const app = new OpenAPIHono<{ Bindings: Env }>({
+const app = new OpenAPIHono<HttpEnv>({
   defaultHook: (result, c) => {
     if (!result.success) {
+      c.var.logger?.warn({
+        event_type: 'validation_error',
+        request_id: c.var.requestId,
+        message: 'Request validation failed',
+        metadata: { error: result.error },
+      });
       return c.json({ error: result.error }, 400);
     }
   },
@@ -28,6 +37,12 @@ const app = new OpenAPIHono<{ Bindings: Env }>({
 
 // CORS middleware
 app.use('/*', cors());
+
+// Logger middleware - creates logger instance and tracks request lifecycle
+app.use('/*', loggerMiddleware);
+
+// Error logging middleware - catches and logs errors
+app.use('/*', errorLoggerMiddleware);
 
 // Health check (no auth required)
 app.get('/health', (c) => c.text('OK'));

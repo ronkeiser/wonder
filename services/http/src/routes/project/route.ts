@@ -3,10 +3,11 @@
  */
 
 import { OpenAPIHono } from '@hono/zod-openapi';
+import type { HttpEnv } from '~/types';
 import { createProjectRoute, deleteProjectRoute, getProjectRoute } from './spec';
 
 /** /projects */
-export const projects = new OpenAPIHono<{ Bindings: Env }>();
+export const projects = new OpenAPIHono<HttpEnv>();
 
 /** POST / */
 projects.openapi(createProjectRoute, async (c) => {

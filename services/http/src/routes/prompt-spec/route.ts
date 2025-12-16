@@ -3,10 +3,11 @@
  */
 
 import { OpenAPIHono } from '@hono/zod-openapi';
+import type { HttpEnv } from '~/types';
 import { createPromptSpecRoute, deletePromptSpecRoute, getPromptSpecRoute } from './spec';
 
 /** /prompt-specs */
-export const promptSpecs = new OpenAPIHono<{ Bindings: Env }>();
+export const promptSpecs = new OpenAPIHono<HttpEnv>();
 
 /** POST / */
 promptSpecs.openapi(createPromptSpecRoute, async (c) => {
