@@ -162,10 +162,8 @@ const TraceEventPayloadSchema = z.discriminatedUnion('type', [
     }),
   }),
   z.object({
-    type: z.literal('operation.context.output_mapping.input'),
-    node_ref: z.string(),
-    output_mapping: z.unknown(),
-    task_output: z.unknown(),
+    type: z.literal('operation.context.output_mapping.start'),
+    output_mapping: z.record(z.string(), z.string()).nullable(),
     task_output_keys: z.array(z.string()),
   }),
   z.object({

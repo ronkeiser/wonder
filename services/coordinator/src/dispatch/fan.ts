@@ -267,13 +267,6 @@ export async function activateFanIn(
 ): Promise<string | null> {
   const { workflowRunId, nodeId, fanInPath } = decision;
 
-  ctx.emitter.emitTrace({
-    type: 'debug.fan_in.start',
-    workflow_run_id: workflowRunId,
-    node_id: nodeId,
-    fan_in_path: fanInPath,
-  });
-
   // First ensure the fan-in record exists (create if not present)
   // This handles the race where all tokens arrive at sync point simultaneously
   ctx.tokens.tryCreateFanIn({
@@ -290,11 +283,6 @@ export async function activateFanIn(
     workflowRunId,
     fanInPath,
     activatedByTokenId: triggeringTokenId,
-  });
-
-  ctx.emitter.emitTrace({
-    type: 'debug.fan_in.try_activate_result',
-    activated,
   });
 
   if (!activated) {

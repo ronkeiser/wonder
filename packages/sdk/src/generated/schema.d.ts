@@ -1956,7 +1956,7 @@ export interface components {
             timestamp: number;
             type: string;
             /** @enum {string} */
-            category: "decision" | "operation" | "dispatch" | "sql";
+            category: "decision" | "operation" | "dispatch" | "sql" | "debug";
             workflow_run_id: string;
             token_id: string | null;
             node_id: string | null;
@@ -2000,6 +2000,32 @@ export interface components {
                 /** @enum {string} */
                 type: "decision.sync.activate";
                 merge_config?: unknown;
+            } | {
+                /** @enum {string} */
+                type: "decision.sync.sibling_group_check";
+                token_fan_out_transition_id: string | null;
+                sync_sibling_group: string;
+                matches: boolean;
+            } | {
+                /** @enum {string} */
+                type: "decision.sync.skipped_wrong_sibling_group";
+                token_fan_out_transition_id: string | null;
+                sync_sibling_group: string;
+            } | {
+                /** @enum {string} */
+                type: "decision.lifecycle.start";
+                workflow_run_id: string;
+                initial_node_id: string;
+            } | {
+                /** @enum {string} */
+                type: "decision.lifecycle.root_token_planned";
+                node_id: string;
+            } | {
+                /** @enum {string} */
+                type: "decision.sync.continuation";
+                workflow_run_id: string;
+                node_id: string;
+                fan_in_path: string;
             } | {
                 /** @enum {string} */
                 type: "decision.completion.start";
@@ -2048,7 +2074,12 @@ export interface components {
                 value?: unknown;
             } | {
                 /** @enum {string} */
-                type: "operation.context.write";
+                type: "operation.context.replace_section";
+                section: string;
+                data?: unknown;
+            } | {
+                /** @enum {string} */
+                type: "operation.context.set_field";
                 path: string;
                 value?: unknown;
             } | {
@@ -2061,10 +2092,10 @@ export interface components {
                 };
             } | {
                 /** @enum {string} */
-                type: "operation.context.output_mapping.input";
-                node_ref: string;
-                output_mapping?: unknown;
-                task_output?: unknown;
+                type: "operation.context.output_mapping.start";
+                output_mapping: {
+                    [key: string]: string;
+                } | null;
                 task_output_keys: string[];
             } | {
                 /** @enum {string} */
@@ -2077,8 +2108,6 @@ export interface components {
                 target_path: string;
                 source_path: string;
                 extracted_value?: unknown;
-                current_value?: unknown;
-                updated_value?: unknown;
             } | {
                 /** @enum {string} */
                 type: "operation.context.branch_table.create";
@@ -2292,6 +2321,16 @@ export interface components {
                 /** @enum {string} */
                 type: "dispatch.workflow.failed";
                 error: string;
+            } | {
+                /** @enum {string} */
+                type: "debug.fan_in.start";
+                workflow_run_id: string;
+                node_id: string;
+                fan_in_path: string;
+            } | {
+                /** @enum {string} */
+                type: "debug.fan_in.try_activate_result";
+                activated: boolean;
             };
         };
         TraceEventsResponse: {

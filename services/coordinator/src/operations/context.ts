@@ -345,6 +345,13 @@ export class ContextManager {
   ): void {
     this.loadSchemas();
 
+    // Emit start event with input context
+    this.emitter.emitTrace({
+      type: 'operation.context.output_mapping.start',
+      output_mapping: outputMapping,
+      task_output_keys: Object.keys(taskOutput),
+    });
+
     if (!outputMapping) {
       this.emitter.emitTrace({
         type: 'operation.context.output_mapping.skip',

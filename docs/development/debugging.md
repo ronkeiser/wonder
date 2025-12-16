@@ -1,6 +1,12 @@
+# Debugging Guide
+
+## Overview
+
 The "edge test" is the test that validates our current work and lives in `packages/test/src/tests/edge`.
 
 It can be run using the `pnpm test:edge` command in the root directory.
+
+## Querying Trace Events
 
 We validate all of our work against edge tests via trace events. After running a test, you can query the trace events like this:
 
@@ -15,6 +21,8 @@ curl "https://api.wflow.app/events/trace?workflow_run_id=run_123&category=decisi
 curl "https://api.wflow.app/events/trace?workflow_run_id=run_123&type=decision.routing.start"
 ```
 
+### API Authentication
+
 All API endpoints require an API key in the `X-API-Key` header. The key is stored in `.env` at the project root:
 
 ```bash
@@ -25,7 +33,11 @@ export API_KEY="ga5jSrsUxsZQtcIT8v1WEUeHhP+2S5o/gNSS7QLEFYM="
 curl -H "X-API-Key: $API_KEY" "https://api.wflow.app/events/trace?workflow_run_id=run_123"
 ```
 
+### Trace Event Types
+
 Trace events are defined in the events service in `services/events/src/types.ts`. Whenever we add new events to the `coordinator` or `executor` services, we need to update the event types.
+
+## Deployment
 
 When ever you make changes to the code in preparation to run a new test, you must deploy the service. The root package.json provide these scripts:
 
@@ -46,6 +58,8 @@ When ever you make changes to the code in preparation to run a new test, you mus
   },
 ```
 
+## Logging
+
 Sometimes, it may be necessary for debugging to add logs. For this, use the `@wonder/logs` client, DO NOT use `console.log`. You can query the logs like this:
 
 ```bash
@@ -59,10 +73,20 @@ curl "https://api.wflow.app/logs?service=coordinator&level=error"
 curl "https://api.wflow.app/logs?trace_id=trace_abc123"
 ```
 
+## Type Checking and Regeneration
+
 After making edits, before announcing completion of work, you MUST run a typecheck. You can do this by running `pnpm typecheck` at the root.
 
 If you changed any of the RPC signatures of any of the services, you must regenerate the types with `pnpm types`.
 
-_How to get the workflow_run_id:_
+### Updating Trace Event Types
+
+**NOTE:** It is common to have to update the trace event types (after adding new trace events to coordinator) at `services/events/src/types.ts`. HOWEVER, if you do so, you **MUST ALSO:**
+
+- update the http service zod schemas at `services/http/src/routes/event/schema.ts`
+- run `pnpm types` from the root. Doing this will BOTH generate worker configurations for all services AND run typechecks against all services.
+- run `pnpm gen:sdk` from the root to regenerate the sdk.
+
+## Getting the Workflow Run ID
 
 Run the edge test, then query the events for the last minute to get the workflow_run_id. You can then use that id to perform any other queries you need.

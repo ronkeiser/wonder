@@ -263,10 +263,8 @@ export type OperationEvent =
       };
     }
   | {
-      type: 'operation.context.output_mapping.input';
-      node_ref: string;
-      output_mapping: unknown;
-      task_output: unknown;
+      type: 'operation.context.output_mapping.start';
+      output_mapping: Record<string, string> | null;
       task_output_keys: string[];
     }
   | {

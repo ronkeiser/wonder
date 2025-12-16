@@ -109,13 +109,6 @@ export async function processTaskResult(
   } else {
     // Linear flow: Apply node's output_mapping to transform and store output
     // e.g., { "state.result": "$.greeting" } writes result.output_data.greeting to context.state.result
-    ctx.emitter.emitTrace({
-      type: 'operation.context.output_mapping.input',
-      node_ref: node.ref,
-      output_mapping: node.output_mapping,
-      task_output: result.output_data,
-      task_output_keys: Object.keys(result.output_data),
-    });
     ctx.context.applyOutputMapping(
       node.output_mapping as Record<string, string> | null,
       result.output_data,
