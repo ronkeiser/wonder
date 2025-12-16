@@ -48,6 +48,8 @@
     "enabled": false,
   },
   "vars": {
+    "SERVICE": "coordinator",
+    "ENVIRONMENT": "development",
     "TRACE_EVENTS_ENABLED": "true",
   },
 }

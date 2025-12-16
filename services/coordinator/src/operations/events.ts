@@ -27,12 +27,12 @@ export class CoordinatorEmitter implements Emitter {
     logger: Logger,
     defs: DefinitionManager,
     eventsService: Env['EVENTS'],
-    traceEnabled: boolean,
+    traceEnabled: 'true' | 'false',
   ) {
     this.logger = logger;
     this.defs = defs;
     this.eventsService = eventsService;
-    this.traceEnabled = traceEnabled ? 'true' : 'false';
+    this.traceEnabled = traceEnabled;
   }
 
   /**

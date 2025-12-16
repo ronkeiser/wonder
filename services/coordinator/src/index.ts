@@ -4,19 +4,18 @@
  * Durable Object-based workflow orchestration service.
  * Manages workflow lifecycle via RPC.
  *
- * This is a thin orchestration layer that delegates to:
- * - dispatch/lifecycle.ts: workflow start, error handling
- * - dispatch/task.ts: task dispatch and result processing
- * - dispatch/fan.ts: fan-out/fan-in orchestration
+ * This is a thin orchestration layer - the DO handles RPC boundaries
+ * and error logging, delegating business logic to the dispatch layer
+ * which handles workflow progression, task execution, and fan-out/fan-in.
  */
 import type { Emitter } from '@wonder/events';
 import { createLogger, type Logger } from '@wonder/logs';
 import { DurableObject } from 'cloudflare:workers';
 import {
-  type DispatchContext,
   processTaskError,
   processTaskResult,
   startWorkflow,
+  type DispatchContext,
   type TaskErrorResult,
 } from './dispatch';
 import { ContextManager } from './operations/context';
@@ -41,8 +40,8 @@ export class WorkflowCoordinator extends DurableObject {
     super(ctx, env);
 
     this.logger = createLogger(this.ctx, this.env.LOGS, {
-      service: 'coordinator',
-      environment: 'development',
+      service: this.env.SERVICE,
+      environment: this.env.ENVIRONMENT,
     });
 
     // Initialize DefinitionManager first
@@ -53,7 +52,7 @@ export class WorkflowCoordinator extends DurableObject {
       this.logger,
       this.defs,
       this.env.EVENTS,
-      this.env.TRACE_EVENTS_ENABLED === 'true',
+      this.env.TRACE_EVENTS_ENABLED,
     );
 
     this.context = new ContextManager(ctx.storage.sql, this.defs, this.emitter);
