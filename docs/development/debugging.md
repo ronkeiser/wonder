@@ -10,27 +10,46 @@ It can be run using the `pnpm test:edge` command in the root directory.
 
 We validate all of our work against edge tests via trace events. After running a test, you can query the trace events like this:
 
+**IMPORTANT:** All API endpoints require authentication. First, set your API key (from `.env` at the project root):
+
 ```bash
-# All trace events for a workflow run (ordered by sequence)
-curl "https://api.wflow.app/events/trace?workflow_run_id=run_123"
-
-# Filter by category (decision/operation/dispatch/sql)
-curl "https://api.wflow.app/events/trace?workflow_run_id=run_123&category=decision"
-
-# Filter by event type
-curl "https://api.wflow.app/events/trace?workflow_run_id=run_123&type=decision.routing.start"
+export API_KEY="ga5jSrsUxsZQtcIT8v1WEUeHhP+2S5o/gNSS7QLEFYM="
 ```
 
-### API Authentication
-
-All API endpoints require an API key in the `X-API-Key` header. The key is stored in `.env` at the project root:
+Then include the `-H "X-API-Key: $API_KEY"` header in **every** request:
 
 ```bash
-# Set the API key (from .env)
-export API_KEY="ga5jSrsUxsZQtcIT8v1WEUeHhP+2S5o/gNSS7QLEFYM="
-
-# Include in all requests
+# All trace events for a workflow run (ordered by sequence)
 curl -H "X-API-Key: $API_KEY" "https://api.wflow.app/events/trace?workflow_run_id=run_123"
+
+# Filter by category (decision/operation/dispatch/sql)
+curl -H "X-API-Key: $API_KEY" "https://api.wflow.app/events/trace?workflow_run_id=run_123&category=decision"
+
+# Filter by event type
+curl -H "X-API-Key: $API_KEY" "https://api.wflow.app/events/trace?workflow_run_id=run_123&type=decision.routing.start"
+```
+
+### Response Structure
+
+All event endpoints return a **wrapped object**, not a raw array:
+
+```json
+{
+  "events": [...]
+}
+```
+
+When using `jq`, access the `.events` array first:
+
+```bash
+# WRONG - will error with "Cannot index object with number"
+curl -s -H "X-API-Key: $API_KEY" "https://api.wflow.app/events?limit=5" | jq '.[0]'
+
+# CORRECT - access the events array first
+curl -s -H "X-API-Key: $API_KEY" "https://api.wflow.app/events?limit=5" | jq '.events[0]'
+
+# Get the workflow_run_id from the most recent event
+curl -s -H "X-API-Key: $API_KEY" "https://api.wflow.app/events?limit=1" | jq -r '.events[0].workflow_run_id'
 ```
 
 ### Trace Event Types
@@ -64,13 +83,13 @@ Sometimes, it may be necessary for debugging to add logs. For this, use the `@wo
 
 ```bash
 # All logs for a service
-curl "https://api.wflow.app/logs?service=coordinator"
+curl -H "X-API-Key: $API_KEY" "https://api.wflow.app/logs?service=coordinator"
 
 # Filter by log level
-curl "https://api.wflow.app/logs?service=coordinator&level=error"
+curl -H "X-API-Key: $API_KEY" "https://api.wflow.app/logs?service=coordinator&level=error"
 
 # Filter by trace ID (correlate across services)
-curl "https://api.wflow.app/logs?trace_id=trace_abc123"
+curl -H "X-API-Key: $API_KEY" "https://api.wflow.app/logs?trace_id=trace_abc123"
 ```
 
 ## Type Checking and Regeneration
