@@ -1,5 +1,5 @@
 ---
-name: onboarding
+name: cloudflare
 description: Onboard to the wonder-refactor project by reading core documentation
 agent: agent
 tools:
