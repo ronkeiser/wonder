@@ -83,8 +83,8 @@ export class SelectGenerator {
           columnName,
         );
       } else if (fieldSchema.type === 'array' && this.options.arrayStrategy === 'table') {
-        // Read from array table
-        result[fieldName] = this.readArrayTable(sql, tableName, rowId, fieldName, fieldSchema);
+        // Read from array table - use columnName (full path) for table name
+        result[fieldName] = this.readArrayTable(sql, tableName, rowId, columnName, fieldSchema);
       } else if (fieldSchema.type === 'array' && this.options.arrayStrategy === 'json') {
         // Parse JSON array
         const jsonValue = flatRow[columnName];
@@ -152,8 +152,8 @@ export class SelectGenerator {
    * Reconstruct an array item object from a row
    */
   private reconstructArrayItem(
-    _sql: SqlExecutor,
-    _arrayTableName: string,
+    sql: SqlExecutor,
+    arrayTableName: string,
     row: Record<string, unknown>,
     itemSchema: JSONSchema,
   ): Record<string, unknown> {
@@ -163,14 +163,16 @@ export class SelectGenerator {
       return result;
     }
 
+    // Get the row's ID for reading nested arrays
+    const rowId = row.id as number;
+
     for (const [fieldName, fieldSchema] of Object.entries(itemSchema.properties)) {
       if (fieldSchema.type === 'object' && this.options.nestedObjectStrategy === 'flatten') {
         // Nested object within array item - reconstruct from prefixed columns
         result[fieldName] = this.reconstructNestedFromRow(row, fieldName, fieldSchema);
       } else if (fieldSchema.type === 'array' && this.options.arrayStrategy === 'table') {
-        // Nested array - would need another table read
-        // For now, skip (complex nested case)
-        result[fieldName] = [];
+        // Nested array - read from child table using this row's ID
+        result[fieldName] = this.readArrayTable(sql, arrayTableName, rowId, fieldName, fieldSchema);
       } else if (fieldSchema.type === 'boolean') {
         result[fieldName] = row[fieldName] === 1;
       } else {

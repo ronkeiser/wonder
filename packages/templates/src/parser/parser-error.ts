@@ -30,8 +30,10 @@ export class ParserError extends Error {
     this.context = context ?? null;
 
     // Maintains proper stack trace for where error was thrown (only available on V8)
-    if (Error.captureStackTrace) {
-      Error.captureStackTrace(this, ParserError);
+    if ('captureStackTrace' in Error) {
+      (
+        Error as { captureStackTrace?: (target: object, constructor: Function) => void }
+      ).captureStackTrace?.(this, ParserError);
     }
   }
 

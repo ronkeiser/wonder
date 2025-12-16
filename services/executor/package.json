@@ -11,7 +11,8 @@
   },
   "dependencies": {
     "@wonder/logs": "workspace:*",
-    "@wonder/resources": "workspace:*"
+    "@wonder/resources": "workspace:*",
+    "@wonder/templates": "workspace:*"
   },
   "devDependencies": {
     "@cloudflare/vitest-pool-workers": "^0.10.11",

@@ -423,6 +423,24 @@ export type DispatchEvent =
       token_id?: string;
       timestamp: number;
     }
+  // Task input mapping debugging
+  | {
+      type: 'dispatch.task.input_mapping.context';
+      token_id: string;
+      node_id: string;
+      context_keys: {
+        input: string[];
+        state: string[];
+        output: string[];
+      };
+    }
+  | {
+      type: 'dispatch.task.input_mapping.applied';
+      token_id: string;
+      node_id: string;
+      input_mapping: unknown;
+      task_input: Record<string, unknown>;
+    }
   // Error handling
   | {
       type: 'dispatch.error';

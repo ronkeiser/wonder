@@ -306,6 +306,24 @@ const TraceEventPayloadSchema = z.discriminatedUnion('type', [
     token_id: z.string().optional(),
     timestamp: z.number(),
   }),
+  // Dispatch events - input mapping debugging
+  z.object({
+    type: z.literal('dispatch.task.input_mapping.context'),
+    token_id: z.string(),
+    node_id: z.string(),
+    context_keys: z.object({
+      input: z.array(z.string()),
+      state: z.array(z.string()),
+      output: z.array(z.string()),
+    }),
+  }),
+  z.object({
+    type: z.literal('dispatch.task.input_mapping.applied'),
+    token_id: z.string(),
+    node_id: z.string(),
+    input_mapping: z.unknown(),
+    task_input: z.record(z.string(), z.unknown()),
+  }),
   // Dispatch events - error handling
   z.object({
     type: z.literal('dispatch.error'),

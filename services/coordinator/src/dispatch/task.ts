@@ -56,6 +56,17 @@ export async function dispatchToken(ctx: DispatchContext, tokenId: string): Prom
   // Get context for input mapping
   const context = ctx.context.getSnapshot();
 
+  ctx.emitter.emitTrace({
+    type: 'dispatch.task.input_mapping.context',
+    token_id: tokenId,
+    node_id: node.id,
+    context_keys: {
+      input: Object.keys(context.input),
+      state: Object.keys(context.state),
+      output: Object.keys(context.output),
+    },
+  });
+
   // If node has no task, complete immediately (e.g., pass-through nodes)
   if (!node.task_id) {
     await processTaskResult(ctx, tokenId, { output_data: {} });
@@ -64,6 +75,14 @@ export async function dispatchToken(ctx: DispatchContext, tokenId: string): Prom
 
   // Apply input mapping to get task input (pure function from planning/completion)
   const taskInput = applyInputMapping(node.input_mapping as Record<string, string> | null, context);
+
+  ctx.emitter.emitTrace({
+    type: 'dispatch.task.input_mapping.applied',
+    token_id: tokenId,
+    node_id: node.id,
+    input_mapping: node.input_mapping,
+    task_input: taskInput,
+  });
 
   // Resolve resource bindings from node to workflow resources
   const resolvedResources = resolveResourceBindings(

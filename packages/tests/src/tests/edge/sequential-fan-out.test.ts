@@ -57,9 +57,8 @@ describe('Coordinator - Idea Ranking Pipeline', () => {
             {
               idea: s.string(),
               score: s.number(),
-              reasoning: s.string(),
             },
-            { required: ['idea', 'score', 'reasoning'] },
+            { required: ['idea', 'score'] },
           ),
         ),
       },
@@ -143,14 +142,14 @@ describe('Coordinator - Idea Ranking Pipeline', () => {
     const ideatePrompt = promptSpec({
       name: 'Ideate Prompt',
       description: 'Generates creative ideas for a topic',
-      template: `You are a creative brainstormer. Generate 3 unique and creative suggestions for: {{topic}}
+      template: `You are brainstormer #{{branch_index}}. Generate 1 unique and creative suggestion for: {{topic}}
 
-Be creative, fun, and diverse in your suggestions. Think outside the box!
+IMPORTANT: Your idea must be DIFFERENT from all other brainstormers. As brainstormer #{{branch_index}}, be creative in your own unique way!
 
 Return JSON with:
-- "ideas": array of 3 string suggestions`,
+- "ideas": array with 1 string suggestion`,
       template_language: 'handlebars',
-      requires: { topic: s.string() },
+      requires: { topic: s.string(), branch_index: s.number() },
       produces: ideationSchema,
     });
 
@@ -166,7 +165,7 @@ Return JSON with:
       ordinal: 0,
       action: ideateAction,
       action_version: 1,
-      input_mapping: { topic: '$.input.topic' },
+      input_mapping: { topic: '$.input.topic', branch_index: '$.input.branch_index' },
       output_mapping: {
         'output.ideas': '$.response.ideas',
       },
@@ -175,7 +174,7 @@ Return JSON with:
     const ideateTask = task({
       name: 'Ideate Task',
       description: 'Task that generates creative ideas',
-      input_schema: s.object({ topic: s.string() }, { required: ['topic'] }),
+      input_schema: s.object({ topic: s.string(), branch_index: s.number() }, { required: ['topic', 'branch_index'] }),
       output_schema: ideationSchema,
       steps: [ideateStep],
     });
@@ -185,7 +184,7 @@ Return JSON with:
       name: 'Generate Ideas',
       task: ideateTask,
       task_version: 1,
-      input_mapping: { topic: '$.input.topic' },
+      input_mapping: { topic: '$.input.topic', branch_index: '$._token.branch_index' },
       output_mapping: {
         'output.ideas': '$.ideas',
       },
@@ -246,7 +245,7 @@ Score each idea from 0-10 based on:
 - Memorability and appeal
 
 Return JSON with:
-- "scores": array of objects, each with "idea" (string), "score" (number 0-10), "reasoning" (brief explanation)`,
+- "scores": array of objects, each with "idea" (string), "score" (number 0-10)`,
       template_language: 'handlebars',
       requires: s.object({
         topic: s.string(),
@@ -317,7 +316,7 @@ Multiple judges have scored the following ideas:
 {{#each judgments}}
 Judge {{@index}}:
 {{#each this.scores}}
-  - "{{this.idea}}": {{this.score}}/10 - {{this.reasoning}}
+  - "{{this.idea}}": {{this.score}}/10
 {{/each}}
 
 {{/each}}
@@ -330,7 +329,7 @@ Create a final report that:
 Return JSON with:
 - "summary": brief overview of the evaluation process
 - "ranked_ideas": array of objects with "rank", "idea", "average_score", "judge_scores" (array of individual scores)
-- "recommendation": your final recommendation with reasoning`,
+- "recommendation": your final recommendation`,
       template_language: 'handlebars',
       requires: s.object({
         topic: s.string(),

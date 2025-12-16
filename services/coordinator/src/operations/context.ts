@@ -113,10 +113,14 @@ export class ContextManager {
 
     if (this.stateTable) {
       this.stateTable.create();
+      // Initialize with empty row so setField() can update it later
+      this.stateTable.insert({});
       tablesCreated.push('context_state');
     }
 
     this.outputTable!.create();
+    // Initialize with empty row so setField() can update it later
+    this.outputTable!.insert({});
     tablesCreated.push('context_output');
 
     this.emitter.emitTrace({
@@ -499,6 +503,14 @@ export class ContextManager {
 
       const output = table.selectFirst() ?? {};
 
+      this.emitter.emitTrace({
+        type: 'operation.context.branch.read',
+        token_id: tokenId,
+        branch_index: branchIndex,
+        output,
+        from_cache: this.branchTables.has(tokenId),
+      });
+
       outputs.push({
         tokenId,
         branchIndex,
@@ -533,11 +545,13 @@ export class ContextManager {
       if (merge.source === '_branch.output') {
         return b;
       }
-      // Extract nested path from output (e.g., '_branch.output.choice')
+      // Extract nested path from output (e.g., '_branch.output.ideas')
+      // For a source like '_branch.output.ideas', we want to extract just the 'ideas' value
       const path = merge.source.replace('_branch.output.', '');
+      const extractedValue = this.getNestedValue(b.output, path);
       return {
         ...b,
-        output: { [path]: this.getNestedValue(b.output, path) },
+        output: extractedValue,
       };
     });
 
@@ -545,12 +559,19 @@ export class ContextManager {
     let merged: unknown;
 
     switch (merge.strategy) {
-      case 'append':
+      case 'append': {
         // Collect all outputs into array, ordered by branch index
-        merged = extractedOutputs
-          .sort((a, b) => a.branchIndex - b.branchIndex)
-          .map((b) => b.output);
+        // If outputs are arrays, flatten them (e.g., merging [ideas1, ideas2, ideas3])
+        const sortedForAppend = extractedOutputs.sort((a, b) => a.branchIndex - b.branchIndex);
+        const outputs = sortedForAppend.map((b) => b.output);
+        // Flatten if all outputs are arrays
+        if (outputs.every((o) => Array.isArray(o))) {
+          merged = outputs.flat();
+        } else {
+          merged = outputs;
+        }
         break;
+      }
 
       case 'merge_object':
         // Shallow merge all outputs (last wins for conflicts)
@@ -564,11 +585,12 @@ export class ContextManager {
         );
         break;
 
-      case 'last_wins':
+      case 'last_wins': {
         // Take last completed (highest branch index)
-        const sorted = extractedOutputs.sort((a, b) => b.branchIndex - a.branchIndex);
-        merged = sorted[0]?.output ?? {};
+        const sortedForLastWins = extractedOutputs.sort((a, b) => b.branchIndex - a.branchIndex);
+        merged = sortedForLastWins[0]?.output ?? {};
         break;
+      }
     }
 
     // Write to target path in context (setField handles nested paths)
@@ -583,13 +605,20 @@ export class ContextManager {
 
   /**
    * Drop branch tables after merge (cleanup)
+   * Uses SchemaTable.dropAll() to handle nested array tables in correct FK order
    */
   dropBranchTables(tokenIds: string[]): void {
     for (const tokenId of tokenIds) {
-      const tableName = `branch_output_${tokenId}`;
+      const table = this.branchTables.get(tokenId);
 
-      // Drop the table
-      this.sql.exec(`DROP TABLE IF EXISTS ${tableName};`);
+      if (table) {
+        // Drop all tables (including array tables) in dependency order
+        table.dropAll();
+      } else {
+        // Fallback for tables not in cache (shouldn't happen normally)
+        const tableName = `branch_output_${tokenId}`;
+        this.sql.exec(`DROP TABLE IF EXISTS ${tableName};`);
+      }
 
       // Remove from cache
       this.branchTables.delete(tokenId);

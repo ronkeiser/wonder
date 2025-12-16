@@ -107,7 +107,7 @@ export function decideSynchronization(params: {
           type: 'ACTIVATE_FAN_IN',
           workflowRunId,
           nodeId: transition.to_node_id,
-          fanInPath: buildFanInPath(token.path_id),
+          fanInPath: buildFanInPath(token.path_id, transition.id),
           mergedTokenIds: [], // Will be populated by dispatch layer with actual sibling IDs
         },
       ],
@@ -178,7 +178,7 @@ export function decideOnSiblingCompletion(params: {
         type: 'ACTIVATE_FAN_IN',
         workflowRunId,
         nodeId: transition.to_node_id,
-        fanInPath: buildFanInPath(completedToken.path_id),
+        fanInPath: buildFanInPath(completedToken.path_id, transition.id),
         mergedTokenIds: [], // Dispatch layer populates with all sibling IDs
       },
     ];
@@ -192,7 +192,7 @@ export function decideOnSiblingCompletion(params: {
       type: 'ACTIVATE_FAN_IN',
       workflowRunId,
       nodeId: transition.to_node_id,
-      fanInPath: buildFanInPath(winnerToken.path_id),
+      fanInPath: buildFanInPath(winnerToken.path_id, transition.id),
       mergedTokenIds: [], // Dispatch layer populates
     },
   ];
@@ -244,23 +244,32 @@ function checkSyncCondition(
 }
 
 /**
- * Build the fan-in path from a token's path.
- * The fan-in path represents the common ancestor for all siblings.
+ * Build the fan-in path from a token's path and transition ID.
+ * The fan-in path must be unique per synchronization point.
  *
- * Example: Token path 'root.A.0.B.2' → Fan-in path 'root.A.0'
- * (strips the last .nodeId.branchIndex segment)
+ * The path consists of:
+ * - Base path: common ancestor for all siblings (derived from token path)
+ * - Transition ID: unique identifier for this synchronization
+ *
+ * This ensures sequential fan-outs (e.g., ideate→aggregate→judge→report)
+ * have distinct fan-in paths even if they share the same base path.
+ *
+ * Example: Token path 'root.A.0', transition 'T1' → Fan-in path 'root:T1'
  */
-function buildFanInPath(tokenPath: string): string {
+function buildFanInPath(tokenPath: string, transitionId: string): string {
   const parts = tokenPath.split('.');
 
   // Path format: root[.nodeId.branchIndex]*
   // To get fan-in path, remove last two segments (nodeId and branchIndex)
+  let basePath: string;
   if (parts.length >= 3) {
-    return parts.slice(0, -2).join('.');
+    basePath = parts.slice(0, -2).join('.');
+  } else {
+    basePath = parts[0] ?? 'root';
   }
 
-  // Root level or malformed path
-  return parts[0] ?? 'root';
+  // Append transition ID to make path unique per synchronization point
+  return `${basePath}:${transitionId}`;
 }
 
 // ============================================================================
@@ -333,7 +342,7 @@ export function decideOnTimeout(params: {
         type: 'ACTIVATE_FAN_IN',
         workflowRunId,
         nodeId: transition.to_node_id,
-        fanInPath: buildFanInPath(winnerToken.path_id),
+        fanInPath: buildFanInPath(winnerToken.path_id, transition.id),
         mergedTokenIds: [], // Dispatch populates with available completed siblings
       },
     ];

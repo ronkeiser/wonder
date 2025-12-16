@@ -123,7 +123,7 @@ export class DDLGenerator {
   /**
    * Generate separate tables for arrays
    */
-  private generateArrayTables(parentTableName: string, schema: JSONSchema): string[] {
+  private generateArrayTables(parentTableName: string, schema: JSONSchema, prefix = ''): string[] {
     const tables: string[] = [];
 
     if (!schema.properties || this.options.arrayStrategy !== 'table') {
@@ -131,12 +131,27 @@ export class DDLGenerator {
     }
 
     for (const [fieldName, fieldSchema] of Object.entries(schema.properties)) {
+      const pathName = prefix ? `${prefix}_${fieldName}` : fieldName;
+
+      // Handle nested objects with flatten strategy - recurse to find arrays inside
+      if (fieldSchema.type === 'object' && this.options.nestedObjectStrategy === 'flatten') {
+        const nestedTables = this.generateArrayTables(parentTableName, fieldSchema, pathName);
+        tables.push(...nestedTables);
+        continue;
+      }
+
       if (fieldSchema.type === 'array' && fieldSchema.items) {
-        const arrayTableName = `${this.options.arrayTablePrefix}${parentTableName}_${fieldName}`;
+        const arrayTableName = `${this.options.arrayTablePrefix}${parentTableName}_${pathName}`;
         const itemSchema = fieldSchema.items;
 
         // Build array table columns
+        // Include id PRIMARY KEY so nested arrays can reference this table
         const columns: ColumnDefinition[] = [
+          {
+            name: 'id',
+            type: 'INTEGER',
+            constraints: ['PRIMARY KEY AUTOINCREMENT'],
+          },
           {
             name: `${parentTableName}_id`,
             type: 'INTEGER',

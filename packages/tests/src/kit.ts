@@ -64,7 +64,7 @@ export async function setupTestContext(): Promise<TestContext> {
     model_id: '@cf/meta/llama-3.3-70b-instruct-fp8-fast',
     parameters: {
       max_tokens: 512,
-      temperature: 1.0,
+      temperature: 2.5,
     },
     cost_per_1k_input_tokens: 0.0,
     cost_per_1k_output_tokens: 0.0,

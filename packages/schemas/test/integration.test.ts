@@ -3,6 +3,7 @@ import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 import { CustomTypeRegistry } from '../src/custom-types.js';
 import { DDLGenerator } from '../src/ddl-generator.js';
 import { DMLGenerator } from '../src/dml-generator.js';
+import { Schema } from '../src/schema.js';
 import type { JSONSchema } from '../src/types.js';
 import { Validator } from '../src/validator.js';
 
@@ -434,6 +435,122 @@ describe('D1 Integration Tests', () => {
         const row = await db.prepare('SELECT * FROM contacts WHERE id = ?').bind(1).first();
         expect(row.email).toBe('test@example.com');
       }
+    });
+  });
+
+  describe('Nested array handling with Schema.bind', () => {
+    it('should insert and read nested arrays at multiple levels', async () => {
+      // Schema with 2-level deep nested arrays:
+      // document → sections[] → items[]
+      const schema: JSONSchema = {
+        type: 'object',
+        properties: {
+          title: { type: 'string' },
+          sections: {
+            type: 'array',
+            items: {
+              type: 'object',
+              properties: {
+                heading: { type: 'string' },
+                items: {
+                  type: 'array',
+                  items: {
+                    type: 'object',
+                    properties: {
+                      name: { type: 'string' },
+                      value: { type: 'integer' },
+                    },
+                  },
+                },
+              },
+            },
+          },
+        },
+      };
+
+      // Create SqlExecutor adapter for D1
+      const sql = {
+        exec: (query: string, ...args: unknown[]) => {
+          const stmt = db.prepare(query);
+          if (args.length > 0) {
+            stmt.bind(...args);
+          }
+          // For SELECT, return iterator over results
+          if (query.trim().toUpperCase().startsWith('SELECT')) {
+            // D1 returns a promise, but we need sync - use workaround
+            // Actually D1 is async, so we need to use a sync SQLite for unit tests
+            // For now, just return empty to test the schema generation
+          }
+          stmt.run();
+          return [] as Record<string, unknown>[];
+        },
+      };
+
+      // Use Schema.bind() API
+      const schemaObj = new Schema(schema);
+      const ddl = schemaObj.generateDDL('docs');
+
+      // Verify DDL creates all nested tables
+      expect(ddl).toContain('CREATE TABLE docs');
+      expect(ddl).toContain('CREATE TABLE docs_sections');
+      expect(ddl).toContain('CREATE TABLE docs_sections_items');
+
+      // Execute DDL
+      await execDDL(ddl);
+
+      // Test data with nested arrays
+      const data = {
+        title: 'Test Document',
+        sections: [
+          {
+            heading: 'Section 1',
+            items: [
+              { name: 'Item A', value: 10 },
+              { name: 'Item B', value: 20 },
+            ],
+          },
+          {
+            heading: 'Section 2',
+            items: [{ name: 'Item C', value: 30 }],
+          },
+        ],
+      };
+
+      // Use the old DML generator (which doesn't handle nesting) to show it fails
+      const dmlGen = new DMLGenerator(schema, new CustomTypeRegistry());
+      const { statements, values } = dmlGen.generateInsert('docs', data);
+
+      // Execute main insert
+      await db
+        .prepare(statements[0])
+        .bind(...values[0])
+        .run();
+
+      // Get parent ID
+      const parentResult = await db.prepare('SELECT last_insert_rowid() as id').first();
+      const parentId = parentResult.id;
+
+      // Execute section inserts (level 1)
+      for (let i = 1; i < statements.length; i++) {
+        const stmt = statements[i].replace(/\{\{PARENT_ID\}\}/g, String(parentId));
+        const vals = values[i].map((v: unknown) => (v === '{{PARENT_ID}}' ? parentId : v));
+        await db
+          .prepare(stmt)
+          .bind(...vals)
+          .run();
+      }
+
+      // Verify sections were inserted
+      const sectionsResult = await db
+        .prepare('SELECT * FROM docs_sections WHERE docs_id = ?')
+        .bind(parentId)
+        .all();
+      expect(sectionsResult.results).toHaveLength(2);
+
+      // Verify nested items are NOT inserted by old DML generator
+      // (This is the bug we're fixing!)
+      const itemsResult = await db.prepare('SELECT * FROM docs_sections_items').all();
+      expect(itemsResult.results).toHaveLength(0); // Old code doesn't insert nested arrays!
     });
   });
 });

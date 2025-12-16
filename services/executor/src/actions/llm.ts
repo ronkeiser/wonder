@@ -17,6 +17,7 @@
  * @see docs/architecture/executor.md
  */
 
+import { render } from '@wonder/templates';
 import type { ActionDeps, ActionInput, ActionOutput } from './types';
 
 /**
@@ -87,7 +88,7 @@ export async function executeLLMAction(
     }
 
     // Render prompt template with input values
-    const prompt = renderTemplate(promptTemplate, actionInput);
+    const prompt = render(promptTemplate, actionInput);
 
     // Build messages array
     const messages: Array<{ role: string; content: string }> = [];
@@ -95,7 +96,7 @@ export async function executeLLMAction(
     if (systemPrompt) {
       messages.push({
         role: 'system',
-        content: renderTemplate(systemPrompt, actionInput),
+        content: render(systemPrompt, actionInput),
       });
     }
 
@@ -235,36 +236,6 @@ export async function executeLLMAction(
       },
     };
   }
-}
-
-/**
- * Render a template string with variable substitution
- * Supports {{variable}} and {{nested.path}} syntax
- */
-function renderTemplate(template: string, values: Record<string, unknown>): string {
-  return template.replace(/\{\{([^}]+)\}\}/g, (_, path: string) => {
-    const value = getNestedValue(values, path.trim());
-    if (value === undefined || value === null) {
-      return '';
-    }
-    return typeof value === 'string' ? value : JSON.stringify(value);
-  });
-}
-
-/**
- * Get nested value from object by dot-path
- */
-function getNestedValue(obj: Record<string, unknown>, path: string): unknown {
-  const parts = path.split('.');
-  let current: unknown = obj;
-
-  for (const part of parts) {
-    if (current === null || current === undefined) return undefined;
-    if (typeof current !== 'object') return undefined;
-    current = (current as Record<string, unknown>)[part];
-  }
-
-  return current;
 }
 
 /**
