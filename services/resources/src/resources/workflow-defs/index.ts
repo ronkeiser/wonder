@@ -13,7 +13,7 @@ export class WorkflowDefs extends Resource {
     workflow_def: WorkflowDef;
   }> {
     this.serviceCtx.logger.info({
-      event_type: 'workflow_def_create_started',
+      event_type: 'workflow_def.create.started',
       metadata: { name: data.name },
     });
 
@@ -23,7 +23,7 @@ export class WorkflowDefs extends Resource {
     } catch (error) {
       if (error instanceof ValidationError) {
         this.serviceCtx.logger.warn({
-          event_type: 'workflow_def_validation_failed',
+          event_type: 'workflow_def.validation.failed',
           metadata: { error: error.code, path: error.path },
         });
       }
@@ -36,7 +36,7 @@ export class WorkflowDefs extends Resource {
 
     // DEBUG: Log transformed transitions
     this.serviceCtx.logger.info({
-      event_type: 'workflow_def_transitions_transformed',
+      event_type: 'workflow_def.transitions.transformed',
       metadata: {
         workflow_def_id: ids.workflowDefId,
         transitions: transformed.transitions.map((t) => ({
@@ -69,7 +69,7 @@ export class WorkflowDefs extends Resource {
 
       if (dbError.constraint === 'unique') {
         this.serviceCtx.logger.warn({
-          event_type: 'workflow_def_create_conflict',
+          event_type: 'workflow_def.create.conflict',
           metadata: { name: data.name, field: dbError.field },
         });
         throw new ConflictError(
@@ -80,7 +80,7 @@ export class WorkflowDefs extends Resource {
       }
 
       this.serviceCtx.logger.error({
-        event_type: 'workflow_def_create_failed',
+        event_type: 'workflow_def.create.failed',
         message: dbError.message,
         metadata: { name: data.name },
       });
@@ -98,7 +98,7 @@ export class WorkflowDefs extends Resource {
       }
     } catch (error) {
       this.serviceCtx.logger.error({
-        event_type: 'workflow_def_node_create_failed',
+        event_type: 'workflow_def.node.create.failed',
         message: error instanceof Error ? error.message : String(error),
         metadata: { workflow_def_id: workflowDef.id, name: data.name },
       });
@@ -122,7 +122,7 @@ export class WorkflowDefs extends Resource {
       }
     } catch (error) {
       this.serviceCtx.logger.error({
-        event_type: 'workflow_def_transition_create_failed',
+        event_type: 'workflow_def.transition.create.failed',
         message: error instanceof Error ? error.message : String(error),
         metadata: { workflow_def_id: workflowDef.id, name: data.name },
       });
@@ -130,7 +130,7 @@ export class WorkflowDefs extends Resource {
     }
 
     this.serviceCtx.logger.info({
-      event_type: 'workflow_def_created',
+      event_type: 'workflow_def.created',
       metadata: {
         workflow_def_id: workflowDef.id,
         version: workflowDef.version,

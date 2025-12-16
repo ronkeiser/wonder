@@ -45,8 +45,11 @@ export abstract class Resource extends RpcTarget {
       .toLowerCase()
       .slice(1);
 
+    // Convert operation name to dot notation (e.g., 'updateStatus' -> 'update_status')
+    const operationName = operation.replace(/([A-Z])/g, '_$1').toLowerCase();
+
     this.serviceCtx.logger.info({
-      event_type: `${resourceName}_${operation}_started`,
+      event_type: `${resourceName}.${operationName}.started`,
       ...context,
     });
 
@@ -54,14 +57,14 @@ export abstract class Resource extends RpcTarget {
       const result = await fn();
 
       this.serviceCtx.logger.info({
-        event_type: `${resourceName}_${operation}_completed`,
+        event_type: `${resourceName}.${operationName}.completed`,
         ...context,
       });
 
       return result;
     } catch (error) {
       this.serviceCtx.logger.error({
-        event_type: `${resourceName}_${operation}_error`,
+        event_type: `${resourceName}.${operationName}.error`,
         message: error instanceof Error ? error.message : String(error),
         ...context,
         metadata: {

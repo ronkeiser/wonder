@@ -18,7 +18,7 @@ export class WorkflowRuns extends Resource {
     workspace_id: string;
   }> {
     this.serviceCtx.logger.info({
-      event_type: 'workflow_run_create_requested',
+      event_type: 'workflow_run.create.requested',
       metadata: { workflow_id: workflowId },
     });
 
@@ -27,7 +27,7 @@ export class WorkflowRuns extends Resource {
       const result = await workflowRepo.getWorkflowWithDef(this.serviceCtx.db, workflowId);
       if (!result) {
         this.serviceCtx.logger.warn({
-          event_type: 'workflow_not_found',
+          event_type: 'workflow.not_found',
           metadata: { workflow_id: workflowId },
         });
         throw new NotFoundError(`Workflow not found: ${workflowId}`, 'workflow', workflowId);
@@ -84,7 +84,7 @@ export class WorkflowRuns extends Resource {
       });
 
       this.serviceCtx.logger.info({
-        event_type: 'workflow_run_created',
+        event_type: 'workflow_run.created',
         metadata: { workflow_id: workflowId, workflow_run_id: workflowRunId },
       });
 
@@ -95,7 +95,7 @@ export class WorkflowRuns extends Resource {
       };
     } catch (error) {
       this.serviceCtx.logger.error({
-        event_type: 'workflow_run_create_failed',
+        event_type: 'workflow_run.create.failed',
         message: error instanceof Error ? error.message : String(error),
         metadata: {
           workflow_id: workflowId,
