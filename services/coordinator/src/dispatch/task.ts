@@ -248,7 +248,7 @@ async function finalizeWorkflow(ctx: DispatchContext): Promise<void> {
     });
   } catch (error) {
     ctx.logger.error({
-      event_type: 'coordinator_finalize_failed',
+      event_type: 'coordinator.finalize.failed',
       message: 'Critical error in finalizeWorkflow()',
       trace_id: ctx.workflowRunId,
       metadata: {

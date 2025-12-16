@@ -94,7 +94,7 @@ export class WorkflowCoordinator extends DurableObject {
       await startWorkflow(ctx);
     } catch (error) {
       this.logger.error({
-        event_type: 'coordinator_start_failed',
+        event_type: 'coordinator.start.failed',
         message: 'Critical error in start()',
         trace_id: workflow_run_id,
         metadata: {
@@ -125,7 +125,7 @@ export class WorkflowCoordinator extends DurableObject {
       await processTaskResult(ctx, tokenId, result);
     } catch (error) {
       this.logger.error({
-        event_type: 'coordinator_task_result_failed',
+        event_type: 'coordinator.task_result.failed',
         message: 'Critical error in handleTaskResult()',
         trace_id: workflow_run_id,
         metadata: {
@@ -157,7 +157,7 @@ export class WorkflowCoordinator extends DurableObject {
       processTaskError(ctx, tokenId, errorResult);
     } catch (error) {
       this.logger.error({
-        event_type: 'coordinator_task_error_failed',
+        event_type: 'coordinator.task_error.failed',
         message: 'Critical error in handleTaskError()',
         trace_id: workflow_run_id,
         metadata: {
@@ -177,8 +177,6 @@ export class WorkflowCoordinator extends DurableObject {
  */
 export default {
   async fetch(request: Request, env: Env): Promise<Response> {
-    return new Response('OK', {
-      headers: { 'Content-Type': 'application/json' },
-    });
+    return new Response('OK');
   },
 };

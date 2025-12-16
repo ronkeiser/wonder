@@ -52,7 +52,7 @@ export async function handleBranchOutput(
   // Fetch TaskDef to get output schema
   if (!node.task_id) {
     ctx.logger.debug({
-      event_type: 'branch_output_skip',
+      event_type: 'branch.output.skip',
       message: 'No task_id on node - skipping branch output',
       metadata: { token_id: token.id, node_id: node.id },
     });
@@ -64,7 +64,7 @@ export async function handleBranchOutput(
 
   if (!taskDef.output_schema) {
     ctx.logger.debug({
-      event_type: 'branch_output_skip',
+      event_type: 'branch.output.skip',
       message: 'No output_schema on TaskDef - skipping branch output',
       metadata: { token_id: token.id, task_id: taskDef.id },
     });
@@ -290,7 +290,7 @@ export async function activateFanIn(
     // Mark the triggering token as completed (absorbed by the winning token's fan-in)
     ctx.tokens.updateStatus(triggeringTokenId, 'completed');
     ctx.logger.debug({
-      event_type: 'fan_in_race_lost',
+      event_type: 'fan_in.race.lost',
       message: 'Another token already activated this fan-in',
       metadata: { fan_in_path: fanInPath },
     });
@@ -317,7 +317,7 @@ export async function activateFanIn(
 
   if (completedSiblings.length === 0) {
     ctx.logger.debug({
-      event_type: 'fan_in_no_completed',
+      event_type: 'fan_in.no_completed',
       message: 'No completed siblings found',
       metadata: { fan_in_path: fanInPath },
     });
@@ -382,7 +382,7 @@ export async function activateFanIn(
   // Get the created continuation token ID
   if (applyResult.tokensCreated.length === 0) {
     ctx.logger.debug({
-      event_type: 'fan_in_no_continuation',
+      event_type: 'fan_in.no_continuation',
       message: 'No continuation token created',
       metadata: { fan_in_path: fanInPath },
     });

@@ -60,7 +60,7 @@ export class DefinitionManager {
       // Run migrations (idempotent - creates tables if not exist)
       migrate(this.db, migrations);
       this.logger.info({
-        event_type: 'defs_migrations_complete',
+        event_type: 'defs.migrations.complete',
         message: 'DO SQLite migrations applied',
         trace_id: workflow_run_id,
       });
@@ -69,7 +69,7 @@ export class DefinitionManager {
       const existing = this.db.select({ id: workflow_runs.id }).from(workflow_runs).limit(1).all();
       if (existing.length > 0) {
         this.logger.info({
-          event_type: 'defs_already_populated',
+          event_type: 'defs.already_populated',
           message: 'DO SQLite already populated (wake-up)',
           trace_id: workflow_run_id,
         });
@@ -88,7 +88,7 @@ export class DefinitionManager {
       const nodeCount = this.db.select({ id: nodes.id }).from(nodes).all().length;
       const transitionCount = this.db.select({ id: transitions.id }).from(transitions).all().length;
       this.logger.info({
-        event_type: 'defs_populated',
+        event_type: 'defs.populated',
         message: 'DO SQLite populated from RESOURCES',
         trace_id: workflow_run_id,
         metadata: {
@@ -101,7 +101,7 @@ export class DefinitionManager {
       this.initialized = true;
     } catch (error) {
       this.logger.error({
-        event_type: 'defs_initialize_failed',
+        event_type: 'defs.initialize.failed',
         message: 'Failed to initialize DefinitionManager',
         trace_id: workflow_run_id,
         metadata: {

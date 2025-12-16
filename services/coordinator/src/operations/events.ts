@@ -64,7 +64,7 @@ export class CoordinatorEmitter implements Emitter {
     } catch (error) {
       // Can't use this.cachedEmitter.emitTrace here as it's not initialized yet
       this.logger.error({
-        event_type: 'emitter_init_failed',
+        event_type: 'emitter.init.failed',
         message: 'Failed to load context from metadata',
         metadata: {
           error: error instanceof Error ? error.message : String(error),
@@ -83,7 +83,7 @@ export class CoordinatorEmitter implements Emitter {
       .then((emitter) => emitter.emit(event))
       .catch((error) => {
         this.logger.error({
-          event_type: 'emit_failed',
+          event_type: 'emit.failed',
           message: 'Failed to emit event',
           metadata: {
             target_event_type: event.event_type,
@@ -101,7 +101,7 @@ export class CoordinatorEmitter implements Emitter {
       .then((emitter) => emitter.emitTrace(event))
       .catch((error) => {
         this.logger.error({
-          event_type: 'emit_trace_failed',
+          event_type: 'emit.trace.failed',
           message: 'Failed to emit trace',
           metadata: {
             error: error instanceof Error ? error.message : String(error),
