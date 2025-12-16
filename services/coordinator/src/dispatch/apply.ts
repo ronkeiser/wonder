@@ -12,6 +12,7 @@
  */
 
 import type { Emitter } from '@wonder/events';
+import type { Logger } from '@wonder/logs';
 import type { JSONSchema } from '@wonder/schemas';
 
 import type { ContextManager } from '../operations/context';
@@ -25,13 +26,42 @@ import { batchDecisions } from './batch';
 // Types
 // ============================================================================
 
-/** Dependencies required to apply decisions */
+/** Resource service bindings for fetching TaskDefs etc */
+export type ResourcesBinding = {
+  taskDefs: () => {
+    get: (
+      id: string,
+      version: number,
+    ) => Promise<{ task_def: { id: string; output_schema?: unknown } }>;
+  };
+};
+
+/** Executor service binding for dispatching tasks */
+export type ExecutorBinding = {
+  executeTask: (params: {
+    token_id: string;
+    workflow_run_id: string;
+    task_id: string;
+    task_version: number;
+    input: Record<string, unknown>;
+    resources: Record<string, string>;
+  }) => Promise<void>;
+};
+
+/** Dependencies required to apply decisions and orchestrate workflow */
 export type DispatchContext = {
   tokens: TokenManager;
   context: ContextManager;
   defs: DefinitionManager;
   emitter: Emitter;
+  logger: Logger;
   workflowRunId: string;
+  /** Resource service for fetching TaskDefs */
+  resources: ResourcesBinding;
+  /** Executor service for dispatching tasks */
+  executor: ExecutorBinding;
+  /** Register background work (fire-and-forget) */
+  waitUntil: (promise: Promise<unknown>) => void;
 };
 
 /** Result of applying decisions */

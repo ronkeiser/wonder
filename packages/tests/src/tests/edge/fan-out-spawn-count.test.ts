@@ -239,7 +239,6 @@ Return JSON with:
         transitions: [startToQuestion, questionToCollect],
       }),
       inputData,
-      { logEvents: false },
     );
 
     // =========================================================================
