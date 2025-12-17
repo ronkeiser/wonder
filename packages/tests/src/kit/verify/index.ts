@@ -6,7 +6,7 @@
  * error context automatically on any failure.
  *
  * @example
- * import { verify } from '~/kit/verify';
+ * import { verify } from '~/kit';
  *
  * verify(trace, { input, definition })
  *   .completed()

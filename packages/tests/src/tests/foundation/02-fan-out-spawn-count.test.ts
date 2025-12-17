@@ -1,7 +1,6 @@
 import { action, node, schema as s, step, task, transition, workflow } from '@wonder/sdk';
 import { describe, it } from 'vitest';
-import { assertInvariants, runTestWorkflow } from '~/kit';
-import { verify } from '~/kit/verify';
+import { assertInvariants, runTestWorkflow, verify } from '~/kit';
 
 /**
  * Foundation Test 02: Fan-out with Spawn Count + Fan-in
