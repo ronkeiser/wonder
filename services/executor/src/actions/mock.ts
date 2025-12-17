@@ -6,7 +6,7 @@
  */
 
 import type { JSONSchema } from '@wonder/schemas';
-import { generateMockData, type MockOptions } from '@wonder/schemas';
+import { generateMockData, type MockOptions } from '../utils/mock-generator';
 import type { ActionDeps, ActionInput, ActionOutput } from './types';
 
 /**

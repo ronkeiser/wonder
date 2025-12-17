@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
-import { generateMockData } from '../src/generators/mock-generator.js';
-import type { JSONSchema } from '../src/types.js';
+import { generateMockData } from '../src/utils/mock-generator';
+import type { JSONSchema } from '@wonder/schemas';
 
 describe('generateMockData', () => {
   describe('primitive types', () => {
@@ -477,6 +477,52 @@ describe('generateMockData', () => {
 
       expect(result.length).toBeGreaterThanOrEqual(20);
       expect(result.length).toBeLessThanOrEqual(25);
+    });
+
+    it('generates human-readable words when stringMode is "words"', () => {
+      const schema: JSONSchema = { type: 'string' };
+      const result = generateMockData(schema, {
+        seed: 42,
+        stringMode: 'words',
+      }) as string;
+
+      // Word strings contain only lowercase letters and hyphens
+      expect(result).toMatch(/^[a-z]+(-[a-z]+)*$/);
+    });
+
+    it('generates reproducible word strings with same seed', () => {
+      const schema: JSONSchema = { type: 'string' };
+      const result1 = generateMockData(schema, { seed: 123, stringMode: 'words' });
+      const result2 = generateMockData(schema, { seed: 123, stringMode: 'words' });
+
+      expect(result1).toBe(result2);
+    });
+
+    it('generates different word strings with different seeds', () => {
+      const schema: JSONSchema = { type: 'string' };
+      const result1 = generateMockData(schema, { seed: 123, stringMode: 'words' });
+      const result2 = generateMockData(schema, { seed: 456, stringMode: 'words' });
+
+      expect(result1).not.toBe(result2);
+    });
+
+    it('generates word strings for nested object properties', () => {
+      const schema: JSONSchema = {
+        type: 'object',
+        properties: {
+          name: { type: 'string' },
+          description: { type: 'string' },
+        },
+        required: ['name', 'description'],
+      };
+
+      const result = generateMockData(schema, {
+        seed: 42,
+        stringMode: 'words',
+      }) as Record<string, string>;
+
+      expect(result.name).toMatch(/^[a-z]+(-[a-z]+)*$/);
+      expect(result.description).toMatch(/^[a-z]+(-[a-z]+)*$/);
     });
 
     it('respects custom arrayLength option', () => {

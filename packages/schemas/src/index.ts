@@ -7,7 +7,6 @@ export * from './validation/validator';
 // Generators
 export * from './generators/ddl-generator';
 export * from './generators/dml-generator';
-export * from './generators/mock-generator';
 export * from './generators/select-generator';
 
 // Core

@@ -311,6 +311,9 @@ importers:
       '@wonder/templates':
         specifier: workspace:*
         version: link:../../packages/templates
+      random-words:
+        specifier: ^2.0.1
+        version: 2.0.1
     devDependencies:
       '@cloudflare/vitest-pool-workers':
         specifier: ^0.10.11
@@ -318,6 +321,9 @@ importers:
       typescript:
         specifier: ^5.9.3
         version: 5.9.3
+      vitest:
+        specifier: ^3.2.4
+        version: 3.2.4(@types/node@24.10.1)(@vitest/ui@3.2.4)(jiti@2.6.1)(lightningcss@1.30.2)(tsx@4.21.0)(yaml@2.8.1)
       wrangler:
         specifier: ^4.51.0
         version: 4.51.0(@cloudflare/workers-types@4.20251127.0)
@@ -2567,6 +2573,9 @@ packages:
     engines: {node: '>=14'}
     hasBin: true
 
+  random-words@2.0.1:
+    resolution: {integrity: sha512-nZNJAmgcFmtJMTDDIUCm/iK4R6RydC6NvALvWhYItXQrgYGk1F7Gww416LpVROFQtfVd5TaLEf4WuSsko03N7w==}
+
   randombytes@2.1.0:
     resolution: {integrity: sha512-vYl3iOX+4CKUWuxGi9Ukhie6fsqXqS9FE2Zaic4tNFD2N2QQaXOMFbuKK4QmDHC0JO6B1Zp41J0LpT0oR68amQ==}
 
@@ -2600,6 +2609,9 @@ packages:
 
   safe-buffer@5.2.1:
     resolution: {integrity: sha512-rp3So07KcdmmKbGvgaNxQSJr7bGVSVk5S9Eq1F+ppbRo70+YeaDxkw5Dd8NPN+GD6bjnYm2VuPuCXmpuYvmCXQ==}
+
+  seedrandom@3.0.5:
+    resolution: {integrity: sha512-8OwmbklUNzwezjGInmZ+2clQmExQPvomqjL7LFqOYqtmuxRgQYqOD3mHaU+MvZn5FLUeVxVfQjwLZW/n/JFuqg==}
 
   semver@7.7.3:
     resolution: {integrity: sha512-SdsKMrI9TdgjdweUSR9MweHA4EJ8YxHn8DFaDisvhVlUOe4BF1tLD7GAj0lIqWVl+dPb/rExr0Btby5loQm20Q==}
@@ -4740,6 +4752,10 @@ snapshots:
 
   prettier@3.7.4: {}
 
+  random-words@2.0.1:
+    dependencies:
+      seedrandom: 3.0.5
+
   randombytes@2.1.0:
     dependencies:
       safe-buffer: 5.2.1
@@ -4787,6 +4803,8 @@ snapshots:
       mri: 1.2.0
 
   safe-buffer@5.2.1: {}
+
+  seedrandom@3.0.5: {}
 
   semver@7.7.3: {}
 

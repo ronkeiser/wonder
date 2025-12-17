@@ -5,7 +5,8 @@
  * Useful for testing workflows without real LLM calls or external services.
  */
 
-import type { JSONSchema } from '../types';
+import { generate as generateRandomWords } from 'random-words';
+import type { JSONSchema } from '@wonder/schemas';
 
 /**
  * Options for mock data generation
@@ -25,6 +26,9 @@ export interface MockOptions {
 
   /** Simulate execution delay (useful for timeout/performance testing) */
   delay?: { min_ms: number; max_ms: number };
+
+  /** String generation mode: 'random' for alphanumeric, 'words' for human-readable English words */
+  stringMode?: 'random' | 'words';
 }
 
 /**
@@ -73,10 +77,11 @@ const ALPHA_NUMERIC = 'abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ01234
  */
 export function generateMockData(schema: JSONSchema, options: MockOptions = {}): unknown {
   const rng = new SeededRandom(options.seed ?? Date.now());
-  const defaults = {
+  const defaults: GeneratorDefaults = {
     stringLength: options.stringLength ?? { min: 5, max: 15 },
     arrayLength: options.arrayLength ?? { min: 1, max: 5 },
     maxDepth: options.maxDepth ?? 10,
+    stringMode: options.stringMode ?? 'random',
   };
 
   return generate(schema, rng, defaults, 0);
@@ -86,6 +91,7 @@ interface GeneratorDefaults {
   stringLength: { min: number; max: number };
   arrayLength: { min: number; max: number };
   maxDepth: number;
+  stringMode: 'random' | 'words';
 }
 
 function generate(
@@ -140,11 +146,7 @@ function generate(
   }
 }
 
-function generateString(
-  schema: JSONSchema,
-  rng: SeededRandom,
-  defaults: GeneratorDefaults,
-): string {
+function generateString(schema: JSONSchema, rng: SeededRandom, defaults: GeneratorDefaults): string {
   const minLen = schema.minLength ?? defaults.stringLength.min;
   const maxLen = schema.maxLength ?? defaults.stringLength.max;
   const length = rng.nextInt(minLen, maxLen);
@@ -164,6 +166,11 @@ function generateString(
     }
   }
 
+  // Use word-based generation if stringMode is 'words'
+  if (defaults.stringMode === 'words') {
+    return generateWordString(rng);
+  }
+
   return generateRandomString(rng, length);
 }
 
@@ -173,6 +180,14 @@ function generateRandomString(rng: SeededRandom, length: number): string {
     result += ALPHA_NUMERIC[rng.nextInt(0, ALPHA_NUMERIC.length - 1)];
   }
   return result;
+}
+
+function generateWordString(rng: SeededRandom): string {
+  // Generate 1-3 random English words joined by hyphens
+  const wordCount = rng.nextInt(1, 3);
+  const seed = String(rng.nextInt(0, 1000000));
+  const words = generateRandomWords({ exactly: wordCount, seed });
+  return Array.isArray(words) ? words.join('-') : words;
 }
 
 function generateUUID(rng: SeededRandom): string {
