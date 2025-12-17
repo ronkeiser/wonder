@@ -27,7 +27,7 @@ export async function executeMockAction(
   deps: ActionDeps,
 ): Promise<ActionOutput> {
   const { action, context } = input;
-  const { logger } = deps;
+  const { logger, emitter } = deps;
   const startTime = Date.now();
 
   const implementation = action.implementation as MockImplementation;
@@ -67,6 +67,19 @@ export async function executeMockAction(
     const mockData = generateMockData(implementation.schema, implementation.options);
 
     const duration = Date.now() - startTime;
+
+    // Emit trace event for mock data generation
+    emitter.emitTrace({
+      type: 'executor.mock.generated',
+      token_id: context.tokenId,
+      duration_ms: duration,
+      payload: {
+        step_ref: context.stepRef,
+        action_id: action.id,
+        schema_type: implementation.schema.type,
+        has_seed: implementation.options?.seed !== undefined,
+      },
+    });
 
     logger.info({
       event_type: 'mock_action_completed',

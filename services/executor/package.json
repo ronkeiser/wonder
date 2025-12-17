@@ -10,6 +10,7 @@
     "test": "vitest"
   },
   "dependencies": {
+    "@wonder/events": "workspace:*",
     "@wonder/logs": "workspace:*",
     "@wonder/resources": "workspace:*",
     "@wonder/schemas": "workspace:*",

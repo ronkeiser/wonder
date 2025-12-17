@@ -95,11 +95,24 @@ export async function dispatchToken(ctx: DispatchContext, tokenId: string): Prom
     node.resource_bindings as Record<string, string> | null,
   );
 
+  // Emit trace event for what we're sending to executor
+  ctx.emitter.emitTrace({
+    type: 'dispatch.task.sent',
+    token_id: tokenId,
+    node_id: node.id,
+    payload: {
+      task_id: node.task_id,
+      task_version: node.task_version ?? 1,
+      resources: resolvedResources,
+    },
+  });
+
   // Dispatch to Executor (fire-and-forget, Executor calls back)
   ctx.waitUntil(
     ctx.executor.executeTask({
       token_id: tokenId,
       workflow_run_id: token.workflow_run_id,
+      project_id: ctx.defs.getWorkflowRun().project_id,
       task_id: node.task_id,
       task_version: node.task_version ?? 1,
       input: taskInput,

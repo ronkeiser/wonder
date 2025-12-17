@@ -4,6 +4,7 @@
  * @see docs/architecture/executor.md
  */
 
+import type { Emitter } from '@wonder/events';
 import type { Logger } from '@wonder/logs';
 import type { Step } from '@wonder/resources/types';
 import { dispatchAction } from '../actions';
@@ -14,6 +15,7 @@ import { StepFailureError, TaskRetryError } from './types';
 
 export interface StepExecutorDeps {
   logger: Logger;
+  emitter: Emitter;
   env: Env;
   workflowRunId: string;
   tokenId: string;
@@ -27,7 +29,21 @@ export async function executeStep(
   context: TaskContext,
   deps: StepExecutorDeps,
 ): Promise<StepResult> {
-  const { logger, workflowRunId } = deps;
+  const { logger, emitter, workflowRunId, tokenId } = deps;
+  const stepStartTime = Date.now();
+
+  // Emit step started trace event
+  emitter.emitTrace({
+    type: 'executor.step.started',
+    token_id: tokenId,
+    payload: {
+      step_ref: step.ref,
+      step_ordinal: step.ordinal,
+      action_id: step.action_id,
+      action_version: step.action_version,
+      has_condition: !!step.condition,
+    },
+  });
 
   // 1. Evaluate condition (if present)
   if (step.condition) {
@@ -104,6 +120,20 @@ export async function executeStep(
     logger,
   );
 
+  // Emit step completed trace event
+  const stepDuration = Date.now() - stepStartTime;
+  emitter.emitTrace({
+    type: 'executor.step.completed',
+    token_id: tokenId,
+    duration_ms: stepDuration,
+    payload: {
+      step_ref: step.ref,
+      action_id: step.action_id,
+      success: true,
+      output_keys: Object.keys(actionResult.output),
+    },
+  });
+
   logger.info({
     event_type: 'step_output_mapped',
     trace_id: workflowRunId,
@@ -127,11 +157,25 @@ async function executeAction(
   input: Record<string, unknown>,
   deps: StepExecutorDeps,
 ): Promise<ActionResult> {
-  const { logger, env, workflowRunId, tokenId } = deps;
+  const { logger, emitter, env, workflowRunId, tokenId } = deps;
+  const actionStartTime = Date.now();
 
   // Load ActionDef from Resources
   using actionsResource = env.RESOURCES.actions();
   const { action } = await actionsResource.get(step.action_id, step.action_version);
+
+  // Emit action started trace event
+  emitter.emitTrace({
+    type: 'executor.action.started',
+    token_id: tokenId,
+    payload: {
+      step_ref: step.ref,
+      action_id: action.id,
+      action_kind: action.kind,
+      action_version: action.version,
+      input_keys: Object.keys(input),
+    },
+  });
 
   logger.info({
     event_type: 'action_execution_started',
@@ -145,7 +189,7 @@ async function executeAction(
     },
   });
 
-  // Dispatch to appropriate action handler
+  // Dispatch to appropriate action handler (pass emitter for mock action tracing)
   const result = await dispatchAction(
     {
       action,
@@ -156,10 +200,24 @@ async function executeAction(
         stepRef: step.ref,
       },
     },
-    { logger, env },
+    { logger, emitter, env },
   );
 
   if (!result.success) {
+    // Emit action failed trace event
+    emitter.emitTrace({
+      type: 'executor.action.failed',
+      token_id: tokenId,
+      payload: {
+        step_ref: step.ref,
+        action_id: action.id,
+        action_kind: action.kind,
+        error: result.error?.message,
+        error_code: result.error?.code,
+        retryable: result.error?.retryable,
+      },
+    });
+
     logger.warn({
       event_type: 'action_execution_failed',
       trace_id: workflowRunId,
@@ -170,6 +228,19 @@ async function executeAction(
       },
     });
   } else {
+    // Emit action completed trace event
+    emitter.emitTrace({
+      type: 'executor.action.completed',
+      token_id: tokenId,
+      duration_ms: result.metrics?.duration_ms,
+      payload: {
+        step_ref: step.ref,
+        action_id: action.id,
+        action_kind: action.kind,
+        output_keys: Object.keys(result.output),
+      },
+    });
+
     logger.info({
       event_type: 'action_execution_completed',
       trace_id: workflowRunId,
@@ -186,6 +257,7 @@ async function executeAction(
     success: result.success,
     output: result.output,
     error: result.error,
+    metrics: result.metrics,
   };
 }
 

@@ -107,6 +107,7 @@ export namespace TracePayloads {
   export interface TokenCreatedPayload {
     task_id: string;
     parent_token_id: string | null;
+    path_id: string;
     fan_out_transition_id: string | null;
     branch_index: number;
     branch_total: number;
@@ -161,6 +162,75 @@ export namespace TracePayloads {
 
   export interface CompletionComplete {
     final_output: Record<string, unknown>;
+  }
+
+  // Dispatch operations
+  export interface TaskSent {
+    task_id: string;
+    task_version: number;
+    resources: Record<string, string>;
+  }
+
+  // Executor operations
+  export interface ExecutorTaskStarted {
+    task_id: string;
+    task_version: number;
+    step_count: number;
+    input_keys: string[];
+  }
+
+  export interface ExecutorTaskCompleted {
+    task_id: string;
+    task_version: number;
+    steps_executed: number;
+    steps_skipped: number;
+    output: Record<string, unknown>;
+  }
+
+  export interface ExecutorStepStarted {
+    step_ref: string;
+    step_ordinal: number;
+    action_id: string;
+    action_version: number;
+    has_condition: boolean;
+  }
+
+  export interface ExecutorStepCompleted {
+    step_ref: string;
+    action_id: string;
+    success: boolean;
+    output_keys: string[];
+  }
+
+  export interface ExecutorActionStarted {
+    step_ref: string;
+    action_id: string;
+    action_kind: string;
+    action_version: number;
+    input_keys: string[];
+  }
+
+  export interface ExecutorActionCompleted {
+    step_ref: string;
+    action_id: string;
+    action_kind: string;
+    output_keys: string[];
+  }
+
+  export interface ExecutorActionFailed {
+    step_ref: string;
+    action_id: string;
+    action_kind: string;
+    error?: string;
+    error_code?: string;
+    retryable?: boolean;
+  }
+
+  export interface ExecutorMockGenerated {
+    step_ref: string;
+    action_id: string;
+    schema_type: string;
+    has_seed: boolean;
   }
 
   // Backwards compatibility aliases (deprecated)
@@ -594,11 +664,110 @@ export class TraceEventCollection {
           (e) => e.type === 'dispatch.task.input_mapping.applied' && e.token_id === tokenId,
         );
       },
+      /** Get all dispatch.task.sent events (task dispatched to executor) */
+      sends(): TypedTraceEvent<TracePayloads.TaskSent>[] {
+        return self.filter<TracePayloads.TaskSent>('dispatch.task.sent');
+      },
+      /** Get dispatch.task.sent event for a specific token */
+      send(tokenId: string): TypedTraceEvent<TracePayloads.TaskSent> | undefined {
+        return self.findWhere((e) => e.type === 'dispatch.task.sent' && e.token_id === tokenId) as
+          | TypedTraceEvent<TracePayloads.TaskSent>
+          | undefined;
+      },
       batchStarts(): TypedTraceEvent[] {
         return self.filter('dispatch.batch.start');
       },
       batchCompletes(): TypedTraceEvent[] {
         return self.filter('dispatch.batch.complete');
+      },
+    };
+  }
+
+  /**
+   * Executor operations (task/step/action execution in executor service)
+   */
+  get executor() {
+    const self = this;
+    return {
+      /** Get all executor.task.started events */
+      taskStarts(): TypedTraceEvent<TracePayloads.ExecutorTaskStarted>[] {
+        return self.filter<TracePayloads.ExecutorTaskStarted>('executor.task.started');
+      },
+      /** Get executor.task.started event for a specific token */
+      taskStart(tokenId: string): TypedTraceEvent<TracePayloads.ExecutorTaskStarted> | undefined {
+        return self.findWhere(
+          (e) => e.type === 'executor.task.started' && e.token_id === tokenId,
+        ) as TypedTraceEvent<TracePayloads.ExecutorTaskStarted> | undefined;
+      },
+      /** Get all executor.task.completed events */
+      taskCompletions(): TypedTraceEvent<TracePayloads.ExecutorTaskCompleted>[] {
+        return self.filter<TracePayloads.ExecutorTaskCompleted>('executor.task.completed');
+      },
+      /** Get executor.task.completed event for a specific token */
+      taskCompletion(
+        tokenId: string,
+      ): TypedTraceEvent<TracePayloads.ExecutorTaskCompleted> | undefined {
+        return self.findWhere(
+          (e) => e.type === 'executor.task.completed' && e.token_id === tokenId,
+        ) as TypedTraceEvent<TracePayloads.ExecutorTaskCompleted> | undefined;
+      },
+      /** Get all executor.step.started events */
+      stepStarts(): TypedTraceEvent<TracePayloads.ExecutorStepStarted>[] {
+        return self.filter<TracePayloads.ExecutorStepStarted>('executor.step.started');
+      },
+      /** Get executor.step.started events for a specific token */
+      stepStartsFor(tokenId: string): TypedTraceEvent<TracePayloads.ExecutorStepStarted>[] {
+        return self
+          .filter<TracePayloads.ExecutorStepStarted>('executor.step.started')
+          .filter((e) => e.token_id === tokenId);
+      },
+      /** Get all executor.step.completed events */
+      stepCompletions(): TypedTraceEvent<TracePayloads.ExecutorStepCompleted>[] {
+        return self.filter<TracePayloads.ExecutorStepCompleted>('executor.step.completed');
+      },
+      /** Get executor.step.completed events for a specific token */
+      stepCompletionsFor(tokenId: string): TypedTraceEvent<TracePayloads.ExecutorStepCompleted>[] {
+        return self
+          .filter<TracePayloads.ExecutorStepCompleted>('executor.step.completed')
+          .filter((e) => e.token_id === tokenId);
+      },
+      /** Get all executor.action.started events */
+      actionStarts(): TypedTraceEvent<TracePayloads.ExecutorActionStarted>[] {
+        return self.filter<TracePayloads.ExecutorActionStarted>('executor.action.started');
+      },
+      /** Get executor.action.started events for a specific token */
+      actionStartsFor(tokenId: string): TypedTraceEvent<TracePayloads.ExecutorActionStarted>[] {
+        return self
+          .filter<TracePayloads.ExecutorActionStarted>('executor.action.started')
+          .filter((e) => e.token_id === tokenId);
+      },
+      /** Get all executor.action.completed events */
+      actionCompletions(): TypedTraceEvent<TracePayloads.ExecutorActionCompleted>[] {
+        return self.filter<TracePayloads.ExecutorActionCompleted>('executor.action.completed');
+      },
+      /** Get executor.action.completed events for a specific token */
+      actionCompletionsFor(
+        tokenId: string,
+      ): TypedTraceEvent<TracePayloads.ExecutorActionCompleted>[] {
+        return self
+          .filter<TracePayloads.ExecutorActionCompleted>('executor.action.completed')
+          .filter((e) => e.token_id === tokenId);
+      },
+      /** Get all executor.action.failed events */
+      actionFailures(): TypedTraceEvent<TracePayloads.ExecutorActionFailed>[] {
+        return self.filter<TracePayloads.ExecutorActionFailed>('executor.action.failed');
+      },
+      /** Get all executor.mock.generated events */
+      mockGenerations(): TypedTraceEvent<TracePayloads.ExecutorMockGenerated>[] {
+        return self.filter<TracePayloads.ExecutorMockGenerated>('executor.mock.generated');
+      },
+      /** Get executor.mock.generated event for a specific token */
+      mockGeneration(
+        tokenId: string,
+      ): TypedTraceEvent<TracePayloads.ExecutorMockGenerated> | undefined {
+        return self.findWhere(
+          (e) => e.type === 'executor.mock.generated' && e.token_id === tokenId,
+        ) as TypedTraceEvent<TracePayloads.ExecutorMockGenerated> | undefined;
       },
     };
   }

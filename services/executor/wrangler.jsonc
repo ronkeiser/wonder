@@ -28,5 +28,6 @@
   "vars": {
     "SERVICE": "executor",
     "ENVIRONMENT": "development",
+    "TRACE_EVENTS_ENABLED": "true",
   },
 }

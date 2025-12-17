@@ -41,6 +41,7 @@ export type ExecutorBinding = {
   executeTask: (params: {
     token_id: string;
     workflow_run_id: string;
+    project_id: string;
     task_id: string;
     task_version: number;
     input: Record<string, unknown>;

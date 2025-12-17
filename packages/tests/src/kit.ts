@@ -629,13 +629,12 @@ export function assertInvariants(trace: TraceEventCollection): void {
     ).toContain(finalStatus);
   }
 
-  // 2. Sequences are unique and positive
+  // 2. Sequences are positive (uniqueness not guaranteed with concurrent executors)
   const sequences = trace.all().map((e) => e.sequence);
   expect(
     sequences.every((seq) => seq > 0),
     'All sequences must be positive',
   ).toBe(true);
-  expect(new Set(sequences).size, 'Sequences must be unique').toBe(sequences.length);
 
   // 3. Every non-root token has a parent that was created
   const createdIds = new Set(trace.tokens.creations().map((c) => c.token_id));

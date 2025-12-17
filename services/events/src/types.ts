@@ -111,7 +111,13 @@ export interface Emitter {
 /**
  * Trace event categories - extracted from type prefix for fast filtering
  */
-export type TraceEventCategory = 'decision' | 'operation' | 'dispatch' | 'sql' | 'debug';
+export type TraceEventCategory =
+  | 'decision'
+  | 'operation'
+  | 'dispatch'
+  | 'sql'
+  | 'debug'
+  | 'executor';
 
 /**
  * Generic trace event input
@@ -147,7 +153,8 @@ export function getEventCategory(type: string): TraceEventCategory {
     category === 'operation' ||
     category === 'dispatch' ||
     category === 'sql' ||
-    category === 'debug'
+    category === 'debug' ||
+    category === 'executor'
   ) {
     return category;
   }

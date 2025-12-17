@@ -6,6 +6,7 @@
  * @see docs/architecture/executor.md
  */
 
+import type { Emitter } from '@wonder/events';
 import type { Logger } from '@wonder/logs';
 import type { TaskDef } from '@wonder/resources/types';
 import type { TaskPayload, TaskResult } from '../index';
@@ -15,6 +16,7 @@ import { StepFailureError, TaskRetryError } from './types';
 
 export interface TaskRunnerDeps {
   logger: Logger;
+  emitter: Emitter;
   env: Env;
 }
 
@@ -26,7 +28,7 @@ export async function runTask(
   taskDef: TaskDef,
   deps: TaskRunnerDeps,
 ): Promise<TaskResult> {
-  const { logger } = deps;
+  const { logger, emitter } = deps;
   const startTime = Date.now();
 
   // Initialize metrics
@@ -66,6 +68,18 @@ export async function runTask(
       },
     });
 
+    // Emit trace event for task started
+    emitter.emitTrace({
+      type: 'executor.task.started',
+      token_id: payload.token_id,
+      payload: {
+        task_id: taskDef.id,
+        task_version: taskDef.version,
+        step_count: sortedSteps.length,
+        input_keys: Object.keys(payload.input),
+      },
+    });
+
     // Execute steps sequentially
     for (const step of sortedSteps) {
       logger.info({
@@ -82,6 +96,7 @@ export async function runTask(
 
       const stepResult = await executeStep(step, context, {
         logger,
+        emitter,
         env: deps.env,
         workflowRunId: payload.workflow_run_id,
         tokenId: payload.token_id,
@@ -115,6 +130,20 @@ export async function runTask(
     // TODO: Validate output against taskDef.output_schema
 
     metrics.duration_ms = Date.now() - startTime;
+
+    // Emit trace event for task completed
+    emitter.emitTrace({
+      type: 'executor.task.completed',
+      token_id: payload.token_id,
+      duration_ms: metrics.duration_ms,
+      payload: {
+        task_id: taskDef.id,
+        task_version: taskDef.version,
+        steps_executed: metrics.steps_executed,
+        steps_skipped: metrics.steps_skipped,
+        output: context.output,
+      },
+    });
 
     logger.info({
       event_type: 'task_runner_completed',

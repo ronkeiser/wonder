@@ -4,6 +4,7 @@
  * Common interfaces for all action handlers.
  */
 
+import type { Emitter } from '@wonder/events';
 import type { Logger } from '@wonder/logs';
 import type { Action } from '@wonder/resources/types';
 
@@ -58,6 +59,7 @@ export interface ActionOutput {
  */
 export interface ActionDeps {
   logger: Logger;
+  emitter: Emitter;
   env: Env;
 }
 

@@ -1,6 +1,6 @@
 ---
-name: coordinator
-description: Understand the coordinator service
+name: pain
+description: The painstaking approach
 agent: agent
 tools:
   [

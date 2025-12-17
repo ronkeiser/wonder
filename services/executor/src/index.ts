@@ -1,3 +1,4 @@
+import { createEmitter, type Emitter } from '@wonder/events';
 import { createLogger } from '@wonder/logs';
 import type { ModelProfile } from '@wonder/resources/types';
 import { WorkerEntrypoint } from 'cloudflare:workers';
@@ -16,6 +17,7 @@ import { runTask } from './execution/task-runner';
 export interface TaskPayload {
   token_id: string; // For result correlation
   workflow_run_id: string; // For sub-workflow context
+  project_id: string; // For trace event context
   task_id: string; // TaskDef to execute
   task_version: number;
   input: Record<string, unknown>; // Mapped from workflow context
@@ -89,6 +91,18 @@ export default class ExecutorService extends WorkerEntrypoint<Env> {
    * @see docs/architecture/executor.md
    */
   async executeTask(payload: TaskPayload): Promise<void> {
+    // Create emitter for this task execution
+    const emitter = createEmitter(
+      this.env.EVENTS,
+      {
+        workflow_run_id: payload.workflow_run_id,
+        project_id: payload.project_id,
+        workflow_def_id: '', // Not needed for trace filtering
+        parent_run_id: null,
+      },
+      { traceEnabled: this.env.TRACE_EVENTS_ENABLED },
+    );
+
     this.logger.info({
       event_type: 'task_execution_started',
       message: 'Task execution started',
@@ -115,6 +129,7 @@ export default class ExecutorService extends WorkerEntrypoint<Env> {
       // Execute the task using the task runner
       const result = await runTask(payload, task_def, {
         logger: this.logger,
+        emitter,
         env: this.env,
       });
 

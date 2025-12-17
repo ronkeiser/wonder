@@ -296,6 +296,9 @@ importers:
 
   services/executor:
     dependencies:
+      '@wonder/events':
+        specifier: workspace:*
+        version: link:../events
       '@wonder/logs':
         specifier: workspace:*
         version: link:../logs
