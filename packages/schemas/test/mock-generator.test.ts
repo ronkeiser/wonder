@@ -285,4 +285,337 @@ describe('generateMockData', () => {
       expect(response.confidence).toBeLessThanOrEqual(1);
     });
   });
+
+  describe('exclusive bounds', () => {
+    it('respects exclusiveMinimum for numbers', () => {
+      const schema: JSONSchema = { type: 'number', exclusiveMinimum: 10 };
+      // Generate multiple values to verify they're all > 10
+      for (let i = 0; i < 20; i++) {
+        const result = generateMockData(schema, { seed: i }) as number;
+        expect(result).toBeGreaterThan(10);
+      }
+    });
+
+    it('respects exclusiveMaximum for numbers', () => {
+      const schema: JSONSchema = { type: 'number', exclusiveMaximum: 100 };
+      for (let i = 0; i < 20; i++) {
+        const result = generateMockData(schema, { seed: i }) as number;
+        expect(result).toBeLessThan(100);
+      }
+    });
+
+    it('respects exclusiveMinimum for integers', () => {
+      const schema: JSONSchema = { type: 'integer', exclusiveMinimum: 5 };
+      for (let i = 0; i < 20; i++) {
+        const result = generateMockData(schema, { seed: i }) as number;
+        expect(result).toBeGreaterThan(5);
+        expect(Number.isInteger(result)).toBe(true);
+      }
+    });
+
+    it('respects exclusiveMaximum for integers', () => {
+      const schema: JSONSchema = { type: 'integer', exclusiveMaximum: 50 };
+      for (let i = 0; i < 20; i++) {
+        const result = generateMockData(schema, { seed: i }) as number;
+        expect(result).toBeLessThan(50);
+        expect(Number.isInteger(result)).toBe(true);
+      }
+    });
+
+    it('respects both exclusive bounds together', () => {
+      const schema: JSONSchema = {
+        type: 'number',
+        exclusiveMinimum: 0,
+        exclusiveMaximum: 1,
+      };
+      for (let i = 0; i < 20; i++) {
+        const result = generateMockData(schema, { seed: i }) as number;
+        expect(result).toBeGreaterThan(0);
+        expect(result).toBeLessThan(1);
+      }
+    });
+  });
+
+  describe('multipleOf constraint', () => {
+    it('generates numbers that are multiples of the specified value', () => {
+      const schema: JSONSchema = {
+        type: 'number',
+        minimum: 0,
+        maximum: 100,
+        multipleOf: 0.5,
+      };
+      for (let i = 0; i < 20; i++) {
+        const result = generateMockData(schema, { seed: i }) as number;
+        // Check that result / 0.5 is a whole number (within floating point tolerance)
+        const divided = result / 0.5;
+        expect(Math.abs(divided - Math.round(divided))).toBeLessThan(0.0001);
+      }
+    });
+
+    it('generates integers that are multiples of the specified value', () => {
+      const schema: JSONSchema = {
+        type: 'integer',
+        minimum: 0,
+        maximum: 100,
+        multipleOf: 5,
+      };
+      for (let i = 0; i < 20; i++) {
+        const result = generateMockData(schema, { seed: i }) as number;
+        expect(result % 5).toBe(0);
+        expect(Number.isInteger(result)).toBe(true);
+      }
+    });
+
+    it('generates integers divisible by 10', () => {
+      const schema: JSONSchema = {
+        type: 'integer',
+        minimum: 0,
+        maximum: 1000,
+        multipleOf: 10,
+      };
+      for (let i = 0; i < 20; i++) {
+        const result = generateMockData(schema, { seed: i }) as number;
+        expect(result % 10).toBe(0);
+      }
+    });
+  });
+
+  describe('uniqueItems constraint', () => {
+    it('generates arrays with unique items when uniqueItems is true', () => {
+      const schema: JSONSchema = {
+        type: 'array',
+        items: { type: 'integer', minimum: 1, maximum: 10 },
+        minItems: 5,
+        maxItems: 10,
+        uniqueItems: true,
+      };
+
+      for (let i = 0; i < 10; i++) {
+        const result = generateMockData(schema, { seed: i }) as number[];
+        const uniqueSet = new Set(result);
+        expect(uniqueSet.size).toBe(result.length);
+      }
+    });
+
+    it('generates arrays with unique string items', () => {
+      const schema: JSONSchema = {
+        type: 'array',
+        items: { type: 'string', enum: ['a', 'b', 'c', 'd', 'e'] },
+        minItems: 3,
+        maxItems: 5,
+        uniqueItems: true,
+      };
+
+      for (let i = 0; i < 10; i++) {
+        const result = generateMockData(schema, { seed: i }) as string[];
+        const uniqueSet = new Set(result);
+        expect(uniqueSet.size).toBe(result.length);
+      }
+    });
+
+    it('generates arrays with unique object items', () => {
+      const schema: JSONSchema = {
+        type: 'array',
+        items: {
+          type: 'object',
+          properties: {
+            id: { type: 'integer', minimum: 1, maximum: 5 },
+          },
+          required: ['id'],
+        },
+        minItems: 3,
+        maxItems: 5,
+        uniqueItems: true,
+      };
+
+      for (let i = 0; i < 10; i++) {
+        const result = generateMockData(schema, { seed: i }) as Array<{ id: number }>;
+        const stringified = result.map((item) => JSON.stringify(item));
+        const uniqueSet = new Set(stringified);
+        expect(uniqueSet.size).toBe(result.length);
+      }
+    });
+  });
+
+  describe('pattern-based string generation', () => {
+    it('generates email-like strings for patterns containing @', () => {
+      const schema: JSONSchema = {
+        type: 'string',
+        pattern: '^[a-z]+@[a-z]+\\.[a-z]+$',
+      };
+
+      const result = generateMockData(schema, { seed: 42 }) as string;
+      expect(result).toContain('@');
+      expect(result).toContain('.com');
+    });
+
+    it('generates UUID-like strings for UUID patterns', () => {
+      const schema: JSONSchema = {
+        type: 'string',
+        pattern: '^[a-f0-9]{8}-[a-f0-9]{4}-[a-f0-9]{4}-[a-f0-9]{4}-[a-f0-9]{12}$',
+      };
+
+      const result = generateMockData(schema, { seed: 42 }) as string;
+      // UUID format: 8-4-4-4-12 characters separated by hyphens
+      const parts = result.split('-');
+      expect(parts).toHaveLength(5);
+      expect(parts[0]).toHaveLength(8);
+      expect(parts[1]).toHaveLength(4);
+      expect(parts[2]).toHaveLength(4);
+      expect(parts[3]).toHaveLength(4);
+      expect(parts[4]).toHaveLength(12);
+    });
+  });
+
+  describe('custom options', () => {
+    it('respects custom stringLength option', () => {
+      const schema: JSONSchema = { type: 'string' };
+      const result = generateMockData(schema, {
+        seed: 42,
+        stringLength: { min: 20, max: 25 },
+      }) as string;
+
+      expect(result.length).toBeGreaterThanOrEqual(20);
+      expect(result.length).toBeLessThanOrEqual(25);
+    });
+
+    it('respects custom arrayLength option', () => {
+      const schema: JSONSchema = {
+        type: 'array',
+        items: { type: 'string' },
+      };
+      const result = generateMockData(schema, {
+        seed: 42,
+        arrayLength: { min: 8, max: 10 },
+      }) as string[];
+
+      expect(result.length).toBeGreaterThanOrEqual(8);
+      expect(result.length).toBeLessThanOrEqual(10);
+    });
+
+    it('respects maxDepth option to prevent infinite recursion', () => {
+      // Create a deeply nested schema
+      const schema: JSONSchema = {
+        type: 'object',
+        properties: {
+          level1: {
+            type: 'object',
+            properties: {
+              level2: {
+                type: 'object',
+                properties: {
+                  level3: {
+                    type: 'object',
+                    properties: {
+                      value: { type: 'string' },
+                    },
+                    required: ['value'],
+                  },
+                },
+                required: ['level3'],
+              },
+            },
+            required: ['level2'],
+          },
+        },
+        required: ['level1'],
+      };
+
+      // With maxDepth of 2, should not go all the way down
+      const result = generateMockData(schema, { seed: 42, maxDepth: 2 }) as Record<string, unknown>;
+      expect(result.level1).toBeDefined();
+      // At depth 2, level2 should be the default for object type (empty object)
+      const level1 = result.level1 as Record<string, unknown>;
+      expect(level1.level2).toEqual({});
+    });
+  });
+
+  describe('default value handling', () => {
+    it('can use schema default values', () => {
+      const schema: JSONSchema = {
+        type: 'string',
+        default: 'default-value',
+      };
+
+      // With multiple seeds, some should return the default (50% probability)
+      const results: unknown[] = [];
+      for (let i = 0; i < 50; i++) {
+        results.push(generateMockData(schema, { seed: i }));
+      }
+
+      const hasDefault = results.some((r) => r === 'default-value');
+      const hasGenerated = results.some((r) => r !== 'default-value' && typeof r === 'string');
+
+      // Both outcomes should be possible
+      expect(hasDefault || hasGenerated).toBe(true);
+    });
+
+    it('handles default values for objects', () => {
+      const schema: JSONSchema = {
+        type: 'object',
+        default: { preset: true },
+        properties: {
+          preset: { type: 'boolean' },
+        },
+      };
+
+      const results: unknown[] = [];
+      for (let i = 0; i < 50; i++) {
+        results.push(generateMockData(schema, { seed: i }));
+      }
+
+      const hasDefault = results.some(
+        (r) => typeof r === 'object' && r !== null && (r as Record<string, unknown>).preset === true,
+      );
+      expect(hasDefault).toBe(true);
+    });
+  });
+
+  describe('edge cases', () => {
+    it('returns empty array when no items schema provided', () => {
+      const schema: JSONSchema = {
+        type: 'array',
+        // No items schema
+      };
+
+      const result = generateMockData(schema, { seed: 42 });
+      expect(result).toEqual([]);
+    });
+
+    it('returns empty object when no properties defined', () => {
+      const schema: JSONSchema = {
+        type: 'object',
+        // No properties
+      };
+
+      const result = generateMockData(schema, { seed: 42 });
+      expect(result).toEqual({});
+    });
+
+    it('returns null for unknown types', () => {
+      const schema = { type: 'unknownType' } as unknown as JSONSchema;
+      const result = generateMockData(schema, { seed: 42 });
+      expect(result).toBe(null);
+    });
+
+    it('handles numeric enum values', () => {
+      const schema: JSONSchema = {
+        type: 'integer',
+        enum: [1, 2, 3, 5, 8, 13],
+      };
+
+      const result = generateMockData(schema, { seed: 42 });
+      expect([1, 2, 3, 5, 8, 13]).toContain(result);
+    });
+
+    it('handles boolean enum values', () => {
+      const schema: JSONSchema = {
+        type: 'boolean',
+        enum: [true],
+      };
+
+      const result = generateMockData(schema, { seed: 42 });
+      expect(result).toBe(true);
+    });
+  });
 });

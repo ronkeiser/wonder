@@ -487,4 +487,161 @@ describe('DDLGenerator', () => {
       expect(ddl).toMatch(/\);\n\nCREATE TABLE posts_tags/);
     });
   });
+
+  describe('Nested objects with JSON strategy', () => {
+    it('should store nested objects as TEXT column with json strategy', () => {
+      const schema: JSONSchema = {
+        type: 'object',
+        properties: {
+          id: { type: 'integer' },
+          metadata: {
+            type: 'object',
+            properties: {
+              timestamp: { type: 'integer' },
+              source: { type: 'string' },
+            },
+          },
+        },
+      };
+
+      const generator = new DDLGenerator(schema, new CustomTypeRegistry(), {
+        nestedObjectStrategy: 'json',
+      });
+      const ddl = generator.generateDDL('events');
+
+      expect(ddl).toContain('metadata TEXT');
+      expect(ddl).not.toContain('metadata_timestamp');
+      expect(ddl).not.toContain('metadata_source');
+    });
+
+    it('should not flatten deeply nested objects with json strategy', () => {
+      const schema: JSONSchema = {
+        type: 'object',
+        properties: {
+          config: {
+            type: 'object',
+            properties: {
+              database: {
+                type: 'object',
+                properties: {
+                  host: { type: 'string' },
+                  port: { type: 'integer' },
+                },
+              },
+            },
+          },
+        },
+      };
+
+      const generator = new DDLGenerator(schema, new CustomTypeRegistry(), {
+        nestedObjectStrategy: 'json',
+      });
+      const ddl = generator.generateDDL('apps');
+
+      expect(ddl).toContain('config TEXT');
+      expect(ddl).not.toContain('config_database');
+      expect(ddl).not.toContain('host');
+      expect(ddl).not.toContain('port');
+    });
+
+    it('should handle mixed scalars and nested objects with json strategy', () => {
+      const schema: JSONSchema = {
+        type: 'object',
+        properties: {
+          name: { type: 'string' },
+          settings: {
+            type: 'object',
+            properties: {
+              theme: { type: 'string' },
+            },
+          },
+          active: { type: 'boolean' },
+        },
+      };
+
+      const generator = new DDLGenerator(schema, new CustomTypeRegistry(), {
+        nestedObjectStrategy: 'json',
+      });
+      const ddl = generator.generateDDL('users');
+
+      expect(ddl).toContain('name TEXT');
+      expect(ddl).toContain('settings TEXT');
+      expect(ddl).toContain('active INTEGER');
+      expect(ddl).not.toContain('settings_theme');
+    });
+
+    it('should not add constraints to JSON columns', () => {
+      const schema: JSONSchema = {
+        type: 'object',
+        properties: {
+          data: {
+            type: 'object',
+            properties: {
+              value: { type: 'string', minLength: 1, maxLength: 100 },
+            },
+          },
+        },
+      };
+
+      const generator = new DDLGenerator(schema, new CustomTypeRegistry(), {
+        nestedObjectStrategy: 'json',
+      });
+      const ddl = generator.generateDDL('items');
+
+      expect(ddl).toContain('data TEXT');
+      // Should not have CHECK constraints for JSON column
+      expect(ddl).not.toContain('CHECK');
+    });
+  });
+
+  describe('Type mapping edge cases', () => {
+    it('should map null type to TEXT', () => {
+      const schema: JSONSchema = {
+        type: 'object',
+        properties: {
+          nullableField: { type: 'null' },
+        },
+      };
+
+      const generator = new DDLGenerator(schema, new CustomTypeRegistry());
+      const ddl = generator.generateDDL('test');
+
+      expect(ddl).toContain('nullableField TEXT');
+    });
+
+    it('should map object type to TEXT when not using flatten strategy', () => {
+      const schema: JSONSchema = {
+        type: 'object',
+        properties: {
+          data: { type: 'object' },
+        },
+      };
+
+      const generator = new DDLGenerator(schema, new CustomTypeRegistry(), {
+        nestedObjectStrategy: 'json',
+      });
+      const ddl = generator.generateDDL('test');
+
+      expect(ddl).toContain('data TEXT');
+    });
+
+    it('should map array type to TEXT when using json strategy', () => {
+      const schema: JSONSchema = {
+        type: 'object',
+        properties: {
+          items: {
+            type: 'array',
+            items: { type: 'string' },
+          },
+        },
+      };
+
+      const generator = new DDLGenerator(schema, new CustomTypeRegistry(), {
+        arrayStrategy: 'json',
+      });
+      const ddl = generator.generateDDL('test');
+
+      expect(ddl).toContain('items TEXT');
+    });
+  });
 });

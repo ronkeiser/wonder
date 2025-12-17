@@ -555,4 +555,292 @@ describe('DMLGenerator', () => {
       expect(result.values[0]).toEqual([JSON.stringify({ key: 'value' })]);
     });
   });
+
+  describe('generateParameterizedInsert', () => {
+    it('should generate parameterized INSERT with scalar columns', () => {
+      const schema: JSONSchema = {
+        type: 'object',
+        properties: {
+          name: { type: 'string' },
+          age: { type: 'integer' },
+          active: { type: 'boolean' },
+        },
+      };
+
+      const generator = new DMLGenerator(schema, new CustomTypeRegistry());
+      const result = generator.generateParameterizedInsert('users');
+
+      expect(result).toBe('INSERT INTO users (name, age, active) VALUES (?, ?, ?)');
+    });
+
+    it('should flatten nested objects in parameterized INSERT', () => {
+      const schema: JSONSchema = {
+        type: 'object',
+        properties: {
+          metadata: {
+            type: 'object',
+            properties: {
+              timestamp: { type: 'integer' },
+              source: { type: 'string' },
+            },
+          },
+        },
+      };
+
+      const generator = new DMLGenerator(schema, new CustomTypeRegistry());
+      const result = generator.generateParameterizedInsert('events');
+
+      expect(result).toBe(
+        'INSERT INTO events (metadata_timestamp, metadata_source) VALUES (?, ?)',
+      );
+    });
+
+    it('should skip array fields with table strategy', () => {
+      const schema: JSONSchema = {
+        type: 'object',
+        properties: {
+          name: { type: 'string' },
+          tags: {
+            type: 'array',
+            items: { type: 'string' },
+          },
+        },
+      };
+
+      const generator = new DMLGenerator(schema, new CustomTypeRegistry());
+      const result = generator.generateParameterizedInsert('posts');
+
+      expect(result).toBe('INSERT INTO posts (name) VALUES (?)');
+      expect(result).not.toContain('tags');
+    });
+
+    it('should include array as column with json strategy', () => {
+      const schema: JSONSchema = {
+        type: 'object',
+        properties: {
+          name: { type: 'string' },
+          tags: {
+            type: 'array',
+            items: { type: 'string' },
+          },
+        },
+      };
+
+      const generator = new DMLGenerator(schema, new CustomTypeRegistry(), {
+        arrayStrategy: 'json',
+      });
+      const result = generator.generateParameterizedInsert('posts');
+
+      expect(result).toBe('INSERT INTO posts (name, tags) VALUES (?, ?)');
+    });
+
+    it('should throw error for non-object schema', () => {
+      const schema: JSONSchema = {
+        type: 'string',
+      };
+
+      const generator = new DMLGenerator(schema, new CustomTypeRegistry());
+
+      expect(() => generator.generateParameterizedInsert('test')).toThrow(
+        'DML generation requires an object schema at root',
+      );
+    });
+
+    it('should throw error when no columns found', () => {
+      const schema: JSONSchema = {
+        type: 'object',
+        properties: {},
+      };
+
+      const generator = new DMLGenerator(schema, new CustomTypeRegistry());
+
+      expect(() => generator.generateParameterizedInsert('empty')).toThrow('No columns found');
+    });
+
+    it('should handle deeply nested objects', () => {
+      const schema: JSONSchema = {
+        type: 'object',
+        properties: {
+          user: {
+            type: 'object',
+            properties: {
+              profile: {
+                type: 'object',
+                properties: {
+                  name: { type: 'string' },
+                },
+              },
+            },
+          },
+        },
+      };
+
+      const generator = new DMLGenerator(schema, new CustomTypeRegistry());
+      const result = generator.generateParameterizedInsert('data');
+
+      expect(result).toBe('INSERT INTO data (user_profile_name) VALUES (?)');
+    });
+
+    it('should use JSON strategy for nested objects when configured', () => {
+      const schema: JSONSchema = {
+        type: 'object',
+        properties: {
+          id: { type: 'integer' },
+          config: {
+            type: 'object',
+            properties: {
+              setting: { type: 'string' },
+            },
+          },
+        },
+      };
+
+      const generator = new DMLGenerator(schema, new CustomTypeRegistry(), {
+        nestedObjectStrategy: 'json',
+      });
+      const result = generator.generateParameterizedInsert('settings');
+
+      expect(result).toBe('INSERT INTO settings (id, config) VALUES (?, ?)');
+    });
+  });
+
+  describe('UPDATE error handling', () => {
+    it('should throw error for non-object schema in UPDATE', () => {
+      const schema: JSONSchema = {
+        type: 'string',
+      };
+
+      const generator = new DMLGenerator(schema, new CustomTypeRegistry());
+
+      expect(() => generator.generateUpdate('test', { value: 'test' }, 'id = 1')).toThrow(
+        'DML generation requires an object schema at root',
+      );
+    });
+
+    it('should return empty statements when no columns to update', () => {
+      const schema: JSONSchema = {
+        type: 'object',
+        properties: {
+          tags: {
+            type: 'array',
+            items: { type: 'string' },
+          },
+        },
+      };
+
+      // With json strategy so arrays become columns, but we provide empty data
+      const generator = new DMLGenerator(schema, new CustomTypeRegistry(), {
+        arrayStrategy: 'json',
+      });
+      const result = generator.generateUpdate('posts', {}, 'id = 1');
+
+      // No scalar columns to update means no UPDATE statement generated
+      expect(result.statements.filter((s) => s.startsWith('UPDATE'))).toHaveLength(0);
+    });
+  });
+
+  describe('INSERT generation - nested objects (json strategy)', () => {
+    it('should store deeply nested object as JSON', () => {
+      const schema: JSONSchema = {
+        type: 'object',
+        properties: {
+          id: { type: 'integer' },
+          config: {
+            type: 'object',
+            properties: {
+              database: {
+                type: 'object',
+                properties: {
+                  host: { type: 'string' },
+                  port: { type: 'integer' },
+                },
+              },
+            },
+          },
+        },
+      };
+
+      const generator = new DMLGenerator(schema, new CustomTypeRegistry(), {
+        nestedObjectStrategy: 'json',
+      });
+      const result = generator.generateInsert('apps', {
+        id: 1,
+        config: {
+          database: {
+            host: 'localhost',
+            port: 5432,
+          },
+        },
+      });
+
+      expect(result.statements[0]).toBe('INSERT INTO apps (id, config) VALUES (?, ?);');
+      expect(result.values[0]).toEqual([
+        1,
+        JSON.stringify({ database: { host: 'localhost', port: 5432 } }),
+      ]);
+    });
+
+    it('should handle mixed nested objects and scalars with JSON strategy', () => {
+      const schema: JSONSchema = {
+        type: 'object',
+        properties: {
+          name: { type: 'string' },
+          metadata: {
+            type: 'object',
+            properties: {
+              created: { type: 'integer' },
+            },
+          },
+          active: { type: 'boolean' },
+        },
+      };
+
+      const generator = new DMLGenerator(schema, new CustomTypeRegistry(), {
+        nestedObjectStrategy: 'json',
+      });
+      const result = generator.generateInsert('items', {
+        name: 'test',
+        metadata: { created: 1234567890 },
+        active: true,
+      });
+
+      expect(result.statements[0]).toBe('INSERT INTO items (name, metadata, active) VALUES (?, ?, ?);');
+      expect(result.values[0]).toEqual([
+        'test',
+        JSON.stringify({ created: 1234567890 }),
+        1,
+      ]);
+    });
+  });
+
+  describe('UPDATE generation - nested objects (json strategy)', () => {
+    it('should serialize nested objects as JSON in UPDATE', () => {
+      const schema: JSONSchema = {
+        type: 'object',
+        properties: {
+          settings: {
+            type: 'object',
+            properties: {
+              theme: { type: 'string' },
+              notifications: { type: 'boolean' },
+            },
+          },
+        },
+      };
+
+      const generator = new DMLGenerator(schema, new CustomTypeRegistry(), {
+        nestedObjectStrategy: 'json',
+      });
+      const result = generator.generateUpdate(
+        'users',
+        { settings: { theme: 'dark', notifications: true } },
+        'id = 1',
+      );
+
+      expect(result.statements[0]).toBe('UPDATE users SET settings = ? WHERE id = 1;');
+      expect(result.values[0]).toEqual([
+        JSON.stringify({ theme: 'dark', notifications: true }),
+      ]);
+    });
+  });
 });
