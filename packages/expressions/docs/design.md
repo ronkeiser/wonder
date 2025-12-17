@@ -107,13 +107,17 @@ null
 { ...user, role: 'admin' }
 ```
 
-### Arithmetic
+### Arithmetic & String Concatenation
 
 ```javascript
 a + b;
 count * 2;
 total / items.length;
 (remainder % 10) - value;
+
+// String concatenation uses +
+firstName + ' ' + lastName;  // => 'John Doe'
+'Hello, ' + user.name;       // => 'Hello, Alice'
 ```
 
 ### Comparison
@@ -180,6 +184,14 @@ keys(object);
 | `find(array, expr)`         | Find first match                 | `find(items, 'item.id === 5')`      |
 | `every(array, expr)`        | All match predicate              | `every(items, 'item.valid')`        |
 | `some(array, expr)`         | Any match predicate              | `some(items, 'item.error')`         |
+
+**Iterator variable:** In `map`, `filter`, `find`, `every`, and `some`, the predicate expression receives `item` as the current element and `index` as its position:
+
+```javascript
+map(users, 'item.name')                    // => ['Alice', 'Bob']
+filter(users, 'item.age >= 18')            // => [{ name: 'Alice', age: 30 }]
+map(items, '{ value: item, pos: index }')  // => [{ value: 'a', pos: 0 }, ...]
+```
 
 ### Object Functions
 
