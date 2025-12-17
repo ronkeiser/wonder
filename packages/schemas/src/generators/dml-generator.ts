@@ -1,7 +1,7 @@
 // DML (Data Manipulation Language) Generator - INSERT/UPDATE/DELETE statements
 
-import type { CustomTypeRegistry } from '../custom-types.js';
-import type { JSONSchema } from '../types.js';
+import type { CustomTypeRegistry } from '../custom-types';
+import type { JSONSchema } from '../types';
 
 export type DMLGeneratorOptions = {
   // Strategy for nested objects: 'flatten' or 'json'

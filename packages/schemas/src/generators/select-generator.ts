@@ -7,8 +7,8 @@
  * - Converting SQLite types back to JS types (0/1 → boolean)
  */
 
-import type { SqlExecutor } from '../schema.js';
-import type { JSONSchema } from '../types.js';
+import type { SqlExecutor } from '../schema';
+import type { JSONSchema } from '../types';
 
 export type SelectGeneratorOptions = {
   /** Strategy used for nested objects in DDL (must match) */

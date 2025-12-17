@@ -9,7 +9,7 @@
  * - payload: Event-specific data (varies by event type)
  */
 
-import type { components } from './generated/schema.js';
+import type { components } from './generated/schema';
 
 export type TraceEventEntry = components['schemas']['TraceEventEntry'];
 

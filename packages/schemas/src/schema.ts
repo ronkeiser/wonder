@@ -8,16 +8,16 @@
  * - Table binding for execution
  */
 
-import { CustomTypeRegistry } from './custom-types.js';
-import { DDLGenerator, type DDLGeneratorOptions } from './generators/ddl-generator.js';
+import { CustomTypeRegistry } from './custom-types';
+import { DDLGenerator, type DDLGeneratorOptions } from './generators/ddl-generator';
 import {
   DMLGenerator,
   type DMLGeneratorOptions,
   type InsertResult,
-} from './generators/dml-generator.js';
-import { SelectGenerator, type SelectGeneratorOptions } from './generators/select-generator.js';
-import type { JSONSchema, ValidationResult, ValidatorOptions } from './types.js';
-import { Validator } from './validation/validator.js';
+} from './generators/dml-generator';
+import { SelectGenerator, type SelectGeneratorOptions } from './generators/select-generator';
+import type { JSONSchema, ValidationResult, ValidatorOptions } from './types';
+import { Validator } from './validation/validator';
 
 export type SchemaOptions = DDLGeneratorOptions &
   DMLGeneratorOptions &

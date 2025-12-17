@@ -3,7 +3,7 @@
  */
 
 import type { Client } from 'openapi-fetch';
-import type { components, paths } from './generated/schema.js';
+import type { components, paths } from './generated/schema';
 
 const WS_MESSAGE_TYPE = {
   SUBSCRIBE: 'subscribe',

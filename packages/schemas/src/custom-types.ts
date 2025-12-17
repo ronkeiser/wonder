@@ -1,4 +1,4 @@
-import type { CustomTypeDefinition } from './types.js';
+import type { CustomTypeDefinition } from './types';
 
 export class CustomTypeRegistry {
   private types = new Map<string, CustomTypeDefinition>();

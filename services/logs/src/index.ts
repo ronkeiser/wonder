@@ -5,9 +5,9 @@ import { ulid } from 'ulid';
 import { logs } from './schema';
 import type { GetLogsOptions, LogContext, LogLevel, Logger, LoggerInput } from './types';
 
-export { createLogger } from './client.js';
+export { createLogger } from './client';
 export { Streamer } from './streamer';
-export type { GetLogsOptions, LogContext, LogLevel, Logger, LoggerInput } from './types.js';
+export type { GetLogsOptions, LogContext, LogLevel, Logger, LoggerInput } from './types';
 
 /**
  * Helper to normalize logger input

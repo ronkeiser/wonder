@@ -5,7 +5,7 @@
  * Data frames contain special @ variables like @index, @first, @last, @key, @root.
  */
 
-import { createFrame, lookupProperty } from '../runtime/utils.js';
+import { createFrame, lookupProperty } from '../runtime/utils';
 
 /**
  * Metadata stored in a data frame for loop iteration.

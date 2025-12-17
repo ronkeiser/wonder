@@ -16,13 +16,13 @@ import type {
   TraceEventContext,
   TraceEventEntry,
   TraceEventInput,
-} from './types.js';
-import { getEventCategory } from './types.js';
+} from './types';
+import { getEventCategory } from './types';
 
 // Re-export client and types for consumer convenience
-export { createEmitter } from './client.js';
-export { Streamer } from './streamer.js';
-export type { Emitter, TraceEventInput } from './types.js';
+export { createEmitter } from './client';
+export { Streamer } from './streamer';
+export type { Emitter, TraceEventInput } from './types';
 
 const STREAMER_NAME = 'events-streamer';
 

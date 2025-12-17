@@ -1,17 +1,17 @@
 // @wonder/schemas - Runtime JSON Schema validation and SQL generation for DOs
 
 // Validation
-export * from './validation/constraints.js';
-export * from './validation/validator.js';
+export * from './validation/constraints';
+export * from './validation/validator';
 
 // Generators
-export * from './generators/ddl-generator.js';
-export * from './generators/dml-generator.js';
-export * from './generators/mock-generator.js';
-export * from './generators/select-generator.js';
+export * from './generators/ddl-generator';
+export * from './generators/dml-generator';
+export * from './generators/mock-generator';
+export * from './generators/select-generator';
 
 // Core
-export * from './custom-types.js';
-export * from './schema.js';
-export * from './types.js';
-export * from './utils.js';
+export * from './custom-types';
+export * from './schema';
+export * from './types';
+export * from './utils';

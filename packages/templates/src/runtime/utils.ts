@@ -8,7 +8,7 @@
  * Reference: Handlebars lib/handlebars/runtime.js and lib/handlebars/utils.js
  */
 
-import { SafeString } from './safe-string.js';
+import { SafeString } from './safe-string';
 
 // Re-export SafeString for backwards compatibility (tests import it from utils)
 export { SafeString };

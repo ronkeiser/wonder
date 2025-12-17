@@ -5,10 +5,10 @@
  * using secure lookupProperty access.
  */
 
-import type { PathExpression } from '../parser/ast-nodes.js';
-import { lookupProperty } from '../runtime/utils.js';
-import type { ContextStack } from './context-stack.js';
-import type { DataStack } from './data-stack.js';
+import type { PathExpression } from '../parser/ast-nodes';
+import { lookupProperty } from '../runtime/utils';
+import type { ContextStack } from './context-stack';
+import type { DataStack } from './data-stack';
 
 /**
  * Resolve a path by walking through parts sequentially.

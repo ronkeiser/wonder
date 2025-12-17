@@ -1,9 +1,9 @@
 // Core validator implementation
 
-import type { CustomTypeRegistry } from '../custom-types.js';
-import type { JSONSchema, ValidationError, ValidationResult, ValidatorOptions } from '../types.js';
-import { ValidationErrorCode } from '../types.js';
-import { getType } from '../utils.js';
+import type { CustomTypeRegistry } from '../custom-types';
+import type { JSONSchema, ValidationError, ValidationResult, ValidatorOptions } from '../types';
+import { ValidationErrorCode } from '../types';
+import { getType } from '../utils';
 import {
   validateArray,
   validateBoolean,
@@ -12,7 +12,7 @@ import {
   validateNumber,
   validateObject,
   validateString,
-} from './constraints.js';
+} from './constraints';
 
 export class Validator {
   private options: Required<ValidatorOptions>;

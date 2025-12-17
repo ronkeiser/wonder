@@ -5,9 +5,9 @@
  * These helpers are available by default and can be overridden by user-provided helpers.
  */
 
-import { lookupProperty } from '../runtime/utils.js';
-import * as comparison from './comparison.js';
-import * as logical from './logical.js';
+import { lookupProperty } from '../runtime/utils';
+import * as comparison from './comparison';
+import * as logical from './logical';
 
 /**
  * Type definition for helper functions.

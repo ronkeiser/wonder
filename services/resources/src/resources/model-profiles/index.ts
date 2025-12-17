@@ -3,7 +3,7 @@
 import { ConflictError, NotFoundError, extractDbError } from '~/errors';
 import { Resource } from '../base';
 import * as repo from './repository';
-import type { ModelId, ModelProfile } from './types.js';
+import type { ModelId, ModelProfile } from './types';
 
 type ModelProvider = 'anthropic' | 'openai' | 'google' | 'cloudflare' | 'local';
 

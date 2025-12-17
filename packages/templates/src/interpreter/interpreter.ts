@@ -5,8 +5,8 @@
  * Implements Handlebars-compatible template evaluation without code generation.
  */
 
-import type { HelperRegistry } from '../helpers/index.js';
-import { builtInHelpers } from '../helpers/index.js';
+import type { HelperRegistry } from '../helpers/index';
+import { builtInHelpers } from '../helpers/index';
 import type {
   BlockStatement,
   BooleanLiteral,
@@ -23,13 +23,13 @@ import type {
   StringLiteral,
   SubExpression,
   UndefinedLiteral,
-} from '../parser/ast-nodes.js';
-import { SafeString } from '../runtime/safe-string.js';
-import { escapeExpression, isEmpty, lookupProperty } from '../runtime/utils.js';
-import { ContextStack } from './context-stack.js';
-import { createDataFrame } from './data-frame.js';
-import { DataStack } from './data-stack.js';
-import { resolvePathExpression } from './path-resolver.js';
+} from '../parser/ast-nodes';
+import { SafeString } from '../runtime/safe-string';
+import { escapeExpression, isEmpty, lookupProperty } from '../runtime/utils';
+import { ContextStack } from './context-stack';
+import { createDataFrame } from './data-frame';
+import { DataStack } from './data-stack';
+import { resolvePathExpression } from './path-resolver';
 
 /**
  * Options for configuring the interpreter.

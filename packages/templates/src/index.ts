@@ -5,10 +5,10 @@
  * Provides synchronous template compilation and rendering without eval() or new Function().
  */
 
-import type { HelperRegistry } from './helpers/index.js';
-import { Interpreter } from './interpreter/interpreter.js';
-import { Lexer } from './lexer/lexer.js';
-import { Parser } from './parser/parser.js';
+import type { HelperRegistry } from './helpers/index';
+import { Interpreter } from './interpreter/interpreter';
+import { Lexer } from './lexer/lexer';
+import { Parser } from './parser/parser';
 
 /**
  * Options for template rendering.
@@ -128,8 +128,8 @@ export function render(template: string, context: any, options?: RenderOptions):
 }
 
 // Re-export types for convenience
-export type { Helper, HelperRegistry } from './helpers/index.js';
-export type { Program } from './parser/ast-nodes.js';
+export type { Helper, HelperRegistry } from './helpers/index';
+export type { Program } from './parser/ast-nodes';
 
 // Re-export SafeString for user code
-export { SafeString } from './runtime/safe-string.js';
+export { SafeString } from './runtime/safe-string';

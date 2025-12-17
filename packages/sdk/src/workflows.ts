@@ -3,9 +3,9 @@
  */
 
 import type { Client } from 'openapi-fetch';
-import type { EventsClient, SubscriptionFilter } from './events.js';
-import type { components, paths } from './generated/schema.js';
-import { TraceEventCollection } from './trace.js';
+import type { EventsClient, SubscriptionFilter } from './events';
+import type { components, paths } from './generated/schema';
+import { TraceEventCollection } from './trace';
 
 const DEFAULT_TIMEOUT_MS = 300000; // 5 minutes
 const DEFAULT_IDLE_TIMEOUT_MS = 30000; // 30 seconds
@@ -53,7 +53,7 @@ interface Subscription {
  * Create workflows client that extends generated workflows with streaming capabilities
  */
 export function createWorkflowsClient(
-  generatedWorkflows: ReturnType<typeof import('./generated/client.js').createClient>['workflows'],
+  generatedWorkflows: ReturnType<typeof import('./generated/client').createClient>['workflows'],
   baseUrl: string,
   sdk: Client<paths>,
   eventsClient: EventsClient,

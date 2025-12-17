@@ -5,7 +5,7 @@
  * Uses isEmpty() from runtime utils to match Handlebars behavior.
  */
 
-import { isEmpty } from '../runtime/utils.js';
+import { isEmpty } from '../runtime/utils';
 
 /**
  * Logical AND - Returns true if all arguments are truthy.
