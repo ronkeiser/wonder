@@ -374,6 +374,7 @@ describe('Foundation: 04 - Nested State Structure', () => {
       to_node_ref: 'phase1',
       priority: 1,
       spawn_count: 3,
+      sibling_group: 'phase1_group',
     });
 
     // Fan-in #1: phase1 → bridge (merge to nested path)
@@ -384,7 +385,7 @@ describe('Foundation: 04 - Nested State Structure', () => {
       priority: 1,
       synchronization: {
         strategy: 'all',
-        sibling_group: 'fanout_1',
+        sibling_group: 'phase1_group',
         merge: {
           source: '_branch.output.value',
           target: 'state.phase1.results', // Nested merge target
@@ -400,6 +401,7 @@ describe('Foundation: 04 - Nested State Structure', () => {
       to_node_ref: 'phase2',
       priority: 1,
       spawn_count: 3,
+      sibling_group: 'phase2_group',
     });
 
     // Fan-in #2: phase2 → summarize (collect accumulated arrays, preserve structure)
@@ -410,7 +412,7 @@ describe('Foundation: 04 - Nested State Structure', () => {
       priority: 1,
       synchronization: {
         strategy: 'all',
-        sibling_group: 'fanout_2',
+        sibling_group: 'phase2_group',
         merge: {
           source: '_branch.output.accumulated', // Each branch's accumulated array
           target: 'state.phase2.accumulated', // Collect as array of arrays (no flattening)

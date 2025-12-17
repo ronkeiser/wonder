@@ -275,6 +275,7 @@ describe('Foundation: 03 - Sequential Fan-out/Fan-in', () => {
       to_node_ref: 'phase1',
       priority: 1,
       spawn_count: 3,
+      sibling_group: 'phase1_group',
     });
 
     // Fan-in #1: phase1 → bridge (synchronize all phase1 branches)
@@ -285,7 +286,7 @@ describe('Foundation: 03 - Sequential Fan-out/Fan-in', () => {
       priority: 1,
       synchronization: {
         strategy: 'all',
-        sibling_group: 'fanout_1',
+        sibling_group: 'phase1_group',
         merge: {
           source: '_branch.output.value',
           target: 'state.phase1_results',
@@ -301,6 +302,7 @@ describe('Foundation: 03 - Sequential Fan-out/Fan-in', () => {
       to_node_ref: 'phase2',
       priority: 1,
       spawn_count: 3,
+      sibling_group: 'phase2_group',
     });
 
     // Fan-in #2: phase2 → summarize (synchronize all phase2 branches)
@@ -311,7 +313,7 @@ describe('Foundation: 03 - Sequential Fan-out/Fan-in', () => {
       priority: 1,
       synchronization: {
         strategy: 'all',
-        sibling_group: 'fanout_2',
+        sibling_group: 'phase2_group',
         merge: {
           source: '_branch.output.transformed',
           target: 'state.phase2_results',

@@ -25,11 +25,11 @@ export type TransitionInput = {
   priority: number;
   condition?: object;
   spawn_count?: number;
-  sibling_group?: string; // Named sibling group identifier (for explicit fan-out)
+  sibling_group?: string; // Named sibling group identifier for fan-out coordination
   foreach?: object;
   synchronization?: {
     strategy: string;
-    sibling_group: string; // References either a named group or transition ref
+    sibling_group: string; // Must reference a declared sibling_group
     merge?: object;
   };
   loop_config?: object;
@@ -174,11 +174,11 @@ function validateOwnership(projectId?: string, libraryId?: string): void {
 
 /**
  * Validates sibling_group usage across transitions.
- * Two patterns are supported:
- * 1. spawn_count pattern: sibling_group in synchronization must reference a transition
- * 2. explicit fan-out: sibling_group is a named string declared on transitions
+ *
+ * synchronization.sibling_group must reference a sibling_group declared on one or more transitions.
+ * This is the only way to create sibling relationships for fan-in coordination.
  */
-function validateSiblingGroups(transitions: TransitionInput[], transitionRefs: Set<string>): void {
+function validateSiblingGroups(transitions: TransitionInput[], _transitionRefs: Set<string>): void {
   // Collect all declared sibling groups (from transition.sibling_group)
   const declaredGroups = new Set<string>();
   for (const transition of transitions) {
@@ -192,13 +192,9 @@ function validateSiblingGroups(transitions: TransitionInput[], transitionRefs: S
     if (transition.synchronization?.sibling_group) {
       const siblingGroupRef = transition.synchronization.sibling_group;
 
-      // Must be either a declared sibling group OR a valid transition ref
-      const isTransitionRef = transitionRefs.has(siblingGroupRef);
-      const isDeclaredGroup = declaredGroups.has(siblingGroupRef);
-
-      if (!isTransitionRef && !isDeclaredGroup) {
+      if (!declaredGroups.has(siblingGroupRef)) {
         throw new ValidationError(
-          `Invalid synchronization.sibling_group: '${siblingGroupRef}' is neither a declared sibling group nor a valid transition reference`,
+          `Invalid synchronization.sibling_group: '${siblingGroupRef}' is not a declared sibling group`,
           'transitions.synchronization.sibling_group',
           'INVALID_SIBLING_GROUP',
         );

@@ -40,7 +40,7 @@ export type TransformedTransition = {
   foreach: object | null;
   synchronization: {
     strategy: string;
-    sibling_group: string; // References either a named group or transition ref
+    sibling_group: string; // Must reference a declared sibling_group
     merge?: object;
   } | null;
   loop_config: object | null;
@@ -116,22 +116,14 @@ function transformNodes(nodes: NodeInput[], nodeIds: Map<string, string>): Trans
 
 /**
  * Transforms transitions from input format to database format.
- * This is where sibling_group ref → ID resolution happens!
  */
 function transformTransitions(
   transitions: TransitionInput[],
   ids: GeneratedIds,
 ): TransformedTransition[] {
-  // Build a map from transition ref to its generated ID
-  // We need this to resolve sibling_group refs for spawn_count pattern
-  const transitionRefToId = ids.transitionIds;
-
-  return transitions.map((transition, index) => {
+  return transitions.map((transition) => {
     // Get or generate the transition ID
-    const transitionId = transition.ref ? transitionRefToId.get(transition.ref)! : ulid(); // Generate for transitions without refs
-
-    // Transform synchronization
-    const transformedSync = transformSynchronization(transition.synchronization, transitionRefToId);
+    const transitionId = transition.ref ? ids.transitionIds.get(transition.ref)! : ulid();
 
     return {
       id: transitionId,
@@ -143,25 +135,23 @@ function transformTransitions(
       spawn_count: transition.spawn_count ?? null,
       sibling_group: transition.sibling_group ?? null,
       foreach: transition.foreach ?? null,
-      synchronization: transformedSync,
+      synchronization: transformSynchronization(transition.synchronization),
       loop_config: transition.loop_config ?? null,
     };
   });
 }
 
 /**
- * Transforms synchronization config - keeps sibling_group as string identifier.
- * No longer resolves to ID - sibling_group is now a semantic string shared across transitions.
+ * Transforms synchronization config.
+ * sibling_group is passed through as-is - it's a string identifier declared on transitions.
  */
 function transformSynchronization(
   sync: TransitionInput['synchronization'],
-  transitionRefToId: Map<string, string>,
 ): TransformedTransition['synchronization'] {
   if (!sync) {
     return null;
   }
 
-  // Keep sibling_group as-is - it's now a string identifier, not a ref to resolve
   return {
     strategy: sync.strategy,
     sibling_group: sync.sibling_group,

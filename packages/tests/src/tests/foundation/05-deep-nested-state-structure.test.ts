@@ -519,6 +519,7 @@ describe('Foundation: 05 - Deep Nested State Structure', () => {
         to_node_ref: 'phase1',
         priority: 1,
         spawn_count: 3,
+        sibling_group: 'phase1_group',
       });
 
       // Fan-in #1: phase1 → bridge1 (append words)
@@ -529,7 +530,7 @@ describe('Foundation: 05 - Deep Nested State Structure', () => {
         priority: 1,
         synchronization: {
           strategy: 'all',
-          sibling_group: 'fanout_1',
+          sibling_group: 'phase1_group',
           merge: {
             source: '_branch.output.word',
             target: 'state.pipeline.stages.phase1.results.words',
@@ -545,6 +546,7 @@ describe('Foundation: 05 - Deep Nested State Structure', () => {
         to_node_ref: 'phase2',
         priority: 1,
         spawn_count: 3,
+        sibling_group: 'phase2_group',
       });
 
       // Fan-in #2: phase2 → bridge2 (collect accumulated arrays)
@@ -555,7 +557,7 @@ describe('Foundation: 05 - Deep Nested State Structure', () => {
         priority: 1,
         synchronization: {
           strategy: 'all',
-          sibling_group: 'fanout_2',
+          sibling_group: 'phase2_group',
           merge: {
             source: '_branch.output.accumulated',
             target: 'state.pipeline.stages.phase2.results.accumulated',
@@ -571,6 +573,7 @@ describe('Foundation: 05 - Deep Nested State Structure', () => {
         to_node_ref: 'phase3',
         priority: 1,
         spawn_count: 3,
+        sibling_group: 'phase3_group',
       });
 
       // Fan-in #3: phase3 → finalize (collect final arrays)
@@ -581,7 +584,7 @@ describe('Foundation: 05 - Deep Nested State Structure', () => {
         priority: 1,
         synchronization: {
           strategy: 'all',
-          sibling_group: 'fanout_3',
+          sibling_group: 'phase3_group',
           merge: {
             source: '_branch.output.final',
             target: 'state.pipeline.stages.phase3.results.final',

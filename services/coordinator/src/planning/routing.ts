@@ -108,63 +108,31 @@ export function decideRouting(params: {
     return { decisions: [], events };
   }
 
-  // Count total tokens per sibling_group for fan-out patterns
-  // Handles both:
-  // 1. Explicit sibling_group: multiple transitions share the same named group
-  // 2. spawn_count without explicit sibling_group: uses transition ref as implicit group
+  // Pre-compute total tokens per sibling_group for fan-out transitions
   const siblingGroupTotals = new Map<string, number>();
   for (const t of matchedTransitions) {
-    const count = determineSpawnCount(t, context);
-    const sg = t.sibling_group ?? null;
-    if (sg !== null) {
-      // Explicit sibling_group
-      siblingGroupTotals.set(sg, (siblingGroupTotals.get(sg) ?? 0) + count);
-    } else if (count > 1) {
-      // spawn_count fan-out: use transition ref as implicit sibling_group
-      const implicitSg = t.ref ?? t.id;
-      siblingGroupTotals.set(implicitSg, (siblingGroupTotals.get(implicitSg) ?? 0) + count);
+    if (t.sibling_group) {
+      const count = determineSpawnCount(t, context);
+      siblingGroupTotals.set(t.sibling_group, (siblingGroupTotals.get(t.sibling_group) ?? 0) + count);
     }
   }
 
-  // Generate CREATE_TOKEN decisions for each match
-  // Track branch_index per sibling_group for correct indexing
+  // Track branch_index per sibling_group for sequential indexing during fan-out
   const siblingGroupIndices = new Map<string, number>();
 
   for (const transition of matchedTransitions) {
     const spawnCount = determineSpawnCount(transition, context);
 
-    // Determine sibling group membership
-    // Two patterns for fan-out:
-    // 1. Explicit sibling_group on transition: use that value
-    // 2. spawn_count > 1 without explicit sibling_group: use transition ref as sibling_group
-    // For continuations (spawn_count == 1, no sibling_group): inherit from parent
-    const transitionSiblingGroup = transition.sibling_group ?? null;
-    const hasExplicitSiblingGroup = transitionSiblingGroup !== null;
-    const isSpawnCountFanOut = spawnCount > 1;
+    // Fan-out origin: transition declares sibling_group
+    // Continuation: inherit sibling identity from parent token
+    const siblingGroup = transition.sibling_group ?? completedToken.sibling_group ?? null;
+    const isFanOutOrigin = transition.sibling_group !== null;
 
-    let siblingGroup: string | null;
-    if (hasExplicitSiblingGroup) {
-      // Explicit sibling_group declared on transition
-      siblingGroup = transitionSiblingGroup;
-    } else if (isSpawnCountFanOut) {
-      // spawn_count fan-out: use transition ref as implicit sibling_group
-      siblingGroup = transition.ref ?? transition.id;
-    } else {
-      // Continuation: inherit from parent
-      siblingGroup = completedToken.sibling_group ?? null;
-    }
+    // branch_total: from pre-computed totals for fan-out, otherwise inherit
+    const branchTotal = isFanOutOrigin
+      ? siblingGroupTotals.get(transition.sibling_group!)!
+      : completedToken.branch_total;
 
-    // Determine branch_total:
-    // 1. For fan-out (explicit or spawn_count): look up total from siblingGroupTotals
-    // 2. For continuation: inherit from parent
-    let branchTotal: number;
-    if (siblingGroup !== null && siblingGroupTotals.has(siblingGroup)) {
-      branchTotal = siblingGroupTotals.get(siblingGroup)!;
-    } else {
-      branchTotal = completedToken.branch_total;
-    }
-
-    // Emit transition matched event
     events.push({
       type: 'decision.routing.transition_matched',
       payload: {
@@ -174,16 +142,12 @@ export function decideRouting(params: {
     });
 
     for (let i = 0; i < spawnCount; i++) {
-      // Determine branch_index:
-      // 1. Fan-out (siblingGroup is set): use global index across all tokens in the group
-      // 2. Continuation (siblingGroup inherited/null): inherit from parent
+      // branch_index: sequential for fan-out origin, inherited for continuation
       let branchIndex: number;
-      if (siblingGroup !== null && siblingGroupTotals.has(siblingGroup)) {
-        // Fan-out: track global index across all matched transitions in this group
-        branchIndex = siblingGroupIndices.get(siblingGroup) ?? 0;
-        siblingGroupIndices.set(siblingGroup, branchIndex + 1);
+      if (isFanOutOrigin) {
+        branchIndex = siblingGroupIndices.get(transition.sibling_group!) ?? 0;
+        siblingGroupIndices.set(transition.sibling_group!, branchIndex + 1);
       } else {
-        // Continuation: inherit branch_index from parent to maintain sibling identity
         branchIndex = completedToken.branch_index;
       }
 

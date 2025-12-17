@@ -5,7 +5,7 @@
  * when tokens arrive at nodes with synchronization requirements.
  *
  * Key concepts:
- * - Sibling group: Tokens spawned from the same fan-out transition
+ * - Sibling group: Tokens that share the same sibling_group identifier
  * - Strategy: 'any' (first wins), 'all' (wait for all), m_of_n (quorum)
  * - Returns { decisions, events } tuple for dispatch to execute and emit
  */
@@ -254,10 +254,10 @@ function checkSyncCondition(
  * The fan-in path must be unique per synchronization point.
  *
  * Uses sibling_group as the base identifier since all tokens in the same
- * fan-out group share this value, regardless of their individual path_id.
+ * sibling group share this value, regardless of their individual path_id.
  * This ensures the SQL UNIQUE constraint properly prevents duplicate activations.
  *
- * Example: sibling_group 'fanout_group', transition 'T1' → Fan-in path 'fanout_group:T1'
+ * Example: sibling_group 'phase1_fanin', transition 'T1' → Fan-in path 'phase1_fanin:T1'
  */
 function buildFanInPath(siblingGroup: string, transitionId: string): string {
   return `${siblingGroup}:${transitionId}`;
