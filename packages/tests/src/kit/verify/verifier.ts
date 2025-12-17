@@ -656,29 +656,44 @@ export class WorkflowVerifier {
 
     // Classify tokens
     const rootTokens = tokenCreations.filter((tc) => tc.payload.path_id === 'root');
-    const rootTokenId = rootTokens[0]?.token_id;
 
-    // Fan-out siblings: parent is root, have fan_out_transition_id, branch_total > 1
-    const fanOutSiblings = tokenCreations.filter(
-      (tc) =>
-        tc.payload.parent_token_id === rootTokenId &&
-        tc.payload.fan_out_transition_id !== null &&
-        tc.payload.branch_total > 1,
-    );
+    // Fan-out siblings: tokens with fan_out_transition_id, branch_total > 1, AND
+    // a unique branch path (not index 0 continuing from a completed branch).
+    // The key insight: true fan-out siblings are the FIRST tokens in their branch path,
+    // meaning their parent doesn't have the same fan_out_transition_id.
+    // Fan-in arrivals (child of a sibling going into sync) inherit fan_out_id but are NOT siblings.
+    const tokenMap = new Map(tokenCreations.map((tc) => [tc.token_id, tc]));
+
+    const fanOutSiblings = tokenCreations.filter((tc) => {
+      if (tc.payload.fan_out_transition_id === null) return false;
+      if (tc.payload.branch_total <= 1) return false;
+      // Check if parent has the same fan_out_transition_id
+      // If yes, this is a continuation/arrival, not a true sibling
+      const parent = tc.payload.parent_token_id ? tokenMap.get(tc.payload.parent_token_id) : null;
+      if (parent && parent.payload.fan_out_transition_id === tc.payload.fan_out_transition_id) {
+        return false; // This is a fan-in arrival, not a new sibling
+      }
+      return true;
+    });
     const siblingIds = new Set(fanOutSiblings.map((s) => s.token_id));
 
-    // Fan-in arrivals: parent is a sibling
-    const fanInArrivals = tokenCreations.filter((tc) =>
-      siblingIds.has(tc.payload.parent_token_id!),
-    );
+    // Fan-in arrivals: have fan_out_transition_id, but parent is a fan-out sibling
+    // (so they inherit the fan_out_id from their parent)
+    const fanInArrivals = tokenCreations.filter((tc) => {
+      if (tc.payload.fan_out_transition_id === null) return false;
+      return siblingIds.has(tc.payload.parent_token_id!);
+    });
 
-    // Fan-in continuations: parent is root, no fan_out_id, not root itself
-    const fanInContinuations = tokenCreations.filter(
-      (tc) =>
-        tc.payload.parent_token_id === rootTokenId &&
-        tc.payload.fan_out_transition_id === null &&
-        tc.payload.path_id !== 'root',
-    );
+    // Fan-in continuations: tokens created after synchronization completes
+    // These are tokens with no fan_out_transition_id, not root, and branch_total of 1
+    const fanInContinuations = tokenCreations.filter((tc) => {
+      // Not root
+      if (tc.payload.path_id === 'root') return false;
+      // Has no fan_out_transition_id (distinguishes from siblings and arrivals)
+      if (tc.payload.fan_out_transition_id !== null) return false;
+      // Has branch_total of 1 (single continuation after sync)
+      return tc.payload.branch_total === 1;
+    });
 
     // Collect branch outputs
     const branchOutputs = new Map<string, Record<string, unknown>>();

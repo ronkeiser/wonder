@@ -113,7 +113,7 @@ export class WorkflowVerificationError extends Error {
       lines.push('  STATE WRITES (in order)');
       lines.push('───────────────────────────────────────────────────────────────────────────────');
       for (const sw of diagnostics.stateWrites) {
-        const valueStr = JSON.stringify(sw.value);
+        const valueStr = JSON.stringify(sw.value) ?? 'undefined';
         const truncated = valueStr.length > 60 ? valueStr.slice(0, 57) + '...' : valueStr;
         lines.push(`  [${sw.sequence}] ${sw.path} = ${truncated}`);
       }
