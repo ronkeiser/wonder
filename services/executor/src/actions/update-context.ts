@@ -16,13 +16,22 @@ import type { ActionDeps, ActionInput, ActionOutput } from './types';
 interface UpdateContextImplementation {
   /**
    * Merge multiple input fields into a single output field.
-   * Arrays are concatenated, scalars are wrapped in arrays then concatenated.
+   *
+   * Default behavior (mode: 'flatten'):
+   *   Arrays are spread into a flat result, scalars are pushed as items.
+   *   Example: merge(['a', 'b'], 'c') → ['a', 'b', 'c']
+   *
+   * Preserve structure mode (mode: 'append'):
+   *   Each source is appended as a single element, preserving nested structure.
+   *   Example: merge([['a', 'b'], ['c', 'd']], ['e']) → [['a', 'b'], ['c', 'd'], ['e']]
    */
   merge?: {
     /** Output field name */
     target: string;
     /** Input field names to merge */
     sources: string[];
+    /** Merge mode: 'flatten' (default) spreads arrays, 'append' preserves structure */
+    mode?: 'flatten' | 'append';
   };
 }
 
@@ -60,18 +69,36 @@ export async function executeUpdateContextAction(
   }
 
   // Merge mode: combine sources into target
-  const { target, sources } = implementation.merge;
+  const { target, sources, mode = 'flatten' } = implementation.merge;
   const merged: unknown[] = [];
 
-  for (const source of sources) {
-    const value = input[source];
-    if (value === undefined) {
-      continue;
+  if (mode === 'append') {
+    // Append mode: preserve structure, each source becomes one element
+    for (const source of sources) {
+      const value = input[source];
+      if (value === undefined) {
+        continue;
+      }
+      // If the first source is an array, spread it (it's the base)
+      // Subsequent sources are appended as elements
+      if (merged.length === 0 && Array.isArray(value)) {
+        merged.push(...value);
+      } else {
+        merged.push(value);
+      }
     }
-    if (Array.isArray(value)) {
-      merged.push(...value);
-    } else {
-      merged.push(value);
+  } else {
+    // Flatten mode (default): spread arrays, push scalars
+    for (const source of sources) {
+      const value = input[source];
+      if (value === undefined) {
+        continue;
+      }
+      if (Array.isArray(value)) {
+        merged.push(...value);
+      } else {
+        merged.push(value);
+      }
     }
   }
 
@@ -89,6 +116,7 @@ export async function executeUpdateContextAction(
       action_id: action.id,
       target,
       sources,
+      mode,
       merged_length: merged.length,
     },
   });
