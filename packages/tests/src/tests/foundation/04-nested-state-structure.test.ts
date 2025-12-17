@@ -59,17 +59,27 @@ describe('Foundation: 04 - Nested State Structure', () => {
       { required: ['count', 'completed_at'] },
     );
 
-    const phase2OutputSchema = s.object({ transformed: s.string() }, { required: ['transformed'] });
+    // Phase2 output includes source_count - each branch echoes phase1.meta.count to prove it read accumulated state
+    const phase2OutputSchema = s.object(
+      {
+        transformed: s.string(),
+        source_count: s.number(), // Each phase2 branch echoes phase1.meta.count
+      },
+      { required: ['transformed', 'source_count'] },
+    );
 
+    // Summarize output includes accumulated counts from both phases
     const summarizeOutputSchema = s.object(
       {
         text: s.string(),
         total_items: s.number(),
+        phase1_item_count: s.number(), // Echo of phase1.meta.count
+        phase2_item_count: s.number(), // Count of phase2 results
       },
-      { required: ['text', 'total_items'] },
+      { required: ['text', 'total_items', 'phase1_item_count', 'phase2_item_count'] },
     );
 
-    // Nested context schema
+    // Nested context schema - shows state building across phases
     const contextSchema = s.object({
       init: s.object({
         seed: s.string(),
@@ -84,25 +94,30 @@ describe('Foundation: 04 - Nested State Structure', () => {
       phase2: s.object({
         results: s.array(s.string()),
         meta: s.object({
-          count: s.number(),
+          // source_count echoes phase1.meta.count - proving phase2 read accumulated state
           source_count: s.number(),
         }),
       }),
       summary: s.object({
         text: s.string(),
         total_items: s.number(),
+        // These echo the counts from both phases - proving summary read full accumulated state
+        phase1_count: s.number(),
+        phase2_count: s.number(),
       }),
     });
 
-    // Output extracts from nested paths
+    // Output extracts from nested paths - shows final accumulated state
     const workflowOutputSchema = s.object({
       seed: s.string(),
       phase1_results: s.array(s.string()),
       phase1_count: s.number(),
       phase2_results: s.array(s.string()),
-      phase2_count: s.number(),
+      phase2_source_count: s.number(), // Echoed from phase1 by phase2
       summary_text: s.string(),
       total_items: s.number(),
+      summary_phase1_count: s.number(), // Summary's record of phase1 count
+      summary_phase2_count: s.number(), // Summary's record of phase2 count
     });
 
     // =========================================================================
@@ -247,7 +262,10 @@ describe('Foundation: 04 - Nested State Structure', () => {
       action: phase2Action,
       action_version: 1,
       input_mapping: {},
-      output_mapping: { 'output.transformed': '$.transformed' },
+      output_mapping: {
+        'output.transformed': '$.transformed',
+        'output.source_count': '$.source_count',
+      },
     });
 
     const phase2Task = task({
@@ -266,12 +284,17 @@ describe('Foundation: 04 - Nested State Structure', () => {
       name: 'Phase 2',
       task: phase2Task,
       task_version: 1,
-      // Read from deeply nested paths
+      // Read from deeply nested paths - accumulated phase1 state
       input_mapping: {
         phase1_results: '$.state.phase1.results',
         phase1_count: '$.state.phase1.meta.count',
       },
-      output_mapping: { 'output.transformed': '$.transformed' },
+      // IDEAL BEHAVIOR: Each phase2 branch writes source_count to state
+      // This proves each branch had access to accumulated phase1 state
+      output_mapping: {
+        'output.transformed': '$.transformed',
+        'state.phase2.meta.source_count': '$.source_count',
+      },
     });
 
     // =========================================================================
@@ -293,17 +316,19 @@ describe('Foundation: 04 - Nested State Structure', () => {
       output_mapping: {
         'output.text': '$.text',
         'output.total_items': '$.total_items',
+        'output.phase1_item_count': '$.phase1_item_count',
+        'output.phase2_item_count': '$.phase2_item_count',
       },
     });
 
     const summarizeTask = task({
       name: 'Summarize Task',
-      description: 'Produce final summary',
+      description: 'Produce final summary from accumulated state',
       input_schema: s.object({
         phase1_results: s.array(s.string()),
         phase2_results: s.array(s.string()),
-        phase1_count: s.number(),
-        phase2_count: s.number(),
+        phase1_count: s.number(),        // From phase1.meta.count (written by bridge)
+        phase2_source_count: s.number(), // From phase2.meta.source_count (written by phase2 branches)
       }),
       output_schema: summarizeOutputSchema,
       steps: [summarizeStep],
@@ -314,22 +339,19 @@ describe('Foundation: 04 - Nested State Structure', () => {
       name: 'Summarize',
       task: summarizeTask,
       task_version: 1,
-      // Read from multiple nested paths
-      // Note: phase2_count reads from state that hasn't been written yet, so it will be null
-      // The summarizeTask still receives it but we compute our own count from the results array
+      // Read accumulated state from BOTH phases - demonstrating state building
       input_mapping: {
-        phase1_results: '$.state.phase1.results',
-        phase2_results: '$.state.phase2.results',
-        phase1_count: '$.state.phase1.meta.count',
-        phase2_count: '$.state.phase1.meta.count', // Reuse phase1 count since phase2.meta.count is never written
+        phase1_results: '$.state.phase1.results',              // Accumulated in fan-in #1
+        phase2_results: '$.state.phase2.results',              // Accumulated in fan-in #2  
+        phase1_count: '$.state.phase1.meta.count',             // Written by bridge
+        phase2_source_count: '$.state.phase2.meta.source_count', // Written by phase2 branches
       },
-      // Write to nested paths - both summary and phase2 metadata
+      // Write final summary - proves summarize read full accumulated state from both phases
       output_mapping: {
         'state.summary.text': '$.text',
         'state.summary.total_items': '$.total_items',
-        // Also write to phase2.meta to fulfill the test expectation
-        'state.phase2.meta.count': '$.total_items',
-        'state.phase2.meta.source_count': '$.total_items',
+        'state.summary.phase1_count': '$.phase1_item_count',
+        'state.summary.phase2_count': '$.phase2_item_count',
       },
     });
 
@@ -398,15 +420,17 @@ describe('Foundation: 04 - Nested State Structure', () => {
       input_schema: inputSchema,
       output_schema: workflowOutputSchema,
       context_schema: contextSchema,
-      // Output mapping from deeply nested paths
+      // Output mapping from deeply nested paths - shows full accumulated state
       output_mapping: {
         seed: '$.state.init.seed',
         phase1_results: '$.state.phase1.results',
         phase1_count: '$.state.phase1.meta.count',
         phase2_results: '$.state.phase2.results',
-        phase2_count: '$.state.phase2.meta.count',
+        phase2_source_count: '$.state.phase2.meta.source_count', // Echoed from phase1 by phase2
         summary_text: '$.state.summary.text',
         total_items: '$.state.summary.total_items',
+        summary_phase1_count: '$.state.summary.phase1_count', // Summary's record of phase1 count
+        summary_phase2_count: '$.state.summary.phase2_count', // Summary's record of phase2 count
       },
       initial_node_ref: 'init',
       nodes: [initNode, phase1Node, bridgeNode, phase2Node, summarizeNode],
@@ -445,22 +469,27 @@ describe('Foundation: 04 - Nested State Structure', () => {
           root: 1,
           fanOuts: [
             { count: 3, branchTotal: 3, outputFields: ['value'] },
-            { count: 3, branchTotal: 3, outputFields: ['transformed'] },
+            { count: 3, branchTotal: 3, outputFields: ['transformed', 'source_count'] },
           ],
           fanInArrivals: 6,
           fanInContinuations: 2,
           total: 15,
         })
         .withStateWriteOrder([
+          // Phase 1: init → fan-out → fan-in → bridge
           'state.init.seed',
-          'state.phase1.results',
-          'state.phase1.meta.count',
+          'state.phase1.results', // Fan-in merge
+          'state.phase1.meta.count', // Bridge writes metadata
           'state.phase1.meta.completed_at',
-          'state.phase2.results',
+          // Phase 2: fan-out → phase2 nodes write source_count → fan-in → summarize
+          // Note: phase2 nodes each write source_count (may appear multiple times due to parallel execution)
+          'state.phase2.meta.source_count', // Phase2 echoes phase1.meta.count - STATE BUILDING
+          'state.phase2.results', // Fan-in merge
+          // Summarize writes final accumulated counts
           'state.summary.text',
           'state.summary.total_items',
-          'state.phase2.meta.count',
-          'state.phase2.meta.source_count',
+          'state.summary.phase1_count', // Summary echoes phase1 count - STATE BUILDING
+          'state.summary.phase2_count', // Summary echoes phase2 count - STATE BUILDING
         ])
         .withStateWrites([
           { path: 'state.init.seed', type: 'string', description: 'Written by init' },
@@ -468,43 +497,48 @@ describe('Foundation: 04 - Nested State Structure', () => {
             path: 'state.phase1.results',
             type: 'array',
             arrayLength: 3,
-            description: 'Written by fan-in #1 to nested path',
+            description: 'Fan-in #1 merges phase1 outputs',
           },
           {
             path: 'state.phase1.meta.count',
             type: 'number',
-            description: 'Written by bridge to nested path',
+            description: 'Bridge computes count from phase1.results',
           },
           {
             path: 'state.phase1.meta.completed_at',
             type: 'string',
-            description: 'Written by bridge to nested path',
+            description: 'Bridge records completion timestamp',
+          },
+          {
+            path: 'state.phase2.meta.source_count',
+            type: 'number',
+            description: 'Phase2 echoes phase1.meta.count - proves it read accumulated state',
           },
           {
             path: 'state.phase2.results',
             type: 'array',
             arrayLength: 3,
-            description: 'Written by fan-in #2 to nested path',
+            description: 'Fan-in #2 merges phase2 outputs',
           },
           {
             path: 'state.summary.text',
             type: 'string',
-            description: 'Written by summarize to nested path',
+            description: 'Summarize produces final text',
           },
           {
             path: 'state.summary.total_items',
             type: 'number',
-            description: 'Written by summarize to nested path',
+            description: 'Summarize computes total from both phases',
           },
           {
-            path: 'state.phase2.meta.count',
+            path: 'state.summary.phase1_count',
             type: 'number',
-            description: 'Written by summarize to nested path (phase2 metadata)',
+            description: 'Summary records phase1 count - proves it read accumulated state',
           },
           {
-            path: 'state.phase2.meta.source_count',
+            path: 'state.summary.phase2_count',
             type: 'number',
-            description: 'Written by summarize to nested path (phase2 metadata)',
+            description: 'Summary records phase2 count - proves it read accumulated state',
           },
         ])
         .withBranchWrites({
@@ -515,9 +549,11 @@ describe('Foundation: 04 - Nested State Structure', () => {
           phase1_results: { type: 'array', arrayLength: 3 },
           phase1_count: { type: 'number', defined: true },
           phase2_results: { type: 'array', arrayLength: 3 },
-          phase2_count: { type: 'number', defined: true },
+          phase2_source_count: { type: 'number', defined: true }, // Echoed from phase1
           summary_text: { type: 'string', defined: true },
           total_items: { type: 'number', defined: true },
+          summary_phase1_count: { type: 'number', defined: true }, // Summary's record
+          summary_phase2_count: { type: 'number', defined: true }, // Summary's record
         })
         .withSnapshots({
           minCount: 2,

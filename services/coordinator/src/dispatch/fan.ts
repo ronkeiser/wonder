@@ -41,7 +41,8 @@ type Node = ReturnType<DefinitionManager['getNode']>;
  * 1. Fetch TaskDef to get output_schema
  * 2. Initialize branch table (lazy - creates if not exists)
  * 3. Write task output to branch table
- * 4. Check if sibling completion triggers fan-in
+ * 4. Apply any state.* mappings from node's output_mapping to shared context
+ * 5. Check if sibling completion triggers fan-in
  */
 export async function handleBranchOutput(
   ctx: DispatchContext,
@@ -82,6 +83,25 @@ export async function handleBranchOutput(
     token_id: token.id,
     payload: { output },
   });
+
+  // Apply state.* mappings from node's output_mapping to shared context
+  // This allows fan-out branches to write to shared state in addition to their branch output
+  // (output.* mappings are handled by the branch table, state.* go to shared context)
+  const outputMapping = node.output_mapping as Record<string, string> | null;
+  if (outputMapping) {
+    // Filter to only state.* mappings (not output.* which go to branch table)
+    const stateMappings: Record<string, string> = {};
+    for (const [target, source] of Object.entries(outputMapping)) {
+      if (target.startsWith('state.')) {
+        stateMappings[target] = source;
+      }
+    }
+
+    // Apply state mappings if any exist
+    if (Object.keys(stateMappings).length > 0) {
+      ctx.context.applyOutputMapping(stateMappings, output);
+    }
+  }
 
   // Check if this completion triggers fan-in for waiting siblings
   return await checkSiblingCompletion(ctx, token);
