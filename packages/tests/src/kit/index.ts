@@ -22,19 +22,19 @@ export type {
   TestContext,
   TestWorkflowResult,
   WorkflowTestSetup,
-} from './types.js';
+} from './types';
 
 // Context setup and teardown
-export { cleanupTestContext, setupTestContext } from './context.js';
+export { cleanupTestContext, setupTestContext } from './context';
 
 // Cleanup utilities
-export { cleanup, cleanupWorkflowTest } from './cleanup.js';
+export { cleanup, cleanupWorkflowTest } from './cleanup';
 
 // Workflow creation and execution
-export { createWorkflow, executeWorkflow, runTestWorkflow } from './workflow.js';
+export { createWorkflow, executeWorkflow, runTestWorkflow } from './workflow';
 
 // Invariant assertions
-export { assertInvariants } from './invariants.js';
+export { assertInvariants } from './invariants';
 
 // Verification API
 export {
@@ -51,4 +51,4 @@ export {
   type VerificationConfig,
   type VerificationContext,
   type VerificationResult,
-} from './verify/index.js';
+} from './verify/index';

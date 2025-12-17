@@ -15,9 +15,9 @@ import {
   type EmbeddedTaskDef,
 } from '@wonder/sdk';
 import { wonder } from '~/client';
-import type { CreatedResources, TestContext } from './types.js';
+import type { CreatedResources, TestContext } from './types';
 
-export type { CreatedResources } from './types.js';
+export type { CreatedResources } from './types';
 
 /**
  * Creates an embedded task def and all its dependencies (actions, prompt specs).

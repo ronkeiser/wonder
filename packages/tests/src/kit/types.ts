@@ -4,7 +4,7 @@
  * All type definitions for the test kit.
  */
 
-import type { executeWorkflow } from './workflow.js';
+import type { executeWorkflow } from './workflow';
 
 // =============================================================================
 // Context Types

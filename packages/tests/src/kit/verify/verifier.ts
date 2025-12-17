@@ -6,7 +6,7 @@
  */
 
 import type { EmbeddedWorkflowDef, TraceEventCollection } from '@wonder/sdk';
-import { WorkflowVerificationError } from './error.js';
+import { WorkflowVerificationError } from './error';
 import type {
   BranchWriteSpec,
   DiagnosticContext,
@@ -19,7 +19,7 @@ import type {
   TypedTraceEvent,
   VerificationConfig,
   VerificationContext,
-} from './types.js';
+} from './types';
 
 /**
  * Workflow Verifier with fluent API

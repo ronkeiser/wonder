@@ -20,7 +20,7 @@
  */
 
 // Re-export everything
-export { WorkflowVerificationError } from './error.js';
+export { WorkflowVerificationError } from './error';
 export type {
   BranchWriteSpec,
   DiagnosticContext,
@@ -32,5 +32,5 @@ export type {
   VerificationConfig,
   VerificationContext,
   VerificationResult,
-} from './types.js';
-export { verify, WorkflowVerifier } from './verifier.js';
+} from './types';
+export { verify, WorkflowVerifier } from './verifier';

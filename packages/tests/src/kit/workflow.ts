@@ -6,17 +6,17 @@
 
 import { isEmbeddedTaskDef, type EmbeddedNode, type EmbeddedWorkflowDef } from '@wonder/sdk';
 import { wonder } from '~/client';
-import { cleanupWorkflowTest } from './cleanup.js';
-import { setupTestContext } from './context.js';
-import { createEmbeddedTaskDef } from './resources.js';
+import { cleanupWorkflowTest } from './cleanup';
+import { setupTestContext } from './context';
+import { createEmbeddedTaskDef } from './resources';
 import type {
   CreatedResources,
   TestContext,
   TestWorkflowResult,
   WorkflowTestSetup,
-} from './types.js';
+} from './types';
 
-export type { TestWorkflowResult, WorkflowTestSetup } from './types.js';
+export type { TestWorkflowResult, WorkflowTestSetup } from './types';
 
 /**
  * Creates all embedded resources and the workflow.

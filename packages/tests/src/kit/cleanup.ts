@@ -5,9 +5,9 @@
  */
 
 import { wonder } from '~/client';
-import type { Deletable, WorkflowTestSetup } from './types.js';
+import type { Deletable, WorkflowTestSetup } from './types';
 
-export type { Deletable } from './types.js';
+export type { Deletable } from './types';
 
 /**
  * Cleans up resources in reverse order (LIFO).

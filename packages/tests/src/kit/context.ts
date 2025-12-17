@@ -5,9 +5,9 @@
  */
 
 import { wonder } from '~/client';
-import type { TestContext } from './types.js';
+import type { TestContext } from './types';
 
-export type { TestContext } from './types.js';
+export type { TestContext } from './types';
 
 /**
  * Sets up the base infrastructure needed for workflow tests:

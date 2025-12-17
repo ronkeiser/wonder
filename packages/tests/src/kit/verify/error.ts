@@ -6,7 +6,7 @@
  * to understand what went wrong without bolt-on diagnostics.
  */
 
-import type { DiagnosticContext } from './types.js';
+import type { DiagnosticContext } from './types';
 
 /**
  * Error thrown when workflow verification fails.
