@@ -69,9 +69,11 @@ export class ContextManager {
       onQuery: (query, params, durationMs) => {
         this.emitter.emitTrace({
           type: 'sql.query',
-          sql: query,
-          params,
           duration_ms: durationMs,
+          payload: {
+            sql: query,
+            params,
+          },
         });
       },
     };
@@ -125,10 +127,12 @@ export class ContextManager {
 
     this.emitter.emitTrace({
       type: 'operation.context.initialized',
-      has_input_schema: true,
-      has_context_schema: this.stateTable !== null,
-      table_count: tablesCreated.length,
-      tables_created: tablesCreated,
+      payload: {
+        has_input_schema: true,
+        has_context_schema: this.stateTable !== null,
+        table_count: tablesCreated.length,
+        tables_created: tablesCreated,
+      },
     });
 
     // Validate and store input
@@ -136,11 +140,13 @@ export class ContextManager {
 
     this.emitter.emitTrace({
       type: 'operation.context.validate',
-      path: 'input',
-      schema_type: 'object',
-      valid: result.valid,
-      error_count: result.errors.length,
-      errors: result.errors.slice(0, 5).map((e) => e.message),
+      payload: {
+        path: 'input',
+        schema_type: 'object',
+        valid: result.valid,
+        error_count: result.errors.length,
+        errors: result.errors.slice(0, 5).map((e) => e.message),
+      },
     });
 
     if (!result.valid) {
@@ -151,8 +157,10 @@ export class ContextManager {
 
     this.emitter.emitTrace({
       type: 'operation.context.section_replaced',
-      section: 'input',
-      data: input,
+      payload: {
+        section: 'input',
+        data: input,
+      },
     });
   }
 
@@ -193,8 +201,10 @@ export class ContextManager {
 
     this.emitter.emitTrace({
       type: 'operation.context.read',
-      path: section,
-      value,
+      payload: {
+        path: section,
+        value,
+      },
     });
 
     return value;
@@ -235,8 +245,10 @@ export class ContextManager {
 
     this.emitter.emitTrace({
       type: 'operation.context.section_replaced',
-      section,
-      data,
+      payload: {
+        section,
+        data,
+      },
     });
   }
 
@@ -262,8 +274,10 @@ export class ContextManager {
 
     this.emitter.emitTrace({
       type: 'operation.context.field_set',
-      path,
-      value,
+      payload: {
+        path,
+        value,
+      },
     });
   }
 
@@ -285,7 +299,7 @@ export class ContextManager {
 
     this.emitter.emitTrace({
       type: 'operation.context.snapshot',
-      snapshot,
+      payload: { snapshot },
     });
 
     return snapshot;
@@ -317,14 +331,16 @@ export class ContextManager {
     // Emit start event with input context
     this.emitter.emitTrace({
       type: 'operation.context.output_mapping.started',
-      output_mapping: outputMapping,
-      task_output_keys: Object.keys(taskOutput),
+      payload: {
+        output_mapping: outputMapping,
+        task_output_keys: Object.keys(taskOutput),
+      },
     });
 
     if (!outputMapping) {
       this.emitter.emitTrace({
         type: 'operation.context.output_mapping.skipped',
-        reason: 'no_mapping',
+        payload: { reason: 'no_mapping' },
       });
       return;
     }
@@ -338,9 +354,11 @@ export class ContextManager {
 
       this.emitter.emitTrace({
         type: 'operation.context.output_mapping.applied',
-        target_path: targetPath,
-        source_path: sourcePath,
-        extracted_value: value,
+        payload: {
+          target_path: targetPath,
+          source_path: sourcePath,
+          extracted_value: value,
+        },
       });
     }
   }
@@ -436,8 +454,10 @@ export class ContextManager {
     this.emitter.emitTrace({
       type: 'operation.context.branch_table.created',
       token_id: tokenId,
-      table_name: tableName,
-      schema_type: outputSchema.type as string,
+      payload: {
+        table_name: tableName,
+        schema_type: outputSchema.type as string,
+      },
     });
   }
 
@@ -457,9 +477,11 @@ export class ContextManager {
     this.emitter.emitTrace({
       type: 'operation.context.branch.validate',
       token_id: tokenId,
-      valid: result.valid,
-      error_count: result.errors.length,
-      errors: result.errors.slice(0, 5).map((e) => e.message),
+      payload: {
+        valid: result.valid,
+        error_count: result.errors.length,
+        errors: result.errors.slice(0, 5).map((e) => e.message),
+      },
     });
 
     if (!result.valid) {
@@ -473,7 +495,7 @@ export class ContextManager {
     this.emitter.emitTrace({
       type: 'operation.context.branch.written',
       token_id: tokenId,
-      output,
+      payload: { output },
     });
   }
 
@@ -506,9 +528,11 @@ export class ContextManager {
       this.emitter.emitTrace({
         type: 'operation.context.branch.read',
         token_id: tokenId,
-        branch_index: branchIndex,
-        output,
-        from_cache: this.branchTables.has(tokenId),
+        payload: {
+          branch_index: branchIndex,
+          output,
+          from_cache: this.branchTables.has(tokenId),
+        },
       });
 
       outputs.push({
@@ -520,8 +544,10 @@ export class ContextManager {
 
     this.emitter.emitTrace({
       type: 'operation.context.branches_read',
-      token_ids: tokenIds,
-      output_count: outputs.length,
+      payload: {
+        token_ids: tokenIds,
+        output_count: outputs.length,
+      },
     });
 
     return outputs;
@@ -534,10 +560,12 @@ export class ContextManager {
   mergeBranches(branchOutputs: BranchOutput[], merge: MergeConfig): void {
     this.emitter.emitTrace({
       type: 'operation.context.merge.started',
-      sibling_count: branchOutputs.length,
-      strategy: merge.strategy,
-      source_path: merge.source,
-      target_path: merge.target,
+      payload: {
+        sibling_count: branchOutputs.length,
+        strategy: merge.strategy,
+        source_path: merge.source,
+        target_path: merge.target,
+      },
     });
 
     // Extract outputs based on source path
@@ -598,8 +626,10 @@ export class ContextManager {
 
     this.emitter.emitTrace({
       type: 'operation.context.merged',
-      target_path: merge.target,
-      branch_count: branchOutputs.length,
+      payload: {
+        target_path: merge.target,
+        branch_count: branchOutputs.length,
+      },
     });
   }
 
@@ -626,8 +656,10 @@ export class ContextManager {
 
     this.emitter.emitTrace({
       type: 'operation.context.branch_table.dropped',
-      token_ids: tokenIds,
-      tables_dropped: tokenIds.length,
+      payload: {
+        token_ids: tokenIds,
+        tables_dropped: tokenIds.length,
+      },
     });
   }
 

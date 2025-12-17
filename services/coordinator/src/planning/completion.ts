@@ -10,13 +10,13 @@
  * - Same logic as input/output mapping elsewhere
  */
 
-import type { DecisionEvent } from '@wonder/events';
+import type { TraceEventInput } from '@wonder/events';
 import type { ContextSnapshot } from '../types';
 
 /** Result from completion planning */
 export type CompletionResult = {
   output: Record<string, unknown>;
-  events: DecisionEvent[];
+  events: TraceEventInput[];
 };
 
 // ============================================================================
@@ -39,15 +39,17 @@ export function extractFinalOutput(
   outputMapping: Record<string, string> | null,
   context: ContextSnapshot,
 ): CompletionResult {
-  const events: DecisionEvent[] = [];
+  const events: TraceEventInput[] = [];
 
   events.push({
     type: 'decision.completion.start',
-    output_mapping: outputMapping,
-    context_keys: {
-      input: Object.keys(context.input),
-      state: Object.keys(context.state),
-      output: Object.keys(context.output),
+    payload: {
+      output_mapping: outputMapping,
+      context_keys: {
+        input: Object.keys(context.input),
+        state: Object.keys(context.state),
+        output: Object.keys(context.output),
+      },
     },
   });
 
@@ -66,9 +68,11 @@ export function extractFinalOutput(
 
     events.push({
       type: 'decision.completion.extract',
-      target_field: targetField,
-      source_path: sourcePath,
-      extracted_value: value,
+      payload: {
+        target_field: targetField,
+        source_path: sourcePath,
+        extracted_value: value,
+      },
     });
 
     output[targetField] = value;
@@ -76,7 +80,7 @@ export function extractFinalOutput(
 
   events.push({
     type: 'decision.completion.complete',
-    final_output: output,
+    payload: { final_output: output },
   });
 
   return { output, events };

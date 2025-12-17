@@ -114,8 +114,10 @@ export function applyDecisions(decisions: Decision[], ctx: DispatchContext): App
       // Log but don't stop - try remaining decisions
       ctx.emitter.emitTrace({
         type: 'dispatch.error',
-        decision_type: decision.type,
-        error: error instanceof Error ? error.message : String(error),
+        payload: {
+          decision_type: decision.type,
+          error: error instanceof Error ? error.message : String(error),
+        },
       });
     }
   }
@@ -123,12 +125,14 @@ export function applyDecisions(decisions: Decision[], ctx: DispatchContext): App
   // Emit batch completion trace
   ctx.emitter.emitTrace({
     type: 'dispatch.batch.complete',
-    total_decisions: decisions.length,
-    batched_decisions: batched.length,
-    applied: result.applied,
-    tokens_created: result.tokensCreated.length,
-    tokens_dispatched: result.tokensDispatched.length,
-    errors: result.errors.length,
+    payload: {
+      total_decisions: decisions.length,
+      batched_decisions: batched.length,
+      applied: result.applied,
+      tokens_created: result.tokensCreated.length,
+      tokens_dispatched: result.tokensDispatched.length,
+      errors: result.errors.length,
+    },
   });
 
   return result;
@@ -143,10 +147,12 @@ export function applyTracedDecisions(traced: TracedDecision[], ctx: DispatchCont
   for (const t of traced) {
     ctx.emitter.emitTrace({
       type: 'dispatch.decision.planned',
-      decision_type: t.decision.type,
-      source: t.source,
       token_id: t.tokenId ?? undefined,
-      timestamp: t.timestamp,
+      payload: {
+        decision_type: t.decision.type,
+        source: t.source,
+        timestamp: t.timestamp,
+      },
     });
   }
 

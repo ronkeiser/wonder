@@ -11,7 +11,7 @@
  * - Spawn count from transition config or foreach collection
  */
 
-import type { DecisionEvent } from '@wonder/events';
+import type { TraceEventInput } from '@wonder/events';
 import type { TransitionRow } from '../operations/defs';
 import type { TokenRow } from '../operations/tokens';
 import type {
@@ -29,7 +29,7 @@ import type {
 /** Result from planning functions - decisions to apply and events to emit */
 export type PlanningResult = {
   decisions: Decision[];
-  events: DecisionEvent[];
+  events: TraceEventInput[];
 };
 
 // ============================================================================
@@ -59,7 +59,7 @@ export function decideRouting(params: {
   const completedTokenId = completedToken.id;
   const completedTokenPath = completedToken.path_id;
 
-  const events: DecisionEvent[] = [];
+  const events: TraceEventInput[] = [];
   const decisions: Decision[] = [];
 
   // Emit routing start event
@@ -82,8 +82,10 @@ export function decideRouting(params: {
       // Emit evaluation event for each transition
       events.push({
         type: 'decision.routing.evaluate_transition',
-        transition_id: t.id,
-        condition: t.condition,
+        payload: {
+          transition_id: t.id,
+          condition: t.condition,
+        },
       });
 
       const matched = evaluateCondition(t.condition as Condition | null, context);
@@ -102,7 +104,7 @@ export function decideRouting(params: {
   if (matchedTransitions.length === 0) {
     events.push({
       type: 'decision.routing.complete',
-      decisions: [],
+      payload: { decisions: [] },
     });
     return { decisions: [], events };
   }
@@ -119,8 +121,10 @@ export function decideRouting(params: {
     // Emit transition matched event
     events.push({
       type: 'decision.routing.transition_matched',
-      transition_id: transition.id,
-      spawn_count: spawnCount,
+      payload: {
+        transition_id: transition.id,
+        spawn_count: spawnCount,
+      },
     });
 
     for (let i = 0; i < spawnCount; i++) {
@@ -144,7 +148,7 @@ export function decideRouting(params: {
   // Emit routing complete event
   events.push({
     type: 'decision.routing.complete',
-    decisions,
+    payload: { decisions },
   });
 
   return { decisions, events };

@@ -94,11 +94,13 @@ export class TokenManager {
       type: 'operation.tokens.created',
       token_id: tokenId,
       node_id: params.node_id,
-      task_id: params.node_id,
-      parent_token_id: params.parent_token_id,
-      fan_out_transition_id: params.fan_out_transition_id,
-      branch_index: params.branch_index,
-      branch_total: params.branch_total,
+      payload: {
+        task_id: params.node_id,
+        parent_token_id: params.parent_token_id,
+        fan_out_transition_id: params.fan_out_transition_id,
+        branch_index: params.branch_index,
+        branch_total: params.branch_total,
+      },
     });
 
     return tokenId;
@@ -136,8 +138,10 @@ export class TokenManager {
       type: 'operation.tokens.status_updated',
       token_id: tokenId,
       node_id: token.node_id,
-      from: token.status,
-      to: status,
+      payload: {
+        from: token.status,
+        to: status,
+      },
     });
   }
 
@@ -222,8 +226,10 @@ export class TokenManager {
       type: 'operation.tokens.status_updated',
       token_id: tokenId,
       node_id: token.node_id,
-      from: token.status,
-      to: 'waiting_for_siblings',
+      payload: {
+        from: token.status,
+        to: 'waiting_for_siblings',
+      },
     });
   }
 
@@ -330,8 +336,10 @@ export class TokenManager {
         type: 'operation.tokens.status_updated',
         token_id: tokenId,
         node_id: token?.node_id ?? 'unknown',
-        from: 'waiting_for_siblings',
-        to: 'completed',
+        payload: {
+          from: 'waiting_for_siblings',
+          to: 'completed',
+        },
       });
     }
   }
@@ -363,8 +371,10 @@ export class TokenManager {
         type: 'operation.tokens.status_updated',
         token_id: tokenId,
         node_id: token?.node_id ?? 'unknown',
-        from: token?.status ?? 'unknown',
-        to: 'cancelled',
+        payload: {
+          from: token?.status ?? 'unknown',
+          to: 'cancelled',
+        },
       });
     }
   }

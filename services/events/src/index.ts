@@ -22,7 +22,7 @@ import { getEventCategory } from './types.js';
 // Re-export client and types for consumer convenience
 export { createEmitter } from './client.js';
 export { Streamer } from './streamer.js';
-export type { DecisionEvent, Emitter } from './types.js';
+export type { Emitter, TraceEventInput } from './types.js';
 
 const STREAMER_NAME = 'events-streamer';
 
@@ -150,13 +150,14 @@ export class EventsService extends WorkerEntrypoint<Env> {
             id: ulid(),
             timestamp: Date.now(),
             ...context,
-            ...event,
+            type: event.type,
+            sequence: event.sequence,
             category: getEventCategory(event.type),
             token_id: event.token_id ?? null,
             node_id: event.node_id ?? null,
             duration_ms: event.duration_ms ?? null,
-            message: 'message' in event ? ((event as { message?: string }).message ?? null) : null,
-            payload: JSON.stringify(event),
+            message: null,
+            payload: JSON.stringify(event.payload ?? {}),
           };
 
           await this.db.insert(traceEvents).values(entry);
@@ -164,7 +165,7 @@ export class EventsService extends WorkerEntrypoint<Env> {
           // Broadcast to WebSocket clients with parsed payload
           await this.broadcastTraceEventToClients({
             ...entry,
-            payload: event,
+            payload: event.payload ?? {},
           });
         } catch (error) {
           this.logger.error({ message: 'Failed to insert trace event', metadata: { error } });

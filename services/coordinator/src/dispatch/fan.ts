@@ -80,7 +80,7 @@ export async function handleBranchOutput(
   ctx.emitter.emitTrace({
     type: 'operation.context.branch.written',
     token_id: token.id,
-    output,
+    payload: { output },
   });
 
   // Check if this completion triggers fan-in for waiting siblings
@@ -300,9 +300,11 @@ export async function activateFanIn(
   // We won the race - proceed with merge
   ctx.emitter.emitTrace({
     type: 'dispatch.sync.fan_in_activated',
-    fan_in_path: fanInPath,
     node_id: nodeId,
-    merged_count: decision.mergedTokenIds.length,
+    payload: {
+      fan_in_path: fanInPath,
+      merged_count: decision.mergedTokenIds.length,
+    },
   });
 
   const sync = transition.synchronization;

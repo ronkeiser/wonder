@@ -36,7 +36,7 @@ export async function dispatchToken(ctx: DispatchContext, tokenId: string): Prom
 
   ctx.emitter.emitTrace({
     type: 'dispatch.batch.start',
-    decision_count: 1,
+    payload: { decision_count: 1 },
   });
 
   // Update token status to executing
@@ -60,10 +60,12 @@ export async function dispatchToken(ctx: DispatchContext, tokenId: string): Prom
     type: 'dispatch.task.input_mapping.context',
     token_id: tokenId,
     node_id: node.id,
-    context_keys: {
-      input: Object.keys(context.input),
-      state: Object.keys(context.state),
-      output: Object.keys(context.output),
+    payload: {
+      context_keys: {
+        input: Object.keys(context.input),
+        state: Object.keys(context.state),
+        output: Object.keys(context.output),
+      },
     },
   });
 
@@ -80,8 +82,10 @@ export async function dispatchToken(ctx: DispatchContext, tokenId: string): Prom
     type: 'dispatch.task.input_mapping.applied',
     token_id: tokenId,
     node_id: node.id,
-    input_mapping: node.input_mapping,
-    task_input: taskInput,
+    payload: {
+      input_mapping: node.input_mapping,
+      task_input: taskInput,
+    },
   });
 
   // Resolve resource bindings from node to workflow resources

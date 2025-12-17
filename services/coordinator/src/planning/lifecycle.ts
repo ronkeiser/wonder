@@ -8,7 +8,7 @@
  * - Returns { decisions, events } tuple for dispatch to execute and emit
  */
 
-import type { DecisionEvent } from '@wonder/events';
+import type { TraceEventInput } from '@wonder/events';
 import type { Decision } from '../types';
 import type { PlanningResult } from './routing';
 
@@ -29,14 +29,16 @@ export function decideWorkflowStart(params: {
 }): PlanningResult {
   const { workflowRunId, initialNodeId } = params;
 
-  const events: DecisionEvent[] = [];
+  const events: TraceEventInput[] = [];
   const decisions: Decision[] = [];
 
   // Emit lifecycle start event
   events.push({
     type: 'decision.lifecycle.start',
-    workflow_run_id: workflowRunId,
-    initial_node_id: initialNodeId,
+    payload: {
+      workflow_run_id: workflowRunId,
+      initial_node_id: initialNodeId,
+    },
   });
 
   // Create initial root token
@@ -55,7 +57,7 @@ export function decideWorkflowStart(params: {
 
   events.push({
     type: 'decision.lifecycle.root_token_planned',
-    node_id: initialNodeId,
+    payload: { node_id: initialNodeId },
   });
 
   return { decisions, events };

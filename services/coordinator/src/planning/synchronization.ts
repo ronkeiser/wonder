@@ -10,7 +10,7 @@
  * - Returns { decisions, events } tuple for dispatch to execute and emit
  */
 
-import type { DecisionEvent } from '@wonder/events';
+import type { TraceEventInput } from '@wonder/events';
 import type { SiblingCounts, TokenRow } from '../operations/tokens';
 import type { Decision, MergeConfig, SynchronizationConfig, TransitionDef } from '../types';
 import type { PlanningResult } from './routing';
@@ -40,13 +40,13 @@ export function decideSynchronization(params: {
 }): PlanningResult {
   const { token, transition, siblingCounts, workflowRunId } = params;
 
-  const events: DecisionEvent[] = [];
+  const events: TraceEventInput[] = [];
 
   // Emit sync start event
   events.push({
     type: 'decision.sync.start',
     token_id: token.id,
-    sibling_count: siblingCounts.total,
+    payload: { sibling_count: siblingCounts.total },
   });
 
   // No synchronization config → pass through
@@ -59,17 +59,21 @@ export function decideSynchronization(params: {
   // Emit sibling_group comparison event for tracing
   events.push({
     type: 'decision.sync.sibling_group_check',
-    token_fan_out_transition_id: token.fan_out_transition_id,
-    sync_sibling_group: sync.sibling_group,
-    matches: token.fan_out_transition_id === sync.sibling_group,
+    payload: {
+      token_fan_out_transition_id: token.fan_out_transition_id,
+      sync_sibling_group: sync.sibling_group,
+      matches: token.fan_out_transition_id === sync.sibling_group,
+    },
   });
 
   // Token not in the specified sibling group → pass through
   if (token.fan_out_transition_id !== sync.sibling_group) {
     events.push({
       type: 'decision.sync.skipped_wrong_sibling_group',
-      token_fan_out_transition_id: token.fan_out_transition_id,
-      sync_sibling_group: sync.sibling_group,
+      payload: {
+        token_fan_out_transition_id: token.fan_out_transition_id,
+        sync_sibling_group: sync.sibling_group,
+      },
     });
     return { decisions: [{ type: 'MARK_FOR_DISPATCH', tokenId: token.id }], events };
   }
@@ -89,16 +93,18 @@ export function decideSynchronization(params: {
   // Emit condition check event
   events.push({
     type: 'decision.sync.check_condition',
-    strategy: strategyStr,
-    completed: siblingCounts.completed,
-    required,
+    payload: {
+      strategy: strategyStr,
+      completed: siblingCounts.completed,
+      required,
+    },
   });
 
   if (conditionMet) {
     // Condition met → activate fan-in
     events.push({
       type: 'decision.sync.activate',
-      merge_config: sync.merge ?? null,
+      payload: { merge_config: sync.merge ?? null },
     });
 
     return {
@@ -118,7 +124,7 @@ export function decideSynchronization(params: {
   // Condition not met → wait
   events.push({
     type: 'decision.sync.wait',
-    reason: `waiting for ${required - siblingCounts.completed} more siblings`,
+    payload: { reason: `waiting for ${required - siblingCounts.completed} more siblings` },
   });
 
   return {
@@ -401,15 +407,17 @@ export function decideFanInContinuation(params: {
 }): PlanningResult {
   const { workflowRunId, nodeId, fanInPath, parentTokenId } = params;
 
-  const events: DecisionEvent[] = [];
+  const events: TraceEventInput[] = [];
   const decisions: Decision[] = [];
 
   // Emit fan-in continuation planning event
   events.push({
     type: 'decision.sync.continuation',
-    workflow_run_id: workflowRunId,
     node_id: nodeId,
-    fan_in_path: fanInPath,
+    payload: {
+      workflow_run_id: workflowRunId,
+      fan_in_path: fanInPath,
+    },
   });
 
   // Create continuation token to proceed after merge
