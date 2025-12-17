@@ -11,12 +11,17 @@ import { assertInvariants, runTestWorkflow } from '~/kit';
  * Workflow structure:
  *   [nodeA] → (spawn_count: 3) → [nodeB] × 3 → (synchronization) → [nodeC]
  *
- * Data flow:
- *   1. nodeA: Initial execution, sets starter value
- *   2. nodeB ×3: Parallel execution, each writes to isolated branch table
- *   3. Fan-in: Merges branch outputs into context.state.results[]
- *   4. nodeC: Post-merge node, has access to merged results
- *   5. Workflow output: Extracts final merged data
+ * Data flow with state transformations:
+ *   1. nodeA: Reads input.prefix, writes state.seed (transformed from input)
+ *   2. nodeB ×3: Each branch reads state.seed, produces prefixed result
+ *   3. Fan-in: Merges branch results into state.results[]
+ *   4. nodeC: Reads merged state.results, produces summary, writes state.summary
+ *   5. Workflow output: Extracts prefix, seed, results, and summary
+ *
+ * State mutations traced:
+ *   - state.seed: Written by nodeA
+ *   - state.results: Written by fan-in merge (array of branch outputs)
+ *   - state.summary: Written by nodeC
  *
  * This proves:
  * 1. Multiple tokens created from single transition
@@ -25,6 +30,8 @@ import { assertInvariants, runTestWorkflow } from '~/kit';
  * 4. Fan-in synchronization (strategy: 'all')
  * 5. Branch merge into context.state
  * 6. ACTUAL STATE MUTATION - values flow through and end up in final output
+ * 7. State reads across nodes (nodeB reads state.seed written by nodeA)
+ * 8. State write ordering (seed → results → summary)
  */
 
 describe('Foundation: 02 - Fan-out with Spawn Count + Fan-in', () => {
@@ -33,69 +40,81 @@ describe('Foundation: 02 - Fan-out with Spawn Count + Fan-in', () => {
     // Schemas
     // =========================================================================
     const inputSchema = s.object({
-      starter: s.string(),
+      prefix: s.string(),
     });
 
-    // Each node produces a result field
-    const nodeOutputSchema = s.object({ result: s.string() }, { required: ['result'] });
+    // Node A produces a seed value derived from input
+    const nodeAOutputSchema = s.object({ seed: s.string() }, { required: ['seed'] });
+
+    // Node B produces a result that incorporates the seed
+    const nodeBOutputSchema = s.object({ result: s.string() }, { required: ['result'] });
+
+    // Node C produces a summary after seeing merged results
+    const nodeCOutputSchema = s.object({ summary: s.string() }, { required: ['summary'] });
 
     // Workflow context schema defines mutable state
-    // The fan-in merge will write branch results to state.results
+    // Multiple fields are mutated at different points in the workflow
     const contextSchema = s.object({
-      results: s.array(s.string()),
+      seed: s.string(), // Written by nodeA
+      results: s.array(s.string()), // Written by fan-in merge
+      summary: s.string(), // Written by nodeC
     });
 
-    // Final workflow output extracts the merged results
+    // Final workflow output extracts multiple state fields
     const workflowOutputSchema = s.object({
-      starter: s.string(),
-      merged_results: s.array(s.string()),
+      prefix: s.string(), // From input
+      seed: s.string(), // From state (written by nodeA)
+      merged_results: s.array(s.string()), // From state (written by fan-in)
+      summary: s.string(), // From state (written by nodeC)
     });
 
     // =========================================================================
     // Workflow Definition
     // =========================================================================
 
-    // Node A: Initial node that triggers fan-out
+    // Node A: Initial node that transforms input and writes to state
+    // Reads input.prefix, produces seed, writes state.seed
     const nodeAAction = action({
-      name: 'Start Action',
-      description: 'Initiates the workflow',
+      name: 'Initialize Action',
+      description: 'Transforms input prefix into a seed value',
       kind: 'mock',
-      implementation: { schema: nodeOutputSchema },
+      implementation: { schema: nodeAOutputSchema },
     });
 
     const nodeAStep = step({
-      ref: 'start_step',
+      ref: 'init_step',
       ordinal: 0,
       action: nodeAAction,
       action_version: 1,
       input_mapping: {},
-      output_mapping: { 'output.result': '$.result' },
+      output_mapping: { 'output.seed': '$.seed' },
     });
 
     const nodeATask = task({
-      name: 'Start Task',
-      description: 'Start task',
-      input_schema: s.object({}),
-      output_schema: nodeOutputSchema,
+      name: 'Initialize Task',
+      description: 'Initialize workflow state from input',
+      input_schema: s.object({ prefix: s.string() }),
+      output_schema: nodeAOutputSchema,
       steps: [nodeAStep],
     });
 
     const nodeA = node({
       ref: 'node_a',
-      name: 'Node A',
+      name: 'Node A - Initialize',
       task: nodeATask,
       task_version: 1,
-      input_mapping: {},
-      output_mapping: {},
+      input_mapping: { prefix: '$.input.prefix' },
+      // Write the seed to state so parallel branches can read it
+      output_mapping: { 'state.seed': '$.seed' },
     });
 
     // Node B: Executes in parallel (3 times)
-    // Each instance writes its result to its isolated branch table
+    // Each instance reads state.seed, produces a prefixed result
     const nodeBAction = action({
       name: 'Process Action',
-      description: 'Processes in parallel',
+      description: 'Processes in parallel using seed from state',
       kind: 'mock',
-      implementation: { schema: nodeOutputSchema },
+      implementation: { schema: nodeBOutputSchema },
     });
 
     const nodeBStep = step({
@@ -109,57 +128,61 @@ describe('Foundation: 02 - Fan-out with Spawn Count + Fan-in', () => {
 
     const nodeBTask = task({
       name: 'Process Task',
-      description: 'Process task',
-      input_schema: s.object({}),
-      output_schema: nodeOutputSchema,
+      description: 'Process with seed value',
+      input_schema: s.object({ seed: s.string() }),
+      output_schema: nodeBOutputSchema,
       steps: [nodeBStep],
     });
 
     const nodeB = node({
       ref: 'node_b',
-      name: 'Node B',
+      name: 'Node B - Process',
       task: nodeBTask,
       task_version: 1,
-      input_mapping: {},
+      // Read seed from state (written by nodeA)
+      input_mapping: { seed: '$.state.seed' },
       // Each parallel instance writes to branch table (isolated storage)
-      output_mapping: {
-        'output.result': '$.result',
-      },
+      output_mapping: { 'output.result': '$.result' },
     });
 
-    // Node C: Post-merge node
-    // Receives merged results from fan-in
+    // Node C: Post-merge node that reads merged results and produces summary
     const nodeCAction = action({
-      name: 'Collect Action',
-      description: 'Collects merged results',
+      name: 'Summarize Action',
+      description: 'Summarizes merged results',
       kind: 'mock',
-      implementation: { schema: nodeOutputSchema },
+      implementation: { schema: nodeCOutputSchema },
     });
 
     const nodeCStep = step({
-      ref: 'collect_step',
+      ref: 'summarize_step',
       ordinal: 0,
       action: nodeCAction,
       action_version: 1,
       input_mapping: {},
-      output_mapping: { 'output.result': '$.result' },
+      output_mapping: { 'output.summary': '$.summary' },
     });
 
     const nodeCTask = task({
-      name: 'Collect Task',
-      description: 'Collect task',
-      input_schema: s.object({}),
-      output_schema: nodeOutputSchema,
+      name: 'Summarize Task',
+      description: 'Produce summary from merged results',
+      input_schema: s.object({
+        results: s.array(s.string()),
+      }),
+      output_schema: nodeCOutputSchema,
       steps: [nodeCStep],
     });
 
     const nodeC = node({
       ref: 'node_c',
-      name: 'Node C',
+      name: 'Node C - Summarize',
       task: nodeCTask,
       task_version: 1,
-      input_mapping: {},
-      output_mapping: {},
+      // Read merged data from state
+      input_mapping: {
+        results: '$.state.results',
+      },
+      // Write summary back to state
+      output_mapping: { 'state.summary': '$.summary' },
     });
 
     // Transition: Fan-out from A to B with spawn_count
@@ -172,6 +195,7 @@ describe('Foundation: 02 - Fan-out with Spawn Count + Fan-in', () => {
     });
 
     // Transition: Fan-in from B to C with synchronization
+    // Merges branch results into state.results
     const fanInTransition = transition({
       ref: 'fanin_transition',
       from_node_ref: 'node_b',
@@ -195,10 +219,12 @@ describe('Foundation: 02 - Fan-out with Spawn Count + Fan-in', () => {
       output_schema: workflowOutputSchema,
       context_schema: contextSchema,
       output_mapping: {
-        // Pass through input.starter to verify data flow
-        starter: '$.input.starter',
-        // Extract merged branch results from context
+        // Pass through input.prefix to verify data flow
+        prefix: '$.input.prefix',
+        // Extract state fields written during workflow
+        seed: '$.state.seed',
         merged_results: '$.state.results',
+        summary: '$.state.summary',
       },
       initial_node_ref: 'node_a',
       nodes: [nodeA, nodeB, nodeC],
@@ -208,7 +234,7 @@ describe('Foundation: 02 - Fan-out with Spawn Count + Fan-in', () => {
     // =========================================================================
     // Execute
     // =========================================================================
-    const workflowInput = { starter: 'hello-world' };
+    const workflowInput = { prefix: 'TEST' };
     const { result, cleanup } = await runTestWorkflow(workflowDef, workflowInput);
 
     try {
@@ -245,9 +271,9 @@ INPUT ARRIVAL DIAGNOSTIC:
 `;
 
       expect(
-        snapshotInput.starter,
-        `Workflow input.starter should arrive in context.\n${inputDiagnostic}`,
-      ).toBe(workflowInput.starter);
+        snapshotInput.prefix,
+        `Workflow input.prefix should arrive in context.\n${inputDiagnostic}`,
+      ).toBe(workflowInput.prefix);
 
       // =========================================================================
       // TOKEN CREATION - Self-Diagnosing Validation
@@ -538,61 +564,77 @@ ${Array.from(siblingTokenIds)
       const completionExtracts = trace.filter('decision.completion.extract');
 
       const finalOutput = completion!.payload.final_output as {
-        starter: string;
+        prefix: string;
+        seed: string;
         merged_results: string[];
+        summary: string;
       };
 
-      // 5.2: Verify input propagated to output via state.starter
-      // The output_mapping extracts $.state.starter to output.starter
+      // 5.2: Verify input propagated to output
+      // The output_mapping extracts $.input.prefix to output.prefix
       //
       // Context write tracing: Look for what was actually written to state
       const contextWrites = trace.context.setFields();
-      const starterWrites = contextWrites.filter((w) => w.payload.path.includes('starter'));
+      const seedWrites = contextWrites.filter((w) => w.payload.path.includes('seed'));
 
       const stateMutationDiagnostic = `
 STATE MUTATION DIAGNOSTIC:
   Final output: ${JSON.stringify(finalOutput)}
-  Expected starter: "${workflowInput.starter}"
-  Actual starter: ${JSON.stringify(finalOutput.starter)}
+  Expected prefix: "${workflowInput.prefix}"
+  Actual prefix: ${JSON.stringify(finalOutput.prefix)}
+  Actual seed: ${JSON.stringify(finalOutput.seed)}
   
   All context writes (${contextWrites.length}):
 ${contextWrites.map((w) => `    path=${w.payload.path} | value=${JSON.stringify(w.payload.value)}`).join('\n')}
 
-  Starter-related writes (${starterWrites.length}):
-${starterWrites.map((w) => `    path=${w.payload.path} | value=${JSON.stringify(w.payload.value)}`).join('\n')}
+  Seed-related writes (${seedWrites.length}):
+${seedWrites.map((w) => `    path=${w.payload.path} | value=${JSON.stringify(w.payload.value)}`).join('\n')}
 `;
       expect(
-        finalOutput.starter,
-        `Final output.starter should match input.starter via state mutation.\n${stateMutationDiagnostic}`,
-      ).toBe(workflowInput.starter);
+        finalOutput.prefix,
+        `Final output.prefix should match input.prefix.\n${stateMutationDiagnostic}`,
+      ).toBe(workflowInput.prefix);
 
-      // 5.3: Verify branch merge happened
+      // 5.3: Verify seed was written to state by nodeA
+      expect(
+        finalOutput.seed,
+        `Final output.seed should be defined (written by nodeA).\n${stateMutationDiagnostic}`,
+      ).toBeDefined();
+
+      // 5.4: Verify branch merge happened
       // The fan-in merge should collect all branch results into state.results
       // which then gets extracted to output.merged_results
       const mergedResultsDiagnostic = `
-MERGED RESULTS DIAGNOSTIC:
-  Final output: ${JSON.stringify(finalOutput)}
-  merged_results: ${JSON.stringify(finalOutput.merged_results)}
-  merged_results type: ${typeof finalOutput.merged_results}
-  Is array: ${Array.isArray(finalOutput.merged_results)}
-  
-COMPLETION DEBUG:
-  Context keys at completion: ${JSON.stringify(completionStart?.payload.context_keys)}
-  Output mapping: ${JSON.stringify(completionStart?.payload.output_mapping)}
-  Extracts: ${JSON.stringify(completionExtracts.map((e) => e.payload))}
-`;
+      MERGED RESULTS DIAGNOSTIC:
+        Final output: ${JSON.stringify(finalOutput)}
+        merged_results: ${JSON.stringify(finalOutput.merged_results)}
+        merged_results type: ${typeof finalOutput.merged_results}
+        Is array: ${Array.isArray(finalOutput.merged_results)}
+        summary: ${JSON.stringify(finalOutput.summary)}
+        
+      COMPLETION DEBUG:
+        Context keys at completion: ${JSON.stringify(completionStart?.payload.context_keys)}
+        Output mapping: ${JSON.stringify(completionStart?.payload.output_mapping)}
+        Extracts: ${JSON.stringify(completionExtracts.map((e) => e.payload))}
+      `;
       expect(
         Array.isArray(finalOutput.merged_results),
         `Final output.merged_results should be an array.\n${mergedResultsDiagnostic}`,
       ).toBe(true);
 
-      // 5.4: Verify we got all 3 branch results
+      // 5.5: Verify we got all 3 branch results
       expect(
         finalOutput.merged_results,
         'Should have exactly 3 merged results from fan-out',
       ).toHaveLength(3);
 
-      // 5.5: Verify the merged values match the branch outputs
+      // 5.6: Verify summary was written by nodeC
+      expect(
+        finalOutput.summary,
+        `Summary should be defined (written by nodeC after reading merged results).\n${mergedResultsDiagnostic}`,
+      ).toBeDefined();
+
+      // 5.7: Verify the merged values match the branch outputs
       // The branch outputs are collected from the trace events
       // Note: We dedupe by tokenId since each sibling may have multiple branch writes
       // (step output + node output), but the final result is one per token
@@ -613,14 +655,53 @@ COMPLETION DEBUG:
       // =========================================================================
 
       // Verify we can trace the state mutations through context.set events
+      // This test has multiple state mutations at different points:
+      // 1. state.seed - written by nodeA
+      // 2. state.results - written by fan-in merge
+      // 3. state.summary - written by nodeC
 
-      // 6.1: Verify state.results was written (by fan-in merge)
-      // Note: starter is read from input, not written to state
+      // 6.1: Verify state.seed was written by nodeA
+      const seedWrite = trace.context.setFieldAt('state.seed');
+      expect(seedWrite, 'Should have context write for state.seed (from nodeA)').toBeDefined();
+      expect(typeof seedWrite!.payload.value, 'state.seed should be a string').toBe('string');
+
+      // 6.2: Verify state.results was written by fan-in merge
       const resultsWrite = trace.context.setFieldAt('state.results');
-      expect(resultsWrite, 'Should have context write for state.results').toBeDefined();
+      expect(
+        resultsWrite,
+        'Should have context write for state.results (from fan-in)',
+      ).toBeDefined();
       const writtenResults = resultsWrite!.payload.value as string[];
       expect(Array.isArray(writtenResults), 'state.results write should be an array').toBe(true);
       expect(writtenResults.length, 'state.results should have 3 merged values').toBe(3);
+
+      // 6.3: Verify state.summary was written by nodeC
+      const summaryWrite = trace.context.setFieldAt('state.summary');
+      expect(
+        summaryWrite,
+        'Should have context write for state.summary (from nodeC)',
+      ).toBeDefined();
+      expect(typeof summaryWrite!.payload.value, 'state.summary should be a string').toBe('string');
+
+      // 6.4: Verify write ordering - seed must come before results
+      // (nodeA writes seed, then fan-out happens, then fan-in merges results)
+      const allWrites = trace.context.setFields();
+      const seedWriteIndex = allWrites.findIndex((w) => w.payload.path === 'state.seed');
+      const resultsWriteIndex = allWrites.findIndex((w) => w.payload.path === 'state.results');
+      const summaryWriteIndex = allWrites.findIndex((w) => w.payload.path === 'state.summary');
+
+      expect(seedWriteIndex, 'state.seed write should exist').toBeGreaterThanOrEqual(0);
+      expect(resultsWriteIndex, 'state.results write should exist').toBeGreaterThanOrEqual(0);
+      expect(summaryWriteIndex, 'state.summary write should exist').toBeGreaterThanOrEqual(0);
+
+      expect(
+        seedWriteIndex < resultsWriteIndex,
+        'state.seed should be written before state.results (nodeA runs before fan-in)',
+      ).toBe(true);
+      expect(
+        resultsWriteIndex < summaryWriteIndex,
+        'state.results should be written before state.summary (fan-in runs before nodeC)',
+      ).toBe(true);
 
       // =========================================================================
       // LAYER 7: Context Snapshots (Decision Points)
