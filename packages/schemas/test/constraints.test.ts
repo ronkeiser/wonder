@@ -6,7 +6,7 @@ import {
   validateNumber,
   validateObject,
   validateString,
-} from '../src/constraints.js';
+} from '../src/validation/constraints.js';
 import type { JSONSchema } from '../src/types.js';
 import { ValidationErrorCode } from '../src/types.js';
 

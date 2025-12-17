@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import { CustomTypeRegistry } from '../src/custom-types.js';
-import { DDLGenerator } from '../src/ddl-generator.js';
+import { DDLGenerator } from '../src/generators/ddl-generator.js';
 import type { JSONSchema } from '../src/types.js';
 
 describe('DDLGenerator', () => {

@@ -2,7 +2,7 @@ import { describe, expect, it } from 'vitest';
 import { CustomTypeRegistry } from '../src/custom-types.js';
 import type { JSONSchema } from '../src/types.js';
 import { ValidationErrorCode } from '../src/types.js';
-import { Validator, validateSchema } from '../src/validator.js';
+import { Validator, validateSchema } from '../src/validation/validator.js';
 
 describe('Validator', () => {
   describe('basic type validation', () => {

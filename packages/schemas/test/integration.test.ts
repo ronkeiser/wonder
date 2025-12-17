@@ -1,11 +1,11 @@
 import { Miniflare } from 'miniflare';
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 import { CustomTypeRegistry } from '../src/custom-types.js';
-import { DDLGenerator } from '../src/ddl-generator.js';
-import { DMLGenerator } from '../src/dml-generator.js';
+import { DDLGenerator } from '../src/generators/ddl-generator.js';
+import { DMLGenerator } from '../src/generators/dml-generator.js';
 import { Schema } from '../src/schema.js';
 import type { JSONSchema } from '../src/types.js';
-import { Validator } from '../src/validator.js';
+import { Validator } from '../src/validation/validator.js';
 
 // D1Database type from Miniflare
 type D1Database = any;

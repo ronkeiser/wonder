@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
-import { generateMockData } from '../src/mock-generator';
-import type { JSONSchema } from '../src/types';
+import { generateMockData } from '../src/generators/mock-generator.js';
+import type { JSONSchema } from '../src/types.js';
 
 describe('generateMockData', () => {
   describe('primitive types', () => {
