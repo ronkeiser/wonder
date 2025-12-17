@@ -174,13 +174,14 @@ export class DMLGenerator {
   }
 
   /**
-   * Generate INSERT statements for array tables
+   * Generate INSERT statements for array tables (including arrays nested in flattened objects)
    */
   private generateArrayInserts(
     parentTableName: string,
     data: Record<string, unknown>,
     schema: JSONSchema,
     parentIdPlaceholder: string,
+    prefix = '',
   ): InsertResult {
     const statements: string[] = [];
     const values: unknown[][] = [];
@@ -190,15 +191,34 @@ export class DMLGenerator {
     }
 
     for (const [fieldName, fieldSchema] of Object.entries(schema.properties)) {
+      const fieldValue = data[fieldName];
+      if (fieldValue === undefined) continue;
+
+      const pathName = buildColumnName(prefix, fieldName);
+
+      // Recurse into nested objects with flatten strategy to find arrays inside them
+      if (fieldSchema.type === 'object' && this.options.nestedObjectStrategy === 'flatten') {
+        const nestedInserts = this.generateArrayInserts(
+          parentTableName,
+          fieldValue as Record<string, unknown>,
+          fieldSchema,
+          parentIdPlaceholder,
+          pathName,
+        );
+        statements.push(...nestedInserts.statements);
+        values.push(...nestedInserts.values);
+        continue;
+      }
+
       if (fieldSchema.type === 'array' && fieldSchema.items) {
-        const arrayValue = data[fieldName];
+        const arrayValue = fieldValue;
         if (!Array.isArray(arrayValue)) {
           continue;
         }
 
         const arrayTableName = buildArrayTableName(
           parentTableName,
-          fieldName,
+          pathName,
           this.options.arrayTablePrefix,
         );
         const itemSchema = fieldSchema.items;
@@ -241,12 +261,13 @@ export class DMLGenerator {
   }
 
   /**
-   * Generate DELETE statements for array tables
+   * Generate DELETE statements for array tables (including arrays nested in flattened objects)
    */
   private generateArrayDeletes(
     parentTableName: string,
     schema: JSONSchema,
     parentWhereClause: string,
+    prefix = '',
   ): string[] {
     const statements: string[] = [];
 
@@ -255,10 +276,24 @@ export class DMLGenerator {
     }
 
     for (const [fieldName, fieldSchema] of Object.entries(schema.properties)) {
+      const pathName = buildColumnName(prefix, fieldName);
+
+      // Recurse into nested objects with flatten strategy to find arrays inside them
+      if (fieldSchema.type === 'object' && this.options.nestedObjectStrategy === 'flatten') {
+        const nestedDeletes = this.generateArrayDeletes(
+          parentTableName,
+          fieldSchema,
+          parentWhereClause,
+          pathName,
+        );
+        statements.push(...nestedDeletes);
+        continue;
+      }
+
       if (fieldSchema.type === 'array' && fieldSchema.items) {
         const arrayTableName = buildArrayTableName(
           parentTableName,
-          fieldName,
+          pathName,
           this.options.arrayTablePrefix,
         );
         const fkColumnName = buildForeignKeyColumnName(parentTableName);
