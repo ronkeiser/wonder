@@ -4,7 +4,6 @@
   "private": true,
   "scripts": {
     "test": "vitest run --config packages/tests/vitest.config.ts",
-    "test:edge": "vitest run --config packages/tests/vitest.config.ts tests/edge",
     "test:foundation": "vitest run --config packages/tests/vitest.config.ts tests/foundation",
     "test:foundation:latest": "vitest run --config packages/tests/vitest.config.ts $(ls packages/tests/src/tests/foundation/*.test.ts | sort | tail -1)",
     "types": "pnpm --filter @wonder/scripts run build-services",

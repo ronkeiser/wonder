@@ -6,8 +6,8 @@
   "scripts": {
     "test": "vitest run",
     "test:watch": "vitest",
-    "test:ui": "vitest --ui",
-    "test:edge": "vitest run src/tests/edge.test.ts"
+    "test:foundation": "vitest run src/tests/foundation",
+    "test:latest": "vitest run $(ls src/tests/foundation/*.test.ts | sort -V | tail -1)"
   },
   "dependencies": {
     "@wonder/sdk": "workspace:*"
