@@ -70,8 +70,8 @@ export namespace TracePayloads {
   }
 
   // Branch operations
+  // Note: token_id is a TOP-LEVEL field on these events, not in the payload
   export interface BranchTableCreate {
-    token_id: string;
     table_name: string;
     schema_type: string;
   }
@@ -82,14 +82,13 @@ export namespace TracePayloads {
   }
 
   export interface BranchValidate {
-    token_id: string;
+    valid: boolean;
     valid: boolean;
     error_count: number;
     errors?: string[];
   }
 
   export interface BranchWrite {
-    token_id: string;
     output: unknown;
   }
 
