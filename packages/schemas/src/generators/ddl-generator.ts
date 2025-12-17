@@ -2,37 +2,27 @@
 
 import type { CustomTypeRegistry } from '../custom-types';
 import type { JSONSchema } from '../types';
+import {
+  type ColumnDefinition,
+  type GeneratorOptions,
+  type NormalizedGeneratorOptions,
+  normalizeOptions,
+} from './shared';
+import { buildArrayTableName, buildColumnName, buildForeignKeyColumnName } from './shared/naming';
 
-export type ColumnDefinition = {
-  name: string;
-  type: string;
-  constraints: string[];
-};
-
-export type DDLGeneratorOptions = {
-  // Strategy for nested objects: 'flatten' (dot notation) or 'json' (JSON column)
-  nestedObjectStrategy?: 'flatten' | 'json';
-
-  // Strategy for arrays: 'table' (separate table with FK) or 'json' (JSON column)
-  arrayStrategy?: 'table' | 'json';
-
-  // Prefix for array table names
-  arrayTablePrefix?: string;
-};
+// Re-export for backwards compatibility
+export type { ColumnDefinition };
+export type DDLGeneratorOptions = GeneratorOptions;
 
 export class DDLGenerator {
-  private options: Required<DDLGeneratorOptions>;
+  private options: NormalizedGeneratorOptions;
 
   constructor(
     private schema: JSONSchema,
     private customTypes: CustomTypeRegistry,
-    options: DDLGeneratorOptions = {},
+    options: GeneratorOptions = {},
   ) {
-    this.options = {
-      nestedObjectStrategy: options.nestedObjectStrategy ?? 'flatten',
-      arrayStrategy: options.arrayStrategy ?? 'table',
-      arrayTablePrefix: options.arrayTablePrefix ?? '',
-    };
+    this.options = normalizeOptions(options);
   }
 
   /**
@@ -47,7 +37,7 @@ export class DDLGenerator {
     const arrayTables = this.generateArrayTables(tableName, this.schema);
 
     // Add primary key as first column
-    const pkColumn = {
+    const pkColumn: ColumnDefinition = {
       name: 'id',
       type: 'INTEGER',
       constraints: ['PRIMARY KEY AUTOINCREMENT'],
@@ -55,13 +45,7 @@ export class DDLGenerator {
 
     // Build CREATE TABLE statement
     const allColumns = [pkColumn, ...columns];
-    const columnDefs = allColumns.map((col) => {
-      const parts = [col.name, col.type];
-      if (col.constraints.length > 0) {
-        parts.push(...col.constraints);
-      }
-      return `  ${parts.join(' ')}`;
-    });
+    const columnDefs = allColumns.map((col) => formatColumnDefinition(col));
 
     let ddl = `CREATE TABLE ${tableName} (\n${columnDefs.join(',\n')}\n);`;
 
@@ -89,7 +73,7 @@ export class DDLGenerator {
         continue;
       }
 
-      const columnName = prefix ? `${prefix}_${fieldName}` : fieldName;
+      const columnName = buildColumnName(prefix, fieldName);
       const isRequired = schema.required?.includes(fieldName) ?? false;
 
       if (fieldSchema.type === 'object' && this.options.nestedObjectStrategy === 'flatten') {
@@ -131,7 +115,7 @@ export class DDLGenerator {
     }
 
     for (const [fieldName, fieldSchema] of Object.entries(schema.properties)) {
-      const pathName = prefix ? `${prefix}_${fieldName}` : fieldName;
+      const pathName = buildColumnName(prefix, fieldName);
 
       // Handle nested objects with flatten strategy - recurse to find arrays inside
       if (fieldSchema.type === 'object' && this.options.nestedObjectStrategy === 'flatten') {
@@ -141,8 +125,13 @@ export class DDLGenerator {
       }
 
       if (fieldSchema.type === 'array' && fieldSchema.items) {
-        const arrayTableName = `${this.options.arrayTablePrefix}${parentTableName}_${pathName}`;
+        const arrayTableName = buildArrayTableName(
+          parentTableName,
+          pathName,
+          this.options.arrayTablePrefix,
+        );
         const itemSchema = fieldSchema.items;
+        const fkColumnName = buildForeignKeyColumnName(parentTableName);
 
         // Build array table columns
         // Include id PRIMARY KEY so nested arrays can reference this table
@@ -153,7 +142,7 @@ export class DDLGenerator {
             constraints: ['PRIMARY KEY AUTOINCREMENT'],
           },
           {
-            name: `${parentTableName}_id`,
+            name: fkColumnName,
             type: 'INTEGER',
             constraints: ['NOT NULL'],
           },
@@ -179,15 +168,8 @@ export class DDLGenerator {
         }
 
         // Build CREATE TABLE statement
-        const columnDefs = columns.map((col) => {
-          const parts = [col.name, col.type];
-          if (col.constraints.length > 0) {
-            parts.push(...col.constraints);
-          }
-          return `  ${parts.join(' ')}`;
-        });
-
-        const fkConstraint = `  FOREIGN KEY (${parentTableName}_id) REFERENCES ${parentTableName}(id)`;
+        const columnDefs = columns.map((col) => formatColumnDefinition(col));
+        const fkConstraint = `  FOREIGN KEY (${fkColumnName}) REFERENCES ${parentTableName}(id)`;
 
         const ddl = `CREATE TABLE ${arrayTableName} (\n${columnDefs.join(
           ',\n',
@@ -350,7 +332,11 @@ export class DDLGenerator {
 
     for (const [fieldName, fieldSchema] of Object.entries(schema.properties)) {
       if (fieldSchema.type === 'array' && fieldSchema.items) {
-        const arrayTableName = `${this.options.arrayTablePrefix}${parentTableName}_${fieldName}`;
+        const arrayTableName = buildArrayTableName(
+          parentTableName,
+          fieldName,
+          this.options.arrayTablePrefix,
+        );
         tableNames.push(arrayTableName);
 
         // Recursively handle nested arrays in object items
@@ -363,4 +349,15 @@ export class DDLGenerator {
 
     return tableNames;
   }
+}
+
+/**
+ * Format a column definition as SQL string
+ */
+function formatColumnDefinition(col: ColumnDefinition): string {
+  const parts = [col.name, col.type];
+  if (col.constraints.length > 0) {
+    parts.push(...col.constraints);
+  }
+  return `  ${parts.join(' ')}`;
 }

@@ -8,6 +8,7 @@ export * from './validation/validator';
 export * from './generators/ddl-generator';
 export * from './generators/dml-generator';
 export * from './generators/select-generator';
+export * from './generators/shared';
 
 // Core
 export * from './custom-types';

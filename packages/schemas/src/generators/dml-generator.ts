@@ -2,41 +2,29 @@
 
 import type { CustomTypeRegistry } from '../custom-types';
 import type { JSONSchema } from '../types';
+import {
+  type GeneratorOptions,
+  type InsertResult,
+  type NormalizedGeneratorOptions,
+  type UpdateResult,
+  normalizeOptions,
+} from './shared';
+import { buildArrayTableName, buildColumnName, buildForeignKeyColumnName } from './shared/naming';
+import { booleanToSql, encodeJsonValue } from './shared/value-codecs';
 
-export type DMLGeneratorOptions = {
-  // Strategy for nested objects: 'flatten' or 'json'
-  nestedObjectStrategy?: 'flatten' | 'json';
-
-  // Strategy for arrays: 'table' or 'json'
-  arrayStrategy?: 'table' | 'json';
-
-  // Prefix for array table names (must match DDL generator)
-  arrayTablePrefix?: string;
-};
-
-export type InsertResult = {
-  statements: string[];
-  values: unknown[][];
-};
-
-export type UpdateResult = {
-  statements: string[];
-  values: unknown[][];
-};
+// Re-export for backwards compatibility
+export type { InsertResult, UpdateResult };
+export type DMLGeneratorOptions = GeneratorOptions;
 
 export class DMLGenerator {
-  private options: Required<DMLGeneratorOptions>;
+  private options: NormalizedGeneratorOptions;
 
   constructor(
     private schema: JSONSchema,
     _customTypes: CustomTypeRegistry,
-    options: DMLGeneratorOptions = {},
+    options: GeneratorOptions = {},
   ) {
-    this.options = {
-      nestedObjectStrategy: options.nestedObjectStrategy ?? 'flatten',
-      arrayStrategy: options.arrayStrategy ?? 'table',
-      arrayTablePrefix: options.arrayTablePrefix ?? '',
-    };
+    this.options = normalizeOptions(options);
   }
 
   /**
@@ -148,7 +136,7 @@ export class DMLGenerator {
 
     for (const [fieldName, fieldSchema] of Object.entries(schema.properties)) {
       const value = data[fieldName];
-      const columnName = prefix ? `${prefix}_${fieldName}` : fieldName;
+      const columnName = buildColumnName(prefix, fieldName);
 
       // Skip undefined values
       if (value === undefined) {
@@ -170,11 +158,11 @@ export class DMLGenerator {
       } else if (fieldSchema.type === 'object' || fieldSchema.type === 'array') {
         // Store as JSON
         columns.push(columnName);
-        vals.push(JSON.stringify(value));
+        vals.push(encodeJsonValue(value));
       } else if (fieldSchema.type === 'boolean') {
         // SQLite stores boolean as 0/1
         columns.push(columnName);
-        vals.push(value ? 1 : 0);
+        vals.push(booleanToSql(value as boolean));
       } else {
         // Regular scalar value
         columns.push(columnName);
@@ -208,8 +196,13 @@ export class DMLGenerator {
           continue;
         }
 
-        const arrayTableName = `${this.options.arrayTablePrefix}${parentTableName}_${fieldName}`;
+        const arrayTableName = buildArrayTableName(
+          parentTableName,
+          fieldName,
+          this.options.arrayTablePrefix,
+        );
         const itemSchema = fieldSchema.items;
+        const fkColumnName = buildForeignKeyColumnName(parentTableName);
 
         for (let index = 0; index < arrayValue.length; index++) {
           const item = arrayValue[index];
@@ -222,7 +215,7 @@ export class DMLGenerator {
               '',
             );
 
-            const allColumns = [`${parentTableName}_id`, '"index"', ...columns];
+            const allColumns = [fkColumnName, '"index"', ...columns];
             const allVals = [parentIdPlaceholder, index, ...vals];
             const placeholders = allColumns.map(() => '?').join(', ');
 
@@ -232,7 +225,7 @@ export class DMLGenerator {
             values.push(allVals);
           } else {
             // Array of scalars
-            const allColumns = [`${parentTableName}_id`, '"index"', 'value'];
+            const allColumns = [fkColumnName, '"index"', 'value'];
             const allVals = [parentIdPlaceholder, index, item];
 
             statements.push(
@@ -263,11 +256,16 @@ export class DMLGenerator {
 
     for (const [fieldName, fieldSchema] of Object.entries(schema.properties)) {
       if (fieldSchema.type === 'array' && fieldSchema.items) {
-        const arrayTableName = `${this.options.arrayTablePrefix}${parentTableName}_${fieldName}`;
+        const arrayTableName = buildArrayTableName(
+          parentTableName,
+          fieldName,
+          this.options.arrayTablePrefix,
+        );
+        const fkColumnName = buildForeignKeyColumnName(parentTableName);
 
         // Use subquery to properly cascade delete based on parent FK
         statements.push(
-          `DELETE FROM ${arrayTableName} WHERE ${parentTableName}_id IN (SELECT id FROM ${parentTableName} WHERE ${parentWhereClause});`,
+          `DELETE FROM ${arrayTableName} WHERE ${fkColumnName} IN (SELECT id FROM ${parentTableName} WHERE ${parentWhereClause});`,
         );
       }
     }
@@ -303,7 +301,7 @@ export class DMLGenerator {
     }
 
     for (const [fieldName, fieldSchema] of Object.entries(schema.properties)) {
-      const columnName = prefix ? `${prefix}_${fieldName}` : fieldName;
+      const columnName = buildColumnName(prefix, fieldName);
 
       if (fieldSchema.type === 'object' && this.options.nestedObjectStrategy === 'flatten') {
         this.collectColumns(fieldSchema, columnName, columns);

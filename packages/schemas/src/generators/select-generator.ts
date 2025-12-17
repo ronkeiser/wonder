@@ -9,28 +9,21 @@
 
 import type { SqlExecutor } from '../schema';
 import type { JSONSchema } from '../types';
+import { type GeneratorOptions, type NormalizedGeneratorOptions, normalizeOptions } from './shared';
+import { buildArrayTableName, buildColumnName, buildForeignKeyColumnName } from './shared/naming';
+import { decodeJsonArray, decodeJsonObject, sqlToBoolean } from './shared/value-codecs';
 
-export type SelectGeneratorOptions = {
-  /** Strategy used for nested objects in DDL (must match) */
-  nestedObjectStrategy?: 'flatten' | 'json';
-  /** Strategy used for arrays in DDL (must match) */
-  arrayStrategy?: 'table' | 'json';
-  /** Prefix used for array table names (must match DDL) */
-  arrayTablePrefix?: string;
-};
+// Re-export for backwards compatibility
+export type SelectGeneratorOptions = GeneratorOptions;
 
 export class SelectGenerator {
-  private options: Required<SelectGeneratorOptions>;
+  private options: NormalizedGeneratorOptions;
 
   constructor(
     private schema: JSONSchema,
-    options: SelectGeneratorOptions = {},
+    options: GeneratorOptions = {},
   ) {
-    this.options = {
-      nestedObjectStrategy: options.nestedObjectStrategy ?? 'flatten',
-      arrayStrategy: options.arrayStrategy ?? 'table',
-      arrayTablePrefix: options.arrayTablePrefix ?? '',
-    };
+    this.options = normalizeOptions(options);
   }
 
   /**
@@ -70,7 +63,7 @@ export class SelectGenerator {
     }
 
     for (const [fieldName, fieldSchema] of Object.entries(schema.properties)) {
-      const columnName = prefix ? `${prefix}_${fieldName}` : fieldName;
+      const columnName = buildColumnName(prefix, fieldName);
 
       if (fieldSchema.type === 'object' && this.options.nestedObjectStrategy === 'flatten') {
         // Recursively reconstruct nested object from flattened columns
@@ -87,17 +80,13 @@ export class SelectGenerator {
         result[fieldName] = this.readArrayTable(sql, tableName, rowId, columnName, fieldSchema);
       } else if (fieldSchema.type === 'array' && this.options.arrayStrategy === 'json') {
         // Parse JSON array
-        const jsonValue = flatRow[columnName];
-        result[fieldName] =
-          typeof jsonValue === 'string' ? JSON.parse(jsonValue) : (jsonValue ?? []);
+        result[fieldName] = decodeJsonArray(flatRow[columnName]);
       } else if (fieldSchema.type === 'object' && this.options.nestedObjectStrategy === 'json') {
         // Parse JSON object
-        const jsonValue = flatRow[columnName];
-        result[fieldName] =
-          typeof jsonValue === 'string' ? JSON.parse(jsonValue) : (jsonValue ?? {});
+        result[fieldName] = decodeJsonObject(flatRow[columnName]);
       } else if (fieldSchema.type === 'boolean') {
         // Convert SQLite 0/1 back to boolean
-        result[fieldName] = flatRow[columnName] === 1;
+        result[fieldName] = sqlToBoolean(flatRow[columnName]);
       } else {
         // Regular scalar - copy directly
         result[fieldName] = flatRow[columnName];
@@ -117,16 +106,22 @@ export class SelectGenerator {
     fieldName: string,
     fieldSchema: JSONSchema,
   ): unknown[] {
-    const arrayTableName = `${this.options.arrayTablePrefix}${parentTableName}_${fieldName}`;
+    const arrayTableName = buildArrayTableName(
+      parentTableName,
+      fieldName,
+      this.options.arrayTablePrefix,
+    );
     const itemSchema = fieldSchema.items;
 
     if (!itemSchema) {
       return [];
     }
 
+    const fkColumnName = buildForeignKeyColumnName(parentTableName);
+
     try {
       const result = sql.exec(
-        `SELECT * FROM ${arrayTableName} WHERE ${parentTableName}_id = ? ORDER BY "index";`,
+        `SELECT * FROM ${arrayTableName} WHERE ${fkColumnName} = ? ORDER BY "index";`,
         parentId,
       );
       const rows = [...result] as Record<string, unknown>[];
@@ -136,7 +131,7 @@ export class SelectGenerator {
           // Reconstruct object from flattened columns (excluding FK and index)
           return this.reconstructArrayItem(sql, arrayTableName, row, itemSchema);
         } else if (itemSchema.type === 'boolean') {
-          return row.value === 1;
+          return sqlToBoolean(row.value);
         } else {
           // Scalar array - return value column
           return row.value;
@@ -174,7 +169,7 @@ export class SelectGenerator {
         // Nested array - read from child table using this row's ID
         result[fieldName] = this.readArrayTable(sql, arrayTableName, rowId, fieldName, fieldSchema);
       } else if (fieldSchema.type === 'boolean') {
-        result[fieldName] = row[fieldName] === 1;
+        result[fieldName] = sqlToBoolean(row[fieldName]);
       } else {
         result[fieldName] = row[fieldName];
       }
@@ -198,12 +193,12 @@ export class SelectGenerator {
     }
 
     for (const [fieldName, fieldSchema] of Object.entries(schema.properties)) {
-      const columnName = `${prefix}_${fieldName}`;
+      const columnName = buildColumnName(prefix, fieldName);
 
       if (fieldSchema.type === 'object' && this.options.nestedObjectStrategy === 'flatten') {
         result[fieldName] = this.reconstructNestedFromRow(row, columnName, fieldSchema);
       } else if (fieldSchema.type === 'boolean') {
-        result[fieldName] = row[columnName] === 1;
+        result[fieldName] = sqlToBoolean(row[columnName]);
       } else {
         result[fieldName] = row[columnName];
       }
