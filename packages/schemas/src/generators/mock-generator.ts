@@ -5,7 +5,7 @@
  * Useful for testing workflows without real LLM calls or external services.
  */
 
-import type { JSONSchema } from './types.js';
+import type { JSONSchema } from '../types.js';
 
 /**
  * Options for mock data generation

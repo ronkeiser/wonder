@@ -1,5 +1,5 @@
 /**
- * Schema - Primary API for @wonder/context
+ * Schema - Primary API for @wonder/schemas
  *
  * Unified entry point that wraps JSONSchema and provides:
  * - Validation (cached Validator)
@@ -9,11 +9,15 @@
  */
 
 import { CustomTypeRegistry } from './custom-types.js';
-import { DDLGenerator, type DDLGeneratorOptions } from './ddl-generator.js';
-import { DMLGenerator, type DMLGeneratorOptions, type InsertResult } from './dml-generator.js';
-import { SelectGenerator, type SelectGeneratorOptions } from './select-generator.js';
+import { DDLGenerator, type DDLGeneratorOptions } from './generators/ddl-generator.js';
+import {
+  DMLGenerator,
+  type DMLGeneratorOptions,
+  type InsertResult,
+} from './generators/dml-generator.js';
+import { SelectGenerator, type SelectGeneratorOptions } from './generators/select-generator.js';
 import type { JSONSchema, ValidationResult, ValidatorOptions } from './types.js';
-import { Validator } from './validator.js';
+import { Validator } from './validation/validator.js';
 
 export type SchemaOptions = DDLGeneratorOptions &
   DMLGeneratorOptions &

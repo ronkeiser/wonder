@@ -1,8 +1,8 @@
 // Type-specific constraint validation logic
 
-import type { JSONSchema, ValidationError } from './types.js';
-import { ValidationErrorCode } from './types.js';
-import { deepEqual, getType, isPlainObject } from './utils.js';
+import type { JSONSchema, ValidationError } from '../types.js';
+import { ValidationErrorCode } from '../types.js';
+import { deepEqual, getType, isPlainObject } from '../utils.js';
 
 /**
  * Validate a string value with constraints

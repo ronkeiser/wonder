@@ -1,7 +1,7 @@
 // DDL Generator - converts JSONSchema to SQLite DDL
 
-import type { CustomTypeRegistry } from './custom-types.js';
-import type { JSONSchema } from './types.js';
+import type { CustomTypeRegistry } from '../custom-types.js';
+import type { JSONSchema } from '../types.js';
 
 export type ColumnDefinition = {
   name: string;
