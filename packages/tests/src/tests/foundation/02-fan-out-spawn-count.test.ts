@@ -76,7 +76,7 @@ describe('Foundation: 02 - Fan-out with Spawn Count + Fan-in', () => {
       name: 'Initialize Action',
       description: 'Transforms input prefix into a seed value',
       kind: 'mock',
-      implementation: { schema: nodeAOutputSchema },
+      implementation: { schema: nodeAOutputSchema, options: { stringMode: 'words' } },
     });
 
     const nodeAStep = step({
@@ -113,7 +113,7 @@ describe('Foundation: 02 - Fan-out with Spawn Count + Fan-in', () => {
       kind: 'mock',
       implementation: {
         schema: nodeBOutputSchema,
-        options: { delay: { min_ms: 50, max_ms: 200 } },
+        options: { stringMode: 'words', delay: { min_ms: 50, max_ms: 200 } },
       },
     });
 
@@ -148,7 +148,7 @@ describe('Foundation: 02 - Fan-out with Spawn Count + Fan-in', () => {
       name: 'Summarize Action',
       description: 'Summarizes merged results',
       kind: 'mock',
-      implementation: { schema: nodeCOutputSchema },
+      implementation: { schema: nodeCOutputSchema, options: { stringMode: 'words' } },
     });
 
     const nodeCStep = step({

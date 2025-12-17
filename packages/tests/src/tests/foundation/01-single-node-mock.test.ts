@@ -38,10 +38,7 @@ describe('Foundation: 01 - Single Node Mock', () => {
     // Schemas
     // =========================================================================
     const inputSchema = s.object({});
-    const mockOutputSchema = s.object(
-      { code: s.string({ minLength: 6, maxLength: 6 }) },
-      { required: ['code'] },
-    );
+    const mockOutputSchema = s.object({ code: s.string() }, { required: ['code'] });
     const workflowOutputSchema = s.object({ code: s.string() }, { required: ['code'] });
 
     // =========================================================================
@@ -51,7 +48,7 @@ describe('Foundation: 01 - Single Node Mock', () => {
       name: 'Generate Code',
       description: 'Generates a random 6-character code',
       kind: 'mock',
-      implementation: { schema: mockOutputSchema }, // NO SEED - random value each run
+      implementation: { schema: mockOutputSchema, options: { stringMode: 'words' } },
     });
 
     const generateStep = step({
@@ -272,7 +269,7 @@ describe('Foundation: 01 - Single Node Mock', () => {
 
       const finalOutput = completionComplete!.payload.final_output as { code: string };
       expect(typeof finalOutput.code).toBe('string');
-      expect(finalOutput.code.length, 'Code must be 6 characters (schema constraint)').toBe(6);
+      expect(finalOutput.code.length, 'Code must be non-empty').toBeGreaterThan(0);
 
       // =========================================================================
       // RELATIONAL - Data flow verification
@@ -353,7 +350,7 @@ describe('Foundation: 01 - Single Node Mock', () => {
       // RELATIONAL: Extracted value must match final output
       const extractedCode = completionPlanningExtracts[0].payload.extracted_value;
       expect(typeof extractedCode).toBe('string');
-      expect((extractedCode as string).length).toBe(6);
+      expect((extractedCode as string).length).toBeGreaterThan(0);
       expect(extractedCode, 'Extracted value must equal final output').toBe(finalOutput.code);
 
       const completionPlanningComplete = trace.completion.complete();

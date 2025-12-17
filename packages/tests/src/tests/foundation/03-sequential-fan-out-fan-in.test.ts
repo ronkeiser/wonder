@@ -71,7 +71,7 @@ describe('Foundation: 03 - Sequential Fan-out/Fan-in', () => {
       name: 'Init Action',
       description: 'Initialize workflow state',
       kind: 'mock',
-      implementation: { schema: initOutputSchema },
+      implementation: { schema: initOutputSchema, options: { stringMode: 'words' } },
     });
 
     const initStep = step({
@@ -110,7 +110,7 @@ describe('Foundation: 03 - Sequential Fan-out/Fan-in', () => {
       kind: 'mock',
       implementation: {
         schema: phase1OutputSchema,
-        options: { delay: { min_ms: 50, max_ms: 200 } },
+        options: { stringMode: 'words', delay: { min_ms: 50, max_ms: 200 } },
       },
     });
 
@@ -147,7 +147,7 @@ describe('Foundation: 03 - Sequential Fan-out/Fan-in', () => {
       name: 'Bridge Action',
       description: 'Bridge between phases - counts phase 1 results',
       kind: 'mock',
-      implementation: { schema: bridgeOutputSchema },
+      implementation: { schema: bridgeOutputSchema, options: { stringMode: 'words' } },
     });
 
     const bridgeStep = step({
@@ -186,7 +186,7 @@ describe('Foundation: 03 - Sequential Fan-out/Fan-in', () => {
       kind: 'mock',
       implementation: {
         schema: phase2OutputSchema,
-        options: { delay: { min_ms: 50, max_ms: 200 } },
+        options: { stringMode: 'words', delay: { min_ms: 50, max_ms: 200 } },
       },
     });
 
@@ -229,7 +229,7 @@ describe('Foundation: 03 - Sequential Fan-out/Fan-in', () => {
       name: 'Summarize Action',
       description: 'Summarize all results',
       kind: 'mock',
-      implementation: { schema: summarizeOutputSchema },
+      implementation: { schema: summarizeOutputSchema, options: { stringMode: 'words' } },
     });
 
     const summarizeStep = step({
