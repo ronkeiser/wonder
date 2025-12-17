@@ -75,6 +75,36 @@ export class WorkflowVerificationError extends Error {
       lines.push('');
     }
 
+    // Workflow failure - show prominently if present
+    if (diagnostics.failure) {
+      lines.push('───────────────────────────────────────────────────────────────────────────────');
+      lines.push('  ⚠️  WORKFLOW FAILURE DETECTED');
+      lines.push('───────────────────────────────────────────────────────────────────────────────');
+      lines.push(`  Message: ${diagnostics.failure.message}`);
+      if (diagnostics.failure.nodeId) {
+        lines.push(`  Node ID: ${diagnostics.failure.nodeId}`);
+      }
+      if (diagnostics.failure.taskId) {
+        lines.push(`  Task ID: ${diagnostics.failure.taskId}`);
+      }
+      if (diagnostics.failure.tokenId) {
+        lines.push(`  Token ID: ${diagnostics.failure.tokenId}`);
+      }
+      if (diagnostics.failure.error) {
+        lines.push('  Error Details:');
+        lines.push(
+          `    ${JSON.stringify(diagnostics.failure.error, null, 2).split('\n').join('\n    ')}`,
+        );
+      }
+      if (diagnostics.failure.metrics) {
+        lines.push('  Metrics:');
+        lines.push(
+          `    ${JSON.stringify(diagnostics.failure.metrics, null, 2).split('\n').join('\n    ')}`,
+        );
+      }
+      lines.push('');
+    }
+
     // Token summary
     lines.push('───────────────────────────────────────────────────────────────────────────────');
     lines.push('  TOKEN STRUCTURE');

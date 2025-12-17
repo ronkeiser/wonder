@@ -5,7 +5,7 @@
  * Provides self-diagnosing test assertions with full context on failure.
  */
 
-import type { EmbeddedWorkflowDef, TraceEventCollection } from '@wonder/sdk';
+import type { EmbeddedWorkflowDef, EventEntry, TraceEventCollection } from '@wonder/sdk';
 import { WorkflowVerificationError } from './error';
 import type {
   BranchWriteSpec,
@@ -19,6 +19,7 @@ import type {
   TypedTraceEvent,
   VerificationConfig,
   VerificationContext,
+  WorkflowFailure,
 } from './types';
 
 /**
@@ -26,6 +27,7 @@ import type {
  */
 export class WorkflowVerifier {
   private readonly trace: TraceEventCollection;
+  private readonly events: EventEntry[];
   private readonly input: unknown;
   private readonly definition: EmbeddedWorkflowDef;
   private readonly config: VerificationConfig = {};
@@ -39,9 +41,11 @@ export class WorkflowVerifier {
     options: {
       input: unknown;
       definition: EmbeddedWorkflowDef;
+      events?: EventEntry[];
     },
   ) {
     this.trace = trace;
+    this.events = options.events ?? [];
     this.input = options.input;
     this.definition = options.definition;
   }
@@ -191,12 +195,72 @@ export class WorkflowVerifier {
   private verifyCompleted(diagnostics: DiagnosticContext): void {
     const completion = this.trace.completion.complete();
     if (!completion) {
+      // Check if workflow failed (provides better error message)
+      const failure = this.extractWorkflowFailure();
+      if (failure) {
+        // Update diagnostics with failure info for display
+        diagnostics.failure = failure;
+        throw new WorkflowVerificationError(
+          'completed',
+          `Workflow failed: ${failure.message}`,
+          diagnostics,
+          { failure },
+        );
+      }
+
       throw new WorkflowVerificationError(
         'completed',
         'Workflow did not complete - no completion event found.',
         diagnostics,
       );
     }
+  }
+
+  /**
+   * Extract workflow failure info from regular events.
+   */
+  private extractWorkflowFailure(): WorkflowFailure | null {
+    // Look for task.failed event first (has more details)
+    const taskFailed = this.events.find((e) => e.event_type === 'task.failed');
+    if (taskFailed) {
+      const metadata = this.parseMetadata(taskFailed.metadata);
+      return {
+        message: taskFailed.message ?? 'Task failed',
+        tokenId: metadata?.token_id as string | undefined,
+        nodeId: metadata?.node_id as string | undefined,
+        taskId: metadata?.task_id as string | undefined,
+        error: metadata?.error as WorkflowFailure['error'],
+        metrics: metadata?.metrics as WorkflowFailure['metrics'],
+      };
+    }
+
+    // Fall back to workflow.failed
+    const workflowFailed = this.events.find((e) => e.event_type === 'workflow.failed');
+    if (workflowFailed) {
+      const metadata = this.parseMetadata(workflowFailed.metadata);
+      const errorMsg = metadata?.error;
+      return {
+        message:
+          workflowFailed.message ?? (typeof errorMsg === 'string' ? errorMsg : 'Workflow failed'),
+      };
+    }
+
+    return null;
+  }
+
+  /**
+   * Parse metadata from event (may be string or object).
+   */
+  private parseMetadata(metadata: unknown): Record<string, unknown> | null {
+    if (!metadata) return null;
+    if (typeof metadata === 'string') {
+      try {
+        return JSON.parse(metadata);
+      } catch {
+        return null;
+      }
+    }
+    return metadata as Record<string, unknown>;
   }
 
   private verifyTokens(
@@ -774,6 +838,9 @@ export class WorkflowVerifier {
     const snapshots = this.trace.context.snapshots();
     const errors = this.trace.errors.all();
 
+    // Extract any failure info from events
+    const failure = this.extractWorkflowFailure();
+
     this._diagnostics = {
       input: this.input,
       tokenCreations: tokenCreations.map((tc) => ({
@@ -810,6 +877,7 @@ export class WorkflowVerifier {
         type: e.type,
         payload: e.payload,
       })),
+      failure: failure ?? undefined,
     };
 
     return this._diagnostics;
@@ -860,6 +928,7 @@ export function verify(
   options: {
     input: unknown;
     definition: EmbeddedWorkflowDef;
+    events?: EventEntry[];
   },
 ): WorkflowVerifier {
   return new WorkflowVerifier(trace, options);

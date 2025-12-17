@@ -37,5 +37,6 @@ export type {
   VerificationConfig,
   VerificationContext,
   VerificationResult,
+  WorkflowFailure,
 } from './types';
 export { verify, WorkflowVerifier } from './verifier';

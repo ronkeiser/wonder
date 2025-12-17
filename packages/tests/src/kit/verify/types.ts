@@ -220,6 +220,36 @@ export interface VerificationContext {
 }
 
 /**
+ * Workflow failure information extracted from events.
+ */
+export interface WorkflowFailure {
+  /** Error message from the failure */
+  message: string;
+
+  /** Token ID where failure occurred (if task failure) */
+  tokenId?: string;
+
+  /** Node ID where failure occurred (if task failure) */
+  nodeId?: string;
+
+  /** Task ID that failed (if task failure) */
+  taskId?: string;
+
+  /** Error details from metadata */
+  error?: {
+    type?: string;
+    message: string;
+    retryable?: boolean;
+  };
+
+  /** Execution metrics at time of failure */
+  metrics?: {
+    duration_ms?: number;
+    steps_executed?: number;
+  };
+}
+
+/**
  * Diagnostic context for error reporting.
  */
 export interface DiagnosticContext {
@@ -275,6 +305,9 @@ export interface DiagnosticContext {
     type: string;
     payload: unknown;
   }>;
+
+  /** Workflow failure info (if workflow failed) */
+  failure?: WorkflowFailure;
 }
 
 /**

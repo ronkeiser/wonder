@@ -38,6 +38,8 @@ export { ApiError } from './generated/client';
 
 export { TraceEventCollection } from './trace';
 
+export type { EventEntry } from './workflows';
+
 export interface WonderClient extends Omit<ReturnType<typeof createGeneratedClient>, 'workflows'> {
   // Events client extends generated events with WebSocket capabilities
   events: EventsClient;
