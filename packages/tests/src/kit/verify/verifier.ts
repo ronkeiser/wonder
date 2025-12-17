@@ -204,7 +204,7 @@ export class WorkflowVerifier {
     ctx: VerificationContext,
     diagnostics: DiagnosticContext,
   ): void {
-    const { rootTokens, fanOutSiblings, fanInArrivals, fanInContinuations } = ctx.collected;
+    const { rootTokens, fanOutGroups, fanInArrivals, fanInContinuations } = ctx.collected;
 
     // Verify root tokens
     if (rootTokens.length !== structure.root) {
@@ -216,73 +216,97 @@ export class WorkflowVerifier {
       );
     }
 
-    // Verify siblings
-    if (structure.siblings) {
-      if (fanOutSiblings.length !== structure.siblings.count) {
+    // Verify fan-out groups
+    if (structure.fanOuts) {
+      // Verify number of fan-out groups
+      if (fanOutGroups.length !== structure.fanOuts.length) {
         throw new WorkflowVerificationError(
-          'tokens.siblings.count',
-          `Expected ${structure.siblings.count} fan-out siblings, got ${fanOutSiblings.length}.`,
+          'tokens.fanOuts',
+          `Expected ${structure.fanOuts.length} fan-out group(s), got ${fanOutGroups.length}.`,
           diagnostics,
-          { expected: structure.siblings.count, actual: fanOutSiblings.length },
+          {
+            expected: structure.fanOuts.length,
+            actual: fanOutGroups.length,
+            fanOutIds: fanOutGroups.map((g) => g.fanOutId),
+          },
         );
       }
 
-      // Verify shared fan_out_transition_id
-      if (structure.siblings.sharedFanOutId) {
-        const fanOutIds = new Set(fanOutSiblings.map((s) => s.payload.fan_out_transition_id));
-        if (fanOutIds.size !== 1) {
-          throw new WorkflowVerificationError(
-            'tokens.siblings.sharedFanOutId',
-            `Expected all siblings to share same fan_out_transition_id, found ${fanOutIds.size} distinct IDs.`,
-            diagnostics,
-            { distinctIds: Array.from(fanOutIds) },
-          );
-        }
-        if (!fanOutIds.has(null) && fanOutIds.size === 1) {
-          // Valid - all share same non-null ID
-        } else if (fanOutIds.has(null)) {
-          throw new WorkflowVerificationError(
-            'tokens.siblings.sharedFanOutId',
-            'Fan-out siblings have null fan_out_transition_id.',
-            diagnostics,
-          );
-        }
-      }
+      // Verify each fan-out group (matched by index/order)
+      for (let i = 0; i < structure.fanOuts.length; i++) {
+        const spec = structure.fanOuts[i];
+        const group = fanOutGroups[i];
+        const groupLabel = `fanOuts[${i}]`;
 
-      // Verify branch indices
-      if (structure.siblings.branchIndices) {
-        const actualIndices = fanOutSiblings
-          .map((s) => s.payload.branch_index)
-          .sort((a, b) => a - b);
-        const expectedIndices = [...structure.siblings.branchIndices].sort((a, b) => a - b);
-        if (JSON.stringify(actualIndices) !== JSON.stringify(expectedIndices)) {
+        // Verify sibling count
+        if (group.siblings.length !== spec.count) {
           throw new WorkflowVerificationError(
-            'tokens.siblings.branchIndices',
-            `Expected branch indices ${JSON.stringify(expectedIndices)}, got ${JSON.stringify(actualIndices)}.`,
+            `tokens.${groupLabel}.count`,
+            `Expected fan-out group ${i} to have ${spec.count} siblings, got ${group.siblings.length}.`,
             diagnostics,
-            { expected: expectedIndices, actual: actualIndices },
+            { expected: spec.count, actual: group.siblings.length, fanOutId: group.fanOutId },
           );
         }
-      }
 
-      // Verify branch_total
-      if (structure.siblings.branchTotal !== undefined) {
-        const wrongTotals = fanOutSiblings.filter(
-          (s) => s.payload.branch_total !== structure.siblings!.branchTotal,
+        // Verify branch_total
+        const wrongTotals = group.siblings.filter(
+          (s) => s.payload.branch_total !== spec.branchTotal,
         );
         if (wrongTotals.length > 0) {
           throw new WorkflowVerificationError(
-            'tokens.siblings.branchTotal',
-            `Expected all siblings to have branch_total=${structure.siblings.branchTotal}, found mismatches.`,
+            `tokens.${groupLabel}.branchTotal`,
+            `Expected fan-out group ${i} siblings to have branch_total=${spec.branchTotal}.`,
             diagnostics,
             {
-              expected: structure.siblings.branchTotal,
+              expected: spec.branchTotal,
+              fanOutId: group.fanOutId,
               mismatches: wrongTotals.map((s) => ({
                 tokenId: s.token_id,
                 branchTotal: s.payload.branch_total,
               })),
             },
           );
+        }
+
+        // Verify branch indices are 0..count-1
+        const expectedIndices = Array.from({ length: spec.count }, (_, j) => j);
+        const actualIndices = group.siblings
+          .map((s) => s.payload.branch_index)
+          .sort((a, b) => a - b);
+        if (JSON.stringify(actualIndices) !== JSON.stringify(expectedIndices)) {
+          throw new WorkflowVerificationError(
+            `tokens.${groupLabel}.branchIndices`,
+            `Expected fan-out group ${i} to have branch indices [0..${spec.count - 1}], got ${JSON.stringify(actualIndices)}.`,
+            diagnostics,
+            { expected: expectedIndices, actual: actualIndices, fanOutId: group.fanOutId },
+          );
+        }
+
+        // Verify output fields for this fan-out group's branches
+        if (spec.outputFields) {
+          const { branchOutputs } = ctx.collected;
+          for (const sibling of group.siblings) {
+            const tokenId = sibling.token_id!;
+            const output = branchOutputs.get(tokenId);
+            if (!output) {
+              throw new WorkflowVerificationError(
+                `tokens.${groupLabel}.outputFields`,
+                `Expected branch output for token ${tokenId.slice(-8)}, but none found.`,
+                diagnostics,
+                { tokenId, fanOutId: group.fanOutId },
+              );
+            }
+            for (const field of spec.outputFields) {
+              if (!(field in output)) {
+                throw new WorkflowVerificationError(
+                  `tokens.${groupLabel}.outputFields`,
+                  `Expected branch output for token ${tokenId.slice(-8)} to have field "${field}".`,
+                  diagnostics,
+                  { tokenId, output, expectedFields: spec.outputFields, fanOutId: group.fanOutId },
+                );
+              }
+            }
+          }
         }
       }
     }
@@ -579,22 +603,6 @@ export class WorkflowVerifier {
       );
     }
 
-    // Output fields check
-    if (spec.outputFields) {
-      for (const [tokenId, output] of branchOutputs) {
-        for (const field of spec.outputFields) {
-          if (!(field in output)) {
-            throw new WorkflowVerificationError(
-              `branchWrites.outputFields`,
-              `Expected branch output for token ${tokenId.slice(-8)} to have field "${field}".`,
-              diagnostics,
-              { tokenId, output, expectedFields: spec.outputFields },
-            );
-          }
-        }
-      }
-    }
-
     // Output matcher
     if (spec.outputMatcher) {
       for (const [tokenId, output] of branchOutputs) {
@@ -677,6 +685,20 @@ export class WorkflowVerifier {
     });
     const siblingIds = new Set(fanOutSiblings.map((s) => s.token_id));
 
+    // Group siblings by fan_out_transition_id (preserving order of first occurrence)
+    const fanOutGroupMap = new Map<string, typeof fanOutSiblings>();
+    for (const sibling of fanOutSiblings) {
+      const fanOutId = sibling.payload.fan_out_transition_id!;
+      if (!fanOutGroupMap.has(fanOutId)) {
+        fanOutGroupMap.set(fanOutId, []);
+      }
+      fanOutGroupMap.get(fanOutId)!.push(sibling);
+    }
+    const fanOutGroups = Array.from(fanOutGroupMap.entries()).map(([fanOutId, siblings]) => ({
+      fanOutId,
+      siblings,
+    }));
+
     // Fan-in arrivals: have fan_out_transition_id, but parent is a fan-out sibling
     // (so they inherit the fan_out_id from their parent)
     const fanInArrivals = tokenCreations.filter((tc) => {
@@ -724,6 +746,7 @@ export class WorkflowVerifier {
       collected: {
         rootTokens,
         fanOutSiblings,
+        fanOutGroups,
         fanInArrivals,
         fanInContinuations,
         branchOutputs,

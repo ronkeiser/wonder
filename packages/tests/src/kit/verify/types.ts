@@ -37,6 +37,21 @@ export interface TypedTraceEvent<TPayload = Record<string, unknown>> {
 // =============================================================================
 
 /**
+ * Fan-out group specification.
+ * Describes expected tokens from a single fan-out transition.
+ */
+export interface FanOutSpec {
+  /** Number of sibling tokens in this fan-out group */
+  count: number;
+
+  /** Expected branch_total on each sibling (should equal count) */
+  branchTotal: number;
+
+  /** Expected output fields from this fan-out's branches (optional) */
+  outputFields?: string[];
+}
+
+/**
  * Token structure specification for verification.
  * Describes expected token creation patterns.
  */
@@ -44,17 +59,11 @@ export interface TokenStructure {
   /** Expected number of root tokens (usually 1) */
   root: number;
 
-  /** Expected sibling structure from fan-out */
-  siblings?: {
-    /** Expected number of sibling tokens */
-    count: number;
-    /** If true, verify all siblings share same fan_out_transition_id */
-    sharedFanOutId?: boolean;
-    /** Expected branch indices (e.g., [0, 1, 2]) */
-    branchIndices?: number[];
-    /** Expected branch_total on each sibling */
-    branchTotal?: number;
-  };
+  /**
+   * Fan-out groups - each entry represents one fan-out transition.
+   * For sequential fan-out/fan-in, provide multiple entries.
+   */
+  fanOuts?: FanOutSpec[];
 
   /** Expected fan-in arrival tokens (created when siblings arrive at sync) */
   fanInArrivals?: number;
@@ -116,13 +125,11 @@ export type OutputSpec = Record<string, OutputFieldSpec | unknown>;
 
 /**
  * Branch write specification for verification.
+ * Note: Per-fan-out outputFields validation is handled in FanOutSpec.
  */
 export interface BranchWriteSpec {
   /** Expected number of unique tokens with branch writes */
   uniqueTokenCount?: number;
-
-  /** Expected fields in each branch output */
-  outputFields?: string[];
 
   /** Matcher for branch output values */
   outputMatcher?: (output: Record<string, unknown>, tokenId: string) => boolean;
@@ -175,6 +182,16 @@ export interface VerificationConfig {
 }
 
 /**
+ * Fan-out group with its sibling tokens.
+ */
+export interface FanOutGroup {
+  /** The fan_out_transition_id for this group */
+  fanOutId: string;
+  /** Sibling tokens in this group */
+  siblings: TypedTraceEvent<TokenCreatedPayload>[];
+}
+
+/**
  * Context passed to verification methods.
  */
 export interface VerificationContext {
@@ -190,7 +207,10 @@ export interface VerificationContext {
   /** Collected data during verification */
   collected: {
     rootTokens: TypedTraceEvent<TokenCreatedPayload>[];
+    /** All fan-out siblings (flat list for backward compat) */
     fanOutSiblings: TypedTraceEvent<TokenCreatedPayload>[];
+    /** Fan-out groups organized by fan_out_transition_id */
+    fanOutGroups: FanOutGroup[];
     fanInArrivals: TypedTraceEvent<TokenCreatedPayload>[];
     fanInContinuations: TypedTraceEvent<TokenCreatedPayload>[];
     branchOutputs: Map<string, Record<string, unknown>>;

@@ -363,12 +363,10 @@ describe('Foundation: 03 - Sequential Fan-out/Fan-in', () => {
           // - 1 summarize continuation token (after fan-in #2 completes)
           // Total: 1 + 3 + 3 + 1 + 3 + 3 + 1 = 15
           root: 1,
-          siblings: {
-            count: 6, // 3 phase1 + 3 phase2
-            sharedFanOutId: false, // Two different fan-out IDs (fanout_1 and fanout_2)
-            branchIndices: [0, 1, 2, 0, 1, 2], // Indices reset for second fan-out
-            branchTotal: 3,
-          },
+          fanOuts: [
+            { count: 3, branchTotal: 3, outputFields: ['value'] },
+            { count: 3, branchTotal: 3, outputFields: ['transformed'] },
+          ],
           fanInArrivals: 6, // 3 for fanIn1 + 3 for fanIn2
           fanInContinuations: 2, // 1 for bridge + 1 for summarize
           total: 15,
@@ -399,8 +397,6 @@ describe('Foundation: 03 - Sequential Fan-out/Fan-in', () => {
         ])
         .withBranchWrites({
           uniqueTokenCount: 6, // 3 phase1 + 3 phase2 branches
-          // Note: outputFields check removed - phase1 has 'value', phase2 has 'transformed'
-          // The verifier would need fan-out-aware grouping to verify heterogeneous branch outputs
         })
         .withOutput({
           seed: { type: 'string', defined: true },

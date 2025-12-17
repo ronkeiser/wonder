@@ -239,12 +239,7 @@ describe('Foundation: 02 - Fan-out with Spawn Count + Fan-in', () => {
         .completed()
         .withTokens({
           root: 1,
-          siblings: {
-            count: 3,
-            sharedFanOutId: true,
-            branchIndices: [0, 1, 2],
-            branchTotal: 3,
-          },
+          fanOuts: [{ count: 3, branchTotal: 3, outputFields: ['result'] }],
           fanInArrivals: 3,
           fanInContinuations: 1,
           total: 8,
@@ -262,7 +257,6 @@ describe('Foundation: 02 - Fan-out with Spawn Count + Fan-in', () => {
         ])
         .withBranchWrites({
           uniqueTokenCount: 3,
-          outputFields: ['result'],
         })
         .withOutput({
           prefix: workflowInput.prefix,

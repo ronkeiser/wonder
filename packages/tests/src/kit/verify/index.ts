@@ -10,7 +10,10 @@
  *
  * verify(trace, { input, definition })
  *   .completed()
- *   .withTokens({ root: 1, siblings: { count: 3, sharedFanOutId: true } })
+ *   .withTokens({
+ *     root: 1,
+ *     fanOuts: [{ count: 3, branchTotal: 3, outputFields: ['result'] }],
+ *   })
  *   .withStateWriteOrder(['state.seed', 'state.results', 'state.summary'])
  *   .withOutput({
  *     prefix: 'TEST',
@@ -24,6 +27,8 @@ export { WorkflowVerificationError } from './error';
 export type {
   BranchWriteSpec,
   DiagnosticContext,
+  FanOutGroup,
+  FanOutSpec,
   OutputFieldSpec,
   OutputSpec,
   SnapshotSpec,
