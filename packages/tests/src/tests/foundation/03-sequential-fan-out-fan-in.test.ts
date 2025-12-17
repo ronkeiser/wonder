@@ -103,11 +103,15 @@ describe('Foundation: 03 - Sequential Fan-out/Fan-in', () => {
     // =========================================================================
     // Node: phase1 (runs 3 times in parallel)
     // =========================================================================
+    // Uses time jitter to test synchronization with out-of-order completion
     const phase1Action = action({
       name: 'Phase 1 Action',
       description: 'First phase parallel processing',
       kind: 'mock',
-      implementation: { schema: phase1OutputSchema },
+      implementation: {
+        schema: phase1OutputSchema,
+        options: { delay: { min_ms: 50, max_ms: 200 } },
+      },
     });
 
     const phase1Step = step({
@@ -175,11 +179,15 @@ describe('Foundation: 03 - Sequential Fan-out/Fan-in', () => {
     // =========================================================================
     // Node: phase2 (runs 3 times in parallel, reads aggregated phase1 state)
     // =========================================================================
+    // Uses time jitter to test synchronization with out-of-order completion
     const phase2Action = action({
       name: 'Phase 2 Action',
       description: 'Second phase parallel processing',
       kind: 'mock',
-      implementation: { schema: phase2OutputSchema },
+      implementation: {
+        schema: phase2OutputSchema,
+        options: { delay: { min_ms: 50, max_ms: 200 } },
+      },
     });
 
     const phase2Step = step({

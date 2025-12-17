@@ -106,11 +106,15 @@ describe('Foundation: 02 - Fan-out with Spawn Count + Fan-in', () => {
     });
 
     // Node B: Executes in parallel (3 times)
+    // Uses time jitter to test synchronization with out-of-order completion
     const nodeBAction = action({
       name: 'Process Action',
       description: 'Processes in parallel using seed from state',
       kind: 'mock',
-      implementation: { schema: nodeBOutputSchema },
+      implementation: {
+        schema: nodeBOutputSchema,
+        options: { delay: { min_ms: 50, max_ms: 200 } },
+      },
     });
 
     const nodeBStep = step({
