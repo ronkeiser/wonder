@@ -18,11 +18,13 @@ import { assertInvariants, runTestWorkflow } from '~/kit';
  * 4. Task dispatch and result handling
  * 5. Output mapping from task → workflow context
  * 6. Completion extraction via output_mapping
+ * 7. Decision Pattern architecture: Planning → Dispatch → Operations
  *
  * Assertion strategy:
  * - NO SEED: Mock generates random data
  * - RELATIONAL: Assert value at Point A === value at Point B
  * - STRUCTURAL: Assert token lifecycle, event counts
+ * - ARCHITECTURAL: Assert decision planning, dispatch, and operation execution
  * - INVARIANTS: Assert global properties that must always hold
  */
 
@@ -309,22 +311,130 @@ describe('Foundation: 01 - Single Node Mock', () => {
       expect(trace.branches.merges(), 'No branch merges for linear workflow').toHaveLength(0);
 
       // =========================================================================
+      // DECISION ARCHITECTURE (Planning → Dispatch → Operations)
+      // =========================================================================
+      // This validates the core Decision Pattern that makes Wonder unique:
+      // Planning layer generates pure decisions, dispatch converts to operations
+
+      // ROUTING PLANNING
+      const routingPlanningStarts = trace.routing.starts();
+      expect(routingPlanningStarts, 'Routing planning invoked').toHaveLength(1);
+      expect(routingPlanningStarts[0].token_id, 'Planning for completed token').toBe(tokenId);
+      expect(routingPlanningStarts[0].node_id, 'Planning has node context').toBeDefined();
+
+      // No transitions should be evaluated (workflow has no outgoing transitions)
+      const transitionEvaluations = trace.routing.evaluations();
+      expect(transitionEvaluations, 'No transitions to evaluate').toHaveLength(0);
+
+      const routingPlanningComplete = trace.routing.completions();
+      expect(routingPlanningComplete, 'Routing completed with decisions').toHaveLength(1);
+      expect(
+        routingPlanningComplete[0].payload.decisions,
+        'No routing decisions (no outgoing transitions)',
+      ).toEqual([]);
+
+      // COMPLETION PLANNING
+      const completionPlanningStart = trace.completion.start();
+      expect(completionPlanningStart, 'Completion planning started').toBeDefined();
+      expect(completionPlanningStart!.payload.output_mapping).toEqual({ code: '$.output.code' });
+
+      // Verify context structure available to planning
+      const contextKeys = completionPlanningStart!.payload.context_keys;
+      expect(contextKeys.input, 'Input available to planning').toBeDefined();
+      expect(contextKeys.state, 'State available to planning').toBeDefined();
+      expect(contextKeys.output, 'Output available to planning').toBeDefined();
+      expect(contextKeys.output, 'Output has code field').toContain('code');
+
+      const completionPlanningExtracts = trace.completion.extracts();
+      expect(completionPlanningExtracts, 'Output fields extracted via planning').toHaveLength(1);
+      expect(completionPlanningExtracts[0].payload.target_field).toBe('code');
+      expect(completionPlanningExtracts[0].payload.source_path).toBe('$.output.code');
+
+      // RELATIONAL: Extracted value must match final output
+      const extractedCode = completionPlanningExtracts[0].payload.extracted_value;
+      expect(typeof extractedCode).toBe('string');
+      expect((extractedCode as string).length).toBe(6);
+      expect(extractedCode, 'Extracted value must equal final output').toBe(finalOutput.code);
+
+      const completionPlanningComplete = trace.completion.complete();
+      expect(completionPlanningComplete, 'Completion planning finished').toBeDefined();
+      expect(completionPlanningComplete!.payload.final_output).toEqual({ code: finalOutput.code });
+
+      // DISPATCH LAYER
+      // The dispatch layer converts decisions into operations.
+      // For this single-node workflow: initial token created at start, no routing decisions.
+      const dispatchBatches = trace.dispatch.batchCompletes();
+      expect(dispatchBatches.length, 'Dispatch batches executed').toBeGreaterThan(0);
+
+      // Aggregate all batch results
+      let totalApplied = 0;
+      let totalTokensCreated = 0;
+      let totalTokensDispatched = 0;
+      let totalErrors = 0;
+      for (const batch of dispatchBatches) {
+        const payload = batch.payload as any;
+        expect(payload.errors, `Batch errors`).toBe(0);
+        totalApplied += payload.applied;
+        totalTokensCreated += payload.tokens_created;
+        totalTokensDispatched += payload.tokens_dispatched;
+        totalErrors += payload.errors;
+      }
+
+      // SPEC: Single-node workflow decision flow
+      // - Workflow start: CREATE_TOKEN decision for initial token
+      // - Routing: No decisions (no outgoing transitions)
+      // - No MARK_FOR_DISPATCH in decision layer (initial token dispatched separately)
+      expect(totalTokensCreated, '1 token created via CREATE_TOKEN decision').toBe(1);
+      expect(
+        totalTokensDispatched,
+        'No tokens dispatched via decisions (initial dispatch happens outside decision flow)',
+      ).toBe(0);
+      expect(totalErrors, 'No dispatch errors').toBe(0);
+      expect(totalApplied, 'Decisions applied').toBeGreaterThan(0);
+
+      // CONTEXT SNAPSHOTS (for planning layer)
+      const contextSnapshots = trace.context.snapshots();
+      expect(
+        contextSnapshots.length,
+        'Context snapshots created for decision logic',
+      ).toBeGreaterThanOrEqual(1);
+
+      // Verify snapshot used before routing planning (causal ordering)
+      const snapshotBeforeRouting = contextSnapshots.find(
+        (s) => s.sequence < routingPlanningStarts[0].sequence,
+      );
+      expect(snapshotBeforeRouting, 'Snapshot created before routing planning').toBeDefined();
+
+      // Verify snapshot structure contains context sections
+      const snapshot = contextSnapshots[0];
+      expect(snapshot.payload.snapshot, 'Snapshot has context data').toBeDefined();
+      expect(snapshot.payload.snapshot.input, 'Snapshot includes input').toBeDefined();
+      expect(snapshot.payload.snapshot.output, 'Snapshot includes output').toBeDefined();
+
+      // =========================================================================
       // EVENT MANIFEST
       // =========================================================================
       const expectedEvents: Record<string, number> = {
+        // Context operations
         'operation.context.initialized': 1,
         'operation.context.validate': 1,
         'operation.context.section_replaced': 1,
         'operation.context.field_set': 1,
+        // Token operations
         'operation.tokens.created': 1,
         'operation.tokens.status_updated': 3,
+        // Decision layer - routing
         'decision.routing.start': 1,
         'decision.routing.complete': 1,
+        // Decision layer - completion
         'decision.completion.start': 1,
+        'decision.completion.extract': 1,
         'decision.completion.complete': 1,
+        // Dispatch layer
         'dispatch.task.input_mapping.context': 1,
         'dispatch.task.input_mapping.applied': 1,
         'dispatch.task.sent': 1,
+        // Executor operations
         'executor.task.started': 1,
         'executor.task.completed': 1,
         'executor.step.started': 1,
