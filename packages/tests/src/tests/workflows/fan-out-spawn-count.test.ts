@@ -279,7 +279,7 @@ Return JSON with:
       (t) => t.payload.fan_out_transition_id === fanOutRouting?.payload.transition_id,
     );
     // Group by node_id to separate question_node tokens from collect_node tokens
-    const tokensByNode = new Map<string, typeof fanOutTokens>();
+    const tokensByNode = new Map<string | null, typeof fanOutTokens>();
     for (const t of fanOutTokens) {
       const nodeId = t.node_id;
       if (!tokensByNode.has(nodeId)) {

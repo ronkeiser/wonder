@@ -36,7 +36,7 @@
 
     // Task execution - blue/indigo/violet family
     'task.dispatched': 'var(--blue)',
-    'task.completed': 'var(--indigo)',
+    'task.completed': 'var(--purple-light)',
     'task.failed': 'var(--violet)',
 
     // Token lifecycle - teal/cyan/orange family

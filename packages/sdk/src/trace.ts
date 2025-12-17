@@ -83,7 +83,6 @@ export namespace TracePayloads {
 
   export interface BranchValidate {
     valid: boolean;
-    valid: boolean;
     error_count: number;
     errors?: string[];
   }
