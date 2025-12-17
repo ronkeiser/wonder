@@ -23,4 +23,6 @@ Read these docs:
 3. `docs/architecture/branching.md`
 4. `docs/architecture/branch-storage.md`
 
-Finally, demonstrate understanding with a single sentence.
+Then, investigate the coordinator implementation in `services/coordinator`.
+
+Summarize what you learned.

@@ -215,6 +215,13 @@ export class TraceEventCollection {
   }
 
   /**
+   * Filter events by type (alias for filter)
+   */
+  byType<T = any>(type: string): TypedTraceEvent<T>[] {
+    return this.filter<T>(type);
+  }
+
+  /**
    * Filter events by category
    */
   byCategory(category: 'decision' | 'operation' | 'dispatch' | 'sql'): TypedTraceEvent[] {
@@ -412,6 +419,15 @@ export class TraceEventCollection {
         }
         return statuses;
       },
+      /** Get the specific status update event when token transitioned to a status */
+      statusUpdate(
+        tokenId: string,
+        toStatus: string,
+      ): TypedTraceEvent<TracePayloads.TokenStatusUpdatedPayload> | undefined {
+        return self
+          .filter<TracePayloads.TokenStatusUpdatedPayload>('operation.tokens.status_updated')
+          .find((e) => e.token_id === tokenId && e.payload.to === toStatus);
+      },
     };
   }
 
@@ -536,6 +552,68 @@ export class TraceEventCollection {
       },
       noMapping(): boolean {
         return self.has('decision.completion.no_mapping');
+      },
+    };
+  }
+
+  /**
+   * Synchronization operations (fan-in)
+   */
+  get sync() {
+    const self = this;
+    return {
+      all(): TypedTraceEvent[] {
+        return self.events.filter((e) => e.type.startsWith('decision.sync.'));
+      },
+      starts(): TypedTraceEvent[] {
+        return self.filter('decision.sync.start');
+      },
+      waits(): TypedTraceEvent[] {
+        return self.filter('decision.sync.wait');
+      },
+      activations(): TypedTraceEvent[] {
+        return self.filter('decision.sync.activate');
+      },
+    };
+  }
+
+  /**
+   * Dispatch operations (task dispatch to executor)
+   */
+  get dispatch() {
+    const self = this;
+    return {
+      all(): TypedTraceEvent[] {
+        return self.byCategory('dispatch');
+      },
+      taskDispatches(): TypedTraceEvent[] {
+        return self.filter('dispatch.task.input_mapping.applied');
+      },
+      taskDispatch(tokenId: string): TypedTraceEvent | undefined {
+        return self.findWhere(
+          (e) => e.type === 'dispatch.task.input_mapping.applied' && e.token_id === tokenId,
+        );
+      },
+      batchStarts(): TypedTraceEvent[] {
+        return self.filter('dispatch.batch.start');
+      },
+      batchCompletes(): TypedTraceEvent[] {
+        return self.filter('dispatch.batch.complete');
+      },
+    };
+  }
+
+  /**
+   * Error events (any event with 'error' in the type)
+   */
+  get errors() {
+    const self = this;
+    return {
+      all(): TypedTraceEvent[] {
+        return self.events.filter((e) => e.type.toLowerCase().includes('error'));
+      },
+      count(): number {
+        return this.all().length;
       },
     };
   }

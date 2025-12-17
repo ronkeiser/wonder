@@ -39,8 +39,9 @@ export async function dispatchToken(ctx: DispatchContext, tokenId: string): Prom
     payload: { decision_count: 1 },
   });
 
-  // Update token status to executing
-  ctx.tokens.updateStatus(tokenId, 'executing');
+  // Mark token as dispatched (sent to executor, awaiting execution)
+  // Executor will call markTokenExecuting when it starts the task
+  ctx.tokens.updateStatus(tokenId, 'dispatched');
 
   // Emit workflow event for task dispatch
   ctx.emitter.emit({
@@ -169,16 +170,11 @@ export async function processTaskResult(
   // Get outgoing transitions from completed node
   const transitions = ctx.defs.getTransitionsFrom(token.node_id);
 
-  // If no transitions, finalize if no active tokens remain
-  if (transitions.length === 0) {
-    await checkAndFinalizeWorkflow(ctx);
-    return;
-  }
-
   // Get context snapshot for routing decisions
   const contextSnapshot = ctx.context.getSnapshot();
 
   // Plan routing decisions (returns decisions + trace events)
+  // Always call decideRouting for consistent tracing, even with no transitions
   const routingResult = decideRouting({
     completedToken: token,
     workflowRunId: ctx.workflowRunId,

@@ -249,6 +249,126 @@ describe('Foundation: 01 - Single Node Mock', () => {
     console.log('  ✓ Output conforms to schema constraints');
 
     // =========================================================================
+    // CAUSAL ORDERING - Events must occur in correct sequence
+    // =========================================================================
+
+    // 10. Verify causal ordering via sequence numbers
+    const contextInitSeq = contextInit!.sequence;
+    const tokenCreatedSeq = rootToken.sequence;
+    const dispatchedEvent = trace.tokens.statusUpdate(tokenId, 'dispatched');
+    const executingEvent = trace.tokens.statusUpdate(tokenId, 'executing');
+    const completedEvent = trace.tokens.statusUpdate(tokenId, 'completed');
+    const routingStartSeq = routingStarts[0].sequence;
+    const completionCompleteSeq = completionComplete!.sequence;
+
+    expect(dispatchedEvent).toBeDefined();
+    expect(executingEvent).toBeDefined();
+    expect(completedEvent).toBeDefined();
+
+    // Context init before token creation
+    expect(contextInitSeq).toBeLessThan(tokenCreatedSeq);
+    // Token created before dispatched
+    expect(tokenCreatedSeq).toBeLessThan(dispatchedEvent!.sequence);
+    // Dispatched before executing (executor acknowledged)
+    expect(dispatchedEvent!.sequence).toBeLessThan(executingEvent!.sequence);
+    // Executing before completed
+    expect(executingEvent!.sequence).toBeLessThan(completedEvent!.sequence);
+    // Completed before routing (routing happens after task result)
+    expect(completedEvent!.sequence).toBeLessThan(routingStartSeq);
+    // Routing before completion extraction
+    expect(routingStartSeq).toBeLessThan(completionCompleteSeq);
+    console.log('  ✓ Causal ordering verified');
+
+    // =========================================================================
+    // EXACT EVENT COUNTS - No spurious events
+    // =========================================================================
+
+    // 11. Assert exact event counts (no unexpected events)
+    expect(trace.tokens.creations()).toHaveLength(1);
+    expect(trace.tokens.statusUpdates()).toHaveLength(3); // dispatched, executing, completed
+    expect(trace.routing.starts()).toHaveLength(1);
+    expect(trace.routing.completions()).toHaveLength(1);
+    expect(trace.context.validates()).toHaveLength(1); // input validation
+    console.log('  ✓ Exact event counts verified');
+
+    // =========================================================================
+    // NEGATIVE ASSERTIONS - What should NOT happen
+    // =========================================================================
+
+    // 12. No fan-out/synchronization events
+    expect(trace.sync.all()).toHaveLength(0);
+    console.log('  ✓ No synchronization events (expected for linear workflow)');
+
+    // 13. No branch table operations
+    expect(trace.branches.creates()).toHaveLength(0);
+    expect(trace.branches.writes()).toHaveLength(0);
+    expect(trace.branches.merges()).toHaveLength(0);
+    console.log('  ✓ No branch table operations (expected for linear workflow)');
+
+    // 14. No error events
+    expect(trace.errors.all()).toHaveLength(0);
+    console.log('  ✓ No error events');
+
+    // =========================================================================
+    // INPUT VALIDATION
+    // =========================================================================
+
+    // 15. Input was validated before being stored
+    const inputValidation = trace.context.validateAt('input');
+    expect(inputValidation).toBeDefined();
+    expect(inputValidation!.payload.valid).toBe(true);
+    expect(inputValidation!.payload.error_count).toBe(0);
+    console.log('  ✓ Input validation passed');
+
+    // =========================================================================
+    // DISPATCH VERIFICATION
+    // =========================================================================
+
+    // 16. Verify task was dispatched with correct payload
+    const taskDispatch = trace.dispatch.taskDispatch(tokenId);
+    expect(taskDispatch).toBeDefined();
+    expect(taskDispatch!.payload.task_input).toEqual({}); // empty input mapping
+    console.log('  ✓ Task dispatch verified');
+
+    // =========================================================================
+    // EVENT MANIFEST - Critical events that MUST exist
+    // =========================================================================
+
+    // 17. Verify critical event types exist with expected counts
+    // This catches missing events without being too fragile to internal changes
+    const criticalEvents = {
+      // Context operations
+      'operation.context.initialized': 1,
+      'operation.context.validate': 1,
+      'operation.context.section_replaced': 1, // input stored
+      'operation.context.field_set': 1, // output.code written
+
+      // Token operations
+      'operation.tokens.created': 1,
+      'operation.tokens.status_updated': 3, // dispatched, executing, completed
+
+      // Routing
+      'decision.routing.start': 1,
+      'decision.routing.complete': 1,
+
+      // Completion
+      'decision.completion.start': 1,
+      'decision.completion.complete': 1,
+
+      // Dispatch
+      'dispatch.task.input_mapping.context': 1,
+      'dispatch.task.input_mapping.applied': 1,
+    };
+
+    for (const [eventType, expectedCount] of Object.entries(criticalEvents)) {
+      const actual = trace.byType(eventType).length;
+      expect(actual, `Expected ${expectedCount} events of type '${eventType}', got ${actual}`).toBe(
+        expectedCount,
+      );
+    }
+    console.log('  ✓ Critical event manifest verified');
+
+    // =========================================================================
     // Summary
     // =========================================================================
     console.log('\n✅ Foundation Test 01 PASSED');

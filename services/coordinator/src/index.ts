@@ -140,6 +140,47 @@ export class WorkflowCoordinator extends DurableObject {
   }
 
   /**
+   * Mark token as executing
+   *
+   * Called by Executor when it starts running a task.
+   * This transition (dispatched → executing) enables observability:
+   * a token stuck in 'dispatched' means executor never received it.
+   */
+  async markTokenExecuting(tokenId: string): Promise<void> {
+    const token = this.tokens.get(tokenId);
+
+    // State guard: only transition from dispatched
+    if (token.status !== 'dispatched') {
+      this.logger.warn({
+        event_type: 'coordinator.mark_executing.invalid_state',
+        message: `Cannot transition to executing from ${token.status}`,
+        trace_id: token.workflow_run_id,
+        metadata: {
+          tokenId,
+          currentStatus: token.status,
+          expectedStatus: 'dispatched',
+        },
+      });
+      return; // Idempotent: no-op if already executing/completed
+    }
+
+    try {
+      this.tokens.updateStatus(tokenId, 'executing');
+    } catch (error) {
+      this.logger.error({
+        event_type: 'coordinator.mark_executing.failed',
+        message: 'Failed to mark token as executing',
+        trace_id: token.workflow_run_id,
+        metadata: {
+          error: error instanceof Error ? error.message : String(error),
+          tokenId,
+        },
+      });
+      throw error;
+    }
+  }
+
+  /**
    * Handle task error from Executor
    *
    * Called when task execution fails. May trigger retry based on error type.

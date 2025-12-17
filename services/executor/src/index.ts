@@ -102,6 +102,11 @@ export default class ExecutorService extends WorkerEntrypoint<Env> {
       },
     });
 
+    // Mark token as executing (ack to coordinator that we received the task)
+    const coordinatorId = this.env.COORDINATOR.idFromName(payload.workflow_run_id);
+    const coordinator = this.env.COORDINATOR.get(coordinatorId);
+    await coordinator.markTokenExecuting(payload.token_id);
+
     try {
       // Load task definition from Resources
       using taskDefsResource = this.env.RESOURCES.taskDefs();
