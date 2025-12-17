@@ -11,6 +11,7 @@ import type { Action } from '@wonder/resources/types';
 import { executeLLMAction } from './llm';
 import { executeMockAction } from './mock';
 import type { ActionDeps, ActionInput, ActionOutput } from './types';
+import { executeUpdateContextAction } from './update-context';
 
 export interface DispatchActionParams {
   action: Action;
@@ -67,15 +68,7 @@ export async function dispatchAction(
       return notImplemented(action, context, logger);
 
     case 'update_context':
-      // TODO: Implement expression evaluation per primitives.md
-      // Currently a pass-through stub. Should evaluate implementation.updates[].expr
-      // against input to enable computation (math, string ops, conditionals).
-      // Output mapping alone cannot compute derived values (e.g., average of scores).
-      return {
-        success: true,
-        output: input,
-        metrics: { duration_ms: 0 },
-      };
+      return executeUpdateContextAction(actionInput, deps);
 
     case 'write_artifact':
       // TODO: Implement artifact writing action handler

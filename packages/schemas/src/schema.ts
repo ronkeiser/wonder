@@ -386,11 +386,13 @@ class SchemaInserter {
           index: i,
         });
       } else {
+        // For non-object items (including nested arrays), JSON-encode if needed
+        const value = Array.isArray(items[i]) ? JSON.stringify(items[i]) : items[i];
         this.sql.exec(
           `INSERT INTO ${childTable} (${fkColumn}, "index", value) VALUES (?, ?, ?);`,
           parentId,
           i,
-          items[i],
+          value,
         );
       }
     }

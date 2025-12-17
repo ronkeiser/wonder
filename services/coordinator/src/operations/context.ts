@@ -12,7 +12,7 @@ import type { DefinitionManager } from './defs';
 export type MergeConfig = {
   source: string;
   target: string;
-  strategy: 'append' | 'merge_object' | 'keyed_by_branch' | 'last_wins';
+  strategy: 'append' | 'collect' | 'merge_object' | 'keyed_by_branch' | 'last_wins';
 };
 
 /** Branch output with metadata */
@@ -598,6 +598,14 @@ export class ContextManager {
         } else {
           merged = outputs;
         }
+        break;
+      }
+
+      case 'collect': {
+        // Collect all outputs into array, preserving structure (no flattening)
+        // Use this when you want [[a,b], [c,d]] instead of [a,b,c,d]
+        const sortedForCollect = extractedOutputs.sort((a, b) => a.branchIndex - b.branchIndex);
+        merged = sortedForCollect.map((b) => b.output);
         break;
       }
 

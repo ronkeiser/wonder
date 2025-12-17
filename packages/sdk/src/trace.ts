@@ -251,7 +251,9 @@ export class TraceEventCollection {
 
   constructor(events: TraceEventEntry[]) {
     // Payloads are parsed objects from the service
-    this.events = events as TypedTraceEvent[];
+    // Sort by sequence to ensure causal ordering - events may arrive out of order via WebSocket
+    // due to fire-and-forget emission from coordinator (network race conditions)
+    this.events = (events as TypedTraceEvent[]).sort((a, b) => a.sequence - b.sequence);
   }
 
   /**

@@ -130,6 +130,9 @@ export class SelectGenerator {
         if (itemSchema.type === 'object') {
           // Reconstruct object from flattened columns (excluding FK and index)
           return this.reconstructArrayItem(sql, arrayTableName, row, itemSchema);
+        } else if (itemSchema.type === 'array') {
+          // Nested array - decode from JSON string in value column
+          return decodeJsonArray(row.value);
         } else if (itemSchema.type === 'boolean') {
           return sqlToBoolean(row.value);
         } else {

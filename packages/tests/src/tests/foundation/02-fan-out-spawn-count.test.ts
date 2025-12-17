@@ -113,7 +113,7 @@ describe('Foundation: 02 - Fan-out with Spawn Count + Fan-in', () => {
       kind: 'mock',
       implementation: {
         schema: nodeBOutputSchema,
-        options: { stringMode: 'words', delay: { min_ms: 50, max_ms: 200 } },
+        options: { stringMode: 'words', delay: { min_ms: 100, max_ms: 500 } },
       },
     });
 

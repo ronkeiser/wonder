@@ -5,7 +5,7 @@
  * These are extracted to enable unit testing without D1 dependencies.
  */
 
-export type MergeStrategy = 'append' | 'merge_object' | 'keyed_by_branch' | 'last_wins';
+export type MergeStrategy = 'append' | 'collect' | 'merge_object' | 'keyed_by_branch' | 'last_wins';
 
 export interface BranchOutput {
   tokenId: string;
@@ -36,6 +36,12 @@ export function applyMergeStrategy(
   switch (strategy) {
     case 'append':
       // Collect all outputs into array, ordered by branch index
+      // Note: context.ts flattens arrays for 'append' - this is the pure version
+      return sorted.map((b) => b.output);
+
+    case 'collect':
+      // Same as append - collect all outputs preserving structure
+      // Exists for semantic clarity: 'collect' never flattens, 'append' may flatten
       return sorted.map((b) => b.output);
 
     case 'merge_object':

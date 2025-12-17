@@ -83,7 +83,7 @@ export type SynchronizationConfig = {
 export type MergeConfig = {
   source: string; // Path in branch output (e.g., '_branch.output', '_branch.output.choice')
   target: string; // Where to write merged result (e.g., 'state.votes')
-  strategy: 'append' | 'merge_object' | 'keyed_by_branch' | 'last_wins';
+  strategy: 'append' | 'collect' | 'merge_object' | 'keyed_by_branch' | 'last_wins';
 };
 
 /**
