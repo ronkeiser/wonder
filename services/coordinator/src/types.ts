@@ -71,7 +71,7 @@ export type ForeachConfig = {
  */
 export type SynchronizationConfig = {
   strategy: 'any' | 'all' | { m_of_n: number };
-  sibling_group: string; // fan_out_transition_id to synchronize on
+  sibling_group: string; // Named sibling group identifier (not transition ID)
   timeout_ms?: number | null; // Max wait time (null = no timeout)
   on_timeout?: 'proceed_with_available' | 'fail';
   merge?: MergeConfig;
@@ -97,6 +97,7 @@ export type TransitionDef = {
   priority: number;
   condition?: Condition | null;
   spawn_count?: number | null;
+  sibling_group?: string | null;
   foreach?: ForeachConfig | null;
   synchronization?: SynchronizationConfig | null;
 };

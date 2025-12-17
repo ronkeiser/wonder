@@ -60,18 +60,18 @@ export function decideSynchronization(params: {
   events.push({
     type: 'decision.sync.sibling_group_check',
     payload: {
-      token_fan_out_transition_id: token.fan_out_transition_id,
+      token_sibling_group: token.sibling_group,
       sync_sibling_group: sync.sibling_group,
-      matches: token.fan_out_transition_id === sync.sibling_group,
+      matches: token.sibling_group === sync.sibling_group,
     },
   });
 
   // Token not in the specified sibling group → pass through
-  if (token.fan_out_transition_id !== sync.sibling_group) {
+  if (token.sibling_group !== sync.sibling_group) {
     events.push({
       type: 'decision.sync.skipped_wrong_sibling_group',
       payload: {
-        token_fan_out_transition_id: token.fan_out_transition_id,
+        token_sibling_group: token.sibling_group,
         sync_sibling_group: sync.sibling_group,
       },
     });
@@ -113,7 +113,7 @@ export function decideSynchronization(params: {
           type: 'ACTIVATE_FAN_IN',
           workflowRunId,
           nodeId: transition.to_node_id,
-          fanInPath: buildFanInPath(token.path_id, transition.id),
+          fanInPath: buildFanInPath(token.sibling_group!, transition.id),
           mergedTokenIds: [], // Will be populated by dispatch layer with actual sibling IDs
         },
       ],
@@ -159,7 +159,7 @@ export function decideOnSiblingCompletion(params: {
   const sync = transition.synchronization;
 
   // Only process if completed token is part of this sibling group
-  if (completedToken.fan_out_transition_id !== sync.sibling_group) {
+  if (completedToken.sibling_group !== sync.sibling_group) {
     return [];
   }
 
@@ -184,7 +184,7 @@ export function decideOnSiblingCompletion(params: {
         type: 'ACTIVATE_FAN_IN',
         workflowRunId,
         nodeId: transition.to_node_id,
-        fanInPath: buildFanInPath(completedToken.path_id, transition.id),
+        fanInPath: buildFanInPath(completedToken.sibling_group!, transition.id),
         mergedTokenIds: [], // Dispatch layer populates with all sibling IDs
       },
     ];
@@ -198,7 +198,7 @@ export function decideOnSiblingCompletion(params: {
       type: 'ACTIVATE_FAN_IN',
       workflowRunId,
       nodeId: transition.to_node_id,
-      fanInPath: buildFanInPath(winnerToken.path_id, transition.id),
+      fanInPath: buildFanInPath(winnerToken.sibling_group!, transition.id),
       mergedTokenIds: [], // Dispatch layer populates
     },
   ];
@@ -250,32 +250,17 @@ function checkSyncCondition(
 }
 
 /**
- * Build the fan-in path from a token's path and transition ID.
+ * Build the fan-in path from a token's sibling_group and transition ID.
  * The fan-in path must be unique per synchronization point.
  *
- * The path consists of:
- * - Base path: common ancestor for all siblings (derived from token path)
- * - Transition ID: unique identifier for this synchronization
+ * Uses sibling_group as the base identifier since all tokens in the same
+ * fan-out group share this value, regardless of their individual path_id.
+ * This ensures the SQL UNIQUE constraint properly prevents duplicate activations.
  *
- * This ensures sequential fan-outs (e.g., ideate→aggregate→judge→report)
- * have distinct fan-in paths even if they share the same base path.
- *
- * Example: Token path 'root.A.0', transition 'T1' → Fan-in path 'root:T1'
+ * Example: sibling_group 'fanout_group', transition 'T1' → Fan-in path 'fanout_group:T1'
  */
-function buildFanInPath(tokenPath: string, transitionId: string): string {
-  const parts = tokenPath.split('.');
-
-  // Path format: root[.nodeId.branchIndex]*
-  // To get fan-in path, remove last two segments (nodeId and branchIndex)
-  let basePath: string;
-  if (parts.length >= 3) {
-    basePath = parts.slice(0, -2).join('.');
-  } else {
-    basePath = parts[0] ?? 'root';
-  }
-
-  // Append transition ID to make path unique per synchronization point
-  return `${basePath}:${transitionId}`;
+function buildFanInPath(siblingGroup: string, transitionId: string): string {
+  return `${siblingGroup}:${transitionId}`;
 }
 
 // ============================================================================
@@ -348,7 +333,7 @@ export function decideOnTimeout(params: {
         type: 'ACTIVATE_FAN_IN',
         workflowRunId,
         nodeId: transition.to_node_id,
-        fanInPath: buildFanInPath(winnerToken.path_id, transition.id),
+        fanInPath: buildFanInPath(winnerToken.sibling_group!, transition.id),
         mergedTokenIds: [], // Dispatch populates with available completed siblings
       },
     ];
@@ -428,7 +413,7 @@ export function decideFanInContinuation(params: {
       node_id: nodeId,
       parent_token_id: parentTokenId,
       path_id: fanInPath,
-      fan_out_transition_id: null, // Merged token is not part of a fan-out
+      sibling_group: null, // Merged token is not part of a fan-out
       branch_index: 0,
       branch_total: 1,
     },

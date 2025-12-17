@@ -9,12 +9,7 @@ import { wonder } from '~/client';
 import { cleanupWorkflowTest } from './cleanup';
 import { setupTestContext } from './context';
 import { createEmbeddedTaskDef } from './resources';
-import type {
-  CreatedResources,
-  TestContext,
-  TestWorkflowResult,
-  WorkflowTestSetup,
-} from './types';
+import type { CreatedResources, TestContext, TestWorkflowResult, WorkflowTestSetup } from './types';
 
 export type { TestWorkflowResult, WorkflowTestSetup } from './types';
 
@@ -228,7 +223,7 @@ export async function runTestWorkflow(
   console.log(
     `   curl -H "X-API-Key: $API_KEY" "https://api.wflow.app/events/trace?workflow_run_id=${result.workflowRunId}"`,
   );
-  console.log('\n⚠️  Response is wrapped: { "events": [...] }');
+  console.log('\n🎁  Response is wrapped: { "events": [...] }');
   console.log("   Use jq to unwrap: curl ... | jq '.events'");
   console.log('');
 

@@ -141,7 +141,7 @@ describe('Foundation: 01 - Single Node Mock', () => {
       expect(rootToken.payload.path_id, 'Root token path_id must be "root"').toBe('root');
       expect(rootToken.payload.branch_index).toBe(0);
       expect(rootToken.payload.branch_total).toBe(1);
-      expect(rootToken.payload.fan_out_transition_id).toBeNull();
+      expect(rootToken.payload.sibling_group).toBeNull();
       expect(rootToken.node_id).toBeDefined();
 
       // Token state transitions

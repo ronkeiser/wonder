@@ -31,6 +31,7 @@ export function transition(config: TransitionConfig): TransitionConfig {
     ...(config.ref !== undefined && { ref: config.ref }),
     ...(config.condition !== undefined && { condition: config.condition }),
     ...(config.spawn_count !== undefined && { spawn_count: config.spawn_count }),
+    ...(config.sibling_group !== undefined && { sibling_group: config.sibling_group }),
     ...(config.foreach !== undefined && { foreach: config.foreach }),
     ...(config.synchronization !== undefined && { synchronization: config.synchronization }),
     ...(config.loop_config !== undefined && { loop_config: config.loop_config }),

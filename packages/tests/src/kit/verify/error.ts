@@ -123,16 +123,16 @@ export class WorkflowVerificationError extends Error {
       lines.push('  ALL TOKENS');
       lines.push('───────────────────────────────────────────────────────────────────────────────');
       const header =
-        '  ID (last 8)   | Path ID                          | Parent    | Fan-out   | Branch';
+        '  ID (last 8)   | Path ID                          | Parent    | Sibling   | Branch';
       lines.push(header);
       lines.push('  ' + '-'.repeat(header.length - 2));
       for (const tc of diagnostics.tokenCreations) {
         const id = tc.tokenId?.slice(-8) ?? 'null';
         const pathId = tc.pathId.padEnd(32);
         const parent = (tc.parentId?.slice(-8) ?? 'null').padEnd(9);
-        const fanOut = (tc.fanOutId?.slice(-8) ?? 'null').padEnd(9);
+        const siblingGroup = (tc.siblingGroup?.slice(0, 9) ?? 'null').padEnd(9);
         const branch = `${tc.branchIndex}/${tc.branchTotal}`;
-        lines.push(`  ${id.padEnd(13)} | ${pathId} | ${parent} | ${fanOut} | ${branch}`);
+        lines.push(`  ${id.padEnd(13)} | ${pathId} | ${parent} | ${siblingGroup} | ${branch}`);
       }
       lines.push('');
     }

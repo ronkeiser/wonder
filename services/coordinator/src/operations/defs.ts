@@ -206,6 +206,7 @@ export class DefinitionManager {
           priority: transition.priority,
           condition: transition.condition,
           spawn_count: transition.spawn_count,
+          sibling_group: transition.sibling_group,
           foreach: transition.foreach,
           synchronization: transition.synchronization,
           loop_config: transition.loop_config,

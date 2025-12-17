@@ -25,10 +25,11 @@ export type TransitionInput = {
   priority: number;
   condition?: object;
   spawn_count?: number;
+  sibling_group?: string; // Named sibling group identifier (for explicit fan-out)
   foreach?: object;
   synchronization?: {
     strategy: string;
-    sibling_group: string; // This is a transition ref that must be resolved
+    sibling_group: string; // References either a named group or transition ref
     merge?: object;
   };
   loop_config?: object;
@@ -67,7 +68,7 @@ export function validateWorkflowDef(data: WorkflowDefInput): ValidationResult {
   validateTransitionNodeRefs(data.transitions ?? [], nodeRefs);
   validateInitialNodeRef(data.initial_node_ref, nodeRefs);
   validateOwnership(data.project_id, data.library_id);
-  validateSynchronizationRefs(data.transitions ?? [], transitionRefs);
+  validateSiblingGroups(data.transitions ?? [], transitionRefs);
 
   return { nodeRefs, transitionRefs };
 }
@@ -172,22 +173,34 @@ function validateOwnership(projectId?: string, libraryId?: string): void {
 }
 
 /**
- * Validates synchronization.sibling_group refs point to valid transitions.
- * This is the key validation that was missing!
+ * Validates sibling_group usage across transitions.
+ * Two patterns are supported:
+ * 1. spawn_count pattern: sibling_group in synchronization must reference a transition
+ * 2. explicit fan-out: sibling_group is a named string declared on transitions
  */
-function validateSynchronizationRefs(
-  transitions: TransitionInput[],
-  transitionRefs: Set<string>,
-): void {
+function validateSiblingGroups(transitions: TransitionInput[], transitionRefs: Set<string>): void {
+  // Collect all declared sibling groups (from transition.sibling_group)
+  const declaredGroups = new Set<string>();
+  for (const transition of transitions) {
+    if (transition.sibling_group) {
+      declaredGroups.add(transition.sibling_group);
+    }
+  }
+
+  // Validate synchronization.sibling_group references
   for (const transition of transitions) {
     if (transition.synchronization?.sibling_group) {
       const siblingGroupRef = transition.synchronization.sibling_group;
 
-      if (!transitionRefs.has(siblingGroupRef)) {
+      // Must be either a declared sibling group OR a valid transition ref
+      const isTransitionRef = transitionRefs.has(siblingGroupRef);
+      const isDeclaredGroup = declaredGroups.has(siblingGroupRef);
+
+      if (!isTransitionRef && !isDeclaredGroup) {
         throw new ValidationError(
-          `Invalid synchronization.sibling_group: '${siblingGroupRef}' does not reference a valid transition`,
+          `Invalid synchronization.sibling_group: '${siblingGroupRef}' is neither a declared sibling group nor a valid transition reference`,
           'transitions.synchronization.sibling_group',
-          'INVALID_SIBLING_GROUP_REF',
+          'INVALID_SIBLING_GROUP',
         );
       }
     }

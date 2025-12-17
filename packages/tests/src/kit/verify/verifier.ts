@@ -291,7 +291,7 @@ export class WorkflowVerifier {
           {
             expected: structure.fanOuts.length,
             actual: fanOutGroups.length,
-            fanOutIds: fanOutGroups.map((g) => g.fanOutId),
+            siblingGroups: fanOutGroups.map((g) => g.siblingGroup),
           },
         );
       }
@@ -308,7 +308,7 @@ export class WorkflowVerifier {
             `tokens.${groupLabel}.count`,
             `Expected fan-out group ${i} to have ${spec.count} siblings, got ${group.siblings.length}.`,
             diagnostics,
-            { expected: spec.count, actual: group.siblings.length, fanOutId: group.fanOutId },
+            { expected: spec.count, actual: group.siblings.length, siblingGroup: group.siblingGroup },
           );
         }
 
@@ -323,7 +323,7 @@ export class WorkflowVerifier {
             diagnostics,
             {
               expected: spec.branchTotal,
-              fanOutId: group.fanOutId,
+              siblingGroup: group.siblingGroup,
               mismatches: wrongTotals.map((s) => ({
                 tokenId: s.token_id,
                 branchTotal: s.payload.branch_total,
@@ -342,7 +342,7 @@ export class WorkflowVerifier {
             `tokens.${groupLabel}.branchIndices`,
             `Expected fan-out group ${i} to have branch indices [0..${spec.count - 1}], got ${JSON.stringify(actualIndices)}.`,
             diagnostics,
-            { expected: expectedIndices, actual: actualIndices, fanOutId: group.fanOutId },
+            { expected: expectedIndices, actual: actualIndices, siblingGroup: group.siblingGroup },
           );
         }
 
@@ -357,7 +357,7 @@ export class WorkflowVerifier {
                 `tokens.${groupLabel}.outputFields`,
                 `Expected branch output for token ${tokenId.slice(-8)}, but none found.`,
                 diagnostics,
-                { tokenId, fanOutId: group.fanOutId },
+                { tokenId, siblingGroup: group.siblingGroup },
               );
             }
             for (const field of spec.outputFields) {
@@ -366,7 +366,7 @@ export class WorkflowVerifier {
                   `tokens.${groupLabel}.outputFields`,
                   `Expected branch output for token ${tokenId.slice(-8)} to have field "${field}".`,
                   diagnostics,
-                  { tokenId, output, expectedFields: spec.outputFields, fanOutId: group.fanOutId },
+                  { tokenId, output, expectedFields: spec.outputFields, siblingGroup: group.siblingGroup },
                 );
               }
             }
@@ -729,54 +729,54 @@ export class WorkflowVerifier {
     // Classify tokens
     const rootTokens = tokenCreations.filter((tc) => tc.payload.path_id === 'root');
 
-    // Fan-out siblings: tokens with fan_out_transition_id, branch_total > 1, AND
+    // Fan-out siblings: tokens with sibling_group, branch_total > 1, AND
     // a unique branch path (not index 0 continuing from a completed branch).
     // The key insight: true fan-out siblings are the FIRST tokens in their branch path,
-    // meaning their parent doesn't have the same fan_out_transition_id.
-    // Fan-in arrivals (child of a sibling going into sync) inherit fan_out_id but are NOT siblings.
+    // meaning their parent doesn't have the same sibling_group.
+    // Fan-in arrivals (child of a sibling going into sync) inherit sibling_group but are NOT siblings.
     const tokenMap = new Map(tokenCreations.map((tc) => [tc.token_id, tc]));
 
     const fanOutSiblings = tokenCreations.filter((tc) => {
-      if (tc.payload.fan_out_transition_id === null) return false;
+      if (tc.payload.sibling_group === null) return false;
       if (tc.payload.branch_total <= 1) return false;
-      // Check if parent has the same fan_out_transition_id
+      // Check if parent has the same sibling_group
       // If yes, this is a continuation/arrival, not a true sibling
       const parent = tc.payload.parent_token_id ? tokenMap.get(tc.payload.parent_token_id) : null;
-      if (parent && parent.payload.fan_out_transition_id === tc.payload.fan_out_transition_id) {
+      if (parent && parent.payload.sibling_group === tc.payload.sibling_group) {
         return false; // This is a fan-in arrival, not a new sibling
       }
       return true;
     });
     const siblingIds = new Set(fanOutSiblings.map((s) => s.token_id));
 
-    // Group siblings by fan_out_transition_id (preserving order of first occurrence)
+    // Group siblings by sibling_group (preserving order of first occurrence)
     const fanOutGroupMap = new Map<string, typeof fanOutSiblings>();
     for (const sibling of fanOutSiblings) {
-      const fanOutId = sibling.payload.fan_out_transition_id!;
-      if (!fanOutGroupMap.has(fanOutId)) {
-        fanOutGroupMap.set(fanOutId, []);
+      const siblingGroup = sibling.payload.sibling_group!;
+      if (!fanOutGroupMap.has(siblingGroup)) {
+        fanOutGroupMap.set(siblingGroup, []);
       }
-      fanOutGroupMap.get(fanOutId)!.push(sibling);
+      fanOutGroupMap.get(siblingGroup)!.push(sibling);
     }
-    const fanOutGroups = Array.from(fanOutGroupMap.entries()).map(([fanOutId, siblings]) => ({
-      fanOutId,
+    const fanOutGroups = Array.from(fanOutGroupMap.entries()).map(([siblingGroup, siblings]) => ({
+      siblingGroup,
       siblings,
     }));
 
-    // Fan-in arrivals: have fan_out_transition_id, but parent is a fan-out sibling
-    // (so they inherit the fan_out_id from their parent)
+    // Fan-in arrivals: have sibling_group, but parent is a fan-out sibling
+    // (so they inherit the sibling_group from their parent)
     const fanInArrivals = tokenCreations.filter((tc) => {
-      if (tc.payload.fan_out_transition_id === null) return false;
+      if (tc.payload.sibling_group === null) return false;
       return siblingIds.has(tc.payload.parent_token_id!);
     });
 
     // Fan-in continuations: tokens created after synchronization completes
-    // These are tokens with no fan_out_transition_id, not root, and branch_total of 1
+    // These are tokens with no sibling_group, not root, and branch_total of 1
     const fanInContinuations = tokenCreations.filter((tc) => {
       // Not root
       if (tc.payload.path_id === 'root') return false;
-      // Has no fan_out_transition_id (distinguishes from siblings and arrivals)
-      if (tc.payload.fan_out_transition_id !== null) return false;
+      // Has no sibling_group (distinguishes from siblings and arrivals)
+      if (tc.payload.sibling_group !== null) return false;
       // Has branch_total of 1 (single continuation after sync)
       return tc.payload.branch_total === 1;
     });
@@ -847,7 +847,7 @@ export class WorkflowVerifier {
         tokenId: tc.token_id,
         pathId: tc.payload.path_id,
         parentId: tc.payload.parent_token_id,
-        fanOutId: tc.payload.fan_out_transition_id,
+        siblingGroup: tc.payload.sibling_group,
         branchIndex: tc.payload.branch_index,
         branchTotal: tc.payload.branch_total,
       })),

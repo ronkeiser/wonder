@@ -49,7 +49,7 @@ export function decideWorkflowStart(params: {
       node_id: initialNodeId,
       parent_token_id: null,
       path_id: 'root',
-      fan_out_transition_id: null,
+      sibling_group: null,
       branch_index: 0,
       branch_total: 1,
     },

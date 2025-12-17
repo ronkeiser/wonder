@@ -21,7 +21,6 @@ import type {
   FieldRef,
   ForeachConfig,
   Literal,
-  MergeConfig,
   SynchronizationConfig,
   TransitionDef,
 } from '../types';
@@ -109,14 +108,61 @@ export function decideRouting(params: {
     return { decisions: [], events };
   }
 
+  // Count total tokens per sibling_group for fan-out patterns
+  // Handles both:
+  // 1. Explicit sibling_group: multiple transitions share the same named group
+  // 2. spawn_count without explicit sibling_group: uses transition ref as implicit group
+  const siblingGroupTotals = new Map<string, number>();
+  for (const t of matchedTransitions) {
+    const count = determineSpawnCount(t, context);
+    const sg = t.sibling_group ?? null;
+    if (sg !== null) {
+      // Explicit sibling_group
+      siblingGroupTotals.set(sg, (siblingGroupTotals.get(sg) ?? 0) + count);
+    } else if (count > 1) {
+      // spawn_count fan-out: use transition ref as implicit sibling_group
+      const implicitSg = t.ref ?? t.id;
+      siblingGroupTotals.set(implicitSg, (siblingGroupTotals.get(implicitSg) ?? 0) + count);
+    }
+  }
+
   // Generate CREATE_TOKEN decisions for each match
+  // Track branch_index per sibling_group for correct indexing
+  const siblingGroupIndices = new Map<string, number>();
+
   for (const transition of matchedTransitions) {
     const spawnCount = determineSpawnCount(transition, context);
 
-    // Determine if this creates a new sibling group or inherits parent's
-    const isNewFanOut = spawnCount > 1;
-    const fanOutTransitionId = isNewFanOut ? transition.id : completedToken.fan_out_transition_id;
-    const branchTotal = isNewFanOut ? spawnCount : completedToken.branch_total;
+    // Determine sibling group membership
+    // Two patterns for fan-out:
+    // 1. Explicit sibling_group on transition: use that value
+    // 2. spawn_count > 1 without explicit sibling_group: use transition ref as sibling_group
+    // For continuations (spawn_count == 1, no sibling_group): inherit from parent
+    const transitionSiblingGroup = transition.sibling_group ?? null;
+    const hasExplicitSiblingGroup = transitionSiblingGroup !== null;
+    const isSpawnCountFanOut = spawnCount > 1;
+
+    let siblingGroup: string | null;
+    if (hasExplicitSiblingGroup) {
+      // Explicit sibling_group declared on transition
+      siblingGroup = transitionSiblingGroup;
+    } else if (isSpawnCountFanOut) {
+      // spawn_count fan-out: use transition ref as implicit sibling_group
+      siblingGroup = transition.ref ?? transition.id;
+    } else {
+      // Continuation: inherit from parent
+      siblingGroup = completedToken.sibling_group ?? null;
+    }
+
+    // Determine branch_total:
+    // 1. For fan-out (explicit or spawn_count): look up total from siblingGroupTotals
+    // 2. For continuation: inherit from parent
+    let branchTotal: number;
+    if (siblingGroup !== null && siblingGroupTotals.has(siblingGroup)) {
+      branchTotal = siblingGroupTotals.get(siblingGroup)!;
+    } else {
+      branchTotal = completedToken.branch_total;
+    }
 
     // Emit transition matched event
     events.push({
@@ -128,7 +174,20 @@ export function decideRouting(params: {
     });
 
     for (let i = 0; i < spawnCount; i++) {
-      const pathId = buildPathId(completedTokenPath, nodeId, i, spawnCount);
+      // Determine branch_index:
+      // 1. Fan-out (siblingGroup is set): use global index across all tokens in the group
+      // 2. Continuation (siblingGroup inherited/null): inherit from parent
+      let branchIndex: number;
+      if (siblingGroup !== null && siblingGroupTotals.has(siblingGroup)) {
+        // Fan-out: track global index across all matched transitions in this group
+        branchIndex = siblingGroupIndices.get(siblingGroup) ?? 0;
+        siblingGroupIndices.set(siblingGroup, branchIndex + 1);
+      } else {
+        // Continuation: inherit branch_index from parent to maintain sibling identity
+        branchIndex = completedToken.branch_index;
+      }
+
+      const pathId = buildPathId(completedTokenPath, nodeId, branchIndex, branchTotal);
 
       decisions.push({
         type: 'CREATE_TOKEN',
@@ -137,8 +196,8 @@ export function decideRouting(params: {
           node_id: transition.to_node_id,
           parent_token_id: completedTokenId,
           path_id: pathId,
-          fan_out_transition_id: fanOutTransitionId,
-          branch_index: i,
+          sibling_group: siblingGroup,
+          branch_index: branchIndex,
           branch_total: branchTotal,
         },
       });
@@ -455,6 +514,7 @@ export function toTransitionDef(row: TransitionRow): TransitionDef {
     priority: row.priority,
     condition: row.condition as Condition | null,
     spawn_count: row.spawn_count,
+    sibling_group: row.sibling_group ?? null,
     foreach: row.foreach as ForeachConfig | null,
     synchronization: row.synchronization as SynchronizationConfig | null,
   };

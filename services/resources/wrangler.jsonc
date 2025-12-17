@@ -10,7 +10,7 @@
       "binding": "DB",
       "database_name": "wonder",
       "database_id": "a670820b-6a86-441f-a2eb-9936908a9e92",
-      "migrations_dir": "src/infrastructure/db/migrations",
+      "migrations_dir": "src/schema/migrations",
       "remote": true,
     },
   ],

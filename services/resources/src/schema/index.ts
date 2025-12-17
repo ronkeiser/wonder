@@ -191,6 +191,7 @@ export const transitions = sqliteTable(
 
     condition: text('condition', { mode: 'json' }).$type<object>(), // structured or expression
     spawn_count: integer('spawn_count'), // How many tokens to spawn (default: 1)
+    sibling_group: text('sibling_group'), // Sibling group identifier for fan-in coordination
     foreach: text('foreach', { mode: 'json' }).$type<object>(), // foreach config
     synchronization: text('synchronization', { mode: 'json' }).$type<object>(), // fan-in config
     loop_config: text('loop_config', { mode: 'json' }).$type<object>(),

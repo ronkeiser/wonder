@@ -1807,6 +1807,7 @@ export interface components {
                     [key: string]: unknown;
                 };
                 spawn_count?: number;
+                sibling_group?: string;
                 foreach?: {
                     [key: string]: unknown;
                 };

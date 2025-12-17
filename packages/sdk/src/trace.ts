@@ -106,7 +106,8 @@ export namespace TracePayloads {
     task_id: string;
     parent_token_id: string | null;
     path_id: string;
-    fan_out_transition_id: string | null;
+    sibling_group: string | null;
+    fan_out_transition_id: string | null; // DEPRECATED - use sibling_group
     branch_index: number;
     branch_total: number;
   }

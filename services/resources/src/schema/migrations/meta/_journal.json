@@ -22,6 +22,13 @@
       "when": 1765615884867,
       "tag": "0002_chief_wolverine",
       "breakpoints": true
+    },
+    {
+      "idx": 3,
+      "version": "6",
+      "when": 1766003525555,
+      "tag": "0003_slimy_cyclops",
+      "breakpoints": true
     }
   ]
 }

@@ -36,10 +36,11 @@ export type TransformedTransition = {
   priority: number;
   condition: object | null;
   spawn_count: number | null;
+  sibling_group: string | null; // Named sibling group for fan-in coordination
   foreach: object | null;
   synchronization: {
     strategy: string;
-    sibling_group: string; // Now contains the transition ID, not the ref
+    sibling_group: string; // References either a named group or transition ref
     merge?: object;
   } | null;
   loop_config: object | null;
@@ -122,14 +123,14 @@ function transformTransitions(
   ids: GeneratedIds,
 ): TransformedTransition[] {
   // Build a map from transition ref to its generated ID
-  // We need this to resolve sibling_group refs
+  // We need this to resolve sibling_group refs for spawn_count pattern
   const transitionRefToId = ids.transitionIds;
 
   return transitions.map((transition, index) => {
     // Get or generate the transition ID
     const transitionId = transition.ref ? transitionRefToId.get(transition.ref)! : ulid(); // Generate for transitions without refs
 
-    // Transform synchronization - resolve sibling_group ref to ID
+    // Transform synchronization
     const transformedSync = transformSynchronization(transition.synchronization, transitionRefToId);
 
     return {
@@ -140,6 +141,7 @@ function transformTransitions(
       priority: transition.priority,
       condition: transition.condition ?? null,
       spawn_count: transition.spawn_count ?? null,
+      sibling_group: transition.sibling_group ?? null,
       foreach: transition.foreach ?? null,
       synchronization: transformedSync,
       loop_config: transition.loop_config ?? null,
@@ -148,8 +150,8 @@ function transformTransitions(
 }
 
 /**
- * Transforms synchronization config - resolves sibling_group ref to ID.
- * This is the key transformation that fixes the bug!
+ * Transforms synchronization config - keeps sibling_group as string identifier.
+ * No longer resolves to ID - sibling_group is now a semantic string shared across transitions.
  */
 function transformSynchronization(
   sync: TransitionInput['synchronization'],
@@ -159,17 +161,10 @@ function transformSynchronization(
     return null;
   }
 
-  const siblingGroupId = transitionRefToId.get(sync.sibling_group);
-  if (!siblingGroupId) {
-    // This should never happen if validation passed
-    throw new Error(
-      `Internal error: sibling_group ref '${sync.sibling_group}' not found in transition map`,
-    );
-  }
-
+  // Keep sibling_group as-is - it's now a string identifier, not a ref to resolve
   return {
     strategy: sync.strategy,
-    sibling_group: siblingGroupId, // Now contains the ID!
+    sibling_group: sync.sibling_group,
     merge: sync.merge,
   };
 }

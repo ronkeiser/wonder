@@ -299,6 +299,7 @@ export async function createTransitionWithId(
     priority: number;
     condition?: object | null;
     spawn_count?: number | null;
+    sibling_group?: string | null;
     foreach?: object | null;
     synchronization?: object | null;
     loop_config?: object | null;
@@ -314,6 +315,7 @@ export async function createTransitionWithId(
     priority: data.priority,
     condition: data.condition ?? null,
     spawn_count: data.spawn_count ?? null,
+    sibling_group: data.sibling_group ?? null,
     foreach: data.foreach ?? null,
     synchronization: data.synchronization ?? null,
     loop_config: data.loop_config ?? null,

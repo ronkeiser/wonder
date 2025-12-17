@@ -6,27 +6,30 @@ CREATE TABLE `fan_ins` (
 	`status` text NOT NULL,
 	`transition_id` text NOT NULL,
 	`first_arrival_at` integer NOT NULL,
-	`activated_at` integer
+	`activated_at` integer,
+	`activated_by_token_id` text
 );
 --> statement-breakpoint
 CREATE INDEX `idx_fan_ins_workflow_run` ON `fan_ins` (`workflow_run_id`);--> statement-breakpoint
 CREATE INDEX `idx_fan_ins_path` ON `fan_ins` (`fan_in_path`);--> statement-breakpoint
+CREATE INDEX `idx_fan_ins_unique_path` ON `fan_ins` (`workflow_run_id`,`fan_in_path`);--> statement-breakpoint
 CREATE TABLE `nodes` (
 	`id` text NOT NULL,
 	`ref` text NOT NULL,
 	`workflow_def_id` text NOT NULL,
 	`workflow_def_version` integer NOT NULL,
 	`name` text NOT NULL,
-	`action_id` text,
-	`action_version` integer,
+	`task_id` text,
+	`task_version` integer,
 	`input_mapping` text,
 	`output_mapping` text,
+	`resource_bindings` text,
 	PRIMARY KEY(`workflow_def_id`, `workflow_def_version`, `id`),
 	FOREIGN KEY (`workflow_def_id`,`workflow_def_version`) REFERENCES `workflow_defs`(`id`,`version`) ON UPDATE no action ON DELETE no action
 );
 --> statement-breakpoint
 CREATE INDEX `idx_nodes_workflow_def` ON `nodes` (`workflow_def_id`,`workflow_def_version`);--> statement-breakpoint
-CREATE INDEX `idx_nodes_action` ON `nodes` (`action_id`,`action_version`);--> statement-breakpoint
+CREATE INDEX `idx_nodes_task` ON `nodes` (`task_id`,`task_version`);--> statement-breakpoint
 CREATE INDEX `idx_nodes_ref` ON `nodes` (`workflow_def_id`,`workflow_def_version`,`ref`);--> statement-breakpoint
 CREATE TABLE `tokens` (
 	`id` text PRIMARY KEY NOT NULL,
@@ -35,6 +38,7 @@ CREATE TABLE `tokens` (
 	`status` text NOT NULL,
 	`parent_token_id` text,
 	`path_id` text NOT NULL,
+	`sibling_group` text,
 	`fan_out_transition_id` text,
 	`branch_index` integer NOT NULL,
 	`branch_total` integer NOT NULL,
@@ -45,6 +49,7 @@ CREATE TABLE `tokens` (
 --> statement-breakpoint
 CREATE INDEX `idx_tokens_workflow_run` ON `tokens` (`workflow_run_id`);--> statement-breakpoint
 CREATE INDEX `idx_tokens_status` ON `tokens` (`status`);--> statement-breakpoint
+CREATE INDEX `idx_tokens_sibling_group` ON `tokens` (`sibling_group`);--> statement-breakpoint
 CREATE INDEX `idx_tokens_fan_out` ON `tokens` (`fan_out_transition_id`);--> statement-breakpoint
 CREATE INDEX `idx_tokens_path` ON `tokens` (`path_id`);--> statement-breakpoint
 CREATE TABLE `transitions` (
@@ -57,6 +62,7 @@ CREATE TABLE `transitions` (
 	`priority` integer NOT NULL,
 	`condition` text,
 	`spawn_count` integer,
+	`sibling_group` text,
 	`foreach` text,
 	`synchronization` text,
 	`loop_config` text,
@@ -114,4 +120,9 @@ CREATE INDEX `idx_workflow_runs_project` ON `workflow_runs` (`project_id`);--> s
 CREATE INDEX `idx_workflow_runs_workflow` ON `workflow_runs` (`workflow_id`);--> statement-breakpoint
 CREATE INDEX `idx_workflow_runs_status` ON `workflow_runs` (`status`);--> statement-breakpoint
 CREATE INDEX `idx_workflow_runs_parent` ON `workflow_runs` (`parent_run_id`);--> statement-breakpoint
-CREATE INDEX `idx_workflow_runs_created_at` ON `workflow_runs` (`created_at`);
+CREATE INDEX `idx_workflow_runs_created_at` ON `workflow_runs` (`created_at`);--> statement-breakpoint
+CREATE TABLE `workflow_status` (
+	`workflow_run_id` text PRIMARY KEY NOT NULL,
+	`status` text NOT NULL,
+	`updated_at` integer NOT NULL
+);

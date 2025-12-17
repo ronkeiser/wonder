@@ -42,6 +42,7 @@ export type Transition = {
   priority: number;
   condition: object | null;
   spawn_count: number | null;
+  sibling_group: string | null;
   foreach: object | null;
   synchronization: object | null;
   loop_config: object | null;

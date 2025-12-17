@@ -47,7 +47,10 @@ export const tokens = sqliteTable(
     /** Lineage tracking */
     parent_token_id: text('parent_token_id'),
     path_id: text('path_id').notNull(),
-    fan_out_transition_id: text('fan_out_transition_id'),
+
+    /** Sibling group membership - replaces fan_out_transition_id */
+    sibling_group: text('sibling_group'),
+    fan_out_transition_id: text('fan_out_transition_id'), // DEPRECATED - kept for migration
 
     /** Branch position (for fan-out siblings) */
     branch_index: integer('branch_index').notNull(),
@@ -61,7 +64,8 @@ export const tokens = sqliteTable(
   (table) => [
     index('idx_tokens_workflow_run').on(table.workflow_run_id),
     index('idx_tokens_status').on(table.status),
-    index('idx_tokens_fan_out').on(table.fan_out_transition_id),
+    index('idx_tokens_sibling_group').on(table.sibling_group),
+    index('idx_tokens_fan_out').on(table.fan_out_transition_id), // DEPRECATED - kept for migration
     index('idx_tokens_path').on(table.path_id),
   ],
 );

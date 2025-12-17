@@ -186,6 +186,7 @@ describe('Foundation: 02 - Fan-out with Spawn Count + Fan-in', () => {
       to_node_ref: 'node_b',
       priority: 1,
       spawn_count: 3,
+      sibling_group: 'fanout_group', // Explicitly declare sibling group for fan-in coordination
     });
 
     // Transition: Fan-in from B to C with synchronization
@@ -196,7 +197,7 @@ describe('Foundation: 02 - Fan-out with Spawn Count + Fan-in', () => {
       priority: 1,
       synchronization: {
         strategy: 'all',
-        sibling_group: 'fanout_transition',
+        sibling_group: 'fanout_group', // References the sibling group declared on fan-out
         merge: {
           source: '_branch.output.result',
           target: 'state.results',

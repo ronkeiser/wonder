@@ -1,7 +1,7 @@
 {
   "version": "6",
   "dialect": "sqlite",
-  "id": "407f70d6-5e23-411c-8501-efe1147687da",
+  "id": "4489a8ad-0dec-42ed-b2df-e1ac6bb57981",
   "prevId": "00000000-0000-0000-0000-000000000000",
   "tables": {
     "fan_ins": {
@@ -62,6 +62,13 @@
           "primaryKey": false,
           "notNull": false,
           "autoincrement": false
+        },
+        "activated_by_token_id": {
+          "name": "activated_by_token_id",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false,
+          "autoincrement": false
         }
       },
       "indexes": {
@@ -75,6 +82,14 @@
         "idx_fan_ins_path": {
           "name": "idx_fan_ins_path",
           "columns": [
+            "fan_in_path"
+          ],
+          "isUnique": false
+        },
+        "idx_fan_ins_unique_path": {
+          "name": "idx_fan_ins_unique_path",
+          "columns": [
+            "workflow_run_id",
             "fan_in_path"
           ],
           "isUnique": false
@@ -123,15 +138,15 @@
           "notNull": true,
           "autoincrement": false
         },
-        "action_id": {
-          "name": "action_id",
+        "task_id": {
+          "name": "task_id",
           "type": "text",
           "primaryKey": false,
           "notNull": false,
           "autoincrement": false
         },
-        "action_version": {
-          "name": "action_version",
+        "task_version": {
+          "name": "task_version",
           "type": "integer",
           "primaryKey": false,
           "notNull": false,
@@ -150,6 +165,13 @@
           "primaryKey": false,
           "notNull": false,
           "autoincrement": false
+        },
+        "resource_bindings": {
+          "name": "resource_bindings",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false,
+          "autoincrement": false
         }
       },
       "indexes": {
@@ -161,11 +183,11 @@
           ],
           "isUnique": false
         },
-        "idx_nodes_action": {
-          "name": "idx_nodes_action",
+        "idx_nodes_task": {
+          "name": "idx_nodes_task",
           "columns": [
-            "action_id",
-            "action_version"
+            "task_id",
+            "task_version"
           ],
           "isUnique": false
         },
@@ -254,6 +276,13 @@
           "notNull": true,
           "autoincrement": false
         },
+        "sibling_group": {
+          "name": "sibling_group",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false,
+          "autoincrement": false
+        },
         "fan_out_transition_id": {
           "name": "fan_out_transition_id",
           "type": "text",
@@ -309,6 +338,13 @@
           "name": "idx_tokens_status",
           "columns": [
             "status"
+          ],
+          "isUnique": false
+        },
+        "idx_tokens_sibling_group": {
+          "name": "idx_tokens_sibling_group",
+          "columns": [
+            "sibling_group"
           ],
           "isUnique": false
         },
@@ -394,6 +430,13 @@
         "spawn_count": {
           "name": "spawn_count",
           "type": "integer",
+          "primaryKey": false,
+          "notNull": false,
+          "autoincrement": false
+        },
+        "sibling_group": {
+          "name": "sibling_group",
+          "type": "text",
           "primaryKey": false,
           "notNull": false,
           "autoincrement": false
@@ -864,6 +907,37 @@
           "onUpdate": "no action"
         }
       },
+      "compositePrimaryKeys": {},
+      "uniqueConstraints": {},
+      "checkConstraints": {}
+    },
+    "workflow_status": {
+      "name": "workflow_status",
+      "columns": {
+        "workflow_run_id": {
+          "name": "workflow_run_id",
+          "type": "text",
+          "primaryKey": true,
+          "notNull": true,
+          "autoincrement": false
+        },
+        "status": {
+          "name": "status",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false
+        },
+        "updated_at": {
+          "name": "updated_at",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false
+        }
+      },
+      "indexes": {},
+      "foreignKeys": {},
       "compositePrimaryKeys": {},
       "uniqueConstraints": {},
       "checkConstraints": {}

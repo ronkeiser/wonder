@@ -35,7 +35,7 @@ export type CreateTokenParams = {
   node_id: string;
   parent_token_id: string | null;
   path_id: string;
-  fan_out_transition_id: string | null;
+  sibling_group: string | null;
   branch_index: number;
   branch_total: number;
 };
@@ -82,7 +82,7 @@ export class TokenManager {
         status: 'pending',
         parent_token_id: params.parent_token_id,
         path_id: params.path_id,
-        fan_out_transition_id: params.fan_out_transition_id,
+        sibling_group: params.sibling_group,
         branch_index: params.branch_index,
         branch_total: params.branch_total,
         created_at: now,
@@ -98,7 +98,7 @@ export class TokenManager {
         task_id: params.node_id,
         parent_token_id: params.parent_token_id,
         path_id: params.path_id,
-        fan_out_transition_id: params.fan_out_transition_id,
+        sibling_group: params.sibling_group,
         branch_index: params.branch_index,
         branch_total: params.branch_total,
       },
@@ -164,26 +164,21 @@ export class TokenManager {
   // ============================================================================
 
   /**
-   * Get all sibling tokens from a fan-out transition
+   * Get all sibling tokens from a sibling group
    */
-  getSiblings(workflowRunId: string, fanOutTransitionId: string): TokenRow[] {
+  getSiblings(workflowRunId: string, siblingGroup: string): TokenRow[] {
     return this.db
       .select()
       .from(tokens)
-      .where(
-        and(
-          eq(tokens.workflow_run_id, workflowRunId),
-          eq(tokens.fan_out_transition_id, fanOutTransitionId),
-        ),
-      )
+      .where(and(eq(tokens.workflow_run_id, workflowRunId), eq(tokens.sibling_group, siblingGroup)))
       .all();
   }
 
   /**
    * Get sibling count breakdown for synchronization checks
    */
-  getSiblingCounts(workflowRunId: string, fanOutTransitionId: string): SiblingCounts {
-    const siblings = this.getSiblings(workflowRunId, fanOutTransitionId);
+  getSiblingCounts(workflowRunId: string, siblingGroup: string): SiblingCounts {
+    const siblings = this.getSiblings(workflowRunId, siblingGroup);
 
     const counts: SiblingCounts = {
       total: siblings.length,
@@ -235,16 +230,16 @@ export class TokenManager {
   }
 
   /**
-   * Get all tokens waiting for siblings in a fan-out group
+   * Get all tokens waiting for siblings in a sibling group
    */
-  getWaitingTokens(workflowRunId: string, fanOutTransitionId: string): TokenRow[] {
+  getWaitingTokens(workflowRunId: string, siblingGroup: string): TokenRow[] {
     return this.db
       .select()
       .from(tokens)
       .where(
         and(
           eq(tokens.workflow_run_id, workflowRunId),
-          eq(tokens.fan_out_transition_id, fanOutTransitionId),
+          eq(tokens.sibling_group, siblingGroup),
           eq(tokens.status, 'waiting_for_siblings'),
         ),
       )

@@ -123,32 +123,26 @@ export async function checkSiblingCompletion(
   ctx: DispatchContext,
   completedToken: Token,
 ): Promise<string | null> {
-  if (!completedToken.fan_out_transition_id) {
+  if (!completedToken.sibling_group) {
     return null; // Not a fan-out token, nothing to check
   }
 
   const workflowRunId = completedToken.workflow_run_id;
+  const siblingGroup = completedToken.sibling_group;
 
-  // Get the transition that spawned this fan-out
-  const fanOutTransition = ctx.defs.getTransition(completedToken.fan_out_transition_id);
-  if (!fanOutTransition) {
-    return null;
-  }
-
-  // Find the next transition (from the same source node) that has synchronization
-  const outboundTransitions = ctx.defs.getTransitionsFrom(fanOutTransition.from_node_id);
-  const syncTransitionRow = outboundTransitions.find((t) => {
+  // Find transitions with synchronization on this sibling group
+  const allTransitions = ctx.defs.getTransitions();
+  const syncTransitionRow = allTransitions.find((t) => {
     const sync = t.synchronization as { sibling_group?: string } | null;
-    return sync?.sibling_group === fanOutTransition.id;
+    return sync?.sibling_group === siblingGroup;
   });
 
   if (!syncTransitionRow || !syncTransitionRow.synchronization) {
-    return null; // No sync transition for this fan-out group
+    return null; // No sync transition for this sibling group
   }
 
   // Cast synchronization to typed config
   const syncTransition = toTransitionDef(syncTransitionRow);
-  const siblingGroup = syncTransition.synchronization!.sibling_group;
 
   // Check for tokens waiting for this sibling group
   const waitingTokens = ctx.tokens.getWaitingTokens(workflowRunId, siblingGroup);

@@ -131,9 +131,9 @@ export async function dispatchToken(ctx: DispatchContext, tokenId: string): Prom
  * For linear flows: Apply node's output_mapping to write directly to context
  * For fan-out flows: Write to branch table, then check if siblings can merge
  *
- * The distinction is determined by whether this token has fan_out_transition_id:
- * - No fan-out: Linear flow, use output_mapping to write to context
- * - Has fan-out: Branch flow, output goes to branch table for later merge
+ * The distinction is determined by whether this token has sibling_group:
+ * - No sibling_group: Linear flow, use output_mapping to write to context
+ * - Has sibling_group: Branch flow, output goes to branch table for later merge
  */
 export async function processTaskResult(
   ctx: DispatchContext,
@@ -148,7 +148,7 @@ export async function processTaskResult(
   const node = ctx.defs.getNode(token.node_id);
 
   // Handle output based on flow type
-  if (token.fan_out_transition_id) {
+  if (token.sibling_group) {
     // Fan-out flow: Write to branch table
     const continuationTokenId = await handleBranchOutput(ctx, token, node, result.output_data);
     // If fan-in activated, dispatch the continuation token

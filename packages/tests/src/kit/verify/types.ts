@@ -13,7 +13,7 @@ export interface TokenCreatedPayload {
   task_id: string;
   parent_token_id: string | null;
   path_id: string;
-  fan_out_transition_id: string | null;
+  sibling_group: string | null;
   branch_index: number;
   branch_total: number;
 }
@@ -185,8 +185,8 @@ export interface VerificationConfig {
  * Fan-out group with its sibling tokens.
  */
 export interface FanOutGroup {
-  /** The fan_out_transition_id for this group */
-  fanOutId: string;
+  /** The sibling_group identifier for this group */
+  siblingGroup: string;
   /** Sibling tokens in this group */
   siblings: TypedTraceEvent<TokenCreatedPayload>[];
 }
@@ -209,7 +209,7 @@ export interface VerificationContext {
     rootTokens: TypedTraceEvent<TokenCreatedPayload>[];
     /** All fan-out siblings (flat list for backward compat) */
     fanOutSiblings: TypedTraceEvent<TokenCreatedPayload>[];
-    /** Fan-out groups organized by fan_out_transition_id */
+    /** Fan-out groups organized by sibling_group */
     fanOutGroups: FanOutGroup[];
     fanInArrivals: TypedTraceEvent<TokenCreatedPayload>[];
     fanInContinuations: TypedTraceEvent<TokenCreatedPayload>[];
@@ -261,7 +261,7 @@ export interface DiagnosticContext {
     tokenId: string | null;
     pathId: string;
     parentId: string | null;
-    fanOutId: string | null;
+    siblingGroup: string | null;
     branchIndex: number;
     branchTotal: number;
   }>;
