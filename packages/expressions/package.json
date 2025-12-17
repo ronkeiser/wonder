@@ -1,0 +1,20 @@
+{
+  "name": "@wonder/expressions",
+  "version": "0.0.1",
+  "description": "Pure expression evaluation for JSON data transformation. Safe for Cloudflare Workers.",
+  "type": "module",
+  "main": "./src/index.ts",
+  "types": "./src/index.ts",
+  "exports": {
+    ".": "./src/index.ts"
+  },
+  "scripts": {
+    "test": "vitest run",
+    "test:watch": "vitest --watch"
+  },
+  "devDependencies": {
+    "miniflare": "^4.20251202.1",
+    "typescript": "^5.9.3",
+    "vitest": "^3.2.4"
+  }
+}
