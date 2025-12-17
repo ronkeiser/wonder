@@ -42,6 +42,7 @@
   let currentFilter = $state('');
   let timeFilterMinutes = $state(5);
   let prettyPrintEnabled = $state(false);
+  let identifierFilters = $state<string[]>([]);
   let ws: WebSocket | null = null;
   let seenIds = new Set<string>();
 
@@ -198,7 +199,7 @@
   let copyAllTimeout: ReturnType<typeof setTimeout> | null = null;
 
   function copyAllToClipboard() {
-    const text = JSON.stringify(items, null, 2);
+    const text = JSON.stringify(filteredItems, null, 2);
     navigator.clipboard.writeText(text);
 
     // Show feedback
@@ -263,6 +264,25 @@
     }
     window.history.pushState({}, '', url);
   }
+
+  function addIdentifierFilter(identifier: string) {
+    if (!identifierFilters.includes(identifier)) {
+      identifierFilters = [...identifierFilters, identifier];
+    }
+  }
+
+  function removeIdentifierFilter(identifier: string) {
+    identifierFilters = identifierFilters.filter((f) => f !== identifier);
+  }
+
+  // Filter items by identifier chips (client-side filtering)
+  const filteredItems = $derived.by(() => {
+    if (identifierFilters.length === 0) return items;
+    return items.filter((item) => {
+      const header = renderItemHeader(item);
+      return header.identifier && identifierFilters.includes(header.identifier);
+    });
+  });
 </script>
 
 <div class="stream-viewer">
@@ -310,7 +330,7 @@
         class="copy-all-btn"
         class:copied={copyAllStatus === 'copied'}
         onclick={copyAllToClipboard}
-        disabled={items.length === 0}
+        disabled={filteredItems.length === 0}
       >
         {#if copyAllStatus === 'copied'}
           <svg viewBox="0 0 16 16" fill="currentColor">
@@ -328,7 +348,7 @@
               d="M5 1.75C5 .784 5.784 0 6.75 0h7.5C15.216 0 16 .784 16 1.75v7.5A1.75 1.75 0 0 1 14.25 11h-7.5A1.75 1.75 0 0 1 5 9.25Zm1.75-.25a.25.25 0 0 0-.25.25v7.5c0 .138.112.25.25.25h7.5a.25.25 0 0 0 .25-.25v-7.5a.25.25 0 0 0-.25-.25Z"
             ></path>
           </svg>
-          Copy All ({items.length})
+          Copy All ({filteredItems.length})
         {/if}
       </button>
 
@@ -344,8 +364,21 @@
     </div>
   </header>
 
+  {#if identifierFilters.length > 0}
+    <div class="filter-chips">
+      {#each identifierFilters as filter}
+        <button class="filter-chip" onclick={() => removeIdentifierFilter(filter)}>
+          {filter}
+          <svg class="chip-x" viewBox="0 0 16 16" fill="currentColor">
+            <path d="M3.72 3.72a.75.75 0 0 1 1.06 0L8 6.94l3.22-3.22a.749.749 0 0 1 1.275.326.749.749 0 0 1-.215.734L9.06 8l3.22 3.22a.749.749 0 0 1-.326 1.275.749.749 0 0 1-.734-.215L8 9.06l-3.22 3.22a.751.751 0 0 1-1.042-.018.751.751 0 0 1-.018-1.042L6.94 8 3.72 4.78a.75.75 0 0 1 0-1.06Z"></path>
+          </svg>
+        </button>
+      {/each}
+    </div>
+  {/if}
+
   <div class="items" id="items-container">
-    {#each items as item (item.id)}
+    {#each filteredItems as item (item.id)}
       <StreamItem
         {item}
         metadata={getMetadata?.(item)}
@@ -353,6 +386,7 @@
         {getItemColor}
         {renderItemHeader}
         onCopy={copyToClipboard}
+        onIdentifierClick={addIdentifierFilter}
       />
     {/each}
   </div>
@@ -622,5 +656,44 @@
 
   ::-webkit-scrollbar-thumb:hover {
     background: #484f58;
+  }
+
+  .filter-chips {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0.5rem;
+    padding: 0.75rem 1rem;
+    background: var(--bg-secondary);
+    border-bottom: 1px solid var(--border);
+  }
+
+  .filter-chip {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.375rem;
+    padding: 0.25rem 0.5rem;
+    background: var(--indigo);
+    color: #fff;
+    border: none;
+    border-radius: 4px;
+    font-size: 0.8rem;
+    font-weight: 500;
+    font-family: inherit;
+    cursor: pointer;
+    transition: background 0.1s, opacity 0.1s;
+  }
+
+  .filter-chip:hover {
+    opacity: 0.8;
+  }
+
+  .chip-x {
+    width: 14px;
+    height: 14px;
+    opacity: 0.7;
+  }
+
+  .filter-chip:hover .chip-x {
+    opacity: 1;
   }
 </style>

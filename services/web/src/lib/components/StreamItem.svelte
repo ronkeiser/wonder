@@ -11,9 +11,10 @@
       message?: string;
     };
     onCopy: (item: any) => void;
+    onIdentifierClick?: (identifier: string) => void;
   }
 
-  let { item, metadata, prettyPrint, getItemColor, renderItemHeader, onCopy }: Props = $props();
+  let { item, metadata, prettyPrint, getItemColor, renderItemHeader, onCopy, onIdentifierClick }: Props = $props();
 
   // Local override for individual toggle (null = use global default)
   let localPrettyPrint = $state<boolean | null>(null);
@@ -72,6 +73,13 @@
       }, 200);
     }, 2000);
   }
+
+  function handleIdentifierClick(event: MouseEvent) {
+    event.stopPropagation();
+    if (header.identifier && onIdentifierClick) {
+      onIdentifierClick(header.identifier);
+    }
+  }
 </script>
 
 <div class="item-entry" style="border-left-color: {getColor()}">
@@ -81,7 +89,13 @@
       {header.badge.text}
     </span>
     {#if header.identifier}
-      <span class="item-identifier">[{header.identifier}]</span>
+      <!-- svelte-ignore a11y_click_events_have_key_events -->
+      <!-- svelte-ignore a11y_no_static_element_interactions -->
+      <span
+        class="item-identifier"
+        class:clickable={onIdentifierClick}
+        onclick={onIdentifierClick ? handleIdentifierClick : undefined}
+      >[<span class="identifier-text">{header.identifier}</span>]</span>
     {/if}
     {#if header.message}
       <span class="item-message">{header.message}</span>
@@ -158,6 +172,14 @@
   .item-identifier {
     color: var(--blue-lighter);
     font-size: 0.9rem;
+  }
+
+  .item-identifier.clickable {
+    cursor: pointer;
+  }
+
+  .item-identifier.clickable:hover .identifier-text {
+    text-decoration: underline;
   }
 
   .item-message {
