@@ -368,7 +368,7 @@
     <div class="filter-chips">
       {#each identifierFilters as filter}
         <button class="filter-chip" onclick={() => removeIdentifierFilter(filter)}>
-          {filter}
+          <span class="chip-label">ID:</span>{filter}
           <svg class="chip-x" viewBox="0 0 16 16" fill="currentColor">
             <path d="M3.72 3.72a.75.75 0 0 1 1.06 0L8 6.94l3.22-3.22a.749.749 0 0 1 1.275.326.749.749 0 0 1-.215.734L9.06 8l3.22 3.22a.749.749 0 0 1-.326 1.275.749.749 0 0 1-.734-.215L8 9.06l-3.22 3.22a.751.751 0 0 1-1.042-.018.751.751 0 0 1-.018-1.042L6.94 8 3.72 4.78a.75.75 0 0 1 0-1.06Z"></path>
           </svg>
@@ -486,7 +486,7 @@
 
   .time-filter-btn.active {
     background: var(--accent);
-    color: #000;
+    color: #fff;
   }
 
   .pretty-print-toggle {
@@ -523,7 +523,7 @@
 
   .pretty-print-toggle.active {
     background: var(--accent);
-    color: #000;
+    color: #fff;
   }
 
   .copy-all-btn {
@@ -680,20 +680,19 @@
     font-weight: 500;
     font-family: inherit;
     cursor: pointer;
-    transition: background 0.1s, opacity 0.1s;
+    transition: background 0.1s;
   }
 
   .filter-chip:hover {
-    opacity: 0.8;
+    background: var(--indigo-light);
+  }
+
+  .chip-label {
+    margin-right: 0.25rem;
   }
 
   .chip-x {
     width: 14px;
     height: 14px;
-    opacity: 0.7;
-  }
-
-  .filter-chip:hover .chip-x {
-    opacity: 1;
   }
 </style>
