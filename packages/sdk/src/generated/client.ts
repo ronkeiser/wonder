@@ -3,7 +3,7 @@
  * This file was auto-generated. Do not edit manually.
  */
 
-import type { paths } from './schema';
+import type { paths } from './schema.js';
 
 /**
  * Error thrown when an API request fails
