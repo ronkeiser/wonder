@@ -372,9 +372,9 @@ Be lenient with minor spelling differences or equivalent answers.`,
     console.log('  ✓ Data flow integrity verified - all values match state writes');
 
     // 8. All tokens completed
-    const firstTokenStatuses = trace.tokens.statusTransitions(tokenCreations[0].payload.token_id);
-    const secondTokenStatuses = trace.tokens.statusTransitions(tokenCreations[1].payload.token_id);
-    const thirdTokenStatuses = trace.tokens.statusTransitions(tokenCreations[2].payload.token_id);
+    const firstTokenStatuses = trace.tokens.statusTransitions(tokenCreations[0].token_id!);
+    const secondTokenStatuses = trace.tokens.statusTransitions(tokenCreations[1].token_id!);
+    const thirdTokenStatuses = trace.tokens.statusTransitions(tokenCreations[2].token_id!);
 
     expect(firstTokenStatuses).toContain('completed');
     expect(secondTokenStatuses).toContain('completed');

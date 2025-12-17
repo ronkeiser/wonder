@@ -459,7 +459,7 @@ Return a JSON object echoing all 6 values exactly:
 
     // 7. All tokens completed
     for (let i = 0; i < tokenCreations.length; i++) {
-      const statuses = trace.tokens.statusTransitions(tokenCreations[i].payload.token_id);
+      const statuses = trace.tokens.statusTransitions(tokenCreations[i].token_id!);
       expect(statuses).toContain('completed');
       console.log(`  ✓ Token ${i + 1}: ${statuses.join(' → ')}`);
     }

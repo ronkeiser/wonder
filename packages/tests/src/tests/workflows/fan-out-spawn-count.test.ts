@@ -261,7 +261,7 @@ Return JSON with:
     console.log(`  Token creations (${tokenCreations.length}):`);
     for (const tc of tokenCreations) {
       console.log(
-        `    - node_id: ${tc.payload.node_id}, branch_index: ${tc.payload.branch_index}, fan_out: ${tc.payload.fan_out_transition_id}`,
+        `    - node_id: ${tc.node_id}, branch_index: ${tc.payload.branch_index}, fan_out: ${tc.payload.fan_out_transition_id}`,
       );
     }
     expect(tokenCreations.length).toBe(8);
@@ -281,7 +281,7 @@ Return JSON with:
     // Group by node_id to separate question_node tokens from collect_node tokens
     const tokensByNode = new Map<string, typeof fanOutTokens>();
     for (const t of fanOutTokens) {
-      const nodeId = t.payload.node_id;
+      const nodeId = t.node_id;
       if (!tokensByNode.has(nodeId)) {
         tokensByNode.set(nodeId, []);
       }
@@ -343,7 +343,7 @@ Return JSON with:
 
     // 10. All tokens completed
     for (let i = 0; i < tokenCreations.length; i++) {
-      const statuses = trace.tokens.statusTransitions(tokenCreations[i].payload.token_id);
+      const statuses = trace.tokens.statusTransitions(tokenCreations[i].token_id!);
       expect(statuses).toContain('completed');
     }
     console.log('  ✓ All tokens completed successfully');

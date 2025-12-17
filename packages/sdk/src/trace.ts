@@ -2,7 +2,11 @@
  * Trace Event Helpers - Ergonomic trace event access for tests
  *
  * Provides typed access to trace events with semantic query methods.
- * Payloads are parsed objects returned directly from the service.
+ * Types match exactly what the coordinator emits - no remapping.
+ *
+ * Event structure:
+ * - Top-level: type, token_id, node_id, duration_ms, sequence, timestamp, category
+ * - payload: Event-specific data (varies by event type)
  */
 
 import type { components } from './generated/schema.js';
@@ -10,17 +14,23 @@ import type { components } from './generated/schema.js';
 export type TraceEventEntry = components['schemas']['TraceEventEntry'];
 
 /**
- * Typed trace event with known payload structure
- * Note: payload is guaranteed to be present despite being optional in the generated schema
+ * Typed trace event with known payload structure.
+ * Top-level fields (token_id, node_id) come from TraceEventEntry.
+ * Payload contains event-specific data.
  */
-export interface TypedTraceEvent<T = any> extends Omit<TraceEventEntry, 'payload'> {
-  payload: T;
+export interface TypedTraceEvent<TPayload = Record<string, unknown>> extends Omit<
+  TraceEventEntry,
+  'payload'
+> {
+  payload: TPayload;
 }
 
 /**
- * Common trace event payload types
+ * Trace event payload types - matches exactly what coordinator emits in payload.
+ * Top-level fields (token_id, node_id) are NOT duplicated here.
  */
 export namespace TracePayloads {
+  // Context operations
   export interface ContextInitialize {
     has_input_schema: boolean;
     has_context_schema: boolean;
@@ -29,11 +39,6 @@ export namespace TracePayloads {
   }
 
   export interface ContextRead {
-    path: string;
-    value: unknown;
-  }
-
-  export interface ContextWrite {
     path: string;
     value: unknown;
   }
@@ -64,6 +69,7 @@ export namespace TracePayloads {
     };
   }
 
+  // Branch operations
   export interface BranchTableCreate {
     token_id: string;
     table_name: string;
@@ -97,36 +103,35 @@ export namespace TracePayloads {
     branch_count: number;
   }
 
-  export interface TokenCreated {
-    token_id: string;
-    node_id: string;
+  // Token operations - token_id and node_id are TOP LEVEL, not in payload
+  export interface TokenCreatedPayload {
+    task_id: string;
     parent_token_id: string | null;
     fan_out_transition_id: string | null;
     branch_index: number;
     branch_total: number;
   }
 
-  export interface TokenStatusUpdated {
-    token_id: string;
-    node_id?: string;
+  export interface TokenStatusUpdatedPayload {
     from: string;
     to: string;
   }
 
+  // SQL operations
   export interface SqlQuery {
     sql: string;
-    params: any[];
+    params: unknown[];
     duration_ms: number;
   }
 
+  // Routing/decision operations
   export interface RoutingStart {
-    token_id: string;
-    node_id: string;
+    // Empty - token_id and node_id are top level
   }
 
   export interface RoutingEvaluateTransition {
     transition_id: string;
-    condition: any;
+    condition: unknown;
   }
 
   export interface RoutingTransitionMatched {
@@ -135,9 +140,10 @@ export namespace TracePayloads {
   }
 
   export interface RoutingComplete {
-    decisions: any[];
+    decisions: unknown[];
   }
 
+  // Completion operations
   export interface CompletionStart {
     output_mapping: Record<string, string> | null;
     context_keys: {
@@ -156,6 +162,17 @@ export namespace TracePayloads {
   export interface CompletionComplete {
     final_output: Record<string, unknown>;
   }
+
+  // Backwards compatibility aliases (deprecated)
+  /** @deprecated Use TokenCreatedPayload */
+  export type TokenCreated = TokenCreatedPayload & { token_id: string; node_id: string };
+  /** @deprecated Use TokenStatusUpdatedPayload */
+  export type TokenStatusUpdated = TokenStatusUpdatedPayload & {
+    token_id: string;
+    node_id?: string;
+  };
+  /** @deprecated Use ContextSetField */
+  export type ContextWrite = ContextSetField;
 }
 
 /**
@@ -356,29 +373,36 @@ export class TraceEventCollection {
 
   /**
    * Token operations
+   *
+   * Note: token_id and node_id are TOP-LEVEL fields on the event,
+   * not inside payload. Access via event.token_id, event.node_id.
    */
   get tokens() {
     const self = this;
     return {
-      creates(): TypedTraceEvent<TracePayloads.TokenCreated>[] {
-        return self.filter<TracePayloads.TokenCreated>('operation.tokens.created');
+      creates(): TypedTraceEvent<TracePayloads.TokenCreatedPayload>[] {
+        return self.filter<TracePayloads.TokenCreatedPayload>('operation.tokens.created');
       },
       /** Alias for creates() */
-      creations(): TypedTraceEvent<TracePayloads.TokenCreated>[] {
+      creations(): TypedTraceEvent<TracePayloads.TokenCreatedPayload>[] {
         return this.creates();
       },
-      created(tokenId: string): TypedTraceEvent<TracePayloads.TokenCreated> | undefined {
+      created(tokenId: string): TypedTraceEvent<TracePayloads.TokenCreatedPayload> | undefined {
+        // token_id is top-level, not in payload
         return self.findWhere(
-          (e) => e.type === 'operation.tokens.created' && e.payload.token_id === tokenId,
-        ) as TypedTraceEvent<TracePayloads.TokenCreated> | undefined;
+          (e) => e.type === 'operation.tokens.created' && e.token_id === tokenId,
+        ) as TypedTraceEvent<TracePayloads.TokenCreatedPayload> | undefined;
       },
-      statusUpdates(): TypedTraceEvent<TracePayloads.TokenStatusUpdated>[] {
-        return self.filter<TracePayloads.TokenStatusUpdated>('operation.tokens.status_updated');
+      statusUpdates(): TypedTraceEvent<TracePayloads.TokenStatusUpdatedPayload>[] {
+        return self.filter<TracePayloads.TokenStatusUpdatedPayload>(
+          'operation.tokens.status_updated',
+        );
       },
       statusTransitions(tokenId: string): string[] {
+        // token_id is top-level, not in payload
         const updates = self
-          .filter<TracePayloads.TokenStatusUpdated>('operation.tokens.status_updated')
-          .filter((e) => e.payload.token_id === tokenId)
+          .filter<TracePayloads.TokenStatusUpdatedPayload>('operation.tokens.status_updated')
+          .filter((e) => e.token_id === tokenId)
           .sort((a, b) => a.sequence - b.sequence);
         if (updates.length === 0) return [];
         // Return list of status names in order

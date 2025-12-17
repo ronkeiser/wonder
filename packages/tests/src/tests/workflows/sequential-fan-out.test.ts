@@ -174,7 +174,10 @@ Return JSON with:
     const ideateTask = task({
       name: 'Ideate Task',
       description: 'Task that generates creative ideas',
-      input_schema: s.object({ topic: s.string(), branch_index: s.number() }, { required: ['topic', 'branch_index'] }),
+      input_schema: s.object(
+        { topic: s.string(), branch_index: s.number() },
+        { required: ['topic', 'branch_index'] },
+      ),
       output_schema: ideationSchema,
       steps: [ideateStep],
     });
@@ -552,7 +555,7 @@ Return JSON with:
 
     // 10. All tokens completed
     for (const tc of tokenCreations) {
-      const statuses = trace.tokens.statusTransitions(tc.payload.token_id);
+      const statuses = trace.tokens.statusTransitions(tc.token_id!);
       expect(statuses).toContain('completed');
     }
     console.log('  ✓ All tokens completed successfully');

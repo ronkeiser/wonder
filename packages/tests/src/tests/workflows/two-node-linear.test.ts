@@ -211,13 +211,13 @@ describe('Coordinator - Two Node Linear Workflow', () => {
 
     // First token for generate_node
     const firstToken = tokenCreations[0];
-    expect(firstToken.payload.node_id).toBeDefined();
-    console.log(`    - Token 1: node=${firstToken.payload.node_id}`);
+    expect(firstToken.node_id).toBeDefined();
+    console.log(`    - Token 1: node=${firstToken.node_id}`);
 
     // Second token for echo_node
     const secondToken = tokenCreations[1];
-    expect(secondToken.payload.node_id).toBeDefined();
-    console.log(`    - Token 2: node=${secondToken.payload.node_id}`);
+    expect(secondToken.node_id).toBeDefined();
+    console.log(`    - Token 2: node=${secondToken.node_id}`);
 
     // 5. Transition was evaluated
     const routingStart = trace.routing.starts();
@@ -260,8 +260,8 @@ describe('Coordinator - Two Node Linear Workflow', () => {
     );
 
     // 11. Verify token status transitions
-    const firstTokenId = firstToken.payload.token_id;
-    const secondTokenId = secondToken.payload.token_id;
+    const firstTokenId = firstToken.token_id!;
+    const secondTokenId = secondToken.token_id!;
 
     const firstTokenStatuses = trace.tokens.statusTransitions(firstTokenId);
     const secondTokenStatuses = trace.tokens.statusTransitions(secondTokenId);
