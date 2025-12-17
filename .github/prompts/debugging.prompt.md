@@ -1,6 +1,6 @@
 ---
 name: debugging
-description: Debug workflow issues by running edge tests and querying trace events to validate behavior
+description: Debug workflow issues by running foundation tests and querying trace events to validate behavior
 agent: agent
 tools:
   [
@@ -20,13 +20,13 @@ tools:
 
 ## Overview
 
-The "edge test" is the test that validates our current work and lives in `packages/test/src/tests/edge`.
+The "foundation tests" ares the tests that validates our current work and live in `packages/test/src/tests/foundation`.
 
-It can be run using the `pnpm test:edge` command in the root directory.
+They can be run using the `pnpm test:foundation` command in the root directory.
 
 ## Querying Trace Events
 
-We validate all of our work against edge tests via trace events. After running a test, you can query the trace events like this:
+We validate all of our work against foundation tests via trace events. After running a test, you can query the trace events like this:
 
 **IMPORTANT:** All API endpoints require authentication. First, set your API key (from `.env` at the project root):
 
@@ -80,9 +80,9 @@ When ever you make changes to the code in preparation to run a new test, you mus
 
 ```typescript
   "scripts": {
-    "test": "vitest run --config packages/test/vitest.config.ts",
-    "test:edge": "vitest run --config packages/test/vitest.config.ts tests/edge",
-    "types": "pnpm --filter @wonder/env run build-services",
+    "test": "vitest run --config packages/tests/vitest.config.ts",
+    "test:foundation": "vitest run --config packages/tests/vitest.config.ts tests/foundation",
+    "types": "pnpm --filter @wonder/scripts run build-services",
     "typecheck": "pnpm run --parallel --filter \"./services/*\" typecheck",
     "deploy:all": "pnpm -r --filter './services/*' --workspace-concurrency 1 deploy",
     "deploy:coordinator": "wrangler deploy --config services/coordinator/wrangler.jsonc",
@@ -91,7 +91,8 @@ When ever you make changes to the code in preparation to run a new test, you mus
     "deploy:http": "wrangler deploy --config services/http/wrangler.jsonc",
     "deploy:logs": "wrangler deploy --config services/logs/wrangler.jsonc",
     "deploy:resources": "wrangler deploy --config services/resources/wrangler.jsonc",
-    "deploy:web": "pnpm --filter web run deploy"
+    "deploy:web": "pnpm --filter web run deploy",
+    "gen:sdk": "pnpm --filter @wonder/sdk run generate"
   },
 ```
 
@@ -110,25 +111,11 @@ curl -H "X-API-Key: $API_KEY" "https://api.wflow.app/logs?service=coordinator&le
 curl -H "X-API-Key: $API_KEY" "https://api.wflow.app/logs?trace_id=trace_abc123"
 ```
 
-## Type Checking and Regeneration
-
-After making edits, before announcing completion of work, you MUST run a typecheck. You can do this by running `pnpm typecheck` at the root.
-
-If you changed any of the RPC signatures of any of the services, you must regenerate the types with `pnpm types`.
-
-### Updating Trace Event Types
-
-**NOTE:** It is common to have to update the trace event types (after adding new trace events to coordinator) at `services/events/src/types.ts`. HOWEVER, if you do so, you **MUST ALSO:**
-
-- update the http service zod schemas at `services/http/src/routes/event/schema.ts`
-- run `pnpm types` from the root. Doing this will BOTH generate worker configurations for all services AND run typechecks against all services.
-- run `pnpm gen:sdk` from the root to regenerate the sdk.
-
 ## Getting the Workflow Run ID
 
 The test helpers will output the Workflow Run ID when the workflow completes.
 
-If you don't see the run id from the output, run the edge test, then query the events for the last minute to get the workflow_run_id. You can then use that id to perform any other queries you need.
+If you don't see the run id from the output, query the events for the last minute to get the workflow_run_id. You can then use that id to perform any other queries you need.
 
 ## Instruction:
 

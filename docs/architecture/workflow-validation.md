@@ -254,9 +254,10 @@ function assertInvariants(trace: TraceEventCollection) {
     expect(terminal).toContain(statuses.at(-1));
   }
 
-  // Events are monotonically sequenced
+  // Event sequences are unique and positive (delivery order may differ from emission order)
   const sequences = trace.all().map((e) => e.sequence);
-  expect(sequences).toEqual([...sequences].sort((a, b) => a - b));
+  expect(sequences.every((s) => s > 0)).toBe(true);
+  expect(new Set(sequences).size).toBe(sequences.length);
 
   // Every non-root token has a parent that was created
   const createdIds = new Set(trace.tokens.creations().map((c) => c.payload.token_id));
