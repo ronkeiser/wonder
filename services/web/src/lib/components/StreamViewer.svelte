@@ -80,24 +80,17 @@
       const filtered = rawItems
         .filter((item: any) => item.timestamp >= cutoffTime)
         .sort((a: any, b: any) => {
-          if (a.timestamp !== b.timestamp) return a.timestamp - b.timestamp;
-          // Sort by sequence for tie-breaking
+          // Sort newest first (descending)
+          if (a.timestamp !== b.timestamp) return b.timestamp - a.timestamp;
+          // Sort by sequence for tie-breaking (descending)
           if (a.sequence !== undefined && b.sequence !== undefined) {
-            return a.sequence - b.sequence;
+            return b.sequence - a.sequence;
           }
           return 0;
         });
 
       items = filtered;
       filtered.forEach((item: any) => seenIds.add(item.id));
-
-      // Scroll to bottom after DOM updates
-      setTimeout(() => {
-        const container = document.getElementById('items-container');
-        if (container) {
-          container.scrollTop = container.scrollHeight;
-        }
-      }, 0);
     } catch (error) {
       console.error(`Failed to fetch items:`, error);
     }
@@ -113,14 +106,14 @@
       if (itemFilterValue !== currentFilter) return;
     }
 
-    // Insert in sorted order
+    // Insert in sorted order (newest first - descending)
     const insertIndex = items.findIndex((existingItem) => {
       if (existingItem.timestamp !== item.timestamp) {
-        return existingItem.timestamp > item.timestamp;
+        return existingItem.timestamp < item.timestamp;
       }
-      // Sort by sequence for tie-breaking
+      // Sort by sequence for tie-breaking (descending)
       if (existingItem.sequence !== undefined && item.sequence !== undefined) {
-        return existingItem.sequence > item.sequence;
+        return existingItem.sequence < item.sequence;
       }
       return false;
     });
@@ -131,17 +124,9 @@
       items = [...items.slice(0, insertIndex), item, ...items.slice(insertIndex)];
     }
 
-    // Auto-scroll to bottom after DOM updates
-    setTimeout(() => {
-      const container = document.getElementById('items-container');
-      if (container) {
-        container.scrollTop = container.scrollHeight;
-      }
-    }, 0);
-
-    // Keep only last 1000 entries
+    // Keep only first 1000 entries (newest)
     if (items.length > 1000) {
-      items = items.slice(-1000);
+      items = items.slice(0, 1000);
     }
 
     // Trim seenIds set

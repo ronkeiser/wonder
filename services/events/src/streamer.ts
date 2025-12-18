@@ -15,16 +15,12 @@ import type {
 } from './types';
 import { getEventCategory } from './types';
 
-// Batching configuration
-const BATCH_SIZE = 50;
-const BATCH_DELAY_MS = 10;
-
 /**
  * Streamer Durable Object - one instance per workflow_run_id
  *
  * Responsibilities:
  * - Assigns sequences atomically (single-threaded per workflow)
- * - Buffers and batch-writes events to D1
+ * - Writes events to D1
  * - Broadcasts events to WebSocket subscribers
  * - Manages WebSocket connections for real-time streaming
  */
@@ -35,12 +31,6 @@ export class Streamer extends DurableObject<Env> {
   // Sequence counters (persisted to DO storage, loaded at startup)
   private eventSeq = 0;
   private traceSeq = 0;
-
-  // Event buffers for batch D1 writes
-  private eventBuffer: (typeof workflowEvents.$inferInsert)[] = [];
-  private traceBuffer: (typeof traceEvents.$inferInsert)[] = [];
-  private eventFlushScheduled = false;
-  private traceFlushScheduled = false;
 
   constructor(ctx: DurableObjectState, env: Env) {
     super(ctx, env);
@@ -79,13 +69,8 @@ export class Streamer extends DurableObject<Env> {
       metadata: JSON.stringify(input.metadata ?? {}),
     };
 
-    // Buffer for batch D1 insert
-    this.eventBuffer.push(entry);
-    if (this.eventBuffer.length >= BATCH_SIZE) {
-      this.ctx.waitUntil(this.flushEventBuffer());
-    } else {
-      this.scheduleEventFlush();
-    }
+    // Insert directly to D1
+    this.ctx.waitUntil(this.db.insert(workflowEvents).values(entry));
 
     // Broadcast immediately to WebSocket subscribers
     this.broadcastEvent({
@@ -129,78 +114,6 @@ export class Streamer extends DurableObject<Env> {
       ...entry,
       payload: input.payload ?? {},
     });
-  }
-
-  // ============================================================================
-  // Batching Infrastructure
-  // ============================================================================
-
-  private scheduleEventFlush(): void {
-    if (this.eventFlushScheduled) return;
-    this.eventFlushScheduled = true;
-
-    this.ctx.waitUntil(
-      new Promise<void>((resolve) => {
-        setTimeout(() => {
-          this.flushEventBuffer().then(resolve);
-        }, BATCH_DELAY_MS);
-      }),
-    );
-  }
-
-  private async flushEventBuffer(): Promise<void> {
-    this.eventFlushScheduled = false;
-    if (this.eventBuffer.length === 0) return;
-
-    const batch = this.eventBuffer.splice(0);
-
-    try {
-      await this.db.insert(workflowEvents).values(batch);
-    } catch (error) {
-      this.logger.error({
-        message: 'Failed to batch insert workflow events',
-        metadata: {
-          error_message: error instanceof Error ? error.message : String(error),
-          error_stack: error instanceof Error ? error.stack : undefined,
-          batch_size: batch.length,
-          sample_entry: batch[0],
-        },
-      });
-    }
-  }
-
-  private scheduleTraceFlush(): void {
-    if (this.traceFlushScheduled) return;
-    this.traceFlushScheduled = true;
-
-    this.ctx.waitUntil(
-      new Promise<void>((resolve) => {
-        setTimeout(() => {
-          this.flushTraceBuffer().then(resolve);
-        }, BATCH_DELAY_MS);
-      }),
-    );
-  }
-
-  private async flushTraceBuffer(): Promise<void> {
-    this.traceFlushScheduled = false;
-    if (this.traceBuffer.length === 0) return;
-
-    const batch = this.traceBuffer.splice(0);
-
-    try {
-      await this.db.insert(traceEvents).values(batch);
-    } catch (error) {
-      this.logger.error({
-        message: 'Failed to batch insert trace events',
-        metadata: {
-          error_message: error instanceof Error ? error.message : String(error),
-          error_stack: error instanceof Error ? error.stack : undefined,
-          batch_size: batch.length,
-          sample_entry: batch[0],
-        },
-      });
-    }
   }
 
   // ============================================================================
