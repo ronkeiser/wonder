@@ -38,7 +38,7 @@
 
   async function fetchRuns() {
     try {
-      const res = await fetch('/api/workflow-runs?limit=10');
+      const res = await fetch('/api/workflow-runs?limit=30');
       const data = await res.json();
       // API returns most recent first (ordered by created_at DESC)
       runs = data.runs;
