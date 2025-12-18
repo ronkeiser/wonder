@@ -3,20 +3,15 @@ import { describe, it } from 'vitest';
 import { assertInvariants, runTestWorkflow, verify } from '~/kit';
 
 /**
- * Foundation Test 06: Explicit Fan-Out with Synchronization (IDEAL BEHAVIOR SPECIFICATION)
+ * Foundation Test 06: Explicit Fan-Out with Synchronization
  *
- * ⚠️  SPECIFICATION TEST - CURRENTLY FAILING ⚠️
+ * This test validates explicit fan-out (multiple distinct transitions to different nodes)
+ * with synchronization and merge semantics - the same semantics supported by spawn_count-based
+ * fan-out.
  *
- * This test defines the IDEAL behavior for explicit fan-out (multiple distinct transitions
- * to different nodes) with synchronization and merge semantics - the same semantics supported
- * by spawn_count-based fan-out.
- *
- * STATUS: Currently fails with "Internal Server Error" during workflow definition creation.
- *
- * REQUIRED COORDINATOR ENHANCEMENT:
- * The coordinator MUST support sibling grouping for explicit fan-out transitions. When multiple
+ * The coordinator supports sibling grouping for explicit fan-out transitions. When multiple
  * transitions share the same `sibling_group` name in their synchronization config, the coordinator
- * should treat tokens spawned by these transitions as siblings for fan-in coordination.
+ * treats tokens spawned by these transitions as siblings for fan-in coordination.
  *
  * Workflow structure:
  *   [init] → [phase1_a]
@@ -33,21 +28,15 @@ import { assertInvariants, runTestWorkflow, verify } from '~/kit';
  * COMPARISON WITH TEST 04:
  * - Test 04: Uses spawn_count (single transition spawns 3 tokens to same node)
  * - Test 06: Uses explicit fan-out (3 transitions to 3 different nodes)
- * - Both SHOULD have identical synchronization and merge behavior
- * - Test 06 defines what the coordinator SHOULD support
+ * - Both have identical synchronization and merge behavior
  *
- * WHAT THIS TEST VALIDATES (when passing):
- * ✓ Explicit transitions can declare sibling_group membership
- * ✓ Coordinator recognizes explicit siblings for synchronization
- * ✓ Fan-in waits for all siblings before continuation
- * ✓ Merge strategies work identically to spawn_count
- * ✓ Value flow through explicit branches
- * ✓ Nested state structure with explicit nodes
- *
- * WHEN THIS TEST PASSES:
- * The coordinator will support both fan-out patterns (spawn_count and explicit) with
- * equivalent synchronization semantics, giving workflow authors full flexibility to choose
- * the pattern that best fits their use case.
+ * WHAT THIS TEST VALIDATES:
+ * - Explicit transitions can declare sibling_group membership
+ * - Coordinator recognizes explicit siblings for synchronization
+ * - Fan-in waits for all siblings before continuation
+ * - Merge strategies work identically to spawn_count
+ * - Value flow through explicit branches
+ * - Nested state structure with explicit nodes
  */
 
 describe('Foundation: 06 - Explicit Fan-Out', () => {

@@ -4,10 +4,11 @@
   "type": "module",
   "private": true,
   "bin": {
-    "build-services": "./src/index.ts"
+    "build-services": "./src/generate-types.ts",
+    "run-foundation-test": "./src/run-foundation-test.ts"
   },
   "scripts": {
-    "build-services": "tsx src/index.ts"
+    "build-services": "tsx src/generate-types.ts"
   },
   "dependencies": {
     "@wonder/sdk": "workspace:*",

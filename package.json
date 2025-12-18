@@ -4,8 +4,9 @@
   "private": true,
   "scripts": {
     "test": "vitest run --config packages/tests/vitest.config.ts",
-    "test:foundation": "vitest run --config packages/tests/vitest.config.ts tests/foundation",
+    "test:foundation:all": "vitest run --config packages/tests/vitest.config.ts tests/foundation",
     "test:foundation:latest": "vitest run --config packages/tests/vitest.config.ts $(ls packages/tests/src/tests/foundation/*.test.ts | sort | tail -1)",
+    "test:foundation": "tsx packages/scripts/src/run-foundation-test.ts",
     "types": "pnpm --filter @wonder/scripts run build-services",
     "typecheck": "pnpm run --parallel --filter \"./services/*\" typecheck",
     "deploy:all": "pnpm -r --filter './services/*' --workspace-concurrency 1 deploy",
@@ -36,6 +37,7 @@
     ]
   },
   "devDependencies": {
-    "prettier": "^3.7.4"
+    "prettier": "^3.7.4",
+    "tsx": "^4.20.6"
   }
 }
