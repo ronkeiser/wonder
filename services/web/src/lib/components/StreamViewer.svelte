@@ -45,6 +45,8 @@
   let identifierFilters = $state<string[]>([]);
   let ws: WebSocket | null = null;
   let seenIds = new Set<string>();
+  let reconnectTimeout: ReturnType<typeof setTimeout> | null = null;
+  let intentionalClose = false;
 
   function getColor(item: any): string {
     if (getItemColor) {
@@ -137,6 +139,24 @@
     }
   }
 
+  function disconnect() {
+    // Cancel any pending reconnect
+    if (reconnectTimeout) {
+      clearTimeout(reconnectTimeout);
+      reconnectTimeout = null;
+    }
+
+    // Mark as intentional so onclose doesn't auto-reconnect
+    intentionalClose = true;
+
+    if (ws) {
+      ws.close();
+      ws = null;
+    }
+
+    status = 'disconnected';
+  }
+
   function connect() {
     // Require workflowRunId to connect
     if (!workflowRunId) {
@@ -144,25 +164,50 @@
       return;
     }
 
+    // Clean up any existing connection first
+    if (ws) {
+      intentionalClose = true;
+      ws.close();
+      ws = null;
+    }
+
+    // Cancel any pending reconnect from previous connection
+    if (reconnectTimeout) {
+      clearTimeout(reconnectTimeout);
+      reconnectTimeout = null;
+    }
+
+    // Reset intentional close flag for new connection
+    intentionalClose = false;
     status = 'connecting';
 
-    // WebSocket connections go directly to the API service (can't proxy WS through SvelteKit)
-    const wsUrl = `wss://api.wflow.app/workflow-runs/${workflowRunId}/stream`;
-    ws = new WebSocket(wsUrl);
+    // Capture the workflowRunId for this connection's closure
+    const targetRunId = workflowRunId;
 
-    ws.onopen = () => {
+    // WebSocket connections go directly to the API service (can't proxy WS through SvelteKit)
+    const wsUrl = `wss://api.wflow.app/workflow-runs/${targetRunId}/stream`;
+    const socket = new WebSocket(wsUrl);
+    ws = socket;
+
+    socket.onopen = () => {
+      // Check if this socket is still current
+      if (ws !== socket) return;
+
       status = 'connected';
-      console.log('WebSocket connected');
+      console.log('WebSocket connected to', targetRunId);
 
       if (subscribeMessage) {
         // Build subscription message with workflow_run_id filter
         const message = { ...subscribeMessage } as any;
-        message.filters = { ...message.filters, workflow_run_id: workflowRunId };
-        ws?.send(JSON.stringify(message));
+        message.filters = { ...message.filters, workflow_run_id: targetRunId };
+        socket.send(JSON.stringify(message));
       }
     };
 
-    ws.onmessage = (message) => {
+    socket.onmessage = (message) => {
+      // Check if this socket is still current
+      if (ws !== socket) return;
+
       try {
         const data = JSON.parse(message.data);
 
@@ -176,15 +221,31 @@
       }
     };
 
-    ws.onerror = (error) => {
+    socket.onerror = (error) => {
+      // Check if this socket is still current
+      if (ws !== socket) return;
+
       console.error('WebSocket error:', error);
-      status = 'disconnected';
     };
 
-    ws.onclose = () => {
+    socket.onclose = () => {
+      // Check if this socket is still current
+      if (ws !== socket) return;
+
       status = 'disconnected';
-      console.log('WebSocket closed, reconnecting in 3s...');
-      setTimeout(connect, 3000);
+
+      // Only auto-reconnect if this wasn't an intentional close
+      if (!intentionalClose) {
+        console.log('WebSocket closed unexpectedly, reconnecting in 3s...');
+        reconnectTimeout = setTimeout(() => {
+          // Double-check we should still reconnect to this run
+          if (workflowRunId === targetRunId) {
+            connect();
+          }
+        }, 3000);
+      } else {
+        console.log('WebSocket closed intentionally');
+      }
     };
   }
 
@@ -223,19 +284,19 @@
     if (workflowRunId !== prevWorkflowRunId) {
       prevWorkflowRunId = workflowRunId;
 
-      // Clear existing items and reconnect
+      // Clean up existing connection properly
+      disconnect();
+
+      // Clear existing items
       items = [];
       seenIds.clear();
-      ws?.close();
 
       // Reset time filter when switching workflow runs
       timeFilterMinutes = null;
 
-      // Small delay to ensure clean disconnect
-      setTimeout(() => {
-        filterItemsByTime(null);
-        connect();
-      }, 100);
+      // Fetch data and connect to new run
+      filterItemsByTime(null);
+      connect();
     }
   });
 
@@ -256,7 +317,7 @@
   });
 
   onDestroy(() => {
-    ws?.close();
+    disconnect();
   });
 
   function handleFilterChange(value: string) {

@@ -1,5 +1,6 @@
 <script lang="ts">
   import { onMount, onDestroy } from 'svelte';
+  import { timeAgo } from '$lib/time';
 
   interface WorkflowRunSummary {
     id: string;
@@ -35,6 +36,8 @@
   let runs = $state<WorkflowRunSummary[]>([]);
   let status = $state<'connected' | 'disconnected' | 'connecting'>('disconnected');
   let ws: WebSocket | null = null;
+  let reconnectTimeout: ReturnType<typeof setTimeout> | null = null;
+  let intentionalClose = false;
 
   async function fetchRuns() {
     try {
@@ -47,20 +50,43 @@
     }
   }
 
+  function disconnect() {
+    if (reconnectTimeout) {
+      clearTimeout(reconnectTimeout);
+      reconnectTimeout = null;
+    }
+    intentionalClose = true;
+    if (ws) {
+      ws.close();
+      ws = null;
+    }
+    status = 'disconnected';
+  }
+
   function connectToEventHub() {
+    // Cancel any pending reconnect
+    if (reconnectTimeout) {
+      clearTimeout(reconnectTimeout);
+      reconnectTimeout = null;
+    }
+
+    intentionalClose = false;
     status = 'connecting';
 
     // WebSocket connections go directly to the API service (can't proxy WS through SvelteKit)
     const wsUrl = 'wss://api.wflow.app/workflow-runs/stream';
-    ws = new WebSocket(wsUrl);
+    const socket = new WebSocket(wsUrl);
+    ws = socket;
 
-    ws.onopen = () => {
+    socket.onopen = () => {
+      if (ws !== socket) return;
       status = 'connected';
       // Subscribe to all status changes (no filters)
-      ws?.send(JSON.stringify({ type: 'subscribe', id: 'sidebar', filters: {} }));
+      socket.send(JSON.stringify({ type: 'subscribe', id: 'sidebar', filters: {} }));
     };
 
-    ws.onmessage = (event) => {
+    socket.onmessage = (event) => {
+      if (ws !== socket) return;
       try {
         const msg = JSON.parse(event.data);
         if (msg.type === 'status_change') {
@@ -71,14 +97,19 @@
       }
     };
 
-    ws.onerror = () => {
-      status = 'disconnected';
+    socket.onerror = () => {
+      if (ws !== socket) return;
+      console.error('WebSocket error');
     };
 
-    ws.onclose = () => {
+    socket.onclose = () => {
+      if (ws !== socket) return;
       status = 'disconnected';
-      // Reconnect after 3 seconds
-      setTimeout(connectToEventHub, 3000);
+
+      if (!intentionalClose) {
+        console.log('EventHub WebSocket closed, reconnecting in 3s...');
+        reconnectTimeout = setTimeout(connectToEventHub, 3000);
+      }
     };
   }
 
@@ -119,22 +150,13 @@
     }
   }
 
-  function formatTime(isoString: string): string {
-    const date = new Date(isoString);
-    return date.toLocaleTimeString('en-US', {
-      hour12: false,
-      hour: '2-digit',
-      minute: '2-digit',
-    });
-  }
-
   onMount(() => {
     fetchRuns();
     connectToEventHub();
   });
 
   onDestroy(() => {
-    ws?.close();
+    disconnect();
   });
 </script>
 
@@ -156,7 +178,7 @@
           <span class="workflow-name">{run.workflow_name}</span>
           <span class="run-id">{run.id.slice(-6)}</span>
         </div>
-        <span class="run-time">{formatTime(run.created_at)}</span>
+        <span class="run-time">{timeAgo(run.created_at)}</span>
       </button>
     {/each}
 
@@ -216,9 +238,9 @@
     padding: 0.5rem;
   }
 
-  /* Scrollbar styles */
+  /* Scrollbar styles - thumb visible on sidebar hover, hidden otherwise */
   .runs-list::-webkit-scrollbar {
-    width: 8px;
+    width: 12px;
   }
 
   .runs-list::-webkit-scrollbar-track {
@@ -226,17 +248,18 @@
   }
 
   .runs-list::-webkit-scrollbar-thumb {
-    background: transparent;
-    border-radius: 4px;
-    transition: background 0.2s;
+    background-color: transparent;
+    background-clip: padding-box;
+    border: 3px solid transparent;
+    border-radius: 6px;
   }
 
-  .runs-list:hover::-webkit-scrollbar-thumb {
-    background: var(--border);
+  .workflow-runs-sidebar:hover .runs-list::-webkit-scrollbar-thumb {
+    background-color: var(--border);
   }
 
-  .runs-list::-webkit-scrollbar-thumb:hover {
-    background: #484f58;
+  .workflow-runs-sidebar:hover .runs-list::-webkit-scrollbar-thumb:hover {
+    background-color: #484f58;
   }
 
   .run-item {
