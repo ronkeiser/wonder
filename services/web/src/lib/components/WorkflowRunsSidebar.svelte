@@ -49,11 +49,8 @@
   function connectToEventHub() {
     status = 'connecting';
 
-    // In local dev, connect directly to live API; otherwise use relative path
-    const isLocalDev = window.location.hostname === 'localhost';
-    const wsUrl = isLocalDev
-      ? 'wss://api.wflow.app/workflow-runs/stream'
-      : `${window.location.protocol === 'https:' ? 'wss:' : 'ws:'}//${window.location.host}/api/workflow-runs/stream`;
+    // WebSocket connections go directly to the API service (can't proxy WS through SvelteKit)
+    const wsUrl = 'wss://api.wflow.app/workflow-runs/stream';
     ws = new WebSocket(wsUrl);
 
     ws.onopen = () => {
