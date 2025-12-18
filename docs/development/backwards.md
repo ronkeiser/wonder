@@ -1,0 +1,1 @@
+We do not need backwards compatibility. We have full control over the stack and our data. When refactoring, instead of optimizing for backwards compatibility, define the cleanest, most ideal api. Then, search for any references to refactored code and update them.
