@@ -164,7 +164,7 @@ describe('Coordinator - Two Node Linear Workflow', () => {
     // =========================================================================
     const { result, cleanup } = await runTestWorkflow(
       workflow({
-        name: `Two Node Linear Workflow ${Date.now()}`,
+        name: 'Two Node Linear Workflow',
         description: 'Tests two-node linear execution proving data flows through state',
         input_schema: inputSchema,
         context_schema: s.object({

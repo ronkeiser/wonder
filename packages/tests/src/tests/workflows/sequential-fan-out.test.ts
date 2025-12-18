@@ -451,7 +451,7 @@ Return JSON with:
     // =========================================================================
     const { result, cleanup } = await runTestWorkflow(
       workflow({
-        name: `Idea Ranking Pipeline ${Date.now()}`,
+        name: 'Idea Ranking Pipeline',
         description: 'Multi-stage fan-out/fan-in with LLM ideation, judging, and reporting',
         input_schema: inputSchema,
         context_schema: contextSchema,

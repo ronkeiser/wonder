@@ -8,6 +8,7 @@ import {
   createWorkspaceRoute,
   deleteWorkspaceRoute,
   getWorkspaceRoute,
+  listWorkspaceProjectsRoute,
   listWorkspacesRoute,
   updateWorkspaceRoute,
 } from './spec';
@@ -53,5 +54,13 @@ workspaces.openapi(updateWorkspaceRoute, async (c) => {
   const validated = c.req.valid('json');
   using workspaces = c.env.RESOURCES.workspaces();
   const result = await workspaces.update(id, validated);
+  return c.json(result);
+});
+
+/** GET /{id}/projects */
+workspaces.openapi(listWorkspaceProjectsRoute, async (c) => {
+  const { id } = c.req.valid('param');
+  using projects = c.env.RESOURCES.projects();
+  const result = await projects.list({ workspace_id: id });
   return c.json(result);
 });

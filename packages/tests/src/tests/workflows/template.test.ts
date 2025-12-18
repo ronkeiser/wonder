@@ -18,7 +18,7 @@ describe('Coordinator - Simple Workflow Tests', () => {
   it('executes a workflow with context state', async () => {
     const { result, cleanup } = await runTestWorkflow(
       workflow({
-        name: `Stateful Workflow ${Date.now()}`,
+        name: 'Stateful Workflow',
         description: 'Workflow with context state',
 
         input_schema: schema.object(

@@ -2,6 +2,7 @@
 
 import { ConflictError, NotFoundError, ValidationError, extractDbError } from '~/errors';
 import { Resource } from '../base';
+import { computeFingerprint } from './fingerprint';
 import * as repo from './repository';
 import { generateIds, transformWorkflowDef } from './transformer';
 import type { Node, Transition, WorkflowDef } from './types';
@@ -11,10 +12,12 @@ export class WorkflowDefs extends Resource {
   async create(data: WorkflowDefInput): Promise<{
     workflow_def_id: string;
     workflow_def: WorkflowDef;
+    /** True if an existing workflow def was reused (autoversion matched content hash) */
+    reused: boolean;
   }> {
     this.serviceCtx.logger.info({
       event_type: 'workflow_def.create.started',
-      metadata: { name: data.name },
+      metadata: { name: data.name, autoversion: data.autoversion ?? false },
     });
 
     // 1. Validate all input data (pure validation, no side effects)
@@ -30,7 +33,80 @@ export class WorkflowDefs extends Resource {
       throw error;
     }
 
-    // 2. Generate IDs and transform refs → IDs
+    // 2. Autoversion deduplication check
+    if (data.autoversion) {
+      const contentHash = await computeFingerprint(data);
+      const projectId = data.project_id ?? null;
+      const libraryId = data.library_id ?? null;
+
+      // Check for existing workflow with same name + owner + content
+      const existing = await repo.getWorkflowDefByNameAndHash(
+        this.serviceCtx.db,
+        data.name,
+        projectId,
+        libraryId,
+        contentHash,
+      );
+
+      if (existing) {
+        // Exact match found - return existing without creating
+        this.serviceCtx.logger.info({
+          event_type: 'workflow_def.autoversion.matched',
+          metadata: {
+            workflow_def_id: existing.id,
+            version: existing.version,
+            name: existing.name,
+            content_hash: contentHash,
+          },
+        });
+
+        return {
+          workflow_def_id: existing.id,
+          workflow_def: existing,
+          reused: true,
+        };
+      }
+
+      // No exact match - determine version number
+      const maxVersion = await repo.getMaxVersionByName(
+        this.serviceCtx.db,
+        data.name,
+        projectId,
+        libraryId,
+      );
+      const newVersion = maxVersion + 1;
+
+      this.serviceCtx.logger.info({
+        event_type: 'workflow_def.autoversion.creating',
+        metadata: {
+          name: data.name,
+          version: newVersion,
+          content_hash: contentHash,
+          existing_max_version: maxVersion,
+        },
+      });
+
+      // Create with computed version and content hash
+      return this.createWithVersionAndHash(data, newVersion, contentHash);
+    }
+
+    // 3. Non-autoversion path: create with version 1 (original behavior)
+    return this.createWithVersionAndHash(data, 1, null);
+  }
+
+  /**
+   * Internal helper to create a workflow def with specified version and content hash.
+   */
+  private async createWithVersionAndHash(
+    data: WorkflowDefInput,
+    version: number,
+    contentHash: string | null,
+  ): Promise<{
+    workflow_def_id: string;
+    workflow_def: WorkflowDef;
+    reused: boolean;
+  }> {
+    // Generate IDs and transform refs → IDs
     const ids = generateIds(data);
     const transformed = transformWorkflowDef(data, ids);
 
@@ -48,13 +124,14 @@ export class WorkflowDefs extends Resource {
       },
     });
 
-    // 3. Create workflow def with pre-generated ID and initial_node_id
+    // Create workflow def with pre-generated ID, version, and content hash
     let workflowDef;
     try {
       workflowDef = await repo.createWorkflowDefWithId(this.serviceCtx.db, {
         id: ids.workflowDefId,
         name: data.name,
         description: data.description,
+        version,
         project_id: data.project_id ?? null,
         library_id: data.library_id ?? null,
         tags: data.tags ?? null,
@@ -63,6 +140,7 @@ export class WorkflowDefs extends Resource {
         output_mapping: data.output_mapping ?? null,
         context_schema: data.context_schema ?? null,
         initial_node_id: transformed.initialNodeId,
+        content_hash: contentHash,
       });
     } catch (error) {
       const dbError = extractDbError(error);
@@ -87,7 +165,7 @@ export class WorkflowDefs extends Resource {
       throw error;
     }
 
-    // 4. Create all nodes with pre-generated IDs
+    // Create all nodes with pre-generated IDs
     try {
       for (const node of transformed.nodes) {
         await repo.createNodeWithId(this.serviceCtx.db, {
@@ -105,7 +183,7 @@ export class WorkflowDefs extends Resource {
       throw error;
     }
 
-    // 5. Create transitions with transformed IDs (including synchronization.sibling_group)
+    // Create transitions with transformed IDs (including synchronization.sibling_group)
     try {
       for (const transition of transformed.transitions) {
         console.log('[RESOURCES] Creating transition:', {
@@ -135,12 +213,14 @@ export class WorkflowDefs extends Resource {
         workflow_def_id: workflowDef.id,
         version: workflowDef.version,
         name: workflowDef.name,
+        content_hash: contentHash,
       },
     });
 
     return {
       workflow_def_id: workflowDef.id,
       workflow_def: workflowDef,
+      reused: false,
     };
   }
 

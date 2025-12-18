@@ -41,6 +41,13 @@ export function createClient(baseClient: any) {
             const { data, error } = await baseClient.PATCH(`/workspaces/${id}`, { body });
             if (error) throw new ApiError(`PATCH /workspaces/${id} failed`, error);
             return data;
+          },
+          projects: {
+            list: async (options?: any): Promise<paths['/workspaces/{id}/projects']['get']['responses']['200']['content']['application/json']> => {
+              const { data, error } = await baseClient.GET(`/workspaces/${id}/projects`, {});
+              if (error) throw new ApiError(`GET /workspaces/${id}/projects failed`, error);
+              return data;
+            }
           }
         }),
       {
@@ -229,6 +236,8 @@ export function createClient(baseClient: any) {
             const { data, error } = await baseClient.DELETE(`/workflow-runs/${id}`, {});
             if (error) throw new ApiError(`DELETE /workflow-runs/${id} failed`, error);
             return data;
+          },
+          stream: {
           }
         }),
       {

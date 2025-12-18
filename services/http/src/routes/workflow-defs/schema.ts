@@ -67,6 +67,9 @@ export const CreateWorkflowDefSchema = z
         }),
       )
       .optional(),
+    autoversion: z.boolean().optional().openapi({
+      description: 'Enable content-based deduplication. If true, returns existing workflow def when content matches.',
+    }),
   })
   .openapi('CreateWorkflowDef');
 
@@ -115,6 +118,7 @@ export const WorkflowDefSchema = z
     output_schema: z.record(z.string(), z.unknown()),
     context_schema: z.record(z.string(), z.unknown()).nullable(),
     initial_node_id: z.string().nullable(),
+    content_hash: z.string().nullable(),
     created_at: z.string(),
     updated_at: z.string(),
   })
@@ -124,6 +128,8 @@ export const WorkflowDefCreateResponseSchema = z
   .object({
     workflow_def_id: ulid(),
     workflow_def: WorkflowDefSchema,
+    /** True if an existing workflow def was reused (autoversion matched content hash) */
+    reused: z.boolean(),
   })
   .openapi('WorkflowDefCreateResponse');
 

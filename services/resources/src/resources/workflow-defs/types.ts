@@ -14,6 +14,7 @@ export type WorkflowDef = {
   output_mapping: object | null;
   context_schema: object | null;
   initial_node_id: string | null;
+  content_hash: string | null;
   created_at: string;
   updated_at: string;
 };

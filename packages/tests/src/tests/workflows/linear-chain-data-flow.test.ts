@@ -279,7 +279,7 @@ Be lenient with minor spelling differences or equivalent answers.`,
     // =========================================================================
     const { result, cleanup } = await runTestWorkflow(
       workflow({
-        name: `Trivia Chain Workflow ${Date.now()}`,
+        name: 'Trivia Chain Workflow',
         description: 'Tests 3-node chain with data isolation and aggregation',
         input_schema: inputSchema,
         context_schema: s.object({

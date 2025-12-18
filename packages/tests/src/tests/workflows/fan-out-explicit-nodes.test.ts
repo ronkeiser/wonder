@@ -332,7 +332,7 @@ Return a JSON object echoing all 6 values exactly:
     // =========================================================================
     const { result, cleanup } = await runTestWorkflow(
       workflow({
-        name: `Fan-Out Trivia Workflow ${Date.now()}`,
+        name: 'Fan-Out Trivia Workflow',
         description: 'Tests fan-out to 3 parallel nodes and fan-in collection',
         input_schema: inputSchema,
         context_schema: s.object({

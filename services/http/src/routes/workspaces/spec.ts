@@ -10,6 +10,7 @@ import {
   WorkspaceCreateResponseSchema,
   WorkspaceGetResponseSchema,
   WorkspaceListResponseSchema,
+  WorkspaceProjectsResponseSchema,
   WorkspaceUpdateResponseSchema,
 } from './schema';
 
@@ -132,6 +133,30 @@ export const updateWorkspaceRoute = createRoute({
         },
       },
       description: 'Workspace updated successfully',
+    },
+  },
+});
+
+export const listWorkspaceProjectsRoute = createRoute({
+  method: 'get',
+  path: '/{id}/projects',
+  tags: ['workspaces'],
+  request: {
+    params: z.object({
+      id: ulid().openapi({
+        param: { name: 'id', in: 'path' },
+        example: '01ARZ3NDEKTSV4RRFFQ69G5FAV',
+      }),
+    }),
+  },
+  responses: {
+    200: {
+      content: {
+        'application/json': {
+          schema: WorkspaceProjectsResponseSchema,
+        },
+      },
+      description: 'Projects retrieved successfully',
     },
   },
 });

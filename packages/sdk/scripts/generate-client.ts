@@ -20,7 +20,7 @@ export function getMethodName(node: RouteNode, verb: HttpMethod): string {
 
   const methodMap: Record<HttpMethod, string> = {
     post: 'create',
-    get: node.type === NodeType.Collection ? 'list' : 'get',
+    get: node.type !== NodeType.Param ? 'list' : 'get',
     put: 'update',
     patch: 'patch',
     delete: 'delete',
@@ -231,6 +231,31 @@ function formatWithCommas<T>(items: T[], formatter: (item: T) => string): string
 }
 
 /**
+ * Format a nested collection as a property with methods
+ * Used for sub-resources like workspaces(id).projects
+ */
+function formatNestedCollection(
+  collection: ClientProperty,
+  indent: string,
+  excludeParams: Set<string>,
+): string {
+  const lines: string[] = [];
+  const propertyName = /^[a-zA-Z_$][a-zA-Z0-9_$]*$/.test(collection.name)
+    ? collection.name
+    : `"${collection.name}"`;
+
+  lines.push(`${indent}${propertyName}: {`);
+  lines.push(
+    ...formatWithCommas(collection.methods ?? [], (method) =>
+      formatMethod(method, indent + '  ', excludeParams),
+    ),
+  );
+  lines.push(`${indent}}`);
+
+  return lines.join('\n');
+}
+
+/**
  * Generate code for a property (collection or parameter)
  */
 function formatProperty(prop: ClientProperty, indent: string): string {
@@ -249,18 +274,49 @@ function formatProperty(prop: ClientProperty, indent: string): string {
     // The parameter is captured, so exclude it from method signatures
     const excludeParams = new Set([prop.name]);
 
-    // Collect all methods (instance + nested action methods)
-    const allMethods = [
+    // Separate action children (flatten their methods) from collection children (keep as nested objects)
+    // Actions only have POST methods (like /start, /cancel). Collections have GET or other methods.
+    const isActionChild = (c: ClientProperty) => {
+      const methods = c.methods ?? [];
+      return methods.length > 0 && methods.every((m) => m.verb === 'post');
+    };
+    const actionChildren = child.children?.filter(isActionChild) ?? [];
+    const collectionChildren = child.children?.filter((c) => !isActionChild(c)) ?? [];
+
+    // Collect instance methods and action methods (actions are flattened)
+    const instanceMethods = [
       ...(child.methods ?? []),
-      ...(child.children?.flatMap((c) => c.methods ?? []) ?? []),
+      ...actionChildren.flatMap((c) => c.methods ?? []),
     ];
 
-    // Add all methods with proper comma formatting
-    lines.push(
-      ...formatWithCommas(allMethods, (method) =>
-        formatMethod(method, indent + '    ', excludeParams),
-      ),
-    );
+    // Determine if we have more items after methods
+    const hasMoreItems = collectionChildren.length > 0;
+
+    // Add instance methods
+    if (instanceMethods.length > 0) {
+      if (hasMoreItems) {
+        // Add comma to all methods since more properties follow
+        lines.push(
+          ...instanceMethods.map((method) => formatMethod(method, indent + '    ', excludeParams) + ','),
+        );
+      } else {
+        // Standard comma formatting (no comma on last)
+        lines.push(
+          ...formatWithCommas(instanceMethods, (method) =>
+            formatMethod(method, indent + '    ', excludeParams),
+          ),
+        );
+      }
+    }
+
+    // Add nested collection children as properties (e.g., projects: { list: ... })
+    if (collectionChildren.length > 0) {
+      lines.push(
+        ...formatWithCommas(collectionChildren, (nestedCollection) =>
+          formatNestedCollection(nestedCollection, indent + '    ', excludeParams),
+        ),
+      );
+    }
 
     lines.push(`${indent}  })`);
   } else {

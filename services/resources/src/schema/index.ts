@@ -104,6 +104,8 @@ export const workflow_defs = sqliteTable(
 
     initial_node_id: text('initial_node_id'),
 
+    content_hash: text('content_hash'),
+
     created_at: text('created_at').notNull(),
     updated_at: text('updated_at').notNull(),
   },
@@ -116,6 +118,12 @@ export const workflow_defs = sqliteTable(
       table.project_id,
       table.library_id,
       table.version,
+    ),
+    index('idx_workflow_defs_content_hash').on(
+      table.name,
+      table.project_id,
+      table.library_id,
+      table.content_hash,
     ),
   ],
 );

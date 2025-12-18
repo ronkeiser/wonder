@@ -225,7 +225,7 @@ Return JSON with:
     // =========================================================================
     const { result, cleanup } = await runTestWorkflow(
       workflow({
-        name: `Fan-Out Trivia Questions ${Date.now()}`,
+        name: 'Fan-Out Trivia Questions',
         description: 'Tests spawn_count to generate multiple trivia questions',
         input_schema: inputSchema,
         context_schema: s.object({}),
@@ -261,7 +261,7 @@ Return JSON with:
     console.log(`  Token creations (${tokenCreations.length}):`);
     for (const tc of tokenCreations) {
       console.log(
-        `    - node_id: ${tc.node_id}, branch_index: ${tc.payload.branch_index}, fan_out: ${tc.payload.fan_out_transition_id}`,
+        `    - node_id: ${tc.node_id}, branch_index: ${tc.payload.branch_index}, sibling_group: ${tc.payload.sibling_group}`,
       );
     }
     expect(tokenCreations.length).toBe(8);
@@ -273,31 +273,29 @@ Return JSON with:
     expect(fanOutRouting).toBeDefined();
     console.log('  ✓ Spawn count: 3 tokens created from single transition');
 
-    // 4. Verify all 3 question generators share fan_out_transition_id
-    // Filter to get only the original fan-out tokens (those with distinct branch indices)
-    const fanOutTokens = tokenCreations.filter(
-      (t) => t.payload.fan_out_transition_id === fanOutRouting?.payload.transition_id,
-    );
-    // Group by node_id to separate question_node tokens from collect_node tokens
-    const tokensByNode = new Map<string | null, typeof fanOutTokens>();
+    // 4. Verify all 3 question generators share sibling_group
+    // Filter to get tokens with a sibling_group (fan-out tokens)
+    const fanOutTokens = tokenCreations.filter((t) => t.payload.sibling_group !== null);
+    // Group by sibling_group to find the question node tokens
+    const tokensBySiblingGroup = new Map<string, typeof fanOutTokens>();
     for (const t of fanOutTokens) {
-      const nodeId = t.node_id;
-      if (!tokensByNode.has(nodeId)) {
-        tokensByNode.set(nodeId, []);
+      const group = t.payload.sibling_group!;
+      if (!tokensBySiblingGroup.has(group)) {
+        tokensBySiblingGroup.set(group, []);
       }
-      tokensByNode.get(nodeId)!.push(t);
+      tokensBySiblingGroup.get(group)!.push(t);
     }
-    // The question_node is the one with 3 tokens with distinct branch indices (0, 1, 2)
-    const questionTokens = Array.from(tokensByNode.values()).find(
+    // The question_node tokens are those with 3 distinct branch indices (0, 1, 2)
+    const questionTokens = Array.from(tokensBySiblingGroup.values()).find(
       (tokens) =>
         tokens.length === 3 && new Set(tokens.map((t) => t.payload.branch_index)).size === 3,
     );
     expect(questionTokens).toBeDefined();
 
-    const fanOutIds = questionTokens!.map((t) => t.payload.fan_out_transition_id);
-    const uniqueFanOutIds = new Set(fanOutIds.filter((id) => id !== null));
-    expect(uniqueFanOutIds.size).toBe(1);
-    console.log('  ✓ All 3 question generators share same fan_out_transition_id');
+    const siblingGroups = questionTokens!.map((t) => t.payload.sibling_group);
+    const uniqueSiblingGroups = new Set(siblingGroups.filter((g) => g !== null));
+    expect(uniqueSiblingGroups.size).toBe(1);
+    console.log('  ✓ All 3 question generators share same sibling_group');
 
     // 5. Verify branch indices (should have 0, 1, 2)
     const branchIndices = questionTokens!.map((t) => t.payload.branch_index).sort();

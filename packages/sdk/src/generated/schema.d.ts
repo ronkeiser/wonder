@@ -151,6 +151,43 @@ export interface paths {
         };
         trace?: never;
     };
+    "/workspaces/{id}/projects": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: {
+            parameters: {
+                query?: never;
+                header?: never;
+                path: {
+                    id: string;
+                };
+                cookie?: never;
+            };
+            requestBody?: never;
+            responses: {
+                /** @description Projects retrieved successfully */
+                200: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["WorkspaceProjectsResponse"];
+                    };
+                };
+            };
+        };
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/projects": {
         parameters: {
             query?: never;
@@ -1384,6 +1421,9 @@ export interface components {
             created_at: string;
             updated_at: string;
         };
+        WorkspaceProjectsResponse: {
+            projects: components["schemas"]["Project"][];
+        };
         ProjectCreateResponse: {
             project_id: string;
             project: components["schemas"]["Project"];
@@ -1780,12 +1820,14 @@ export interface components {
             output_schema: JSONSchema;
             context_schema: JSONSchema | null;
             initial_node_id: string | null;
+            content_hash: string | null;
             created_at: string;
             updated_at: string;
         };
         WorkflowDefCreateResponse: {
             workflow_def_id: string;
             workflow_def: components["schemas"]["WorkflowDef"];
+            reused: boolean;
         };
         CreateWorkflowDef: {
             /** @example Content Generation Pipeline */
@@ -1866,6 +1908,8 @@ export interface components {
                     [key: string]: unknown;
                 };
             }[];
+            /** @description Enable content-based deduplication. If true, returns existing workflow def when content matches. */
+            autoversion?: boolean;
         };
         Node: {
             id: string;

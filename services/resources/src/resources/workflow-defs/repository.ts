@@ -1,6 +1,6 @@
 /** Repository for workflow definition data access */
 
-import { and, eq } from 'drizzle-orm';
+import { and, desc, eq } from 'drizzle-orm';
 import type { DrizzleD1Database } from 'drizzle-orm/d1';
 import { ulid } from 'ulid';
 import { nodes, transitions, workflow_defs } from '~/schema';
@@ -21,6 +21,7 @@ export async function createWorkflowDef(
     output_mapping?: object | null;
     context_schema?: object | null;
     initial_node_id: string | null;
+    content_hash?: string | null;
   },
 ): Promise<WorkflowDef> {
   const now = new Date().toISOString();
@@ -38,6 +39,7 @@ export async function createWorkflowDef(
     output_mapping: data.output_mapping ?? null,
     context_schema: data.context_schema ?? null,
     initial_node_id: data.initial_node_id,
+    content_hash: data.content_hash ?? null,
     created_at: now,
     updated_at: now,
   };
@@ -56,6 +58,7 @@ export async function createWorkflowDefWithId(
     id: string;
     name: string;
     description: string;
+    version?: number;
     project_id?: string | null;
     library_id?: string | null;
     tags?: string[] | null;
@@ -64,13 +67,14 @@ export async function createWorkflowDefWithId(
     output_mapping?: object | null;
     context_schema?: object | null;
     initial_node_id: string | null;
+    content_hash?: string | null;
   },
 ): Promise<WorkflowDef> {
   const now = new Date().toISOString();
 
   const row = {
     id: data.id,
-    version: 1,
+    version: data.version ?? 1,
     name: data.name,
     description: data.description,
     project_id: data.project_id ?? null,
@@ -81,6 +85,7 @@ export async function createWorkflowDefWithId(
     output_mapping: data.output_mapping ?? null,
     context_schema: data.context_schema ?? null,
     initial_node_id: data.initial_node_id,
+    content_hash: data.content_hash ?? null,
     created_at: now,
     updated_at: now,
   };
@@ -146,6 +151,70 @@ export async function listWorkflowDefsByLibrary(
     .from(workflow_defs)
     .where(eq(workflow_defs.library_id, library_id))
     .all();
+}
+
+/**
+ * Find a workflow def by name, project/library, and content hash.
+ * Used for autoversion deduplication.
+ */
+export async function getWorkflowDefByNameAndHash(
+  db: DrizzleD1Database,
+  name: string,
+  projectId: string | null,
+  libraryId: string | null,
+  contentHash: string,
+): Promise<WorkflowDef | null> {
+  let whereClause;
+
+  if (projectId) {
+    whereClause = and(
+      eq(workflow_defs.name, name),
+      eq(workflow_defs.project_id, projectId),
+      eq(workflow_defs.content_hash, contentHash),
+    );
+  } else if (libraryId) {
+    whereClause = and(
+      eq(workflow_defs.name, name),
+      eq(workflow_defs.library_id, libraryId),
+      eq(workflow_defs.content_hash, contentHash),
+    );
+  } else {
+    return null;
+  }
+
+  const result = await db.select().from(workflow_defs).where(whereClause).get();
+  return result ?? null;
+}
+
+/**
+ * Get the maximum version number for a workflow def by name and project/library.
+ * Returns 0 if no existing workflow def with that name exists.
+ */
+export async function getMaxVersionByName(
+  db: DrizzleD1Database,
+  name: string,
+  projectId: string | null,
+  libraryId: string | null,
+): Promise<number> {
+  let whereClause;
+
+  if (projectId) {
+    whereClause = and(eq(workflow_defs.name, name), eq(workflow_defs.project_id, projectId));
+  } else if (libraryId) {
+    whereClause = and(eq(workflow_defs.name, name), eq(workflow_defs.library_id, libraryId));
+  } else {
+    return 0;
+  }
+
+  const result = await db
+    .select({ version: workflow_defs.version })
+    .from(workflow_defs)
+    .where(whereClause)
+    .orderBy(desc(workflow_defs.version))
+    .limit(1)
+    .get();
+
+  return result?.version ?? 0;
 }
 
 /** Node */

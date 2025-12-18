@@ -48,6 +48,7 @@ export type WorkflowDefInput = {
   initial_node_ref: string;
   nodes: NodeInput[];
   transitions?: TransitionInput[];
+  autoversion?: boolean;
 };
 
 /** Validation result with collected refs for transformation */

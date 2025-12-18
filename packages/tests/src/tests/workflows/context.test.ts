@@ -72,7 +72,7 @@ describe('Coordinator - Context Operations', () => {
     // Compose into workflow
     const { result, cleanup } = await runTestWorkflow(
       workflow({
-        name: `Context Test Workflow ${Date.now()}`,
+        name: 'Context Test Workflow',
         description: 'Workflow to test context operations',
         input_schema: inputSchema,
         context_schema: s.object({

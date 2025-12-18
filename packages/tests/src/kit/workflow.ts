@@ -91,6 +91,7 @@ export async function createWorkflow(
     ...workflow,
     project_id: ctx.projectId,
     nodes: resolvedNodes,
+    autoversion: true,
   };
 
   const workflowDefResponse = await wonder.workflowDefs.create(resolvedWorkflow as any);
@@ -99,6 +100,13 @@ export async function createWorkflow(
     throw new Error('Failed to create workflow definition');
   }
   const workflowDefId = workflowDefResponse.workflow_def_id;
+  const version = workflowDefResponse.workflow_def?.version ?? 1;
+
+  if (workflowDefResponse.reused) {
+    console.log(`📦 Reusing existing workflow def (version ${version})`);
+  } else {
+    console.log(`📦 Created new workflow def (version ${version})`);
+  }
 
   const workflowResponse = await wonder.workflows.create({
     project_id: ctx.projectId,

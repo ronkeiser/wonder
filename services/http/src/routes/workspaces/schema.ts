@@ -4,6 +4,7 @@
 
 import { z } from '@hono/zod-openapi';
 import { ulid } from '../../validators';
+import { ProjectSchema } from '../projects/schema';
 
 export const CreateWorkspaceSchema = z
   .object({
@@ -53,3 +54,9 @@ export const WorkspaceUpdateResponseSchema = z
     workspace: WorkspaceSchema,
   })
   .openapi('WorkspaceUpdateResponse');
+
+export const WorkspaceProjectsResponseSchema = z
+  .object({
+    projects: z.array(ProjectSchema),
+  })
+  .openapi('WorkspaceProjectsResponse');
