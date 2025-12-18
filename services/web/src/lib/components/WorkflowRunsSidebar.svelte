@@ -27,9 +27,10 @@
   interface Props {
     selectedRunId?: string | null;
     onSelect?: (id: string | null) => void;
+    width?: number;
   }
 
-  let { selectedRunId = null, onSelect }: Props = $props();
+  let { selectedRunId = null, onSelect, width }: Props = $props();
 
   let runs = $state<WorkflowRunSummary[]>([]);
   let status = $state<'connected' | 'disconnected' | 'connecting'>('disconnected');
@@ -137,7 +138,7 @@
   });
 </script>
 
-<aside class="workflow-runs-sidebar">
+<aside class="workflow-runs-sidebar" style:width={width ? `${width}px` : undefined}>
   <header>
     <h3>Workflow Runs</h3>
     <span class="ws-status {status}">{status === 'connected' ? '●' : '○'}</span>
@@ -168,25 +169,29 @@
 <style>
   .workflow-runs-sidebar {
     width: 220px;
-    min-width: 220px;
+    min-width: 160px;
+    max-width: 400px;
     background: var(--bg-secondary);
     border-right: 1px solid var(--border);
     display: flex;
     flex-direction: column;
     overflow: hidden;
+    flex-shrink: 0;
   }
 
   header {
-    padding: 1rem;
+    height: 64px;
+    padding: 0 1rem;
     border-bottom: 1px solid var(--border);
     display: flex;
     justify-content: space-between;
     align-items: center;
-    min-height: 3.75rem;
+    box-sizing: border-box;
   }
 
   h3 {
     margin: 0;
+    padding: 0.375rem 0;
     font-size: 0.875rem;
     font-weight: 600;
     color: var(--text-primary);

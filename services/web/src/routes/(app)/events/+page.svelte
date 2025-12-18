@@ -1,8 +1,52 @@
 <script lang="ts">
+  import { onMount } from 'svelte';
   import StreamViewer from '$lib/components/StreamViewer.svelte';
   import WorkflowRunsSidebar from '$lib/components/WorkflowRunsSidebar.svelte';
 
   let selectedRunId = $state<string | null>(null);
+
+  // Sidebar resize state
+  const STORAGE_KEY = 'sidebar-width';
+  const DEFAULT_WIDTH = 220;
+  const MIN_WIDTH = 160;
+  const MAX_WIDTH = 400;
+
+  let sidebarWidth = $state(DEFAULT_WIDTH);
+  let isResizing = $state(false);
+
+  onMount(() => {
+    const saved = localStorage.getItem(STORAGE_KEY);
+    if (saved) {
+      const parsed = parseInt(saved, 10);
+      if (!isNaN(parsed) && parsed >= MIN_WIDTH && parsed <= MAX_WIDTH) {
+        sidebarWidth = parsed;
+      }
+    }
+  });
+
+  function handleResizeStart(e: MouseEvent) {
+    e.preventDefault();
+    isResizing = true;
+
+    const startX = e.clientX;
+    const startWidth = sidebarWidth;
+
+    function onMouseMove(e: MouseEvent) {
+      const delta = e.clientX - startX;
+      const newWidth = Math.min(MAX_WIDTH, Math.max(MIN_WIDTH, startWidth + delta));
+      sidebarWidth = newWidth;
+    }
+
+    function onMouseUp() {
+      isResizing = false;
+      localStorage.setItem(STORAGE_KEY, String(sidebarWidth));
+      document.removeEventListener('mousemove', onMouseMove);
+      document.removeEventListener('mouseup', onMouseUp);
+    }
+
+    document.addEventListener('mousemove', onMouseMove);
+    document.addEventListener('mouseup', onMouseUp);
+  }
 
   const eventTypeOptions = [
     // Workflow lifecycle
@@ -101,8 +145,16 @@
   <title>Events</title>
 </svelte:head>
 
-<div class="page-with-sidebar">
-  <WorkflowRunsSidebar selectedRunId={selectedRunId} onSelect={(id) => (selectedRunId = id)} />
+<div class="page-with-sidebar" class:resizing={isResizing}>
+  <WorkflowRunsSidebar
+    width={sidebarWidth}
+    selectedRunId={selectedRunId}
+    onSelect={(id) => (selectedRunId = id)}
+  />
+  <!-- svelte-ignore a11y_no_static_element_interactions -->
+  <div class="resize-handle" onmousedown={handleResizeStart}>
+    <div class="resize-handle-header"></div>
+  </div>
   <StreamViewer
     title="Events"
     apiPath="/api/events"
@@ -124,6 +176,38 @@
     display: flex;
     height: 100%;
     overflow: hidden;
+  }
+
+  .page-with-sidebar.resizing {
+    cursor: col-resize;
+    user-select: none;
+  }
+
+  .resize-handle {
+    width: 6px;
+    cursor: col-resize;
+    background: var(--bg-primary);
+    flex-shrink: 0;
+    display: flex;
+    flex-direction: column;
+  }
+
+  .resize-handle-header {
+    height: 64px;
+    background: var(--bg-secondary);
+    border-bottom: 1px solid var(--border);
+    box-sizing: border-box;
+  }
+
+  .resize-handle:hover,
+  .resizing .resize-handle {
+    background: var(--accent);
+  }
+
+  .resize-handle:hover .resize-handle-header,
+  .resizing .resize-handle .resize-handle-header {
+    background: var(--accent);
+    border-bottom-color: var(--accent);
   }
 
   .page-with-sidebar :global(.stream-viewer) {

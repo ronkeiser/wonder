@@ -442,6 +442,7 @@
       {/each}
     </div>
   {:else}
+    <header class="empty-header"></header>
     <div class="empty-state">
       <p>Select a workflow run to view events</p>
     </div>
@@ -458,13 +459,15 @@
   }
 
   header {
+    height: 64px;
     background: var(--bg-secondary);
-    padding: 1rem;
+    padding: 0 1rem 0 calc(1rem - 6px);
     border-bottom: 1px solid var(--border);
     display: flex;
     justify-content: space-between;
     align-items: center;
     gap: 1rem;
+    box-sizing: border-box;
   }
 
   .left-controls {
@@ -694,7 +697,7 @@
   .items {
     flex: 1;
     overflow-y: auto;
-    padding: 1rem;
+    padding: 1rem 1rem 1rem calc(1rem - 6px);
   }
 
   ::-webkit-scrollbar {

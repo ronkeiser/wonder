@@ -3,12 +3,14 @@
   "version": "0.0.1",
   "private": true,
   "scripts": {
-    "test": "vitest run --config packages/tests/vitest.config.ts",
-    "test:foundation:all": "vitest run --config packages/tests/vitest.config.ts tests/foundation",
-    "test:foundation:latest": "vitest run --config packages/tests/vitest.config.ts $(ls packages/tests/src/tests/foundation/*.test.ts | sort | tail -1)",
-    "test:foundation": "tsx packages/scripts/src/run-foundation-test.ts",
+    "dev": "pnpm --filter web run dev",
     "types": "pnpm --filter @wonder/scripts run build-services",
     "typecheck": "pnpm run --parallel --filter \"./services/*\" typecheck",
+    "test": "vitest run --config packages/tests/vitest.config.ts",
+    "test:foundation": "tsx packages/scripts/src/run-foundation-test.ts",
+    "test:foundation:all": "vitest run --config packages/tests/vitest.config.ts tests/foundation",
+    "test:foundation:latest": "vitest run --config packages/tests/vitest.config.ts $(ls packages/tests/src/tests/foundation/*.test.ts | sort | tail -1)",
+    "gen:sdk": "pnpm --filter @wonder/sdk run generate",
     "deploy:all": "pnpm -r --filter './services/*' --workspace-concurrency 1 deploy",
     "deploy:coordinator": "wrangler deploy --config services/coordinator/wrangler.jsonc",
     "deploy:events": "wrangler deploy --config services/events/wrangler.jsonc",
@@ -16,8 +18,7 @@
     "deploy:http": "wrangler deploy --config services/http/wrangler.jsonc",
     "deploy:logs": "wrangler deploy --config services/logs/wrangler.jsonc",
     "deploy:resources": "wrangler deploy --config services/resources/wrangler.jsonc",
-    "deploy:web": "pnpm --filter web run deploy",
-    "gen:sdk": "pnpm --filter @wonder/sdk run generate"
+    "deploy:web": "pnpm --filter web run deploy"
   },
   "engines": {
     "node": ">=24.0.0",
