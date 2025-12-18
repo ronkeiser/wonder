@@ -11,6 +11,7 @@
  */
 
 import type { TraceEventInput } from '@wonder/events';
+import { extractFromContext } from '../shared';
 import type { ContextSnapshot } from '../types';
 
 /** Result from completion planning */
@@ -23,18 +24,7 @@ export type CompletionResult = {
 // Main Completion Entry Point
 // ============================================================================
 
-/**
- * Extract final workflow output by applying output_mapping to context.
- *
- * The workflow's output_mapping defines what to extract from context:
- *   { "result": "$.output.greeting", "status": "$.state.final_status" }
- *
- * This extracts context.output.greeting → finalOutput.result, etc.
- *
- * @param outputMapping - Workflow's output_mapping (target -> source JSONPath)
- * @param context - Current context snapshot
- * @returns Final output object and trace events
- */
+/** Extract final workflow output by applying output_mapping to context. */
 export function extractFinalOutput(
   outputMapping: Record<string, string> | null,
   context: ContextSnapshot,
@@ -64,7 +54,7 @@ export function extractFinalOutput(
   const output: Record<string, unknown> = {};
 
   for (const [targetField, sourcePath] of Object.entries(outputMapping)) {
-    const value = extractValueFromContext(sourcePath, context);
+    const value = extractFromContext(sourcePath, context);
 
     events.push({
       type: 'decision.completion.extract',
@@ -90,63 +80,8 @@ export function extractFinalOutput(
 // Pure Helpers
 // ============================================================================
 
-/**
- * Extract value from context using JSONPath-style path.
- *
- * Paths are structured as: $.{section}.{field}[.{nested}...]
- * - $.input.name → context.input.name
- * - $.state.result.data → context.state.result.data
- * - $.output.greeting → context.output.greeting
- *
- * Non-JSONPath values are treated as literals.
- *
- * @param path - JSONPath-style path (e.g., "$.state.result")
- * @param context - Context snapshot to extract from
- * @returns Extracted value or undefined if path doesn't exist
- */
-export function extractValueFromContext(path: string, context: ContextSnapshot): unknown {
-  // Handle literal values (not starting with $.)
-  if (!path.startsWith('$.')) {
-    return path;
-  }
 
-  const pathParts = path.slice(2).split('.'); // Remove '$.' prefix
-
-  // First part must be input, state, or output
-  const section = pathParts[0];
-  if (section !== 'input' && section !== 'state' && section !== 'output') {
-    return undefined;
-  }
-
-  let value: unknown = context[section as keyof ContextSnapshot];
-
-  // Navigate remaining path parts
-  for (let i = 1; i < pathParts.length; i++) {
-    const part = pathParts[i];
-    if (value && typeof value === 'object' && part in value) {
-      value = (value as Record<string, unknown>)[part];
-    } else {
-      return undefined;
-    }
-  }
-
-  return value;
-}
-
-/**
- * Apply input mapping to context to extract task/action input.
- *
- * This is the inverse of output mapping - extracts values FROM context
- * to provide as input to a task or action.
- *
- * Mappings: { "taskField": "$.context.path" }
- * - Keys are target fields in the resulting input object
- * - Values are JSONPath-style paths into context
- *
- * @param mapping - Input mapping (target -> source JSONPath)
- * @param context - Context snapshot to extract from
- * @returns Extracted input object
- */
+/** Apply input mapping to extract task/action input from context. */
 export function applyInputMapping(
   mapping: Record<string, string> | null,
   context: ContextSnapshot,
@@ -156,7 +91,7 @@ export function applyInputMapping(
   const result: Record<string, unknown> = {};
 
   for (const [targetField, sourcePath] of Object.entries(mapping)) {
-    result[targetField] = extractValueFromContext(sourcePath, context);
+    result[targetField] = extractFromContext(sourcePath, context);
   }
 
   return result;

@@ -25,7 +25,7 @@ function createToken(overrides: Partial<TokenRow> = {}): TokenRow {
     branch_index: 0,
     branch_total: 1,
     parent_token_id: null,
-    fan_out_transition_id: null,
+    sibling_group: null,
     created_at: new Date(),
     updated_at: new Date(),
     arrived_at: null,
@@ -52,6 +52,7 @@ function createTransition(overrides: Partial<TransitionDef> = {}): TransitionDef
     priority: 1,
     condition: null,
     spawn_count: null,
+    sibling_group: null,
     synchronization: null,
     ...overrides,
   };
@@ -190,9 +191,9 @@ describe('decideOnTimeout', () => {
       });
 
       const tokens = [
-        createToken({ id: 'winner', path_id: 'root.A.0.B.1' }),
-        createToken({ id: 'loser-1', path_id: 'root.A.0.B.2' }),
-        createToken({ id: 'loser-2', path_id: 'root.A.0.B.3' }),
+        createToken({ id: 'winner', path_id: 'root.A.0.B.1', sibling_group: 'proceed-group' }),
+        createToken({ id: 'loser-1', path_id: 'root.A.0.B.2', sibling_group: 'proceed-group' }),
+        createToken({ id: 'loser-2', path_id: 'root.A.0.B.3', sibling_group: 'proceed-group' }),
       ];
 
       const decisions = decideOnTimeout({
@@ -209,7 +210,7 @@ describe('decideOnTimeout', () => {
         type: 'ACTIVATE_FAN_IN',
         workflowRunId: 'run-1',
         nodeId: 'B',
-        fanInPath: 'root.A.0', // stripped last .nodeId.branchIndex
+        fanInPath: 'proceed-group:B', // sibling_group:to_node_id
         mergedTokenIds: [],
       });
 
@@ -238,7 +239,7 @@ describe('decideOnTimeout', () => {
       });
 
       const decisions = decideOnTimeout({
-        waitingTokens: [createToken({ id: 'solo', path_id: 'root.X.0' })],
+        waitingTokens: [createToken({ id: 'solo', path_id: 'root.X.0', sibling_group: 'single-proceed' })],
         transition,
         siblingCounts: createSiblingCounts({ total: 1, completed: 0, waiting: 1 }),
         workflowRunId: 'run-1',
@@ -249,7 +250,7 @@ describe('decideOnTimeout', () => {
         type: 'ACTIVATE_FAN_IN',
         workflowRunId: 'run-1',
         nodeId: 'B',
-        fanInPath: 'root', // root.X.0 → root
+        fanInPath: 'single-proceed:B', // sibling_group:to_node_id
         mergedTokenIds: [],
       });
     });
@@ -277,7 +278,7 @@ describe('decideOnTimeout', () => {
   });
 
   describe('fan-in path calculation', () => {
-    it('strips last two path segments for fan-in', () => {
+    it('builds fan-in path from sibling_group and to_node_id', () => {
       const transition = createTransition({
         synchronization: {
           strategy: 'all',
@@ -288,9 +289,9 @@ describe('decideOnTimeout', () => {
         },
       });
 
-      // Path: root.A.0.B.1 → fan-in: root.A.0
+      // fanInPath is built from sibling_group:to_node_id
       const decisions = decideOnTimeout({
-        waitingTokens: [createToken({ path_id: 'root.A.0.B.1' })],
+        waitingTokens: [createToken({ path_id: 'root.A.0.B.1', sibling_group: 'path-test' })],
         transition,
         siblingCounts: createSiblingCounts({ total: 1, completed: 0, waiting: 1 }),
         workflowRunId: 'run-1',
@@ -298,11 +299,11 @@ describe('decideOnTimeout', () => {
 
       expect(decisions[0]).toMatchObject({
         type: 'ACTIVATE_FAN_IN',
-        fanInPath: 'root.A.0',
+        fanInPath: 'path-test:B',
       });
     });
 
-    it('handles deeply nested paths', () => {
+    it('handles different sibling groups', () => {
       const transition = createTransition({
         synchronization: {
           strategy: 'all',
@@ -313,9 +314,9 @@ describe('decideOnTimeout', () => {
         },
       });
 
-      // Path: root.A.0.B.1.C.2.D.3 → fan-in: root.A.0.B.1.C.2
+      // fanInPath is built from sibling_group:to_node_id
       const decisions = decideOnTimeout({
-        waitingTokens: [createToken({ path_id: 'root.A.0.B.1.C.2.D.3' })],
+        waitingTokens: [createToken({ path_id: 'root.A.0.B.1.C.2.D.3', sibling_group: 'deep-path' })],
         transition,
         siblingCounts: createSiblingCounts({ total: 1, completed: 0, waiting: 1 }),
         workflowRunId: 'run-1',
@@ -323,7 +324,7 @@ describe('decideOnTimeout', () => {
 
       expect(decisions[0]).toMatchObject({
         type: 'ACTIVATE_FAN_IN',
-        fanInPath: 'root.A.0.B.1.C.2',
+        fanInPath: 'deep-path:B',
       });
     });
 
@@ -338,9 +339,9 @@ describe('decideOnTimeout', () => {
         },
       });
 
-      // Path: root.A.0 → fan-in: root
+      // fanInPath is built from sibling_group:to_node_id
       const decisions = decideOnTimeout({
-        waitingTokens: [createToken({ path_id: 'root.A.0' })],
+        waitingTokens: [createToken({ path_id: 'root.A.0', sibling_group: 'root-level' })],
         transition,
         siblingCounts: createSiblingCounts({ total: 1, completed: 0, waiting: 1 }),
         workflowRunId: 'run-1',
@@ -348,7 +349,7 @@ describe('decideOnTimeout', () => {
 
       expect(decisions[0]).toMatchObject({
         type: 'ACTIVATE_FAN_IN',
-        fanInPath: 'root',
+        fanInPath: 'root-level:B',
       });
     });
   });

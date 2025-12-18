@@ -18,7 +18,6 @@ describe('decideSynchronization()', () => {
     parent_token_id: 'tok_q1',
     path_id: 'root.question.0',
     sibling_group: 'fanout_group', // Token's sibling group membership
-    fan_out_transition_id: 'start_to_question',
     branch_index: 0,
     branch_total: 3,
     status: 'pending',

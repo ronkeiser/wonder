@@ -30,7 +30,6 @@ function createTokenParams(overrides: Partial<CreateTokenParams> = {}): CreateTo
     node_id: 'nodeA',
     path_id: 'root.nodeA.0',
     parent_token_id: null,
-    fan_out_transition_id: null,
     branch_index: 0,
     branch_total: 1,
     ...overrides,

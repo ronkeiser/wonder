@@ -18,13 +18,10 @@ export interface BranchOutput {
  *
  * Strategies:
  * - append: Collect all outputs into array, ordered by branch index
+ * - collect: Same as append but never flattens arrays
  * - merge_object: Shallow merge all outputs (last wins for conflicts)
  * - keyed_by_branch: Object keyed by branch index
  * - last_wins: Take output from highest branch index
- *
- * @param branchOutputs - Array of branch outputs with token ID, index, and output
- * @param strategy - The merge strategy to apply
- * @returns Merged value according to strategy
  */
 export function applyMergeStrategy(
   branchOutputs: BranchOutput[],

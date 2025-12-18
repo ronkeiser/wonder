@@ -6,7 +6,8 @@
  */
 
 import { describe, expect, it } from 'vitest';
-import { getMergeConfig, toTransitionDef } from '../../../src/planning/routing.js';
+import { toTransitionDef } from '../../../src/planning/routing.js';
+import { getMergeConfig } from '../../../src/planning/synchronization.js';
 import type { TransitionDef } from '../../../src/types.js';
 
 // Mock TransitionRow type (matches drizzle schema inference)
@@ -20,6 +21,7 @@ type TransitionRow = {
   priority: number;
   condition: object | null;
   spawn_count: number | null;
+  sibling_group: string | null;
   foreach: object | null;
   synchronization: object | null;
   loop_config: object | null;
@@ -37,6 +39,7 @@ describe('toTransitionDef', () => {
       priority: 0,
       condition: null,
       spawn_count: null,
+      sibling_group: null,
       foreach: null,
       synchronization: null,
       loop_config: null,
@@ -52,6 +55,7 @@ describe('toTransitionDef', () => {
       priority: 0,
       condition: null,
       spawn_count: null,
+      sibling_group: null,
       foreach: null,
       synchronization: null,
     });
@@ -68,6 +72,7 @@ describe('toTransitionDef', () => {
       priority: 1,
       condition: null,
       spawn_count: null,
+      sibling_group: null,
       foreach: null,
       synchronization: null,
       loop_config: null,
@@ -90,6 +95,7 @@ describe('toTransitionDef', () => {
       priority: 0,
       condition: null,
       spawn_count: 3,
+      sibling_group: null,
       foreach: null,
       synchronization: null,
       loop_config: null,
@@ -118,6 +124,7 @@ describe('toTransitionDef', () => {
       priority: 0,
       condition,
       spawn_count: null,
+      sibling_group: null,
       foreach: null,
       synchronization: null,
       loop_config: null,
@@ -144,6 +151,7 @@ describe('toTransitionDef', () => {
       priority: 0,
       condition: null,
       spawn_count: null,
+      sibling_group: null,
       foreach,
       synchronization: null,
       loop_config: null,
@@ -177,6 +185,7 @@ describe('toTransitionDef', () => {
       priority: 0,
       condition: null,
       spawn_count: null,
+      sibling_group: null,
       foreach: null,
       synchronization,
       loop_config: null,
@@ -198,6 +207,7 @@ describe('toTransitionDef', () => {
       priority: 0,
       condition: null,
       spawn_count: null,
+      sibling_group: null,
       foreach: null,
       synchronization: null,
       loop_config: null,
@@ -220,6 +230,7 @@ describe('toTransitionDef', () => {
       priority: 0,
       condition: null,
       spawn_count: null,
+      sibling_group: null,
       foreach: null,
       synchronization: null,
       loop_config: { max_iterations: 10 },

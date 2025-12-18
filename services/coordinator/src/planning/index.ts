@@ -18,7 +18,6 @@
 export {
   buildPathId,
   decideRouting,
-  evaluateCondition,
   getTransitionsWithSynchronization,
   toTransitionDef,
   type PlanningResult,
@@ -38,9 +37,7 @@ export {
 export { decideWorkflowStart } from './lifecycle';
 
 // Completion: workflow finalization and output extraction
-export {
-  applyInputMapping,
-  extractFinalOutput,
-  extractValueFromContext,
-  type CompletionResult,
-} from './completion';
+export { applyInputMapping, extractFinalOutput, type CompletionResult } from './completion';
+
+// Shared utilities re-exported for convenience
+export { evaluateCondition, extractFromContext } from '../shared';

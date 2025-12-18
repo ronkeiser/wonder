@@ -5,15 +5,15 @@
 
 import type { Emitter } from '@wonder/events';
 import { Schema, type JSONSchema, type SchemaTable, type SqlHook } from '@wonder/schemas';
-import type { ContextSnapshot } from '../types';
+import {
+  extractJsonPath,
+  getNestedValue,
+  parsePath,
+  setNestedValue,
+} from '../shared';
+import type { ContextSnapshot, MergeConfig } from '../types';
 import type { DefinitionManager } from './defs';
 
-/** Merge configuration for fan-in */
-export type MergeConfig = {
-  source: string;
-  target: string;
-  strategy: 'append' | 'collect' | 'merge_object' | 'keyed_by_branch' | 'last_wins';
-};
 
 /** Branch output with metadata */
 export type BranchOutput = {
@@ -79,9 +79,7 @@ export class ContextManager {
     };
   }
 
-  /**
-   * Load schemas and bind tables (lazy initialization)
-   */
+  /** Load schemas and bind tables (lazy initialization). */
   private loadSchemas(): void {
     if (this.initialized) return;
 
@@ -101,9 +99,7 @@ export class ContextManager {
     this.initialized = true;
   }
 
-  /**
-   * Initialize context tables and store input
-   */
+  /** Initialize context tables and store input. */
   async initialize(input: Record<string, unknown>): Promise<void> {
     this.loadSchemas();
 
@@ -165,21 +161,10 @@ export class ContextManager {
   }
 
   // ============================================================================
-  // Path Parsing (pure utilities)
+  // Path Validation
   // ============================================================================
 
-  /**
-   * Parse a dot-notation path into section and field parts
-   * e.g., "state.all_trivia.items" → { section: "state", fieldParts: ["all_trivia", "items"] }
-   */
-  private parsePath(path: string): { section: string; fieldParts: string[] } {
-    const [section, ...fieldParts] = path.split('.');
-    return { section, fieldParts };
-  }
-
-  /**
-   * Validate that a section is writable
-   */
+  /** Validate that a section is writable. */
   private assertWritableSection(section: string): void {
     if (section !== 'state' && section !== 'output') {
       throw new Error(`Cannot write to '${section}' - only 'state' and 'output' are writable`);
@@ -190,9 +175,7 @@ export class ContextManager {
   // Read Operations
   // ============================================================================
 
-  /**
-   * Read entire section from context
-   */
+  /** Read entire section from context. */
   getSection(section: string): Record<string, unknown> {
     this.loadSchemas();
 
@@ -210,28 +193,23 @@ export class ContextManager {
     return value;
   }
 
-  /**
-   * Read value from context (supports nested paths for backwards compat)
-   */
+  /** Read value from context (supports nested paths). */
   get(path: string): unknown {
-    const { section, fieldParts } = this.parsePath(path);
+    const { section, fieldParts } = parsePath(path);
     const sectionData = this.getSection(section);
 
     if (fieldParts.length === 0) {
       return sectionData;
     }
 
-    return this.getNestedValue(sectionData, fieldParts.join('.'));
+    return getNestedValue(sectionData, fieldParts.join('.'));
   }
 
   // ============================================================================
   // Write Operations
   // ============================================================================
 
-  /**
-   * Replace an entire section with new data
-   * Use when you have the complete object to store (e.g., after merge)
-   */
+  /** Replace an entire section with new data. */
   replaceSection(section: string, data: Record<string, unknown>): void {
     this.loadSchemas();
     this.assertWritableSection(section);
@@ -252,14 +230,11 @@ export class ContextManager {
     });
   }
 
-  /**
-   * Set a field within a section (read-modify-write)
-   * Use for nested paths like "state.all_trivia" or "output.result"
-   */
+  /** Set a field within a section (read-modify-write). */
   setField(path: string, value: unknown): void {
     this.loadSchemas();
 
-    const { section, fieldParts } = this.parsePath(path);
+    const { section, fieldParts } = parsePath(path);
     this.assertWritableSection(section);
 
     const table = this.getTable(section);
@@ -269,7 +244,7 @@ export class ContextManager {
 
     // Read current section, update nested field, write back
     const currentData = this.getSection(section);
-    const updatedData = this.setNestedValue(currentData, fieldParts, value);
+    const updatedData = setNestedValue(currentData, fieldParts, value);
     table.replace(updatedData);
 
     this.emitter.emitTrace({
@@ -282,7 +257,7 @@ export class ContextManager {
   }
 
   /**
-   * Get read-only snapshot of entire context
+   * Get read-only snapshot of entire context.
    *
    * Returns input, state, and output from schema-driven tables.
    * Branch outputs are stored separately and merged into state/output
@@ -310,7 +285,7 @@ export class ContextManager {
   // ============================================================================
 
   /**
-   * Apply node's output_mapping to write task output to context
+   * Apply node's output_mapping to write task output to context.
    *
    * For linear flows (no fan-out), task output is written directly to
    * schema-driven context tables via the node's output_mapping.
@@ -318,9 +293,6 @@ export class ContextManager {
    * Mappings are JSONPath-style: { "state.result": "$.response", "output.greeting": "$.message" }
    * - Target paths (keys) specify where in context to write (state.* or output.*)
    * - Source paths (values) specify what to extract from task output
-   *
-   * @param outputMapping - Node's output_mapping (target -> source JSONPath)
-   * @param taskOutput - Raw task output from executor
    */
   applyOutputMapping(
     outputMapping: Record<string, string> | null,
@@ -347,7 +319,7 @@ export class ContextManager {
 
     for (const [targetPath, sourcePath] of Object.entries(outputMapping)) {
       // Extract value from task output using source path
-      const value = this.extractValue(taskOutput, sourcePath);
+      const value = extractJsonPath(taskOutput, sourcePath);
 
       // Use setField for the write (handles path parsing and read-modify-write)
       this.setField(targetPath, value);
@@ -363,62 +335,7 @@ export class ContextManager {
     }
   }
 
-  /**
-   * Extract value from object using JSONPath-style path
-   * e.g., "$.response.greeting" extracts obj.response.greeting
-   */
-  private extractValue(obj: Record<string, unknown>, path: string): unknown {
-    // Handle literal values (not starting with $.)
-    if (!path.startsWith('$.')) {
-      return path;
-    }
-
-    const pathParts = path.slice(2).split('.'); // Remove '$.' prefix
-    let value: unknown = obj;
-
-    for (const part of pathParts) {
-      if (value && typeof value === 'object' && part in value) {
-        value = (value as Record<string, unknown>)[part];
-      } else {
-        return undefined;
-      }
-    }
-
-    return value;
-  }
-
-  /**
-   * Set nested value in object by path parts
-   * e.g., setNestedValue({}, ['result', 'data'], 'hello') -> { result: { data: 'hello' } }
-   */
-  private setNestedValue(
-    obj: Record<string, unknown>,
-    pathParts: string[],
-    value: unknown,
-  ): Record<string, unknown> {
-    if (pathParts.length === 0) {
-      // No path parts means replace entire object
-      return value as Record<string, unknown>;
-    }
-
-    const result = { ...obj };
-    let current = result;
-
-    for (let i = 0; i < pathParts.length - 1; i++) {
-      const part = pathParts[i];
-      if (!(part in current) || typeof current[part] !== 'object') {
-        current[part] = {};
-      } else {
-        current[part] = { ...(current[part] as Record<string, unknown>) };
-      }
-      current = current[part] as Record<string, unknown>;
-    }
-
-    current[pathParts[pathParts.length - 1]] = value;
-    return result;
-  }
-
-  /** Get table by path */
+  /** Get table by path. */
   private getTable(path: string): SchemaTable | null {
     switch (path) {
       case 'input':
@@ -439,10 +356,7 @@ export class ContextManager {
   /** Cache of branch tables by token ID */
   private branchTables = new Map<string, SchemaTable>();
 
-  /**
-   * Create a branch output table for a token
-   * Called during fan-out when token is created
-   */
+  /** Create a branch output table for a token. */
   initializeBranchTable(tokenId: string, outputSchema: JSONSchema): void {
     const tableName = `branch_output_${tokenId}`;
     const schema = new Schema(outputSchema);
@@ -461,10 +375,7 @@ export class ContextManager {
     });
   }
 
-  /**
-   * Write task output to a token's branch table
-   * Called when task completes during fan-out execution
-   */
+  /** Write task output to a token's branch table. */
   applyBranchOutput(tokenId: string, output: Record<string, unknown>): void {
     const table = this.branchTables.get(tokenId);
 
@@ -499,10 +410,7 @@ export class ContextManager {
     });
   }
 
-  /**
-   * Read outputs from sibling branch tables
-   * Called during fan-in to collect all branch results
-   */
+  /** Read outputs from sibling branch tables. */
   getBranchOutputs(
     tokenIds: string[],
     branchIndices: number[],
@@ -553,10 +461,7 @@ export class ContextManager {
     return outputs;
   }
 
-  /**
-   * Merge branch outputs into main context
-   * Called at fan-in after synchronization condition is met
-   */
+  /** Merge branch outputs into main context. */
   mergeBranches(branchOutputs: BranchOutput[], merge: MergeConfig): void {
     this.emitter.emitTrace({
       type: 'operation.context.merge.started',
@@ -576,7 +481,7 @@ export class ContextManager {
       // Extract nested path from output (e.g., '_branch.output.ideas')
       // For a source like '_branch.output.ideas', we want to extract just the 'ideas' value
       const path = merge.source.replace('_branch.output.', '');
-      const extractedValue = this.getNestedValue(b.output, path);
+      const extractedValue = getNestedValue(b.output, path);
       return {
         ...b,
         output: extractedValue,
@@ -641,10 +546,7 @@ export class ContextManager {
     });
   }
 
-  /**
-   * Drop branch tables after merge (cleanup)
-   * Uses SchemaTable.dropAll() to handle nested array tables in correct FK order
-   */
+  /** Drop branch tables after merge (cleanup). */
   dropBranchTables(tokenIds: string[]): void {
     for (const tokenId of tokenIds) {
       const table = this.branchTables.get(tokenId);
@@ -671,13 +573,4 @@ export class ContextManager {
     });
   }
 
-  /** Get nested value from object by dot-separated path */
-  private getNestedValue(obj: Record<string, unknown>, path: string): unknown {
-    return path.split('.').reduce((current: unknown, key) => {
-      if (current && typeof current === 'object') {
-        return (current as Record<string, unknown>)[key];
-      }
-      return undefined;
-    }, obj);
-  }
 }

@@ -20,8 +20,7 @@ import type { PlanningResult } from './routing';
 // ============================================================================
 
 /**
- * Decide synchronization behavior for a newly created token arriving
- * at a node with synchronization requirements.
+ * Decide synchronization behavior for a token arriving at a sync point.
  *
  * Scenarios:
  * 1. Token not in sibling group → pass through (MARK_FOR_DISPATCH)
@@ -29,8 +28,6 @@ import type { PlanningResult } from './routing';
  * 3. Strategy 'all' or m_of_n:
  *    - Condition met → ACTIVATE_FAN_IN (merge and proceed)
  *    - Not met → MARK_WAITING
- *
- * Returns both decisions and trace events for observability.
  */
 export function decideSynchronization(params: {
   token: TokenRow;
@@ -147,13 +144,7 @@ export function decideSynchronization(params: {
 // Synchronization Condition Evaluation
 // ============================================================================
 
-/**
- * Check if synchronization condition is met based on strategy.
- *
- * @param strategy - 'all' or { m_of_n: number }
- * @param counts - Current sibling state counts
- * @param branchTotal - Total expected siblings
- */
+/** Check if synchronization condition is met based on strategy. */
 function checkSyncCondition(
   strategy: SynchronizationConfig['strategy'],
   counts: SiblingCounts,
@@ -178,15 +169,12 @@ function checkSyncCondition(
 }
 
 /**
- * Build the fan-in path from a token's sibling_group and target node ID.
- * The fan-in path must be unique per synchronization point.
+ * Build the fan-in path from sibling_group and target node ID.
  *
  * Uses sibling_group:target_node_id so all transitions in the same sibling group
- * going to the same target node share one fan-in coordination path.
- * This ensures the SQL UNIQUE constraint properly prevents duplicate activations
- * even when multiple transitions exist (explicit fan-out pattern).
- *
- * Example: sibling_group 'phase1_fanin', target 'bridge' → Fan-in path 'phase1_fanin:bridge'
+ * going to the same target node share one fan-in coordination path. This ensures
+ * the SQL UNIQUE constraint properly prevents duplicate activations even when
+ * multiple transitions exist (explicit fan-out pattern).
  */
 function buildFanInPath(siblingGroup: string, targetNodeId: string): string {
   return `${siblingGroup}:${targetNodeId}`;
@@ -196,16 +184,12 @@ function buildFanInPath(siblingGroup: string, targetNodeId: string): string {
 // Merge Strategy Helpers
 // ============================================================================
 
-/**
- * Determine if branch merge is needed.
- */
+/** Determine if branch merge is needed. */
 export function needsMerge(transition: TransitionDef): boolean {
   return transition.synchronization?.merge !== undefined;
 }
 
-/**
- * Get merge configuration from transition.
- */
+/** Get merge configuration from transition. */
 export function getMergeConfig(transition: TransitionDef): MergeConfig | null {
   return transition.synchronization?.merge ?? null;
 }
@@ -214,10 +198,7 @@ export function getMergeConfig(transition: TransitionDef): MergeConfig | null {
 // Timeout Handling
 // ============================================================================
 
-/**
- * Check if synchronization has timed out.
- * Returns decisions based on on_timeout policy.
- */
+/** Decide how to handle synchronization timeout based on policy. */
 export function decideOnTimeout(params: {
   waitingTokens: TokenRow[];
   transition: TransitionDef;
@@ -281,9 +262,7 @@ export function decideOnTimeout(params: {
   return [];
 }
 
-/**
- * Check if a timeout is configured and has elapsed.
- */
+/** Check if a timeout is configured and has elapsed. */
 export function hasTimedOut(
   transition: TransitionDef,
   oldestWaitingTimestamp: Date | null,
@@ -304,14 +283,7 @@ export function hasTimedOut(
 // Fan-In Continuation
 // ============================================================================
 
-/**
- * Decide fan-in continuation token creation.
- *
- * After fan-in merges sibling tokens, create a continuation token
- * to proceed execution at the target node.
- *
- * Returns both decisions and trace events for observability.
- */
+/** Decide fan-in continuation token creation after merge. */
 export function decideFanInContinuation(params: {
   workflowRunId: string;
   nodeId: string;

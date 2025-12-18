@@ -16,13 +16,7 @@ import type { PlanningResult } from './routing';
 // Workflow Start
 // ============================================================================
 
-/**
- * Decide initial token creation when workflow starts.
- *
- * Creates the root token at the workflow's initial node.
- *
- * Returns both decisions and trace events for observability.
- */
+/** Decide initial token creation when workflow starts. */
 export function decideWorkflowStart(params: {
   workflowRunId: string;
   initialNodeId: string;

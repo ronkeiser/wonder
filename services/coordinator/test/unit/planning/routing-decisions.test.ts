@@ -23,7 +23,7 @@ function createToken(overrides: Partial<TokenRow> = {}): TokenRow {
     node_id: 'nodeA',
     parent_token_id: null,
     path_id: 'root',
-    fan_out_transition_id: null,
+    sibling_group: null,
     branch_index: 0,
     branch_total: 1,
     status: 'completed',
@@ -45,6 +45,7 @@ function createTransition(overrides: Partial<TransitionRow> = {}): TransitionRow
     priority: 1,
     condition: null,
     spawn_count: null,
+    sibling_group: null,
     foreach: null,
     synchronization: null,
     loop_config: null,
@@ -333,7 +334,9 @@ describe('decideRouting - spawn_count', () => {
       completedToken: createToken(),
       workflowRunId: 'wfr_123',
       nodeId: 'nodeA',
-      transitions: [createTransition({ id: 'trans_fanout', spawn_count: 3 })],
+      transitions: [
+        createTransition({ id: 'trans_fanout', spawn_count: 3, sibling_group: 'fanout-group' }),
+      ],
       context: baseContext,
     });
 
@@ -345,19 +348,19 @@ describe('decideRouting - spawn_count', () => {
       path_id: 'root.nodeA.0',
       branch_index: 0,
       branch_total: 3,
-      fan_out_transition_id: 'trans_fanout',
+      sibling_group: 'fanout-group',
     });
     expect(params[1]).toMatchObject({
       path_id: 'root.nodeA.1',
       branch_index: 1,
       branch_total: 3,
-      fan_out_transition_id: 'trans_fanout',
+      sibling_group: 'fanout-group',
     });
     expect(params[2]).toMatchObject({
       path_id: 'root.nodeA.2',
       branch_index: 2,
       branch_total: 3,
-      fan_out_transition_id: 'trans_fanout',
+      sibling_group: 'fanout-group',
     });
   });
 
@@ -366,18 +369,20 @@ describe('decideRouting - spawn_count', () => {
       completedToken: createToken(),
       workflowRunId: 'wfr_123',
       nodeId: 'nodeA',
-      transitions: [createTransition({ id: 'trans_judges', spawn_count: 5 })],
+      transitions: [
+        createTransition({ id: 'trans_judges', spawn_count: 5, sibling_group: 'judges-group' }),
+      ],
       context: baseContext,
     });
 
     expect(result.decisions).toHaveLength(5);
 
-    // All share same fan_out_transition_id
-    const fanOutIds = result.decisions.map(
-      (d) => (d as { params: { fan_out_transition_id: string } }).params.fan_out_transition_id,
+    // All share same sibling_group
+    const siblingGroups = result.decisions.map(
+      (d) => (d as { params: { sibling_group: string } }).params.sibling_group,
     );
-    expect(new Set(fanOutIds).size).toBe(1);
-    expect(fanOutIds[0]).toBe('trans_judges');
+    expect(new Set(siblingGroups).size).toBe(1);
+    expect(siblingGroups[0]).toBe('judges-group');
   });
 });
 
@@ -456,13 +461,13 @@ describe('decideRouting - foreach', () => {
 });
 
 // ============================================================================
-// Fan-out Transition ID Inheritance
+// Sibling Group Inheritance
 // ============================================================================
 
-describe('decideRouting - fan_out_transition_id inheritance', () => {
-  test('single token inherits parent fan_out_transition_id', () => {
+describe('decideRouting - sibling_group inheritance', () => {
+  test('single token inherits parent sibling_group', () => {
     const completedToken = createToken({
-      fan_out_transition_id: 'parent_fanout',
+      sibling_group: 'parent_group',
       branch_index: 2,
       branch_total: 5,
     });
@@ -479,15 +484,15 @@ describe('decideRouting - fan_out_transition_id inheritance', () => {
     expect(result.decisions[0]).toMatchObject({
       type: 'CREATE_TOKEN',
       params: {
-        fan_out_transition_id: 'parent_fanout', // Inherited
+        sibling_group: 'parent_group', // Inherited
         branch_total: 5, // Inherited
       },
     });
   });
 
-  test('new fan-out creates new fan_out_transition_id', () => {
+  test('new fan-out creates new sibling_group', () => {
     const completedToken = createToken({
-      fan_out_transition_id: 'parent_fanout',
+      sibling_group: 'parent_group',
       branch_index: 2,
       branch_total: 5,
     });
@@ -496,17 +501,17 @@ describe('decideRouting - fan_out_transition_id inheritance', () => {
       completedToken,
       workflowRunId: 'wfr_123',
       nodeId: 'nodeA',
-      transitions: [createTransition({ id: 'new_fanout', spawn_count: 3 })],
+      transitions: [
+        createTransition({ id: 'new_fanout', spawn_count: 3, sibling_group: 'new_group' }),
+      ],
       context: baseContext,
     });
 
     expect(result.decisions).toHaveLength(3);
 
-    // All new tokens get the new fan_out_transition_id
+    // All new tokens get the new sibling_group
     for (const d of result.decisions) {
-      expect(
-        (d as { params: { fan_out_transition_id: string } }).params.fan_out_transition_id,
-      ).toBe('new_fanout');
+      expect((d as { params: { sibling_group: string } }).params.sibling_group).toBe('new_group');
     }
   });
 });
@@ -557,14 +562,16 @@ describe('decideRouting - events', () => {
       completedToken: createToken(),
       workflowRunId: 'wfr_123',
       nodeId: 'nodeA',
-      transitions: [createTransition({ spawn_count: 3 })],
+      transitions: [createTransition({ spawn_count: 3, sibling_group: 'test-group' })],
       context: baseContext,
     });
 
     const matchEvent = result.events.find((e) => e.type === 'decision.routing.transition_matched');
     expect(matchEvent).toMatchObject({
       type: 'decision.routing.transition_matched',
-      spawn_count: 3,
+      payload: {
+        spawn_count: 3,
+      },
     });
   });
 

@@ -183,14 +183,8 @@ export async function processSynchronization(
  * Handle ACTIVATE_FAN_IN decision
  *
  * This is called when synchronization condition is met:
- * 1. Try to activate (race-safe via SQL constraint)
- * 2. If won the race:
- *    - Query all completed siblings
- *    - Fetch TaskDef for output schema
- *    - Merge branch outputs
- *    - Drop branch tables
- *    - Create continuation token
- *    - Mark waiting siblings as completed
+ * 1. Try to win the fan-in race (race-safe via SQL constraint)
+ * 2. If won: merge siblings and create continuation token
  */
 export async function activateFanIn(
   ctx: DispatchContext,
@@ -200,18 +194,90 @@ export async function activateFanIn(
 ): Promise<string | null> {
   const { workflowRunId, nodeId, fanInPath } = decision;
 
-  // First ensure the fan-in record exists (create if not present)
-  // This handles the race where all tokens arrive at sync point simultaneously
-  ctx.tokens.tryCreateFanIn({
+  // Step 1: Try to win the fan-in race
+  const raceWon = tryWinFanInRace(ctx, {
     workflowRunId,
     nodeId,
     fanInPath,
     transitionId: transition.id,
+    triggeringTokenId,
+  });
+
+  if (!raceWon) {
+    return null;
+  }
+
+  // Step 2: Get siblings for merge
+  const sync = transition.synchronization;
+  if (!sync) {
+    return null;
+  }
+
+  const siblings = getSiblingsForMerge(ctx, workflowRunId, sync.sibling_group, fanInPath);
+  if (!siblings) {
+    return null;
+  }
+
+  const { completedSiblings, waitingSiblings } = siblings;
+
+  // Emit trace event
+  ctx.emitter.emitTrace({
+    type: 'dispatch.sync.fan_in_activated',
+    node_id: nodeId,
+    payload: {
+      fan_in_path: fanInPath,
+      merged_count: completedSiblings.length,
+      waiting_count: waitingSiblings.length,
+    },
+  });
+
+  // Step 3: Merge branch outputs if configured
+  if (sync.merge) {
+    await mergeBranchOutputs(ctx, transition.from_node_id, completedSiblings, sync.merge);
+  }
+
+  // Step 4: Mark siblings as completed
+  markSiblingsCompleted(ctx, triggeringTokenId, waitingSiblings);
+
+  // Step 5: Create continuation token
+  return createFanInContinuation(ctx, {
+    workflowRunId,
+    nodeId,
+    fanInPath,
+    parentTokenId: completedSiblings[0].parent_token_id ?? '',
+  });
+}
+
+// ============================================================================
+// Fan-In Helper Functions
+// ============================================================================
+
+/**
+ * Attempt to win the fan-in race using SQL constraints.
+ * Returns true if this call won the race, false if another token already activated.
+ */
+function tryWinFanInRace(
+  ctx: DispatchContext,
+  params: {
+    workflowRunId: string;
+    nodeId: string;
+    fanInPath: string;
+    transitionId: string;
+    triggeringTokenId: string;
+  },
+): boolean {
+  const { workflowRunId, nodeId, fanInPath, transitionId, triggeringTokenId } = params;
+
+  // Ensure fan-in record exists (handles race where all tokens arrive simultaneously)
+  ctx.tokens.tryCreateFanIn({
+    workflowRunId,
+    nodeId,
+    fanInPath,
+    transitionId,
     tokenId: triggeringTokenId,
   });
 
   // Try to activate - first caller wins
-  // Use the triggering token ID for race-safe deduplication
   const activated = ctx.tokens.tryActivateFanIn({
     workflowRunId,
     fanInPath,
@@ -219,25 +285,33 @@ export async function activateFanIn(
   });
 
   if (!activated) {
-    // Another token already activated this fan-in
-    // Mark the triggering token as completed (absorbed by the winning token's fan-in)
+    // Lost the race - mark triggering token as completed (absorbed by winner)
     ctx.tokens.updateStatus(triggeringTokenId, 'completed');
     ctx.logger.debug({
       event_type: 'fan_in.race.lost',
       message: 'Another token already activated this fan-in',
       metadata: { fan_in_path: fanInPath },
     });
-    return null;
+    return false;
   }
 
-  // We won the race - proceed with merge
-  const sync = transition.synchronization;
-  if (!sync) {
-    return null; // Should not happen
-  }
+  return true;
+}
 
-  // Get all completed siblings
-  const siblings = ctx.tokens.getSiblings(workflowRunId, sync.sibling_group);
+/** Token shape for sibling operations */
+type SiblingToken = ReturnType<TokenManager['getSiblings']>[number];
+
+/**
+ * Get completed and waiting siblings for fan-in merge.
+ * Returns null if no completed siblings found.
+ */
+function getSiblingsForMerge(
+  ctx: DispatchContext,
+  workflowRunId: string,
+  siblingGroup: string,
+  fanInPath: string,
+): { completedSiblings: SiblingToken[]; waitingSiblings: SiblingToken[] } | null {
+  const siblings = ctx.tokens.getSiblings(workflowRunId, siblingGroup);
   const completedSiblings = siblings.filter((s) => s.status === 'completed');
   const waitingSiblings = siblings.filter((s) => s.status === 'waiting_for_siblings');
 
@@ -250,84 +324,86 @@ export async function activateFanIn(
     return null;
   }
 
-  // Emit trace event with actual merged count (now that we have the siblings)
-  ctx.emitter.emitTrace({
-    type: 'dispatch.sync.fan_in_activated',
-    node_id: nodeId,
-    payload: {
-      fan_in_path: fanInPath,
-      merged_count: completedSiblings.length,
-      waiting_count: waitingSiblings.length,
-    },
-  });
+  return { completedSiblings, waitingSiblings };
+}
 
-  // Get merge config
-  const mergeConfig = sync.merge;
-  if (mergeConfig) {
-    // Fetch TaskDef to get output schema (from the source node of the fan-out transition)
-    const sourceNode = ctx.defs.getNode(transition.from_node_id);
+/**
+ * Merge branch outputs from completed siblings into main context.
+ */
+async function mergeBranchOutputs(
+  ctx: DispatchContext,
+  sourceNodeId: string,
+  completedSiblings: SiblingToken[],
+  mergeConfig: NonNullable<TransitionDef['synchronization']>['merge'],
+): Promise<void> {
+  if (!mergeConfig) return;
 
-    if (sourceNode.task_id) {
-      const taskDefsResource = ctx.resources.taskDefs();
-      const { task_def: taskDef } = await taskDefsResource.get(
-        sourceNode.task_id,
-        sourceNode.task_version ?? 1,
-      );
+  const sourceNode = ctx.defs.getNode(sourceNodeId);
+  if (!sourceNode.task_id) return;
 
-      if (taskDef.output_schema) {
-        // Get branch outputs
-        const branchOutputs = ctx.context.getBranchOutputs(
-          completedSiblings.map((s) => s.id),
-          completedSiblings.map((s) => s.branch_index),
-          taskDef.output_schema as JSONSchema,
-        );
+  const taskDefsResource = ctx.resources.taskDefs();
+  const { task_def: taskDef } = await taskDefsResource.get(
+    sourceNode.task_id,
+    sourceNode.task_version ?? 1,
+  );
 
-        // Merge into context
-        ctx.context.mergeBranches(branchOutputs, mergeConfig);
-      }
-    }
-
-    // Drop branch tables
-    ctx.context.dropBranchTables(completedSiblings.map((s) => s.id));
+  if (taskDef.output_schema) {
+    const branchOutputs = ctx.context.getBranchOutputs(
+      completedSiblings.map((s) => s.id),
+      completedSiblings.map((s) => s.branch_index),
+      taskDef.output_schema as JSONSchema,
+    );
+    ctx.context.mergeBranches(branchOutputs, mergeConfig);
   }
 
-  // Mark waiting siblings as completed (absorbed by merge)
+  // Clean up branch tables
+  ctx.context.dropBranchTables(completedSiblings.map((s) => s.id));
+}
+
+/**
+ * Mark triggering token and waiting siblings as completed.
+ */
+function markSiblingsCompleted(
+  ctx: DispatchContext,
+  triggeringTokenId: string,
+  waitingSiblings: SiblingToken[],
+): void {
   if (waitingSiblings.length > 0) {
     ctx.tokens.completeMany(waitingSiblings.map((s) => s.id));
   }
-
-  // Mark the triggering token as completed (it activated the fan-in but is now absorbed)
   ctx.tokens.updateStatus(triggeringTokenId, 'completed');
+}
 
-  // Plan continuation token creation (pure function)
-  const firstSibling = completedSiblings[0];
-  const continuationResult = decideFanInContinuation({
-    workflowRunId,
-    nodeId,
-    fanInPath,
-    parentTokenId: firstSibling.parent_token_id ?? '',
-  });
+/**
+ * Create the continuation token after fan-in merge.
+ */
+function createFanInContinuation(
+  ctx: DispatchContext,
+  params: {
+    workflowRunId: string;
+    nodeId: string;
+    fanInPath: string;
+    parentTokenId: string;
+  },
+): string | null {
+  const continuationResult = decideFanInContinuation(params);
 
-  // Emit trace events from planning
+  // Emit trace events
   for (const event of continuationResult.events) {
     ctx.emitter.emitTrace(event);
   }
 
-  // Apply planning decisions (creates continuation token)
+  // Apply decisions (creates continuation token)
   const applyResult = applyDecisions(continuationResult.decisions, ctx);
 
-  // Get the created continuation token ID
   if (applyResult.tokensCreated.length === 0) {
     ctx.logger.debug({
       event_type: 'fan_in.no_continuation',
       message: 'No continuation token created',
-      metadata: { fan_in_path: fanInPath },
+      metadata: { fan_in_path: params.fanInPath },
     });
     return null;
   }
 
-  const continuationTokenId = applyResult.tokensCreated[0];
-
-  // Return continuation token ID for caller to dispatch
-  return continuationTokenId;
+  return applyResult.tokensCreated[0];
 }

@@ -7,7 +7,7 @@
 
 import { describe, expect, test } from 'vitest';
 
-import { evaluateCondition } from '../../../src/planning/routing';
+import { evaluateCondition } from '../../../src/shared';
 import type { Condition, ContextSnapshot } from '../../../src/types';
 
 // ============================================================================

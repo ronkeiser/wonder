@@ -2,18 +2,15 @@
  * Tests for completion planning functions
  *
  * Pure unit tests for:
- * - extractValueFromContext: JSONPath-style extraction
+ * - extractFromContext: JSONPath-style extraction
  * - extractFinalOutput: Workflow output mapping
  * - applyInputMapping: Task/action input extraction
  */
 
 import { describe, expect, test } from 'vitest';
 
-import {
-  applyInputMapping,
-  extractFinalOutput,
-  extractValueFromContext,
-} from '../../../src/planning/completion';
+import { applyInputMapping, extractFinalOutput } from '../../../src/planning/completion';
+import { extractFromContext } from '../../../src/shared';
 import type { ContextSnapshot } from '../../../src/types';
 
 // ============================================================================
@@ -48,77 +45,77 @@ const baseContext: ContextSnapshot = {
 };
 
 // ============================================================================
-// extractValueFromContext
+// extractFromContext
 // ============================================================================
 
-describe('extractValueFromContext', () => {
+describe('extractFromContext', () => {
   describe('input paths', () => {
     test('extracts top-level input field', () => {
-      expect(extractValueFromContext('$.input.name', baseContext)).toBe('Alice');
+      expect(extractFromContext('$.input.name', baseContext)).toBe('Alice');
     });
 
     test('extracts numeric input field', () => {
-      expect(extractValueFromContext('$.input.age', baseContext)).toBe(30);
+      expect(extractFromContext('$.input.age', baseContext)).toBe(30);
     });
 
     test('extracts nested input field', () => {
-      expect(extractValueFromContext('$.input.config.verbose', baseContext)).toBe(true);
+      expect(extractFromContext('$.input.config.verbose', baseContext)).toBe(true);
     });
   });
 
   describe('state paths', () => {
     test('extracts top-level state field', () => {
-      expect(extractValueFromContext('$.state.score', baseContext)).toBe(85);
+      expect(extractFromContext('$.state.score', baseContext)).toBe(85);
     });
 
     test('extracts string state field', () => {
-      expect(extractValueFromContext('$.state.status', baseContext)).toBe('approved');
+      expect(extractFromContext('$.state.status', baseContext)).toBe('approved');
     });
 
     test('extracts deeply nested state field', () => {
-      expect(extractValueFromContext('$.state.nested.deep.value', baseContext)).toBe('found');
+      expect(extractFromContext('$.state.nested.deep.value', baseContext)).toBe('found');
     });
 
     test('extracts array from state', () => {
-      expect(extractValueFromContext('$.state.items', baseContext)).toEqual([1, 2, 3]);
+      expect(extractFromContext('$.state.items', baseContext)).toEqual([1, 2, 3]);
     });
   });
 
   describe('output paths', () => {
     test('extracts top-level output field', () => {
-      expect(extractValueFromContext('$.output.result', baseContext)).toBe('success');
+      expect(extractFromContext('$.output.result', baseContext)).toBe('success');
     });
 
     test('extracts nested output field', () => {
-      expect(extractValueFromContext('$.output.data.greeting', baseContext)).toBe('Hello, Alice!');
+      expect(extractFromContext('$.output.data.greeting', baseContext)).toBe('Hello, Alice!');
     });
   });
 
   describe('literal values (non-JSONPath)', () => {
     test('returns string literal as-is', () => {
-      expect(extractValueFromContext('hello world', baseContext)).toBe('hello world');
+      expect(extractFromContext('hello world', baseContext)).toBe('hello world');
     });
 
     test('returns numeric string as-is', () => {
-      expect(extractValueFromContext('123', baseContext)).toBe('123');
+      expect(extractFromContext('123', baseContext)).toBe('123');
     });
 
     test('returns empty string as-is', () => {
-      expect(extractValueFromContext('', baseContext)).toBe('');
+      expect(extractFromContext('', baseContext)).toBe('');
     });
   });
 
   describe('missing paths', () => {
     test('returns undefined for missing top-level field', () => {
-      expect(extractValueFromContext('$.input.nonexistent', baseContext)).toBeUndefined();
+      expect(extractFromContext('$.input.nonexistent', baseContext)).toBeUndefined();
     });
 
     test('returns undefined for missing nested field', () => {
-      expect(extractValueFromContext('$.state.nested.missing.value', baseContext)).toBeUndefined();
+      expect(extractFromContext('$.state.nested.missing.value', baseContext)).toBeUndefined();
     });
 
     test('returns undefined for invalid section', () => {
-      expect(extractValueFromContext('$.invalid.field', baseContext)).toBeUndefined();
+      expect(extractFromContext('$.invalid.field', baseContext)).toBeUndefined();
     });
   });
 
@@ -129,18 +126,18 @@ describe('extractValueFromContext', () => {
         state: {},
         output: {},
       };
-      expect(extractValueFromContext('$.input.value', context)).toBeNull();
+      expect(extractFromContext('$.input.value', context)).toBeNull();
     });
 
     test('handles object value', () => {
-      expect(extractValueFromContext('$.input.config', baseContext)).toEqual({
+      expect(extractFromContext('$.input.config', baseContext)).toEqual({
         verbose: true,
         retries: 3,
       });
     });
 
     test('returns undefined traversing through non-object', () => {
-      expect(extractValueFromContext('$.input.name.invalid', baseContext)).toBeUndefined();
+      expect(extractFromContext('$.input.name.invalid', baseContext)).toBeUndefined();
     });
   });
 });
@@ -242,7 +239,9 @@ describe('extractFinalOutput', () => {
       const completeEvent = result.events.find((e) => e.type === 'decision.completion.complete');
       expect(completeEvent).toMatchObject({
         type: 'decision.completion.complete',
-        final_output: { result: 'success' },
+        payload: {
+          final_output: { result: 'success' },
+        },
       });
     });
 
