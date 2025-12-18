@@ -1,6 +1,6 @@
 import { action, node, schema as s, step, task, transition, workflow } from '@wonder/sdk';
 import { describe, it } from 'vitest';
-import { assertInvariants, runTestWorkflow, verify } from '~/kit';
+import { assertInvariants, runTestWorkflow, TIME_JITTER, verify } from '~/kit';
 
 /**
  * Foundation Test 04: Nested State Structure with Value Flow Validation
@@ -153,7 +153,7 @@ describe('Foundation: 04 - Nested State Structure', () => {
       kind: 'mock',
       implementation: {
         schema: phase1OutputSchema,
-        options: { stringMode: 'words', delay: { min_ms: 100, max_ms: 500 } },
+        options: { stringMode: 'words', delay: TIME_JITTER },
       },
     });
 
@@ -240,7 +240,7 @@ describe('Foundation: 04 - Nested State Structure', () => {
       kind: 'mock',
       implementation: {
         schema: s.object({ word: s.string() }, { required: ['word'] }),
-        options: { stringMode: 'words', delay: { min_ms: 100, max_ms: 500 } },
+        options: { stringMode: 'words', delay: TIME_JITTER },
       },
     });
 

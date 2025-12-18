@@ -36,6 +36,9 @@ export { createWorkflow, executeWorkflow, runTestWorkflow } from './workflow';
 // Invariant assertions
 export { assertInvariants } from './invariants';
 
+// Constants
+export { TIME_JITTER } from './constants';
+
 // Verification API
 export {
   verify,

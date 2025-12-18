@@ -1,6 +1,6 @@
 import { action, node, schema as s, step, task, transition, workflow } from '@wonder/sdk';
 import { describe, it } from 'vitest';
-import { assertInvariants, runTestWorkflow, verify } from '~/kit';
+import { assertInvariants, runTestWorkflow, TIME_JITTER, verify } from '~/kit';
 
 /**
  * Foundation Test 02: Fan-out with Spawn Count + Fan-in
@@ -113,7 +113,7 @@ describe('Foundation: 02 - Fan-out with Spawn Count + Fan-in', () => {
       kind: 'mock',
       implementation: {
         schema: nodeBOutputSchema,
-        options: { stringMode: 'words', delay: { min_ms: 100, max_ms: 500 } },
+        options: { stringMode: 'words', delay: TIME_JITTER },
       },
     });
 

@@ -1,6 +1,6 @@
 import { action, node, schema as s, step, task, transition, workflow } from '@wonder/sdk';
 import { describe, it } from 'vitest';
-import { assertInvariants, runTestWorkflow, verify } from '~/kit';
+import { assertInvariants, runTestWorkflow, TIME_JITTER, verify } from '~/kit';
 
 /**
  * Foundation Test 05: Deep Nested State Structure with Three-Phase Accumulation
@@ -175,7 +175,7 @@ describe('Foundation: 05 - Deep Nested State Structure', () => {
         kind: 'mock',
         implementation: {
           schema: phase1OutputSchema,
-          options: { stringMode: 'words', delay: { min_ms: 50, max_ms: 200 } },
+          options: { stringMode: 'words', delay: TIME_JITTER },
         },
       });
 
@@ -253,7 +253,7 @@ describe('Foundation: 05 - Deep Nested State Structure', () => {
         kind: 'mock',
         implementation: {
           schema: s.object({ word: s.string() }, { required: ['word'] }),
-          options: { stringMode: 'words', delay: { min_ms: 50, max_ms: 200 } },
+          options: { stringMode: 'words', delay: TIME_JITTER },
         },
       });
 
@@ -359,7 +359,7 @@ describe('Foundation: 05 - Deep Nested State Structure', () => {
         kind: 'mock',
         implementation: {
           schema: s.object({ word: s.string() }, { required: ['word'] }),
-          options: { stringMode: 'words', delay: { min_ms: 50, max_ms: 200 } },
+          options: { stringMode: 'words', delay: TIME_JITTER },
         },
       });
 
