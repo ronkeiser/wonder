@@ -18,8 +18,6 @@ export {
   applyTracedDecisions,
   type ApplyResult,
   type DispatchContext,
-  type ExecutorBinding,
-  type ResourcesBinding,
 } from './apply';
 
 // Batch: optimize decision lists

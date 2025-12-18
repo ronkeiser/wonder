@@ -176,7 +176,7 @@ export function createWorkflowsClient(
       }));
 
       eventsClient
-        .subscribe(subscriptions)
+        .subscribe(subscriptions, workflow_run_id)
         .then((sub) => {
           subscription = sub;
           resetIdleTimer();

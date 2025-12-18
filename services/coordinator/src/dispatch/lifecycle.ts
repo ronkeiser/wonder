@@ -101,11 +101,11 @@ export async function startWorkflow(ctx: DispatchContext): Promise<void> {
  *
  * Called when task execution fails. May trigger retry based on error type.
  */
-export function processTaskError(
+export async function processTaskError(
   ctx: DispatchContext,
   tokenId: string,
   errorResult: TaskErrorResult,
-): void {
+): Promise<void> {
   const token = ctx.tokens.get(tokenId);
   const _node = ctx.defs.getNode(token.node_id);
 
@@ -128,7 +128,7 @@ export function processTaskError(
 
   // Check if we should fail the workflow
   // For now, any error fails the workflow
-  failWorkflow(ctx, errorResult.error.message);
+  await failWorkflow(ctx, errorResult.error.message);
 }
 
 // ============================================================================
@@ -138,10 +138,14 @@ export function processTaskError(
 /**
  * Fail workflow due to unrecoverable error
  */
-export function failWorkflow(ctx: DispatchContext, errorMessage: string): void {
+export async function failWorkflow(ctx: DispatchContext, errorMessage: string): Promise<void> {
   ctx.emitter.emit({
     event_type: 'workflow.failed',
     message: `Workflow failed: ${errorMessage}`,
     metadata: { error: errorMessage },
   });
+
+  // Update workflow run status in resources service
+  const workflowRunsResource = ctx.resources.workflowRuns();
+  await workflowRunsResource.updateStatus(ctx.workflowRunId, 'failed');
 }

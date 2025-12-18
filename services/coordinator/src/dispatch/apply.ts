@@ -26,29 +26,6 @@ import { batchDecisions } from './batch';
 // Types
 // ============================================================================
 
-/** Resource service bindings for fetching TaskDefs etc */
-export type ResourcesBinding = {
-  taskDefs: () => {
-    get: (
-      id: string,
-      version: number,
-    ) => Promise<{ task_def: { id: string; output_schema?: unknown } }>;
-  };
-};
-
-/** Executor service binding for dispatching tasks */
-export type ExecutorBinding = {
-  executeTask: (params: {
-    token_id: string;
-    workflow_run_id: string;
-    project_id: string;
-    task_id: string;
-    task_version: number;
-    input: Record<string, unknown>;
-    resources: Record<string, string>;
-  }) => Promise<void>;
-};
-
 /** Dependencies required to apply decisions and orchestrate workflow */
 export type DispatchContext = {
   tokens: TokenManager;
@@ -58,9 +35,9 @@ export type DispatchContext = {
   logger: Logger;
   workflowRunId: string;
   /** Resource service for fetching TaskDefs */
-  resources: ResourcesBinding;
+  resources: Env['RESOURCES'];
   /** Executor service for dispatching tasks */
-  executor: ExecutorBinding;
+  executor: Env['EXECUTOR'];
   /** Register background work (fire-and-forget) */
   waitUntil: (promise: Promise<unknown>) => void;
 };

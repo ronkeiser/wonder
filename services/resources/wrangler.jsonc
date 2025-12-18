@@ -14,6 +14,15 @@
       "remote": true,
     },
   ],
+  "durable_objects": {
+    "bindings": [
+      {
+        "name": "EVENT_HUB",
+        "class_name": "EventHub",
+        "script_name": "wonder-events",
+      },
+    ],
+  },
   "services": [
     {
       "binding": "LOGS",

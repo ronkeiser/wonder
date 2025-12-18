@@ -1,5 +1,8 @@
 <script lang="ts">
   import StreamViewer from '$lib/components/StreamViewer.svelte';
+  import WorkflowRunsSidebar from '$lib/components/WorkflowRunsSidebar.svelte';
+
+  let selectedRunId = $state<string | null>(null);
 
   const categoryOptions = [
     { value: 'decision', label: 'decision' },
@@ -83,17 +86,33 @@
   <title>Trace Events</title>
 </svelte:head>
 
-<StreamViewer
-  title="Trace Events"
-  apiPath="/api/events/trace"
-  streamPath="/api/events/stream"
-  filterLabel="Categories"
-  filterParam="category"
-  filterOptions={categoryOptions}
-  itemsKey="events"
-  itemKey="event"
-  {subscribeMessage}
-  getItemColor={getTraceColor}
-  getMetadata={getTraceMetadata}
-  renderItemHeader={renderTraceHeader}
-/>
+<div class="page-with-sidebar">
+  <WorkflowRunsSidebar selectedRunId={selectedRunId} onSelect={(id) => (selectedRunId = id)} />
+  <StreamViewer
+    title="Trace Events"
+    apiPath="/api/events/trace"
+    filterLabel="Categories"
+    filterParam="category"
+    filterOptions={categoryOptions}
+    itemsKey="events"
+    itemKey="event"
+    {subscribeMessage}
+    workflowRunId={selectedRunId}
+    getItemColor={getTraceColor}
+    getMetadata={getTraceMetadata}
+    renderItemHeader={renderTraceHeader}
+  />
+</div>
+
+<style>
+  .page-with-sidebar {
+    display: flex;
+    height: 100%;
+    overflow: hidden;
+  }
+
+  .page-with-sidebar :global(.stream-viewer) {
+    flex: 1;
+    min-width: 0;
+  }
+</style>

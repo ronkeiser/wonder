@@ -1,5 +1,8 @@
 <script lang="ts">
   import StreamViewer from '$lib/components/StreamViewer.svelte';
+  import WorkflowRunsSidebar from '$lib/components/WorkflowRunsSidebar.svelte';
+
+  let selectedRunId = $state<string | null>(null);
 
   const eventTypeOptions = [
     // Workflow lifecycle
@@ -98,17 +101,33 @@
   <title>Events</title>
 </svelte:head>
 
-<StreamViewer
-  title="Events"
-  apiPath="/api/events"
-  streamPath="/api/events/stream"
-  filterLabel="Event Types"
-  filterParam="event_type"
-  filterOptions={eventTypeOptions}
-  itemsKey="events"
-  itemKey="event"
-  {subscribeMessage}
-  getItemColor={getEventColor}
-  getMetadata={getEventMetadata}
-  renderItemHeader={renderEventHeader}
-/>
+<div class="page-with-sidebar">
+  <WorkflowRunsSidebar selectedRunId={selectedRunId} onSelect={(id) => (selectedRunId = id)} />
+  <StreamViewer
+    title="Events"
+    apiPath="/api/events"
+    filterLabel="Event Types"
+    filterParam="event_type"
+    filterOptions={eventTypeOptions}
+    itemsKey="events"
+    itemKey="event"
+    {subscribeMessage}
+    workflowRunId={selectedRunId}
+    getItemColor={getEventColor}
+    getMetadata={getEventMetadata}
+    renderItemHeader={renderEventHeader}
+  />
+</div>
+
+<style>
+  .page-with-sidebar {
+    display: flex;
+    height: 100%;
+    overflow: hidden;
+  }
+
+  .page-with-sidebar :global(.stream-viewer) {
+    flex: 1;
+    min-width: 0;
+  }
+</style>

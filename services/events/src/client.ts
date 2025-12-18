@@ -1,53 +1,76 @@
-import type {
-  Emitter,
-  EventContext,
-  EventInput,
-  TraceEventContext,
-  TraceEventInput,
-} from './types';
+/**
+ * Event Emitter Client
+ *
+ * Thin wrapper around Streamer DO for emitting events and trace events.
+ * Used by coordinator and executor to emit events without knowing about
+ * the underlying infrastructure.
+ */
+
+import type { Streamer } from './streamer';
+import type { EventContext, EventInput, TraceEventInput } from './types';
+
+/** Streamer stub type */
+type StreamerStub = ReturnType<DurableObjectNamespace<Streamer>['get']>;
 
 /**
- * Create an event emitter that wraps the EVENTS service binding
- * Works with both Workers (ExecutionContext) and Durable Objects (DurableObjectState)
- * Tracks sequence_number internally for event ordering within a workflow run
+ * Emitter interface - context-bound event emitter
+ */
+export interface Emitter {
+  emit: (event: Omit<EventInput, 'sequence'>) => void;
+  emitTrace: (event: TraceEventInput | TraceEventInput[]) => void;
+}
+
+/**
+ * Create an emitter bound to a specific workflow context
+ *
+ * Context can be provided directly or as a function for lazy evaluation.
+ * Use a function when context isn't available at creation time (e.g., coordinator DO).
+ *
+ * @param streamer - DurableObjectNamespace for Streamer DO
+ * @param context - Event context or function returning context (lazy)
+ * @param options - Emitter options
+ * @returns Emitter instance
  */
 export function createEmitter(
-  eventsBinding: {
-    write(context: EventContext, event: EventInput): void;
-    writeTraceEvent(
-      context: TraceEventContext,
-      event: TraceEventInput & { sequence: number },
-    ): void;
-  },
-  context: EventContext & TraceEventContext,
-  options: { traceEnabled?: 'true' | 'false' } = {},
+  streamer: DurableObjectNamespace<Streamer>,
+  context: EventContext | (() => EventContext),
+  options: { traceEnabled: boolean },
 ): Emitter {
-  let eventSequenceNumber = 0;
-  let traceSequenceNumber = 0;
-  const traceEnabled = options.traceEnabled === 'true';
+  // Cached context and stub (lazy initialized on first emit)
+  let cached: {
+    context: EventContext;
+    traceContext: { workflow_run_id: string; project_id: string };
+    stub: StreamerStub;
+  } | null = null;
+
+  const getCache = () => {
+    if (!cached) {
+      const ctx = typeof context === 'function' ? context() : context;
+      cached = {
+        context: ctx,
+        traceContext: {
+          workflow_run_id: ctx.workflow_run_id,
+          project_id: ctx.project_id,
+        },
+        stub: streamer.get(streamer.idFromName(ctx.workflow_run_id)),
+      };
+    }
+    return cached;
+  };
 
   return {
-    emit: (input: EventInput) => {
-      eventSequenceNumber++;
-      // The service's write() method handles id, timestamp, and waitUntil internally
-      eventsBinding.write(context, {
-        ...input,
-        sequence: eventSequenceNumber,
-      });
+    emit: (event) => {
+      const { context: ctx, stub } = getCache();
+      stub.emit(ctx, event);
     },
 
-    emitTrace: (event: TraceEventInput | TraceEventInput[]) => {
-      if (!traceEnabled) return;
+    emitTrace: (event) => {
+      if (!options.traceEnabled) return;
 
+      const { traceContext, stub } = getCache();
       const events = Array.isArray(event) ? event : [event];
-
       for (const evt of events) {
-        traceSequenceNumber++;
-        // The service's writeTraceEvent() method handles id, timestamp, and other entry fields
-        eventsBinding.writeTraceEvent(context, {
-          ...evt,
-          sequence: traceSequenceNumber,
-        });
+        stub.emitTrace(traceContext, evt);
       }
     },
   };

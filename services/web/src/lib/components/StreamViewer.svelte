@@ -5,13 +5,13 @@
   interface Props {
     title: string;
     apiPath: string;
-    streamPath: string;
     filterLabel: string;
     filterParam: string;
     filterOptions: Array<{ value: string; label: string }>;
     itemsKey: string; // e.g., 'events' or 'logs'
     itemKey: string; // e.g., 'event' or 'log'
     subscribeMessage?: object; // Optional WebSocket subscription message
+    workflowRunId?: string | null; // Required for WebSocket streaming
     getItemColor?: (item: any) => string;
     getMetadata?: (item: any) => any;
     renderItemHeader: (item: any) => {
@@ -25,13 +25,13 @@
   let {
     title,
     apiPath,
-    streamPath,
     filterLabel,
     filterParam,
     filterOptions,
     itemsKey,
     itemKey,
     subscribeMessage,
+    workflowRunId = null,
     getItemColor,
     getMetadata,
     renderItemHeader,
@@ -40,7 +40,7 @@
   let items = $state<any[]>([]);
   let status = $state<'connected' | 'disconnected' | 'connecting'>('disconnected');
   let currentFilter = $state('');
-  let timeFilterMinutes = $state(5);
+  let timeFilterMinutes = $state<number | null>(null);
   let prettyPrintEnabled = $state(false);
   let identifierFilters = $state<string[]>([]);
   let ws: WebSocket | null = null;
@@ -53,18 +53,22 @@
     return 'var(--gray)';
   }
 
-  async function filterItemsByTime(minutes: number) {
+  async function filterItemsByTime(minutes: number | null) {
     items = [];
     seenIds.clear();
     timeFilterMinutes = minutes;
 
-    const cutoffTime = Date.now() - minutes * 60 * 1000;
+    // If no time filter, use a very large window (all time)
+    const cutoffTime = minutes ? Date.now() - minutes * 60 * 1000 : 0;
 
     try {
       const url = new URL(apiPath, window.location.origin);
       url.searchParams.set('limit', '1000');
       if (currentFilter) {
         url.searchParams.set(filterParam, currentFilter);
+      }
+      if (workflowRunId) {
+        url.searchParams.set('workflow_run_id', workflowRunId);
       }
 
       const response = await fetch(url);
@@ -149,10 +153,19 @@
   }
 
   function connect() {
+    // Require workflowRunId to connect
+    if (!workflowRunId) {
+      status = 'disconnected';
+      return;
+    }
+
     status = 'connecting';
 
-    const protocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
-    const wsUrl = `${protocol}//${window.location.host}${streamPath}`;
+    // In local dev, connect directly to live API; otherwise use relative path
+    const isLocalDev = window.location.hostname === 'localhost';
+    const wsUrl = isLocalDev
+      ? `wss://api.wflow.app/workflow-runs/${workflowRunId}/stream`
+      : `${window.location.protocol === 'https:' ? 'wss:' : 'ws:'}//${window.location.host}/api/workflow-runs/${workflowRunId}/stream`;
     ws = new WebSocket(wsUrl);
 
     ws.onopen = () => {
@@ -160,7 +173,10 @@
       console.log('WebSocket connected');
 
       if (subscribeMessage) {
-        ws?.send(JSON.stringify(subscribeMessage));
+        // Build subscription message with workflow_run_id filter
+        const message = { ...subscribeMessage } as any;
+        message.filters = { ...message.filters, workflow_run_id: workflowRunId };
+        ws?.send(JSON.stringify(message));
       }
     };
 
@@ -210,6 +226,37 @@
     }, 2000);
   }
 
+  // Track previous workflowRunId to detect changes
+  let prevWorkflowRunId = $state<string | null | undefined>(undefined);
+
+  // Reconnect when workflowRunId changes
+  $effect(() => {
+    // Skip initial render (prevWorkflowRunId is undefined)
+    if (prevWorkflowRunId === undefined) {
+      prevWorkflowRunId = workflowRunId;
+      return;
+    }
+
+    // If workflowRunId changed, reconnect
+    if (workflowRunId !== prevWorkflowRunId) {
+      prevWorkflowRunId = workflowRunId;
+
+      // Clear existing items and reconnect
+      items = [];
+      seenIds.clear();
+      ws?.close();
+
+      // Reset time filter when switching workflow runs
+      timeFilterMinutes = null;
+
+      // Small delay to ensure clean disconnect
+      setTimeout(() => {
+        filterItemsByTime(null);
+        connect();
+      }, 100);
+    }
+  });
+
   onMount(() => {
     // Load filters from URL params
     const urlParams = new URLSearchParams(window.location.search);
@@ -221,6 +268,7 @@
     if (savedFilter) currentFilter = savedFilter;
     if (savedPretty === '1') prettyPrintEnabled = true;
 
+    // Default to no time filter (show all events for the run)
     filterItemsByTime(timeFilterMinutes);
     connect();
   });
@@ -244,13 +292,18 @@
   }
 
   function handleTimeFilterChange(minutes: number) {
-    timeFilterMinutes = minutes;
+    // If clicking the already-selected filter, remove it (toggle off)
+    const newValue = timeFilterMinutes === minutes ? null : minutes;
 
     const url = new URL(window.location.href);
-    url.searchParams.set('m', minutes.toString());
+    if (newValue) {
+      url.searchParams.set('m', newValue.toString());
+    } else {
+      url.searchParams.delete('m');
+    }
     window.history.pushState({}, '', url);
 
-    filterItemsByTime(minutes);
+    filterItemsByTime(newValue);
   }
 
   function togglePrettyPrint() {
@@ -286,110 +339,116 @@
 </script>
 
 <div class="stream-viewer">
-  <header>
-    <div class="left-controls">
-      <select
-        class="filter-select"
-        bind:value={currentFilter}
-        onchange={(e) => handleFilterChange(e.currentTarget.value)}
-      >
-        <option value="">All {filterLabel}</option>
-        {#each filterOptions as option}
-          <option value={option.value}>{option.label}</option>
-        {/each}
-      </select>
-      <span class="status {status}">{status}</span>
-    </div>
-    <div class="right-controls">
-      <div class="time-filters">
-        {#each [1, 5, 15, 60, 1440] as minutes}
-          <button
-            class="time-filter-btn"
-            class:active={timeFilterMinutes === minutes}
-            onclick={() => handleTimeFilterChange(minutes)}
-          >
-            {minutes < 60 ? `${minutes}m` : minutes === 60 ? '1h' : '24h'}
+  {#if workflowRunId}
+    <header>
+      <div class="left-controls">
+        <select
+          class="filter-select"
+          bind:value={currentFilter}
+          onchange={(e) => handleFilterChange(e.currentTarget.value)}
+        >
+          <option value="">All {filterLabel}</option>
+          {#each filterOptions as option}
+            <option value={option.value}>{option.label}</option>
+          {/each}
+        </select>
+        <span class="status {status}">{status}</span>
+      </div>
+      <div class="right-controls">
+        <div class="time-filters">
+          {#each [1, 5, 15, 60, 1440] as minutes}
+            <button
+              class="time-filter-btn"
+              class:active={timeFilterMinutes === minutes}
+              onclick={() => handleTimeFilterChange(minutes)}
+            >
+              {minutes < 60 ? `${minutes}m` : minutes === 60 ? '1h' : '24h'}
+            </button>
+          {/each}
+        </div>
+
+        <button
+          class="pretty-print-toggle"
+          class:active={prettyPrintEnabled}
+          onclick={togglePrettyPrint}
+        >
+          <svg viewBox="0 0 16 16" fill="currentColor">
+            <path
+              d="M0 3.75C0 2.784.784 2 1.75 2h12.5c.966 0 1.75.784 1.75 1.75v8.5A1.75 1.75 0 0 1 14.25 14H1.75A1.75 1.75 0 0 1 0 12.25Zm1.75-.25a.25.25 0 0 0-.25.25v8.5c0 .138.112.25.25.25h12.5a.25.25 0 0 0 .25-.25v-8.5a.25.25 0 0 0-.25-.25ZM3.5 6.25a.75.75 0 0 1 .75-.75h7a.75.75 0 0 1 0 1.5h-7a.75.75 0 0 1-.75-.75Zm.75 2.25h4a.75.75 0 0 1 0 1.5h-4a.75.75 0 0 1 0-1.5Z"
+            ></path>
+          </svg>
+          Pretty
+        </button>
+
+        <button
+          class="copy-all-btn"
+          class:copied={copyAllStatus === 'copied'}
+          onclick={copyAllToClipboard}
+          disabled={filteredItems.length === 0}
+        >
+          {#if copyAllStatus === 'copied'}
+            <svg viewBox="0 0 16 16" fill="currentColor">
+              <path
+                d="M13.78 4.22a.75.75 0 0 1 0 1.06l-7.25 7.25a.75.75 0 0 1-1.06 0L2.22 9.28a.75.75 0 0 1 1.06-1.06L6 10.94l6.72-6.72a.75.75 0 0 1 1.06 0Z"
+              ></path>
+            </svg>
+            Copied!
+          {:else}
+            <svg viewBox="0 0 16 16" fill="currentColor">
+              <path
+                d="M0 6.75C0 5.784.784 5 1.75 5h1.5a.75.75 0 0 1 0 1.5h-1.5a.25.25 0 0 0-.25.25v7.5c0 .138.112.25.25.25h7.5a.25.25 0 0 0 .25-.25v-1.5a.75.75 0 0 1 1.5 0v1.5A1.75 1.75 0 0 1 9.25 16h-7.5A1.75 1.75 0 0 1 0 14.25Z"
+              ></path>
+              <path
+                d="M5 1.75C5 .784 5.784 0 6.75 0h7.5C15.216 0 16 .784 16 1.75v7.5A1.75 1.75 0 0 1 14.25 11h-7.5A1.75 1.75 0 0 1 5 9.25Zm1.75-.25a.25.25 0 0 0-.25.25v7.5c0 .138.112.25.25.25h7.5a.25.25 0 0 0 .25-.25v-7.5a.25.25 0 0 0-.25-.25Z"
+              ></path>
+            </svg>
+            Copy All ({filteredItems.length})
+          {/if}
+        </button>
+
+        <button class="refresh-btn" onclick={() => filterItemsByTime(timeFilterMinutes)}>
+          <svg viewBox="0 0 16 16" fill="currentColor">
+            <path
+              fill-rule="evenodd"
+              d="M8 2.5a5.487 5.487 0 00-4.131 1.869l1.204 1.204A.25.25 0 014.896 6H1.25A.25.25 0 011 5.75V2.104a.25.25 0 01.427-.177l1.38 1.38A7.001 7.001 0 0114.95 7.16a.75.75 0 11-1.49.178A5.501 5.501 0 008 2.5zM1.705 8.005a.75.75 0 01.834.656 5.501 5.501 0 009.592 2.97l-1.204-1.204a.25.25 0 01.177-.427h3.646a.25.25 0 01.25.25v3.646a.25.25 0 01-.427.177l-1.38-1.38A7.001 7.001 0 011.05 8.84a.75.75 0 01.656-.834z"
+            ></path>
+          </svg>
+          Refresh
+        </button>
+      </div>
+    </header>
+
+    {#if identifierFilters.length > 0}
+      <div class="filter-chips">
+        {#each identifierFilters as filter}
+          <button class="filter-chip" onclick={() => removeIdentifierFilter(filter)}>
+            <span class="chip-label">ID:</span>{filter}
+            <svg class="chip-x" viewBox="0 0 16 16" fill="currentColor">
+              <path d="M3.72 3.72a.75.75 0 0 1 1.06 0L8 6.94l3.22-3.22a.749.749 0 0 1 1.275.326.749.749 0 0 1-.215.734L9.06 8l3.22 3.22a.749.749 0 0 1-.326 1.275.749.749 0 0 1-.734-.215L8 9.06l-3.22 3.22a.751.751 0 0 1-1.042-.018.751.751 0 0 1-.018-1.042L6.94 8 3.72 4.78a.75.75 0 0 1 0-1.06Z"></path>
+            </svg>
           </button>
         {/each}
       </div>
+    {/if}
 
-      <button
-        class="pretty-print-toggle"
-        class:active={prettyPrintEnabled}
-        onclick={togglePrettyPrint}
-      >
-        <svg viewBox="0 0 16 16" fill="currentColor">
-          <path
-            d="M0 3.75C0 2.784.784 2 1.75 2h12.5c.966 0 1.75.784 1.75 1.75v8.5A1.75 1.75 0 0 1 14.25 14H1.75A1.75 1.75 0 0 1 0 12.25Zm1.75-.25a.25.25 0 0 0-.25.25v8.5c0 .138.112.25.25.25h12.5a.25.25 0 0 0 .25-.25v-8.5a.25.25 0 0 0-.25-.25ZM3.5 6.25a.75.75 0 0 1 .75-.75h7a.75.75 0 0 1 0 1.5h-7a.75.75 0 0 1-.75-.75Zm.75 2.25h4a.75.75 0 0 1 0 1.5h-4a.75.75 0 0 1 0-1.5Z"
-          ></path>
-        </svg>
-        Pretty
-      </button>
-
-      <button
-        class="copy-all-btn"
-        class:copied={copyAllStatus === 'copied'}
-        onclick={copyAllToClipboard}
-        disabled={filteredItems.length === 0}
-      >
-        {#if copyAllStatus === 'copied'}
-          <svg viewBox="0 0 16 16" fill="currentColor">
-            <path
-              d="M13.78 4.22a.75.75 0 0 1 0 1.06l-7.25 7.25a.75.75 0 0 1-1.06 0L2.22 9.28a.75.75 0 0 1 1.06-1.06L6 10.94l6.72-6.72a.75.75 0 0 1 1.06 0Z"
-            ></path>
-          </svg>
-          Copied!
-        {:else}
-          <svg viewBox="0 0 16 16" fill="currentColor">
-            <path
-              d="M0 6.75C0 5.784.784 5 1.75 5h1.5a.75.75 0 0 1 0 1.5h-1.5a.25.25 0 0 0-.25.25v7.5c0 .138.112.25.25.25h7.5a.25.25 0 0 0 .25-.25v-1.5a.75.75 0 0 1 1.5 0v1.5A1.75 1.75 0 0 1 9.25 16h-7.5A1.75 1.75 0 0 1 0 14.25Z"
-            ></path>
-            <path
-              d="M5 1.75C5 .784 5.784 0 6.75 0h7.5C15.216 0 16 .784 16 1.75v7.5A1.75 1.75 0 0 1 14.25 11h-7.5A1.75 1.75 0 0 1 5 9.25Zm1.75-.25a.25.25 0 0 0-.25.25v7.5c0 .138.112.25.25.25h7.5a.25.25 0 0 0 .25-.25v-7.5a.25.25 0 0 0-.25-.25Z"
-            ></path>
-          </svg>
-          Copy All ({filteredItems.length})
-        {/if}
-      </button>
-
-      <button class="refresh-btn" onclick={() => filterItemsByTime(timeFilterMinutes)}>
-        <svg viewBox="0 0 16 16" fill="currentColor">
-          <path
-            fill-rule="evenodd"
-            d="M8 2.5a5.487 5.487 0 00-4.131 1.869l1.204 1.204A.25.25 0 014.896 6H1.25A.25.25 0 011 5.75V2.104a.25.25 0 01.427-.177l1.38 1.38A7.001 7.001 0 0114.95 7.16a.75.75 0 11-1.49.178A5.501 5.501 0 008 2.5zM1.705 8.005a.75.75 0 01.834.656 5.501 5.501 0 009.592 2.97l-1.204-1.204a.25.25 0 01.177-.427h3.646a.25.25 0 01.25.25v3.646a.25.25 0 01-.427.177l-1.38-1.38A7.001 7.001 0 011.05 8.84a.75.75 0 01.656-.834z"
-          ></path>
-        </svg>
-        Refresh
-      </button>
-    </div>
-  </header>
-
-  {#if identifierFilters.length > 0}
-    <div class="filter-chips">
-      {#each identifierFilters as filter}
-        <button class="filter-chip" onclick={() => removeIdentifierFilter(filter)}>
-          <span class="chip-label">ID:</span>{filter}
-          <svg class="chip-x" viewBox="0 0 16 16" fill="currentColor">
-            <path d="M3.72 3.72a.75.75 0 0 1 1.06 0L8 6.94l3.22-3.22a.749.749 0 0 1 1.275.326.749.749 0 0 1-.215.734L9.06 8l3.22 3.22a.749.749 0 0 1-.326 1.275.749.749 0 0 1-.734-.215L8 9.06l-3.22 3.22a.751.751 0 0 1-1.042-.018.751.751 0 0 1-.018-1.042L6.94 8 3.72 4.78a.75.75 0 0 1 0-1.06Z"></path>
-          </svg>
-        </button>
+    <div class="items" id="items-container">
+      {#each filteredItems as item (item.id)}
+        <StreamItem
+          {item}
+          metadata={getMetadata?.(item)}
+          prettyPrint={prettyPrintEnabled}
+          {getItemColor}
+          {renderItemHeader}
+          onCopy={copyToClipboard}
+          onIdentifierClick={addIdentifierFilter}
+        />
       {/each}
     </div>
+  {:else}
+    <div class="empty-state">
+      <p>Select a workflow run to view events</p>
+    </div>
   {/if}
-
-  <div class="items" id="items-container">
-    {#each filteredItems as item (item.id)}
-      <StreamItem
-        {item}
-        metadata={getMetadata?.(item)}
-        prettyPrint={prettyPrintEnabled}
-        {getItemColor}
-        {renderItemHeader}
-        onCopy={copyToClipboard}
-        onIdentifierClick={addIdentifierFilter}
-      />
-    {/each}
-  </div>
 </div>
 
 <style>
@@ -694,5 +753,18 @@
   .chip-x {
     width: 14px;
     height: 14px;
+  }
+
+  .empty-state {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    flex: 1;
+    color: var(--text-secondary);
+    font-size: 0.875rem;
+  }
+
+  .empty-state p {
+    margin: 0;
   }
 </style>

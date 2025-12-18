@@ -221,3 +221,90 @@ export interface TraceEventEmitter {
   flush: (context: TraceEventContext) => Promise<void>;
   getEvents: () => TraceEventInput[];
 }
+
+// ============================================================================
+// WebSocket Subscription Types
+// ============================================================================
+
+/**
+ * Filter for server-side event filtering on WebSocket subscriptions
+ */
+export interface SubscriptionFilter {
+  workflow_run_id?: string;
+  parent_run_id?: string;
+  project_id?: string;
+  event_type?: string;
+  event_types?: string[];
+  node_id?: string;
+  token_id?: string;
+  path_id?: string;
+  category?: TraceEventCategory;
+  type?: string;
+  min_duration_ms?: number;
+}
+
+/**
+ * Message sent from client to manage WebSocket subscriptions
+ */
+export interface SubscriptionMessage {
+  type: 'subscribe' | 'unsubscribe';
+  id: string;
+  stream: 'events' | 'trace';
+  filters: SubscriptionFilter;
+}
+
+/**
+ * Active subscription state per WebSocket connection
+ */
+export interface Subscription {
+  id: string;
+  stream: 'events' | 'trace';
+  filters: SubscriptionFilter;
+}
+
+// ============================================================================
+// EventHub Types (Workflow Lifecycle)
+// ============================================================================
+
+/**
+ * Workflow run status values
+ */
+export type WorkflowRunStatus = 'running' | 'completed' | 'failed' | 'waiting';
+
+/**
+ * Status change notification payload
+ */
+export interface WorkflowStatusChange {
+  workflow_run_id: string;
+  workflow_def_id: string;
+  project_id: string;
+  parent_run_id: string | null;
+  status: WorkflowRunStatus;
+  timestamp: number;
+}
+
+/**
+ * Subscription filter for hub events
+ */
+export interface HubSubscriptionFilter {
+  project_id?: string;
+  workflow_def_id?: string;
+  status?: WorkflowRunStatus;
+}
+
+/**
+ * Message sent from client to manage hub subscriptions
+ */
+export interface HubSubscriptionMessage {
+  type: 'subscribe' | 'unsubscribe';
+  id: string;
+  filters: HubSubscriptionFilter;
+}
+
+/**
+ * Active hub subscription state per WebSocket connection
+ */
+export interface HubSubscription {
+  id: string;
+  filters: HubSubscriptionFilter;
+}

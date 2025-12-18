@@ -1,5 +1,6 @@
 /** Workflow Runs RPC resource */
 
+import type { EventHub } from '@wonder/events';
 import { eq } from 'drizzle-orm';
 import { ulid } from 'ulid';
 import { NotFoundError } from '~/errors';
@@ -7,6 +8,9 @@ import * as schema from '~/schema';
 import { Resource } from '../base';
 import * as workflowRepo from '../workflows/repository';
 import * as repo from './repository';
+import type { ListWorkflowRunsFilters, WorkflowRunSummary } from './types';
+
+export type { ListWorkflowRunsFilters, WorkflowRunSummary } from './types';
 
 export class WorkflowRuns extends Resource {
   async create(
@@ -114,6 +118,16 @@ export class WorkflowRuns extends Resource {
       'updateStatus',
       { workflow_run_id: workflowRunId, metadata: { workflow_run_id: workflowRunId, status } },
       async () => {
+        // Fetch workflow run first to get details for EventHub notification
+        const workflowRun = await repo.getWorkflowRun(this.serviceCtx.db, workflowRunId);
+        if (!workflowRun) {
+          throw new NotFoundError(
+            `Workflow run not found: ${workflowRunId}`,
+            'workflow_run',
+            workflowRunId,
+          );
+        }
+
         const updated = await repo.updateWorkflowRun(this.serviceCtx.db, workflowRunId, {
           status,
         });
@@ -125,6 +139,20 @@ export class WorkflowRuns extends Resource {
             workflowRunId,
           );
         }
+
+        // Notify EventHub about the status change
+        const eventHub = (this.env as unknown as { EVENT_HUB: DurableObjectNamespace<EventHub> })
+          .EVENT_HUB;
+        const hubId = eventHub.idFromName('global');
+        const hubStub = eventHub.get(hubId);
+        hubStub.notifyStatusChange({
+          workflow_run_id: workflowRunId,
+          workflow_def_id: workflowRun.workflow_def_id,
+          project_id: workflowRun.project_id,
+          parent_run_id: workflowRun.parent_run_id,
+          status,
+          timestamp: Date.now(),
+        });
       },
     );
   }
@@ -167,6 +195,12 @@ export class WorkflowRuns extends Resource {
       'complete',
       { trace_id: id, workflow_run_id: id, metadata: { workflow_run_id: id, final_output } },
       async () => {
+        // Fetch workflow run first to get details for EventHub notification
+        const workflowRun = await repo.getWorkflowRun(this.serviceCtx.db, id);
+        if (!workflowRun) {
+          throw new NotFoundError(`Workflow run not found: ${id}`, 'workflow_run', id);
+        }
+
         const updated = await repo.updateWorkflowRun(this.serviceCtx.db, id, {
           status: 'completed',
           completed_at: new Date().toISOString(),
@@ -176,6 +210,20 @@ export class WorkflowRuns extends Resource {
         if (!updated) {
           throw new NotFoundError(`Workflow run not found: ${id}`, 'workflow_run', id);
         }
+
+        // Notify EventHub about the status change
+        const eventHub = (this.env as unknown as { EVENT_HUB: DurableObjectNamespace<EventHub> })
+          .EVENT_HUB;
+        const hubId = eventHub.idFromName('global');
+        const hubStub = eventHub.get(hubId);
+        hubStub.notifyStatusChange({
+          workflow_run_id: id,
+          workflow_def_id: workflowRun.workflow_def_id,
+          project_id: workflowRun.project_id,
+          parent_run_id: workflowRun.parent_run_id,
+          status: 'completed',
+          timestamp: Date.now(),
+        });
       },
     );
   }
@@ -192,6 +240,43 @@ export class WorkflowRuns extends Resource {
 
         await repo.deleteWorkflowRun(this.serviceCtx.db, id);
         return { success: true };
+      },
+    );
+  }
+
+  async list(filters: ListWorkflowRunsFilters = {}): Promise<{
+    runs: WorkflowRunSummary[];
+    total: number;
+    limit: number;
+    offset: number;
+  }> {
+    return this.withLogging(
+      'list',
+      { metadata: { filters } },
+      async () => {
+        const { runs, total } = await repo.listWorkflowRuns(this.serviceCtx.db, filters);
+
+        // Return summary (exclude heavy fields like context, active_tokens, latest_snapshot)
+        const summaries: WorkflowRunSummary[] = runs.map((run) => ({
+          id: run.id,
+          project_id: run.project_id,
+          workflow_id: run.workflow_id,
+          workflow_name: run.workflow_name,
+          workflow_def_id: run.workflow_def_id,
+          workflow_version: run.workflow_version,
+          status: run.status as WorkflowRunSummary['status'],
+          parent_run_id: run.parent_run_id,
+          created_at: run.created_at,
+          updated_at: run.updated_at,
+          completed_at: run.completed_at,
+        }));
+
+        return {
+          runs: summaries,
+          total,
+          limit: filters.limit ?? 50,
+          offset: filters.offset ?? 0,
+        };
       },
     );
   }

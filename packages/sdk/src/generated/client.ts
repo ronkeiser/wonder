@@ -232,6 +232,11 @@ export function createClient(baseClient: any) {
           }
         }),
       {
+        list: async (options?: any): Promise<paths['/workflow-runs']['get']['responses']['200']['content']['application/json']> => {
+          const { data, error } = await baseClient.GET(`/workflow-runs`, {});
+          if (error) throw new ApiError(`GET /workflow-runs failed`, error);
+          return data;
+        }
       }
     ),
     events: {

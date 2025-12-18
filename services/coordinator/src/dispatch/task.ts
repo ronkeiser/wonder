@@ -276,6 +276,10 @@ async function finalizeWorkflow(ctx: DispatchContext): Promise<void> {
       message: 'Workflow completed',
       metadata: { output: finalOutput },
     });
+
+    // Update workflow run status in resources service
+    const workflowRunsResource = ctx.resources.workflowRuns();
+    await workflowRunsResource.complete(ctx.workflowRunId, finalOutput);
   } catch (error) {
     ctx.logger.error({
       event_type: 'coordinator.finalize.failed',

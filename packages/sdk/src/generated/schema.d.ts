@@ -1043,6 +1043,50 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/workflow-runs": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: {
+            parameters: {
+                query?: {
+                    /** @description Max results (default 50) */
+                    limit?: string;
+                    /** @description Pagination offset */
+                    offset?: string;
+                    /** @description Filter by status (comma-separated: running,completed,failed) */
+                    status?: string;
+                    /** @description Filter by project ID */
+                    project_id?: string;
+                };
+                header?: never;
+                path?: never;
+                cookie?: never;
+            };
+            requestBody?: never;
+            responses: {
+                /** @description List of workflow runs */
+                200: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["WorkflowRunListResponse"];
+                    };
+                };
+            };
+        };
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/workflow-runs/{id}/stream": {
         parameters: {
             query?: never;
@@ -1927,6 +1971,26 @@ export interface components {
         };
         WorkflowRunStartError: {
             error: string;
+        };
+        WorkflowRunSummary: {
+            id: string;
+            project_id: string;
+            workflow_id: string;
+            workflow_name: string;
+            workflow_def_id: string;
+            workflow_version: number;
+            /** @enum {string} */
+            status: "running" | "completed" | "failed" | "waiting";
+            parent_run_id: string | null;
+            created_at: string;
+            updated_at: string;
+            completed_at: string | null;
+        };
+        WorkflowRunListResponse: {
+            runs: components["schemas"]["WorkflowRunSummary"][];
+            total: number;
+            limit: number;
+            offset: number;
         };
         WorkflowRunDeleteResponse: {
             success: boolean;

@@ -25,6 +25,10 @@
         "name": "STREAMER",
         "class_name": "Streamer",
       },
+      {
+        "name": "EVENT_HUB",
+        "class_name": "EventHub",
+      },
     ],
   },
   "vars": {
@@ -35,6 +39,10 @@
     {
       "tag": "v1",
       "new_classes": ["Streamer"],
+    },
+    {
+      "tag": "v2",
+      "new_classes": ["EventHub"],
     },
   ],
   "observability": {

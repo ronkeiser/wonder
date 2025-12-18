@@ -1,4 +1,4 @@
-import { createEmitter, type Emitter } from '@wonder/events';
+import { createEmitter } from '@wonder/events';
 import { createLogger } from '@wonder/logs';
 import type { ModelProfile } from '@wonder/resources/types';
 import { WorkerEntrypoint } from 'cloudflare:workers';
@@ -91,16 +91,16 @@ export default class ExecutorService extends WorkerEntrypoint<Env> {
    * @see docs/architecture/executor.md
    */
   async executeTask(payload: TaskPayload): Promise<void> {
-    // Create emitter for this task execution
+    // Create emitter for this task execution - uses Streamer DO for event writes
     const emitter = createEmitter(
-      this.env.EVENTS,
+      this.env.STREAMER,
       {
         workflow_run_id: payload.workflow_run_id,
         project_id: payload.project_id,
-        workflow_def_id: '', // Not needed for trace filtering
+        workflow_def_id: '',
         parent_run_id: null,
       },
-      { traceEnabled: this.env.TRACE_EVENTS_ENABLED },
+      { traceEnabled: this.env.TRACE_EVENTS_ENABLED === 'true' },
     );
 
     this.logger.info({

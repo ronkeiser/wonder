@@ -11,6 +11,11 @@
         "name": "COORDINATOR",
         "class_name": "WorkflowCoordinator",
       },
+      {
+        "name": "STREAMER",
+        "class_name": "Streamer",
+        "script_name": "wonder-events",
+      },
     ],
   },
   "services": [

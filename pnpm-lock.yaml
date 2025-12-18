@@ -398,6 +398,9 @@ importers:
 
   services/resources:
     dependencies:
+      '@wonder/events':
+        specifier: workspace:*
+        version: link:../events
       '@wonder/logs':
         specifier: workspace:*
         version: link:../logs

@@ -23,28 +23,13 @@ events.openapi(getTraceEventsRoute, async (c) => {
   return c.json(result);
 });
 
-/** GET /stream - WebSocket stream */
+/** GET /stream - Reserved for future global streamer */
 events.get('/stream', async (c) => {
-  const upgradeHeader = c.req.header('Upgrade');
-
-  if (upgradeHeader !== 'websocket') {
-    return c.json(
-      {
-        error: 'WebSocket upgrade required',
-        received_upgrade: upgradeHeader,
-      },
-      400,
-    );
-  }
-
-  // Forward to Streamer DO with rewritten path
-  const id = c.env.EVENTS_STREAMER.idFromName('events-streamer');
-  const stub = c.env.EVENTS_STREAMER.get(id);
-
-  // Rewrite the URL to /stream (what the Streamer expects)
-  const url = new URL(c.req.url);
-  url.pathname = '/stream';
-  const request = new Request(url, c.req.raw);
-
-  return stub.fetch(request);
+  return c.json(
+    {
+      error: 'Not Implemented',
+      message: 'Global event streaming is not yet implemented. Use /workflow-runs/{id}/stream for per-run streaming.',
+    },
+    501,
+  );
 });

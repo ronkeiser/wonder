@@ -37,6 +37,11 @@
         "script_name": "wonder-events",
       },
       {
+        "name": "EVENT_HUB",
+        "class_name": "EventHub",
+        "script_name": "wonder-events",
+      },
+      {
         "name": "LOGS_STREAMER",
         "class_name": "Streamer",
         "script_name": "wonder-logs",

@@ -136,9 +136,15 @@ export class EventsClient {
 
   /**
    * Subscribe to event/trace stream via WebSocket with server-side filtering
+   *
+   * @param subscriptions - Array of subscriptions to create
+   * @param workflowRunId - Required workflow run ID to connect to the per-run Streamer DO
    */
-  async subscribe(subscriptions: Subscription[]): Promise<EventStreamSubscription> {
-    const url = `${this.wsUrl}/events/stream`;
+  async subscribe(
+    subscriptions: Subscription[],
+    workflowRunId: string,
+  ): Promise<EventStreamSubscription> {
+    const url = `${this.wsUrl}/workflow-runs/${workflowRunId}/stream`;
     const ws = new WebSocket(url);
 
     const callbacks = new Map(subscriptions.map((s) => [s.id, s.callback]));

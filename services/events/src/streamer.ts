@@ -1,55 +1,46 @@
 import { createLogger, type Logger } from '@wonder/logs';
 import { DurableObject } from 'cloudflare:workers';
-import type { BroadcastEventEntry, BroadcastTraceEventEntry } from './types';
+import { drizzle } from 'drizzle-orm/d1';
+import { ulid } from 'ulid';
+import { traceEvents, workflowEvents } from './schema';
+import type {
+  BroadcastEventEntry,
+  BroadcastTraceEventEntry,
+  EventContext,
+  EventInput,
+  Subscription,
+  SubscriptionFilter,
+  SubscriptionMessage,
+  TraceEventInput,
+} from './types';
+import { getEventCategory } from './types';
+
+// Batching configuration
+const BATCH_SIZE = 50;
+const BATCH_DELAY_MS = 10;
 
 /**
- * Subscription filter for server-side event filtering
- */
-interface SubscriptionFilter {
-  // Workflow execution context
-  workflow_run_id?: string;
-  parent_run_id?: string;
-  project_id?: string;
-
-  // Event classification
-  event_type?: string;
-  event_types?: string[];
-
-  // Execution elements
-  node_id?: string;
-  token_id?: string;
-  path_id?: string;
-
-  // Trace event specific
-  category?: 'decision' | 'operation' | 'dispatch' | 'sql';
-  type?: string;
-  min_duration_ms?: number;
-}
-
-/**
- * Message sent from client to manage subscriptions
- */
-interface SubscriptionMessage {
-  type: 'subscribe' | 'unsubscribe';
-  id: string; // Client-provided subscription ID
-  stream: 'events' | 'trace';
-  filters: SubscriptionFilter;
-}
-
-/**
- * Active subscription per WebSocket connection
- */
-interface Subscription {
-  id: string;
-  stream: 'events' | 'trace';
-  filters: SubscriptionFilter;
-}
-
-/**
- * Durable Object for managing WebSocket connections to stream events in real-time
+ * Streamer Durable Object - one instance per workflow_run_id
+ *
+ * Responsibilities:
+ * - Assigns sequences atomically (single-threaded per workflow)
+ * - Buffers and batch-writes events to D1
+ * - Broadcasts events to WebSocket subscribers
+ * - Manages WebSocket connections for real-time streaming
  */
 export class Streamer extends DurableObject<Env> {
   private logger: Logger;
+  private db = drizzle(this.env.DB);
+
+  // Sequence counters (persisted to DO storage, loaded at startup)
+  private eventSeq = 0;
+  private traceSeq = 0;
+
+  // Event buffers for batch D1 writes
+  private eventBuffer: (typeof workflowEvents.$inferInsert)[] = [];
+  private traceBuffer: (typeof traceEvents.$inferInsert)[] = [];
+  private eventFlushScheduled = false;
+  private traceFlushScheduled = false;
 
   constructor(ctx: DurableObjectState, env: Env) {
     super(ctx, env);
@@ -57,7 +48,164 @@ export class Streamer extends DurableObject<Env> {
       service: `${env.SERVICE}-streamer`,
       environment: env.ENVIRONMENT,
     });
+
+    // Load persisted sequence counters at startup
+    ctx.blockConcurrencyWhile(async () => {
+      this.eventSeq = (await ctx.storage.get<number>('eventSeq')) ?? 0;
+      this.traceSeq = (await ctx.storage.get<number>('traceSeq')) ?? 0;
+    });
   }
+
+  // ============================================================================
+  // RPC Methods - Called by Coordinator and Executor
+  // ============================================================================
+
+  /**
+   * Emit a workflow event
+   *
+   * Called by coordinator/executor via RPC. Assigns sequence, buffers for D1,
+   * and broadcasts immediately to WebSocket subscribers.
+   */
+  emit(context: EventContext, input: Omit<EventInput, 'sequence'>): void {
+    this.eventSeq++;
+    this.ctx.storage.put('eventSeq', this.eventSeq);
+
+    const entry = {
+      id: ulid(),
+      timestamp: Date.now(),
+      ...context,
+      ...input,
+      sequence: this.eventSeq,
+      metadata: JSON.stringify(input.metadata ?? {}),
+    };
+
+    // Buffer for batch D1 insert
+    this.eventBuffer.push(entry);
+    if (this.eventBuffer.length >= BATCH_SIZE) {
+      this.ctx.waitUntil(this.flushEventBuffer());
+    } else {
+      this.scheduleEventFlush();
+    }
+
+    // Broadcast immediately to WebSocket subscribers
+    this.broadcastEvent({
+      ...entry,
+      metadata: input.metadata ?? {},
+    });
+  }
+
+  /**
+   * Emit a trace event
+   *
+   * Called by coordinator/executor via RPC. Assigns sequence, buffers for D1,
+   * and broadcasts immediately to WebSocket subscribers.
+   */
+  emitTrace(
+    context: { workflow_run_id: string; project_id: string },
+    input: TraceEventInput,
+  ): void {
+    this.traceSeq++;
+    this.ctx.storage.put('traceSeq', this.traceSeq);
+
+    const entry = {
+      id: ulid(),
+      timestamp: Date.now(),
+      ...context,
+      type: input.type,
+      sequence: this.traceSeq,
+      category: getEventCategory(input.type),
+      token_id: input.token_id ?? null,
+      node_id: input.node_id ?? null,
+      duration_ms: input.duration_ms ?? null,
+      message: null,
+      payload: JSON.stringify(input.payload ?? {}),
+    };
+
+    // Insert directly (batching disabled for debugging)
+    this.ctx.waitUntil(this.db.insert(traceEvents).values(entry));
+
+    // Broadcast immediately to WebSocket subscribers
+    this.broadcastTraceEvent({
+      ...entry,
+      payload: input.payload ?? {},
+    });
+  }
+
+  // ============================================================================
+  // Batching Infrastructure
+  // ============================================================================
+
+  private scheduleEventFlush(): void {
+    if (this.eventFlushScheduled) return;
+    this.eventFlushScheduled = true;
+
+    this.ctx.waitUntil(
+      new Promise<void>((resolve) => {
+        setTimeout(() => {
+          this.flushEventBuffer().then(resolve);
+        }, BATCH_DELAY_MS);
+      }),
+    );
+  }
+
+  private async flushEventBuffer(): Promise<void> {
+    this.eventFlushScheduled = false;
+    if (this.eventBuffer.length === 0) return;
+
+    const batch = this.eventBuffer.splice(0);
+
+    try {
+      await this.db.insert(workflowEvents).values(batch);
+    } catch (error) {
+      this.logger.error({
+        message: 'Failed to batch insert workflow events',
+        metadata: {
+          error_message: error instanceof Error ? error.message : String(error),
+          error_stack: error instanceof Error ? error.stack : undefined,
+          batch_size: batch.length,
+          sample_entry: batch[0],
+        },
+      });
+    }
+  }
+
+  private scheduleTraceFlush(): void {
+    if (this.traceFlushScheduled) return;
+    this.traceFlushScheduled = true;
+
+    this.ctx.waitUntil(
+      new Promise<void>((resolve) => {
+        setTimeout(() => {
+          this.flushTraceBuffer().then(resolve);
+        }, BATCH_DELAY_MS);
+      }),
+    );
+  }
+
+  private async flushTraceBuffer(): Promise<void> {
+    this.traceFlushScheduled = false;
+    if (this.traceBuffer.length === 0) return;
+
+    const batch = this.traceBuffer.splice(0);
+
+    try {
+      await this.db.insert(traceEvents).values(batch);
+    } catch (error) {
+      this.logger.error({
+        message: 'Failed to batch insert trace events',
+        metadata: {
+          error_message: error instanceof Error ? error.message : String(error),
+          error_stack: error instanceof Error ? error.stack : undefined,
+          batch_size: batch.length,
+          sample_entry: batch[0],
+        },
+      });
+    }
+  }
+
+  // ============================================================================
+  // WebSocket Management
+  // ============================================================================
 
   /**
    * Handle WebSocket upgrade and initial connection
@@ -65,7 +213,6 @@ export class Streamer extends DurableObject<Env> {
   async fetch(request: Request): Promise<Response> {
     const url = new URL(request.url);
 
-    // Handle WebSocket connections on /stream
     if (url.pathname === '/stream') {
       const upgradeHeader = request.headers.get('Upgrade');
       if (upgradeHeader !== 'websocket') {
@@ -75,7 +222,6 @@ export class Streamer extends DurableObject<Env> {
       const pair = new WebSocketPair();
       const [client, server] = Object.values(pair);
 
-      // Store empty subscriptions object in WebSocket metadata for hibernation
       server.serializeAttachment({});
       this.ctx.acceptWebSocket(server);
 
@@ -94,8 +240,6 @@ export class Streamer extends DurableObject<Env> {
   webSocketMessage(ws: WebSocket, message: string): void {
     try {
       const msg = JSON.parse(message) as SubscriptionMessage;
-
-      // Get subscriptions from hibernation-safe WebSocket metadata
       const subsObj = (ws.deserializeAttachment() as Record<string, Subscription>) || {};
 
       if (msg.type === 'subscribe') {
@@ -111,33 +255,35 @@ export class Streamer extends DurableObject<Env> {
       }
     } catch (error) {
       this.logger.error({ message: 'Error handling WebSocket message', metadata: { error } });
-      ws.send(
-        JSON.stringify({
-          type: 'error',
-          message: 'Invalid subscription message',
-        }),
-      );
+      ws.send(JSON.stringify({ type: 'error', message: 'Invalid subscription message' }));
     }
   }
 
-  /**
-   * Broadcast a new event entry to all connected WebSocket clients
-   */
-  async broadcast(eventEntry: BroadcastEventEntry): Promise<void> {
+  webSocketClose(ws: WebSocket, code: number, reason: string): void {
+    ws.close(code, reason);
+  }
+
+  webSocketError(ws: WebSocket, error: unknown): void {
+    this.logger.error({ message: 'WebSocket error', metadata: { error } });
+  }
+
+  // ============================================================================
+  // Broadcasting
+  // ============================================================================
+
+  private broadcastEvent(entry: BroadcastEventEntry): void {
     this.ctx.getWebSockets().forEach((ws) => {
-      // Get subscriptions from hibernation-safe WebSocket metadata
       const subsObj = (ws.deserializeAttachment() as Record<string, Subscription>) || {};
 
-      // Find matching subscriptions
       for (const sub of Object.values(subsObj)) {
-        if (sub.stream === 'events' && this.matchesEventFilter(eventEntry, sub.filters)) {
+        if (sub.stream === 'events' && this.matchesEventFilter(entry, sub.filters)) {
           try {
             ws.send(
               JSON.stringify({
                 type: 'event',
                 stream: 'events',
                 subscription_id: sub.id,
-                event: eventEntry,
+                event: entry,
               }),
             );
           } catch (error) {
@@ -151,24 +297,19 @@ export class Streamer extends DurableObject<Env> {
     });
   }
 
-  /**
-   * Broadcast trace event to subscribed clients
-   */
-  async broadcastTraceEvent(traceEntry: BroadcastTraceEventEntry): Promise<void> {
+  private broadcastTraceEvent(entry: BroadcastTraceEventEntry): void {
     this.ctx.getWebSockets().forEach((ws) => {
-      // Get subscriptions from hibernation-safe WebSocket metadata
       const subsObj = (ws.deserializeAttachment() as Record<string, Subscription>) || {};
 
-      // Find matching subscriptions
       for (const sub of Object.values(subsObj)) {
-        if (sub.stream === 'trace' && this.matchesTraceFilter(traceEntry, sub.filters)) {
+        if (sub.stream === 'trace' && this.matchesTraceFilter(entry, sub.filters)) {
           try {
             ws.send(
               JSON.stringify({
                 type: 'event',
                 stream: 'trace',
                 subscription_id: sub.id,
-                event: traceEntry,
+                event: entry,
               }),
             );
           } catch (error) {
@@ -182,9 +323,10 @@ export class Streamer extends DurableObject<Env> {
     });
   }
 
-  /**
-   * Check if workflow event matches subscription filter
-   */
+  // ============================================================================
+  // Filtering
+  // ============================================================================
+
   private matchesEventFilter(event: BroadcastEventEntry, filter: SubscriptionFilter): boolean {
     if (filter.workflow_run_id && event.workflow_run_id !== filter.workflow_run_id) return false;
     if (filter.parent_run_id && event.parent_run_id !== filter.parent_run_id) return false;
@@ -194,13 +336,9 @@ export class Streamer extends DurableObject<Env> {
     if (filter.path_id && event.path_id !== filter.path_id) return false;
     if (filter.event_type && event.event_type !== filter.event_type) return false;
     if (filter.event_types && !filter.event_types.includes(event.event_type)) return false;
-
     return true;
   }
 
-  /**
-   * Check if trace event matches subscription filter
-   */
   private matchesTraceFilter(event: BroadcastTraceEventEntry, filter: SubscriptionFilter): boolean {
     if (filter.workflow_run_id && event.workflow_run_id !== filter.workflow_run_id) return false;
     if (filter.project_id && event.project_id !== filter.project_id) return false;
@@ -215,21 +353,6 @@ export class Streamer extends DurableObject<Env> {
     ) {
       return false;
     }
-
     return true;
-  }
-
-  /**
-   * Handle WebSocket close events
-   */
-  webSocketClose(ws: WebSocket, code: number, reason: string): void {
-    ws.close(code, reason);
-  }
-
-  /**
-   * Handle WebSocket error events
-   */
-  webSocketError(ws: WebSocket, error: unknown): void {
-    this.logger.error({ message: 'WebSocket error', metadata: { error } });
   }
 }

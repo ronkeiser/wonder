@@ -1,72 +1,30 @@
-import { createLogger, type Logger } from '@wonder/logs';
 import { WorkerEntrypoint } from 'cloudflare:workers';
 import { and, desc, eq, gte } from 'drizzle-orm';
 import { drizzle } from 'drizzle-orm/d1';
-import { ulid } from 'ulid';
 import { traceEvents, workflowEvents } from './schema';
 import type {
-  BroadcastEventEntry,
   BroadcastTraceEventEntry,
-  EventContext,
   EventEntry,
-  EventInput,
   GetEventsOptions,
   GetTraceEventsOptions,
   TraceEventCategory,
-  TraceEventContext,
-  TraceEventEntry,
-  TraceEventInput,
 } from './types';
-import { getEventCategory } from './types';
 
-// Re-export client and types for consumer convenience
-export { createEmitter } from './client';
+// Re-export DOs and types for consumer convenience
+export { EventHub } from './hub';
 export { Streamer } from './streamer';
-export type { Emitter, TraceEventInput } from './types';
-
-const STREAMER_NAME = 'events-streamer';
+export { createEmitter, type Emitter } from './client';
+export type { EventContext, EventInput, TraceEventInput } from './types';
+export type { WorkflowStatusChange, WorkflowRunStatus } from './hub';
 
 /**
- * Main service
+ * Events Query Service
+ *
+ * Provides read-only access to historical events stored in D1.
+ * All event writes go through the Streamer DO (one per workflow_run_id).
  */
 export class EventsService extends WorkerEntrypoint<Env> {
   private db = drizzle(this.env.DB);
-  private logger: Logger = createLogger(this.ctx, this.env.LOGS, {
-    service: this.env.SERVICE,
-    environment: this.env.ENVIRONMENT,
-  });
-
-  /**
-   * Broadcast event to WebSocket clients
-   */
-  private async broadcastEvent(event: BroadcastEventEntry): Promise<void> {
-    try {
-      const id = this.env.STREAMER.idFromName(STREAMER_NAME);
-      const stub = this.env.STREAMER.get(id);
-      await stub.broadcast(event);
-    } catch (error) {
-      this.logger.error({
-        message: 'Failed to broadcast event to WebSocket clients',
-        metadata: { error },
-      });
-    }
-  }
-
-  /**
-   * Broadcast trace event to WebSocket clients
-   */
-  private async broadcastTraceEventToClients(event: BroadcastTraceEventEntry): Promise<void> {
-    try {
-      const id = this.env.STREAMER.idFromName(STREAMER_NAME);
-      const stub = this.env.STREAMER.get(id);
-      await stub.broadcastTraceEvent(event);
-    } catch (error) {
-      this.logger.error({
-        message: 'Failed to broadcast trace event to WebSocket clients',
-        metadata: { error },
-      });
-    }
-  }
 
   /**
    * HTTP entrypoint
@@ -76,44 +34,7 @@ export class EventsService extends WorkerEntrypoint<Env> {
   }
 
   /**
-   * RPC method - writes event to D1
-   */
-  write(context: EventContext, input: EventInput): void {
-    this.ctx.waitUntil(
-      (async () => {
-        try {
-          const eventEntry = {
-            id: ulid(),
-            timestamp: Date.now(),
-            ...context,
-            ...input,
-            sequence: input.sequence ?? 0,
-            metadata: JSON.stringify(input.metadata || {}),
-          };
-
-          await this.db.insert(workflowEvents).values(eventEntry);
-
-          // Broadcast to connected WebSocket clients with parsed metadata
-          await this.broadcastEvent({
-            id: eventEntry.id,
-            timestamp: eventEntry.timestamp,
-            ...context,
-            ...input,
-            sequence: eventEntry.sequence,
-            metadata: input.metadata || {},
-          });
-        } catch (error) {
-          this.logger.error({
-            message: 'Failed to insert event',
-            metadata: { error, context, input },
-          });
-        }
-      })(),
-    );
-  }
-
-  /**
-   * RPC method - retrieves events from D1
+   * RPC method - retrieves workflow events from D1
    */
   async getEvents(options: GetEventsOptions = {}): Promise<{ events: EventEntry[] }> {
     const events = await this.db
@@ -137,62 +58,6 @@ export class EventsService extends WorkerEntrypoint<Env> {
       .limit(options.limit || 100);
 
     return { events };
-  }
-
-  /**
-   * RPC method - writes a single trace event to D1
-   */
-  writeTraceEvent(context: TraceEventContext, event: TraceEventInput & { sequence: number }): void {
-    this.ctx.waitUntil(
-      (async () => {
-        try {
-          const entry = {
-            id: ulid(),
-            timestamp: Date.now(),
-            ...context,
-            type: event.type,
-            sequence: event.sequence,
-            category: getEventCategory(event.type),
-            token_id: event.token_id ?? null,
-            node_id: event.node_id ?? null,
-            duration_ms: event.duration_ms ?? null,
-            message: null,
-            payload: JSON.stringify(event.payload ?? {}),
-          };
-
-          await this.db.insert(traceEvents).values(entry);
-
-          // Broadcast to WebSocket clients with parsed payload
-          await this.broadcastTraceEventToClients({
-            ...entry,
-            payload: event.payload ?? {},
-          });
-        } catch (error) {
-          this.logger.error({ message: 'Failed to insert trace event', metadata: { error } });
-        }
-      })(),
-    );
-  }
-
-  /**
-   * RPC method - writes trace events batch to D1
-   */
-  writeTraceEvents(batch: TraceEventEntry[]): void {
-    this.ctx.waitUntil(
-      (async () => {
-        try {
-          // Stringify payloads for database insertion
-          const batchWithStringPayloads = batch.map((entry) => ({
-            ...entry,
-            payload: JSON.stringify(entry.payload),
-          }));
-
-          await this.db.insert(traceEvents).values(batchWithStringPayloads);
-        } catch (error) {
-          this.logger.error({ message: 'Failed to insert trace events', metadata: { error } });
-        }
-      })(),
-    );
   }
 
   /**
@@ -222,7 +87,7 @@ export class EventsService extends WorkerEntrypoint<Env> {
       .orderBy(desc(traceEvents.timestamp))
       .limit(options.limit || 1000);
 
-    // Manually parse JSON payloads
+    // Parse JSON payloads
     const events = results.map((row) => ({
       ...row,
       category: row.category as TraceEventCategory,

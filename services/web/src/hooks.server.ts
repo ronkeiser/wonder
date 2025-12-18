@@ -40,10 +40,40 @@ export const handle: Handle = async ({ event, resolve }) => {
     if (!isWebSocket && apiKey) {
       headers.set('X-API-Key', apiKey);
     }
+    // Remove Accept-Encoding to prevent compression issues when proxying
+    headers.delete('Accept-Encoding');
 
-    // Use service binding if available
+    // Prefer HTTP_URL for local development, fall back to service binding for production
+    if (httpUrl) {
+      // Local development: use HTTP_URL directly
+      const url = new URL(backendPath + event.url.search, httpUrl);
+      if (isWebSocket) {
+        url.protocol = url.protocol === 'https:' ? 'wss:' : 'ws:';
+      }
+
+      const response = await fetch(url, {
+        method: event.request.method,
+        headers,
+        body:
+          event.request.method !== 'GET' && event.request.method !== 'HEAD'
+            ? await event.request.text()
+            : undefined,
+      });
+
+      // Strip Content-Encoding header to prevent decoding issues
+      // The response body is already decompressed by fetch()
+      const responseHeaders = new Headers(response.headers);
+      responseHeaders.delete('Content-Encoding');
+
+      return new Response(response.body, {
+        status: response.status,
+        statusText: response.statusText,
+        headers: responseHeaders,
+      });
+    }
+
+    // Production: use service binding
     if (httpService) {
-      // Build new URL with stripped /api prefix
       const originalUrl = new URL(event.request.url);
       const proxyUrl = new URL(backendPath + originalUrl.search, originalUrl.origin);
       return httpService.fetch(
@@ -55,20 +85,7 @@ export const handle: Handle = async ({ event, resolve }) => {
       );
     }
 
-    // Local development fallback: use HTTP_URL
-    const url = new URL(backendPath + event.url.search, httpUrl!);
-    if (isWebSocket) {
-      url.protocol = url.protocol === 'https:' ? 'wss:' : 'ws:';
-    }
-
-    return fetch(url, {
-      method: event.request.method,
-      headers,
-      body:
-        event.request.method !== 'GET' && event.request.method !== 'HEAD'
-          ? await event.request.text()
-          : undefined,
-    });
+    return new Response('HTTP service not available', { status: 503 });
   }
 
   // For all other requests, use normal SvelteKit rendering

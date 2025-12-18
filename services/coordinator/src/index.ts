@@ -8,7 +8,7 @@
  * and error logging, delegating business logic to the dispatch layer
  * which handles workflow progression, task execution, and fan-out/fan-in.
  */
-import type { Emitter } from '@wonder/events';
+import { createEmitter, type Emitter } from '@wonder/events';
 import { createLogger, type Logger } from '@wonder/logs';
 import { DurableObject } from 'cloudflare:workers';
 import {
@@ -20,7 +20,6 @@ import {
 } from './dispatch';
 import { ContextManager } from './operations/context';
 import { DefinitionManager } from './operations/defs';
-import { CoordinatorEmitter } from './operations/events';
 import { TokenManager } from './operations/tokens';
 import type { TaskResult } from './types';
 
@@ -47,12 +46,20 @@ export class WorkflowCoordinator extends DurableObject {
     // Initialize DefinitionManager first
     this.defs = new DefinitionManager(ctx, this.env);
 
-    // Initialize emitter with DefinitionManager
-    this.emitter = new CoordinatorEmitter(
-      this.logger,
-      this.defs,
-      this.env.EVENTS,
-      this.env.TRACE_EVENTS_ENABLED,
+    // Initialize emitter with lazy context (deferred until first emit)
+    // Context comes from defs.getWorkflowRun() after initialize() is called
+    this.emitter = createEmitter(
+      this.env.STREAMER,
+      () => {
+        const run = this.defs.getWorkflowRun();
+        return {
+          workflow_run_id: run.id,
+          project_id: run.project_id,
+          workflow_def_id: run.workflow_def_id,
+          parent_run_id: run.parent_run_id,
+        };
+      },
+      { traceEnabled: this.env.TRACE_EVENTS_ENABLED === 'true' },
     );
 
     this.context = new ContextManager(ctx.storage.sql, this.defs, this.emitter);
@@ -195,7 +202,7 @@ export class WorkflowCoordinator extends DurableObject {
 
       // Delegate to lifecycle module
       const ctx = this.getDispatchContext(workflow_run_id);
-      processTaskError(ctx, tokenId, errorResult);
+      await processTaskError(ctx, tokenId, errorResult);
     } catch (error) {
       this.logger.error({
         event_type: 'coordinator.task_error.failed',

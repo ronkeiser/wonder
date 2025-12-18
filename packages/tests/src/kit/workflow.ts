@@ -43,6 +43,7 @@ export type { TestWorkflowResult, WorkflowTestSetup } from './types';
 export async function createWorkflow(
   ctx: TestContext,
   workflow: EmbeddedWorkflowDef,
+  options?: { name?: string },
 ): Promise<WorkflowTestSetup> {
   const createdResources: CreatedResources = {
     promptSpecIds: [],
@@ -102,7 +103,7 @@ export async function createWorkflow(
   const workflowResponse = await wonder.workflows.create({
     project_id: ctx.projectId,
     workflow_def_id: workflowDefId,
-    name: workflow.name,
+    name: options?.name ?? workflow.name,
     description: workflow.description || 'Test workflow',
   });
 
@@ -193,6 +194,8 @@ export async function runTestWorkflow(
   workflow: EmbeddedWorkflowDef,
   input: unknown,
   options?: {
+    /** Override workflow name (useful for identifying test runs) */
+    name?: string;
     timeout?: number;
     idleTimeout?: number;
     /** Log events to console as they arrive */
@@ -204,7 +207,7 @@ export async function runTestWorkflow(
   const ctx = await setupTestContext();
 
   // Create workflow and all embedded resources
-  const setup = await createWorkflow(ctx, workflow);
+  const setup = await createWorkflow(ctx, workflow, { name: options?.name });
 
   // Execute the workflow
   console.log('🚀 Starting workflow execution...');
