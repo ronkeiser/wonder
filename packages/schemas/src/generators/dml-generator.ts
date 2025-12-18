@@ -19,12 +19,20 @@ export type DMLGeneratorOptions = GeneratorOptions;
 export class DMLGenerator {
   private options: NormalizedGeneratorOptions;
 
+  /**
+   * @param schema - JSON schema for the table
+   * @param optionsOrRegistry - Generator options, or CustomTypeRegistry (deprecated, for backwards compatibility)
+   * @param options - Generator options (only when second param is CustomTypeRegistry)
+   */
   constructor(
     private schema: JSONSchema,
-    _customTypes: CustomTypeRegistry,
-    options: GeneratorOptions = {},
+    optionsOrRegistry?: GeneratorOptions | CustomTypeRegistry,
+    options?: GeneratorOptions,
   ) {
-    this.options = normalizeOptions(options);
+    // Handle backwards-compatible signature: (schema, registry, options)
+    const actualOptions =
+      optionsOrRegistry && 'has' in optionsOrRegistry ? (options ?? {}) : (optionsOrRegistry ?? {});
+    this.options = normalizeOptions(actualOptions);
   }
 
   /**

@@ -74,7 +74,6 @@ export class DDLGenerator {
       }
 
       const columnName = buildColumnName(prefix, fieldName);
-      const isRequired = schema.required?.includes(fieldName) ?? false;
 
       if (fieldSchema.type === 'object' && this.options.nestedObjectStrategy === 'flatten') {
         // Flatten nested objects with dot notation
@@ -85,7 +84,7 @@ export class DDLGenerator {
         columns.push({
           name: columnName,
           type: 'TEXT',
-          constraints: this.buildConstraints(fieldSchema, isRequired, columnName, true),
+          constraints: this.buildConstraints(fieldSchema, columnName, true),
         });
       } else if (fieldSchema.type === 'array' && this.options.arrayStrategy === 'table') {
         // Arrays handled as separate tables - skip column
@@ -96,7 +95,7 @@ export class DDLGenerator {
         columns.push({
           name: columnName,
           type: sqlType,
-          constraints: this.buildConstraints(fieldSchema, isRequired, columnName),
+          constraints: this.buildConstraints(fieldSchema, columnName),
         });
       }
     }
@@ -163,7 +162,7 @@ export class DDLGenerator {
           columns.push({
             name: 'value',
             type: sqlType,
-            constraints: this.buildConstraints(itemSchema, true, 'value'),
+            constraints: this.buildConstraints(itemSchema, 'value'),
           });
         }
 
@@ -231,7 +230,6 @@ export class DDLGenerator {
    */
   private buildConstraints(
     schema: JSONSchema,
-    _isRequired: boolean,
     columnName: string,
     isJsonColumn = false,
   ): string[] {

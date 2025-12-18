@@ -3,7 +3,7 @@
 import type { CustomTypeRegistry } from '../custom-types';
 import type { JSONSchema, ValidationError, ValidationResult, ValidatorOptions } from '../types';
 import { ValidationErrorCode } from '../types';
-import { getType } from '../utils';
+import { getType, isPlainObject } from '../utils';
 import {
   validateArray,
   validateBoolean,
@@ -154,11 +154,32 @@ export class Validator {
   }
 
   /**
-   * Apply default values (if enabled)
+   * Apply default values from schema to data
    */
   private applyDefaults(data: unknown): unknown {
-    // TODO: Implement default value application in Phase 1.5
-    // For now, just return the data as-is
+    return this.applyDefaultsRecursive(data, this.schema);
+  }
+
+  /**
+   * Recursively apply default values
+   */
+  private applyDefaultsRecursive(data: unknown, schema: JSONSchema): unknown {
+    if (data === undefined) {
+      return schema.default !== undefined ? structuredClone(schema.default) : undefined;
+    }
+
+    if (schema.type === 'object' && schema.properties && isPlainObject(data)) {
+      const result = { ...data } as Record<string, unknown>;
+      for (const [key, propSchema] of Object.entries(schema.properties)) {
+        result[key] = this.applyDefaultsRecursive(result[key], propSchema);
+      }
+      return result;
+    }
+
+    if (schema.type === 'array' && schema.items && Array.isArray(data)) {
+      return data.map((item) => this.applyDefaultsRecursive(item, schema.items!));
+    }
+
     return data;
   }
 }

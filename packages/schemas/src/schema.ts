@@ -106,7 +106,7 @@ export class Schema {
   /** Get cached DML generator */
   private get dmlGenerator(): DMLGenerator {
     if (!this._dmlGenerator) {
-      this._dmlGenerator = new DMLGenerator(this.json, this.registry, this.options);
+      this._dmlGenerator = new DMLGenerator(this.json, this.options);
     }
     return this._dmlGenerator;
   }
@@ -236,24 +236,16 @@ export class SchemaTable {
 
   /** Select the first row (schema-aware reconstruction) */
   selectFirst<T = Record<string, unknown>>(): T | null {
-    try {
-      return this.schema.readFirst(this.sql, this.tableName) as T | null;
-    } catch {
-      return null;
-    }
+    return this.schema.readFirst(this.sql, this.tableName) as T | null;
   }
 
   /** Check if the table exists */
   exists(): boolean {
-    try {
-      const result = this.sql.exec(
-        `SELECT name FROM sqlite_master WHERE type='table' AND name=?;`,
-        this.tableName,
-      );
-      return [...result].length > 0;
-    } catch {
-      return false;
-    }
+    const result = this.sql.exec(
+      `SELECT name FROM sqlite_master WHERE type='table' AND name=?;`,
+      this.tableName,
+    );
+    return [...result].length > 0;
   }
 }
 

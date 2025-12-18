@@ -140,9 +140,17 @@ export class SelectGenerator {
           return row.value;
         }
       });
-    } catch {
-      // Table might not exist
-      return [];
+    } catch (error) {
+      // Return empty array if table doesn't exist (common case when no array items were written)
+      const message = error instanceof Error ? error.message : String(error);
+      if (
+        message.includes('no such table') ||
+        message.includes('SQLITE_ERROR') ||
+        message.includes('does not exist')
+      ) {
+        return [];
+      }
+      throw error;
     }
   }
 
