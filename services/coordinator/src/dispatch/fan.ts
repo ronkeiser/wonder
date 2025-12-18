@@ -8,15 +8,14 @@
  *
  * Key responsibilities:
  * - Write branch outputs to isolated branch tables
- * - Check sibling completion to trigger fan-in
- * - Process synchronization conditions
+ * - Process synchronization conditions (single deterministic path)
  * - Execute fan-in merge when conditions met
  */
 
 import type { JSONSchema } from '@wonder/schemas';
 import type { DefinitionManager } from '../operations/defs';
 import type { TokenManager } from '../operations/tokens';
-import { decideFanInContinuation, toTransitionDef } from '../planning/index';
+import { decideFanInContinuation } from '../planning/index';
 import { decideSynchronization } from '../planning/synchronization';
 import type { Decision, TransitionDef } from '../types';
 import { applyDecisions, type DispatchContext } from './apply';
@@ -42,14 +41,16 @@ type Node = ReturnType<DefinitionManager['getNode']>;
  * 2. Initialize branch table (lazy - creates if not exists)
  * 3. Write task output to branch table
  * 4. Apply any state.* mappings from node's output_mapping to shared context
- * 5. Check if sibling completion triggers fan-in
+ *
+ * Note: Fan-in activation is handled by processSynchronization in the routing
+ * path, ensuring a single deterministic path for all sync logic.
  */
 export async function handleBranchOutput(
   ctx: DispatchContext,
   token: Token,
   node: Node,
   output: Record<string, unknown>,
-): Promise<string | null> {
+): Promise<void> {
   // Fetch TaskDef to get output schema
   if (!node.task_id) {
     ctx.logger.debug({
@@ -57,7 +58,7 @@ export async function handleBranchOutput(
       message: 'No task_id on node - skipping branch output',
       metadata: { token_id: token.id, node_id: node.id },
     });
-    return null;
+    return;
   }
 
   const taskDefsResource = ctx.resources.taskDefs();
@@ -69,7 +70,7 @@ export async function handleBranchOutput(
       message: 'No output_schema on TaskDef - skipping branch output',
       metadata: { token_id: token.id, task_id: taskDef.id },
     });
-    return null;
+    return;
   }
 
   // Initialize branch table (creates if not exists)
@@ -102,88 +103,6 @@ export async function handleBranchOutput(
       ctx.context.applyOutputMapping(stateMappings, output);
     }
   }
-
-  // Check if this completion triggers fan-in for waiting siblings
-  return await checkSiblingCompletion(ctx, token);
-}
-
-// ============================================================================
-// Sibling Completion Check
-// ============================================================================
-
-/**
- * Check if a completed branch token triggers fan-in for waiting siblings
- *
- * When a fan-out token completes:
- * 1. Find tokens waiting for this sibling group
- * 2. Re-evaluate synchronization condition
- * 3. If condition now met, trigger fan-in activation
- */
-export async function checkSiblingCompletion(
-  ctx: DispatchContext,
-  completedToken: Token,
-): Promise<string | null> {
-  if (!completedToken.sibling_group) {
-    return null; // Not a fan-out token, nothing to check
-  }
-
-  const workflowRunId = completedToken.workflow_run_id;
-  const siblingGroup = completedToken.sibling_group;
-
-  // Find transitions with synchronization on this sibling group
-  const allTransitions = ctx.defs.getTransitions();
-  const syncTransitionRow = allTransitions.find((t) => {
-    const sync = t.synchronization as { sibling_group?: string } | null;
-    return sync?.sibling_group === siblingGroup;
-  });
-
-  if (!syncTransitionRow || !syncTransitionRow.synchronization) {
-    return null; // No sync transition for this sibling group
-  }
-
-  // Cast synchronization to typed config
-  const syncTransition = toTransitionDef(syncTransitionRow);
-
-  // Check for tokens waiting for this sibling group
-  const waitingTokens = ctx.tokens.getWaitingTokens(workflowRunId, siblingGroup);
-  if (waitingTokens.length === 0) {
-    return null; // No one waiting yet
-  }
-
-  // Re-evaluate synchronization with current sibling counts
-  const siblingCounts = ctx.tokens.getSiblingCounts(workflowRunId, siblingGroup);
-
-  // Check if any waiting token should now activate fan-in
-  // We only need to check one (they all have the same view of siblings)
-  const waitingToken = waitingTokens[0];
-
-  const syncResult = decideSynchronization({
-    token: waitingToken,
-    transition: syncTransition,
-    siblingCounts,
-    workflowRunId,
-  });
-
-  // Emit trace events
-  for (const event of syncResult.events) {
-    ctx.emitter.emitTrace(event);
-  }
-
-  // Process any ACTIVATE_FAN_IN decisions
-  for (const decision of syncResult.decisions) {
-    if (decision.type === 'ACTIVATE_FAN_IN') {
-      const continuationTokenId = await activateFanIn(
-        ctx,
-        decision,
-        syncTransition,
-        waitingToken.id,
-      );
-      if (continuationTokenId) {
-        return continuationTokenId;
-      }
-    }
-  }
-  return null;
 }
 
 // ============================================================================

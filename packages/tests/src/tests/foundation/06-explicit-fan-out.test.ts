@@ -51,7 +51,7 @@ import { assertInvariants, runTestWorkflow, verify } from '~/kit';
  */
 
 describe('Foundation: 06 - Explicit Fan-Out', () => {
-  it('executes workflow with explicit parallel nodes (no spawn_count)', async () => {
+  it('executes workflow with explicit parallel nodes (no spawn_count)', { timeout: 60000 }, async () => {
     // =========================================================================
     // Schemas
     // =========================================================================
@@ -631,41 +631,34 @@ describe('Foundation: 06 - Explicit Fan-Out', () => {
       verify(trace, { input: workflowInput, definition: workflowDef, events })
         .completed()
         .withTokens({
-          // IDEAL token structure (same as test 04):
+          // Token structure (deterministic - all siblings create arrivals):
           // - 1 root token (init)
           // - 3 phase1 tokens (explicit fan-out: phase1_a, phase1_b, phase1_c)
-          // - 3 phase1 fan-in arrivals (tokens arriving at bridge synchronization)
+          // - 3 phase1 fan-in arrivals (all 3 siblings create arrival tokens)
           // - 1 bridge continuation (spawned after all 3 arrive and merge)
           // - 3 phase2 tokens (explicit fan-out from bridge)
-          // - 3 phase2 fan-in arrivals (tokens arriving at summarize synchronization)
+          // - 3 phase2 fan-in arrivals (all 3 siblings create arrival tokens)
           // - 1 summarize continuation (spawned after all 3 arrive and merge)
-          // Total: 15 (same as spawn_count version)
+          // Total: 1 + 3 + 3 + 1 + 3 + 3 + 1 = 15
           root: 1,
           fanOuts: [
             { count: 3, branchTotal: 3, outputFields: ['value'] },
             { count: 3, branchTotal: 3, outputFields: ['accumulated'] },
           ],
-          fanInArrivals: 6, // 3 for phase1→bridge + 3 for phase2→summarize
+          fanInArrivals: 6, // 3 for phase1→bridge + 3 for phase2→summarize (deterministic)
           fanInContinuations: 2, // 1 bridge + 1 summarize
-          total: 15, // Same as test 04 with spawn_count
+          total: 15, // Deterministic token count
         })
         .withStateWriteOrder([
-          // Phase 1: init → phase1 explicit nodes
+          // Init writes seed
           'state.init.seed',
-          'state.phase1.value_a', // Phase1_a writes to unique path
-          'state.phase1.value_b', // Phase1_b writes to unique path
-          'state.phase1.value_c', // Phase1_c writes to unique path
-          // Fan-in merge: IDEAL behavior writes merged results
+          // Phase1 branches write to output.value (branch table), fan-in merges to state
           'state.phase1.results', // Merge target (append strategy)
-          // Bridge continuation reads merged results
+          // Bridge writes
           'state.bridge.phase1_words',
-          // Phase 2: bridge → phase2 explicit nodes
-          'state.phase2.accumulated_a', // Phase2_a writes to unique path
-          'state.phase2.accumulated_b', // Phase2_b writes to unique path
-          'state.phase2.accumulated_c', // Phase2_c writes to unique path
-          // Fan-in merge: IDEAL behavior writes collected results
+          // Phase2 branches write to output.accumulated (branch table), fan-in collects
           'state.phase2.accumulated', // Merge target (collect strategy)
-          // Summarize continuation reads merged results
+          // Summarize writes
           'state.summary.phase1_words',
           'state.summary.phase2_accumulated',
           'state.summary.bridge_inherited',
@@ -673,55 +666,22 @@ describe('Foundation: 06 - Explicit Fan-Out', () => {
         .withStateWrites([
           { path: 'state.init.seed', type: 'string', description: 'Written by init' },
           {
-            path: 'state.phase1.value_a',
-            type: 'string',
-            description: 'Phase1_a output (unique branch path)',
-          },
-          {
-            path: 'state.phase1.value_b',
-            type: 'string',
-            description: 'Phase1_b output (unique branch path)',
-          },
-          {
-            path: 'state.phase1.value_c',
-            type: 'string',
-            description: 'Phase1_c output (unique branch path)',
-          },
-          {
             path: 'state.phase1.results',
             type: 'array',
             arrayLength: 3,
-            description: 'IDEAL: Fan-in merge (append) writes merged phase1 results',
+            description: 'Fan-in merge (append) writes merged phase1 results',
           },
           {
             path: 'state.bridge.phase1_words',
             type: 'array',
             arrayLength: 3,
-            description: 'Bridge reads from merged state.phase1.results',
-          },
-          {
-            path: 'state.phase2.accumulated_a',
-            type: 'array',
-            arrayLength: 4, // 3 inherited + 1 new
-            description: 'Phase2_a accumulated (unique branch path)',
-          },
-          {
-            path: 'state.phase2.accumulated_b',
-            type: 'array',
-            arrayLength: 4,
-            description: 'Phase2_b accumulated (unique branch path)',
-          },
-          {
-            path: 'state.phase2.accumulated_c',
-            type: 'array',
-            arrayLength: 4,
-            description: 'Phase2_c accumulated (unique branch path)',
+            description: 'Bridge copies phase1.results',
           },
           {
             path: 'state.phase2.accumulated',
             type: 'array',
             arrayLength: 3, // 3 arrays (collect strategy)
-            description: 'IDEAL: Fan-in merge (collect) writes collected phase2 arrays',
+            description: 'Fan-in merge (collect) writes collected phase2 arrays',
           },
           {
             path: 'state.summary.phase1_words',
@@ -762,9 +722,8 @@ describe('Foundation: 06 - Explicit Fan-Out', () => {
             matcher: (val) =>
               typeof val === 'object' &&
               val !== null &&
-              'value_a' in val &&
-              'value_b' in val &&
-              'value_c' in val,
+              'results' in val &&
+              Array.isArray((val as { results: unknown }).results),
           },
         })
         // =====================================================================

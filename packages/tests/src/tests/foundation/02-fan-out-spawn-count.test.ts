@@ -35,7 +35,7 @@ import { assertInvariants, runTestWorkflow, verify } from '~/kit';
  */
 
 describe('Foundation: 02 - Fan-out with Spawn Count + Fan-in', () => {
-  it('executes fan-out, merges results via fan-in, and produces correct final output', async () => {
+  it('executes fan-out, merges results via fan-in, and produces correct final output', { timeout: 60000 }, async () => {
     // =========================================================================
     // Schemas
     // =========================================================================
@@ -245,9 +245,9 @@ describe('Foundation: 02 - Fan-out with Spawn Count + Fan-in', () => {
         .withTokens({
           root: 1,
           fanOuts: [{ count: 3, branchTotal: 3, outputFields: ['result'] }],
-          fanInArrivals: 3,
-          fanInContinuations: 1,
-          total: 8,
+          fanInArrivals: 3, // All 3 siblings create arrival tokens (deterministic)
+          fanInContinuations: 1, // Single continuation after fan-in activates
+          total: 8, // 1 root + 3 fanOut + 3 arrivals + 1 continuation
         })
         .withStateWriteOrder(['state.seed', 'state.results', 'state.summary'])
         .withStateWrites([

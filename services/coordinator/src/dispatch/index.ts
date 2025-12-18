@@ -32,12 +32,7 @@ export {
 } from './batch';
 
 // Fan: fan-out/fan-in orchestration
-export {
-  activateFanIn,
-  checkSiblingCompletion,
-  handleBranchOutput,
-  processSynchronization,
-} from './fan';
+export { activateFanIn, handleBranchOutput, processSynchronization } from './fan';
 
 // Task: dispatch tokens and process results
 export { dispatchToken, processTaskResult } from './task';

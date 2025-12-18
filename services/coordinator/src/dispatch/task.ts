@@ -150,11 +150,9 @@ export async function processTaskResult(
   // Handle output based on flow type
   if (token.sibling_group) {
     // Fan-out flow: Write to branch table
-    const continuationTokenId = await handleBranchOutput(ctx, token, node, result.output_data);
-    // If fan-in activated, dispatch the continuation token
-    if (continuationTokenId) {
-      await dispatchToken(ctx, continuationTokenId);
-    }
+    // Fan-in activation happens in processSynchronization below, not here
+    // This ensures all sync logic goes through a single deterministic path
+    await handleBranchOutput(ctx, token, node, result.output_data);
   } else {
     // Linear flow: Apply node's output_mapping to transform and store output
     // e.g., { "state.result": "$.greeting" } writes result.output_data.greeting to context.state.result

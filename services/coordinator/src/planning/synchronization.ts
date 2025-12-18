@@ -113,7 +113,7 @@ export function decideSynchronization(params: {
           type: 'ACTIVATE_FAN_IN',
           workflowRunId,
           nodeId: transition.to_node_id,
-          fanInPath: buildFanInPath(token.sibling_group!, transition.id),
+          fanInPath: buildFanInPath(token.sibling_group!, transition.to_node_id),
           mergedTokenIds: [], // Will be populated by dispatch layer with actual sibling IDs
         },
       ],
@@ -184,7 +184,7 @@ export function decideOnSiblingCompletion(params: {
         type: 'ACTIVATE_FAN_IN',
         workflowRunId,
         nodeId: transition.to_node_id,
-        fanInPath: buildFanInPath(completedToken.sibling_group!, transition.id),
+        fanInPath: buildFanInPath(completedToken.sibling_group!, transition.to_node_id),
         mergedTokenIds: [], // Dispatch layer populates with all sibling IDs
       },
     ];
@@ -198,7 +198,7 @@ export function decideOnSiblingCompletion(params: {
       type: 'ACTIVATE_FAN_IN',
       workflowRunId,
       nodeId: transition.to_node_id,
-      fanInPath: buildFanInPath(winnerToken.sibling_group!, transition.id),
+      fanInPath: buildFanInPath(winnerToken.sibling_group!, transition.to_node_id),
       mergedTokenIds: [], // Dispatch layer populates
     },
   ];
@@ -250,17 +250,18 @@ function checkSyncCondition(
 }
 
 /**
- * Build the fan-in path from a token's sibling_group and transition ID.
+ * Build the fan-in path from a token's sibling_group and target node ID.
  * The fan-in path must be unique per synchronization point.
  *
- * Uses sibling_group as the base identifier since all tokens in the same
- * sibling group share this value, regardless of their individual path_id.
- * This ensures the SQL UNIQUE constraint properly prevents duplicate activations.
+ * Uses sibling_group:target_node_id so all transitions in the same sibling group
+ * going to the same target node share one fan-in coordination path.
+ * This ensures the SQL UNIQUE constraint properly prevents duplicate activations
+ * even when multiple transitions exist (explicit fan-out pattern).
  *
- * Example: sibling_group 'phase1_fanin', transition 'T1' → Fan-in path 'phase1_fanin:T1'
+ * Example: sibling_group 'phase1_fanin', target 'bridge' → Fan-in path 'phase1_fanin:bridge'
  */
-function buildFanInPath(siblingGroup: string, transitionId: string): string {
-  return `${siblingGroup}:${transitionId}`;
+function buildFanInPath(siblingGroup: string, targetNodeId: string): string {
+  return `${siblingGroup}:${targetNodeId}`;
 }
 
 // ============================================================================
@@ -333,7 +334,7 @@ export function decideOnTimeout(params: {
         type: 'ACTIVATE_FAN_IN',
         workflowRunId,
         nodeId: transition.to_node_id,
-        fanInPath: buildFanInPath(winnerToken.sibling_group!, transition.id),
+        fanInPath: buildFanInPath(winnerToken.sibling_group!, transition.to_node_id),
         mergedTokenIds: [], // Dispatch populates with available completed siblings
       },
     ];

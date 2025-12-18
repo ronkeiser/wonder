@@ -641,13 +641,25 @@ describe('Foundation: 05 - Deep Nested State Structure', () => {
         verify(trace, { input: workflowInput, definition: workflowDef, events })
           .completed()
           .withTokens({
+            // Token structure for three sequential fan-out/fan-ins:
+            // - 1 root token (init)
+            // - 3 phase1 tokens (fan-out #1)
+            // - 3 fan-in arrival tokens (all siblings create arrivals - deterministic)
+            // - 1 bridge1 continuation token
+            // - 3 phase2 tokens (fan-out #2)
+            // - 3 fan-in arrival tokens (all siblings create arrivals - deterministic)
+            // - 1 bridge2 continuation token
+            // - 3 phase3 tokens (fan-out #3)
+            // - 3 fan-in arrival tokens (all siblings create arrivals - deterministic)
+            // - 1 finalize continuation token
+            // Total: 1 + 3 + 3 + 1 + 3 + 3 + 1 + 3 + 3 + 1 = 22
             root: 1,
             fanOuts: [
               { count: 3, branchTotal: 3, outputFields: ['word'] },
               { count: 3, branchTotal: 3, outputFields: ['accumulated'] },
               { count: 3, branchTotal: 3, outputFields: ['final'] },
             ],
-            fanInArrivals: 9,
+            fanInArrivals: 9, // 3 for each of 3 fan-ins (deterministic)
             fanInContinuations: 3,
             total: 22,
           })

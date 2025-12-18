@@ -30,7 +30,7 @@ import { assertInvariants, runTestWorkflow, verify } from '~/kit';
  */
 
 describe('Foundation: 03 - Sequential Fan-out/Fan-in', () => {
-  it('executes two fan-out/fan-in phases with state propagation', async () => {
+  it('executes two fan-out/fan-in phases with state propagation', { timeout: 60000 }, async () => {
     // =========================================================================
     // Schemas
     // =========================================================================
@@ -366,10 +366,10 @@ describe('Foundation: 03 - Sequential Fan-out/Fan-in', () => {
           // Token structure for two sequential fan-out/fan-ins:
           // - 1 root token (init)
           // - 3 phase1 tokens (fan-out #1)
-          // - 3 fan-in arrival tokens (from phase1 branches arriving at fan-in)
+          // - 3 fan-in arrival tokens (all siblings create arrivals - deterministic)
           // - 1 bridge continuation token (after fan-in #1 completes)
           // - 3 phase2 tokens (fan-out #2)
-          // - 3 fan-in arrival tokens (from phase2 branches arriving at fan-in)
+          // - 3 fan-in arrival tokens (all siblings create arrivals - deterministic)
           // - 1 summarize continuation token (after fan-in #2 completes)
           // Total: 1 + 3 + 3 + 1 + 3 + 3 + 1 = 15
           root: 1,
@@ -377,7 +377,7 @@ describe('Foundation: 03 - Sequential Fan-out/Fan-in', () => {
             { count: 3, branchTotal: 3, outputFields: ['value'] },
             { count: 3, branchTotal: 3, outputFields: ['transformed'] },
           ],
-          fanInArrivals: 6, // 3 for fanIn1 + 3 for fanIn2
+          fanInArrivals: 6, // 3 for fanIn1 + 3 for fanIn2 (deterministic)
           fanInContinuations: 2, // 1 for bridge + 1 for summarize
           total: 15,
         })

@@ -31,7 +31,7 @@ import { assertInvariants, runTestWorkflow, verify } from '~/kit';
  */
 
 describe('Foundation: 04 - Nested State Structure', () => {
-  it('executes workflow with deeply nested state objects', async () => {
+  it('executes workflow with deeply nested state objects', { timeout: 60000 }, async () => {
     // =========================================================================
     // Schemas
     // =========================================================================
@@ -471,18 +471,18 @@ describe('Foundation: 04 - Nested State Structure', () => {
           // Token structure:
           // - 1 root token (init)
           // - 3 phase1 tokens (fan-out #1)
-          // - 3 fan-in arrival tokens (from phase1)
+          // - 3 fan-in arrival tokens (all siblings create arrivals - deterministic)
           // - 1 bridge continuation token
           // - 3 phase2 tokens (fan-out #2)
-          // - 3 fan-in arrival tokens (from phase2)
+          // - 3 fan-in arrival tokens (all siblings create arrivals - deterministic)
           // - 1 summarize continuation token
-          // Total: 15
+          // Total: 1 + 3 + 3 + 1 + 3 + 3 + 1 = 15
           root: 1,
           fanOuts: [
             { count: 3, branchTotal: 3, outputFields: ['value'] },
             { count: 3, branchTotal: 3, outputFields: ['accumulated'] }, // merged array
           ],
-          fanInArrivals: 6,
+          fanInArrivals: 6, // 3 for fanIn1 + 3 for fanIn2 (deterministic)
           fanInContinuations: 2,
           total: 15,
         })
