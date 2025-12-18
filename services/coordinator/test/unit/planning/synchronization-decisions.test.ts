@@ -7,10 +7,7 @@
 
 import { describe, expect, test } from 'vitest';
 import type { SiblingCounts, TokenRow } from '../../../src/operations/tokens';
-import {
-  decideOnSiblingCompletion,
-  decideSynchronization,
-} from '../../../src/planning/synchronization';
+import { decideSynchronization } from '../../../src/planning/synchronization';
 import type { TransitionDef } from '../../../src/types';
 
 describe('decideSynchronization()', () => {
@@ -20,6 +17,7 @@ describe('decideSynchronization()', () => {
     node_id: 'node_collect',
     parent_token_id: 'tok_q1',
     path_id: 'root.question.0',
+    sibling_group: 'fanout_group', // Token's sibling group membership
     fan_out_transition_id: 'start_to_question',
     branch_index: 0,
     branch_total: 3,
@@ -64,7 +62,7 @@ describe('decideSynchronization()', () => {
         spawn_count: null,
         synchronization: {
           strategy: 'all',
-          sibling_group: 'different_transition', // baseToken.fan_out_transition_id = 'start_to_question'
+          sibling_group: 'different_group', // baseToken.sibling_group = 'fanout_group'
           timeout_ms: null,
           on_timeout: 'fail',
           merge: undefined,
@@ -92,7 +90,7 @@ describe('decideSynchronization()', () => {
         spawn_count: null,
         synchronization: {
           strategy: 'all',
-          sibling_group: 'start_to_question', // Matches baseToken.fan_out_transition_id
+          sibling_group: 'fanout_group', // Matches baseToken.sibling_group
           timeout_ms: null,
           on_timeout: 'fail',
           merge: undefined,
@@ -122,7 +120,7 @@ describe('decideSynchronization()', () => {
       spawn_count: null,
       synchronization: {
         strategy: 'all',
-        sibling_group: 'start_to_question',
+        sibling_group: 'fanout_group', // Matches baseToken.sibling_group
         timeout_ms: null,
         on_timeout: 'fail',
         merge: undefined,
@@ -174,7 +172,7 @@ describe('decideSynchronization()', () => {
       spawn_count: null,
       synchronization: {
         strategy: 'any',
-        sibling_group: 'start_to_question',
+        sibling_group: 'fanout_group', // Matches baseToken.sibling_group
         timeout_ms: null,
         on_timeout: 'fail',
         merge: undefined,
@@ -204,7 +202,7 @@ describe('decideSynchronization()', () => {
       spawn_count: null,
       synchronization: {
         strategy: { m_of_n: m },
-        sibling_group: 'start_to_question',
+        sibling_group: 'fanout_group', // Matches baseToken.sibling_group
         timeout_ms: null,
         on_timeout: 'fail',
         merge: undefined,
@@ -260,74 +258,3 @@ describe('decideSynchronization()', () => {
   });
 });
 
-describe('decideOnSiblingCompletion()', () => {
-  const baseToken: TokenRow = {
-    id: 'tok_q1',
-    workflow_run_id: 'run_1',
-    node_id: 'node_question',
-    parent_token_id: null,
-    path_id: 'root.question.0',
-    fan_out_transition_id: 'start_to_question',
-    branch_index: 0,
-    branch_total: 3,
-    status: 'completed',
-    created_at: new Date('2025-12-14T10:00:00Z'),
-    updated_at: new Date('2025-12-14T10:00:00Z'),
-    arrived_at: null,
-  };
-
-  const makeTransition = (): TransitionDef => ({
-    id: 'trans_1',
-    from_node_id: 'node_question',
-    to_node_id: 'node_collect',
-    priority: 1,
-    condition: null,
-    spawn_count: null,
-    synchronization: {
-      strategy: 'all',
-      sibling_group: 'start_to_question',
-      timeout_ms: null,
-      on_timeout: 'fail',
-      merge: undefined,
-    },
-  });
-
-  test('returns empty when condition not met', () => {
-    const waitingToken: TokenRow = {
-      ...baseToken,
-      id: 'tok_collect_1',
-      node_id: 'node_collect',
-      status: 'waiting_for_siblings',
-    };
-
-    const decisions = decideOnSiblingCompletion({
-      completedToken: baseToken,
-      waitingTokens: [waitingToken],
-      transition: makeTransition(),
-      siblingCounts: { total: 3, completed: 2, failed: 0, waiting: 1, terminal: 2 },
-      workflowRunId: 'run_1',
-    });
-
-    // Not all siblings complete yet
-    expect(decisions).toEqual([]);
-  });
-
-  test('activates fan-in when condition met', () => {
-    const waitingToken: TokenRow = {
-      ...baseToken,
-      id: 'tok_collect_1',
-      node_id: 'node_collect',
-      status: 'waiting_for_siblings',
-    };
-
-    const decisions = decideOnSiblingCompletion({
-      completedToken: baseToken,
-      waitingTokens: [waitingToken],
-      transition: makeTransition(),
-      siblingCounts: { total: 3, completed: 3, failed: 0, waiting: 0, terminal: 3 },
-      workflowRunId: 'run_1',
-    });
-
-    expect(decisions).toContainEqual(expect.objectContaining({ type: 'ACTIVATE_FAN_IN' }));
-  });
-});

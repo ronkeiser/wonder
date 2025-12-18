@@ -231,15 +231,6 @@ export async function activateFanIn(
   }
 
   // We won the race - proceed with merge
-  ctx.emitter.emitTrace({
-    type: 'dispatch.sync.fan_in_activated',
-    node_id: nodeId,
-    payload: {
-      fan_in_path: fanInPath,
-      merged_count: decision.mergedTokenIds.length,
-    },
-  });
-
   const sync = transition.synchronization;
   if (!sync) {
     return null; // Should not happen
@@ -258,6 +249,17 @@ export async function activateFanIn(
     });
     return null;
   }
+
+  // Emit trace event with actual merged count (now that we have the siblings)
+  ctx.emitter.emitTrace({
+    type: 'dispatch.sync.fan_in_activated',
+    node_id: nodeId,
+    payload: {
+      fan_in_path: fanInPath,
+      merged_count: completedSiblings.length,
+      waiting_count: waitingSiblings.length,
+    },
+  });
 
   // Get merge config
   const mergeConfig = sync.merge;

@@ -114,7 +114,11 @@ export function decideSynchronization(params: {
           workflowRunId,
           nodeId: transition.to_node_id,
           fanInPath: buildFanInPath(token.sibling_group!, transition.to_node_id),
-          mergedTokenIds: [], // Will be populated by dispatch layer with actual sibling IDs
+          // Note: mergedTokenIds is intentionally empty here. Planning is pure and
+          // cannot query state. The dispatch layer (activateFanIn) queries the actual
+          // completed siblings and performs the merge. This field exists for future
+          // use cases where the caller might pre-compute the list.
+          mergedTokenIds: [],
         },
       ],
       events,
@@ -137,82 +141,6 @@ export function decideSynchronization(params: {
     ],
     events,
   };
-}
-
-/**
- * Re-evaluate synchronization when a sibling completes.
- * Called when a token transitions to terminal state and siblings are waiting.
- */
-export function decideOnSiblingCompletion(params: {
-  completedToken: TokenRow;
-  waitingTokens: TokenRow[];
-  transition: TransitionDef;
-  siblingCounts: SiblingCounts;
-  workflowRunId: string;
-}): Decision[] {
-  const { completedToken, waitingTokens, transition, siblingCounts, workflowRunId } = params;
-
-  if (!transition.synchronization) {
-    return [];
-  }
-
-  const sync = transition.synchronization;
-
-  // Only process if completed token is part of this sibling group
-  if (completedToken.sibling_group !== sync.sibling_group) {
-    return [];
-  }
-
-  // Check if condition is now met
-  const conditionMet = checkSyncCondition(
-    sync.strategy,
-    siblingCounts,
-    completedToken.branch_total,
-  );
-
-  if (!conditionMet) {
-    // Still waiting
-    return [];
-  }
-
-  // Condition met → activate fan-in for waiting tokens
-  // Pick one waiting token to become the "winner" that proceeds
-  if (waitingTokens.length === 0) {
-    // No waiting tokens means the completing token should trigger fan-in
-    return [
-      {
-        type: 'ACTIVATE_FAN_IN',
-        workflowRunId,
-        nodeId: transition.to_node_id,
-        fanInPath: buildFanInPath(completedToken.sibling_group!, transition.to_node_id),
-        mergedTokenIds: [], // Dispatch layer populates with all sibling IDs
-      },
-    ];
-  }
-
-  // Use first waiting token as the one to proceed
-  const winnerToken = waitingTokens[0];
-
-  const decisions: Decision[] = [
-    {
-      type: 'ACTIVATE_FAN_IN',
-      workflowRunId,
-      nodeId: transition.to_node_id,
-      fanInPath: buildFanInPath(winnerToken.sibling_group!, transition.to_node_id),
-      mergedTokenIds: [], // Dispatch layer populates
-    },
-  ];
-
-  // Cancel remaining waiting tokens (they were absorbed by merge)
-  for (let i = 1; i < waitingTokens.length; i++) {
-    decisions.push({
-      type: 'UPDATE_TOKEN_STATUS',
-      tokenId: waitingTokens[i].id,
-      status: 'cancelled',
-    });
-  }
-
-  return decisions;
 }
 
 // ============================================================================
@@ -293,10 +221,9 @@ export function getMergeConfig(transition: TransitionDef): MergeConfig | null {
 export function decideOnTimeout(params: {
   waitingTokens: TokenRow[];
   transition: TransitionDef;
-  siblingCounts: SiblingCounts;
   workflowRunId: string;
 }): Decision[] {
-  const { waitingTokens, transition, siblingCounts, workflowRunId } = params;
+  const { waitingTokens, transition, workflowRunId } = params;
 
   if (!transition.synchronization) {
     return [];

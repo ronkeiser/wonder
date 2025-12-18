@@ -27,7 +27,6 @@ export {
 // Synchronization: fan-in and merge decisions
 export {
   decideFanInContinuation,
-  decideOnSiblingCompletion,
   decideOnTimeout,
   decideSynchronization,
   getMergeConfig,
