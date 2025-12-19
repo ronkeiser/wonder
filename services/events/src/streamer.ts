@@ -5,82 +5,24 @@ import type {
   BroadcastEventEntry,
   BroadcastTraceEventEntry,
   EventContext,
+  EventEntry,
   EventInput,
   Subscription,
   SubscriptionFilter,
   SubscriptionMessage,
-  TraceEventCategory,
+  TraceEventEntry,
   TraceEventInput,
 } from './types';
 import { getEventCategory } from './types';
 
 // ============================================================================
-// Utility Functions
-// ============================================================================
-
-/**
- * Split an array into chunks of specified size
- */
-function chunkArray<T>(array: T[], size: number): T[][] {
-  const chunks: T[][] = [];
-  for (let i = 0; i < array.length; i += size) {
-    chunks.push(array.slice(i, i + size));
-  }
-  return chunks;
-}
-
-// ============================================================================
 // Batching Configuration
 // ============================================================================
 
-/** Maximum events to buffer before forcing a flush */
 const BATCH_SIZE = 50;
-
-/** Maximum time (ms) to wait before flushing buffered events */
 const FLUSH_INTERVAL_MS = 50;
-
-/** Maximum rows per INSERT statement (limited by 100 params / ~10-14 columns) */
 const ROWS_PER_INSERT = 7;
-
-/** Maximum retry attempts for failed batch writes */
 const MAX_RETRY_ATTEMPTS = 3;
-
-// ============================================================================
-// Internal Types for Buffered Entries
-// ============================================================================
-
-interface BufferedEventEntry {
-  id: string;
-  timestamp: number;
-  sequence: number;
-  event_type: string;
-  workflow_run_id: string;
-  parent_run_id: string | null;
-  workflow_def_id: string;
-  node_id: string | null;
-  token_id: string | null;
-  path_id: string | null;
-  project_id: string;
-  tokens: number | null;
-  cost_usd: number | null;
-  message: string | null;
-  metadata: string;
-}
-
-interface BufferedTraceEntry {
-  id: string;
-  timestamp: number;
-  sequence: number;
-  type: string;
-  category: TraceEventCategory;
-  workflow_run_id: string;
-  token_id: string | null;
-  node_id: string | null;
-  project_id: string;
-  duration_ms: number | null;
-  payload: string;
-  message: string | null;
-}
 
 /**
  * Streamer Durable Object - one instance per workflow_run_id
@@ -99,8 +41,8 @@ export class Streamer extends DurableObject<Env> {
   private traceSeq = 0;
 
   // Event buffers for batched D1 writes
-  private eventBuffer: BufferedEventEntry[] = [];
-  private traceBuffer: BufferedTraceEntry[] = [];
+  private eventBuffer: EventEntry[] = [];
+  private traceBuffer: TraceEventEntry[] = [];
   private flushScheduled = false;
   private retryCount = 0;
 
@@ -132,7 +74,7 @@ export class Streamer extends DurableObject<Env> {
     this.eventSeq++;
     this.ctx.storage.put('eventSeq', this.eventSeq);
 
-    const entry: BufferedEventEntry = {
+    const entry: EventEntry = {
       id: ulid(),
       timestamp: Date.now(),
       sequence: this.eventSeq,
@@ -174,7 +116,7 @@ export class Streamer extends DurableObject<Env> {
     this.traceSeq++;
     this.ctx.storage.put('traceSeq', this.traceSeq);
 
-    const entry: BufferedTraceEntry = {
+    const entry: TraceEventEntry = {
       id: ulid(),
       timestamp: Date.now(),
       sequence: this.traceSeq,
@@ -186,7 +128,6 @@ export class Streamer extends DurableObject<Env> {
       project_id: context.project_id,
       duration_ms: input.duration_ms ?? null,
       payload: JSON.stringify(input.payload ?? {}),
-      message: null,
     };
 
     // Buffer for batched D1 write
@@ -246,12 +187,12 @@ export class Streamer extends DurableObject<Env> {
       const statements: Parameters<typeof this.env.DB.batch>[0] = [];
 
       // Build multi-row insert statements for events
-      for (const chunk of chunkArray(eventBatch, ROWS_PER_INSERT)) {
+      for (const chunk of this.chunkArray(eventBatch, ROWS_PER_INSERT)) {
         statements.push(this.buildEventInsert(chunk));
       }
 
       // Build multi-row insert statements for traces
-      for (const chunk of chunkArray(traceBatch, ROWS_PER_INSERT)) {
+      for (const chunk of this.chunkArray(traceBatch, ROWS_PER_INSERT)) {
         statements.push(this.buildTraceInsert(chunk));
       }
 
@@ -294,7 +235,7 @@ export class Streamer extends DurableObject<Env> {
   /**
    * Build a multi-row INSERT statement for workflow events
    */
-  private buildEventInsert(entries: BufferedEventEntry[]): D1PreparedStatement {
+  private buildEventInsert(entries: EventEntry[]): D1PreparedStatement {
     const columns = [
       'id',
       'timestamp',
@@ -341,7 +282,7 @@ export class Streamer extends DurableObject<Env> {
   /**
    * Build a multi-row INSERT statement for trace events
    */
-  private buildTraceInsert(entries: BufferedTraceEntry[]): D1PreparedStatement {
+  private buildTraceInsert(entries: TraceEventEntry[]): D1PreparedStatement {
     const columns = [
       'id',
       'timestamp',
@@ -354,7 +295,6 @@ export class Streamer extends DurableObject<Env> {
       'project_id',
       'duration_ms',
       'payload',
-      'message',
     ];
 
     const placeholders = entries.map(() => `(${columns.map(() => '?').join(', ')})`).join(', ');
@@ -371,7 +311,6 @@ export class Streamer extends DurableObject<Env> {
       e.project_id,
       e.duration_ms,
       e.payload,
-      e.message,
     ]);
 
     return this.env.DB.prepare(
@@ -530,5 +469,13 @@ export class Streamer extends DurableObject<Env> {
       return false;
     }
     return true;
+  }
+
+  private chunkArray<T>(array: T[], size: number): T[][] {
+    const chunks: T[][] = [];
+    for (let i = 0; i < array.length; i += size) {
+      chunks.push(array.slice(i, i + size));
+    }
+    return chunks;
   }
 }
