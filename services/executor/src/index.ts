@@ -123,11 +123,11 @@ export default class ExecutorService extends WorkerEntrypoint<Env> {
 
     try {
       // Load task definition from Resources
-      using taskDefsResource = this.env.RESOURCES.taskDefs();
-      const { task_def } = await taskDefsResource.get(payload.task_id, payload.task_version);
+      using tasksResource = this.env.RESOURCES.tasks();
+      const { task } = await tasksResource.get(payload.task_id, payload.task_version);
 
       // Execute the task using the task runner
-      const result = await runTask(payload, task_def, {
+      const result = await runTask(payload, task, {
         logger: this.logger,
         emitter,
         env: this.env,

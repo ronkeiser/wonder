@@ -55,7 +55,6 @@ describe('Foundation: 01 - Single Node Mock', () => {
       ref: 'generate_step',
       ordinal: 0,
       action: generateAction,
-      action_version: 1,
       input_mapping: {},
       output_mapping: { 'output.code': '$.code' },
     });

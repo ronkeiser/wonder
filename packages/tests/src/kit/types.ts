@@ -26,7 +26,7 @@ export interface TestContext {
 export interface CreatedResources {
   promptSpecIds: string[];
   actionIds: string[];
-  taskDefIds: string[];
+  taskIds: string[];
 }
 
 // =============================================================================

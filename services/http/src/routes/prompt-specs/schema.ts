@@ -16,6 +16,13 @@ export const CreatePromptSpecSchema = z
     produces: z.record(z.string(), z.unknown()).openapi({ example: { summary: 'string' } }),
     examples: z.array(z.unknown()).optional(),
     tags: z.array(z.string()).optional(),
+    autoversion: z
+      .boolean()
+      .optional()
+      .openapi({
+        description:
+          'When true, compute content hash for deduplication. If existing spec with same name and content exists, return it. Otherwise auto-increment version.',
+      }),
   })
   .openapi('CreatePromptSpec');
 
@@ -32,6 +39,7 @@ export const PromptSpecSchema = z
     produces: z.record(z.string(), z.unknown()),
     examples: z.array(z.unknown()).nullable(),
     tags: z.array(z.string()).nullable(),
+    content_hash: z.string().nullable(),
     created_at: z.string(),
     updated_at: z.string(),
   })
@@ -41,6 +49,9 @@ export const PromptSpecCreateResponseSchema = z
   .object({
     prompt_spec_id: z.string(),
     prompt_spec: PromptSpecSchema,
+    reused: z
+      .boolean()
+      .openapi({ description: 'True if an existing prompt spec was reused (autoversion matched)' }),
   })
   .openapi('PromptSpecCreateResponse');
 

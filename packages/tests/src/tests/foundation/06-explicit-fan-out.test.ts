@@ -129,7 +129,6 @@ describe('Foundation: 06 - Explicit Fan-Out', () => {
       ref: 'init_step',
       ordinal: 0,
       action: initAction,
-      action_version: 1,
       input_mapping: {},
       output_mapping: { 'output.seed': '$.seed' },
     });
@@ -171,7 +170,6 @@ describe('Foundation: 06 - Explicit Fan-Out', () => {
         ref: `phase1_${suffix}_step`,
         ordinal: 0,
         action: phase1Action,
-        action_version: 1,
         input_mapping: {},
         output_mapping: { 'output.value': '$.value' },
       });
@@ -213,7 +211,6 @@ describe('Foundation: 06 - Explicit Fan-Out', () => {
       ref: 'bridge_step',
       ordinal: 0,
       action: bridgeAction,
-      action_version: 1,
       input_mapping: { phase1_words: '$.input.phase1_words' },
       output_mapping: { 'output.phase1_words': '$.phase1_words' },
     });
@@ -260,7 +257,6 @@ describe('Foundation: 06 - Explicit Fan-Out', () => {
         ref: `phase2_${suffix}_word_step`,
         ordinal: 0,
         action: phase2WordAction,
-        action_version: 1,
         input_mapping: {},
         output_mapping: { 'output.word': '$.word' },
       });
@@ -281,7 +277,6 @@ describe('Foundation: 06 - Explicit Fan-Out', () => {
         ref: `phase2_${suffix}_merge_step`,
         ordinal: 1,
         action: phase2MergeAction,
-        action_version: 1,
         input_mapping: {
           inherited_words: '$.input.inherited_words',
           word: '$.output.word',
@@ -334,7 +329,6 @@ describe('Foundation: 06 - Explicit Fan-Out', () => {
       ref: 'summarize_step',
       ordinal: 0,
       action: summarizeAction,
-      action_version: 1,
       input_mapping: {
         phase1_words: '$.input.phase1_words',
         phase2_accumulated: '$.input.phase2_accumulated',

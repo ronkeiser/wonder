@@ -61,20 +61,20 @@ export async function handleBranchOutput(
     return;
   }
 
-  const taskDefsResource = ctx.resources.taskDefs();
-  const { task_def: taskDef } = await taskDefsResource.get(node.task_id, node.task_version ?? 1);
+  const tasksResource = ctx.resources.tasks();
+  const { task } = await tasksResource.get(node.task_id, node.task_version ?? 1);
 
-  if (!taskDef.output_schema) {
+  if (!task.output_schema) {
     ctx.logger.debug({
       event_type: 'branch.output.skip',
-      message: 'No output_schema on TaskDef - skipping branch output',
-      metadata: { token_id: token.id, task_id: taskDef.id },
+      message: 'No output_schema on Task - skipping branch output',
+      metadata: { token_id: token.id, task_id: task.id },
     });
     return;
   }
 
   // Initialize branch table (creates if not exists)
-  ctx.context.initializeBranchTable(token.id, taskDef.output_schema as JSONSchema);
+  ctx.context.initializeBranchTable(token.id, task.output_schema as JSONSchema);
 
   // Write output to branch table
   ctx.context.applyBranchOutput(token.id, output);
@@ -341,17 +341,17 @@ async function mergeBranchOutputs(
   const sourceNode = ctx.defs.getNode(sourceNodeId);
   if (!sourceNode.task_id) return;
 
-  const taskDefsResource = ctx.resources.taskDefs();
-  const { task_def: taskDef } = await taskDefsResource.get(
+  const tasksResource = ctx.resources.tasks();
+  const { task } = await tasksResource.get(
     sourceNode.task_id,
     sourceNode.task_version ?? 1,
   );
 
-  if (taskDef.output_schema) {
+  if (task.output_schema) {
     const branchOutputs = ctx.context.getBranchOutputs(
       completedSiblings.map((s) => s.id),
       completedSiblings.map((s) => s.branch_index),
-      taskDef.output_schema as JSONSchema,
+      task.output_schema as JSONSchema,
     );
     ctx.context.mergeBranches(branchOutputs, mergeConfig);
   }

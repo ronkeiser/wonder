@@ -77,3 +77,27 @@ export async function deleteAction(
     await db.delete(actions).where(eq(actions.id, id)).run();
   }
 }
+
+export async function getActionByNameAndHash(
+  db: DrizzleD1Database,
+  name: string,
+  contentHash: string,
+): Promise<Action | null> {
+  const result = await db
+    .select()
+    .from(actions)
+    .where(and(eq(actions.name, name), eq(actions.content_hash, contentHash)))
+    .get();
+  return result ?? null;
+}
+
+export async function getMaxVersionByName(db: DrizzleD1Database, name: string): Promise<number> {
+  const result = await db
+    .select({ version: actions.version })
+    .from(actions)
+    .where(eq(actions.name, name))
+    .orderBy(desc(actions.version))
+    .limit(1)
+    .get();
+  return result?.version ?? 0;
+}

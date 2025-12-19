@@ -78,7 +78,6 @@ describe('Foundation: 03 - Sequential Fan-out/Fan-in', () => {
       ref: 'init_step',
       ordinal: 0,
       action: initAction,
-      action_version: 1,
       input_mapping: {},
       output_mapping: { 'output.seed': '$.seed' },
     });
@@ -118,7 +117,6 @@ describe('Foundation: 03 - Sequential Fan-out/Fan-in', () => {
       ref: 'phase1_step',
       ordinal: 0,
       action: phase1Action,
-      action_version: 1,
       input_mapping: {},
       output_mapping: { 'output.value': '$.value' },
     });
@@ -154,7 +152,6 @@ describe('Foundation: 03 - Sequential Fan-out/Fan-in', () => {
       ref: 'bridge_step',
       ordinal: 0,
       action: bridgeAction,
-      action_version: 1,
       input_mapping: {},
       output_mapping: { 'output.count': '$.count' },
     });
@@ -194,7 +191,6 @@ describe('Foundation: 03 - Sequential Fan-out/Fan-in', () => {
       ref: 'phase2_step',
       ordinal: 0,
       action: phase2Action,
-      action_version: 1,
       input_mapping: {},
       output_mapping: { 'output.transformed': '$.transformed' },
     });
@@ -236,7 +232,6 @@ describe('Foundation: 03 - Sequential Fan-out/Fan-in', () => {
       ref: 'summarize_step',
       ordinal: 0,
       action: summarizeAction,
-      action_version: 1,
       input_mapping: {},
       output_mapping: { 'output.summary': '$.summary' },
     });

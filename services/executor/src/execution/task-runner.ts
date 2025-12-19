@@ -8,7 +8,7 @@
 
 import type { Emitter } from '@wonder/events';
 import type { Logger } from '@wonder/logs';
-import type { TaskDef } from '@wonder/resources/types';
+import type { Task } from '@wonder/resources/types';
 import type { TaskPayload, TaskResult } from '../index';
 import { executeStep } from './step-executor';
 import type { ExecutionMetrics, TaskContext } from './types';
@@ -25,7 +25,7 @@ export interface TaskRunnerDeps {
  */
 export async function runTask(
   payload: TaskPayload,
-  taskDef: TaskDef,
+  task: Task,
   deps: TaskRunnerDeps,
 ): Promise<TaskResult> {
   const { logger, emitter } = deps;
@@ -51,10 +51,10 @@ export async function runTask(
   };
 
   try {
-    // TODO: Validate input against taskDef.input_schema
+    // TODO: Validate input against task.input_schema
 
     // Sort steps by ordinal
-    const sortedSteps = [...taskDef.steps].sort((a, b) => a.ordinal - b.ordinal);
+    const sortedSteps = [...task.steps].sort((a, b) => a.ordinal - b.ordinal);
 
     logger.info({
       event_type: 'task_runner_started',
@@ -62,8 +62,8 @@ export async function runTask(
       trace_id: payload.workflow_run_id,
       metadata: {
         token_id: payload.token_id,
-        task_id: taskDef.id,
-        task_version: taskDef.version,
+        task_id: task.id,
+        task_version: task.version,
         step_count: sortedSteps.length,
       },
     });
@@ -73,8 +73,8 @@ export async function runTask(
       type: 'executor.task.started',
       token_id: payload.token_id,
       payload: {
-        task_id: taskDef.id,
-        task_version: taskDef.version,
+        task_id: task.id,
+        task_version: task.version,
         step_count: sortedSteps.length,
         input_keys: Object.keys(payload.input),
       },
@@ -127,7 +127,7 @@ export async function runTask(
       }
     }
 
-    // TODO: Validate output against taskDef.output_schema
+    // TODO: Validate output against task.output_schema
 
     metrics.duration_ms = Date.now() - startTime;
 
@@ -137,8 +137,8 @@ export async function runTask(
       token_id: payload.token_id,
       duration_ms: metrics.duration_ms,
       payload: {
-        task_id: taskDef.id,
-        task_version: taskDef.version,
+        task_id: task.id,
+        task_version: task.version,
         steps_executed: metrics.steps_executed,
         steps_skipped: metrics.steps_skipped,
         output: context.output,
@@ -151,7 +151,7 @@ export async function runTask(
       trace_id: payload.workflow_run_id,
       metadata: {
         token_id: payload.token_id,
-        task_id: taskDef.id,
+        task_id: task.id,
         duration_ms: metrics.duration_ms,
         steps_executed: metrics.steps_executed,
         steps_skipped: metrics.steps_skipped,

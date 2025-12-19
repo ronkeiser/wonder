@@ -382,7 +382,7 @@
 </script>
 
 <div class="stream-viewer">
-  {#if workflowRunId}
+  {#if workflowRunId || !subscribeMessage}
     <header>
       <div class="left-controls">
         <select
@@ -395,7 +395,9 @@
             <option value={option.value}>{option.label}</option>
           {/each}
         </select>
-        <span class="status {status}">{status}</span>
+        {#if subscribeMessage && workflowRunId}
+          <span class="status {status}">{status}</span>
+        {/if}
       </div>
       <div class="right-controls">
         <div class="time-filters">

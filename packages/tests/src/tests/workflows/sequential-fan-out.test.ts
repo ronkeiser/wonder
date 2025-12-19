@@ -114,7 +114,6 @@ describe('Coordinator - Idea Ranking Pipeline', () => {
       ref: 'start_step',
       ordinal: 0,
       action: startAction,
-      action_version: 1,
       input_mapping: {},
       output_mapping: {},
     });
@@ -164,7 +163,6 @@ Return JSON with:
       ref: 'ideate_step',
       ordinal: 0,
       action: ideateAction,
-      action_version: 1,
       input_mapping: { topic: '$.input.topic', branch_index: '$.input.branch_index' },
       output_mapping: {
         'output.ideas': '$.response.ideas',
@@ -207,7 +205,6 @@ Return JSON with:
       ref: 'aggregate_step',
       ordinal: 0,
       action: aggregateAction,
-      action_version: 1,
       input_mapping: {},
       output_mapping: {},
     });
@@ -268,7 +265,6 @@ Return JSON with:
       ref: 'judge_step',
       ordinal: 0,
       action: judgeAction,
-      action_version: 1,
       input_mapping: {
         topic: '$.input.topic',
         ideas: '$.input.ideas',
@@ -352,7 +348,6 @@ Return JSON with:
       ref: 'report_step',
       ordinal: 0,
       action: reportAction,
-      action_version: 1,
       input_mapping: {
         topic: '$.input.topic',
         judgments: '$.input.judgments',

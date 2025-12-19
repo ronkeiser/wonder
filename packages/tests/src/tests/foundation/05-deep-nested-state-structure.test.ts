@@ -144,7 +144,6 @@ describe('Foundation: 05 - Deep Nested State Structure', () => {
         ref: 'init_step',
         ordinal: 0,
         action: initAction,
-        action_version: 1,
         input_mapping: {},
         output_mapping: { 'output.seed': '$.seed' },
       });
@@ -183,7 +182,6 @@ describe('Foundation: 05 - Deep Nested State Structure', () => {
         ref: 'phase1_step',
         ordinal: 0,
         action: phase1Action,
-        action_version: 1,
         input_mapping: {},
         output_mapping: { 'output.word': '$.word' },
       });
@@ -219,7 +217,6 @@ describe('Foundation: 05 - Deep Nested State Structure', () => {
         ref: 'bridge1_step',
         ordinal: 0,
         action: bridge1Action,
-        action_version: 1,
         input_mapping: { phase1_words: '$.input.phase1_words' },
         output_mapping: { 'output.phase1_words': '$.phase1_words' },
       });
@@ -261,7 +258,6 @@ describe('Foundation: 05 - Deep Nested State Structure', () => {
         ref: 'phase2_word_step',
         ordinal: 0,
         action: phase2WordAction,
-        action_version: 1,
         input_mapping: {},
         output_mapping: { 'output.word': '$.word' },
       });
@@ -283,7 +279,6 @@ describe('Foundation: 05 - Deep Nested State Structure', () => {
         ref: 'phase2_merge_step',
         ordinal: 1,
         action: phase2MergeAction,
-        action_version: 1,
         input_mapping: {
           inherited_words: '$.input.inherited_words',
           word: '$.output.word',
@@ -324,7 +319,6 @@ describe('Foundation: 05 - Deep Nested State Structure', () => {
         ref: 'bridge2_step',
         ordinal: 0,
         action: bridge2Action,
-        action_version: 1,
         input_mapping: { phase2_accumulated: '$.input.phase2_accumulated' },
         output_mapping: { 'output.phase2_accumulated': '$.phase2_accumulated' },
       });
@@ -367,7 +361,6 @@ describe('Foundation: 05 - Deep Nested State Structure', () => {
         ref: 'phase3_word_step',
         ordinal: 0,
         action: phase3WordAction,
-        action_version: 1,
         input_mapping: {},
         output_mapping: { 'output.word': '$.word' },
       });
@@ -393,7 +386,6 @@ describe('Foundation: 05 - Deep Nested State Structure', () => {
         ref: 'phase3_merge_step',
         ordinal: 1,
         action: phase3MergeAction,
-        action_version: 1,
         input_mapping: {
           inherited_accumulated: '$.input.inherited_accumulated',
           // Wrap word in array so it becomes a row
@@ -419,7 +411,6 @@ describe('Foundation: 05 - Deep Nested State Structure', () => {
         ref: 'phase3_wrap_step',
         ordinal: 1,
         action: phase3WrapAction,
-        action_version: 1,
         input_mapping: { word: '$.output.word' },
         output_mapping: { 'output.word_row': '$.word_row' },
       });
@@ -429,7 +420,6 @@ describe('Foundation: 05 - Deep Nested State Structure', () => {
         ref: 'phase3_merge_step',
         ordinal: 2,
         action: phase3MergeAction,
-        action_version: 1,
         input_mapping: {
           inherited_accumulated: '$.input.inherited_accumulated',
           word_row: '$.output.word_row',
@@ -470,7 +460,6 @@ describe('Foundation: 05 - Deep Nested State Structure', () => {
         ref: 'finalize_step',
         ordinal: 0,
         action: finalizeAction,
-        action_version: 1,
         input_mapping: {
           phase1_words: '$.input.phase1_words',
           phase2_accumulated: '$.input.phase2_accumulated',

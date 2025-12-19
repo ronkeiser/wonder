@@ -96,7 +96,6 @@ describe('Coordinator - Fan-Out Explicit Nodes', () => {
       ref: 'start_step',
       ordinal: 0,
       action: startAction,
-      action_version: 1,
       input_mapping: { topic: '$.input.topic' },
       output_mapping: { 'output.topic': '$.response.topic' },
     });
@@ -146,7 +145,6 @@ Return a JSON object with:
         ref: `trivia_${num}_step`,
         ordinal: 0,
         action: triviaAction,
-        action_version: 1,
         input_mapping: { topic: '$.input.topic' },
         output_mapping: {
           'output.question': '$.response.question',
@@ -221,7 +219,6 @@ Return a JSON object echoing all 6 values exactly:
       ref: 'collect_step',
       ordinal: 0,
       action: collectAction,
-      action_version: 1,
       input_mapping: {
         q1: '$.input.q1',
         a1: '$.input.a1',

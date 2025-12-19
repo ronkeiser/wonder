@@ -83,7 +83,6 @@ describe('Foundation: 02 - Fan-out with Spawn Count + Fan-in', () => {
       ref: 'init_step',
       ordinal: 0,
       action: nodeAAction,
-      action_version: 1,
       input_mapping: {},
       output_mapping: { 'output.seed': '$.seed' },
     });
@@ -121,7 +120,6 @@ describe('Foundation: 02 - Fan-out with Spawn Count + Fan-in', () => {
       ref: 'process_step',
       ordinal: 0,
       action: nodeBAction,
-      action_version: 1,
       input_mapping: {},
       output_mapping: { 'output.result': '$.result' },
     });
@@ -155,7 +153,6 @@ describe('Foundation: 02 - Fan-out with Spawn Count + Fan-in', () => {
       ref: 'summarize_step',
       ordinal: 0,
       action: nodeCAction,
-      action_version: 1,
       input_mapping: {},
       output_mapping: { 'output.summary': '$.summary' },
     });

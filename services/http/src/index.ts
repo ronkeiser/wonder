@@ -14,7 +14,7 @@ import { logs } from './routes/logs/route';
 import { modelProfiles } from './routes/model-profiles/route';
 import { projects } from './routes/projects/route';
 import { promptSpecs } from './routes/prompt-specs/route';
-import { taskDefs } from './routes/task-defs/route';
+import { tasks } from './routes/tasks/route';
 import { workflowDefs } from './routes/workflow-defs/route';
 import { workflowRuns } from './routes/workflow-runs/route';
 import { workflows } from './routes/workflows/route';
@@ -57,7 +57,7 @@ const routes = app
   .route('/actions', actions)
   .route('/prompt-specs', promptSpecs)
   .route('/model-profiles', modelProfiles)
-  .route('/task-defs', taskDefs)
+  .route('/tasks', tasks)
   .route('/workflow-defs', workflowDefs)
   .route('/workflows', workflows)
   .route('/workflow-runs', workflowRuns)

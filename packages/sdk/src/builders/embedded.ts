@@ -68,7 +68,6 @@ export interface EmbeddedStep {
   ordinal: number;
   action_id?: string;
   action?: EmbeddedAction;
-  action_version: number;
   input_mapping?: Record<string, unknown> | null;
   output_mapping?: Record<string, unknown> | null;
   on_failure?: 'abort' | 'retry' | 'continue';

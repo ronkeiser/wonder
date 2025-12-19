@@ -117,7 +117,7 @@ interface ApiTestContext {
 interface CreatedResources {
   promptSpecIds: string[];
   actionIds: string[];
-  taskDefIds: string[];
+  taskIds: string[];
   workflowDefId?: string;
   workflowId?: string;
   workflowRunId?: string;
@@ -195,9 +195,9 @@ async function cleanupResources(
     }
   }
 
-  for (const id of resources.taskDefIds.reverse()) {
+  for (const id of resources.taskIds.reverse()) {
     try {
-      await client['task-defs'](id).delete();
+      await client.tasks(id).delete();
     } catch {
       /* ignore */
     }
@@ -338,7 +338,6 @@ function transformTask(taskDoc: TaskDocument, testContext: TestContext): Embedde
           ref: stepDoc.ref || `step-${stepDoc.ordinal || 0}`,
           ordinal: stepDoc.ordinal || 0,
           action: embeddedAction,
-          action_version: stepDoc.action_version || 1,
           // Support both input_mapping and input_map (parser may produce either)
           input_mapping: stepDoc.input_mapping || (stepDoc as any).input_map || undefined,
           output_mapping: stepDoc.output_mapping || (stepDoc as any).output_map || undefined,
@@ -604,7 +603,7 @@ async function executeTestCase(
   const resources: CreatedResources = {
     promptSpecIds: [],
     actionIds: [],
-    taskDefIds: [],
+    taskIds: [],
   };
 
   try {
@@ -775,11 +774,18 @@ async function createEmbeddedTaskDef(
 
   for (const s of taskDef.steps as EmbeddedStep[]) {
     let actionId: string;
+    let actionVersion: number;
 
     if (s.action_id) {
-      actionId = s.action_id;
+      // Reference to existing action - get latest version
+      const actionResponse = await client.actions(s.action_id).get();
+      actionId = actionResponse.action.id;
+      actionVersion = actionResponse.action.version;
     } else if (s.action) {
-      actionId = await createEmbeddedAction(client, apiCtx, s.action as EmbeddedAction, resources);
+      // Create embedded action and use returned version
+      const result = await createEmbeddedAction(client, apiCtx, s.action as EmbeddedAction, resources);
+      actionId = result.id;
+      actionVersion = result.version;
     } else {
       throw new Error(`Step ${s.ref} must have either action_id or action`);
     }
@@ -788,7 +794,7 @@ async function createEmbeddedTaskDef(
       ref: s.ref,
       ordinal: s.ordinal,
       action_id: actionId,
-      action_version: s.action_version,
+      action_version: actionVersion,
       input_mapping: s.input_mapping ?? null,
       output_mapping: s.output_mapping ?? null,
       on_failure: s.on_failure ?? 'abort',
@@ -796,7 +802,7 @@ async function createEmbeddedTaskDef(
     });
   }
 
-  const response = await client.taskDefs.create({
+  const response = await client.tasks.create({
     name: taskDef.name,
     description: taskDef.description,
     version: taskDef.version ?? 1,
@@ -808,12 +814,12 @@ async function createEmbeddedTaskDef(
     timeout_ms: taskDef.timeout_ms,
   } as any);
 
-  if (!response?.task_def?.id) {
-    throw new Error('Failed to create task def');
+  if (!response?.task?.id) {
+    throw new Error('Failed to create task');
   }
 
-  resources.taskDefIds.push(response.task_def.id);
-  return response.task_def.id;
+  resources.taskIds.push(response.task.id);
+  return response.task.id;
 }
 
 /**
@@ -824,7 +830,7 @@ async function createEmbeddedAction(
   apiCtx: ApiTestContext,
   actionDef: EmbeddedAction,
   resources: CreatedResources,
-): Promise<string> {
+): Promise<{ id: string; version: number }> {
   const implementation = { ...actionDef.implementation };
 
   // Resolve embedded prompt spec
@@ -860,7 +866,7 @@ async function createEmbeddedAction(
   }
 
   resources.actionIds.push(response.action.id);
-  return response.action.id;
+  return { id: response.action.id, version: response.action.version };
 }
 
 /**

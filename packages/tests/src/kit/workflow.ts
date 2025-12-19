@@ -48,7 +48,7 @@ export async function createWorkflow(
   const createdResources: CreatedResources = {
     promptSpecIds: [],
     actionIds: [],
-    taskDefIds: [],
+    taskIds: [],
   };
 
   // Process nodes to resolve embedded resources
@@ -91,7 +91,6 @@ export async function createWorkflow(
     ...workflow,
     project_id: ctx.projectId,
     nodes: resolvedNodes,
-    autoversion: true,
   };
 
   const workflowDefResponse = await wonder.workflowDefs.create(resolvedWorkflow as any);
@@ -102,11 +101,7 @@ export async function createWorkflow(
   const workflowDefId = workflowDefResponse.workflow_def_id;
   const version = workflowDefResponse.workflow_def?.version ?? 1;
 
-  if (workflowDefResponse.reused) {
-    console.log(`📦 Reusing existing workflow def (version ${version})`);
-  } else {
-    console.log(`📦 Created new workflow def (version ${version})`);
-  }
+  console.log(`📦 Created workflow def (version ${version})`);
 
   const workflowResponse = await wonder.workflows.create({
     project_id: ctx.projectId,

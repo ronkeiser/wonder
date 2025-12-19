@@ -76,3 +76,36 @@ export async function deletePromptSpec(
     await db.delete(prompt_specs).where(eq(prompt_specs.id, id)).run();
   }
 }
+
+/**
+ * Find a prompt spec by name and content hash.
+ * Used for autoversion deduplication.
+ */
+export async function getPromptSpecByNameAndHash(
+  db: DrizzleD1Database,
+  name: string,
+  contentHash: string,
+): Promise<PromptSpec | null> {
+  const result = await db
+    .select()
+    .from(prompt_specs)
+    .where(and(eq(prompt_specs.name, name), eq(prompt_specs.content_hash, contentHash)))
+    .get();
+  return result ?? null;
+}
+
+/**
+ * Get the maximum version number for a prompt spec by name.
+ * Returns 0 if no existing prompt spec with that name exists.
+ */
+export async function getMaxVersionByName(db: DrizzleD1Database, name: string): Promise<number> {
+  const result = await db
+    .select({ version: prompt_specs.version })
+    .from(prompt_specs)
+    .where(eq(prompt_specs.name, name))
+    .orderBy(desc(prompt_specs.version))
+    .limit(1)
+    .get();
+
+  return result?.version ?? 0;
+}

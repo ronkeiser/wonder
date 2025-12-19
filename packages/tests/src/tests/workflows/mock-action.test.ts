@@ -59,7 +59,6 @@ describe('Coordinator - Mock Action', () => {
       ref: 'mock_step',
       ordinal: 0,
       action: mockAction,
-      action_version: 1,
       input_mapping: {},
       output_mapping: {
         'output.score': '$.score',

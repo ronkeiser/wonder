@@ -80,7 +80,6 @@ describe('Coordinator - Two Node Linear Workflow', () => {
       ref: 'generate_step',
       ordinal: 0,
       action: generateAction,
-      action_version: 1,
       input_mapping: { seed: '$.input.seed' },
       output_mapping: { 'output.code': '$.response.code' },
     });
@@ -126,7 +125,6 @@ describe('Coordinator - Two Node Linear Workflow', () => {
       ref: 'echo_step',
       ordinal: 0,
       action: echoAction,
-      action_version: 1,
       input_mapping: { code: '$.input.code' },
       output_mapping: { 'output.echoed_code': '$.response.echoed_code' },
     });

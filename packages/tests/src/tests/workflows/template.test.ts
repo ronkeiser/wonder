@@ -81,7 +81,6 @@ describe('Coordinator - Simple Workflow Tests', () => {
                       }),
                     },
                   }),
-                  action_version: 1,
                   input_mapping: {
                     name: '$.input.name',
                     count: '$.input.count',

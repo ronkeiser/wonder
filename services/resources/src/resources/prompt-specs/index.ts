@@ -2,11 +2,13 @@
 
 import { ConflictError, NotFoundError, extractDbError } from '~/errors';
 import { Resource } from '../base';
+import { computeFingerprint } from './fingerprint';
 import * as repo from './repository';
+import type { PromptSpec } from './types';
 
 export class PromptSpecs extends Resource {
   async create(data: {
-    version: number;
+    version?: number;
     name: string;
     description?: string;
     system_prompt?: string;
@@ -16,82 +18,127 @@ export class PromptSpecs extends Resource {
     produces?: object;
     examples?: object;
     tags?: string[];
+    autoversion?: boolean;
   }): Promise<{
     prompt_spec_id: string;
-    prompt_spec: {
-      id: string;
-      name: string;
-      description: string;
-      version: number;
-      system_prompt: string | null;
-      template: string;
-      template_language: 'handlebars' | 'jinja2';
-      requires: object;
-      produces: object;
-      examples: object | null;
-      tags: string[] | null;
-      created_at: string;
-      updated_at: string;
-    };
+    prompt_spec: PromptSpec;
+    /** True if an existing prompt spec was reused (autoversion matched content hash) */
+    reused: boolean;
   }> {
-    return this.withLogging(
-      'create',
-      { metadata: { name: data.name, version: data.version } },
-      async () => {
-        try {
-          const promptSpec = await repo.createPromptSpec(this.serviceCtx.db, {
-            version: data.version,
-            name: data.name,
-            description: data.description ?? '',
-            system_prompt: data.system_prompt ?? null,
-            template: data.template,
-            template_language: data.template_language ?? 'handlebars',
-            requires: data.requires ?? {},
-            produces: data.produces ?? {},
-            examples: data.examples ?? null,
-            tags: data.tags ?? null,
-          });
+    this.serviceCtx.logger.info({
+      event_type: 'prompt_spec.create.started',
+      metadata: { name: data.name, autoversion: data.autoversion ?? false },
+    });
 
-          return {
-            prompt_spec_id: promptSpec.id,
-            prompt_spec: promptSpec,
-          };
-        } catch (error) {
-          const dbError = extractDbError(error);
+    // Autoversion deduplication check
+    if (data.autoversion) {
+      const contentHash = await computeFingerprint(data);
 
-          if (dbError.constraint === 'unique') {
-            throw new ConflictError(
-              `PromptSpec with ${dbError.field} already exists`,
-              dbError.field,
-              'unique',
-            );
-          }
+      // Check for existing prompt spec with same name + content
+      const existing = await repo.getPromptSpecByNameAndHash(
+        this.serviceCtx.db,
+        data.name,
+        contentHash,
+      );
 
-          throw error;
-        }
-      },
-    );
+      if (existing) {
+        this.serviceCtx.logger.info({
+          event_type: 'prompt_spec.autoversion.matched',
+          metadata: {
+            prompt_spec_id: existing.id,
+            version: existing.version,
+            name: existing.name,
+            content_hash: contentHash,
+          },
+        });
+
+        return {
+          prompt_spec_id: existing.id,
+          prompt_spec: existing,
+          reused: true,
+        };
+      }
+
+      // No exact match - determine version number
+      const maxVersion = await repo.getMaxVersionByName(this.serviceCtx.db, data.name);
+      const newVersion = maxVersion + 1;
+
+      this.serviceCtx.logger.info({
+        event_type: 'prompt_spec.autoversion.creating',
+        metadata: {
+          name: data.name,
+          version: newVersion,
+          content_hash: contentHash,
+          existing_max_version: maxVersion,
+        },
+      });
+
+      return this.createWithVersionAndHash(data, newVersion, contentHash);
+    }
+
+    // Non-autoversion path: create with version 1 (original behavior)
+    return this.createWithVersionAndHash(data, data.version ?? 1, null);
+  }
+
+  private async createWithVersionAndHash(
+    data: {
+      name: string;
+      description?: string;
+      system_prompt?: string;
+      template: string;
+      template_language?: 'handlebars' | 'jinja2';
+      requires?: object;
+      produces?: object;
+      examples?: object;
+      tags?: string[];
+    },
+    version: number,
+    contentHash: string | null,
+  ): Promise<{
+    prompt_spec_id: string;
+    prompt_spec: PromptSpec;
+    reused: boolean;
+  }> {
+    try {
+      const promptSpec = await repo.createPromptSpec(this.serviceCtx.db, {
+        version,
+        name: data.name,
+        description: data.description ?? '',
+        system_prompt: data.system_prompt ?? null,
+        template: data.template,
+        template_language: data.template_language ?? 'handlebars',
+        requires: data.requires ?? {},
+        produces: data.produces ?? {},
+        examples: data.examples ?? null,
+        tags: data.tags ?? null,
+        content_hash: contentHash,
+      });
+
+      return {
+        prompt_spec_id: promptSpec.id,
+        prompt_spec: promptSpec,
+        reused: false,
+      };
+    } catch (error) {
+      const dbError = extractDbError(error);
+
+      if (dbError.constraint === 'unique') {
+        throw new ConflictError(
+          `PromptSpec with ${dbError.field} already exists`,
+          dbError.field,
+          'unique',
+        );
+      }
+
+      throw error;
+    }
   }
 
   async get(
     id: string,
     version?: number,
   ): Promise<{
-    prompt_spec: {
-      id: string;
-      name: string;
-      description: string;
-      version: number;
-      system_prompt: string | null;
-      template: string;
-      template_language: 'handlebars' | 'jinja2';
-      requires: object;
-      produces: object;
-      examples: object | null;
-      tags: string[] | null;
-      created_at: string;
-      updated_at: string;
-    };
+    prompt_spec: PromptSpec;
   }> {
     return this.withLogging(
       'get',

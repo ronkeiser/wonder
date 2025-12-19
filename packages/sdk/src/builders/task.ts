@@ -5,22 +5,17 @@
  * Steps can embed actions for automatic creation by createWorkflow.
  */
 
-import type { components } from '../generated/schema';
 import { type EmbeddedAction, type EmbeddedStep, type EmbeddedTaskDef, TASK_DEF } from './embedded';
-
-type CreateTaskDef = components['schemas']['CreateTaskDef'];
-type CreateStep = components['schemas']['CreateStep'];
 
 /**
  * Create a step for a task definition
  *
  * @example
- * // With action ID (traditional)
+ * // With action ID (references existing action, uses latest version)
  * const myStep = step({
  *   ref: 'call_llm',
  *   ordinal: 0,
  *   action_id: 'my-action-id',
- *   action_version: 1,
  *   input_mapping: { prompt: '$.input.prompt' },
  *   output_mapping: { response: '$.result.text' },
  * });
@@ -30,7 +25,6 @@ type CreateStep = components['schemas']['CreateStep'];
  *   ref: 'call_llm',
  *   ordinal: 0,
  *   action: action({...}),  // will be created automatically
- *   action_version: 1,
  * });
  */
 export function step(config: {
@@ -38,7 +32,6 @@ export function step(config: {
   ordinal: number;
   action_id?: string;
   action?: EmbeddedAction;
-  action_version: number;
   input_mapping?: Record<string, unknown> | null;
   output_mapping?: Record<string, unknown> | null;
   on_failure?: 'abort' | 'retry' | 'continue';
@@ -56,7 +49,6 @@ export function step(config: {
     ordinal: config.ordinal,
     action_id: config.action_id,
     action: config.action,
-    action_version: config.action_version,
     input_mapping: config.input_mapping ?? null,
     output_mapping: config.output_mapping ?? null,
     on_failure: config.on_failure ?? 'abort',
@@ -68,7 +60,7 @@ export function step(config: {
  * Create a task definition
  *
  * @example
- * // With action IDs (traditional)
+ * // With action IDs (references existing action, uses latest version)
  * const myTask = taskDef({
  *   name: 'Write File Verified',
  *   description: 'Write file with read-back verification',
@@ -76,7 +68,7 @@ export function step(config: {
  *   input_schema: schema.object({ path: schema.string(), content: schema.string() }),
  *   output_schema: schema.object({ success: schema.boolean() }),
  *   steps: [
- *     step({ ref: 'write', ordinal: 0, action_id: 'write-action', action_version: 1 }),
+ *     step({ ref: 'write', ordinal: 0, action_id: 'write-action' }),
  *   ]
  * });
  *
@@ -93,7 +85,6 @@ export function step(config: {
  *         promptSpec: promptSpec({...}),
  *         ...
  *       }),
- *       action_version: 1
  *     }),
  *   ]
  * });

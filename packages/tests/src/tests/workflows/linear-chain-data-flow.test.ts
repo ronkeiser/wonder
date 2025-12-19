@@ -99,7 +99,6 @@ Make the question specific and factual.`,
       ref: 'question_step',
       ordinal: 0,
       action: questionAction,
-      action_version: 1,
       input_mapping: { topic: '$.input.topic' },
       output_mapping: {
         'output.question': '$.response.question',
@@ -154,7 +153,6 @@ Return a JSON object with:
       ref: 'guess_step',
       ordinal: 0,
       action: guessAction,
-      action_version: 1,
       input_mapping: { question: '$.input.question' },
       output_mapping: { 'output.guess': '$.response.guess' },
     });
@@ -212,7 +210,6 @@ Be lenient with minor spelling differences or equivalent answers.`,
       ref: 'judge_step',
       ordinal: 0,
       action: judgeAction,
-      action_version: 1,
       input_mapping: {
         question: '$.input.question',
         correct_answer: '$.input.correct_answer',

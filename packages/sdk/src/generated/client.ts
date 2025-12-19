@@ -152,28 +152,28 @@ export function createClient(baseClient: any) {
         }
       }
     ),
-    "task-defs": Object.assign(
+    tasks: Object.assign(
       (id: string) => ({
-          get: async (options?: any): Promise<paths['/task-defs/{id}']['get']['responses']['200']['content']['application/json']> => {
-            const { data, error } = await baseClient.GET(`/task-defs/${id}`, {});
-            if (error) throw new ApiError(`GET /task-defs/${id} failed`, error);
+          get: async (options?: any): Promise<paths['/tasks/{id}']['get']['responses']['200']['content']['application/json']> => {
+            const { data, error } = await baseClient.GET(`/tasks/${id}`, {});
+            if (error) throw new ApiError(`GET /tasks/${id} failed`, error);
             return data;
           },
-          delete: async (options?: any): Promise<paths['/task-defs/{id}']['delete']['responses']['200']['content']['application/json']> => {
-            const { data, error } = await baseClient.DELETE(`/task-defs/${id}`, {});
-            if (error) throw new ApiError(`DELETE /task-defs/${id} failed`, error);
+          delete: async (options?: any): Promise<paths['/tasks/{id}']['delete']['responses']['200']['content']['application/json']> => {
+            const { data, error } = await baseClient.DELETE(`/tasks/${id}`, {});
+            if (error) throw new ApiError(`DELETE /tasks/${id} failed`, error);
             return data;
           }
         }),
       {
-        create: async (body: NonNullable<paths['/task-defs']['post']['requestBody']>['content']['application/json'], options?: any): Promise<paths['/task-defs']['post']['responses']['201']['content']['application/json']> => {
-          const { data, error } = await baseClient.POST(`/task-defs`, { body });
-          if (error) throw new ApiError(`POST /task-defs failed`, error);
+        create: async (body: NonNullable<paths['/tasks']['post']['requestBody']>['content']['application/json'], options?: any): Promise<paths['/tasks']['post']['responses']['201']['content']['application/json']> => {
+          const { data, error } = await baseClient.POST(`/tasks`, { body });
+          if (error) throw new ApiError(`POST /tasks failed`, error);
           return data;
         },
-        list: async (options?: any): Promise<paths['/task-defs']['get']['responses']['200']['content']['application/json']> => {
-          const { data, error } = await baseClient.GET(`/task-defs`, {});
-          if (error) throw new ApiError(`GET /task-defs failed`, error);
+        list: async (options?: any): Promise<paths['/tasks']['get']['responses']['200']['content']['application/json']> => {
+          const { data, error } = await baseClient.GET(`/tasks`, {});
+          if (error) throw new ApiError(`GET /tasks failed`, error);
           return data;
         }
       }
@@ -268,7 +268,6 @@ export function createClient(baseClient: any) {
   return Object.assign(client, {
     promptSpecs: client["prompt-specs"],
     modelProfiles: client["model-profiles"],
-    taskDefs: client["task-defs"],
     workflowDefs: client["workflow-defs"],
     workflowRuns: client["workflow-runs"]
   });

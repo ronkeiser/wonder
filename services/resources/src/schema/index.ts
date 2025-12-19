@@ -257,16 +257,21 @@ export const actions = sqliteTable(
     execution: text('execution', { mode: 'json' }).$type<object>(), // timeout, retry_policy
     idempotency: text('idempotency', { mode: 'json' }).$type<object>(),
 
+    content_hash: text('content_hash'),
+
     created_at: text('created_at').notNull(),
     updated_at: text('updated_at').notNull(),
   },
-  (table) => [primaryKey({ columns: [table.id, table.version] })],
+  (table) => [
+    primaryKey({ columns: [table.id, table.version] }),
+    index('idx_actions_content_hash').on(table.name, table.content_hash),
+  ],
 );
 
-/** TaskDefs - Intermediate layer between Node and Action */
+/** Tasks - Intermediate layer between Node and Action */
 
 /**
- * Step: Embedded in TaskDef (not a separate table)
+ * Step: Embedded in Task (not a separate table)
  * @see docs/architecture/primitives.md
  */
 export type Step = {
@@ -296,8 +301,8 @@ export type RetryConfig = {
   max_delay_ms: number | null;
 };
 
-export const task_defs = sqliteTable(
-  'task_defs',
+export const tasks = sqliteTable(
+  'tasks',
   {
     id: text('id').notNull(),
     version: integer('version').notNull().default(1),
@@ -319,18 +324,26 @@ export const task_defs = sqliteTable(
     retry: text('retry', { mode: 'json' }).$type<RetryConfig>(),
     timeout_ms: integer('timeout_ms'),
 
+    content_hash: text('content_hash'),
+
     created_at: text('created_at').notNull(),
     updated_at: text('updated_at').notNull(),
   },
   (table) => [
     primaryKey({ columns: [table.id, table.version] }),
-    index('idx_task_defs_project').on(table.project_id),
-    index('idx_task_defs_library').on(table.library_id),
-    index('idx_task_defs_name_version').on(
+    index('idx_tasks_project').on(table.project_id),
+    index('idx_tasks_library').on(table.library_id),
+    index('idx_tasks_name_version').on(
       table.name,
       table.project_id,
       table.library_id,
       table.version,
+    ),
+    index('idx_tasks_content_hash').on(
+      table.name,
+      table.project_id,
+      table.library_id,
+      table.content_hash,
     ),
   ],
 );
@@ -356,10 +369,15 @@ export const prompt_specs = sqliteTable(
     examples: text('examples', { mode: 'json' }).$type<object>(),
     tags: text('tags', { mode: 'json' }).$type<string[]>(),
 
+    content_hash: text('content_hash'),
+
     created_at: text('created_at').notNull(),
     updated_at: text('updated_at').notNull(),
   },
-  (table) => [primaryKey({ columns: [table.id, table.version] })],
+  (table) => [
+    primaryKey({ columns: [table.id, table.version] }),
+    index('idx_prompt_specs_content_hash').on(table.name, table.content_hash),
+  ],
 );
 
 export const model_profiles = sqliteTable('model_profiles', {
@@ -471,8 +489,16 @@ export const artifact_types = sqliteTable(
     description: text('description').notNull(),
     schema: text('schema', { mode: 'json' }).$type<object>().notNull(),
     version: integer('version').notNull(),
+
+    content_hash: text('content_hash'),
+
+    created_at: text('created_at').notNull(),
+    updated_at: text('updated_at').notNull(),
   },
-  (table) => [primaryKey({ columns: [table.id, table.version] })],
+  (table) => [
+    primaryKey({ columns: [table.id, table.version] }),
+    index('idx_artifact_types_content_hash').on(table.name, table.content_hash),
+  ],
 );
 
 export const artifacts = sqliteTable(

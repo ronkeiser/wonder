@@ -121,8 +121,18 @@ export const CreateTaskDefSchema = z
       }),
     retry: RetryConfigSchema.optional(),
     timeout_ms: z.number().int().positive().optional().openapi({ example: 30000 }),
+    autoversion: z
+      .boolean()
+      .optional()
+      .openapi({
+        description:
+          'When true, compute content hash for deduplication. If existing task with same name/owner and content exists, return it. Otherwise auto-increment version.',
+      }),
   })
   .openapi('CreateTaskDef');
+
+/** Alias for CreateTaskDefSchema for consistency with renamed entity */
+export const CreateTaskSchema = CreateTaskDefSchema;
 
 export const TaskDefSchema = z
   .object({
@@ -138,26 +148,33 @@ export const TaskDefSchema = z
     steps: z.array(StepSchema),
     retry: RetryConfigSchema.nullable(),
     timeout_ms: z.number().int().nullable(),
+    content_hash: z.string().nullable(),
     created_at: z.string(),
     updated_at: z.string(),
   })
   .openapi('TaskDef');
 
-export const TaskDefCreateResponseSchema = z
-  .object({
-    task_def_id: z.string(),
-    task_def: TaskDefSchema,
-  })
-  .openapi('TaskDefCreateResponse');
+/** Alias for TaskDefSchema for consistency with renamed entity */
+export const TaskSchema = TaskDefSchema;
 
-export const TaskDefGetResponseSchema = z
+export const TaskCreateResponseSchema = z
   .object({
-    task_def: TaskDefSchema,
+    task_id: z.string(),
+    task: TaskSchema,
+    reused: z
+      .boolean()
+      .openapi({ description: 'True if an existing task was reused (autoversion matched)' }),
   })
-  .openapi('TaskDefGetResponse');
+  .openapi('TaskCreateResponse');
 
-export const TaskDefListResponseSchema = z
+export const TaskGetResponseSchema = z
   .object({
-    task_defs: z.array(TaskDefSchema),
+    task: TaskSchema,
   })
-  .openapi('TaskDefListResponse');
+  .openapi('TaskGetResponse');
+
+export const TaskListResponseSchema = z
+  .object({
+    tasks: z.array(TaskSchema),
+  })
+  .openapi('TaskListResponse');

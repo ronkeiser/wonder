@@ -1,24 +1,24 @@
 /**
- * TaskDef OpenAPI Route Specifications
+ * Task OpenAPI Route Specifications
  */
 
 import { createRoute, z } from '@hono/zod-openapi';
 import {
-  CreateTaskDefSchema,
-  TaskDefCreateResponseSchema,
-  TaskDefGetResponseSchema,
-  TaskDefListResponseSchema,
+  CreateTaskSchema,
+  TaskCreateResponseSchema,
+  TaskGetResponseSchema,
+  TaskListResponseSchema,
 } from './schema';
 
-export const createTaskDefRoute = createRoute({
+export const createTaskRoute = createRoute({
   method: 'post',
   path: '/',
-  tags: ['task-defs'],
+  tags: ['tasks'],
   request: {
     body: {
       content: {
         'application/json': {
-          schema: CreateTaskDefSchema,
+          schema: CreateTaskSchema,
         },
       },
     },
@@ -27,18 +27,18 @@ export const createTaskDefRoute = createRoute({
     201: {
       content: {
         'application/json': {
-          schema: TaskDefCreateResponseSchema,
+          schema: TaskCreateResponseSchema,
         },
       },
-      description: 'TaskDef created successfully',
+      description: 'Task created successfully',
     },
   },
 });
 
-export const getTaskDefRoute = createRoute({
+export const getTaskRoute = createRoute({
   method: 'get',
   path: '/{id}',
-  tags: ['task-defs'],
+  tags: ['tasks'],
   request: {
     params: z.object({
       id: z
@@ -54,18 +54,18 @@ export const getTaskDefRoute = createRoute({
     200: {
       content: {
         'application/json': {
-          schema: TaskDefGetResponseSchema,
+          schema: TaskGetResponseSchema,
         },
       },
-      description: 'TaskDef retrieved successfully',
+      description: 'Task retrieved successfully',
     },
   },
 });
 
-export const listTaskDefsRoute = createRoute({
+export const listTasksRoute = createRoute({
   method: 'get',
   path: '/',
-  tags: ['task-defs'],
+  tags: ['tasks'],
   request: {
     query: z.object({
       project_id: z.string().optional(),
@@ -77,18 +77,18 @@ export const listTaskDefsRoute = createRoute({
     200: {
       content: {
         'application/json': {
-          schema: TaskDefListResponseSchema,
+          schema: TaskListResponseSchema,
         },
       },
-      description: 'TaskDefs retrieved successfully',
+      description: 'Tasks retrieved successfully',
     },
   },
 });
 
-export const deleteTaskDefRoute = createRoute({
+export const deleteTaskRoute = createRoute({
   method: 'delete',
   path: '/{id}',
-  tags: ['task-defs'],
+  tags: ['tasks'],
   request: {
     params: z.object({
       id: z
@@ -107,7 +107,7 @@ export const deleteTaskDefRoute = createRoute({
           schema: z.object({ success: z.boolean() }),
         },
       },
-      description: 'TaskDef deleted successfully',
+      description: 'Task deleted successfully',
     },
   },
 });

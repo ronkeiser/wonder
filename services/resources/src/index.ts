@@ -8,7 +8,7 @@ import { Actions } from './resources/actions';
 import { ModelProfiles } from './resources/model-profiles';
 import { Projects } from './resources/projects';
 import { PromptSpecs } from './resources/prompt-specs';
-import { TaskDefs } from './resources/task-defs';
+import { Tasks } from './resources/tasks';
 import { WorkflowDefs } from './resources/workflow-defs';
 import { WorkflowRuns } from './resources/workflow-runs';
 import { Workflows } from './resources/workflows';
@@ -49,9 +49,9 @@ class WonderResources extends WorkerEntrypoint<Env> {
     return new Actions(this.env, this.ctx);
   }
 
-  /** RPC: TaskDefs adapter */
-  taskDefs() {
-    return new TaskDefs(this.env, this.ctx);
+  /** RPC: Tasks adapter */
+  tasks() {
+    return new Tasks(this.env, this.ctx);
   }
 
   /** RPC: PromptSpecs adapter */

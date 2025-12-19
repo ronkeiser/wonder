@@ -39,7 +39,6 @@ describe('Coordinator - Context Operations', () => {
       ref: 'process',
       ordinal: 0,
       action: testAction,
-      action_version: 1,
       input_mapping: { name: '$.input.name', count: '$.input.count' },
       output_mapping: {
         'output.greeting': '$.response.greeting',

@@ -120,7 +120,6 @@ describe('Foundation: 04 - Nested State Structure', () => {
       ref: 'init_step',
       ordinal: 0,
       action: initAction,
-      action_version: 1,
       input_mapping: {},
       output_mapping: { 'output.seed': '$.seed' },
     });
@@ -161,7 +160,6 @@ describe('Foundation: 04 - Nested State Structure', () => {
       ref: 'phase1_step',
       ordinal: 0,
       action: phase1Action,
-      action_version: 1,
       input_mapping: {},
       output_mapping: { 'output.value': '$.value' },
     });
@@ -199,7 +197,6 @@ describe('Foundation: 04 - Nested State Structure', () => {
       ref: 'bridge_step',
       ordinal: 0,
       action: bridgeAction,
-      action_version: 1,
       // Pass phase1_words from task input to step input
       input_mapping: { phase1_words: '$.input.phase1_words' },
       // Passthrough returns input as output - map it to task output
@@ -248,7 +245,6 @@ describe('Foundation: 04 - Nested State Structure', () => {
       ref: 'phase2_word_step',
       ordinal: 0,
       action: phase2WordAction,
-      action_version: 1,
       input_mapping: {},
       output_mapping: { 'output.word': '$.word' },
     });
@@ -270,7 +266,6 @@ describe('Foundation: 04 - Nested State Structure', () => {
       ref: 'phase2_merge_step',
       ordinal: 1,
       action: phase2MergeAction,
-      action_version: 1,
       input_mapping: {
         inherited_words: '$.input.inherited_words',
         word: '$.output.word',
@@ -318,7 +313,6 @@ describe('Foundation: 04 - Nested State Structure', () => {
       ref: 'summarize_step',
       ordinal: 0,
       action: summarizeAction,
-      action_version: 1,
       // Pass all accumulated data through
       input_mapping: {
         phase1_words: '$.input.phase1_words',

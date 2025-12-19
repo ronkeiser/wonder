@@ -607,7 +607,7 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
-    "/task-defs": {
+    "/tasks": {
         parameters: {
             query?: never;
             header?: never;
@@ -627,13 +627,13 @@ export interface paths {
             };
             requestBody?: never;
             responses: {
-                /** @description TaskDefs retrieved successfully */
+                /** @description Tasks retrieved successfully */
                 200: {
                     headers: {
                         [name: string]: unknown;
                     };
                     content: {
-                        "application/json": components["schemas"]["TaskDefListResponse"];
+                        "application/json": components["schemas"]["TaskListResponse"];
                     };
                 };
             };
@@ -652,13 +652,13 @@ export interface paths {
                 };
             };
             responses: {
-                /** @description TaskDef created successfully */
+                /** @description Task created successfully */
                 201: {
                     headers: {
                         [name: string]: unknown;
                     };
                     content: {
-                        "application/json": components["schemas"]["TaskDefCreateResponse"];
+                        "application/json": components["schemas"]["TaskCreateResponse"];
                     };
                 };
             };
@@ -669,7 +669,7 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
-    "/task-defs/{id}": {
+    "/tasks/{id}": {
         parameters: {
             query?: never;
             header?: never;
@@ -689,13 +689,13 @@ export interface paths {
             };
             requestBody?: never;
             responses: {
-                /** @description TaskDef retrieved successfully */
+                /** @description Task retrieved successfully */
                 200: {
                     headers: {
                         [name: string]: unknown;
                     };
                     content: {
-                        "application/json": components["schemas"]["TaskDefGetResponse"];
+                        "application/json": components["schemas"]["TaskGetResponse"];
                     };
                 };
             };
@@ -715,7 +715,7 @@ export interface paths {
             };
             requestBody?: never;
             responses: {
-                /** @description TaskDef deleted successfully */
+                /** @description Task deleted successfully */
                 200: {
                     headers: {
                         [name: string]: unknown;
@@ -1466,12 +1466,15 @@ export interface components {
             idempotency: {
                 [key: string]: unknown;
             } | null;
+            content_hash: string | null;
             created_at: string;
             updated_at: string;
         };
         ActionCreateResponse: {
             action_id: string;
             action: components["schemas"]["Action"];
+            /** @description True if an existing action was reused (autoversion matched) */
+            reused: boolean;
         };
         CreateAction: {
             /** @example Generate Summary */
@@ -1508,6 +1511,8 @@ export interface components {
             idempotency?: {
                 [key: string]: unknown;
             };
+            /** @description When true, compute content hash for deduplication. If existing action with same name and content exists, return it. Otherwise auto-increment version. */
+            autoversion?: boolean;
         };
         ActionGetResponse: {
             action: components["schemas"]["Action"];
@@ -1528,12 +1533,15 @@ export interface components {
             produces: JSONSchema;
             examples: unknown[] | null;
             tags: string[] | null;
+            content_hash: string | null;
             created_at: string;
             updated_at: string;
         };
         PromptSpecCreateResponse: {
             prompt_spec_id: string;
             prompt_spec: components["schemas"]["PromptSpec"];
+            /** @description True if an existing prompt spec was reused (autoversion matched) */
+            reused: boolean;
         };
         CreatePromptSpec: {
             /** @example Summarization Prompt */
@@ -1570,6 +1578,8 @@ export interface components {
             produces: JSONSchema;
             examples?: unknown[];
             tags?: string[];
+            /** @description When true, compute content hash for deduplication. If existing spec with same name and content exists, return it. Otherwise auto-increment version. */
+            autoversion?: boolean;
         };
         PromptSpecGetResponse: {
             prompt_spec: components["schemas"]["PromptSpec"];
@@ -1694,12 +1704,15 @@ export interface components {
             steps: components["schemas"]["Step"][];
             retry: components["schemas"]["RetryConfig"];
             timeout_ms: number | null;
+            content_hash: string | null;
             created_at: string;
             updated_at: string;
         };
-        TaskDefCreateResponse: {
-            task_def_id: string;
-            task_def: components["schemas"]["TaskDef"];
+        TaskCreateResponse: {
+            task_id: string;
+            task: components["schemas"]["TaskDef"];
+            /** @description True if an existing task was reused (autoversion matched) */
+            reused: boolean;
         };
         CreateStep: {
             /** @example call_llm */
@@ -1801,12 +1814,14 @@ export interface components {
             retry?: components["schemas"]["RetryConfig"];
             /** @example 30000 */
             timeout_ms?: number;
+            /** @description When true, compute content hash for deduplication. If existing task with same name/owner and content exists, return it. Otherwise auto-increment version. */
+            autoversion?: boolean;
         };
-        TaskDefListResponse: {
-            task_defs: components["schemas"]["TaskDef"][];
+        TaskListResponse: {
+            tasks: components["schemas"]["TaskDef"][];
         };
-        TaskDefGetResponse: {
-            task_def: components["schemas"]["TaskDef"];
+        TaskGetResponse: {
+            task: components["schemas"]["TaskDef"];
         };
         WorkflowDef: {
             id: string;

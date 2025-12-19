@@ -43,7 +43,6 @@ describe('WorkflowDef - Synchronization Ref→ID Transformation', () => {
         ref: 'noop',
         ordinal: 0,
         action: noopAction,
-        action_version: 1,
         input_mapping: {},
         output_mapping: {},
       });
@@ -215,12 +214,12 @@ describe('WorkflowDef - Synchronization Ref→ID Transformation', () => {
         console.warn('Failed to delete workflow def:', e);
       }
 
-      // Delete task defs (references actions via steps)
-      for (const taskDefId of setup.createdResources.taskDefIds.reverse()) {
+      // Delete tasks (references actions via steps)
+      for (const taskId of setup.createdResources.taskIds.reverse()) {
         try {
-          await wonder['task-defs'](taskDefId).delete();
+          await wonder.tasks(taskId).delete();
         } catch (e) {
-          console.warn('Failed to delete task def:', e);
+          console.warn('Failed to delete task:', e);
         }
       }
 

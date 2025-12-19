@@ -46,11 +46,18 @@ export async function createEmbeddedTaskDef(
 
   for (const s of taskDef.steps as EmbeddedStep[]) {
     let actionId: string;
+    let actionVersion: number;
 
     if (s.action_id) {
-      actionId = s.action_id;
+      // Reference to existing action - get latest version
+      const actionResponse = await wonder.actions(s.action_id).get();
+      actionId = actionResponse.action.id;
+      actionVersion = actionResponse.action.version;
     } else if (s.action && isEmbeddedAction(s.action)) {
-      actionId = await createEmbeddedAction(ctx, s.action, createdResources);
+      // Embedded action - create and use returned version
+      const result = await createEmbeddedAction(ctx, s.action, createdResources);
+      actionId = result.id;
+      actionVersion = result.version;
     } else {
       throw new Error(`Step ${s.ref} must have either action_id or action`);
     }
@@ -59,7 +66,7 @@ export async function createEmbeddedTaskDef(
       ref: s.ref,
       ordinal: s.ordinal,
       action_id: actionId,
-      action_version: s.action_version,
+      action_version: actionVersion,
       input_mapping: s.input_mapping ?? null,
       output_mapping: s.output_mapping ?? null,
       on_failure: s.on_failure ?? 'abort',
@@ -67,11 +74,11 @@ export async function createEmbeddedTaskDef(
     });
   }
 
-  // Create task def with resolved steps
-  const resolvedTaskDef = {
+  // Create task with resolved steps
+  const resolvedTask = {
     name: taskDef.name,
     description: taskDef.description,
-    version: taskDef.version ?? 1,
+    version: 1,
     project_id: ctx.projectId,
     library_id: taskDef.library_id,
     tags: taskDef.tags,
@@ -82,13 +89,13 @@ export async function createEmbeddedTaskDef(
     timeout_ms: taskDef.timeout_ms,
   };
 
-  const response = await wonder.taskDefs.create(resolvedTaskDef as any);
-  if (!response?.task_def?.id) {
-    throw new Error('Failed to create task def');
+  const response = await wonder.tasks.create(resolvedTask as any);
+  if (!response?.task?.id) {
+    throw new Error('Failed to create task');
   }
 
-  createdResources.taskDefIds.push(response.task_def.id);
-  return response.task_def.id;
+  createdResources.taskIds.push(response.task.id);
+  return response.task.id;
 }
 
 /**
@@ -99,7 +106,7 @@ export async function createEmbeddedAction(
   ctx: TestContext,
   action: EmbeddedAction,
   createdResources: CreatedResources,
-): Promise<string> {
+): Promise<{ id: string; version: number }> {
   const implementation = { ...action.implementation };
 
   // Resolve embedded prompt spec
@@ -112,9 +119,8 @@ export async function createEmbeddedAction(
     delete implementation.prompt_spec;
   }
 
-  // Resolve embedded model profile or use context's model profile
+  // Resolve embedded model profile if provided
   if (implementation.model_profile && isEmbeddedModelProfile(implementation.model_profile)) {
-    // Create new model profile
     const mpResponse = await wonder.modelProfiles.create({
       name: implementation.model_profile.name,
       provider: implementation.model_profile.provider,
@@ -126,16 +132,13 @@ export async function createEmbeddedAction(
     });
     implementation.model_profile_id = mpResponse.model_profile.id;
     delete implementation.model_profile;
-  } else if (!implementation.model_profile_id) {
-    // Use context's model profile as default
-    implementation.model_profile_id = ctx.modelProfileId;
   }
 
   // Create action
   const response = await wonder.actions.create({
     name: action.name,
     description: action.description,
-    version: action.version ?? 1,
+    version: 1,
     kind: action.kind,
     implementation,
     requires: action.requires,
@@ -149,7 +152,7 @@ export async function createEmbeddedAction(
   }
 
   createdResources.actionIds.push(response.action.id);
-  return response.action.id;
+  return { id: response.action.id, version: response.action.version };
 }
 
 /**
@@ -163,7 +166,7 @@ export async function createEmbeddedPromptSpec(
   const response = await wonder.promptSpecs.create({
     name: promptSpec.name,
     description: promptSpec.description,
-    version: promptSpec.version ?? 1,
+    version: 1,
     system_prompt: promptSpec.system_prompt,
     template: promptSpec.template,
     template_language: promptSpec.template_language,

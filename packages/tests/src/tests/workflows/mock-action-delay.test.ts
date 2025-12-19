@@ -58,7 +58,6 @@ describe('Coordinator - Mock Action Delay', () => {
       ref: 'mock_step',
       ordinal: 0,
       action: mockAction,
-      action_version: 1,
       input_mapping: {},
       output_mapping: {
         'output.value': '$.value',

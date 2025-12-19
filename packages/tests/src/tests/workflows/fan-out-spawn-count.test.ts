@@ -76,7 +76,6 @@ describe('Coordinator - Fan-Out Trivia Questions', () => {
       ref: 'start_step',
       ordinal: 0,
       action: startAction,
-      action_version: 1,
       input_mapping: {},
       output_mapping: {},
     });
@@ -127,7 +126,6 @@ Return JSON with:
       ref: 'question_step',
       ordinal: 0,
       action: questionAction,
-      action_version: 1,
       input_mapping: { topic: '$.input.topic' },
       output_mapping: {
         'output.question': '$.response.question',
@@ -171,7 +169,6 @@ Return JSON with:
       ref: 'collect_step',
       ordinal: 0,
       action: collectAction,
-      action_version: 1,
       input_mapping: {},
       output_mapping: {},
     });

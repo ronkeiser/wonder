@@ -28,6 +28,13 @@ export const CreateActionSchema = z
     produces: z.record(z.string(), z.unknown()).optional(),
     execution: z.record(z.string(), z.unknown()).optional(),
     idempotency: z.record(z.string(), z.unknown()).optional(),
+    autoversion: z
+      .boolean()
+      .optional()
+      .openapi({
+        description:
+          'When true, compute content hash for deduplication. If existing action with same name and content exists, return it. Otherwise auto-increment version.',
+      }),
   })
   .openapi('CreateAction');
 
@@ -54,6 +61,7 @@ export const ActionSchema = z
     produces: z.record(z.string(), z.unknown()).nullable(),
     execution: z.record(z.string(), z.unknown()).nullable(),
     idempotency: z.record(z.string(), z.unknown()).nullable(),
+    content_hash: z.string().nullable(),
     created_at: z.string(),
     updated_at: z.string(),
   })
@@ -63,6 +71,9 @@ export const ActionCreateResponseSchema = z
   .object({
     action_id: z.string(),
     action: ActionSchema,
+    reused: z
+      .boolean()
+      .openapi({ description: 'True if an existing action was reused (autoversion matched)' }),
   })
   .openapi('ActionCreateResponse');
 
