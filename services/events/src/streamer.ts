@@ -247,11 +247,8 @@ export class Streamer extends DurableObject<Env> {
     }
   }
 
-  /**
-   * Build a multi-row INSERT statement for workflow events
-   */
   private buildEventInsert(entries: EventEntry[]): D1PreparedStatement {
-    const columns = [
+    return buildMultiRowInsert(this.env.DB, 'workflow_events', entries, [
       'id',
       'timestamp',
       'sequence',
@@ -267,38 +264,11 @@ export class Streamer extends DurableObject<Env> {
       'cost_usd',
       'message',
       'metadata',
-    ];
-
-    const placeholders = entries.map(() => `(${columns.map(() => '?').join(', ')})`).join(', ');
-
-    const values = entries.flatMap((e) => [
-      e.id,
-      e.timestamp,
-      e.sequence,
-      e.event_type,
-      e.workflow_run_id,
-      e.parent_run_id,
-      e.workflow_def_id,
-      e.node_id,
-      e.token_id,
-      e.path_id,
-      e.project_id,
-      e.tokens,
-      e.cost_usd,
-      e.message,
-      e.metadata,
     ]);
-
-    return this.env.DB.prepare(
-      `INSERT INTO workflow_events (${columns.join(', ')}) VALUES ${placeholders}`,
-    ).bind(...values);
   }
 
-  /**
-   * Build a multi-row INSERT statement for trace events
-   */
   private buildTraceInsert(entries: TraceEventEntry[]): D1PreparedStatement {
-    const columns = [
+    return buildMultiRowInsert(this.env.DB, 'trace_events', entries, [
       'id',
       'timestamp',
       'sequence',
@@ -310,27 +280,7 @@ export class Streamer extends DurableObject<Env> {
       'project_id',
       'duration_ms',
       'payload',
-    ];
-
-    const placeholders = entries.map(() => `(${columns.map(() => '?').join(', ')})`).join(', ');
-
-    const values = entries.flatMap((e) => [
-      e.id,
-      e.timestamp,
-      e.sequence,
-      e.type,
-      e.category,
-      e.workflow_run_id,
-      e.token_id,
-      e.node_id,
-      e.project_id,
-      e.duration_ms,
-      e.payload,
     ]);
-
-    return this.env.DB.prepare(
-      `INSERT INTO trace_events (${columns.join(', ')}) VALUES ${placeholders}`,
-    ).bind(...values);
   }
 
   // ============================================================================
@@ -406,7 +356,7 @@ export class Streamer extends DurableObject<Env> {
       const subsObj = (ws.deserializeAttachment() as Record<string, Subscription>) || {};
 
       for (const sub of Object.values(subsObj)) {
-        if (sub.stream === 'events' && this.matchesEventFilter(entry, sub.filters)) {
+        if (sub.stream === 'events' && matchesEventFilter(entry, sub.filters)) {
           try {
             ws.send(
               JSON.stringify({
@@ -432,7 +382,7 @@ export class Streamer extends DurableObject<Env> {
       const subsObj = (ws.deserializeAttachment() as Record<string, Subscription>) || {};
 
       for (const sub of Object.values(subsObj)) {
-        if (sub.stream === 'trace' && this.matchesTraceFilter(entry, sub.filters)) {
+        if (sub.stream === 'trace' && matchesTraceFilter(entry, sub.filters)) {
           try {
             ws.send(
               JSON.stringify({
@@ -453,38 +403,6 @@ export class Streamer extends DurableObject<Env> {
     });
   }
 
-  // ============================================================================
-  // Filtering
-  // ============================================================================
-
-  private matchesEventFilter(event: BroadcastEventEntry, filter: SubscriptionFilter): boolean {
-    if (filter.workflow_run_id && event.workflow_run_id !== filter.workflow_run_id) return false;
-    if (filter.parent_run_id && event.parent_run_id !== filter.parent_run_id) return false;
-    if (filter.project_id && event.project_id !== filter.project_id) return false;
-    if (filter.node_id && event.node_id !== filter.node_id) return false;
-    if (filter.token_id && event.token_id !== filter.token_id) return false;
-    if (filter.path_id && event.path_id !== filter.path_id) return false;
-    if (filter.event_type && event.event_type !== filter.event_type) return false;
-    if (filter.event_types && !filter.event_types.includes(event.event_type)) return false;
-    return true;
-  }
-
-  private matchesTraceFilter(event: BroadcastTraceEventEntry, filter: SubscriptionFilter): boolean {
-    if (filter.workflow_run_id && event.workflow_run_id !== filter.workflow_run_id) return false;
-    if (filter.project_id && event.project_id !== filter.project_id) return false;
-    if (filter.token_id && event.token_id !== filter.token_id) return false;
-    if (filter.node_id && event.node_id !== filter.node_id) return false;
-    if (filter.category && event.category !== filter.category) return false;
-    if (filter.type && event.type !== filter.type) return false;
-    if (
-      filter.min_duration_ms !== undefined &&
-      event.duration_ms !== null &&
-      event.duration_ms < filter.min_duration_ms
-    ) {
-      return false;
-    }
-    return true;
-  }
 }
 
 function chunkArray<T>(array: T[], size: number): T[][] {
@@ -493,4 +411,45 @@ function chunkArray<T>(array: T[], size: number): T[][] {
     chunks.push(array.slice(i, i + size));
   }
   return chunks;
+}
+
+function buildMultiRowInsert<T>(
+  db: D1Database,
+  table: string,
+  entries: T[],
+  columns: (keyof T)[],
+): D1PreparedStatement {
+  const colNames = columns as string[];
+  const placeholders = entries.map(() => `(${colNames.map(() => '?').join(', ')})`).join(', ');
+  const values = entries.flatMap((e) => columns.map((col) => e[col]));
+  return db.prepare(`INSERT INTO ${table} (${colNames.join(', ')}) VALUES ${placeholders}`).bind(...values);
+}
+
+function matchesEventFilter(event: BroadcastEventEntry, filter: SubscriptionFilter): boolean {
+  if (filter.workflow_run_id && event.workflow_run_id !== filter.workflow_run_id) return false;
+  if (filter.parent_run_id && event.parent_run_id !== filter.parent_run_id) return false;
+  if (filter.project_id && event.project_id !== filter.project_id) return false;
+  if (filter.node_id && event.node_id !== filter.node_id) return false;
+  if (filter.token_id && event.token_id !== filter.token_id) return false;
+  if (filter.path_id && event.path_id !== filter.path_id) return false;
+  if (filter.event_type && event.event_type !== filter.event_type) return false;
+  if (filter.event_types && !filter.event_types.includes(event.event_type)) return false;
+  return true;
+}
+
+function matchesTraceFilter(event: BroadcastTraceEventEntry, filter: SubscriptionFilter): boolean {
+  if (filter.workflow_run_id && event.workflow_run_id !== filter.workflow_run_id) return false;
+  if (filter.project_id && event.project_id !== filter.project_id) return false;
+  if (filter.token_id && event.token_id !== filter.token_id) return false;
+  if (filter.node_id && event.node_id !== filter.node_id) return false;
+  if (filter.category && event.category !== filter.category) return false;
+  if (filter.type && event.type !== filter.type) return false;
+  if (
+    filter.min_duration_ms !== undefined &&
+    event.duration_ms !== null &&
+    event.duration_ms < filter.min_duration_ms
+  ) {
+    return false;
+  }
+  return true;
 }
