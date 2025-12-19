@@ -53,10 +53,17 @@ export class Streamer extends DurableObject<Env> {
       environment: env.ENVIRONMENT,
     });
 
-    // Load persisted sequence counters at startup
+    // Load persisted state at startup
     ctx.blockConcurrencyWhile(async () => {
       this.eventSeq = (await ctx.storage.get<number>('eventSeq')) ?? 0;
       this.traceSeq = (await ctx.storage.get<number>('traceSeq')) ?? 0;
+      this.eventBuffer = (await ctx.storage.get<EventEntry[]>('eventBuffer')) ?? [];
+      this.traceBuffer = (await ctx.storage.get<TraceEventEntry[]>('traceBuffer')) ?? [];
+
+      // Flush any recovered buffered events
+      if (this.eventBuffer.length > 0 || this.traceBuffer.length > 0) {
+        this.scheduleFlush();
+      }
     });
   }
 
@@ -92,8 +99,9 @@ export class Streamer extends DurableObject<Env> {
       metadata: JSON.stringify(input.metadata ?? {}),
     };
 
-    // Buffer for batched D1 write
+    // Buffer for batched D1 write (persisted to survive hibernation)
     this.eventBuffer.push(entry);
+    this.ctx.storage.put('eventBuffer', this.eventBuffer);
     this.scheduleFlush();
 
     // Broadcast immediately to WebSocket subscribers
@@ -130,8 +138,9 @@ export class Streamer extends DurableObject<Env> {
       payload: JSON.stringify(input.payload ?? {}),
     };
 
-    // Buffer for batched D1 write
+    // Buffer for batched D1 write (persisted to survive hibernation)
     this.traceBuffer.push(entry);
+    this.ctx.storage.put('traceBuffer', this.traceBuffer);
     this.scheduleFlush();
 
     // Broadcast immediately to WebSocket subscribers
@@ -200,6 +209,9 @@ export class Streamer extends DurableObject<Env> {
       await this.env.DB.batch(statements);
       this.retryCount = 0;
 
+      // Clear persisted buffers after successful write
+      await this.ctx.storage.delete(['eventBuffer', 'traceBuffer']);
+
       this.logger.debug({
         message: 'Flushed event buffers',
         metadata: { events: eventBatch.length, traces: traceBatch.length },
@@ -211,6 +223,8 @@ export class Streamer extends DurableObject<Env> {
         // Re-queue events for retry
         this.eventBuffer.unshift(...eventBatch);
         this.traceBuffer.unshift(...traceBatch);
+        this.ctx.storage.put('eventBuffer', this.eventBuffer);
+        this.ctx.storage.put('traceBuffer', this.traceBuffer);
         this.scheduleFlush();
 
         this.logger.warn({
@@ -228,6 +242,7 @@ export class Streamer extends DurableObject<Env> {
           },
         });
         this.retryCount = 0;
+        await this.ctx.storage.delete(['eventBuffer', 'traceBuffer']);
       }
     }
   }
