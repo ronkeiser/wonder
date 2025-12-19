@@ -28,23 +28,102 @@ export async function cleanup(...resources: (Deletable | undefined | null)[]) {
 }
 
 /**
- * Cleans up workflow run after a test.
- *
- * Currently does nothing - all resources are preserved so that:
- * 1. workflow_runs appear in the sidebar for debugging/inspection
- * 2. workflows persist so the JOIN query to get workflow_name works
- * 3. workflow_defs, task_defs, actions, prompt_specs persist for reuse
- *
- * TODO: Implement workflow_def deduplication (see docs/planning/workflow-def-deduplication.md)
- * so that repeated test runs reuse existing definitions instead of creating duplicates.
+ * Cleans up all resources created during a workflow test.
+ * Handles both legacy explicit IDs and new createdResources tracking.
+ * Returns the count of resources deleted.
  */
 export async function cleanupWorkflowTest(
-  _setup: WorkflowTestSetup,
-  _workflowRunId?: string,
-  _taskDefId?: string,
-  _actionId?: string,
-  _promptSpecId?: string,
+  setup: WorkflowTestSetup,
+  workflowRunId?: string,
+  taskDefId?: string,
+  actionId?: string,
+  promptSpecId?: string,
 ): Promise<number> {
-  // No cleanup - preserve all resources for sidebar visibility and reuse
-  return 0;
+  let count = 0;
+
+  // Delete workflow run
+  if (workflowRunId) {
+    try {
+      await wonder['workflow-runs'](workflowRunId).delete();
+      count++;
+    } catch (e) {
+      console.warn('Failed to delete workflow run:', e);
+    }
+  }
+
+  // Delete workflow
+  try {
+    await wonder.workflows(setup.workflowId).delete();
+    count++;
+  } catch (e) {
+    console.warn('Failed to delete workflow:', e);
+  }
+
+  // Delete workflow def
+  try {
+    await wonder['workflow-defs'](setup.workflowDefId).delete();
+    count++;
+  } catch (e) {
+    console.warn('Failed to delete workflow def:', e);
+  }
+
+  // Delete task defs (reverse order for any dependencies)
+  const taskDefIds = [...(setup.createdResources?.taskIds || [])];
+  if (taskDefId) taskDefIds.push(taskDefId);
+  for (const id of taskDefIds.reverse()) {
+    try {
+      await wonder['tasks'](id).delete();
+      count++;
+    } catch (e) {
+      console.warn('Failed to delete task def:', e);
+    }
+  }
+
+  // Delete actions
+  const actionIds = [...(setup.createdResources?.actionIds || [])];
+  if (actionId) actionIds.push(actionId);
+  for (const id of actionIds.reverse()) {
+    try {
+      await wonder.actions(id).delete();
+      count++;
+    } catch (e) {
+      console.warn('Failed to delete action:', e);
+    }
+  }
+
+  // Delete prompt specs
+  const promptSpecIds = [...(setup.createdResources?.promptSpecIds || [])];
+  if (promptSpecId) promptSpecIds.push(promptSpecId);
+  for (const id of promptSpecIds.reverse()) {
+    try {
+      await wonder['prompt-specs'](id).delete();
+      count++;
+    } catch (e) {
+      console.warn('Failed to delete prompt spec:', e);
+    }
+  }
+
+  // Delete model profile, project, workspace
+  try {
+    await wonder['model-profiles'](setup.modelProfileId).delete();
+    count++;
+  } catch (e) {
+    console.warn('Failed to delete model profile:', e);
+  }
+
+  try {
+    await wonder.projects(setup.projectId).delete();
+    count++;
+  } catch (e) {
+    console.warn('Failed to delete project:', e);
+  }
+
+  try {
+    await wonder.workspaces(setup.workspaceId).delete();
+    count++;
+  } catch (e) {
+    console.warn('Failed to delete workspace:', e);
+  }
+
+  return count;
 }

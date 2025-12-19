@@ -1525,8 +1525,6 @@ export interface components {
             version: number;
             system_prompt: string | null;
             template: string;
-            /** @enum {string} */
-            template_language: "handlebars" | "jinja2";
             requires: {
                 [key: string]: unknown;
             };
@@ -1557,11 +1555,6 @@ export interface components {
             system_prompt?: string;
             /** @example Summarize: {{text}} */
             template: string;
-            /**
-             * @example handlebars
-             * @enum {string}
-             */
-            template_language: "handlebars" | "jinja2";
             /**
              * @example {
              *       "text": "string"
