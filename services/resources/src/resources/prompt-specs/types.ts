@@ -1,20 +1,17 @@
 /** Type definitions for prompt specs */
 
-export type PromptSpec = {
-  id: string;
-  name: string;
-  description: string;
-  version: number;
-  system_prompt: string | null;
-  template: string;
-  requires: object;
-  produces: object;
-  examples: object | null;
-  tags: string[] | null;
-  content_hash: string | null;
-  created_at: string;
-  updated_at: string;
-};
+import { prompt_specs } from '../../schema';
+
+// ============================================================================
+// Entity Types (inferred from schema)
+// ============================================================================
+
+/** PromptSpec entity - inferred from database schema */
+export type PromptSpec = typeof prompt_specs.$inferSelect;
+
+// ============================================================================
+// API DTOs (explicit - have fields not in DB)
+// ============================================================================
 
 export type PromptSpecInput = {
   version?: number;

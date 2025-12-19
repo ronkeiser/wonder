@@ -1,5 +1,11 @@
 /** Type definitions for actions */
 
+import { actions } from '../../schema';
+
+// ============================================================================
+// Enums (explicit - used by schema via .$type<T>())
+// ============================================================================
+
 export type ActionKind =
   | 'llm_call'
   | 'mcp_tool'
@@ -12,21 +18,16 @@ export type ActionKind =
   | 'emit_metric'
   | 'mock';
 
-export type Action = {
-  id: string;
-  name: string;
-  description: string;
-  version: number;
-  kind: ActionKind;
-  implementation: object;
-  requires: object | null;
-  produces: object | null;
-  execution: object | null;
-  idempotency: object | null;
-  content_hash: string | null;
-  created_at: string;
-  updated_at: string;
-};
+// ============================================================================
+// Entity Types (inferred from schema)
+// ============================================================================
+
+/** Action entity - inferred from database schema */
+export type Action = typeof actions.$inferSelect;
+
+// ============================================================================
+// API DTOs (explicit - have fields not in DB)
+// ============================================================================
 
 export type ActionInput = {
   version?: number;
