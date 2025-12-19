@@ -12,13 +12,11 @@
  * - Manage workflow lifecycle
  */
 
+// Re-export types from centralized types.ts
+export type { ApplyResult, DispatchContext, TaskErrorResult } from '../types';
+
 // Apply: execute decisions using managers
-export {
-  applyDecisions,
-  applyTracedDecisions,
-  type ApplyResult,
-  type DispatchContext,
-} from './apply';
+export { applyDecisions, applyTracedDecisions } from './apply';
 
 // Batch: optimize decision lists
 export {
@@ -36,4 +34,4 @@ export { activateFanIn, handleBranchOutput, processSynchronization } from './fan
 export { dispatchToken, processTaskResult } from './task';
 
 // Lifecycle: workflow start, error handling, failure
-export { failWorkflow, processTaskError, startWorkflow, type TaskErrorResult } from './lifecycle';
+export { failWorkflow, processTaskError, startWorkflow } from './lifecycle';

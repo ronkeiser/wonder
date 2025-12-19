@@ -13,12 +13,13 @@
  */
 
 import type { JSONSchema } from '@wonder/schemas';
+
 import type { DefinitionManager } from '../operations/defs';
 import type { TokenManager } from '../operations/tokens';
 import { decideFanInContinuation } from '../planning/index';
 import { decideSynchronization } from '../planning/synchronization';
-import type { Decision, TransitionDef } from '../types';
-import { applyDecisions, type DispatchContext } from './apply';
+import type { Decision, DispatchContext, TransitionDef } from '../types';
+import { applyDecisions } from './apply';
 
 // ============================================================================
 // Types

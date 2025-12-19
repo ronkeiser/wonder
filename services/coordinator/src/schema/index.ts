@@ -11,6 +11,11 @@
 
 import { index, integer, sqliteTable, text } from 'drizzle-orm/sqlite-core';
 
+import type { TokenStatus, WorkflowStatus } from '../types';
+
+// Re-export for consumers that import from schema
+export type { TokenStatus, WorkflowStatus } from '../types';
+
 /**
  * Definition tables (imported from Resources service)
  */
@@ -19,19 +24,6 @@ export { nodes, transitions, workflow_defs, workflow_runs } from '@wonder/resour
 /**
  * Execution tables (internal coordinator state)
  */
-
-/**
- * Token Status
- */
-export type TokenStatus =
-  | 'pending'
-  | 'dispatched'
-  | 'executing'
-  | 'completed'
-  | 'failed'
-  | 'timed_out'
-  | 'cancelled'
-  | 'waiting_for_siblings';
 
 /**
  * Tokens track execution position within a workflow run.
@@ -94,13 +86,11 @@ export const fan_ins = sqliteTable(
 );
 
 /**
- * Workflow Status
+ * Workflow Status Table
  *
  * Single-row table tracking the workflow run's lifecycle status.
  * Used to guard against double finalization and track overall state.
  */
-export type WorkflowStatus = 'running' | 'completed' | 'failed' | 'timed_out' | 'cancelled';
-
 export const workflow_status = sqliteTable('workflow_status', {
   workflow_run_id: text('workflow_run_id').primaryKey(),
   status: text('status').$type<WorkflowStatus>().notNull(),

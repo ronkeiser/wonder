@@ -11,9 +11,16 @@
  */
 
 import type { TraceEventInput } from '@wonder/events';
-import type { SiblingCounts, TokenRow } from '../operations/tokens';
-import type { Decision, MergeConfig, SynchronizationConfig, TransitionDef } from '../types';
-import type { PlanningResult } from './routing';
+
+import type { TokenRow } from '../operations/tokens';
+import type {
+  Decision,
+  MergeConfig,
+  PlanningResult,
+  SiblingCounts,
+  SynchronizationConfig,
+  TransitionDef,
+} from '../types';
 
 // ============================================================================
 // Main Synchronization Entry Point

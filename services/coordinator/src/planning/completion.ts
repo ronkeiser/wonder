@@ -11,14 +11,9 @@
  */
 
 import type { TraceEventInput } from '@wonder/events';
-import { extractFromContext } from '../shared';
-import type { ContextSnapshot } from '../types';
 
-/** Result from completion planning */
-export type CompletionResult = {
-  output: Record<string, unknown>;
-  events: TraceEventInput[];
-};
+import { extractFromContext } from '../shared';
+import type { CompletionResult, ContextSnapshot } from '../types';
 
 // ============================================================================
 // Main Completion Entry Point

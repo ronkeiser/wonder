@@ -2,14 +2,139 @@
  * Coordinator Type Definitions
  *
  * Core types for coordinator operation:
+ * - Domain types (TokenStatus, WorkflowStatus)
  * - ContextSnapshot: Read-only context for decision logic
  * - TaskResult: Executor response
  * - Decision: Pure data describing state changes
  * - Transition config types for synchronization
+ * - Planning result types
+ * - Dispatch types
  */
 
-import type { CreateTokenParams } from './operations/tokens';
-import type { TokenStatus } from './schema';
+import type { Emitter, TraceEventInput } from '@wonder/events';
+import type { Logger } from '@wonder/logs';
+
+// ============================================================================
+// Domain Status Types
+// ============================================================================
+
+/**
+ * Token Status
+ */
+export type TokenStatus =
+  | 'pending'
+  | 'dispatched'
+  | 'executing'
+  | 'completed'
+  | 'failed'
+  | 'timed_out'
+  | 'cancelled'
+  | 'waiting_for_siblings';
+
+/**
+ * Workflow Status
+ */
+export type WorkflowStatus = 'running' | 'completed' | 'failed' | 'timed_out' | 'cancelled';
+
+// ============================================================================
+// Token Operation Types
+// ============================================================================
+
+/** Parameters for creating a new token */
+export type CreateTokenParams = {
+  workflow_run_id: string;
+  node_id: string;
+  parent_token_id: string | null;
+  path_id: string;
+  sibling_group: string | null;
+  branch_index: number;
+  branch_total: number;
+};
+
+/** Sibling count breakdown for synchronization checks */
+export type SiblingCounts = {
+  total: number;
+  completed: number;
+  failed: number;
+  waiting: number;
+  terminal: number; // completed + failed + timed_out + cancelled
+};
+
+// ============================================================================
+// Planning Result Types
+// ============================================================================
+
+/** Result from planning functions - decisions to apply and events to emit */
+export type PlanningResult = {
+  decisions: Decision[];
+  events: TraceEventInput[];
+};
+
+/** Result from completion planning */
+export type CompletionResult = {
+  output: Record<string, unknown>;
+  events: TraceEventInput[];
+};
+
+// ============================================================================
+// Merge Types
+// ============================================================================
+
+export type MergeStrategy = 'append' | 'collect' | 'merge_object' | 'keyed_by_branch' | 'last_wins';
+
+/** Branch output with metadata */
+export type BranchOutput = {
+  tokenId: string;
+  branchIndex: number;
+  output: unknown;
+};
+
+// ============================================================================
+// Dispatch Types
+// ============================================================================
+
+/** Dependencies required to apply decisions and orchestrate workflow */
+export type DispatchContext = {
+  tokens: TokenManager;
+  context: ContextManager;
+  defs: DefinitionManager;
+  emitter: Emitter;
+  logger: Logger;
+  workflowRunId: string;
+  /** Resource service for fetching TaskDefs */
+  resources: Env['RESOURCES'];
+  /** Executor service for dispatching tasks */
+  executor: Env['EXECUTOR'];
+  /** Register background work (fire-and-forget) */
+  waitUntil: (promise: Promise<unknown>) => void;
+};
+
+/** Result of applying decisions */
+export type ApplyResult = {
+  applied: number;
+  tokensCreated: string[];
+  tokensDispatched: string[];
+  errors: Array<{ decision: Decision; error: Error }>;
+};
+
+/** Task error result from executor */
+export type TaskErrorResult = {
+  error: {
+    type: 'step_failure' | 'task_timeout' | 'validation_error';
+    step_ref?: string;
+    message: string;
+    retryable: boolean;
+  };
+  metrics: {
+    duration_ms: number;
+    steps_executed: number;
+  };
+};
+
+// Forward declarations for manager types (to avoid circular imports)
+import type { ContextManager } from './operations/context';
+import type { DefinitionManager } from './operations/defs';
+import type { TokenManager } from './operations/tokens';
 
 // ============================================================================
 // Context Types

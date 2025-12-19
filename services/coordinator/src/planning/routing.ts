@@ -12,6 +12,7 @@
  */
 
 import type { TraceEventInput } from '@wonder/events';
+
 import type { TransitionRow } from '../operations/defs';
 import type { TokenRow } from '../operations/tokens';
 import { evaluateCondition, getNestedValueByParts } from '../shared';
@@ -20,16 +21,10 @@ import type {
   ContextSnapshot,
   Decision,
   ForeachConfig,
+  PlanningResult,
   SynchronizationConfig,
   TransitionDef,
 } from '../types';
-
-
-/** Result from planning functions - decisions to apply and events to emit */
-export type PlanningResult = {
-  decisions: Decision[];
-  events: TraceEventInput[];
-};
 
 // ============================================================================
 // Main Routing Entry Point

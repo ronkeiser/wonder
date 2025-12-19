@@ -5,13 +5,7 @@
  * These are extracted to enable unit testing without D1 dependencies.
  */
 
-export type MergeStrategy = 'append' | 'collect' | 'merge_object' | 'keyed_by_branch' | 'last_wins';
-
-export interface BranchOutput {
-  tokenId: string;
-  branchIndex: number;
-  output: unknown;
-}
+import type { BranchOutput, MergeStrategy } from '../types';
 
 /**
  * Apply merge strategy to collect branch outputs into a single value.

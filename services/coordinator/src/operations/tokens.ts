@@ -17,7 +17,8 @@ import { drizzle, type DrizzleSqliteDODatabase } from 'drizzle-orm/durable-sqlit
 import { ulid } from 'ulid';
 
 import * as schema from '../schema';
-import { fan_ins, tokens, type TokenStatus } from '../schema';
+import { fan_ins, tokens } from '../schema';
+import type { CreateTokenParams, SiblingCounts, TokenStatus } from '../types';
 import type { DefinitionManager } from './defs';
 
 /** Token row type inferred from schema */
@@ -28,26 +29,6 @@ const TERMINAL_STATES: TokenStatus[] = ['completed', 'failed', 'timed_out', 'can
 
 /** Active states where token is still in flight (not terminal) */
 const ACTIVE_STATES: TokenStatus[] = ['pending', 'dispatched', 'executing', 'waiting_for_siblings'];
-
-/** Parameters for creating a new token */
-export type CreateTokenParams = {
-  workflow_run_id: string;
-  node_id: string;
-  parent_token_id: string | null;
-  path_id: string;
-  sibling_group: string | null;
-  branch_index: number;
-  branch_total: number;
-};
-
-/** Sibling count breakdown for synchronization checks */
-export type SiblingCounts = {
-  total: number;
-  completed: number;
-  failed: number;
-  waiting: number;
-  terminal: number; // completed + failed + timed_out + cancelled
-};
 
 /**
  * TokenManager manages token state for a workflow execution.

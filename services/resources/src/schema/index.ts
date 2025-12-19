@@ -11,9 +11,12 @@ import {
   text,
   unique,
 } from 'drizzle-orm/sqlite-core';
-import type { ModelId, ModelProfile } from '../resources/model-profiles/types';
 
-/** Type definitions for JSON columns */
+import type { ModelId, ModelProfile } from '../resources/model-profiles/types';
+import type { RetryConfig, Step } from '../resources/tasks/types';
+
+// Re-export for consumers that import from schema
+export type { RetryConfig, Step } from '../resources/tasks/types';
 
 /** Workspace & Project */
 
@@ -269,37 +272,6 @@ export const actions = sqliteTable(
 );
 
 /** Tasks - Intermediate layer between Node and Action */
-
-/**
- * Step: Embedded in Task (not a separate table)
- * @see docs/architecture/primitives.md
- */
-export type Step = {
-  id: string; // ULID
-  ref: string; // Human-readable identifier (unique per task)
-  ordinal: number; // Execution order (0-indexed)
-
-  action_id: string; // FK → actions
-  action_version: number;
-
-  input_mapping: object | null; // Map task context → action input
-  output_mapping: object | null; // Map action output → task context
-
-  on_failure: 'abort' | 'retry' | 'continue'; // Default: abort
-
-  condition: {
-    if: string; // Expression evaluated against task context
-    then: 'continue' | 'skip' | 'succeed' | 'fail';
-    else: 'continue' | 'skip' | 'succeed' | 'fail';
-  } | null;
-};
-
-export type RetryConfig = {
-  max_attempts: number;
-  backoff: 'none' | 'linear' | 'exponential';
-  initial_delay_ms: number;
-  max_delay_ms: number | null;
-};
 
 export const tasks = sqliteTable(
   'tasks',

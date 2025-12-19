@@ -15,8 +15,8 @@ import {
   extractFinalOutput,
   getTransitionsWithSynchronization,
 } from '../planning/index';
-import type { TaskResult } from '../types';
-import { applyDecisions, type DispatchContext } from './apply';
+import type { DispatchContext, TaskResult } from '../types';
+import { applyDecisions } from './apply';
 import { handleBranchOutput, processSynchronization } from './fan';
 
 // ============================================================================

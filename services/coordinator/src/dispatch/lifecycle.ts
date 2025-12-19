@@ -10,26 +10,9 @@
  */
 
 import { decideWorkflowStart } from '../planning/index';
-import { applyDecisions, type DispatchContext } from './apply';
+import type { DispatchContext, TaskErrorResult } from '../types';
+import { applyDecisions } from './apply';
 import { dispatchToken } from './task';
-
-// ============================================================================
-// Types
-// ============================================================================
-
-/** Task error result from executor */
-export type TaskErrorResult = {
-  error: {
-    type: 'step_failure' | 'task_timeout' | 'validation_error';
-    step_ref?: string;
-    message: string;
-    retryable: boolean;
-  };
-  metrics: {
-    duration_ms: number;
-    steps_executed: number;
-  };
-};
 
 // ============================================================================
 // Workflow Start

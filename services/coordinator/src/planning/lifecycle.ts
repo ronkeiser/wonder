@@ -9,8 +9,8 @@
  */
 
 import type { TraceEventInput } from '@wonder/events';
-import type { Decision } from '../types';
-import type { PlanningResult } from './routing';
+
+import type { Decision, PlanningResult } from '../types';
 
 // ============================================================================
 // Workflow Start

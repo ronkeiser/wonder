@@ -11,44 +11,11 @@
  * - Emit trace events for observability
  */
 
-import type { Emitter } from '@wonder/events';
-import type { Logger } from '@wonder/logs';
 import type { JSONSchema } from '@wonder/schemas';
 
-import type { ContextManager } from '../operations/context';
-import type { DefinitionManager } from '../operations/defs';
-import type { TokenManager } from '../operations/tokens';
-import type { Decision, TracedDecision } from '../types';
+import type { ApplyResult, Decision, DispatchContext, TracedDecision } from '../types';
 
 import { batchDecisions } from './batch';
-
-// ============================================================================
-// Types
-// ============================================================================
-
-/** Dependencies required to apply decisions and orchestrate workflow */
-export type DispatchContext = {
-  tokens: TokenManager;
-  context: ContextManager;
-  defs: DefinitionManager;
-  emitter: Emitter;
-  logger: Logger;
-  workflowRunId: string;
-  /** Resource service for fetching TaskDefs */
-  resources: Env['RESOURCES'];
-  /** Executor service for dispatching tasks */
-  executor: Env['EXECUTOR'];
-  /** Register background work (fire-and-forget) */
-  waitUntil: (promise: Promise<unknown>) => void;
-};
-
-/** Result of applying decisions */
-export type ApplyResult = {
-  applied: number;
-  tokensCreated: string[];
-  tokensDispatched: string[];
-  errors: Array<{ decision: Decision; error: Error }>;
-};
 
 // ============================================================================
 // Main Dispatch Entry Point

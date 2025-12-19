@@ -14,14 +14,11 @@
  * The dispatch layer then executes decisions and emits events.
  */
 
+// Re-export types from centralized types.ts
+export type { CompletionResult, PlanningResult } from '../types';
+
 // Routing: transition evaluation and token creation decisions
-export {
-  buildPathId,
-  decideRouting,
-  getTransitionsWithSynchronization,
-  toTransitionDef,
-  type PlanningResult,
-} from './routing';
+export { buildPathId, decideRouting, getTransitionsWithSynchronization, toTransitionDef } from './routing';
 
 // Synchronization: fan-in and merge decisions
 export {
@@ -37,7 +34,7 @@ export {
 export { decideWorkflowStart } from './lifecycle';
 
 // Completion: workflow finalization and output extraction
-export { applyInputMapping, extractFinalOutput, type CompletionResult } from './completion';
+export { applyInputMapping, extractFinalOutput } from './completion';
 
 // Shared utilities re-exported for convenience
 export { evaluateCondition, extractFromContext } from '../shared';

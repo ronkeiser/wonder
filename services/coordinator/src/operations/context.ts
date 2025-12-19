@@ -5,22 +5,15 @@
 
 import type { Emitter } from '@wonder/events';
 import { Schema, type JSONSchema, type SchemaTable, type SqlHook } from '@wonder/schemas';
+
 import {
   extractJsonPath,
   getNestedValue,
   parsePath,
   setNestedValue,
 } from '../shared';
-import type { ContextSnapshot, MergeConfig } from '../types';
+import type { BranchOutput, ContextSnapshot, MergeConfig } from '../types';
 import type { DefinitionManager } from './defs';
-
-
-/** Branch output with metadata */
-export type BranchOutput = {
-  tokenId: string;
-  branchIndex: number;
-  output: Record<string, unknown>;
-};
 
 /** Output mapping entry: maps task output field to context path */
 export type OutputMappingEntry = {
