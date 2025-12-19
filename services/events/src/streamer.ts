@@ -1,8 +1,6 @@
 import { createLogger, type Logger } from '@wonder/logs';
 import { DurableObject } from 'cloudflare:workers';
-import { drizzle } from 'drizzle-orm/d1';
 import { ulid } from 'ulid';
-import { traceEvents, workflowEvents } from './schema';
 import type {
   BroadcastEventEntry,
   BroadcastTraceEventEntry,
@@ -11,26 +9,100 @@ import type {
   Subscription,
   SubscriptionFilter,
   SubscriptionMessage,
+  TraceEventCategory,
   TraceEventInput,
 } from './types';
 import { getEventCategory } from './types';
+
+// ============================================================================
+// Utility Functions
+// ============================================================================
+
+/**
+ * Split an array into chunks of specified size
+ */
+function chunkArray<T>(array: T[], size: number): T[][] {
+  const chunks: T[][] = [];
+  for (let i = 0; i < array.length; i += size) {
+    chunks.push(array.slice(i, i + size));
+  }
+  return chunks;
+}
+
+// ============================================================================
+// Batching Configuration
+// ============================================================================
+
+/** Maximum events to buffer before forcing a flush */
+const BATCH_SIZE = 50;
+
+/** Maximum time (ms) to wait before flushing buffered events */
+const FLUSH_INTERVAL_MS = 50;
+
+/** Maximum rows per INSERT statement (limited by 100 params / ~10-14 columns) */
+const ROWS_PER_INSERT = 7;
+
+/** Maximum retry attempts for failed batch writes */
+const MAX_RETRY_ATTEMPTS = 3;
+
+// ============================================================================
+// Internal Types for Buffered Entries
+// ============================================================================
+
+interface BufferedEventEntry {
+  id: string;
+  timestamp: number;
+  sequence: number;
+  event_type: string;
+  workflow_run_id: string;
+  parent_run_id: string | null;
+  workflow_def_id: string;
+  node_id: string | null;
+  token_id: string | null;
+  path_id: string | null;
+  project_id: string;
+  tokens: number | null;
+  cost_usd: number | null;
+  message: string | null;
+  metadata: string;
+}
+
+interface BufferedTraceEntry {
+  id: string;
+  timestamp: number;
+  sequence: number;
+  type: string;
+  category: TraceEventCategory;
+  workflow_run_id: string;
+  token_id: string | null;
+  node_id: string | null;
+  project_id: string;
+  duration_ms: number | null;
+  payload: string;
+  message: string | null;
+}
 
 /**
  * Streamer Durable Object - one instance per workflow_run_id
  *
  * Responsibilities:
  * - Assigns sequences atomically (single-threaded per workflow)
- * - Writes events to D1
- * - Broadcasts events to WebSocket subscribers
+ * - Buffers and batches events for efficient D1 writes
+ * - Broadcasts events to WebSocket subscribers immediately
  * - Manages WebSocket connections for real-time streaming
  */
 export class Streamer extends DurableObject<Env> {
   private logger: Logger;
-  private db = drizzle(this.env.DB);
 
   // Sequence counters (persisted to DO storage, loaded at startup)
   private eventSeq = 0;
   private traceSeq = 0;
+
+  // Event buffers for batched D1 writes
+  private eventBuffer: BufferedEventEntry[] = [];
+  private traceBuffer: BufferedTraceEntry[] = [];
+  private flushScheduled = false;
+  private retryCount = 0;
 
   constructor(ctx: DurableObjectState, env: Env) {
     super(ctx, env);
@@ -60,17 +132,27 @@ export class Streamer extends DurableObject<Env> {
     this.eventSeq++;
     this.ctx.storage.put('eventSeq', this.eventSeq);
 
-    const entry = {
+    const entry: BufferedEventEntry = {
       id: ulid(),
       timestamp: Date.now(),
-      ...context,
-      ...input,
       sequence: this.eventSeq,
+      event_type: input.event_type,
+      workflow_run_id: context.workflow_run_id,
+      parent_run_id: context.parent_run_id ?? null,
+      workflow_def_id: context.workflow_def_id,
+      node_id: input.node_id ?? null,
+      token_id: input.token_id ?? null,
+      path_id: input.path_id ?? null,
+      project_id: context.project_id,
+      tokens: input.tokens ?? null,
+      cost_usd: input.cost_usd ?? null,
+      message: input.message ?? null,
       metadata: JSON.stringify(input.metadata ?? {}),
     };
 
-    // Insert directly to D1
-    this.ctx.waitUntil(this.db.insert(workflowEvents).values(entry));
+    // Buffer for batched D1 write
+    this.eventBuffer.push(entry);
+    this.scheduleFlush();
 
     // Broadcast immediately to WebSocket subscribers
     this.broadcastEvent({
@@ -92,28 +174,209 @@ export class Streamer extends DurableObject<Env> {
     this.traceSeq++;
     this.ctx.storage.put('traceSeq', this.traceSeq);
 
-    const entry = {
+    const entry: BufferedTraceEntry = {
       id: ulid(),
       timestamp: Date.now(),
-      ...context,
-      type: input.type,
       sequence: this.traceSeq,
+      type: input.type,
       category: getEventCategory(input.type),
+      workflow_run_id: context.workflow_run_id,
       token_id: input.token_id ?? null,
       node_id: input.node_id ?? null,
+      project_id: context.project_id,
       duration_ms: input.duration_ms ?? null,
-      message: null,
       payload: JSON.stringify(input.payload ?? {}),
+      message: null,
     };
 
-    // Insert directly (batching disabled for debugging)
-    this.ctx.waitUntil(this.db.insert(traceEvents).values(entry));
+    // Buffer for batched D1 write
+    this.traceBuffer.push(entry);
+    this.scheduleFlush();
 
     // Broadcast immediately to WebSocket subscribers
     this.broadcastTraceEvent({
       ...entry,
       payload: input.payload ?? {},
     });
+  }
+
+  // ============================================================================
+  // Batching & Flush Logic
+  // ============================================================================
+
+  /**
+   * Schedule a flush using DO alarm (reliable across hibernation)
+   */
+  private scheduleFlush(): void {
+    const totalBuffered = this.eventBuffer.length + this.traceBuffer.length;
+
+    // Force immediate flush if batch size exceeded
+    if (totalBuffered >= BATCH_SIZE) {
+      this.ctx.waitUntil(this.flushBuffers());
+      return;
+    }
+
+    // Schedule alarm-based flush if not already scheduled
+    if (!this.flushScheduled) {
+      this.flushScheduled = true;
+      this.ctx.storage.setAlarm(Date.now() + FLUSH_INTERVAL_MS);
+    }
+  }
+
+  /**
+   * Alarm handler - triggered after FLUSH_INTERVAL_MS
+   */
+  async alarm(): Promise<void> {
+    this.flushScheduled = false;
+    await this.flushBuffers();
+  }
+
+  /**
+   * Flush all buffered events to D1 using batched multi-row inserts
+   */
+  private async flushBuffers(): Promise<void> {
+    const eventBatch = this.eventBuffer.splice(0);
+    const traceBatch = this.traceBuffer.splice(0);
+
+    if (eventBatch.length === 0 && traceBatch.length === 0) {
+      return;
+    }
+
+    try {
+      const statements: Parameters<typeof this.env.DB.batch>[0] = [];
+
+      // Build multi-row insert statements for events
+      for (const chunk of chunkArray(eventBatch, ROWS_PER_INSERT)) {
+        statements.push(this.buildEventInsert(chunk));
+      }
+
+      // Build multi-row insert statements for traces
+      for (const chunk of chunkArray(traceBatch, ROWS_PER_INSERT)) {
+        statements.push(this.buildTraceInsert(chunk));
+      }
+
+      // Execute all inserts in a single batch (transactional)
+      await this.env.DB.batch(statements);
+      this.retryCount = 0;
+
+      this.logger.debug({
+        message: 'Flushed event buffers',
+        metadata: { events: eventBatch.length, traces: traceBatch.length },
+      });
+    } catch (error) {
+      this.retryCount++;
+
+      if (this.retryCount <= MAX_RETRY_ATTEMPTS) {
+        // Re-queue events for retry
+        this.eventBuffer.unshift(...eventBatch);
+        this.traceBuffer.unshift(...traceBatch);
+        this.scheduleFlush();
+
+        this.logger.warn({
+          message: 'Batch write failed, scheduling retry',
+          metadata: { attempt: this.retryCount, error },
+        });
+      } else {
+        // Max retries exceeded - log and drop
+        this.logger.error({
+          message: 'Batch write failed after max retries, dropping events',
+          metadata: {
+            droppedEvents: eventBatch.length,
+            droppedTraces: traceBatch.length,
+            error,
+          },
+        });
+        this.retryCount = 0;
+      }
+    }
+  }
+
+  /**
+   * Build a multi-row INSERT statement for workflow events
+   */
+  private buildEventInsert(entries: BufferedEventEntry[]): D1PreparedStatement {
+    const columns = [
+      'id',
+      'timestamp',
+      'sequence',
+      'event_type',
+      'workflow_run_id',
+      'parent_run_id',
+      'workflow_def_id',
+      'node_id',
+      'token_id',
+      'path_id',
+      'project_id',
+      'tokens',
+      'cost_usd',
+      'message',
+      'metadata',
+    ];
+
+    const placeholders = entries.map(() => `(${columns.map(() => '?').join(', ')})`).join(', ');
+
+    const values = entries.flatMap((e) => [
+      e.id,
+      e.timestamp,
+      e.sequence,
+      e.event_type,
+      e.workflow_run_id,
+      e.parent_run_id,
+      e.workflow_def_id,
+      e.node_id,
+      e.token_id,
+      e.path_id,
+      e.project_id,
+      e.tokens,
+      e.cost_usd,
+      e.message,
+      e.metadata,
+    ]);
+
+    return this.env.DB.prepare(
+      `INSERT INTO workflow_events (${columns.join(', ')}) VALUES ${placeholders}`,
+    ).bind(...values);
+  }
+
+  /**
+   * Build a multi-row INSERT statement for trace events
+   */
+  private buildTraceInsert(entries: BufferedTraceEntry[]): D1PreparedStatement {
+    const columns = [
+      'id',
+      'timestamp',
+      'sequence',
+      'type',
+      'category',
+      'workflow_run_id',
+      'token_id',
+      'node_id',
+      'project_id',
+      'duration_ms',
+      'payload',
+      'message',
+    ];
+
+    const placeholders = entries.map(() => `(${columns.map(() => '?').join(', ')})`).join(', ');
+
+    const values = entries.flatMap((e) => [
+      e.id,
+      e.timestamp,
+      e.sequence,
+      e.type,
+      e.category,
+      e.workflow_run_id,
+      e.token_id,
+      e.node_id,
+      e.project_id,
+      e.duration_ms,
+      e.payload,
+      e.message,
+    ]);
+
+    return this.env.DB.prepare(
+      `INSERT INTO trace_events (${columns.join(', ')}) VALUES ${placeholders}`,
+    ).bind(...values);
   }
 
   // ============================================================================
