@@ -39,6 +39,11 @@
   let reconnectTimeout: ReturnType<typeof setTimeout> | null = null;
   let intentionalClose = false;
 
+  // Clock tick for updating relative times - increments every minute
+  let clockTick = $state(0);
+  let clockInterval: ReturnType<typeof setInterval> | null = null;
+  let clockTimeout: ReturnType<typeof setTimeout> | null = null;
+
   async function fetchRuns() {
     try {
       const res = await fetch('/api/workflow-runs?limit=30');
@@ -150,13 +155,52 @@
     }
   }
 
+  /**
+   * Starts an interval synced to second 0 of each minute.
+   * First waits until the next minute boundary, then runs every 60 seconds.
+   */
+  function startClockInterval() {
+    const now = new Date();
+    const msUntilNextMinute = (60 - now.getSeconds()) * 1000 - now.getMilliseconds();
+
+    // Wait until the next minute boundary, then start the interval
+    clockTimeout = setTimeout(() => {
+      clockTick++;
+      clockInterval = setInterval(() => {
+        clockTick++;
+      }, 60_000);
+    }, msUntilNextMinute);
+  }
+
+  function stopClockInterval() {
+    if (clockTimeout) {
+      clearTimeout(clockTimeout);
+      clockTimeout = null;
+    }
+    if (clockInterval) {
+      clearInterval(clockInterval);
+      clockInterval = null;
+    }
+  }
+
+  /**
+   * Compute relative time - depends on clockTick to trigger re-computation each minute
+   */
+  function getRelativeTime(timestamp: string): string {
+    // Reference clockTick to create reactive dependency
+    void clockTick;
+    return timeAgo(timestamp);
+  }
+
   onMount(() => {
     fetchRuns();
     connectToEventHub();
+    startClockInterval();
   });
 
   onDestroy(() => {
     disconnect();
+    stopClockInterval();
   });
 </script>
 
@@ -178,7 +222,7 @@
           <span class="workflow-name">{run.workflow_name}</span>
           <span class="run-id">{run.id.slice(-6)}</span>
         </div>
-        <span class="run-time">{timeAgo(run.created_at)}</span>
+        <span class="run-time">{getRelativeTime(run.created_at)}</span>
       </button>
     {/each}
 

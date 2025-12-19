@@ -215,7 +215,7 @@ type LanguageProposal = {
   timestamp: string;
 
   // What's being proposed
-  proposal_type: "new_symbol" | "refinement" | "deprecation" | "alias";
+  proposal_type: 'new_symbol' | 'refinement' | 'deprecation' | 'alias';
   symbol: string;
 
   // Definition in current language
@@ -391,7 +391,7 @@ type SymbolDefinition = {
 type EvolutionEvent = {
   version: string;
   timestamp: string;
-  event_type: "addition" | "refinement" | "deprecation";
+  event_type: 'addition' | 'refinement' | 'deprecation';
   symbol: string;
   proposal_id: string;
   participating_models: string[];
