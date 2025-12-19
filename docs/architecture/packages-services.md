@@ -68,6 +68,24 @@ Every component in Wonder is either a **package** or a **service**:
 
 ---
 
+### @wonder/expressions
+
+**Purpose:** Pure expression evaluation for JSON data transformation
+
+**Capabilities:**
+
+- JavaScript-like expression syntax (property access, conditionals, operators)
+- Pure AST interpreter (no eval, Workers-compatible)
+- Built-in functions for arrays, strings, math, objects, and iteration
+- Configurable limits for expression length, string size, and literal size
+- Compile-once, evaluate-many pattern for repeated evaluations
+
+**Dependencies:** None (pure TypeScript)
+
+**Used by:** Coordinator (transition conditions, context expressions)
+
+---
+
 ### @wonder/tests
 
 **Purpose:** End-to-end test suite
@@ -359,6 +377,7 @@ git push wonder main
 | @wonder/schemas   | Package | npm (internal)     | None             | Import                                        |
 | @wonder/sdk       | Package | npm (public)       | None             | Import                                        |
 | @wonder/templates | Package | npm (internal)     | None             | Import                                        |
+| @wonder/expressions | Package | npm (internal)   | None             | Import                                        |
 | cache             | Service | Cloudflare Workers | R2               | Workers RPC                                   |
 | containers        | Service | Cloudflare Workers | DO SQLite        | Workers RPC                                   |
 | coordinator       | Service | Cloudflare Workers | DO SQLite, D1    | Workers RPC                                   |
