@@ -1,8 +1,7 @@
 /** Actions RPC resource */
 
-import { ConflictError, NotFoundError, extractDbError } from '~/errors';
-import { Resource } from '../base';
-import { computeFingerprint } from './fingerprint';
+import { ConflictError, NotFoundError, extractDbError } from '~/shared/errors';
+import { Resource } from '~/shared/resource';
 import * as repo from './repository';
 import type { Action, ActionKind } from './types';
 
@@ -29,76 +28,22 @@ export class Actions extends Resource {
       metadata: { name: data.name, kind: data.kind, autoversion: data.autoversion ?? false },
     });
 
-    // Autoversion deduplication check
-    if (data.autoversion) {
-      const { hash: contentHash, input: fingerprintInput } = await computeFingerprint(data);
+    const autoversionResult = await this.withAutoversion(data, {
+      findByNameAndHash: (name, hash) =>
+        repo.getActionByNameAndHash(this.serviceCtx.db, name, hash),
+      getMaxVersion: (name) => repo.getMaxVersionByName(this.serviceCtx.db, name),
+    });
 
-      // Check for existing action with same name + content
-      const existing = await repo.getActionByNameAndHash(
-        this.serviceCtx.db,
-        data.name,
-        contentHash,
-      );
-
-      if (existing) {
-        this.serviceCtx.logger.info({
-          event_type: 'action.autoversion.matched',
-          metadata: {
-            action_id: existing.id,
-            version: existing.version,
-            name: existing.name,
-            content_hash: contentHash,
-            fingerprint_input: fingerprintInput,
-          },
-        });
-
-        return {
-          action_id: existing.id,
-          action: existing,
-          reused: true,
-        };
-      }
-
-      // No exact match - determine version number
-      const maxVersion = await repo.getMaxVersionByName(this.serviceCtx.db, data.name);
-      const newVersion = maxVersion + 1;
-
-      this.serviceCtx.logger.info({
-        event_type: 'action.autoversion.creating',
-        metadata: {
-          name: data.name,
-          version: newVersion,
-          content_hash: contentHash,
-          fingerprint_input: fingerprintInput,
-          existing_max_version: maxVersion,
-        },
-      });
-
-      return this.createWithVersionAndHash(data, newVersion, contentHash);
+    if (autoversionResult.reused) {
+      return {
+        action_id: autoversionResult.entity.id,
+        action: autoversionResult.entity,
+        reused: true,
+      };
     }
 
-    // Non-autoversion path: create with version 1 (original behavior)
-    return this.createWithVersionAndHash(data, data.version ?? 1, null);
-  }
+    const version = data.autoversion ? autoversionResult.version : (data.version ?? 1);
 
-  private async createWithVersionAndHash(
-    data: {
-      name: string;
-      description?: string;
-      kind: ActionKind;
-      implementation: object;
-      requires?: object;
-      produces?: object;
-      execution?: object;
-      idempotency?: object;
-    },
-    version: number,
-    contentHash: string | null,
-  ): Promise<{
-    action_id: string;
-    action: Action;
-    reused: boolean;
-  }> {
     try {
       const action = await repo.createAction(this.serviceCtx.db, {
         version,
@@ -110,7 +55,7 @@ export class Actions extends Resource {
         produces: data.produces ?? null,
         execution: data.execution ?? null,
         idempotency: data.idempotency ?? null,
-        content_hash: contentHash,
+        content_hash: autoversionResult.contentHash,
       });
 
       return {

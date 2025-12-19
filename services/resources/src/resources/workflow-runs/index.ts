@@ -3,9 +3,9 @@
 import type { EventHub } from '@wonder/events';
 import { eq } from 'drizzle-orm';
 import { ulid } from 'ulid';
-import { NotFoundError } from '~/errors';
+import { NotFoundError } from '~/shared/errors';
 import * as schema from '~/schema';
-import { Resource } from '../base';
+import { Resource } from '~/shared/resource';
 import * as workflowRepo from '../workflows/repository';
 import * as repo from './repository';
 import type { ListWorkflowRunsFilters, WorkflowRunSummary } from './types';

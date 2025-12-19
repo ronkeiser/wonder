@@ -1,8 +1,7 @@
 /** PromptSpecs RPC resource */
 
-import { ConflictError, NotFoundError, extractDbError } from '~/errors';
-import { Resource } from '../base';
-import { computeFingerprint } from './fingerprint';
+import { ConflictError, NotFoundError, extractDbError } from '~/shared/errors';
+import { Resource } from '~/shared/resource';
 import * as repo from './repository';
 import type { PromptSpec } from './types';
 
@@ -30,75 +29,22 @@ export class PromptSpecs extends Resource {
       metadata: { name: data.name, autoversion: data.autoversion ?? false },
     });
 
-    // Autoversion deduplication check
-    if (data.autoversion) {
-      const contentHash = await computeFingerprint(data);
+    const autoversionResult = await this.withAutoversion(data, {
+      findByNameAndHash: (name, hash) =>
+        repo.getPromptSpecByNameAndHash(this.serviceCtx.db, name, hash),
+      getMaxVersion: (name) => repo.getMaxVersionByName(this.serviceCtx.db, name),
+    });
 
-      // Check for existing prompt spec with same name + content
-      const existing = await repo.getPromptSpecByNameAndHash(
-        this.serviceCtx.db,
-        data.name,
-        contentHash,
-      );
-
-      if (existing) {
-        this.serviceCtx.logger.info({
-          event_type: 'prompt_spec.autoversion.matched',
-          metadata: {
-            prompt_spec_id: existing.id,
-            version: existing.version,
-            name: existing.name,
-            content_hash: contentHash,
-          },
-        });
-
-        return {
-          prompt_spec_id: existing.id,
-          prompt_spec: existing,
-          reused: true,
-        };
-      }
-
-      // No exact match - determine version number
-      const maxVersion = await repo.getMaxVersionByName(this.serviceCtx.db, data.name);
-      const newVersion = maxVersion + 1;
-
-      this.serviceCtx.logger.info({
-        event_type: 'prompt_spec.autoversion.creating',
-        metadata: {
-          name: data.name,
-          version: newVersion,
-          content_hash: contentHash,
-          existing_max_version: maxVersion,
-        },
-      });
-
-      return this.createWithVersionAndHash(data, newVersion, contentHash);
+    if (autoversionResult.reused) {
+      return {
+        prompt_spec_id: autoversionResult.entity.id,
+        prompt_spec: autoversionResult.entity,
+        reused: true,
+      };
     }
 
-    // Non-autoversion path: create with version 1 (original behavior)
-    return this.createWithVersionAndHash(data, data.version ?? 1, null);
-  }
+    const version = data.autoversion ? autoversionResult.version : (data.version ?? 1);
 
-  private async createWithVersionAndHash(
-    data: {
-      name: string;
-      description?: string;
-      system_prompt?: string;
-      template: string;
-      template_language?: 'handlebars' | 'jinja2';
-      requires?: object;
-      produces?: object;
-      examples?: object;
-      tags?: string[];
-    },
-    version: number,
-    contentHash: string | null,
-  ): Promise<{
-    prompt_spec_id: string;
-    prompt_spec: PromptSpec;
-    reused: boolean;
-  }> {
     try {
       const promptSpec = await repo.createPromptSpec(this.serviceCtx.db, {
         version,
@@ -111,7 +57,7 @@ export class PromptSpecs extends Resource {
         produces: data.produces ?? {},
         examples: data.examples ?? null,
         tags: data.tags ?? null,
-        content_hash: contentHash,
+        content_hash: autoversionResult.contentHash,
       });
 
       return {

@@ -1,8 +1,7 @@
 /** ArtifactTypes RPC resource */
 
-import { ConflictError, NotFoundError, extractDbError } from '~/errors';
-import { Resource } from '../base';
-import { computeFingerprint } from './fingerprint';
+import { ConflictError, NotFoundError, extractDbError } from '~/shared/errors';
+import { Resource } from '~/shared/resource';
 import * as repo from './repository';
 import type { ArtifactType } from './types';
 
@@ -24,76 +23,29 @@ export class ArtifactTypes extends Resource {
       metadata: { name: data.name, autoversion: data.autoversion ?? false },
     });
 
-    // Autoversion deduplication check
-    if (data.autoversion) {
-      const contentHash = await computeFingerprint(data);
+    const autoversionResult = await this.withAutoversion(data, {
+      findByNameAndHash: (name, hash) =>
+        repo.getArtifactTypeByNameAndHash(this.serviceCtx.db, name, hash),
+      getMaxVersion: (name) => repo.getMaxVersionByName(this.serviceCtx.db, name),
+    });
 
-      // Check for existing artifact type with same name + content
-      const existing = await repo.getArtifactTypeByNameAndHash(
-        this.serviceCtx.db,
-        data.name,
-        contentHash,
-      );
-
-      if (existing) {
-        this.serviceCtx.logger.info({
-          event_type: 'artifact_type.autoversion.matched',
-          metadata: {
-            artifact_type_id: existing.id,
-            version: existing.version,
-            name: existing.name,
-            content_hash: contentHash,
-          },
-        });
-
-        return {
-          artifact_type_id: existing.id,
-          artifact_type: existing,
-          reused: true,
-        };
-      }
-
-      // No exact match - determine version number
-      const maxVersion = await repo.getMaxVersionByName(this.serviceCtx.db, data.name);
-      const newVersion = maxVersion + 1;
-
-      this.serviceCtx.logger.info({
-        event_type: 'artifact_type.autoversion.creating',
-        metadata: {
-          name: data.name,
-          version: newVersion,
-          content_hash: contentHash,
-          existing_max_version: maxVersion,
-        },
-      });
-
-      return this.createWithVersionAndHash(data, newVersion, contentHash);
+    if (autoversionResult.reused) {
+      return {
+        artifact_type_id: autoversionResult.entity.id,
+        artifact_type: autoversionResult.entity,
+        reused: true,
+      };
     }
 
-    // Non-autoversion path: create with version 1 (original behavior)
-    return this.createWithVersionAndHash(data, data.version ?? 1, null);
-  }
+    const version = data.autoversion ? autoversionResult.version : (data.version ?? 1);
 
-  private async createWithVersionAndHash(
-    data: {
-      name: string;
-      description?: string;
-      schema: object;
-    },
-    version: number,
-    contentHash: string | null,
-  ): Promise<{
-    artifact_type_id: string;
-    artifact_type: ArtifactType;
-    reused: boolean;
-  }> {
     try {
       const artifactType = await repo.createArtifactType(this.serviceCtx.db, {
         version,
         name: data.name,
         description: data.description ?? '',
         schema: data.schema,
-        content_hash: contentHash,
+        content_hash: autoversionResult.contentHash,
       });
 
       return {

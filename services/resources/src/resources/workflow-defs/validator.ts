@@ -5,7 +5,7 @@
  * All validation happens before any database operations.
  */
 
-import { ValidationError } from '~/errors';
+import { ValidationError } from '~/shared/errors';
 
 /** Input types for validation */
 export type NodeInput = {

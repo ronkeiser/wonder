@@ -1,10 +1,9 @@
 /** Tasks RPC resource */
 
 import { ulid } from 'ulid';
-import { ConflictError, NotFoundError, extractDbError } from '~/errors';
+import { ConflictError, NotFoundError, extractDbError } from '~/shared/errors';
 import type { RetryConfig, Step } from '../../schema';
-import { Resource } from '../base';
-import { computeFingerprint } from './fingerprint';
+import { Resource } from '~/shared/resource';
 import * as repo from './repository';
 import type { Task, StepInput } from './types';
 
@@ -33,85 +32,43 @@ export class Tasks extends Resource {
       metadata: { name: data.name, autoversion: data.autoversion ?? false },
     });
 
-    // Autoversion deduplication check
-    if (data.autoversion) {
-      const contentHash = await computeFingerprint(data);
-      const projectId = data.project_id ?? null;
-      const libraryId = data.library_id ?? null;
+    const scope = {
+      project_id: data.project_id ?? null,
+      library_id: data.library_id ?? null,
+    };
 
-      // Check for existing task with same name + owner + content
-      const existing = await repo.getTaskByNameAndHash(
-        this.serviceCtx.db,
-        data.name,
-        contentHash,
-        projectId,
-        libraryId,
-      );
+    const autoversionResult = await this.withAutoversion(
+      data,
+      {
+        findByNameAndHash: (name, hash, s) =>
+          repo.getTaskByNameAndHash(
+            this.serviceCtx.db,
+            name,
+            hash,
+            s?.project_id ?? null,
+            s?.library_id ?? null,
+          ),
+        getMaxVersion: (name, s) =>
+          repo.getMaxVersionByName(
+            this.serviceCtx.db,
+            name,
+            s?.project_id ?? null,
+            s?.library_id ?? null,
+          ),
+      },
+      scope,
+    );
 
-      if (existing) {
-        this.serviceCtx.logger.info({
-          event_type: 'task.autoversion.matched',
-          metadata: {
-            task_id: existing.id,
-            version: existing.version,
-            name: existing.name,
-            content_hash: contentHash,
-          },
-        });
-
-        return {
-          task_id: existing.id,
-          task: existing,
-          reused: true,
-        };
-      }
-
-      // No exact match - determine version number
-      const maxVersion = await repo.getMaxVersionByName(
-        this.serviceCtx.db,
-        data.name,
-        projectId,
-        libraryId,
-      );
-      const newVersion = maxVersion + 1;
-
-      this.serviceCtx.logger.info({
-        event_type: 'task.autoversion.creating',
-        metadata: {
-          name: data.name,
-          version: newVersion,
-          content_hash: contentHash,
-          existing_max_version: maxVersion,
-        },
-      });
-
-      return this.createWithVersionAndHash(data, newVersion, contentHash);
+    if (autoversionResult.reused) {
+      return {
+        task_id: autoversionResult.entity.id,
+        task: autoversionResult.entity,
+        reused: true,
+      };
     }
 
-    // Non-autoversion path: create with version 1 (original behavior)
-    return this.createWithVersionAndHash(data, data.version ?? 1, null);
-  }
+    const version = data.autoversion ? autoversionResult.version : (data.version ?? 1);
 
-  private async createWithVersionAndHash(
-    data: {
-      name: string;
-      description?: string;
-      project_id?: string;
-      library_id?: string;
-      tags?: string[];
-      input_schema: object;
-      output_schema: object;
-      steps: StepInput[];
-      retry?: RetryConfig;
-      timeout_ms?: number;
-    },
-    version: number,
-    contentHash: string | null,
-  ): Promise<{
-    task_id: string;
-    task: Task;
-    reused: boolean;
-  }> {
     // Generate step IDs
     const stepsWithIds: Step[] = data.steps.map((step) => ({
       id: ulid(),
@@ -138,7 +95,7 @@ export class Tasks extends Resource {
         steps: stepsWithIds,
         retry: data.retry ?? null,
         timeout_ms: data.timeout_ms ?? null,
-        content_hash: contentHash,
+        content_hash: autoversionResult.contentHash,
       });
 
       return {

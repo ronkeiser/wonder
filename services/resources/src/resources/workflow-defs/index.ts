@@ -1,8 +1,7 @@
 /** WorkflowDefs RPC resource */
 
-import { ConflictError, NotFoundError, ValidationError, extractDbError } from '~/errors';
-import { Resource } from '../base';
-import { computeFingerprint } from './fingerprint';
+import { ConflictError, NotFoundError, ValidationError, extractDbError } from '~/shared/errors';
+import { Resource } from '~/shared/resource';
 import * as repo from './repository';
 import { generateIds, transformWorkflowDef } from './transformer';
 import type { Node, Transition, WorkflowDef } from './types';
@@ -33,79 +32,45 @@ export class WorkflowDefs extends Resource {
       throw error;
     }
 
+    const scope = {
+      project_id: data.project_id ?? null,
+      library_id: data.library_id ?? null,
+    };
+
     // 2. Autoversion deduplication check
-    if (data.autoversion) {
-      const contentHash = await computeFingerprint(data);
-      const projectId = data.project_id ?? null;
-      const libraryId = data.library_id ?? null;
+    const autoversionResult = await this.withAutoversion(
+      data as unknown as Record<string, unknown> & { name: string; autoversion?: boolean },
+      {
+        findByNameAndHash: (name, hash, s) =>
+          repo.getWorkflowDefByNameAndHash(
+            this.serviceCtx.db,
+            name,
+            s?.project_id ?? null,
+            s?.library_id ?? null,
+            hash,
+          ),
+        getMaxVersion: (name, s) =>
+          repo.getMaxVersionByName(
+            this.serviceCtx.db,
+            name,
+            s?.project_id ?? null,
+            s?.library_id ?? null,
+          ),
+      },
+      scope,
+    );
 
-      // Check for existing workflow with same name + owner + content
-      const existing = await repo.getWorkflowDefByNameAndHash(
-        this.serviceCtx.db,
-        data.name,
-        projectId,
-        libraryId,
-        contentHash,
-      );
-
-      if (existing) {
-        // Exact match found - return existing without creating
-        this.serviceCtx.logger.info({
-          event_type: 'workflow_def.autoversion.matched',
-          metadata: {
-            workflow_def_id: existing.id,
-            version: existing.version,
-            name: existing.name,
-            content_hash: contentHash,
-          },
-        });
-
-        return {
-          workflow_def_id: existing.id,
-          workflow_def: existing,
-          reused: true,
-        };
-      }
-
-      // No exact match - determine version number
-      const maxVersion = await repo.getMaxVersionByName(
-        this.serviceCtx.db,
-        data.name,
-        projectId,
-        libraryId,
-      );
-      const newVersion = maxVersion + 1;
-
-      this.serviceCtx.logger.info({
-        event_type: 'workflow_def.autoversion.creating',
-        metadata: {
-          name: data.name,
-          version: newVersion,
-          content_hash: contentHash,
-          existing_max_version: maxVersion,
-        },
-      });
-
-      // Create with computed version and content hash
-      return this.createWithVersionAndHash(data, newVersion, contentHash);
+    if (autoversionResult.reused) {
+      return {
+        workflow_def_id: autoversionResult.entity.id,
+        workflow_def: autoversionResult.entity,
+        reused: true,
+      };
     }
 
-    // 3. Non-autoversion path: create with version 1 (original behavior)
-    return this.createWithVersionAndHash(data, 1, null);
-  }
+    const version = data.autoversion ? autoversionResult.version : 1;
 
-  /**
-   * Internal helper to create a workflow def with specified version and content hash.
-   */
-  private async createWithVersionAndHash(
-    data: WorkflowDefInput,
-    version: number,
-    contentHash: string | null,
-  ): Promise<{
-    workflow_def_id: string;
-    workflow_def: WorkflowDef;
-    reused: boolean;
-  }> {
+    // 3. Create with computed version and content hash
     // Generate IDs and transform refs → IDs
     const ids = generateIds(data);
     const transformed = transformWorkflowDef(data, ids);
@@ -140,7 +105,7 @@ export class WorkflowDefs extends Resource {
         output_mapping: data.output_mapping ?? null,
         context_schema: data.context_schema ?? null,
         initial_node_id: transformed.initialNodeId,
-        content_hash: contentHash,
+        content_hash: autoversionResult.contentHash,
       });
     } catch (error) {
       const dbError = extractDbError(error);
@@ -213,7 +178,7 @@ export class WorkflowDefs extends Resource {
         workflow_def_id: workflowDef.id,
         version: workflowDef.version,
         name: workflowDef.name,
-        content_hash: contentHash,
+        content_hash: autoversionResult.contentHash,
       },
     });
 

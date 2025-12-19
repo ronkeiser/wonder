@@ -1,7 +1,7 @@
 /** Workflows RPC resource */
 
-import { ConflictError, NotFoundError, extractDbError } from '~/errors';
-import { Resource } from '../base';
+import { ConflictError, NotFoundError, extractDbError } from '~/shared/errors';
+import { Resource } from '~/shared/resource';
 import * as repo from './repository';
 
 export class Workflows extends Resource {
