@@ -7,7 +7,6 @@ export type PromptSpec = {
   version: number;
   system_prompt: string | null;
   template: string;
-  template_language: 'handlebars' | 'jinja2';
   requires: object;
   produces: object;
   examples: object | null;
@@ -23,7 +22,6 @@ export type PromptSpecInput = {
   description?: string;
   system_prompt?: string;
   template: string;
-  template_language?: 'handlebars' | 'jinja2';
   requires?: object;
   produces?: object;
   examples?: object;

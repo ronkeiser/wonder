@@ -37,7 +37,6 @@ export interface EmbeddedPromptSpec {
   version?: number;
   system_prompt?: string;
   template: string;
-  template_language: 'handlebars' | 'jinja2';
   requires: Record<string, unknown>;
   produces: JSONSchema;
   examples?: unknown[];

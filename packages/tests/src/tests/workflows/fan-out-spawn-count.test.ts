@@ -110,7 +110,6 @@ Make sure the question is specific and factual, not too easy or too hard.
 Return JSON with:
 - "question": the trivia question (end with a question mark)
 - "answer": the correct answer (brief, 1-2 sentences max)`,
-      template_language: 'handlebars',
       requires: { topic: s.string() },
       produces: questionSchema,
     });

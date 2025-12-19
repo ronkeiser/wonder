@@ -360,9 +360,6 @@ export const prompt_specs = sqliteTable(
 
     system_prompt: text('system_prompt'),
     template: text('template').notNull(),
-    template_language: text('template_language', {
-      enum: ['handlebars', 'jinja2'],
-    }).notNull(),
 
     requires: text('requires', { mode: 'json' }).$type<object>().notNull(),
     produces: text('produces', { mode: 'json' }).$type<object>().notNull(),

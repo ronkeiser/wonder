@@ -21,7 +21,6 @@ describe('Coordinator - Context Operations', () => {
       name: 'Test Prompt',
       description: 'Processes input and returns greeting',
       template: 'Process: {{name}} (count: {{count}})',
-      template_language: 'handlebars',
       requires: { name: s.string(), count: s.number() },
       produces: outputSchema,
     });

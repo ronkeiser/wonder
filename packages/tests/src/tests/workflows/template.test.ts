@@ -72,7 +72,6 @@ describe('Coordinator - Simple Workflow Tests', () => {
                         description: 'Echo the input name and count',
                         template:
                           'Enthusiasticly greet a person named {{name}}. Tell them that the count is {{count}}.',
-                        template_language: 'handlebars',
                         requires: { name: schema.string(), count: schema.number() },
                         produces: schema.object(
                           { greeting: schema.string(), processed_count: schema.number() },

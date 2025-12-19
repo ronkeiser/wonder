@@ -64,7 +64,6 @@ describe('Coordinator - Two Node Linear Workflow', () => {
       description: 'Generates a random 4-digit code',
       template:
         'Generate a random 4-digit numeric code. Use seed {{seed}} as inspiration but make it random. Return ONLY a JSON object with a "code" field containing exactly 4 digits as a string.',
-      template_language: 'handlebars',
       requires: { seed: s.number() },
       produces: codeSchema,
     });
@@ -109,7 +108,6 @@ describe('Coordinator - Two Node Linear Workflow', () => {
       description: 'Echoes back the code it received',
       template:
         'You received this code: {{code}}. Return ONLY a JSON object with an "echoed_code" field containing the EXACT same code you received. Do not modify it.',
-      template_language: 'handlebars',
       requires: { code: s.string() },
       produces: echoSchema,
     });

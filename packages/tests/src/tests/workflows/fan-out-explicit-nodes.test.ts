@@ -80,7 +80,6 @@ describe('Coordinator - Fan-Out Explicit Nodes', () => {
       name: 'Start Prompt',
       description: 'Acknowledges topic',
       template: 'Acknowledge the topic: {{topic}}. Return JSON with "topic": "{{topic}}"',
-      template_language: 'handlebars',
       requires: { topic: s.string() },
       produces: s.object({ topic: s.string() }, { required: ['topic'] }),
     });
@@ -129,7 +128,6 @@ describe('Coordinator - Fan-Out Explicit Nodes', () => {
 Return a JSON object with:
 - "question": A specific trivia question
 - "answer": The correct answer (1-3 words)`,
-        template_language: 'handlebars',
         requires: { topic: s.string() },
         produces: triviaSchema,
       });
@@ -196,7 +194,6 @@ A3: {{a3}}
 
 Return a JSON object echoing all 6 values exactly:
 {"q1": "{{q1}}", "a1": "{{a1}}", "q2": "{{q2}}", "a2": "{{a2}}", "q3": "{{q3}}", "a3": "{{a3}}"}`,
-      template_language: 'handlebars',
       requires: {
         q1: s.string(),
         a1: s.string(),

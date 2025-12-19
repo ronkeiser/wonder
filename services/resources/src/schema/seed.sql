@@ -36,7 +36,7 @@ VALUES (
 );
 
 -- PromptSpec: Template for the greeting prompt
-INSERT INTO prompt_specs (id, name, description, version, system_prompt, template, template_language, requires, produces, examples, tags, created_at, updated_at)
+INSERT INTO prompt_specs (id, name, description, version, system_prompt, template, requires, produces, examples, tags, created_at, updated_at)
 VALUES (
   '01JDXSEED0000PROMPTSPEC01',
   'Greeting Prompt',
@@ -44,7 +44,6 @@ VALUES (
   1,
   NULL,
   'Generate a warm, friendly greeting for someone named {{name}}. Keep it short and cheerful.',
-  'handlebars',
   '{"name":"string"}',
   '{"greeting":"string"}',
   NULL,

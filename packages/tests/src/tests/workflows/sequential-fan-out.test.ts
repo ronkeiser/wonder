@@ -147,7 +147,6 @@ IMPORTANT: Your idea must be DIFFERENT from all other brainstormers. As brainsto
 
 Return JSON with:
 - "ideas": array with 1 string suggestion`,
-      template_language: 'handlebars',
       requires: { topic: s.string(), branch_index: s.number() },
       produces: ideationSchema,
     });
@@ -246,7 +245,6 @@ Score each idea from 0-10 based on:
 
 Return JSON with:
 - "scores": array of objects, each with "idea" (string), "score" (number 0-10)`,
-      template_language: 'handlebars',
       requires: s.object({
         topic: s.string(),
         ideas: s.array(s.string()),
@@ -329,7 +327,6 @@ Return JSON with:
 - "summary": brief overview of the evaluation process
 - "ranked_ideas": array of objects with "rank", "idea", "average_score", "judge_scores" (array of individual scores)
 - "recommendation": your final recommendation`,
-      template_language: 'handlebars',
       requires: s.object({
         topic: s.string(),
         judgments: s.array(judgingSchema),

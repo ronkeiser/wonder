@@ -30,7 +30,6 @@ const { result, cleanup } = await runTestWorkflow(
                   prompt_spec: promptSpec({
                     name: 'Greeting Prompt',
                     template: 'Greet {{name}}',
-                    template_language: 'handlebars',
                     requires: { name: schema.string() },
                     produces: schema.object({ greeting: schema.string() }),
                   }),

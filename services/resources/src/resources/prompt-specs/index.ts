@@ -12,7 +12,6 @@ export class PromptSpecs extends Resource {
     description?: string;
     system_prompt?: string;
     template: string;
-    template_language?: 'handlebars' | 'jinja2';
     requires?: object;
     produces?: object;
     examples?: object;
@@ -52,7 +51,6 @@ export class PromptSpecs extends Resource {
         description: data.description ?? '',
         system_prompt: data.system_prompt ?? null,
         template: data.template,
-        template_language: data.template_language ?? 'handlebars',
         requires: data.requires ?? {},
         produces: data.produces ?? {},
         examples: data.examples ?? null,
@@ -116,7 +114,6 @@ export class PromptSpecs extends Resource {
       version: number;
       system_prompt: string | null;
       template: string;
-      template_language: 'handlebars' | 'jinja2';
       requires: object;
       produces: object;
       examples: object | null;

@@ -169,7 +169,6 @@ export async function createEmbeddedPromptSpec(
     version: 1,
     system_prompt: promptSpec.system_prompt,
     template: promptSpec.template,
-    template_language: promptSpec.template_language,
     requires: promptSpec.requires,
     produces: promptSpec.produces,
     examples: promptSpec.examples,

@@ -83,7 +83,6 @@ Return a JSON object with:
 - "answer": The correct answer (keep it short, 1-3 words)
 
 Make the question specific and factual.`,
-      template_language: 'handlebars',
       requires: { topic: s.string() },
       produces: questionSchema,
     });
@@ -137,7 +136,6 @@ Make the question specific and factual.`,
 
 Return a JSON object with:
 - "guess": Your best guess at the answer (keep it short, 1-3 words)`,
-      template_language: 'handlebars',
       requires: { question: s.string() },
       produces: guessSchema,
     });
@@ -194,7 +192,6 @@ Return a JSON object with these EXACT fields:
 - "judgment": Either "correct" or "incorrect" (just one word)
 
 Be lenient with minor spelling differences or equivalent answers.`,
-      template_language: 'handlebars',
       requires: { question: s.string(), correct_answer: s.string(), guess: s.string() },
       produces: judgmentSchema,
     });

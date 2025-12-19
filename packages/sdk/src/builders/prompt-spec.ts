@@ -20,7 +20,6 @@ type CreatePromptSpec = components['schemas']['CreatePromptSpec'];
  *   name: 'Summarization Prompt',
  *   description: 'Summarizes text content',
  *   template: 'Summarize the following: {{text}}',
- *   template_language: 'handlebars',
  *   requires: { text: schema.string() },
  *   produces: schema.object({ summary: schema.string() })
  * });
@@ -37,7 +36,6 @@ export function promptSpec(config: {
   version?: number;
   system_prompt?: string;
   template: string;
-  template_language: 'handlebars' | 'jinja2';
   requires: Record<string, unknown>;
   produces: JSONSchema;
   examples?: unknown[];
@@ -50,7 +48,6 @@ export function promptSpec(config: {
     version: config.version ?? 1,
     system_prompt: config.system_prompt,
     template: config.template,
-    template_language: config.template_language,
     requires: config.requires,
     produces: config.produces,
     examples: config.examples,

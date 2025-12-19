@@ -281,7 +281,6 @@ function transformAction(actionDoc: ActionDocument, _testContext: TestContext): 
       name: `${actionDoc.action || 'action'}-prompt`,
       description: actionDoc.description || 'Auto-generated prompt spec',
       template,
-      template_language: 'handlebars',
       requires: transformSchema(inputSchema) as Record<string, unknown>,
       produces: transformSchema(outputSchema) as any,
     });
@@ -294,7 +293,6 @@ function transformAction(actionDoc: ActionDocument, _testContext: TestContext): 
       name: `${actionDoc.action || 'action'}-prompt`,
       description: actionDoc.description || 'Auto-generated prompt spec',
       template: impl.template as string,
-      template_language: (impl.template_language as 'handlebars' | 'jinja2') || 'handlebars',
       requires: (actionDoc.requires || {}) as Record<string, unknown>,
       produces: transformSchema(actionDoc.produces) as any,
     });
@@ -883,7 +881,6 @@ async function createEmbeddedPromptSpec(
     version: promptSpecDef.version ?? 1,
     system_prompt: promptSpecDef.system_prompt,
     template: promptSpecDef.template,
-    template_language: promptSpecDef.template_language,
     requires: promptSpecDef.requires,
     produces: promptSpecDef.produces,
     examples: promptSpecDef.examples,
