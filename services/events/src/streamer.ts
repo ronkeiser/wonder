@@ -187,12 +187,12 @@ export class Streamer extends DurableObject<Env> {
       const statements: Parameters<typeof this.env.DB.batch>[0] = [];
 
       // Build multi-row insert statements for events
-      for (const chunk of this.chunkArray(eventBatch, ROWS_PER_INSERT)) {
+      for (const chunk of chunkArray(eventBatch, ROWS_PER_INSERT)) {
         statements.push(this.buildEventInsert(chunk));
       }
 
       // Build multi-row insert statements for traces
-      for (const chunk of this.chunkArray(traceBatch, ROWS_PER_INSERT)) {
+      for (const chunk of chunkArray(traceBatch, ROWS_PER_INSERT)) {
         statements.push(this.buildTraceInsert(chunk));
       }
 
@@ -470,12 +470,12 @@ export class Streamer extends DurableObject<Env> {
     }
     return true;
   }
+}
 
-  private chunkArray<T>(array: T[], size: number): T[][] {
-    const chunks: T[][] = [];
-    for (let i = 0; i < array.length; i += size) {
-      chunks.push(array.slice(i, i + size));
-    }
-    return chunks;
+function chunkArray<T>(array: T[], size: number): T[][] {
+  const chunks: T[][] = [];
+  for (let i = 0; i < array.length; i += size) {
+    chunks.push(array.slice(i, i + size));
   }
+  return chunks;
 }
