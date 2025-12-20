@@ -37,5 +37,5 @@ export function timeAgo(timestamp: string | number | Date): string {
   if (minutes > 0) {
     return `${minutes}m`;
   }
-  return `${seconds}s`;
+  return 'just now';
 }
