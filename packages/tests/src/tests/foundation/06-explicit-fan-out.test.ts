@@ -598,10 +598,9 @@ describe('Foundation: 06 - Explicit Fan-Out', () => {
     // Execute
     // =========================================================================
     const workflowInput = { seed: 'EXPLICIT' };
-    const { result, cleanup } = await runTestWorkflow(workflowDef, workflowInput);
+    const { result } = await runTestWorkflow(workflowDef, workflowInput);
 
-    try {
-      const { trace, events } = result;
+    const { trace, events } = result;
 
       // =========================================================================
       // INVARIANTS
@@ -822,8 +821,5 @@ describe('Foundation: 06 - Explicit Fan-Out', () => {
           // All value flow checks passed!
         })
         .run();
-    } finally {
-      await cleanup();
-    }
   });
 });

@@ -224,10 +224,9 @@ describe('Foundation: 02 - Fan-out with Spawn Count + Fan-in', () => {
     // Execute
     // =========================================================================
     const workflowInput = { prefix: 'TEST' };
-    const { result, cleanup } = await runTestWorkflow(workflowDef, workflowInput);
+    const { result } = await runTestWorkflow(workflowDef, workflowInput);
 
-    try {
-      const { trace } = result;
+    const { trace } = result;
 
       // =========================================================================
       // INVARIANTS
@@ -274,8 +273,5 @@ describe('Foundation: 02 - Fan-out with Spawn Count + Fan-in', () => {
           },
         })
         .run();
-    } finally {
-      await cleanup();
-    }
   });
 });

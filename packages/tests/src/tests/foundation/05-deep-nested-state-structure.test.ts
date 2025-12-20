@@ -614,10 +614,9 @@ describe('Foundation: 05 - Deep Nested State Structure', () => {
       // Execute
       // =========================================================================
       const workflowInput = { seed: 'DEEP_NESTED' };
-      const { result, cleanup } = await runTestWorkflow(workflowDef, workflowInput);
+      const { result } = await runTestWorkflow(workflowDef, workflowInput);
 
-      try {
-        const { trace, events } = result;
+      const { trace, events } = result;
 
         // =========================================================================
         // INVARIANTS
@@ -766,9 +765,6 @@ describe('Foundation: 05 - Deep Nested State Structure', () => {
             // =====================================================================
           })
           .run();
-      } finally {
-        await cleanup();
-      }
     },
   );
 });

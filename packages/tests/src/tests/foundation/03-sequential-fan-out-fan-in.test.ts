@@ -342,10 +342,9 @@ describe('Foundation: 03 - Sequential Fan-out/Fan-in', () => {
     // Execute
     // =========================================================================
     const workflowInput = { seed: 'ALPHA' };
-    const { result, cleanup } = await runTestWorkflow(workflowDef, workflowInput);
+    const { result } = await runTestWorkflow(workflowDef, workflowInput);
 
-    try {
-      const { trace } = result;
+    const { trace } = result;
 
       // =========================================================================
       // INVARIANTS
@@ -414,8 +413,5 @@ describe('Foundation: 03 - Sequential Fan-out/Fan-in', () => {
           minCount: 2, // At least one snapshot per phase
         })
         .run();
-    } finally {
-      await cleanup();
-    }
   });
 });

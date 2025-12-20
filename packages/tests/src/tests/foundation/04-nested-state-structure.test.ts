@@ -446,10 +446,9 @@ describe('Foundation: 04 - Nested State Structure', () => {
     // Execute
     // =========================================================================
     const workflowInput = { seed: 'NESTED' };
-    const { result, cleanup } = await runTestWorkflow(workflowDef, workflowInput);
+    const { result } = await runTestWorkflow(workflowDef, workflowInput);
 
-    try {
-      const { trace, events } = result;
+    const { trace, events } = result;
 
       // =========================================================================
       // INVARIANTS
@@ -668,8 +667,5 @@ describe('Foundation: 04 - Nested State Structure', () => {
           // All value flow checks passed!
         })
         .run();
-    } finally {
-      await cleanup();
-    }
   });
 });

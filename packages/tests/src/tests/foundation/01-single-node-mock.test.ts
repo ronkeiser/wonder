@@ -91,10 +91,9 @@ describe('Foundation: 01 - Single Node Mock', () => {
     // Execute
     // =========================================================================
     const startTime = Date.now();
-    const { result, cleanup } = await runTestWorkflow(workflowDef, {});
+    const { result } = await runTestWorkflow(workflowDef, {});
 
-    try {
-      const { trace, events } = result;
+    const { trace, events } = result;
       const elapsedMs = Date.now() - startTime;
 
       // =========================================================================
@@ -446,8 +445,5 @@ describe('Foundation: 01 - Single Node Mock', () => {
           expectedCount,
         );
       }
-    } finally {
-      await cleanup();
-    }
   });
 });
