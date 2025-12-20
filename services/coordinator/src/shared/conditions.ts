@@ -6,7 +6,7 @@
  */
 
 import type { Condition, ContextSnapshot, FieldRef, Literal } from '../types';
-import { resolveFieldPath } from './path-utils';
+import { resolveFieldPath } from './path';
 
 // ============================================================================
 // Main Entry Point
