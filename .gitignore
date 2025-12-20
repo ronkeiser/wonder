@@ -14,6 +14,10 @@ dist/
 # IDE
 .vscode/
 
+# Agents
+.github/
+.claude/
+
 # OS
 .DS_Store
 
