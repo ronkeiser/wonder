@@ -240,7 +240,7 @@ describe('extractFinalOutput', () => {
       expect(completeEvent).toMatchObject({
         type: 'decision.completion.complete',
         payload: {
-          final_output: { result: 'success' },
+          finalOutput: { result: 'success' },
         },
       });
     });

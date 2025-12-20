@@ -19,18 +19,18 @@ import type { Condition, ContextSnapshot } from '../../../src/types';
 function createToken(overrides: Partial<TokenRow> = {}): TokenRow {
   return {
     id: 'tok_completed',
-    workflow_run_id: 'wfr_123',
-    node_id: 'nodeA',
-    parent_token_id: null,
-    path_id: 'root',
+    workflowRunId: 'wfr_123',
+    nodeId: 'nodeA',
+    parentTokenId: null,
+    pathId: 'root',
     siblingGroup: null,
-    branch_index: 0,
-    branch_total: 1,
-    iteration_counts: null,
+    branchIndex: 0,
+    branchTotal: 1,
+    iterationCounts: null,
     status: 'completed',
-    created_at: new Date(),
-    updated_at: new Date(),
-    arrived_at: null,
+    createdAt: new Date(),
+    updatedAt: new Date(),
+    arrivedAt: null,
     ...overrides,
   };
 }
@@ -96,12 +96,9 @@ describe('decideRouting - unconditional', () => {
     expect(result.decisions[0]).toMatchObject({
       type: 'CREATE_TOKEN',
       params: {
-        workflow_run_id: 'wfr_123',
-        node_id: 'nodeB',
-        parent_token_id: 'tok_completed',
-        path_id: 'root', // No fan-out, path unchanged
-        branch_index: 0,
-        branch_total: 1,
+        workflowRunId: 'wfr_123',
+        nodeId: 'nodeB',
+        parentTokenId: 'tok_completed',
       },
     });
   });
@@ -189,7 +186,7 @@ describe('decideRouting - priority tiers', () => {
     expect(result.decisions).toHaveLength(1);
     expect(result.decisions[0]).toMatchObject({
       type: 'CREATE_TOKEN',
-      params: { node_id: 'nodeB' },
+      params: { nodeId: 'nodeB' },
     });
   });
 
@@ -225,7 +222,7 @@ describe('decideRouting - priority tiers', () => {
     expect(result.decisions).toHaveLength(1);
     expect(result.decisions[0]).toMatchObject({
       type: 'CREATE_TOKEN',
-      params: { node_id: 'nodeC' },
+      params: { nodeId: 'nodeC' },
     });
   });
 
@@ -266,7 +263,7 @@ describe('decideRouting - priority tiers', () => {
     // Both match at priority 1 → both fire
     expect(result.decisions).toHaveLength(2);
     expect(
-      result.decisions.map((d) => (d as { params: { node_id: string } }).params.node_id),
+      result.decisions.map((d) => (d as { params: { nodeId: string } }).params.nodeId),
     ).toEqual(['nodeB', 'nodeC']);
   });
 
@@ -308,7 +305,7 @@ describe('decideRouting - priority tiers', () => {
     expect(result.decisions).toHaveLength(1);
     expect(result.decisions[0]).toMatchObject({
       type: 'CREATE_TOKEN',
-      params: { node_id: 'nodeB' },
+      params: { nodeId: 'nodeB' },
     });
   });
 });
@@ -346,21 +343,21 @@ describe('decideRouting - spawnCount', () => {
     // Verify path IDs and branch indices
     const params = result.decisions.map((d) => (d as { params: Record<string, unknown> }).params);
     expect(params[0]).toMatchObject({
-      path_id: 'root.nodeA.0',
-      branch_index: 0,
-      branch_total: 3,
+      pathId: 'root.nodeA.0',
+      branchIndex: 0,
+      branchTotal: 3,
       siblingGroup: 'fanout-group',
     });
     expect(params[1]).toMatchObject({
-      path_id: 'root.nodeA.1',
-      branch_index: 1,
-      branch_total: 3,
+      pathId: 'root.nodeA.1',
+      branchIndex: 1,
+      branchTotal: 3,
       siblingGroup: 'fanout-group',
     });
     expect(params[2]).toMatchObject({
-      path_id: 'root.nodeA.2',
-      branch_index: 2,
-      branch_total: 3,
+      pathId: 'root.nodeA.2',
+      branchIndex: 2,
+      branchTotal: 3,
       siblingGroup: 'fanout-group',
     });
   });
@@ -469,8 +466,8 @@ describe('decideRouting - siblingGroup inheritance', () => {
   test('single token inherits parent siblingGroup', () => {
     const completedToken = createToken({
       siblingGroup: 'parent_group',
-      branch_index: 2,
-      branch_total: 5,
+      branchIndex: 2,
+      branchTotal: 5,
     });
 
     const result = decideRouting({
@@ -486,7 +483,7 @@ describe('decideRouting - siblingGroup inheritance', () => {
       type: 'CREATE_TOKEN',
       params: {
         siblingGroup: 'parent_group', // Inherited
-        branch_total: 5, // Inherited
+        branchTotal: 5, // Inherited
       },
     });
   });
@@ -494,8 +491,8 @@ describe('decideRouting - siblingGroup inheritance', () => {
   test('new fan-out creates new siblingGroup', () => {
     const completedToken = createToken({
       siblingGroup: 'parent_group',
-      branch_index: 2,
-      branch_total: 5,
+      branchIndex: 2,
+      branchTotal: 5,
     });
 
     const result = decideRouting({
@@ -535,8 +532,8 @@ describe('decideRouting - events', () => {
     expect(startEvent).toBeDefined();
     expect(startEvent).toMatchObject({
       type: 'decision.routing.start',
-      token_id: 'tok_completed',
-      node_id: 'nodeA',
+      tokenId: 'tok_completed',
+      nodeId: 'nodeA',
     });
   });
 
@@ -597,7 +594,7 @@ describe('decideRouting - events', () => {
 describe('decideRouting - loopConfig.max_iterations', () => {
   test('transition fires when iteration count is below max', () => {
     const completedToken = createToken({
-      iteration_counts: { trans_loop: 1 },
+      iterationCounts: { trans_loop: 1 },
     });
 
     const result = decideRouting({
@@ -607,7 +604,7 @@ describe('decideRouting - loopConfig.max_iterations', () => {
       transitions: [
         createTransition({
           id: 'trans_loop',
-          loopConfig: { max_iterations: 3 },
+          loopConfig: { maxIterations: 3 },
         }),
       ],
       context: baseContext,
@@ -619,7 +616,7 @@ describe('decideRouting - loopConfig.max_iterations', () => {
 
   test('transition is skipped when iteration count equals max', () => {
     const completedToken = createToken({
-      iteration_counts: { trans_loop: 3 },
+      iterationCounts: { trans_loop: 3 },
     });
 
     const result = decideRouting({
@@ -629,7 +626,7 @@ describe('decideRouting - loopConfig.max_iterations', () => {
       transitions: [
         createTransition({
           id: 'trans_loop',
-          loopConfig: { max_iterations: 3 },
+          loopConfig: { maxIterations: 3 },
         }),
       ],
       context: baseContext,
@@ -640,7 +637,7 @@ describe('decideRouting - loopConfig.max_iterations', () => {
 
   test('transition is skipped when iteration count exceeds max', () => {
     const completedToken = createToken({
-      iteration_counts: { trans_loop: 5 },
+      iterationCounts: { trans_loop: 5 },
     });
 
     const result = decideRouting({
@@ -650,7 +647,7 @@ describe('decideRouting - loopConfig.max_iterations', () => {
       transitions: [
         createTransition({
           id: 'trans_loop',
-          loopConfig: { max_iterations: 3 },
+          loopConfig: { maxIterations: 3 },
         }),
       ],
       context: baseContext,
@@ -661,7 +658,7 @@ describe('decideRouting - loopConfig.max_iterations', () => {
 
   test('emits loop_limit_reached event when max exceeded', () => {
     const completedToken = createToken({
-      iteration_counts: { trans_loop: 3 },
+      iterationCounts: { trans_loop: 3 },
     });
 
     const result = decideRouting({
@@ -671,7 +668,7 @@ describe('decideRouting - loopConfig.max_iterations', () => {
       transitions: [
         createTransition({
           id: 'trans_loop',
-          loopConfig: { max_iterations: 3 },
+          loopConfig: { maxIterations: 3 },
         }),
       ],
       context: baseContext,
@@ -681,16 +678,16 @@ describe('decideRouting - loopConfig.max_iterations', () => {
     expect(limitEvent).toMatchObject({
       type: 'decision.routing.loop_limit_reached',
       payload: {
-        transition_id: 'trans_loop',
-        current_count: 3,
-        max_iterations: 3,
+        transitionId: 'trans_loop',
+        currentCount: 3,
+        maxIterations: 3,
       },
     });
   });
 
   test('fallback transition fires when loop limit reached', () => {
     const completedToken = createToken({
-      iteration_counts: { trans_loop: 3 },
+      iterationCounts: { trans_loop: 3 },
     });
 
     const transitions: TransitionRow[] = [
@@ -698,7 +695,7 @@ describe('decideRouting - loopConfig.max_iterations', () => {
         id: 'trans_loop',
         priority: 1,
         toNodeId: 'loopNode',
-        loopConfig: { max_iterations: 3 },
+        loopConfig: { maxIterations: 3 },
       }),
       createTransition({
         id: 'trans_exit',
@@ -718,13 +715,13 @@ describe('decideRouting - loopConfig.max_iterations', () => {
     expect(result.decisions).toHaveLength(1);
     expect(result.decisions[0]).toMatchObject({
       type: 'CREATE_TOKEN',
-      params: { node_id: 'exitNode' },
+      params: { nodeId: 'exitNode' },
     });
   });
 
-  test('loop transition with null iteration_counts starts at 0', () => {
+  test('loop transition with null iterationCounts starts at 0', () => {
     const completedToken = createToken({
-      iteration_counts: null,
+      iterationCounts: null,
     });
 
     const result = decideRouting({
@@ -734,7 +731,7 @@ describe('decideRouting - loopConfig.max_iterations', () => {
       transitions: [
         createTransition({
           id: 'trans_loop',
-          loopConfig: { max_iterations: 3 },
+          loopConfig: { maxIterations: 3 },
         }),
       ],
       context: baseContext,
@@ -746,7 +743,7 @@ describe('decideRouting - loopConfig.max_iterations', () => {
 
   test('loop transition with undefined key starts at 0', () => {
     const completedToken = createToken({
-      iteration_counts: { other_transition: 5 },
+      iterationCounts: { other_transition: 5 },
     });
 
     const result = decideRouting({
@@ -756,7 +753,7 @@ describe('decideRouting - loopConfig.max_iterations', () => {
       transitions: [
         createTransition({
           id: 'trans_loop',
-          loopConfig: { max_iterations: 3 },
+          loopConfig: { maxIterations: 3 },
         }),
       ],
       context: baseContext,
@@ -770,10 +767,10 @@ describe('decideRouting - loopConfig.max_iterations', () => {
 // Iteration Counts Propagation
 // ============================================================================
 
-describe('decideRouting - iteration_counts propagation', () => {
-  test('child token inherits parent iteration_counts with increment', () => {
+describe('decideRouting - iterationCounts propagation', () => {
+  test('child token inherits parent iterationCounts with increment', () => {
     const completedToken = createToken({
-      iteration_counts: { trans_prev: 2 },
+      iterationCounts: { trans_prev: 2 },
     });
 
     const result = decideRouting({
@@ -785,9 +782,9 @@ describe('decideRouting - iteration_counts propagation', () => {
     });
 
     expect(result.decisions).toHaveLength(1);
-    const params = (result.decisions[0] as { params: { iteration_counts: Record<string, number> } })
+    const params = (result.decisions[0] as { params: { iterationCounts: Record<string, number> } })
       .params;
-    expect(params.iteration_counts).toEqual({
+    expect(params.iterationCounts).toEqual({
       trans_prev: 2, // Inherited
       trans_1: 1, // Incremented for this transition
     });
@@ -795,7 +792,7 @@ describe('decideRouting - iteration_counts propagation', () => {
 
   test('first traversal of transition sets count to 1', () => {
     const completedToken = createToken({
-      iteration_counts: null,
+      iterationCounts: null,
     });
 
     const result = decideRouting({
@@ -806,16 +803,16 @@ describe('decideRouting - iteration_counts propagation', () => {
       context: baseContext,
     });
 
-    const params = (result.decisions[0] as { params: { iteration_counts: Record<string, number> } })
+    const params = (result.decisions[0] as { params: { iterationCounts: Record<string, number> } })
       .params;
-    expect(params.iteration_counts).toEqual({
+    expect(params.iterationCounts).toEqual({
       trans_1: 1,
     });
   });
 
   test('repeat traversal increments existing count', () => {
     const completedToken = createToken({
-      iteration_counts: { trans_1: 2 },
+      iterationCounts: { trans_1: 2 },
     });
 
     const result = decideRouting({
@@ -826,16 +823,16 @@ describe('decideRouting - iteration_counts propagation', () => {
       context: baseContext,
     });
 
-    const params = (result.decisions[0] as { params: { iteration_counts: Record<string, number> } })
+    const params = (result.decisions[0] as { params: { iterationCounts: Record<string, number> } })
       .params;
-    expect(params.iteration_counts).toEqual({
+    expect(params.iterationCounts).toEqual({
       trans_1: 3,
     });
   });
 
-  test('fan-out tokens all get same iteration_counts', () => {
+  test('fan-out tokens all get same iterationCounts', () => {
     const completedToken = createToken({
-      iteration_counts: { trans_prev: 1 },
+      iterationCounts: { trans_prev: 1 },
     });
 
     const result = decideRouting({
@@ -855,8 +852,8 @@ describe('decideRouting - iteration_counts propagation', () => {
     expect(result.decisions).toHaveLength(3);
     const expectedCounts = { trans_prev: 1, trans_fanout: 1 };
     for (const decision of result.decisions) {
-      const params = (decision as { params: { iteration_counts: Record<string, number> } }).params;
-      expect(params.iteration_counts).toEqual(expectedCounts);
+      const params = (decision as { params: { iterationCounts: Record<string, number> } }).params;
+      expect(params.iterationCounts).toEqual(expectedCounts);
     }
   });
 });

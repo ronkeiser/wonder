@@ -74,15 +74,15 @@ export interface MergeConfig {
 }
 
 export interface SyncConfig {
-  strategy: 'all' | 'any' | { m_of_n: number };
+  strategy: 'all' | 'any' | { mOfN: number };
   siblingGroup: string;
   timeoutMs?: number;
-  on_timeout?: 'proceed_with_available' | 'fail';
+  onTimeout?: 'proceed_with_available' | 'fail';
   merge?: MergeConfig;
 }
 
 export interface LoopConfig {
-  max_iterations?: number;
+  maxIterations?: number;
   timeoutMs?: number;
 }
 

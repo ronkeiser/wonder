@@ -18,17 +18,18 @@ import type { TransitionDef } from '../../../src/types';
 function createToken(overrides: Partial<TokenRow> = {}): TokenRow {
   return {
     id: 'token-1',
-    workflow_run_id: 'run-1',
-    node_id: 'A',
+    workflowRunId: 'run-1',
+    nodeId: 'A',
     status: 'waiting_for_siblings',
-    path_id: 'root.A.0',
-    branch_index: 0,
-    branch_total: 1,
-    parent_token_id: null,
+    pathId: 'root.A.0',
+    branchIndex: 0,
+    branchTotal: 1,
+    parentTokenId: null,
     siblingGroup: null,
-    created_at: new Date(),
-    updated_at: new Date(),
-    arrived_at: null,
+    iterationCounts: null,
+    createdAt: new Date(),
+    updatedAt: new Date(),
+    arrivedAt: null,
     ...overrides,
   };
 }
@@ -83,16 +84,16 @@ describe('decideOnTimeout', () => {
         synchronization: {
           strategy: 'all',
           siblingGroup: 'group-1',
-          on_timeout: 'fail',
-          timeout_ms: null,
+          onTimeout: 'fail',
+          timeoutMs: undefined,
           merge: undefined,
         },
       });
 
       const tokens = [
-        createToken({ id: 'token-1', path_id: 'root.A.0' }),
-        createToken({ id: 'token-2', path_id: 'root.A.1' }),
-        createToken({ id: 'token-3', path_id: 'root.A.2' }),
+        createToken({ id: 'token-1', pathId: 'root.A.0' }),
+        createToken({ id: 'token-2', pathId: 'root.A.1' }),
+        createToken({ id: 'token-3', pathId: 'root.A.2' }),
       ];
 
       const decisions = decideOnTimeout({
@@ -126,14 +127,14 @@ describe('decideOnTimeout', () => {
       });
     });
 
-    it('uses default fail policy when on_timeout not specified', () => {
+    it('uses default fail policy when onTimeout not specified', () => {
       const transition = createTransition({
         synchronization: {
           strategy: 'all',
           siblingGroup: 'default-group',
-          timeout_ms: null,
+          timeoutMs: undefined,
           merge: undefined,
-          // on_timeout not specified - defaults to 'fail'
+          // onTimeout not specified - defaults to 'fail'
         },
       });
 
@@ -155,8 +156,8 @@ describe('decideOnTimeout', () => {
         synchronization: {
           strategy: 'all',
           siblingGroup: 'single-group',
-          on_timeout: 'fail',
-          timeout_ms: null,
+          onTimeout: 'fail',
+          timeoutMs: undefined,
           merge: undefined,
         },
       });
@@ -184,16 +185,16 @@ describe('decideOnTimeout', () => {
         synchronization: {
           strategy: 'all',
           siblingGroup: 'proceed-group',
-          on_timeout: 'proceed_with_available',
-          timeout_ms: null,
+          onTimeout: 'proceed_with_available',
+          timeoutMs: undefined,
           merge: undefined,
         },
       });
 
       const tokens = [
-        createToken({ id: 'winner', path_id: 'root.A.0.B.1', siblingGroup: 'proceed-group' }),
-        createToken({ id: 'loser-1', path_id: 'root.A.0.B.2', siblingGroup: 'proceed-group' }),
-        createToken({ id: 'loser-2', path_id: 'root.A.0.B.3', siblingGroup: 'proceed-group' }),
+        createToken({ id: 'winner', pathId: 'root.A.0.B.1', siblingGroup: 'proceed-group' }),
+        createToken({ id: 'loser-1', pathId: 'root.A.0.B.2', siblingGroup: 'proceed-group' }),
+        createToken({ id: 'loser-2', pathId: 'root.A.0.B.3', siblingGroup: 'proceed-group' }),
       ];
 
       const decisions = decideOnTimeout({
@@ -232,14 +233,14 @@ describe('decideOnTimeout', () => {
         synchronization: {
           strategy: 'all',
           siblingGroup: 'single-proceed',
-          on_timeout: 'proceed_with_available',
-          timeout_ms: null,
+          onTimeout: 'proceed_with_available',
+          timeoutMs: undefined,
           merge: undefined,
         },
       });
 
       const decisions = decideOnTimeout({
-        waitingTokens: [createToken({ id: 'solo', path_id: 'root.X.0', siblingGroup: 'single-proceed' })],
+        waitingTokens: [createToken({ id: 'solo', pathId: 'root.X.0', siblingGroup: 'single-proceed' })],
         transition,
         siblingCounts: createSiblingCounts({ total: 1, completed: 0, waiting: 1 }),
         workflowRunId: 'run-1',
@@ -260,8 +261,8 @@ describe('decideOnTimeout', () => {
         synchronization: {
           strategy: 'all',
           siblingGroup: 'empty-group',
-          on_timeout: 'proceed_with_available',
-          timeout_ms: null,
+          onTimeout: 'proceed_with_available',
+          timeoutMs: undefined,
           merge: undefined,
         },
       });
@@ -283,15 +284,15 @@ describe('decideOnTimeout', () => {
         synchronization: {
           strategy: 'all',
           siblingGroup: 'path-test',
-          on_timeout: 'proceed_with_available',
-          timeout_ms: null,
+          onTimeout: 'proceed_with_available',
+          timeoutMs: undefined,
           merge: undefined,
         },
       });
 
       // fanInPath is built from siblingGroup:toNodeId
       const decisions = decideOnTimeout({
-        waitingTokens: [createToken({ path_id: 'root.A.0.B.1', siblingGroup: 'path-test' })],
+        waitingTokens: [createToken({ pathId: 'root.A.0.B.1', siblingGroup: 'path-test' })],
         transition,
         siblingCounts: createSiblingCounts({ total: 1, completed: 0, waiting: 1 }),
         workflowRunId: 'run-1',
@@ -308,15 +309,15 @@ describe('decideOnTimeout', () => {
         synchronization: {
           strategy: 'all',
           siblingGroup: 'deep-path',
-          on_timeout: 'proceed_with_available',
-          timeout_ms: null,
+          onTimeout: 'proceed_with_available',
+          timeoutMs: undefined,
           merge: undefined,
         },
       });
 
       // fanInPath is built from siblingGroup:toNodeId
       const decisions = decideOnTimeout({
-        waitingTokens: [createToken({ path_id: 'root.A.0.B.1.C.2.D.3', siblingGroup: 'deep-path' })],
+        waitingTokens: [createToken({ pathId: 'root.A.0.B.1.C.2.D.3', siblingGroup: 'deep-path' })],
         transition,
         siblingCounts: createSiblingCounts({ total: 1, completed: 0, waiting: 1 }),
         workflowRunId: 'run-1',
@@ -333,15 +334,15 @@ describe('decideOnTimeout', () => {
         synchronization: {
           strategy: 'all',
           siblingGroup: 'root-level',
-          on_timeout: 'proceed_with_available',
-          timeout_ms: null,
+          onTimeout: 'proceed_with_available',
+          timeoutMs: undefined,
           merge: undefined,
         },
       });
 
       // fanInPath is built from siblingGroup:toNodeId
       const decisions = decideOnTimeout({
-        waitingTokens: [createToken({ path_id: 'root.A.0', siblingGroup: 'root-level' })],
+        waitingTokens: [createToken({ pathId: 'root.A.0', siblingGroup: 'root-level' })],
         transition,
         siblingCounts: createSiblingCounts({ total: 1, completed: 0, waiting: 1 }),
         workflowRunId: 'run-1',
@@ -377,14 +378,14 @@ describe('hasTimedOut', () => {
       expect(hasTimedOut(transition, oldestWaiting)).toBe(false);
     });
 
-    it('returns false when synchronization but no timeout_ms', () => {
+    it('returns false when synchronization but no timeoutMs', () => {
       const transition = createTransition({
         synchronization: {
           strategy: 'all',
           siblingGroup: 'no-timeout',
-          timeout_ms: null,
+          timeoutMs: undefined,
           merge: undefined,
-          // no timeout_ms
+          // no timeoutMs
         },
       });
       const oldestWaiting = new Date('2024-01-15T11:00:00.000Z');
@@ -392,12 +393,12 @@ describe('hasTimedOut', () => {
       expect(hasTimedOut(transition, oldestWaiting)).toBe(false);
     });
 
-    it('returns false when timeout_ms is 0', () => {
+    it('returns false when timeoutMs is 0', () => {
       const transition = createTransition({
         synchronization: {
           strategy: 'all',
           siblingGroup: 'zero-timeout',
-          timeout_ms: 0,
+          timeoutMs: 0,
           merge: undefined,
         },
       });
@@ -413,7 +414,7 @@ describe('hasTimedOut', () => {
         synchronization: {
           strategy: 'all',
           siblingGroup: 'has-timeout',
-          timeout_ms: 5000,
+          timeoutMs: 5000,
           merge: undefined,
         },
       });
@@ -423,12 +424,12 @@ describe('hasTimedOut', () => {
   });
 
   describe('timeout detection', () => {
-    it('returns true when elapsed time >= timeout_ms', () => {
+    it('returns true when elapsed time >= timeoutMs', () => {
       const transition = createTransition({
         synchronization: {
           strategy: 'all',
           siblingGroup: 'check-timeout',
-          timeout_ms: 30000, // 30 seconds
+          timeoutMs: 30000, // 30 seconds
           merge: undefined,
         },
       });
@@ -439,12 +440,12 @@ describe('hasTimedOut', () => {
       expect(hasTimedOut(transition, oldestWaiting)).toBe(true);
     });
 
-    it('returns true when elapsed time equals timeout_ms exactly', () => {
+    it('returns true when elapsed time equals timeoutMs exactly', () => {
       const transition = createTransition({
         synchronization: {
           strategy: 'all',
           siblingGroup: 'exact-timeout',
-          timeout_ms: 60000, // 60 seconds
+          timeoutMs: 60000, // 60 seconds
           merge: undefined,
         },
       });
@@ -455,12 +456,12 @@ describe('hasTimedOut', () => {
       expect(hasTimedOut(transition, oldestWaiting)).toBe(true);
     });
 
-    it('returns false when elapsed time < timeout_ms', () => {
+    it('returns false when elapsed time < timeoutMs', () => {
       const transition = createTransition({
         synchronization: {
           strategy: 'all',
           siblingGroup: 'not-yet-timeout',
-          timeout_ms: 120000, // 2 minutes
+          timeoutMs: 120000, // 2 minutes
           merge: undefined,
         },
       });
@@ -476,7 +477,7 @@ describe('hasTimedOut', () => {
         synchronization: {
           strategy: 'all',
           siblingGroup: 'short-timeout',
-          timeout_ms: 100, // 100ms
+          timeoutMs: 100, // 100ms
           merge: undefined,
         },
       });
@@ -492,7 +493,7 @@ describe('hasTimedOut', () => {
         synchronization: {
           strategy: 'all',
           siblingGroup: 'long-timeout',
-          timeout_ms: 3600000, // 1 hour
+          timeoutMs: 3600000, // 1 hour
           merge: undefined,
         },
       });
@@ -510,7 +511,7 @@ describe('hasTimedOut', () => {
         synchronization: {
           strategy: 'all',
           siblingGroup: 'future-timestamp',
-          timeout_ms: 1000,
+          timeoutMs: 1000,
           merge: undefined,
         },
       });
@@ -526,7 +527,7 @@ describe('hasTimedOut', () => {
         synchronization: {
           strategy: 'all',
           siblingGroup: 'now-timestamp',
-          timeout_ms: 1000,
+          timeoutMs: 1000,
           merge: undefined,
         },
       });

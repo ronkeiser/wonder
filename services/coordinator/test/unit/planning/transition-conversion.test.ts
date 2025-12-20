@@ -49,13 +49,13 @@ describe('toTransitionDef', () => {
 
     expect(result).toEqual({
       id: 'trans-1',
-      ref: null,
+      ref: undefined,
       fromNodeId: 'node-a',
       toNodeId: 'node-b',
       priority: 0,
       condition: null,
-      spawnCount: null,
-      siblingGroup: null,
+      spawnCount: undefined,
+      siblingGroup: undefined,
       foreach: null,
       synchronization: null,
     });
@@ -338,7 +338,7 @@ describe('getMergeConfig', () => {
       toNodeId: 'b',
       priority: 0,
       synchronization: {
-        strategy: { m_of_n: 2 },
+        strategy: { mOfN: 2 },
         siblingGroup: 'fan-out-1',
         merge,
       },

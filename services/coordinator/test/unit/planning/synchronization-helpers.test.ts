@@ -158,7 +158,7 @@ describe('getMergeConfig', () => {
 
 describe('hasTimedOut', () => {
   describe('no timeout configured', () => {
-    it('returns false when timeout_ms is null', () => {
+    it('returns false when timeoutMs is null', () => {
       const transition: TransitionDef = {
         id: 'trans-1',
         fromNodeId: 'a',
@@ -167,7 +167,7 @@ describe('hasTimedOut', () => {
         synchronization: {
           strategy: 'all',
           siblingGroup: 'fan-out-1',
-          timeout_ms: null,
+          timeoutMs: undefined,
         },
       };
 
@@ -175,7 +175,7 @@ describe('hasTimedOut', () => {
       expect(hasTimedOut(transition, waitingSince)).toBe(false);
     });
 
-    it('returns false when timeout_ms is undefined', () => {
+    it('returns false when timeoutMs is undefined', () => {
       const transition: TransitionDef = {
         id: 'trans-1',
         fromNodeId: 'a',
@@ -215,7 +215,7 @@ describe('hasTimedOut', () => {
         synchronization: {
           strategy: 'all',
           siblingGroup: 'fan-out-1',
-          timeout_ms: 5000,
+          timeoutMs: 5000,
         },
       };
 
@@ -233,7 +233,7 @@ describe('hasTimedOut', () => {
         synchronization: {
           strategy: 'all',
           siblingGroup: 'fan-out-1',
-          timeout_ms: 10000, // 10s timeout
+          timeoutMs: 10000, // 10s timeout
         },
       };
 
@@ -250,7 +250,7 @@ describe('hasTimedOut', () => {
         synchronization: {
           strategy: 'all',
           siblingGroup: 'fan-out-1',
-          timeout_ms: 5000, // 5s timeout
+          timeoutMs: 5000, // 5s timeout
         },
       };
 
@@ -267,7 +267,7 @@ describe('hasTimedOut', () => {
         synchronization: {
           strategy: 'all',
           siblingGroup: 'fan-out-1',
-          timeout_ms: 1000, // 1s timeout
+          timeoutMs: 1000, // 1s timeout
         },
       };
 
@@ -284,7 +284,7 @@ describe('hasTimedOut', () => {
         synchronization: {
           strategy: 'all',
           siblingGroup: 'fan-out-1',
-          timeout_ms: 5000, // 5s timeout
+          timeoutMs: 5000, // 5s timeout
         },
       };
 
@@ -303,7 +303,7 @@ describe('hasTimedOut', () => {
         synchronization: {
           strategy: 'all',
           siblingGroup: 'fan-out-1',
-          timeout_ms: 100,
+          timeoutMs: 100,
         },
       };
 
@@ -320,7 +320,7 @@ describe('hasTimedOut', () => {
         synchronization: {
           strategy: 'all',
           siblingGroup: 'fan-out-1',
-          timeout_ms: 3600000, // 1 hour
+          timeoutMs: 3600000, // 1 hour
         },
       };
 
@@ -337,7 +337,7 @@ describe('hasTimedOut', () => {
         synchronization: {
           strategy: 'all',
           siblingGroup: 'fan-out-1',
-          timeout_ms: 0, // 0 is falsy, treated as no timeout
+          timeoutMs: 0, // 0 is falsy, treated as no timeout
         },
       };
 
@@ -354,7 +354,7 @@ describe('hasTimedOut', () => {
         synchronization: {
           strategy: 'all',
           siblingGroup: 'fan-out-1',
-          timeout_ms: 5000,
+          timeoutMs: 5000,
         },
       };
 

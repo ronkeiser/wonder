@@ -13,17 +13,18 @@ import type { TransitionDef } from '../../../src/types';
 describe('decideSynchronization()', () => {
   const baseToken: TokenRow = {
     id: 'tok_collect_1',
-    workflow_run_id: 'run_1',
-    node_id: 'node_collect',
-    parent_token_id: 'tok_q1',
-    path_id: 'root.question.0',
+    workflowRunId: 'run_1',
+    nodeId: 'node_collect',
+    parentTokenId: 'tok_q1',
+    pathId: 'root.question.0',
     siblingGroup: 'fanout_group', // Token's sibling group membership
-    branch_index: 0,
-    branch_total: 3,
+    branchIndex: 0,
+    branchTotal: 3,
+    iterationCounts: null,
     status: 'pending',
-    created_at: new Date('2025-12-14T10:00:00Z'),
-    updated_at: new Date('2025-12-14T10:00:00Z'),
-    arrived_at: null,
+    createdAt: new Date('2025-12-14T10:00:00Z'),
+    updatedAt: new Date('2025-12-14T10:00:00Z'),
+    arrivedAt: null,
   };
 
   describe('no synchronization configured', () => {
@@ -62,8 +63,8 @@ describe('decideSynchronization()', () => {
         synchronization: {
           strategy: 'all',
           siblingGroup: 'different_group', // baseToken.siblingGroup = 'fanout_group'
-          timeout_ms: null,
-          on_timeout: 'fail',
+          timeoutMs: undefined,
+          onTimeout: 'fail',
           merge: undefined,
         },
       };
@@ -90,8 +91,8 @@ describe('decideSynchronization()', () => {
         synchronization: {
           strategy: 'all',
           siblingGroup: 'fanout_group', // Matches baseToken.siblingGroup
-          timeout_ms: null,
-          on_timeout: 'fail',
+          timeoutMs: undefined,
+          onTimeout: 'fail',
           merge: undefined,
         },
       };
@@ -120,8 +121,8 @@ describe('decideSynchronization()', () => {
       synchronization: {
         strategy: 'all',
         siblingGroup: 'fanout_group', // Matches baseToken.siblingGroup
-        timeout_ms: null,
-        on_timeout: 'fail',
+        timeoutMs: undefined,
+        onTimeout: 'fail',
         merge: undefined,
       },
     });
@@ -172,8 +173,8 @@ describe('decideSynchronization()', () => {
       synchronization: {
         strategy: 'any',
         siblingGroup: 'fanout_group', // Matches baseToken.siblingGroup
-        timeout_ms: null,
-        on_timeout: 'fail',
+        timeoutMs: undefined,
+        onTimeout: 'fail',
         merge: undefined,
       },
     });
@@ -191,7 +192,7 @@ describe('decideSynchronization()', () => {
     });
   });
 
-  describe('strategy: m_of_n', () => {
+  describe('strategy: mOfN', () => {
     const makeTransition = (m: number): TransitionDef => ({
       id: 'trans_1',
       fromNodeId: 'node_question',
@@ -200,10 +201,10 @@ describe('decideSynchronization()', () => {
       condition: null,
       spawnCount: null,
       synchronization: {
-        strategy: { m_of_n: m },
+        strategy: { mOfN: m },
         siblingGroup: 'fanout_group', // Matches baseToken.siblingGroup
-        timeout_ms: null,
-        on_timeout: 'fail',
+        timeoutMs: undefined,
+        onTimeout: 'fail',
         merge: undefined,
       },
     });
@@ -262,7 +263,7 @@ describe('decideSynchronization()', () => {
 // ============================================================================
 
 describe('decideFanInContinuation()', () => {
-  test('creates continuation token with inherited iteration_counts', () => {
+  test('creates continuation token with inherited iterationCounts', () => {
     const result = decideFanInContinuation({
       workflowRunId: 'run_1',
       nodeId: 'node_after_merge',
@@ -275,15 +276,15 @@ describe('decideFanInContinuation()', () => {
     expect(result.decisions[0]).toMatchObject({
       type: 'CREATE_TOKEN',
       params: {
-        workflow_run_id: 'run_1',
-        node_id: 'node_after_merge',
-        parent_token_id: 'tok_origin',
-        iteration_counts: { trans_loop: 2, trans_other: 1 },
+        workflowRunId: 'run_1',
+        nodeId: 'node_after_merge',
+        parentTokenId: 'tok_origin',
+        iterationCounts: { trans_loop: 2, trans_other: 1 },
       },
     });
   });
 
-  test('creates continuation token with null iteration_counts when parent has none', () => {
+  test('creates continuation token with null iterationCounts when parent has none', () => {
     const result = decideFanInContinuation({
       workflowRunId: 'run_1',
       nodeId: 'node_after_merge',
@@ -296,7 +297,7 @@ describe('decideFanInContinuation()', () => {
     expect(result.decisions[0]).toMatchObject({
       type: 'CREATE_TOKEN',
       params: {
-        iteration_counts: null,
+        iterationCounts: null,
       },
     });
   });
@@ -317,7 +318,7 @@ describe('decideFanInContinuation()', () => {
     expect(createTokenDecision.params.siblingGroup).toBeNull();
   });
 
-  test('continuation token has branch_index 0 and branch_total 1', () => {
+  test('continuation token has branchIndex 0 and branchTotal 1', () => {
     const result = decideFanInContinuation({
       workflowRunId: 'run_1',
       nodeId: 'node_after_merge',
@@ -328,8 +329,8 @@ describe('decideFanInContinuation()', () => {
     expect(result.decisions[0]).toMatchObject({
       type: 'CREATE_TOKEN',
       params: {
-        branch_index: 0,
-        branch_total: 1,
+        branchIndex: 0,
+        branchTotal: 1,
       },
     });
   });
@@ -344,10 +345,10 @@ describe('decideFanInContinuation()', () => {
 
     expect(result.events).toContainEqual({
       type: 'decision.sync.continuation',
-      node_id: 'node_after_merge',
+      nodeId: 'node_after_merge',
       payload: {
-        workflow_run_id: 'run_1',
-        fan_in_path: 'fanout_group:node_after_merge',
+        workflowRunId: 'run_1',
+        fanInPath: 'fanout_group:node_after_merge',
       },
     });
   });
