@@ -2,12 +2,12 @@
  * WorkflowTask - Task format for RPC
  */
 export interface WorkflowTask {
-  workflow_run_id: string;
-  token_id: string;
-  node_id: string;
-  action_kind: string;
-  input_data: Record<string, unknown>;
-  retry_count: number;
+  workflowRunId: string;
+  tokenId: string;
+  nodeId: string;
+  actionKind: string;
+  inputData: Record<string, unknown>;
+  retryCount: number;
 }
 
 /**
@@ -15,11 +15,11 @@ export interface WorkflowTask {
  */
 export interface TaskResult {
   taskId: string;
-  workflow_run_id: string;
-  token_id: string;
-  node_id: string;
+  workflowRunId: string;
+  tokenId: string;
+  nodeId: string;
   success: boolean;
-  output_data?: object;
+  outputData?: object;
   error?: string;
-  completed_at: string;
+  completedAt: string;
 }

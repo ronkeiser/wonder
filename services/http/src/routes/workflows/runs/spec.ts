@@ -48,12 +48,12 @@ export const createWorkflowRunRoute = createRoute({
 
 export const startWorkflowRunRoute = createRoute({
   method: 'post',
-  path: '/{id}/runs/{run_id}/start',
+  path: '/{id}/runs/{runId}/start',
   tags: ['workflows'],
   request: {
     params: z.object({
       id: ulid().openapi({ param: { name: 'id', in: 'path' } }),
-      run_id: ulid().openapi({ param: { name: 'run_id', in: 'path' } }),
+      runId: ulid().openapi({ param: { name: 'runId', in: 'path' } }),
     }),
   },
   responses: {

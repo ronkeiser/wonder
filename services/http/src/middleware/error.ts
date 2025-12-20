@@ -19,7 +19,7 @@ export const errorLoggerMiddleware = createMiddleware<HttpEnv>(async (c, next) =
       requestId: c.var.requestId,
       message: error instanceof Error ? error.message : String(error),
       metadata: {
-        error_name: error instanceof Error ? error.name : 'Unknown',
+        errorName: error instanceof Error ? error.name : 'Unknown',
         stack: error instanceof Error ? error.stack : undefined,
         path: c.req.path,
         method: c.req.method,

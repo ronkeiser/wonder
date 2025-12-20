@@ -55,9 +55,9 @@ export async function executeUpdateContextAction(
       message: 'Update context action (passthrough)',
       traceId: context.workflowRunId,
       metadata: {
-        step_ref: context.stepRef,
+        stepRef: context.stepRef,
         actionId: action.id,
-        input_keys: Object.keys(input),
+        inputKeys: Object.keys(input),
       },
     });
 
@@ -112,12 +112,12 @@ export async function executeUpdateContextAction(
     message: 'Update context action (merge)',
     traceId: context.workflowRunId,
     metadata: {
-      step_ref: context.stepRef,
+      stepRef: context.stepRef,
       actionId: action.id,
       target,
       sources,
       mode,
-      merged_length: merged.length,
+      mergedLength: merged.length,
     },
   });
 

@@ -19,7 +19,7 @@ export class Tasks extends Resource {
     outputSchema: object;
     steps: StepInput[];
     retry?: RetryConfig;
-    timeout_ms?: number;
+    timeoutMs?: number;
     autoversion?: boolean;
   }): Promise<{
     taskId: string;
@@ -33,8 +33,8 @@ export class Tasks extends Resource {
     });
 
     const scope = {
-      project_id: data.projectId ?? null,
-      library_id: data.libraryId ?? null,
+      projectId: data.projectId ?? null,
+      libraryId: data.libraryId ?? null,
     };
 
     const autoversionResult = await this.withAutoversion(
@@ -45,15 +45,15 @@ export class Tasks extends Resource {
             this.serviceCtx.db,
             name,
             hash,
-            s?.project_id ?? null,
-            s?.library_id ?? null,
+            s?.projectId ?? null,
+            s?.libraryId ?? null,
           ),
         getMaxVersion: (name, s) =>
           repo.getMaxVersionByName(
             this.serviceCtx.db,
             name,
-            s?.project_id ?? null,
-            s?.library_id ?? null,
+            s?.projectId ?? null,
+            s?.libraryId ?? null,
           ),
       },
       scope,
@@ -94,7 +94,7 @@ export class Tasks extends Resource {
         outputSchema: data.outputSchema,
         steps: stepsWithIds,
         retry: data.retry ?? null,
-        timeoutMs: data.timeout_ms ?? null,
+        timeoutMs: data.timeoutMs ?? null,
         contentHash: autoversionResult.contentHash,
       });
 

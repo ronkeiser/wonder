@@ -8,10 +8,10 @@ export class Workspaces extends Resource {
   async create(data: {
     name: string;
     settings?: {
-      allowed_model_providers?: string[];
-      allowed_mcp_servers?: string[];
-      budget_max_monthly_spend_cents?: number;
-      budget_alert_threshold_cents?: number;
+      allowedModelProviders?: string[];
+      allowedMcpServers?: string[];
+      budgetMaxMonthlySpendCents?: number;
+      budgetAlertThresholdCents?: number;
     };
   }): Promise<{
     workspaceId: string;
@@ -19,10 +19,10 @@ export class Workspaces extends Resource {
       id: string;
       name: string;
       settings: {
-        allowed_model_providers?: string[];
-        allowed_mcp_servers?: string[];
-        budget_max_monthly_spend_cents?: number;
-        budget_alert_threshold_cents?: number;
+        allowedModelProviders?: string[];
+        allowedMcpServers?: string[];
+        budgetMaxMonthlySpendCents?: number;
+        budgetAlertThresholdCents?: number;
       } | null;
       createdAt: string;
       updatedAt: string;
@@ -34,10 +34,10 @@ export class Workspaces extends Resource {
           name: data.name,
           settings: data.settings
             ? {
-                allowedModelProviders: data.settings.allowed_model_providers,
-                allowedMcpServers: data.settings.allowed_mcp_servers,
-                budgetMaxMonthlySpendCents: data.settings.budget_max_monthly_spend_cents,
-                budgetAlertThresholdCents: data.settings.budget_alert_threshold_cents,
+                allowedModelProviders: data.settings.allowedModelProviders,
+                allowedMcpServers: data.settings.allowedMcpServers,
+                budgetMaxMonthlySpendCents: data.settings.budgetMaxMonthlySpendCents,
+                budgetAlertThresholdCents: data.settings.budgetAlertThresholdCents,
               }
             : null,
         });
@@ -50,10 +50,10 @@ export class Workspaces extends Resource {
             updatedAt: workspace.updatedAt,
             settings: workspace.settings
               ? {
-                  allowed_model_providers: workspace.settings.allowedModelProviders,
-                  allowed_mcp_servers: workspace.settings.allowedMcpServers,
-                  budget_max_monthly_spend_cents: workspace.settings.budgetMaxMonthlySpendCents,
-                  budget_alert_threshold_cents: workspace.settings.budgetAlertThresholdCents,
+                  allowedModelProviders: workspace.settings.allowedModelProviders,
+                  allowedMcpServers: workspace.settings.allowedMcpServers,
+                  budgetMaxMonthlySpendCents: workspace.settings.budgetMaxMonthlySpendCents,
+                  budgetAlertThresholdCents: workspace.settings.budgetAlertThresholdCents,
                 }
               : null,
           },
@@ -79,10 +79,10 @@ export class Workspaces extends Resource {
       id: string;
       name: string;
       settings: {
-        allowed_model_providers?: string[];
-        allowed_mcp_servers?: string[];
-        budget_max_monthly_spend_cents?: number;
-        budget_alert_threshold_cents?: number;
+        allowedModelProviders?: string[];
+        allowedMcpServers?: string[];
+        budgetMaxMonthlySpendCents?: number;
+        budgetAlertThresholdCents?: number;
       } | null;
       createdAt: string;
       updatedAt: string;
@@ -103,10 +103,10 @@ export class Workspaces extends Resource {
             updatedAt: workspace.updatedAt,
             settings: workspace.settings
               ? {
-                  allowed_model_providers: workspace.settings.allowedModelProviders,
-                  allowed_mcp_servers: workspace.settings.allowedMcpServers,
-                  budget_max_monthly_spend_cents: workspace.settings.budgetMaxMonthlySpendCents,
-                  budget_alert_threshold_cents: workspace.settings.budgetAlertThresholdCents,
+                  allowedModelProviders: workspace.settings.allowedModelProviders,
+                  allowedMcpServers: workspace.settings.allowedMcpServers,
+                  budgetMaxMonthlySpendCents: workspace.settings.budgetMaxMonthlySpendCents,
+                  budgetAlertThresholdCents: workspace.settings.budgetAlertThresholdCents,
                 }
               : null,
           },
@@ -120,10 +120,10 @@ export class Workspaces extends Resource {
       id: string;
       name: string;
       settings: {
-        allowed_model_providers?: string[];
-        allowed_mcp_servers?: string[];
-        budget_max_monthly_spend_cents?: number;
-        budget_alert_threshold_cents?: number;
+        allowedModelProviders?: string[];
+        allowedMcpServers?: string[];
+        budgetMaxMonthlySpendCents?: number;
+        budgetAlertThresholdCents?: number;
       } | null;
       createdAt: string;
       updatedAt: string;
@@ -138,10 +138,10 @@ export class Workspaces extends Resource {
           updatedAt: workspace.updatedAt,
           settings: workspace.settings
             ? {
-                allowed_model_providers: workspace.settings.allowedModelProviders,
-                allowed_mcp_servers: workspace.settings.allowedMcpServers,
-                budget_max_monthly_spend_cents: workspace.settings.budgetMaxMonthlySpendCents,
-                budget_alert_threshold_cents: workspace.settings.budgetAlertThresholdCents,
+                allowedModelProviders: workspace.settings.allowedModelProviders,
+                allowedMcpServers: workspace.settings.allowedMcpServers,
+                budgetMaxMonthlySpendCents: workspace.settings.budgetMaxMonthlySpendCents,
+                budgetAlertThresholdCents: workspace.settings.budgetAlertThresholdCents,
               }
             : null,
         })),
@@ -154,10 +154,10 @@ export class Workspaces extends Resource {
     data: {
       name?: string;
       settings?: {
-        allowed_model_providers?: string[];
-        allowed_mcp_servers?: string[];
-        budget_max_monthly_spend_cents?: number;
-        budget_alert_threshold_cents?: number;
+        allowedModelProviders?: string[];
+        allowedMcpServers?: string[];
+        budgetMaxMonthlySpendCents?: number;
+        budgetAlertThresholdCents?: number;
       };
     },
   ): Promise<{
@@ -165,10 +165,10 @@ export class Workspaces extends Resource {
       id: string;
       name: string;
       settings: {
-        allowed_model_providers?: string[];
-        allowed_mcp_servers?: string[];
-        budget_max_monthly_spend_cents?: number;
-        budget_alert_threshold_cents?: number;
+        allowedModelProviders?: string[];
+        allowedMcpServers?: string[];
+        budgetMaxMonthlySpendCents?: number;
+        budgetAlertThresholdCents?: number;
       } | null;
       createdAt: string;
       updatedAt: string;
@@ -182,10 +182,10 @@ export class Workspaces extends Resource {
           name: data.name,
           settings: data.settings
             ? {
-                allowedModelProviders: data.settings.allowed_model_providers,
-                allowedMcpServers: data.settings.allowed_mcp_servers,
-                budgetMaxMonthlySpendCents: data.settings.budget_max_monthly_spend_cents,
-                budgetAlertThresholdCents: data.settings.budget_alert_threshold_cents,
+                allowedModelProviders: data.settings.allowedModelProviders,
+                allowedMcpServers: data.settings.allowedMcpServers,
+                budgetMaxMonthlySpendCents: data.settings.budgetMaxMonthlySpendCents,
+                budgetAlertThresholdCents: data.settings.budgetAlertThresholdCents,
               }
             : undefined,
         });
@@ -199,10 +199,10 @@ export class Workspaces extends Resource {
             updatedAt: workspace.updatedAt,
             settings: workspace.settings
               ? {
-                  allowed_model_providers: workspace.settings.allowedModelProviders,
-                  allowed_mcp_servers: workspace.settings.allowedMcpServers,
-                  budget_max_monthly_spend_cents: workspace.settings.budgetMaxMonthlySpendCents,
-                  budget_alert_threshold_cents: workspace.settings.budgetAlertThresholdCents,
+                  allowedModelProviders: workspace.settings.allowedModelProviders,
+                  allowedMcpServers: workspace.settings.allowedMcpServers,
+                  budgetMaxMonthlySpendCents: workspace.settings.budgetMaxMonthlySpendCents,
+                  budgetAlertThresholdCents: workspace.settings.budgetAlertThresholdCents,
                 }
               : null,
           },

@@ -24,7 +24,7 @@ logs.get('/stream', async (c) => {
     return c.json(
       {
         error: 'WebSocket upgrade required',
-        received_upgrade: upgradeHeader,
+        receivedUpgrade: upgradeHeader,
       },
       400,
     );

@@ -231,16 +231,6 @@ export namespace TracePayloads {
     hasSeed: boolean;
   }
 
-  // Backwards compatibility aliases (deprecated)
-  /** @deprecated Use TokenCreatedPayload */
-  export type TokenCreated = TokenCreatedPayload & { token_id: string; node_id: string };
-  /** @deprecated Use TokenStatusUpdatedPayload */
-  export type TokenStatusUpdated = TokenStatusUpdatedPayload & {
-    token_id: string;
-    node_id?: string;
-  };
-  /** @deprecated Use ContextSetField */
-  export type ContextWrite = ContextSetField;
 }
 
 /**
@@ -349,7 +339,7 @@ export class TraceEventCollection {
         return self.filter<TracePayloads.ContextRead>('operation.context.read');
       },
       /** @deprecated Use setFields() or replaceSections() instead */
-      writes(): TypedTraceEvent<TracePayloads.ContextWrite>[] {
+      writes(): TypedTraceEvent<TracePayloads.ContextSetField>[] {
         // For backwards compatibility, combine set_field events (they have path+value)
         return self
           .filter<TracePayloads.ContextSetField>('operation.context.field_set')
@@ -369,7 +359,7 @@ export class TraceEventCollection {
         ) as TypedTraceEvent<TracePayloads.ContextRead> | undefined;
       },
       /** @deprecated Use setFieldAt() or replaceSectionAt() instead */
-      writeAt(path: string): TypedTraceEvent<TracePayloads.ContextWrite> | undefined {
+      writeAt(path: string): TypedTraceEvent<TracePayloads.ContextSetField> | undefined {
         // First look for set_field events with matching path
         const setFieldEvent = self.findWhere(
           (e) => e.type === 'operation.context.field_set' && e.payload.path === path,
@@ -408,7 +398,7 @@ export class TraceEventCollection {
         ) as TypedTraceEvent<TracePayloads.ContextReplaceSection> | undefined;
       },
       /** @deprecated Use setFieldsTo() instead */
-      writesTo(path: string): TypedTraceEvent<TracePayloads.ContextWrite>[] {
+      writesTo(path: string): TypedTraceEvent<TracePayloads.ContextSetField>[] {
         // Look for set_field events where path starts with the given prefix
         const setFieldEvents = self
           .filter<TracePayloads.ContextSetField>('operation.context.field_set')

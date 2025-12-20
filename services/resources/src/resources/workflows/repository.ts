@@ -74,7 +74,7 @@ export async function getWorkflowWithDef(
   workflowId: string,
 ): Promise<{
   workflow: Workflow;
-  workflow_def: typeof workflow_defs.$inferSelect;
+  workflowDef: typeof workflow_defs.$inferSelect;
 } | null> {
   const workflow = await getWorkflow(db, workflowId);
   if (!workflow) return null;
@@ -102,7 +102,7 @@ export async function getWorkflowWithDef(
 
   return {
     workflow,
-    workflow_def: workflowDef,
+    workflowDef,
   };
 }
 

@@ -34,7 +34,7 @@ export class WorkflowDefs extends Resource {
 
     const scope = {
       projectId: data.projectId ?? null,
-      library_id: data.libraryId ?? null,
+      libraryId: data.libraryId ?? null,
     };
 
     // 2. Autoversion deduplication check
@@ -45,16 +45,16 @@ export class WorkflowDefs extends Resource {
           repo.getWorkflowDefByNameAndHash(
             this.serviceCtx.db,
             name,
-            s?.project_id ?? null,
-            s?.library_id ?? null,
+            s?.projectId ?? null,
+            s?.libraryId ?? null,
             hash,
           ),
         getMaxVersion: (name, s) =>
           repo.getMaxVersionByName(
             this.serviceCtx.db,
             name,
-            s?.project_id ?? null,
-            s?.library_id ?? null,
+            s?.projectId ?? null,
+            s?.libraryId ?? null,
           ),
       },
       scope,

@@ -3,6 +3,6 @@
  * Used to test synchronization with out-of-order completion.
  */
 export const TIME_JITTER = {
-  min_ms: 50,
-  max_ms: 100,
+  minMs: 50,
+  maxMs: 100,
 };

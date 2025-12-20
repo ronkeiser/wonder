@@ -185,8 +185,8 @@ export function createWorkflowsClient(
           // Small delay to ensure WebSocket handshake completes
           setTimeout(async () => {
             try {
-              await sdk.POST('/workflows/{id}/runs/{run_id}/start', {
-                params: { path: { id: workflowId, run_id: workflowRunId } },
+              await sdk.POST('/workflows/{id}/runs/{runId}/start', {
+                params: { path: { id: workflowId, runId: workflowRunId } },
               });
             } catch (error) {
               cleanup();

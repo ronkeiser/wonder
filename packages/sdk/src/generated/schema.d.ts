@@ -1033,7 +1033,7 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
-    "/workflows/{id}/runs/{run_id}/start": {
+    "/workflows/{id}/runs/{runId}/start": {
         parameters: {
             query?: never;
             header?: never;
@@ -1048,7 +1048,7 @@ export interface paths {
                 header?: never;
                 path: {
                     id: string;
-                    run_id: string;
+                    runId: string;
                 };
                 cookie?: never;
             };
@@ -1867,10 +1867,10 @@ export interface components {
                 [key: string]: string;
             };
             contextSchema?: JSONSchema;
-            /** @example start_node */
+            /** @example startNode */
             initialNodeRef: string;
             nodes: {
-                /** @example llm_call_node */
+                /** @example llmCallNode */
                 ref: string;
                 name: string;
                 /** @example my-task */

@@ -13,15 +13,15 @@ export async function createWorkflowDef(
   data: {
     name: string;
     description: string;
-    project_id?: string | null;
-    library_id?: string | null;
+    projectId?: string | null;
+    libraryId?: string | null;
     tags?: string[] | null;
-    input_schema: object;
-    output_schema: object;
+    inputSchema: object;
+    outputSchema: object;
     outputMapping?: object | null;
-    context_schema?: object | null;
-    initial_node_id: string | null;
-    content_hash?: string | null;
+    contextSchema?: object | null;
+    initialNodeId: string | null;
+    contentHash?: string | null;
   },
 ): Promise<WorkflowDef> {
   const now = new Date().toISOString();
@@ -31,15 +31,15 @@ export async function createWorkflowDef(
     version: 1,
     name: data.name,
     description: data.description,
-    projectId: data.project_id ?? null,
-    libraryId: data.library_id ?? null,
+    projectId: data.projectId ?? null,
+    libraryId: data.libraryId ?? null,
     tags: data.tags ?? null,
-    inputSchema: data.input_schema,
-    outputSchema: data.output_schema,
+    inputSchema: data.inputSchema,
+    outputSchema: data.outputSchema,
     outputMapping: data.outputMapping ?? null,
-    contextSchema: data.context_schema ?? null,
-    initialNodeId: data.initial_node_id,
-    contentHash: data.content_hash ?? null,
+    contextSchema: data.contextSchema ?? null,
+    initialNodeId: data.initialNodeId,
+    contentHash: data.contentHash ?? null,
     createdAt: now,
     updatedAt: now,
   };
@@ -118,13 +118,13 @@ export async function updateWorkflowDef(
   db: DrizzleD1Database,
   id: string,
   version: number,
-  data: { initial_node_id?: string | null },
+  data: { initialNodeId?: string | null },
 ): Promise<void> {
   const now = new Date().toISOString();
   await db
     .update(workflow_defs)
     .set({
-      ...(data.initial_node_id !== undefined && { initialNodeId: data.initial_node_id }),
+      ...(data.initialNodeId !== undefined && { initialNodeId: data.initialNodeId }),
       updatedAt: now,
     })
     .where(and(eq(workflow_defs.id, id), eq(workflow_defs.version, version)))
@@ -133,23 +133,23 @@ export async function updateWorkflowDef(
 
 export async function listWorkflowDefsByProject(
   db: DrizzleD1Database,
-  project_id: string,
+  projectId: string,
 ): Promise<WorkflowDef[]> {
   return await db
     .select()
     .from(workflow_defs)
-    .where(eq(workflow_defs.projectId, project_id))
+    .where(eq(workflow_defs.projectId, projectId))
     .all();
 }
 
 export async function listWorkflowDefsByLibrary(
   db: DrizzleD1Database,
-  library_id: string,
+  libraryId: string,
 ): Promise<WorkflowDef[]> {
   return await db
     .select()
     .from(workflow_defs)
-    .where(eq(workflow_defs.libraryId, library_id))
+    .where(eq(workflow_defs.libraryId, libraryId))
     .all();
 }
 
@@ -223,8 +223,8 @@ export async function createNode(
   db: DrizzleD1Database,
   data: {
     ref: string;
-    workflow_def_id: string;
-    workflow_def_version: number;
+    workflowDefId: string;
+    workflowDefVersion: number;
     name: string;
     taskId?: string | null;
     taskVersion?: number | null;
@@ -236,8 +236,8 @@ export async function createNode(
   const row = {
     id: ulid(),
     ref: data.ref,
-    workflowDefId: data.workflow_def_id,
-    workflowDefVersion: data.workflow_def_version,
+    workflowDefId: data.workflowDefId,
+    workflowDefVersion: data.workflowDefVersion,
     name: data.name,
     taskId: data.taskId ?? null,
     taskVersion: data.taskVersion ?? null,
@@ -321,8 +321,8 @@ export async function createTransition(
   db: DrizzleD1Database,
   data: {
     ref?: string | null;
-    workflow_def_id: string;
-    workflow_def_version: number;
+    workflowDefId: string;
+    workflowDefVersion: number;
     fromNodeId: string;
     toNodeId: string;
     priority: number;
@@ -336,8 +336,8 @@ export async function createTransition(
   const row = {
     id: ulid(),
     ref: data.ref ?? null,
-    workflowDefId: data.workflow_def_id,
-    workflowDefVersion: data.workflow_def_version,
+    workflowDefId: data.workflowDefId,
+    workflowDefVersion: data.workflowDefVersion,
     fromNodeId: data.fromNodeId,
     toNodeId: data.toNodeId,
     priority: data.priority,

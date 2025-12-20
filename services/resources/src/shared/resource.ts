@@ -12,13 +12,13 @@ export interface AutoversionRepo<TEntity> {
   findByNameAndHash(
     name: string,
     hash: string,
-    scope?: { project_id?: string | null; library_id?: string | null },
+    scope?: { projectId?: string | null; libraryId?: string | null },
   ): Promise<TEntity | null>;
 
   /** Get the maximum version number for a name within optional scope */
   getMaxVersion(
     name: string,
-    scope?: { project_id?: string | null; library_id?: string | null },
+    scope?: { projectId?: string | null; libraryId?: string | null },
   ): Promise<number>;
 }
 
@@ -124,7 +124,7 @@ export abstract class Resource extends RpcTarget {
   protected async withAutoversion<TEntity>(
     data: Record<string, unknown> & { name: string; autoversion?: boolean },
     repo: AutoversionRepo<TEntity>,
-    scope?: { project_id?: string | null; library_id?: string | null },
+    scope?: { projectId?: string | null; libraryId?: string | null },
   ): Promise<AutoversionResult<TEntity>> {
     if (!data.autoversion) {
       // Non-autoversion path: use version 1, no content hash needed for lookup

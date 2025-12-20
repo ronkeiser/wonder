@@ -52,14 +52,14 @@ export class DefinitionManager {
    * - If not, fetches from RESOURCES and inserts
    * - Updates workflow run status to 'running'
    */
-  async initialize(workflow_run_id: string): Promise<void> {
+  async initialize(workflowRunId: string): Promise<void> {
     try {
       // Run migrations (idempotent - creates tables if not exist)
       migrate(this.db, migrations);
       this.logger.info({
         eventType: 'defs.migrations.complete',
         message: 'DO SQLite migrations applied',
-        traceId: workflow_run_id,
+        traceId: workflowRunId,
       });
 
       // Check if already populated (DO wake-up case)
@@ -68,18 +68,18 @@ export class DefinitionManager {
         this.logger.info({
           eventType: 'defs.already_populated',
           message: 'DO SQLite already populated (wake-up)',
-          traceId: workflow_run_id,
+          traceId: workflowRunId,
         });
         this.initialized = true;
         return;
       }
 
       // Fetch from RESOURCES and insert
-      await this.fetchAndInsert(workflow_run_id);
+      await this.fetchAndInsert(workflowRunId);
 
       // Update workflow run status to 'running' in RESOURCES (D1)
       const workflowRunsResource = this.env.RESOURCES.workflowRuns();
-      await workflowRunsResource.updateStatus(workflow_run_id, 'running');
+      await workflowRunsResource.updateStatus(workflowRunId, 'running');
 
       // Log table counts
       const nodeCount = this.db.select({ id: nodes.id }).from(nodes).all().length;
@@ -87,9 +87,9 @@ export class DefinitionManager {
       this.logger.info({
         eventType: 'defs.populated',
         message: 'DO SQLite populated from RESOURCES',
-        traceId: workflow_run_id,
+        traceId: workflowRunId,
         metadata: {
-          workflowRunId: workflow_run_id,
+          workflowRunId: workflowRunId,
           nodeCount: nodeCount,
           transitionCount: transitionCount,
         },
@@ -100,9 +100,9 @@ export class DefinitionManager {
       this.logger.error({
         eventType: 'defs.initialize.failed',
         message: 'Failed to initialize DefinitionManager',
-        traceId: workflow_run_id,
+        traceId: workflowRunId,
         metadata: {
-          workflowRunId: workflow_run_id,
+          workflowRunId: workflowRunId,
           error: error instanceof Error ? error.message : String(error),
           stack: error instanceof Error ? error.stack : undefined,
         },
@@ -118,7 +118,7 @@ export class DefinitionManager {
     // 1. Fetch workflow run
     const workflowRunsResource = this.env.RESOURCES.workflowRuns();
     const runResponse = await workflowRunsResource.get(workflowRunId);
-    const run = runResponse.workflow_run;
+    const run = runResponse.workflowRun;
 
     // 2. Fetch workflow def with nodes and transitions
     const workflowDefsResource = this.env.RESOURCES.workflowDefs();

@@ -44,10 +44,10 @@ export async function dispatchAction(
     message: `Dispatching action: ${action.kind}`,
     traceId: context.workflowRunId,
     metadata: {
-      step_ref: context.stepRef,
+      stepRef: context.stepRef,
       actionId: action.id,
-      action_kind: action.kind,
-      input_keys: Object.keys(input),
+      actionKind: action.kind,
+      inputKeys: Object.keys(input),
     },
   });
 
@@ -95,7 +95,7 @@ export async function dispatchAction(
         eventType: 'action_unknown_kind',
         message: `Unknown action kind: ${action.kind}`,
         traceId: context.workflowRunId,
-        metadata: { step_ref: context.stepRef, actionId: action.id },
+        metadata: { stepRef: context.stepRef, actionId: action.id },
       });
       return {
         success: false,
@@ -122,9 +122,9 @@ function notImplemented(
     message: `Action kind not yet implemented: ${action.kind}`,
     traceId: context.workflowRunId,
     metadata: {
-      step_ref: context.stepRef,
+      stepRef: context.stepRef,
       actionId: action.id,
-      action_kind: action.kind,
+      actionKind: action.kind,
     },
   });
 

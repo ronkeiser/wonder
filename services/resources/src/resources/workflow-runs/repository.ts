@@ -63,7 +63,7 @@ export async function deleteWorkflowRun(db: DrizzleD1Database, id: string): Prom
 }
 
 /** Workflow run with joined workflow name */
-export type WorkflowRunWithName = WorkflowRun & { workflow_name: string };
+export type WorkflowRunWithName = WorkflowRun & { workflowName: string };
 
 /** List workflow runs with filters and pagination */
 export async function listWorkflowRuns(
@@ -116,8 +116,8 @@ export async function listWorkflowRuns(
 
   const results = await db
     .select({
-      workflow_run: workflow_runs,
-      workflow_name: workflows.name,
+      workflowRun: workflow_runs,
+      workflowName: workflows.name,
     })
     .from(workflow_runs)
     .leftJoin(workflows, eq(workflow_runs.workflowId, workflows.id))
@@ -128,8 +128,8 @@ export async function listWorkflowRuns(
     .all();
 
   const runs: WorkflowRunWithName[] = results.map((r) => ({
-    ...r.workflow_run,
-    workflow_name: r.workflow_name ?? '(deleted)',
+    ...r.workflowRun,
+    workflowName: r.workflowName ?? '(deleted)',
   }));
 
   return { runs, total };

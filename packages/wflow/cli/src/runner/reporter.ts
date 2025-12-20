@@ -48,7 +48,7 @@ function reportPretty(results: TestSuiteResult[], options: ReporterOptions): voi
 
     for (const test of suite.tests) {
       const icon = getStatusIcon(test.status, c);
-      const duration = c.gray(`(${formatDuration(test.duration_ms)})`);
+      const duration = c.gray(`(${formatDuration(test.durationMs)})`);
 
       console.log(`    ${icon} ${test.name} ${duration}`);
 
@@ -63,7 +63,7 @@ function reportPretty(results: TestSuiteResult[], options: ReporterOptions): voi
           }
         }
         if (options.verbose && test.workflowRunId) {
-          console.log(c.gray(`        workflow_run_id: ${test.workflowRunId}`));
+          console.log(c.gray(`        workflowRunId: ${test.workflowRunId}`));
         }
       }
 
@@ -86,7 +86,7 @@ function reportPretty(results: TestSuiteResult[], options: ReporterOptions): voi
     totalFailed += suite.failed;
     totalSkipped += suite.skipped;
     totalErrors += suite.errors;
-    totalDuration += suite.duration_ms;
+    totalDuration += suite.durationMs;
   }
 
   console.log();
@@ -141,7 +141,7 @@ function reportJson(results: TestSuiteResult[]): void {
     failed: results.reduce((sum, s) => sum + s.failed, 0),
     skipped: results.reduce((sum, s) => sum + s.skipped, 0),
     errors: results.reduce((sum, s) => sum + s.errors, 0),
-    duration_ms: results.reduce((sum, s) => sum + s.duration_ms, 0),
+    durationMs: results.reduce((sum, s) => sum + s.durationMs, 0),
   };
 
   const output = {
@@ -149,7 +149,7 @@ function reportJson(results: TestSuiteResult[]): void {
     suites: results.map((suite) => ({
       name: suite.suite,
       file: suite.file,
-      duration_ms: suite.duration_ms,
+      durationMs: suite.durationMs,
       passed: suite.passed,
       failed: suite.failed,
       skipped: suite.skipped,
@@ -157,7 +157,7 @@ function reportJson(results: TestSuiteResult[]): void {
       tests: suite.tests.map((test) => ({
         name: test.name,
         status: test.status,
-        duration_ms: test.duration_ms,
+        durationMs: test.durationMs,
         assertions: test.assertions?.map((a) => ({
           path: a.path,
           passed: a.passed,

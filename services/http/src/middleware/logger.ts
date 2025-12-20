@@ -40,8 +40,8 @@ export const loggerMiddleware = createMiddleware<HttpEnv>(async (c, next) => {
     metadata: {
       method,
       path,
-      is_websocket: isWebSocket,
-      user_agent: c.req.header('User-Agent'),
+      isWebSocket,
+      userAgent: c.req.header('User-Agent'),
     },
   });
 
