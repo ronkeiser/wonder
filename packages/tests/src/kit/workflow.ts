@@ -217,17 +217,18 @@ export async function runTestWorkflow(
   const result = await executeWorkflow(setup.workflowId, input, options);
 
   // Output workflow run ID for debugging queries
+  const apiKey = process.env.API_KEY ?? '$API_KEY';
   console.log('\n📋 Workflow Run Info:');
   console.log(`   workflow_run_id: ${result.workflowRunId}`);
   console.log(`   status: ${result.status}`);
   console.log('\n🔍 Debug Query Examples:');
   console.log('   # Events (workflow/task/token lifecycle, LLM calls):');
   console.log(
-    `   curl -H "X-API-Key: $API_KEY" "https://api.wflow.app/events?workflow_run_id=${result.workflowRunId}"`,
+    `   curl -H "X-API-Key: ${apiKey}" "https://api.wflow.app/events?workflow_run_id=${result.workflowRunId}"`,
   );
   console.log('   # Trace events (coordinator decisions, routing, sync):');
   console.log(
-    `   curl -H "X-API-Key: $API_KEY" "https://api.wflow.app/events/trace?workflow_run_id=${result.workflowRunId}"`,
+    `   curl -H "X-API-Key: ${apiKey}" "https://api.wflow.app/events/trace?workflow_run_id=${result.workflowRunId}"`,
   );
   console.log('\n🎁  Response is wrapped: { "events": [...] }');
   console.log("   Use jq to unwrap: curl ... | jq '.events'");
