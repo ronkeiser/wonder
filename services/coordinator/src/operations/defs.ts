@@ -33,7 +33,6 @@ export class DefinitionManager {
   private readonly db: DrizzleSqliteDODatabase<typeof schema>;
   private readonly env: Env;
   private readonly logger: Logger;
-  private workflow_run_id: string | null = null;
   private initialized = false;
 
   constructor(ctx: DurableObjectState, env: Env) {
@@ -55,8 +54,6 @@ export class DefinitionManager {
    */
   async initialize(workflow_run_id: string): Promise<void> {
     try {
-      this.workflow_run_id = workflow_run_id;
-
       // Run migrations (idempotent - creates tables if not exist)
       migrate(this.db, migrations);
       this.logger.info({
