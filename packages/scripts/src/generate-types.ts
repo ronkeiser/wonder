@@ -1,7 +1,7 @@
 #!/usr/bin/env npx tsx
 
 import { parse as parseJsonc } from 'jsonc-parser';
-import { exec, execSync } from 'node:child_process';
+import { exec } from 'node:child_process';
 import { existsSync, readdirSync, readFileSync, writeFileSync } from 'node:fs';
 import { dirname, join, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
@@ -127,6 +127,34 @@ function discoverServices(): Map<string, ServiceInfo> {
   }
 
   return services;
+}
+
+// ============================================================================
+// Package Discovery
+// ============================================================================
+
+function discoverPackages(): Map<string, PackageInfo> {
+  const packages = new Map<string, PackageInfo>();
+
+  const entries = readdirSync(PACKAGES_DIR, { withFileTypes: true });
+  for (const entry of entries) {
+    if (!entry.isDirectory()) continue;
+
+    const packagePath = join(PACKAGES_DIR, entry.name);
+    const tsconfigPath = join(packagePath, 'tsconfig.json');
+
+    if (!existsSync(tsconfigPath)) {
+      console.warn(`⚠️  Skipping package ${entry.name}: no tsconfig.json found`);
+      continue;
+    }
+
+    packages.set(entry.name, {
+      dirName: entry.name,
+      path: packagePath,
+    });
+  }
+
+  return packages;
 }
 
 // ============================================================================
@@ -281,16 +309,16 @@ async function buildAllDeclarations(services: Map<string, ServiceInfo>): Promise
 }
 
 // ============================================================================
-// Step 4: Final type check (optional)
+// Step 4: Type check services
 // ============================================================================
 
-async function runFinalTypeCheck(services: Map<string, ServiceInfo>): Promise<void> {
-  console.log('🔍 Step 4: Running final type check (tsc --noEmit)...\n');
+async function typeCheckServices(services: Map<string, ServiceInfo>): Promise<boolean> {
+  console.log('🔍 Step 4: Type checking services (tsc --noEmit)...\n');
 
   const tasks = Array.from(services.values()).map(async (service) => {
     const tsconfigPath = join(service.path, 'tsconfig.json');
     if (!existsSync(tsconfigPath)) {
-      return { service: service.dirName, success: true, skipped: true };
+      return { name: service.dirName, success: true, skipped: true };
     }
 
     const cmd = `tsc --noEmit`;
@@ -298,11 +326,11 @@ async function runFinalTypeCheck(services: Map<string, ServiceInfo>): Promise<vo
 
     try {
       await execAsync(cmd, { cwd: service.path });
-      return { service: service.dirName, success: true };
+      return { name: service.dirName, success: true };
     } catch (error) {
       const execError = error as { stdout?: string; stderr?: string };
       return {
-        service: service.dirName,
+        name: service.dirName,
         success: false,
         error: execError.stderr || execError.stdout || String(error),
       };
@@ -313,15 +341,56 @@ async function runFinalTypeCheck(services: Map<string, ServiceInfo>): Promise<vo
   const failures = results.filter((r) => !r.success);
 
   if (failures.length > 0) {
-    console.error('\n❌ Type errors found:');
+    console.error('\n❌ Service type errors found:');
     for (const f of failures) {
-      console.error(`\n  • ${f.service}:`);
+      console.error(`\n  • ${f.name}:`);
       console.error(`    ${(f as any).error?.split('\n').join('\n    ')}`);
     }
-    throw new Error('Type check failed');
+    return false;
   }
 
-  console.log('\n✅ All type checks passed\n');
+  console.log('\n✅ All services type check passed\n');
+  return true;
+}
+
+// ============================================================================
+// Step 5: Type check packages
+// ============================================================================
+
+async function typeCheckPackages(packages: Map<string, PackageInfo>): Promise<boolean> {
+  console.log('🔍 Step 5: Type checking packages (tsc --noEmit)...\n');
+
+  const tasks = Array.from(packages.values()).map(async (pkg) => {
+    const cmd = `tsc --noEmit`;
+    console.log(`  [${pkg.dirName}] ${cmd}`);
+
+    try {
+      await execAsync(cmd, { cwd: pkg.path });
+      return { name: pkg.dirName, success: true };
+    } catch (error) {
+      const execError = error as { stdout?: string; stderr?: string };
+      return {
+        name: pkg.dirName,
+        success: false,
+        error: execError.stderr || execError.stdout || String(error),
+      };
+    }
+  });
+
+  const results = await Promise.all(tasks);
+  const failures = results.filter((r) => !r.success);
+
+  if (failures.length > 0) {
+    console.error('\n❌ Package type errors found:');
+    for (const f of failures) {
+      console.error(`\n  • ${f.name}:`);
+      console.error(`    ${(f as any).error?.split('\n').join('\n    ')}`);
+    }
+    return false;
+  }
+
+  console.log('\n✅ All packages type check passed\n');
+  return true;
 }
 
 // ============================================================================
@@ -343,6 +412,15 @@ async function main(): Promise<void> {
   }
   console.log();
 
+  console.log('🔍 Discovering packages...\n');
+  const packages = discoverPackages();
+
+  console.log(`Found ${packages.size} packages:`);
+  for (const [name] of packages) {
+    console.log(`  • ${name}`);
+  }
+  console.log();
+
   // Step 1: Generate wrangler types for all services
   await generateAllWranglerTypes(services);
 
@@ -352,15 +430,20 @@ async function main(): Promise<void> {
   // Step 3: Build declarations (parallel with skipLibCheck)
   await buildAllDeclarations(services);
 
-  // Step 4: Final type check (unless skipped)
+  // Step 4 & 5: Type check (unless skipped)
   if (!skipTypeCheck) {
-    await runFinalTypeCheck(services);
+    const servicesOk = await typeCheckServices(services);
+    const packagesOk = await typeCheckPackages(packages);
+
+    if (!servicesOk || !packagesOk) {
+      throw new Error('Type check failed');
+    }
   } else {
-    console.log('⏭️  Skipping final type check (--skip-check)\n');
+    console.log('⏭️  Skipping type check (--skip-check)\n');
   }
 
   console.log(`${'='.repeat(60)}`);
-  console.log('✅ All services processed successfully!');
+  console.log('✅ All services and packages processed successfully!');
   console.log(`${'='.repeat(60)}\n`);
 }
 
