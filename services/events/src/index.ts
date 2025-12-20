@@ -3,11 +3,11 @@ import { and, desc, eq, gte } from 'drizzle-orm';
 import { drizzle } from 'drizzle-orm/d1';
 import { traceEvents, workflowEvents } from './schema';
 import type {
-  BroadcastTraceEventEntry,
-  EventEntry,
+  EventRow,
   GetEventsOptions,
   GetTraceEventsOptions,
   TraceEventCategory,
+  TraceEventRow,
 } from './types';
 
 // Re-export DOs and types for consumer convenience
@@ -36,7 +36,7 @@ export class EventsService extends WorkerEntrypoint<Env> {
   /**
    * RPC method - retrieves workflow events from D1
    */
-  async getEvents(options: GetEventsOptions = {}): Promise<{ events: EventEntry[] }> {
+  async getEvents(options: GetEventsOptions = {}): Promise<{ events: EventRow[] }> {
     const events = await this.db
       .select()
       .from(workflowEvents)
@@ -65,7 +65,7 @@ export class EventsService extends WorkerEntrypoint<Env> {
    */
   async getTraceEvents(
     options: GetTraceEventsOptions = {},
-  ): Promise<{ events: BroadcastTraceEventEntry[] }> {
+  ): Promise<{ events: (Omit<TraceEventRow, 'payload'> & { payload: unknown })[] }> {
     const results = await this.db
       .select()
       .from(traceEvents)

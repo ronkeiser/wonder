@@ -87,17 +87,8 @@ export class Streamer extends DurableObject<Env> {
       id: ulid(),
       timestamp: Date.now(),
       sequence: this.eventSeq,
-      eventType: input.eventType,
-      workflowRunId: context.workflowRunId,
-      parentRunId: context.parentRunId ?? null,
-      workflowDefId: context.workflowDefId,
-      nodeId: input.nodeId ?? null,
-      tokenId: input.tokenId ?? null,
-      pathId: input.pathId ?? null,
-      projectId: context.projectId,
-      tokens: input.tokens ?? null,
-      costUsd: input.costUsd ?? null,
-      message: input.message ?? null,
+      ...context,
+      ...input,
       metadata: JSON.stringify(input.metadata ?? {}),
     };
 
@@ -130,13 +121,9 @@ export class Streamer extends DurableObject<Env> {
       id: ulid(),
       timestamp: Date.now(),
       sequence: this.traceSeq,
-      type: input.type,
       category: getEventCategory(input.type),
-      workflowRunId: context.workflowRunId,
-      tokenId: input.tokenId ?? null,
-      nodeId: input.nodeId ?? null,
-      projectId: context.projectId,
-      durationMs: input.durationMs ?? null,
+      ...context,
+      ...input,
       payload: JSON.stringify(input.payload ?? {}),
     };
 
@@ -402,7 +389,7 @@ function matchesTraceFilter(event: BroadcastTraceEventEntry, filter: Subscriptio
   if (filter.type && event.type !== filter.type) return false;
   if (
     filter.minDurationMs !== undefined &&
-    event.durationMs !== null &&
+    event.durationMs != null &&
     event.durationMs < filter.minDurationMs
   ) {
     return false;

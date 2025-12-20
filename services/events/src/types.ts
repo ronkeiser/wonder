@@ -1,5 +1,8 @@
 // services/events/src/types.ts
 
+import type { InferInsertModel, InferSelectModel } from 'drizzle-orm';
+import type { traceEvents, workflowEvents } from './schema';
+
 /**
  * Workflow event types for execution tracking
  *
@@ -67,24 +70,21 @@ export interface EventInput {
 }
 
 /**
- * Complete event entry as stored in D1
+ * Event entry for inserting into D1
  */
-export interface EventEntry extends EventContext, Omit<EventInput, 'metadata'> {
-  id: string;
-  timestamp: number;
-  sequence: number;
-  metadata: string; // JSON string
-}
+export type EventEntry = InferInsertModel<typeof workflowEvents>;
+
+/**
+ * Event entry as selected from D1
+ */
+export type EventRow = InferSelectModel<typeof workflowEvents>;
 
 /**
  * Event entry with parsed metadata for WebSocket broadcasting
  */
-export interface BroadcastEventEntry extends EventContext, EventInput {
-  id: string;
-  timestamp: number;
-  sequence: number;
+export type BroadcastEventEntry = Omit<EventEntry, 'metadata'> & {
   metadata: Record<string, unknown>;
-}
+};
 
 /**
  * Options for querying events
@@ -170,34 +170,21 @@ export interface TraceEventContext {
 }
 
 /**
- * Trace event entry as stored in D1
+ * Trace event entry for inserting into D1
  */
-export interface TraceEventEntry extends TraceEventContext {
-  id: string;
-  sequence: number;
-  timestamp: number;
-  type: string;
-  category: TraceEventCategory;
-  tokenId: string | null;
-  nodeId: string | null;
-  durationMs: number | null;
-  payload: string; // JSON string in DB
-}
+export type TraceEventEntry = InferInsertModel<typeof traceEvents>;
+
+/**
+ * Trace event entry as selected from D1
+ */
+export type TraceEventRow = InferSelectModel<typeof traceEvents>;
 
 /**
  * Trace event entry with parsed payload for WebSocket broadcasting
  */
-export interface BroadcastTraceEventEntry extends TraceEventContext {
-  id: string;
-  sequence: number;
-  timestamp: number;
-  type: string;
-  category: TraceEventCategory;
-  tokenId: string | null;
-  nodeId: string | null;
-  durationMs: number | null;
-  payload: Record<string, unknown>; // Parsed object
-}
+export type BroadcastTraceEventEntry = Omit<TraceEventEntry, 'payload'> & {
+  payload: Record<string, unknown>;
+};
 
 /**
  * Options for querying trace events
