@@ -4,22 +4,22 @@ import { eq } from 'drizzle-orm';
 import type { DrizzleD1Database } from 'drizzle-orm/d1';
 import { ulid } from 'ulid';
 import { modelProfiles } from '~/schema';
-import type { NewEntityIdOnly } from '~/shared/types';
-import type { ModelProfile } from './types';
-
-type NewModelProfile = NewEntityIdOnly<typeof modelProfiles.$inferInsert>;
+import type { ModelProfile, ModelProfileInput } from './types';
 
 type ModelProvider = ModelProfile['provider'];
 
 export async function createModelProfile(
   db: DrizzleD1Database,
-  data: NewModelProfile,
+  data: ModelProfileInput,
 ): Promise<ModelProfile> {
+  const now = new Date().toISOString();
   const [profile] = await db
     .insert(modelProfiles)
     .values({
       id: ulid(),
       ...data,
+      createdAt: now,
+      updatedAt: now,
     })
     .returning();
 

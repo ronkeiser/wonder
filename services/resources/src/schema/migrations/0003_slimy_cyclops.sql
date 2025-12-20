@@ -1,1 +1,0 @@
-ALTER TABLE `transitions` ADD `sibling_group` text;

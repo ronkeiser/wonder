@@ -1,7 +1,7 @@
 {
   "version": "6",
   "dialect": "sqlite",
-  "id": "644cd071-3231-4d77-8988-99bb2873feb4",
+  "id": "debed971-9576-4e41-95a0-bdfe61e935f2",
   "prevId": "00000000-0000-0000-0000-000000000000",
   "tables": {
     "actions": {
@@ -26,14 +26,16 @@
           "type": "text",
           "primaryKey": false,
           "notNull": true,
-          "autoincrement": false
+          "autoincrement": false,
+          "default": "''"
         },
         "version": {
           "name": "version",
           "type": "integer",
           "primaryKey": false,
           "notNull": true,
-          "autoincrement": false
+          "autoincrement": false,
+          "default": 1
         },
         "kind": {
           "name": "kind",
@@ -77,6 +79,13 @@
           "notNull": false,
           "autoincrement": false
         },
+        "content_hash": {
+          "name": "content_hash",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false,
+          "autoincrement": false
+        },
         "created_at": {
           "name": "created_at",
           "type": "text",
@@ -92,7 +101,16 @@
           "autoincrement": false
         }
       },
-      "indexes": {},
+      "indexes": {
+        "idx_actions_content_hash": {
+          "name": "idx_actions_content_hash",
+          "columns": [
+            "name",
+            "content_hash"
+          ],
+          "isUnique": false
+        }
+      },
       "foreignKeys": {},
       "compositePrimaryKeys": {
         "actions_id_version_pk": {
@@ -188,7 +206,8 @@
           "type": "text",
           "primaryKey": false,
           "notNull": true,
-          "autoincrement": false
+          "autoincrement": false,
+          "default": "''"
         },
         "schema": {
           "name": "schema",
@@ -202,10 +221,41 @@
           "type": "integer",
           "primaryKey": false,
           "notNull": true,
+          "autoincrement": false,
+          "default": 1
+        },
+        "content_hash": {
+          "name": "content_hash",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false,
+          "autoincrement": false
+        },
+        "created_at": {
+          "name": "created_at",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false
+        },
+        "updated_at": {
+          "name": "updated_at",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true,
           "autoincrement": false
         }
       },
-      "indexes": {},
+      "indexes": {
+        "idx_artifact_types_content_hash": {
+          "name": "idx_artifact_types_content_hash",
+          "columns": [
+            "name",
+            "content_hash"
+          ],
+          "isUnique": false
+        }
+      },
       "foreignKeys": {},
       "compositePrimaryKeys": {
         "artifact_types_id_version_pk": {
@@ -809,7 +859,8 @@
           "type": "text",
           "primaryKey": false,
           "notNull": true,
-          "autoincrement": false
+          "autoincrement": false,
+          "default": "'{}'"
         },
         "execution_config": {
           "name": "execution_config",
@@ -823,11 +874,27 @@
           "type": "real",
           "primaryKey": false,
           "notNull": true,
-          "autoincrement": false
+          "autoincrement": false,
+          "default": 0
         },
         "cost_per_1k_output_tokens": {
           "name": "cost_per_1k_output_tokens",
           "type": "real",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false,
+          "default": 0
+        },
+        "created_at": {
+          "name": "created_at",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false
+        },
+        "updated_at": {
+          "name": "updated_at",
+          "type": "text",
           "primaryKey": false,
           "notNull": true,
           "autoincrement": false
@@ -877,18 +944,18 @@
           "notNull": true,
           "autoincrement": false
         },
-        "action_id": {
-          "name": "action_id",
+        "task_id": {
+          "name": "task_id",
           "type": "text",
           "primaryKey": false,
-          "notNull": true,
+          "notNull": false,
           "autoincrement": false
         },
-        "action_version": {
-          "name": "action_version",
+        "task_version": {
+          "name": "task_version",
           "type": "integer",
           "primaryKey": false,
-          "notNull": true,
+          "notNull": false,
           "autoincrement": false
         },
         "input_mapping": {
@@ -904,6 +971,13 @@
           "primaryKey": false,
           "notNull": false,
           "autoincrement": false
+        },
+        "resource_bindings": {
+          "name": "resource_bindings",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false,
+          "autoincrement": false
         }
       },
       "indexes": {
@@ -915,11 +989,11 @@
           ],
           "isUnique": false
         },
-        "idx_nodes_action": {
-          "name": "idx_nodes_action",
+        "idx_nodes_task": {
+          "name": "idx_nodes_task",
           "columns": [
-            "action_id",
-            "action_version"
+            "task_id",
+            "task_version"
           ],
           "isUnique": false
         },
@@ -941,21 +1015,6 @@
           "columnsFrom": [
             "workflow_def_id",
             "workflow_def_version"
-          ],
-          "columnsTo": [
-            "id",
-            "version"
-          ],
-          "onDelete": "no action",
-          "onUpdate": "no action"
-        },
-        "nodes_action_id_action_version_actions_id_version_fk": {
-          "name": "nodes_action_id_action_version_actions_id_version_fk",
-          "tableFrom": "nodes",
-          "tableTo": "actions",
-          "columnsFrom": [
-            "action_id",
-            "action_version"
           ],
           "columnsTo": [
             "id",
@@ -1161,14 +1220,16 @@
           "type": "text",
           "primaryKey": false,
           "notNull": true,
-          "autoincrement": false
+          "autoincrement": false,
+          "default": "''"
         },
         "version": {
           "name": "version",
           "type": "integer",
           "primaryKey": false,
           "notNull": true,
-          "autoincrement": false
+          "autoincrement": false,
+          "default": 1
         },
         "system_prompt": {
           "name": "system_prompt",
@@ -1184,26 +1245,21 @@
           "notNull": true,
           "autoincrement": false
         },
-        "template_language": {
-          "name": "template_language",
-          "type": "text",
-          "primaryKey": false,
-          "notNull": true,
-          "autoincrement": false
-        },
         "requires": {
           "name": "requires",
           "type": "text",
           "primaryKey": false,
           "notNull": true,
-          "autoincrement": false
+          "autoincrement": false,
+          "default": "'{}'"
         },
         "produces": {
           "name": "produces",
           "type": "text",
           "primaryKey": false,
           "notNull": true,
-          "autoincrement": false
+          "autoincrement": false,
+          "default": "'{}'"
         },
         "examples": {
           "name": "examples",
@@ -1214,6 +1270,13 @@
         },
         "tags": {
           "name": "tags",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false,
+          "autoincrement": false
+        },
+        "content_hash": {
+          "name": "content_hash",
           "type": "text",
           "primaryKey": false,
           "notNull": false,
@@ -1234,7 +1297,16 @@
           "autoincrement": false
         }
       },
-      "indexes": {},
+      "indexes": {
+        "idx_prompt_specs_content_hash": {
+          "name": "idx_prompt_specs_content_hash",
+          "columns": [
+            "name",
+            "content_hash"
+          ],
+          "isUnique": false
+        }
+      },
       "foreignKeys": {},
       "compositePrimaryKeys": {
         "prompt_specs_id_version_pk": {
@@ -1323,6 +1395,180 @@
       "uniqueConstraints": {},
       "checkConstraints": {}
     },
+    "tasks": {
+      "name": "tasks",
+      "columns": {
+        "id": {
+          "name": "id",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false
+        },
+        "version": {
+          "name": "version",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false,
+          "default": 1
+        },
+        "name": {
+          "name": "name",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false
+        },
+        "description": {
+          "name": "description",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false,
+          "default": "''"
+        },
+        "project_id": {
+          "name": "project_id",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false,
+          "autoincrement": false
+        },
+        "library_id": {
+          "name": "library_id",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false,
+          "autoincrement": false
+        },
+        "tags": {
+          "name": "tags",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false,
+          "autoincrement": false
+        },
+        "input_schema": {
+          "name": "input_schema",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false
+        },
+        "output_schema": {
+          "name": "output_schema",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false
+        },
+        "steps": {
+          "name": "steps",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false
+        },
+        "retry": {
+          "name": "retry",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false,
+          "autoincrement": false
+        },
+        "timeout_ms": {
+          "name": "timeout_ms",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": false,
+          "autoincrement": false
+        },
+        "content_hash": {
+          "name": "content_hash",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false,
+          "autoincrement": false
+        },
+        "created_at": {
+          "name": "created_at",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false
+        },
+        "updated_at": {
+          "name": "updated_at",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false
+        }
+      },
+      "indexes": {
+        "idx_tasks_project": {
+          "name": "idx_tasks_project",
+          "columns": [
+            "project_id"
+          ],
+          "isUnique": false
+        },
+        "idx_tasks_library": {
+          "name": "idx_tasks_library",
+          "columns": [
+            "library_id"
+          ],
+          "isUnique": false
+        },
+        "idx_tasks_name_version": {
+          "name": "idx_tasks_name_version",
+          "columns": [
+            "name",
+            "project_id",
+            "library_id",
+            "version"
+          ],
+          "isUnique": false
+        },
+        "idx_tasks_content_hash": {
+          "name": "idx_tasks_content_hash",
+          "columns": [
+            "name",
+            "project_id",
+            "library_id",
+            "content_hash"
+          ],
+          "isUnique": false
+        }
+      },
+      "foreignKeys": {
+        "tasks_project_id_projects_id_fk": {
+          "name": "tasks_project_id_projects_id_fk",
+          "tableFrom": "tasks",
+          "tableTo": "projects",
+          "columnsFrom": [
+            "project_id"
+          ],
+          "columnsTo": [
+            "id"
+          ],
+          "onDelete": "no action",
+          "onUpdate": "no action"
+        }
+      },
+      "compositePrimaryKeys": {
+        "tasks_id_version_pk": {
+          "columns": [
+            "id",
+            "version"
+          ],
+          "name": "tasks_id_version_pk"
+        }
+      },
+      "uniqueConstraints": {},
+      "checkConstraints": {}
+    },
     "transitions": {
       "name": "transitions",
       "columns": {
@@ -1385,6 +1631,13 @@
         "spawn_count": {
           "name": "spawn_count",
           "type": "integer",
+          "primaryKey": false,
+          "notNull": false,
+          "autoincrement": false
+        },
+        "sibling_group": {
+          "name": "sibling_group",
+          "type": "text",
           "primaryKey": false,
           "notNull": false,
           "autoincrement": false
@@ -1702,14 +1955,16 @@
           "type": "text",
           "primaryKey": false,
           "notNull": true,
-          "autoincrement": false
+          "autoincrement": false,
+          "default": "''"
         },
         "version": {
           "name": "version",
           "type": "integer",
           "primaryKey": false,
           "notNull": true,
-          "autoincrement": false
+          "autoincrement": false,
+          "default": 1
         },
         "project_id": {
           "name": "project_id",
@@ -1767,6 +2022,13 @@
           "notNull": false,
           "autoincrement": false
         },
+        "content_hash": {
+          "name": "content_hash",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false,
+          "autoincrement": false
+        },
         "created_at": {
           "name": "created_at",
           "type": "text",
@@ -1804,6 +2066,16 @@
             "project_id",
             "library_id",
             "version"
+          ],
+          "isUnique": false
+        },
+        "idx_workflow_defs_content_hash": {
+          "name": "idx_workflow_defs_content_hash",
+          "columns": [
+            "name",
+            "project_id",
+            "library_id",
+            "content_hash"
           ],
           "isUnique": false
         }

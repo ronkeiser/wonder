@@ -349,6 +349,9 @@ export const modelProfiles = sqliteTable('model_profiles', {
 
   costPer1kInputTokens: real('cost_per_1k_input_tokens').notNull().default(0),
   costPer1kOutputTokens: real('cost_per_1k_output_tokens').notNull().default(0),
+
+  createdAt: text().notNull(),
+  updatedAt: text().notNull(),
 });
 
 /** Workflow Runs & Execution */

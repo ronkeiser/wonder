@@ -13,10 +13,18 @@ const __filename = fileURLToPath(import.meta.url);
 const __dirname = dirname(__filename);
 
 const SERVICES_DIR = resolve(__dirname, '../../../services');
+const PACKAGES_DIR = resolve(__dirname, '../../../packages');
 
 // ============================================================================
 // Types
 // ============================================================================
+
+interface PackageInfo {
+  /** Directory name (e.g., "schemas") */
+  dirName: string;
+  /** Absolute path to package directory */
+  path: string;
+}
 
 interface WranglerConfig {
   name: string;

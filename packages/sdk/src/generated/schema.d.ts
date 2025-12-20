@@ -1374,7 +1374,10 @@ export interface components {
             /** @example My Workspace */
             name: string;
             settings: {
-                [key: string]: unknown;
+                allowedModelProviders: string[] | null;
+                allowedMcpServers: string[] | null;
+                budgetMaxMonthlySpendCents: number | null;
+                budgetAlertThresholdCents: number | null;
             } | null;
             /** @example 2024-01-01T00:00:00Z */
             createdAt: string;
@@ -1393,7 +1396,10 @@ export interface components {
             name: string;
             /** @example {} */
             settings?: {
-                [key: string]: unknown;
+                allowedModelProviders?: string[] | null;
+                allowedMcpServers?: string[] | null;
+                budgetMaxMonthlySpendCents?: number | null;
+                budgetAlertThresholdCents?: number | null;
             };
         };
         WorkspaceGetResponse: {
@@ -1407,7 +1413,10 @@ export interface components {
             name?: string;
             /** @example {} */
             settings?: {
-                [key: string]: unknown;
+                allowedModelProviders?: string[] | null;
+                allowedMcpServers?: string[] | null;
+                budgetMaxMonthlySpendCents?: number | null;
+                budgetAlertThresholdCents?: number | null;
             };
         };
         Project: {
@@ -1416,7 +1425,14 @@ export interface components {
             name: string;
             description: string | null;
             settings: {
-                [key: string]: unknown;
+                defaultModelProfileId: string | null;
+                rateLimitMaxConcurrentRuns: number | null;
+                rateLimitMaxLlmCallsPerHour: number | null;
+                budgetMaxMonthlySpendCents: number | null;
+                budgetAlertThresholdCents: number | null;
+                snapshotPolicyEveryNEvents: number | null;
+                snapshotPolicyEveryNSeconds: number | null;
+                snapshotPolicyOnFanInComplete: boolean | null;
             } | null;
             createdAt: string;
             updatedAt: string;
@@ -1437,7 +1453,14 @@ export interface components {
             description?: string;
             /** @example {} */
             settings?: {
-                [key: string]: unknown;
+                defaultModelProfileId?: string | null;
+                rateLimitMaxConcurrentRuns?: number | null;
+                rateLimitMaxLlmCallsPerHour?: number | null;
+                budgetMaxMonthlySpendCents?: number | null;
+                budgetAlertThresholdCents?: number | null;
+                snapshotPolicyEveryNEvents?: number | null;
+                snapshotPolicyEveryNSeconds?: number | null;
+                snapshotPolicyOnFanInComplete?: boolean | null;
             };
         };
         ProjectGetResponse: {

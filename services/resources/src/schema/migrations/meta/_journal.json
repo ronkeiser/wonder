@@ -5,43 +5,8 @@
     {
       "idx": 0,
       "version": "6",
-      "when": 1764902583521,
-      "tag": "0000_shiny_menace",
-      "breakpoints": true
-    },
-    {
-      "idx": 1,
-      "version": "6",
-      "when": 1764942092637,
-      "tag": "0001_great_genesis",
-      "breakpoints": true
-    },
-    {
-      "idx": 2,
-      "version": "6",
-      "when": 1765615884867,
-      "tag": "0002_chief_wolverine",
-      "breakpoints": true
-    },
-    {
-      "idx": 3,
-      "version": "6",
-      "when": 1766003525555,
-      "tag": "0003_slimy_cyclops",
-      "breakpoints": true
-    },
-    {
-      "idx": 4,
-      "version": "6",
-      "when": 1766093962764,
-      "tag": "0004_right_human_cannonball",
-      "breakpoints": true
-    },
-    {
-      "idx": 5,
-      "version": "6",
-      "when": 1766100534069,
-      "tag": "0005_common_ma_gnuci",
+      "when": 1766260476317,
+      "tag": "0000_long_medusa",
       "breakpoints": true
     }
   ]

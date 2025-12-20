@@ -174,9 +174,9 @@ export type ModelProfile = {
 // ============================================================================
 
 import { modelProfiles } from '../../schema';
-import type { NewEntityIdOnly } from '~/shared/types';
+import type { NewEntity } from '~/shared/types';
 
 export type ModelProvider = 'anthropic' | 'openai' | 'google' | 'cloudflare' | 'local';
 
 /** Input for creating a model profile - inferred from schema */
-export type ModelProfileInput = NewEntityIdOnly<typeof modelProfiles.$inferInsert>;
+export type ModelProfileInput = NewEntity<typeof modelProfiles.$inferInsert>;
