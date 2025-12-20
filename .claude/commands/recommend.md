@@ -1,1 +1,1 @@
-You're just trying to predict what I want and are pushing decisions on me beause you can't guess that. What you should instead do is take a step back, figure out what is ideal, then make a recommendation
+You're just trying to predict what I want and are pushing decisions on me beause you can't guess that. What you should instead do is take a step back, figure out what is ideal, then make a recommendation.
