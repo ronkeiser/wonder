@@ -3,46 +3,19 @@
 import { ConflictError, NotFoundError, extractDbError } from '~/shared/errors';
 import { Resource } from '~/shared/resource';
 import * as repo from './repository';
-import type { ModelId, ModelProfile } from './types';
-
-type ModelProvider = 'anthropic' | 'openai' | 'google' | 'cloudflare' | 'local';
+import type { ModelId, ModelProfile, ModelProfileInput, ModelProvider } from './types';
 
 export class ModelProfiles extends Resource {
-  async create(data: {
-    name: string;
-    provider: ModelProvider;
-    modelId: ModelId;
-    parameters?: object;
-    executionConfig?: object;
-    costPer1kInputTokens?: number;
-    costPer1kOutputTokens?: number;
-  }): Promise<{
+  async create(data: ModelProfileInput): Promise<{
     modelProfileId: string;
-    modelProfile: {
-      id: string;
-      name: string;
-      provider: ModelProvider;
-      modelId: ModelId;
-      parameters: object | null;
-      executionConfig: object | null;
-      costPer1kInputTokens: number;
-      costPer1kOutputTokens: number;
-    };
+    modelProfile: ModelProfile;
   }> {
     return this.withLogging(
       'create',
       { metadata: { name: data.name, provider: data.provider } },
       async () => {
         try {
-          const profile = await repo.createModelProfile(this.serviceCtx.db, {
-            name: data.name,
-            provider: data.provider,
-            modelId: data.modelId,
-            parameters: (data.parameters ?? {}) as object,
-            executionConfig: data.executionConfig ?? null,
-            costPer1kInputTokens: data.costPer1kInputTokens ?? 0,
-            costPer1kOutputTokens: data.costPer1kOutputTokens ?? 0,
-          });
+          const profile = await repo.createModelProfile(this.serviceCtx.db, data);
 
           return {
             modelProfileId: profile.id,
@@ -82,16 +55,7 @@ export class ModelProfiles extends Resource {
   }
 
   async list(params?: { limit?: number; provider?: ModelProvider }): Promise<{
-    modelProfiles: Array<{
-      id: string;
-      name: string;
-      provider: ModelProvider;
-      modelId: ModelId;
-      parameters: object | null;
-      executionConfig: object | null;
-      costPer1kInputTokens: number;
-      costPer1kOutputTokens: number;
-    }>;
+    modelProfiles: ModelProfile[];
   }> {
     return this.withLogging('list', { metadata: params }, async () => {
       const profiles = params?.provider
@@ -105,11 +69,11 @@ export class ModelProfiles extends Resource {
   async delete(id: string): Promise<{ success: boolean }> {
     return this.withLogging(
       'delete',
-      { model_profile_id: id, metadata: { model_profile_id: id } },
+      { modelProfileId: id, metadata: { modelProfileId: id } },
       async () => {
         const profile = await repo.getModelProfile(this.serviceCtx.db, id);
         if (!profile) {
-          throw new NotFoundError(`ModelProfile not found: ${id}`, 'model_profile', id);
+          throw new NotFoundError(`ModelProfile not found: ${id}`, 'modelProfile', id);
         }
 
         await repo.deleteModelProfile(this.serviceCtx.db, id);

@@ -3,18 +3,12 @@
 import { ConflictError, NotFoundError, extractDbError } from '~/shared/errors';
 import { Resource } from '~/shared/resource';
 import * as repo from './repository';
-import type { ArtifactType } from './types';
+import type { ArtifactType, ArtifactTypeInput } from './types';
 
 export class ArtifactTypes extends Resource {
-  async create(data: {
-    version?: number;
-    name: string;
-    description?: string;
-    schema: object;
-    autoversion?: boolean;
-  }): Promise<{
-    artifact_type_id: string;
-    artifact_type: ArtifactType;
+  async create(data: ArtifactTypeInput): Promise<{
+    artifactTypeId: string;
+    artifactType: ArtifactType;
     /** True if an existing artifact type was reused (autoversion matched content hash) */
     reused: boolean;
   }> {
@@ -31,8 +25,8 @@ export class ArtifactTypes extends Resource {
 
     if (autoversionResult.reused) {
       return {
-        artifact_type_id: autoversionResult.entity.id,
-        artifact_type: autoversionResult.entity,
+        artifactTypeId: autoversionResult.entity.id,
+        artifactType: autoversionResult.entity,
         reused: true,
       };
     }
@@ -41,16 +35,14 @@ export class ArtifactTypes extends Resource {
 
     try {
       const artifactType = await repo.createArtifactType(this.serviceCtx.db, {
+        ...data,
         version,
-        name: data.name,
-        description: data.description ?? '',
-        schema: data.schema,
         contentHash: autoversionResult.contentHash,
       });
 
       return {
-        artifact_type_id: artifactType.id,
-        artifact_type: artifactType,
+        artifactTypeId: artifactType.id,
+        artifactType,
         reused: false,
       };
     } catch (error) {
@@ -72,9 +64,9 @@ export class ArtifactTypes extends Resource {
     id: string,
     version?: number,
   ): Promise<{
-    artifact_type: ArtifactType;
+    artifactType: ArtifactType;
   }> {
-    return this.withLogging('get', { metadata: { artifact_type_id: id, version } }, async () => {
+    return this.withLogging('get', { metadata: { artifactTypeId: id, version } }, async () => {
       const artifactType = version
         ? await repo.getArtifactTypeVersion(this.serviceCtx.db, id, version)
         : await repo.getLatestArtifactType(this.serviceCtx.db, id);
@@ -82,28 +74,28 @@ export class ArtifactTypes extends Resource {
       if (!artifactType) {
         throw new NotFoundError(
           `ArtifactType not found: ${id}${version ? ` version ${version}` : ''}`,
-          'artifact_type',
+          'artifactType',
           id,
         );
       }
 
-      return { artifact_type: artifactType };
+      return { artifactType };
     });
   }
 
   async list(params?: { limit?: number }): Promise<{
-    artifact_types: ArtifactType[];
+    artifactTypes: ArtifactType[];
   }> {
     return this.withLogging('list', { metadata: params }, async () => {
       const artifactTypes = await repo.listArtifactTypes(this.serviceCtx.db, params?.limit);
-      return { artifact_types: artifactTypes };
+      return { artifactTypes };
     });
   }
 
   async delete(id: string, version?: number): Promise<{ success: boolean }> {
     return this.withLogging(
       'delete',
-      { metadata: { artifact_type_id: id, version } },
+      { metadata: { artifactTypeId: id, version } },
       async () => {
         const existing = version
           ? await repo.getArtifactTypeVersion(this.serviceCtx.db, id, version)
@@ -112,7 +104,7 @@ export class ArtifactTypes extends Resource {
         if (!existing) {
           throw new NotFoundError(
             `ArtifactType not found: ${id}${version ? ` version ${version}` : ''}`,
-            'artifact_type',
+            'artifactType',
             id,
           );
         }

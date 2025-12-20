@@ -5,12 +5,23 @@
 import { z } from '@hono/zod-openapi';
 import { ulid } from '../../validators';
 
+export const ProjectSettingsSchema = z.object({
+  defaultModelProfileId: z.string().nullable(),
+  rateLimitMaxConcurrentRuns: z.number().nullable(),
+  rateLimitMaxLlmCallsPerHour: z.number().nullable(),
+  budgetMaxMonthlySpendCents: z.number().nullable(),
+  budgetAlertThresholdCents: z.number().nullable(),
+  snapshotPolicyEveryNEvents: z.number().nullable(),
+  snapshotPolicyEveryNSeconds: z.number().nullable(),
+  snapshotPolicyOnFanInComplete: z.boolean().nullable(),
+});
+
 export const CreateProjectSchema = z
   .object({
     workspaceId: ulid().openapi({ example: '01ARZ3NDEKTSV4RRFFQ69G5FAV' }),
     name: z.string().min(1).max(255).openapi({ example: 'My Project' }),
     description: z.string().optional().openapi({ example: 'Project description' }),
-    settings: z.record(z.string(), z.unknown()).optional().openapi({ example: {} }),
+    settings: ProjectSettingsSchema.partial().optional().openapi({ example: {} }),
   })
   .openapi('CreateProject');
 
@@ -20,7 +31,7 @@ export const ProjectSchema = z
     workspaceId: ulid(),
     name: z.string(),
     description: z.string().nullable(),
-    settings: z.record(z.string(), z.unknown()).nullable(),
+    settings: ProjectSettingsSchema.nullable(),
     createdAt: z.string(),
     updatedAt: z.string(),
   })

@@ -3,42 +3,12 @@
 import { ConflictError, NotFoundError, extractDbError } from '~/shared/errors';
 import { Resource } from '~/shared/resource';
 import * as repo from './repository';
+import type { Project, ProjectInput, ProjectSettingsInput } from './types';
 
 export class Projects extends Resource {
-  async create(data: {
-    workspaceId: string;
-    name: string;
-    description?: string;
-    settings?: {
-      defaultModelProfileId?: string;
-      rateLimitMaxConcurrentRuns?: number;
-      rateLimitMaxLlmCallsPerHour?: number;
-      budgetMaxMonthlySpendCents?: number;
-      budgetAlertThresholdCents?: number;
-      snapshotPolicyEveryNEvents?: number;
-      snapshotPolicyEveryNSeconds?: number;
-      snapshotPolicyOnFanInComplete?: boolean;
-    };
-  }): Promise<{
+  async create(data: ProjectInput): Promise<{
     projectId: string;
-    project: {
-      id: string;
-      workspaceId: string;
-      name: string;
-      description: string | null;
-      settings: {
-        defaultModelProfileId?: string;
-        rateLimitMaxConcurrentRuns?: number;
-        rateLimitMaxLlmCallsPerHour?: number;
-        budgetMaxMonthlySpendCents?: number;
-        budgetAlertThresholdCents?: number;
-        snapshotPolicyEveryNEvents?: number;
-        snapshotPolicyEveryNSeconds?: number;
-        snapshotPolicyOnFanInComplete?: boolean;
-      } | null;
-      createdAt: string;
-      updatedAt: string;
-    };
+    project: Project;
   }> {
     return this.withLogging(
       'create',
@@ -48,12 +18,7 @@ export class Projects extends Resource {
       },
       async () => {
         try {
-          const project = await repo.createProject(this.serviceCtx.db, {
-            workspaceId: data.workspaceId,
-            name: data.name,
-            description: data.description ?? null,
-            settings: data.settings ?? null,
-          });
+          const project = await repo.createProject(this.serviceCtx.db, data);
 
           return {
             projectId: project.id,
@@ -84,26 +49,7 @@ export class Projects extends Resource {
     );
   }
 
-  async get(id: string): Promise<{
-    project: {
-      id: string;
-      workspaceId: string;
-      name: string;
-      description: string | null;
-      settings: {
-        defaultModelProfileId?: string;
-        rateLimitMaxConcurrentRuns?: number;
-        rateLimitMaxLlmCallsPerHour?: number;
-        budgetMaxMonthlySpendCents?: number;
-        budgetAlertThresholdCents?: number;
-        snapshotPolicyEveryNEvents?: number;
-        snapshotPolicyEveryNSeconds?: number;
-        snapshotPolicyOnFanInComplete?: boolean;
-      } | null;
-      createdAt: string;
-      updatedAt: string;
-    };
-  }> {
+  async get(id: string): Promise<{ project: Project }> {
     return this.withLogging('get', { projectId: id, metadata: { projectId: id } }, async () => {
       const project = await repo.getProject(this.serviceCtx.db, id);
       if (!project) {
@@ -113,26 +59,7 @@ export class Projects extends Resource {
     });
   }
 
-  async list(params?: { workspaceId?: string; limit?: number }): Promise<{
-    projects: Array<{
-      id: string;
-      workspaceId: string;
-      name: string;
-      description: string | null;
-      settings: {
-        defaultModelProfileId?: string;
-        rateLimitMaxConcurrentRuns?: number;
-        rateLimitMaxLlmCallsPerHour?: number;
-        budgetMaxMonthlySpendCents?: number;
-        budgetAlertThresholdCents?: number;
-        snapshotPolicyEveryNEvents?: number;
-        snapshotPolicyEveryNSeconds?: number;
-        snapshotPolicyOnFanInComplete?: boolean;
-      } | null;
-      createdAt: string;
-      updatedAt: string;
-    }>;
-  }> {
+  async list(params?: { workspaceId?: string; limit?: number }): Promise<{ projects: Project[] }> {
     return this.withLogging('list', { metadata: params }, async () => {
       const projects = await repo.listProjects(
         this.serviceCtx.db,
@@ -148,37 +75,9 @@ export class Projects extends Resource {
     data: {
       name?: string;
       description?: string;
-      settings?: {
-        defaultModelProfileId?: string;
-        rateLimitMaxConcurrentRuns?: number;
-        rateLimitMaxLlmCallsPerHour?: number;
-        budgetMaxMonthlySpendCents?: number;
-        budgetAlertThresholdCents?: number;
-        snapshotPolicyEveryNEvents?: number;
-        snapshotPolicyEveryNSeconds?: number;
-        snapshotPolicyOnFanInComplete?: boolean;
-      };
+      settings?: ProjectSettingsInput;
     },
-  ): Promise<{
-    project: {
-      id: string;
-      workspaceId: string;
-      name: string;
-      description: string | null;
-      settings: {
-        defaultModelProfileId?: string;
-        rateLimitMaxConcurrentRuns?: number;
-        rateLimitMaxLlmCallsPerHour?: number;
-        budgetMaxMonthlySpendCents?: number;
-        budgetAlertThresholdCents?: number;
-        snapshotPolicyEveryNEvents?: number;
-        snapshotPolicyEveryNSeconds?: number;
-        snapshotPolicyOnFanInComplete?: boolean;
-      } | null;
-      createdAt: string;
-      updatedAt: string;
-    };
-  }> {
+  ): Promise<{ project: Project }> {
     return this.withLogging(
       'update',
       { projectId: id, metadata: { projectId: id } },

@@ -1,17 +1,17 @@
 /** Type definitions for projects */
 
-import { projects } from '../../schema';
+import { projectSettings, projects } from '../../schema';
+import type { NewEntity } from '~/shared/types';
 
-/** ProjectSettings - parsed from project_settings table with undefined for missing values */
-export type ProjectSettings = {
-  defaultModelProfileId?: string;
-  rateLimitMaxConcurrentRuns?: number;
-  rateLimitMaxLlmCallsPerHour?: number;
-  budgetMaxMonthlySpendCents?: number;
-  budgetAlertThresholdCents?: number;
-  snapshotPolicyEveryNEvents?: number;
-  snapshotPolicyEveryNSeconds?: number;
-  snapshotPolicyOnFanInComplete?: boolean;
+/** ProjectSettings - what's returned from DB (all fields present, with | null) */
+export type ProjectSettings = Omit<typeof projectSettings.$inferSelect, 'projectId'>;
+
+/** ProjectSettingsInput - what's accepted for create/update (partial, with | null) */
+export type ProjectSettingsInput = Partial<ProjectSettings>;
+
+/** API input for creating a project - inferred from schema, adds settings */
+export type ProjectInput = NewEntity<typeof projects.$inferInsert> & {
+  settings?: ProjectSettingsInput | null;
 };
 
 /** Project entity - base fields from schema plus joined settings */

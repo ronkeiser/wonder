@@ -93,7 +93,7 @@ export const workflowDefs = sqliteTable(
   {
     id: text().notNull(),
     name: text().notNull(),
-    description: text().notNull(),
+    description: text().notNull().default(''),
     version: integer().notNull().default(1),
 
     projectId: text().references(() => projects.id),
@@ -235,8 +235,8 @@ export const actions = sqliteTable(
   {
     id: text().notNull(),
     name: text().notNull(),
-    description: text().notNull(),
-    version: integer().notNull(),
+    description: text().notNull().default(''),
+    version: integer().notNull().default(1),
 
     kind: text({
       enum: ['llm', 'mcp', 'http', 'human', 'context', 'artifact', 'workflow', 'vector', 'metric', 'mock'],
@@ -268,7 +268,7 @@ export const tasks = sqliteTable(
     id: text().notNull(),
     version: integer().notNull().default(1),
     name: text().notNull(),
-    description: text().notNull(),
+    description: text().notNull().default(''),
 
     // Ownership (exactly one)
     projectId: text().references(() => projects.id),
@@ -316,14 +316,14 @@ export const promptSpecs = sqliteTable(
   {
     id: text().notNull(),
     name: text().notNull(),
-    description: text().notNull(),
-    version: integer().notNull(),
+    description: text().notNull().default(''),
+    version: integer().notNull().default(1),
 
     systemPrompt: text(),
     template: text().notNull(),
 
-    requires: text({ mode: 'json' }).$type<object>().notNull(),
-    produces: text({ mode: 'json' }).$type<object>().notNull(),
+    requires: text({ mode: 'json' }).$type<object>().notNull().default({}),
+    produces: text({ mode: 'json' }).$type<object>().notNull().default({}),
     examples: text({ mode: 'json' }).$type<object>(),
     tags: text({ mode: 'json' }).$type<string[]>(),
 
@@ -344,11 +344,11 @@ export const modelProfiles = sqliteTable('model_profiles', {
   provider: text().notNull(),
   modelId: text().$type<ModelId>().notNull(),
 
-  parameters: text({ mode: 'json' }).$type<ModelProfile['parameters']>().notNull(),
+  parameters: text({ mode: 'json' }).$type<ModelProfile['parameters']>().notNull().default({}),
   executionConfig: text({ mode: 'json' }).$type<object>(),
 
-  costPer1kInputTokens: real('cost_per_1k_input_tokens').notNull(),
-  costPer1kOutputTokens: real('cost_per_1k_output_tokens').notNull(),
+  costPer1kInputTokens: real('cost_per_1k_input_tokens').notNull().default(0),
+  costPer1kOutputTokens: real('cost_per_1k_output_tokens').notNull().default(0),
 });
 
 /** Workflow Runs & Execution */
@@ -444,9 +444,9 @@ export const artifactTypes = sqliteTable(
   {
     id: text().notNull(),
     name: text().notNull(),
-    description: text().notNull(),
+    description: text().notNull().default(''),
     schema: text({ mode: 'json' }).$type<object>().notNull(),
-    version: integer().notNull(),
+    version: integer().notNull().default(1),
 
     contentHash: text(),
 

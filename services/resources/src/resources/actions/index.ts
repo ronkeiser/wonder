@@ -3,21 +3,10 @@
 import { ConflictError, NotFoundError, extractDbError } from '~/shared/errors';
 import { Resource } from '~/shared/resource';
 import * as repo from './repository';
-import type { Action, ActionKind } from './types';
+import type { Action, ActionInput, ActionKind } from './types';
 
 export class Actions extends Resource {
-  async create(data: {
-    version?: number;
-    name: string;
-    description?: string;
-    kind: ActionKind;
-    implementation: object;
-    requires?: object;
-    produces?: object;
-    execution?: object;
-    idempotency?: object;
-    autoversion?: boolean;
-  }): Promise<{
+  async create(data: ActionInput): Promise<{
     actionId: string;
     action: Action;
     /** True if an existing action was reused (autoversion matched content hash) */
@@ -46,15 +35,8 @@ export class Actions extends Resource {
 
     try {
       const action = await repo.createAction(this.serviceCtx.db, {
+        ...data,
         version,
-        name: data.name,
-        description: data.description ?? '',
-        kind: data.kind,
-        implementation: data.implementation,
-        requires: data.requires ?? null,
-        produces: data.produces ?? null,
-        execution: data.execution ?? null,
-        idempotency: data.idempotency ?? null,
         contentHash: autoversionResult.contentHash,
       });
 

@@ -6,10 +6,17 @@ import { z } from '@hono/zod-openapi';
 import { ulid } from '../../validators';
 import { ProjectSchema } from '../projects/schema';
 
+export const WorkspaceSettingsSchema = z.object({
+  allowedModelProviders: z.array(z.string()).nullable(),
+  allowedMcpServers: z.array(z.string()).nullable(),
+  budgetMaxMonthlySpendCents: z.number().nullable(),
+  budgetAlertThresholdCents: z.number().nullable(),
+});
+
 export const CreateWorkspaceSchema = z
   .object({
     name: z.string().min(1).max(255).openapi({ example: 'My Workspace' }),
-    settings: z.record(z.string(), z.unknown()).optional().openapi({ example: {} }),
+    settings: WorkspaceSettingsSchema.partial().optional().openapi({ example: {} }),
   })
   .openapi('CreateWorkspace');
 
@@ -17,7 +24,7 @@ export const WorkspaceSchema = z
   .object({
     id: ulid().openapi({ example: '01ARZ3NDEKTSV4RRFFQ69G5FAV' }),
     name: z.string().openapi({ example: 'My Workspace' }),
-    settings: z.record(z.string(), z.unknown()).nullable(),
+    settings: WorkspaceSettingsSchema.nullable(),
     createdAt: z.string().openapi({ example: '2024-01-01T00:00:00Z' }),
     updatedAt: z.string().openapi({ example: '2024-01-01T00:00:00Z' }),
   })
@@ -45,7 +52,7 @@ export const WorkspaceListResponseSchema = z
 export const UpdateWorkspaceSchema = z
   .object({
     name: z.string().min(1).max(255).optional().openapi({ example: 'My Workspace' }),
-    settings: z.record(z.string(), z.unknown()).optional().openapi({ example: {} }),
+    settings: WorkspaceSettingsSchema.partial().optional().openapi({ example: {} }),
   })
   .openapi('UpdateWorkspace');
 

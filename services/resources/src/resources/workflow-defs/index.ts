@@ -93,17 +93,9 @@ export class WorkflowDefs extends Resource {
     let workflowDef;
     try {
       workflowDef = await repo.createWorkflowDefWithId(this.serviceCtx.db, {
+        ...data,
         id: ids.workflowDefId,
-        name: data.name,
-        description: data.description,
         version,
-        projectId: data.projectId ?? null,
-        libraryId: data.libraryId ?? null,
-        tags: data.tags ?? null,
-        inputSchema: data.inputSchema,
-        outputSchema: data.outputSchema,
-        outputMapping: data.outputMapping ?? null,
-        contextSchema: data.contextSchema ?? null,
         initialNodeId: transformed.initialNodeId,
         contentHash: autoversionResult.contentHash,
       });

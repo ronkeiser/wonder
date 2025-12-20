@@ -48,20 +48,16 @@ export type StepInput = Omit<Step, 'id'>;
 export type Task = typeof tasks.$inferSelect;
 
 // ============================================================================
-// API DTOs (explicit - have fields not in DB)
+// API DTOs (inferred from schema with API-specific modifications)
 // ============================================================================
 
-export type TaskInput = {
-  version?: number;
-  name: string;
-  description?: string;
-  projectId?: string;
-  libraryId?: string;
-  tags?: string[];
-  inputSchema: object;
-  outputSchema: object;
+import type { NewEntity } from '~/shared/types';
+
+/** Base input for creating a task - inferred from schema */
+type TaskInsert = NewEntity<typeof tasks.$inferInsert>;
+
+/** API input for creating a task - uses StepInput instead of Step, adds autoversion */
+export type TaskInput = Omit<TaskInsert, 'contentHash' | 'steps'> & {
   steps: StepInput[];
-  retry?: RetryConfig;
-  timeoutMs?: number;
   autoversion?: boolean;
 };

@@ -2,26 +2,13 @@
 
 import { ulid } from 'ulid';
 import { ConflictError, NotFoundError, extractDbError } from '~/shared/errors';
-import type { RetryConfig, Step } from '../../schema';
+import type { Step } from '../../schema';
 import { Resource } from '~/shared/resource';
 import * as repo from './repository';
-import type { Task, StepInput } from './types';
+import type { Task, TaskInput } from './types';
 
 export class Tasks extends Resource {
-  async create(data: {
-    version?: number;
-    name: string;
-    description?: string;
-    projectId?: string;
-    libraryId?: string;
-    tags?: string[];
-    inputSchema: object;
-    outputSchema: object;
-    steps: StepInput[];
-    retry?: RetryConfig;
-    timeoutMs?: number;
-    autoversion?: boolean;
-  }): Promise<{
+  async create(data: TaskInput): Promise<{
     taskId: string;
     task: Task;
     /** True if an existing task was reused (autoversion matched content hash) */
@@ -71,30 +58,15 @@ export class Tasks extends Resource {
 
     // Generate step IDs
     const stepsWithIds: Step[] = data.steps.map((step) => ({
+      ...step,
       id: ulid(),
-      ref: step.ref,
-      ordinal: step.ordinal,
-      actionId: step.actionId,
-      actionVersion: step.actionVersion,
-      inputMapping: step.inputMapping ?? null,
-      outputMapping: step.outputMapping ?? null,
-      onFailure: step.onFailure,
-      condition: step.condition ?? null,
     }));
 
     try {
       const task = await repo.createTask(this.serviceCtx.db, {
+        ...data,
         version,
-        name: data.name,
-        description: data.description ?? '',
-        projectId: data.projectId ?? null,
-        libraryId: data.libraryId ?? null,
-        tags: data.tags ?? null,
-        inputSchema: data.inputSchema,
-        outputSchema: data.outputSchema,
         steps: stepsWithIds,
-        retry: data.retry ?? null,
-        timeoutMs: data.timeoutMs ?? null,
         contentHash: autoversionResult.contentHash,
       });
 

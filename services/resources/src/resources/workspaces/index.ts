@@ -3,60 +3,20 @@
 import { ConflictError, NotFoundError, extractDbError } from '~/shared/errors';
 import { Resource } from '~/shared/resource';
 import * as repo from './repository';
+import type { Workspace, WorkspaceInput, WorkspaceSettingsInput } from './types';
 
 export class Workspaces extends Resource {
-  async create(data: {
-    name: string;
-    settings?: {
-      allowedModelProviders?: string[];
-      allowedMcpServers?: string[];
-      budgetMaxMonthlySpendCents?: number;
-      budgetAlertThresholdCents?: number;
-    };
-  }): Promise<{
+  async create(data: WorkspaceInput): Promise<{
     workspaceId: string;
-    workspace: {
-      id: string;
-      name: string;
-      settings: {
-        allowedModelProviders?: string[];
-        allowedMcpServers?: string[];
-        budgetMaxMonthlySpendCents?: number;
-        budgetAlertThresholdCents?: number;
-      } | null;
-      createdAt: string;
-      updatedAt: string;
-    };
+    workspace: Workspace;
   }> {
     return this.withLogging('create', { metadata: { name: data.name } }, async () => {
       try {
-        const workspace = await repo.createWorkspace(this.serviceCtx.db, {
-          name: data.name,
-          settings: data.settings
-            ? {
-                allowedModelProviders: data.settings.allowedModelProviders,
-                allowedMcpServers: data.settings.allowedMcpServers,
-                budgetMaxMonthlySpendCents: data.settings.budgetMaxMonthlySpendCents,
-                budgetAlertThresholdCents: data.settings.budgetAlertThresholdCents,
-              }
-            : null,
-        });
+        const workspace = await repo.createWorkspace(this.serviceCtx.db, data);
 
         return {
           workspaceId: workspace.id,
-          workspace: {
-            ...workspace,
-            createdAt: workspace.createdAt,
-            updatedAt: workspace.updatedAt,
-            settings: workspace.settings
-              ? {
-                  allowedModelProviders: workspace.settings.allowedModelProviders,
-                  allowedMcpServers: workspace.settings.allowedMcpServers,
-                  budgetMaxMonthlySpendCents: workspace.settings.budgetMaxMonthlySpendCents,
-                  budgetAlertThresholdCents: workspace.settings.budgetAlertThresholdCents,
-                }
-              : null,
-          },
+          workspace,
         };
       } catch (error) {
         const dbError = extractDbError(error);
@@ -74,20 +34,7 @@ export class Workspaces extends Resource {
     });
   }
 
-  async get(id: string): Promise<{
-    workspace: {
-      id: string;
-      name: string;
-      settings: {
-        allowedModelProviders?: string[];
-        allowedMcpServers?: string[];
-        budgetMaxMonthlySpendCents?: number;
-        budgetAlertThresholdCents?: number;
-      } | null;
-      createdAt: string;
-      updatedAt: string;
-    };
-  }> {
+  async get(id: string): Promise<{ workspace: Workspace }> {
     return this.withLogging(
       'get',
       { workspaceId: id, metadata: { workspaceId: id } },
@@ -96,56 +43,15 @@ export class Workspaces extends Resource {
         if (!workspace) {
           throw new NotFoundError(`Workspace not found: ${id}`, 'workspace', id);
         }
-        return {
-          workspace: {
-            ...workspace,
-            createdAt: workspace.createdAt,
-            updatedAt: workspace.updatedAt,
-            settings: workspace.settings
-              ? {
-                  allowedModelProviders: workspace.settings.allowedModelProviders,
-                  allowedMcpServers: workspace.settings.allowedMcpServers,
-                  budgetMaxMonthlySpendCents: workspace.settings.budgetMaxMonthlySpendCents,
-                  budgetAlertThresholdCents: workspace.settings.budgetAlertThresholdCents,
-                }
-              : null,
-          },
-        };
+        return { workspace };
       },
     );
   }
 
-  async list(params?: { limit?: number }): Promise<{
-    workspaces: Array<{
-      id: string;
-      name: string;
-      settings: {
-        allowedModelProviders?: string[];
-        allowedMcpServers?: string[];
-        budgetMaxMonthlySpendCents?: number;
-        budgetAlertThresholdCents?: number;
-      } | null;
-      createdAt: string;
-      updatedAt: string;
-    }>;
-  }> {
+  async list(params?: { limit?: number }): Promise<{ workspaces: Workspace[] }> {
     return this.withLogging('list', { metadata: params }, async () => {
       const workspaces = await repo.listWorkspaces(this.serviceCtx.db, params?.limit);
-      return {
-        workspaces: workspaces.map((workspace) => ({
-          ...workspace,
-          createdAt: workspace.createdAt,
-          updatedAt: workspace.updatedAt,
-          settings: workspace.settings
-            ? {
-                allowedModelProviders: workspace.settings.allowedModelProviders,
-                allowedMcpServers: workspace.settings.allowedMcpServers,
-                budgetMaxMonthlySpendCents: workspace.settings.budgetMaxMonthlySpendCents,
-                budgetAlertThresholdCents: workspace.settings.budgetAlertThresholdCents,
-              }
-            : null,
-        })),
-      };
+      return { workspaces };
     });
   }
 
@@ -153,60 +59,21 @@ export class Workspaces extends Resource {
     id: string,
     data: {
       name?: string;
-      settings?: {
-        allowedModelProviders?: string[];
-        allowedMcpServers?: string[];
-        budgetMaxMonthlySpendCents?: number;
-        budgetAlertThresholdCents?: number;
-      };
+      settings?: WorkspaceSettingsInput;
     },
-  ): Promise<{
-    workspace: {
-      id: string;
-      name: string;
-      settings: {
-        allowedModelProviders?: string[];
-        allowedMcpServers?: string[];
-        budgetMaxMonthlySpendCents?: number;
-        budgetAlertThresholdCents?: number;
-      } | null;
-      createdAt: string;
-      updatedAt: string;
-    };
-  }> {
+  ): Promise<{ workspace: Workspace }> {
     return this.withLogging(
       'update',
       { workspaceId: id, metadata: { workspaceId: id } },
       async () => {
         const workspace = await repo.updateWorkspace(this.serviceCtx.db, id, {
           name: data.name,
-          settings: data.settings
-            ? {
-                allowedModelProviders: data.settings.allowedModelProviders,
-                allowedMcpServers: data.settings.allowedMcpServers,
-                budgetMaxMonthlySpendCents: data.settings.budgetMaxMonthlySpendCents,
-                budgetAlertThresholdCents: data.settings.budgetAlertThresholdCents,
-              }
-            : undefined,
+          settings: data.settings,
         });
         if (!workspace) {
           throw new NotFoundError(`Workspace not found: ${id}`, 'workspace', id);
         }
-        return {
-          workspace: {
-            ...workspace,
-            createdAt: workspace.createdAt,
-            updatedAt: workspace.updatedAt,
-            settings: workspace.settings
-              ? {
-                  allowedModelProviders: workspace.settings.allowedModelProviders,
-                  allowedMcpServers: workspace.settings.allowedMcpServers,
-                  budgetMaxMonthlySpendCents: workspace.settings.budgetMaxMonthlySpendCents,
-                  budgetAlertThresholdCents: workspace.settings.budgetAlertThresholdCents,
-                }
-              : null,
-          },
-        };
+        return { workspace };
       },
     );
   }

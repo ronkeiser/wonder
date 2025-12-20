@@ -3,42 +3,19 @@
 import { ConflictError, NotFoundError, extractDbError } from '~/shared/errors';
 import { Resource } from '~/shared/resource';
 import * as repo from './repository';
+import type { Workflow, WorkflowInput, WorkflowUpdate } from './types';
 
 export class Workflows extends Resource {
-  async create(data: {
-    projectId: string;
-    name: string;
-    description?: string;
-    workflowDefId: string;
-    pinned_version?: number;
-    enabled?: boolean;
-  }): Promise<{
+  async create(data: WorkflowInput): Promise<{
     workflowId: string;
-    workflow: {
-      id: string;
-      projectId: string;
-      name: string;
-      description: string;
-      workflowDefId: string;
-      pinnedVersion: number | null;
-      enabled: boolean;
-      createdAt: string;
-      updatedAt: string;
-    };
+    workflow: Workflow;
   }> {
     return this.withLogging(
       'create',
       { projectId: data.projectId, metadata: { projectId: data.projectId, name: data.name } },
       async () => {
         try {
-          const workflow = await repo.createWorkflow(this.serviceCtx.db, {
-            projectId: data.projectId,
-            name: data.name,
-            description: data.description ?? data.name,
-            workflowDefId: data.workflowDefId,
-            pinnedVersion: data.pinned_version ?? null,
-            enabled: data.enabled ?? true,
-          });
+          const workflow = await repo.createWorkflow(this.serviceCtx.db, data);
 
           return {
             workflowId: workflow.id,
@@ -70,17 +47,7 @@ export class Workflows extends Resource {
   }
 
   async get(id: string): Promise<{
-    workflow: {
-      id: string;
-      projectId: string;
-      name: string;
-      description: string;
-      workflowDefId: string;
-      pinnedVersion: number | null;
-      enabled: boolean;
-      createdAt: string;
-      updatedAt: string;
-    };
+    workflow: Workflow;
   }> {
     return this.withLogging('get', { workflowId: id, metadata: { workflowId: id } }, async () => {
       const workflow = await repo.getWorkflow(this.serviceCtx.db, id);
@@ -92,17 +59,7 @@ export class Workflows extends Resource {
   }
 
   async list(params?: { limit?: number; projectId?: string }): Promise<{
-    workflows: Array<{
-      id: string;
-      projectId: string;
-      name: string;
-      description: string;
-      workflowDefId: string;
-      pinnedVersion: number | null;
-      enabled: boolean;
-      createdAt: string;
-      updatedAt: string;
-    }>;
+    workflows: Workflow[];
   }> {
     return this.withLogging(
       'list',
@@ -117,26 +74,8 @@ export class Workflows extends Resource {
     );
   }
 
-  async update(
-    id: string,
-    data: {
-      name?: string;
-      description?: string;
-      pinnedVersion?: number;
-      enabled?: boolean;
-    },
-  ): Promise<{
-    workflow: {
-      id: string;
-      projectId: string;
-      name: string;
-      description: string;
-      workflowDefId: string;
-      pinnedVersion: number | null;
-      enabled: boolean;
-      createdAt: string;
-      updatedAt: string;
-    };
+  async update(id: string, data: WorkflowUpdate): Promise<{
+    workflow: Workflow;
   }> {
     return this.withLogging(
       'update',

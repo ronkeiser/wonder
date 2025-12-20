@@ -4,26 +4,29 @@ import { eq } from 'drizzle-orm';
 import type { DrizzleD1Database } from 'drizzle-orm/d1';
 import { ulid } from 'ulid';
 import { workspaceSettings, workspaces } from '~/schema';
-import type { Workspace, WorkspaceSettings } from './types';
+import type { Workspace, WorkspaceInput, WorkspaceSettings } from './types';
 
-type WorkspaceRow = typeof workspaces.$inferSelect;
-type WorkspaceSettingsRow = typeof workspaceSettings.$inferSelect;
+function toSettings(row: typeof workspaceSettings.$inferSelect): WorkspaceSettings {
+  const { workspaceId: _, ...settings } = row;
+  return settings;
+}
 
 export async function createWorkspace(
   db: DrizzleD1Database,
-  data: { name: string; settings?: WorkspaceSettings | null },
+  data: WorkspaceInput,
 ): Promise<Workspace> {
   const now = new Date().toISOString();
   const workspaceId = ulid();
 
-  const workspaceRow: WorkspaceRow = {
-    id: workspaceId,
-    name: data.name,
-    createdAt: now,
-    updatedAt: now,
-  };
-
-  await db.insert(workspaces).values(workspaceRow).run();
+  await db
+    .insert(workspaces)
+    .values({
+      id: workspaceId,
+      name: data.name,
+      createdAt: now,
+      updatedAt: now,
+    })
+    .run();
 
   // Insert settings if provided
   if (data.settings) {
@@ -36,10 +39,8 @@ export async function createWorkspace(
       .run();
   }
 
-  return {
-    ...workspaceRow,
-    settings: data.settings ?? null,
-  };
+  // Fetch the created workspace to get proper settings type
+  return (await getWorkspace(db, workspaceId))!;
 }
 
 export async function getWorkspace(db: DrizzleD1Database, id: string): Promise<Workspace | null> {
@@ -54,14 +55,7 @@ export async function getWorkspace(db: DrizzleD1Database, id: string): Promise<W
 
   return {
     ...workspaceRow,
-    settings: settingsRow
-      ? {
-          allowedModelProviders: settingsRow.allowedModelProviders ?? undefined,
-          allowedMcpServers: settingsRow.allowedMcpServers ?? undefined,
-          budgetMaxMonthlySpendCents: settingsRow.budgetMaxMonthlySpendCents ?? undefined,
-          budgetAlertThresholdCents: settingsRow.budgetAlertThresholdCents ?? undefined,
-        }
-      : null,
+    settings: settingsRow ? toSettings(settingsRow) : null,
   };
 }
 
@@ -82,14 +76,7 @@ export async function listWorkspaces(
     const settingsRow = settingsMap.get(workspace.id);
     return {
       ...workspace,
-      settings: settingsRow
-        ? {
-            allowedModelProviders: settingsRow.allowedModelProviders ?? undefined,
-            allowedMcpServers: settingsRow.allowedMcpServers ?? undefined,
-            budgetMaxMonthlySpendCents: settingsRow.budgetMaxMonthlySpendCents ?? undefined,
-            budgetAlertThresholdCents: settingsRow.budgetAlertThresholdCents ?? undefined,
-          }
-        : null,
+      settings: settingsRow ? toSettings(settingsRow) : null,
     };
   });
 }
@@ -97,7 +84,7 @@ export async function listWorkspaces(
 export async function updateWorkspace(
   db: DrizzleD1Database,
   id: string,
-  data: { name?: string; settings?: WorkspaceSettings },
+  data: Partial<Pick<WorkspaceInput, 'name' | 'settings'>>,
 ): Promise<Workspace | null> {
   const now = new Date().toISOString();
 
@@ -114,7 +101,7 @@ export async function updateWorkspace(
   }
 
   // Update or insert settings if provided
-  if (data.settings !== undefined) {
+  if (data.settings !== undefined && data.settings !== null) {
     const existingSettings = await db
       .select()
       .from(workspaceSettings)

@@ -3,21 +3,10 @@
 import { ConflictError, NotFoundError, extractDbError } from '~/shared/errors';
 import { Resource } from '~/shared/resource';
 import * as repo from './repository';
-import type { PromptSpec } from './types';
+import type { PromptSpec, PromptSpecInput } from './types';
 
 export class PromptSpecs extends Resource {
-  async create(data: {
-    version?: number;
-    name: string;
-    description?: string;
-    system_prompt?: string;
-    template: string;
-    requires?: object;
-    produces?: object;
-    examples?: object;
-    tags?: string[];
-    autoversion?: boolean;
-  }): Promise<{
+  async create(data: PromptSpecInput): Promise<{
     promptSpecId: string;
     promptSpec: PromptSpec;
     /** True if an existing prompt spec was reused (autoversion matched content hash) */
@@ -46,15 +35,8 @@ export class PromptSpecs extends Resource {
 
     try {
       const promptSpec = await repo.createPromptSpec(this.serviceCtx.db, {
+        ...data,
         version,
-        name: data.name,
-        description: data.description ?? '',
-        systemPrompt: data.system_prompt ?? null,
-        template: data.template,
-        requires: data.requires ?? {},
-        produces: data.produces ?? {},
-        examples: data.examples ?? null,
-        tags: data.tags ?? null,
         contentHash: autoversionResult.contentHash,
       });
 
@@ -96,7 +78,7 @@ export class PromptSpecs extends Resource {
         if (!promptSpec) {
           throw new NotFoundError(
             `PromptSpec not found: ${id}${version !== undefined ? ` version ${version}` : ''}`,
-            'prompt_spec',
+            'promptSpec',
             id,
           );
         }
@@ -107,24 +89,11 @@ export class PromptSpecs extends Resource {
   }
 
   async list(params?: { limit?: number }): Promise<{
-    prompt_specs: Array<{
-      id: string;
-      name: string;
-      description: string;
-      version: number;
-      systemPrompt: string | null;
-      template: string;
-      requires: object;
-      produces: object;
-      examples: object | null;
-      tags: string[] | null;
-      createdAt: string;
-      updatedAt: string;
-    }>;
+    promptSpecs: PromptSpec[];
   }> {
     return this.withLogging('list', { metadata: params }, async () => {
       const promptSpecs = await repo.listPromptSpecs(this.serviceCtx.db, params?.limit);
-      return { prompt_specs: promptSpecs };
+      return { promptSpecs };
     });
   }
 
@@ -141,7 +110,7 @@ export class PromptSpecs extends Resource {
         if (!promptSpec) {
           throw new NotFoundError(
             `PromptSpec not found: ${id}${version !== undefined ? ` version ${version}` : ''}`,
-            'prompt_spec',
+            'promptSpec',
             id,
           );
         }

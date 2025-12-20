@@ -8,9 +8,13 @@ import * as schema from '~/schema';
 import { Resource } from '~/shared/resource';
 import * as workflowRepo from '../workflows/repository';
 import * as repo from './repository';
-import type { ListWorkflowRunsFilters, WorkflowRunSummary } from './types';
+import type {
+  ListWorkflowRunsFilters,
+  WorkflowRunSummary,
+  WorkflowRunWithWorkspace,
+} from './types';
 
-export type { ListWorkflowRunsFilters, WorkflowRunSummary } from './types';
+export type { ListWorkflowRunsFilters, WorkflowRunSummary, WorkflowRunWithWorkspace } from './types';
 
 export class WorkflowRuns extends Resource {
   async create(
@@ -158,24 +162,7 @@ export class WorkflowRuns extends Resource {
   }
 
   async get(id: string): Promise<{
-    workflowRun: {
-      id: string;
-      projectId: string;
-      workspaceId: string;
-      workflowId: string;
-      workflowDefId: string;
-      workflowVersion: number;
-      status: string;
-      context: object;
-      activeTokens: object[];
-      durableObjectId: string;
-      parentRunId: string | null;
-      parentNodeId: string | null;
-      latestSnapshot: object | null;
-      createdAt: string;
-      updatedAt: string;
-      completedAt: string | null;
-    };
+    workflowRun: WorkflowRunWithWorkspace;
   }> {
     return this.withLogging(
       'get',
@@ -256,20 +243,10 @@ export class WorkflowRuns extends Resource {
       async () => {
         const { runs, total } = await repo.listWorkflowRuns(this.serviceCtx.db, filters);
 
-        // Return summary (exclude heavy fields like context, activeTokens, latestSnapshot)
-        const summaries: WorkflowRunSummary[] = runs.map((run) => ({
-          id: run.id,
-          projectId: run.projectId,
-          workflowId: run.workflowId,
-          workflowName: run.workflowName,
-          workflowDefId: run.workflowDefId,
-          workflowVersion: run.workflowVersion,
-          status: run.status as WorkflowRunSummary['status'],
-          parentRunId: run.parentRunId,
-          createdAt: run.createdAt,
-          updatedAt: run.updatedAt,
-          completedAt: run.completedAt,
-        }));
+        // Return summary (exclude heavy fields)
+        const summaries: WorkflowRunSummary[] = runs.map(
+          ({ context, activeTokens, latestSnapshot, durableObjectId, ...summary }) => summary,
+        );
 
         return {
           runs: summaries,

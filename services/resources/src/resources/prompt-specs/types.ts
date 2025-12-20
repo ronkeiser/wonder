@@ -10,18 +10,15 @@ import { promptSpecs } from '../../schema';
 export type PromptSpec = typeof promptSpecs.$inferSelect;
 
 // ============================================================================
-// API DTOs (explicit - have fields not in DB)
+// API DTOs (inferred from schema)
 // ============================================================================
 
-export type PromptSpecInput = {
-  version?: number;
-  name: string;
-  description?: string;
-  systemPrompt?: string;
-  template: string;
-  requires?: object;
-  produces?: object;
-  examples?: object;
-  tags?: string[];
+import type { NewEntity } from '~/shared/types';
+
+/** Base input for creating a prompt spec - inferred from schema */
+type PromptSpecInsert = NewEntity<typeof promptSpecs.$inferInsert>;
+
+/** API input for creating a prompt spec - adds autoversion option */
+export type PromptSpecInput = Omit<PromptSpecInsert, 'contentHash'> & {
   autoversion?: boolean;
 };

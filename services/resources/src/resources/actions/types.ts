@@ -26,18 +26,15 @@ export type ActionKind =
 export type Action = typeof actions.$inferSelect;
 
 // ============================================================================
-// API DTOs (explicit - have fields not in DB)
+// API DTOs (inferred from schema)
 // ============================================================================
 
-export type ActionInput = {
-  version?: number;
-  name: string;
-  description?: string;
-  kind: ActionKind;
-  implementation: object;
-  requires?: object;
-  produces?: object;
-  execution?: object;
-  idempotency?: object;
+import type { NewEntity } from '~/shared/types';
+
+/** Base input for creating an action - inferred from schema */
+type ActionInsert = NewEntity<typeof actions.$inferInsert>;
+
+/** API input for creating an action - adds autoversion option */
+export type ActionInput = Omit<ActionInsert, 'contentHash'> & {
   autoversion?: boolean;
 };

@@ -168,3 +168,15 @@ export type ModelProfile = {
     costPer1kOutputTokens: number;
   };
 }[ModelId];
+
+// ============================================================================
+// API DTOs (inferred from schema)
+// ============================================================================
+
+import { modelProfiles } from '../../schema';
+import type { NewEntityIdOnly } from '~/shared/types';
+
+export type ModelProvider = 'anthropic' | 'openai' | 'google' | 'cloudflare' | 'local';
+
+/** Input for creating a model profile - inferred from schema */
+export type ModelProfileInput = NewEntityIdOnly<typeof modelProfiles.$inferInsert>;
