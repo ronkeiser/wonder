@@ -6,7 +6,7 @@ import { ulid } from 'ulid';
 import { artifact_types } from '../../schema';
 import type { ArtifactType } from './types';
 
-type NewArtifactType = Omit<typeof artifact_types.$inferInsert, 'id' | 'created_at' | 'updated_at'>;
+type NewArtifactType = Omit<typeof artifact_types.$inferInsert, 'id' | 'createdAt' | 'updatedAt'>;
 
 export async function createArtifactType(
   db: DrizzleD1Database,
@@ -16,8 +16,8 @@ export async function createArtifactType(
   const artifactType = {
     id: ulid(),
     ...data,
-    created_at: now,
-    updated_at: now,
+    createdAt: now,
+    updatedAt: now,
   };
 
   await db.insert(artifact_types).values(artifactType).run();
@@ -88,7 +88,7 @@ export async function getArtifactTypeByNameAndHash(
   const result = await db
     .select()
     .from(artifact_types)
-    .where(and(eq(artifact_types.name, name), eq(artifact_types.content_hash, contentHash)))
+    .where(and(eq(artifact_types.name, name), eq(artifact_types.contentHash, contentHash)))
     .get();
   return result ?? null;
 }

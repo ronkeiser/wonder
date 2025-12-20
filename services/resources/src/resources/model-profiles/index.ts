@@ -11,22 +11,22 @@ export class ModelProfiles extends Resource {
   async create(data: {
     name: string;
     provider: ModelProvider;
-    model_id: ModelId;
+    modelId: ModelId;
     parameters?: object;
-    execution_config?: object;
-    cost_per_1k_input_tokens?: number;
-    cost_per_1k_output_tokens?: number;
+    executionConfig?: object;
+    costPer1kInputTokens?: number;
+    costPer1kOutputTokens?: number;
   }): Promise<{
-    model_profile_id: string;
-    model_profile: {
+    modelProfileId: string;
+    modelProfile: {
       id: string;
       name: string;
       provider: ModelProvider;
-      model_id: ModelId;
+      modelId: ModelId;
       parameters: object | null;
-      execution_config: object | null;
-      cost_per_1k_input_tokens: number;
-      cost_per_1k_output_tokens: number;
+      executionConfig: object | null;
+      costPer1kInputTokens: number;
+      costPer1kOutputTokens: number;
     };
   }> {
     return this.withLogging(
@@ -37,16 +37,16 @@ export class ModelProfiles extends Resource {
           const profile = await repo.createModelProfile(this.serviceCtx.db, {
             name: data.name,
             provider: data.provider,
-            model_id: data.model_id,
+            modelId: data.modelId,
             parameters: (data.parameters ?? {}) as object,
-            execution_config: data.execution_config ?? null,
-            cost_per_1k_input_tokens: data.cost_per_1k_input_tokens ?? 0,
-            cost_per_1k_output_tokens: data.cost_per_1k_output_tokens ?? 0,
+            executionConfig: data.executionConfig ?? null,
+            costPer1kInputTokens: data.costPer1kInputTokens ?? 0,
+            costPer1kOutputTokens: data.costPer1kOutputTokens ?? 0,
           });
 
           return {
-            model_profile_id: profile.id,
-            model_profile: profile,
+            modelProfileId: profile.id,
+            modelProfile: profile,
           };
         } catch (error) {
           const dbError = extractDbError(error);
@@ -66,31 +66,31 @@ export class ModelProfiles extends Resource {
   }
 
   async get(id: string): Promise<{
-    model_profile: ModelProfile;
+    modelProfile: ModelProfile;
   }> {
     return this.withLogging(
       'get',
-      { model_profile_id: id, metadata: { model_profile_id: id } },
+      { modelProfileId: id, metadata: { modelProfileId: id } },
       async () => {
         const profile = await repo.getModelProfile(this.serviceCtx.db, id);
         if (!profile) {
-          throw new NotFoundError(`ModelProfile not found: ${id}`, 'model_profile', id);
+          throw new NotFoundError(`ModelProfile not found: ${id}`, 'modelProfile', id);
         }
-        return { model_profile: profile as ModelProfile };
+        return { modelProfile: profile as ModelProfile };
       },
     );
   }
 
   async list(params?: { limit?: number; provider?: ModelProvider }): Promise<{
-    model_profiles: Array<{
+    modelProfiles: Array<{
       id: string;
       name: string;
       provider: ModelProvider;
-      model_id: ModelId;
+      modelId: ModelId;
       parameters: object | null;
-      execution_config: object | null;
-      cost_per_1k_input_tokens: number;
-      cost_per_1k_output_tokens: number;
+      executionConfig: object | null;
+      costPer1kInputTokens: number;
+      costPer1kOutputTokens: number;
     }>;
   }> {
     return this.withLogging('list', { metadata: params }, async () => {
@@ -98,7 +98,7 @@ export class ModelProfiles extends Resource {
         ? await repo.listModelProfilesByProvider(this.serviceCtx.db, params.provider, params.limit)
         : await repo.listModelProfiles(this.serviceCtx.db, params?.limit);
 
-      return { model_profiles: profiles };
+      return { modelProfiles: profiles };
     });
   }
 

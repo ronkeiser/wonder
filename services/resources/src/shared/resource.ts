@@ -40,7 +40,7 @@ export abstract class Resource extends RpcTarget {
   constructor(env: Env, ctx: ExecutionContext) {
     super();
     this.env = env as any;
-    const db = drizzle(env.DB);
+    const db = drizzle(env.DB, { casing: 'snake_case' });
     const logger = createLogger(ctx, env.LOGS, {
       service: env.SERVICE,
       environment: env.ENVIRONMENT,
@@ -75,7 +75,7 @@ export abstract class Resource extends RpcTarget {
     const operationName = operation.replace(/([A-Z])/g, '_$1').toLowerCase();
 
     this.serviceCtx.logger.info({
-      event_type: `${resourceName}.${operationName}.started`,
+      eventType: `${resourceName}.${operationName}.started`,
       ...context,
     });
 
@@ -83,14 +83,14 @@ export abstract class Resource extends RpcTarget {
       const result = await fn();
 
       this.serviceCtx.logger.info({
-        event_type: `${resourceName}.${operationName}.completed`,
+        eventType: `${resourceName}.${operationName}.completed`,
         ...context,
       });
 
       return result;
     } catch (error) {
       this.serviceCtx.logger.error({
-        event_type: `${resourceName}.${operationName}.error`,
+        eventType: `${resourceName}.${operationName}.error`,
         message: error instanceof Error ? error.message : String(error),
         ...context,
         metadata: {
@@ -140,7 +140,7 @@ export abstract class Resource extends RpcTarget {
 
     if (existing) {
       this.serviceCtx.logger.info({
-        event_type: `${this.resourceName}.autoversion.matched`,
+        eventType: `${this.resourceName}.autoversion.matched`,
         metadata: {
           name: data.name,
           content_hash: contentHash,
@@ -155,7 +155,7 @@ export abstract class Resource extends RpcTarget {
     const newVersion = maxVersion + 1;
 
     this.serviceCtx.logger.info({
-      event_type: `${this.resourceName}.autoversion.creating`,
+      eventType: `${this.resourceName}.autoversion.creating`,
       metadata: {
         name: data.name,
         version: newVersion,

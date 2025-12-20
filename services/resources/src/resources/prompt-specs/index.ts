@@ -18,13 +18,13 @@ export class PromptSpecs extends Resource {
     tags?: string[];
     autoversion?: boolean;
   }): Promise<{
-    prompt_spec_id: string;
-    prompt_spec: PromptSpec;
+    promptSpecId: string;
+    promptSpec: PromptSpec;
     /** True if an existing prompt spec was reused (autoversion matched content hash) */
     reused: boolean;
   }> {
     this.serviceCtx.logger.info({
-      event_type: 'prompt_spec.create.started',
+      eventType: 'prompt_spec.create.started',
       metadata: { name: data.name, autoversion: data.autoversion ?? false },
     });
 
@@ -36,8 +36,8 @@ export class PromptSpecs extends Resource {
 
     if (autoversionResult.reused) {
       return {
-        prompt_spec_id: autoversionResult.entity.id,
-        prompt_spec: autoversionResult.entity,
+        promptSpecId: autoversionResult.entity.id,
+        promptSpec: autoversionResult.entity,
         reused: true,
       };
     }
@@ -49,18 +49,18 @@ export class PromptSpecs extends Resource {
         version,
         name: data.name,
         description: data.description ?? '',
-        system_prompt: data.system_prompt ?? null,
+        systemPrompt: data.system_prompt ?? null,
         template: data.template,
         requires: data.requires ?? {},
         produces: data.produces ?? {},
         examples: data.examples ?? null,
         tags: data.tags ?? null,
-        content_hash: autoversionResult.contentHash,
+        contentHash: autoversionResult.contentHash,
       });
 
       return {
-        prompt_spec_id: promptSpec.id,
-        prompt_spec: promptSpec,
+        promptSpecId: promptSpec.id,
+        promptSpec: promptSpec,
         reused: false,
       };
     } catch (error) {
@@ -82,11 +82,11 @@ export class PromptSpecs extends Resource {
     id: string,
     version?: number,
   ): Promise<{
-    prompt_spec: PromptSpec;
+    promptSpec: PromptSpec;
   }> {
     return this.withLogging(
       'get',
-      { prompt_spec_id: id, version, metadata: { prompt_spec_id: id, version } },
+      { promptSpecId: id, version, metadata: { promptSpecId: id, version } },
       async () => {
         const promptSpec =
           version !== undefined
@@ -101,7 +101,7 @@ export class PromptSpecs extends Resource {
           );
         }
 
-        return { prompt_spec: promptSpec };
+        return { promptSpec: promptSpec };
       },
     );
   }
@@ -112,14 +112,14 @@ export class PromptSpecs extends Resource {
       name: string;
       description: string;
       version: number;
-      system_prompt: string | null;
+      systemPrompt: string | null;
       template: string;
       requires: object;
       produces: object;
       examples: object | null;
       tags: string[] | null;
-      created_at: string;
-      updated_at: string;
+      createdAt: string;
+      updatedAt: string;
     }>;
   }> {
     return this.withLogging('list', { metadata: params }, async () => {
@@ -131,7 +131,7 @@ export class PromptSpecs extends Resource {
   async delete(id: string, version?: number): Promise<{ success: boolean }> {
     return this.withLogging(
       'delete',
-      { prompt_spec_id: id, version, metadata: { prompt_spec_id: id, version } },
+      { promptSpecId: id, version, metadata: { promptSpecId: id, version } },
       async () => {
         const promptSpec =
           version !== undefined

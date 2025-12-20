@@ -35,13 +35,13 @@ export async function executeStep(
   // Emit step started trace event
   emitter.emitTrace({
     type: 'executor.step.started',
-    token_id: tokenId,
+    tokenId: tokenId,
     payload: {
-      step_ref: step.ref,
-      step_ordinal: step.ordinal,
-      action_id: step.action_id,
-      action_version: step.action_version,
-      has_condition: !!step.condition,
+      stepRef: step.ref,
+      stepOrdinal: step.ordinal,
+      actionId: step.actionId,
+      actionVersion: step.actionVersion,
+      hasCondition: !!step.condition,
     },
   });
 
@@ -54,11 +54,11 @@ export async function executeStep(
       const outcome = conditionResult.outcome;
 
       logger.info({
-        event_type: 'step_condition_evaluated',
+        eventType: 'step_condition_evaluated',
         message: `Step condition evaluated to ${outcome}`,
-        trace_id: workflowRunId,
+        traceId: workflowRunId,
         metadata: {
-          step_ref: step.ref,
+          stepRef: step.ref,
           condition: step.condition.if,
           outcome,
         },
@@ -81,16 +81,16 @@ export async function executeStep(
 
   // 2. Apply input mapping: context → action input
   const actionInput = applyInputMapping(
-    step.input_mapping as Record<string, unknown> | null,
+    step.inputMapping as Record<string, unknown> | null,
     context,
   );
 
   logger.info({
-    event_type: 'step_input_mapped',
-    trace_id: workflowRunId,
+    eventType: 'step_input_mapped',
+    traceId: workflowRunId,
     metadata: {
-      step_ref: step.ref,
-      input_keys: Object.keys(actionInput),
+      stepRef: step.ref,
+      inputKeys: Object.keys(actionInput),
     },
   });
 
@@ -99,7 +99,7 @@ export async function executeStep(
   try {
     actionResult = await executeAction(step, actionInput, deps);
   } catch (error) {
-    // Handle step failure based on on_failure policy
+    // Handle step failure based on onFailure policy
     return handleStepFailure(step, error, context, deps);
   }
 
@@ -114,7 +114,7 @@ export async function executeStep(
 
   // 4. Apply output mapping: action output → context
   applyOutputMapping(
-    step.output_mapping as Record<string, unknown> | null,
+    step.outputMapping as Record<string, unknown> | null,
     actionResult.output,
     context,
     logger,
@@ -124,22 +124,22 @@ export async function executeStep(
   const stepDuration = Date.now() - stepStartTime;
   emitter.emitTrace({
     type: 'executor.step.completed',
-    token_id: tokenId,
-    duration_ms: stepDuration,
+    tokenId: tokenId,
+    durationMs: stepDuration,
     payload: {
-      step_ref: step.ref,
-      action_id: step.action_id,
+      stepRef: step.ref,
+      actionId: step.actionId,
       success: true,
-      output_keys: Object.keys(actionResult.output),
+      outputKeys: Object.keys(actionResult.output),
     },
   });
 
   logger.info({
-    event_type: 'step_output_mapped',
-    trace_id: workflowRunId,
+    eventType: 'step_output_mapped',
+    traceId: workflowRunId,
     metadata: {
-      step_ref: step.ref,
-      output_keys: Object.keys(actionResult.output),
+      stepRef: step.ref,
+      outputKeys: Object.keys(actionResult.output),
     },
   });
 
@@ -162,30 +162,30 @@ async function executeAction(
 
   // Load ActionDef from Resources
   using actionsResource = env.RESOURCES.actions();
-  const { action } = await actionsResource.get(step.action_id, step.action_version);
+  const { action } = await actionsResource.get(step.actionId, step.actionVersion);
 
   // Emit action started trace event
   emitter.emitTrace({
     type: 'executor.action.started',
-    token_id: tokenId,
+    tokenId: tokenId,
     payload: {
-      step_ref: step.ref,
-      action_id: action.id,
-      action_kind: action.kind,
-      action_version: action.version,
-      input_keys: Object.keys(input),
+      stepRef: step.ref,
+      actionId: action.id,
+      actionKind: action.kind,
+      actionVersion: action.version,
+      inputKeys: Object.keys(input),
     },
   });
 
   logger.info({
-    event_type: 'action_execution_started',
-    trace_id: workflowRunId,
+    eventType: 'action_execution_started',
+    traceId: workflowRunId,
     metadata: {
-      step_ref: step.ref,
-      action_id: action.id,
-      action_kind: action.kind,
-      action_version: action.version,
-      input_keys: Object.keys(input),
+      stepRef: step.ref,
+      actionId: action.id,
+      actionKind: action.kind,
+      actionVersion: action.version,
+      inputKeys: Object.keys(input),
     },
   });
 
@@ -207,23 +207,23 @@ async function executeAction(
     // Emit action failed trace event
     emitter.emitTrace({
       type: 'executor.action.failed',
-      token_id: tokenId,
+      tokenId: tokenId,
       payload: {
-        step_ref: step.ref,
-        action_id: action.id,
-        action_kind: action.kind,
+        stepRef: step.ref,
+        actionId: action.id,
+        actionKind: action.kind,
         error: result.error?.message,
-        error_code: result.error?.code,
+        errorCode: result.error?.code,
         retryable: result.error?.retryable,
       },
     });
 
     logger.warn({
-      event_type: 'action_execution_failed',
-      trace_id: workflowRunId,
+      eventType: 'action_execution_failed',
+      traceId: workflowRunId,
       metadata: {
-        step_ref: step.ref,
-        action_id: action.id,
+        stepRef: step.ref,
+        actionId: action.id,
         error: result.error,
       },
     });
@@ -231,24 +231,24 @@ async function executeAction(
     // Emit action completed trace event
     emitter.emitTrace({
       type: 'executor.action.completed',
-      token_id: tokenId,
-      duration_ms: result.metrics?.duration_ms,
+      tokenId: tokenId,
+      durationMs: result.metrics?.durationMs,
       payload: {
-        step_ref: step.ref,
-        action_id: action.id,
-        action_kind: action.kind,
-        output_keys: Object.keys(result.output),
+        stepRef: step.ref,
+        actionId: action.id,
+        actionKind: action.kind,
+        outputKeys: Object.keys(result.output),
       },
     });
 
     logger.info({
-      event_type: 'action_execution_completed',
-      trace_id: workflowRunId,
+      eventType: 'action_execution_completed',
+      traceId: workflowRunId,
       metadata: {
-        step_ref: step.ref,
-        action_id: action.id,
-        output_keys: Object.keys(result.output),
-        duration_ms: result.metrics?.duration_ms,
+        stepRef: step.ref,
+        actionId: action.id,
+        outputKeys: Object.keys(result.output),
+        durationMs: result.metrics?.durationMs,
       },
     });
   }
@@ -262,7 +262,7 @@ async function executeAction(
 }
 
 /**
- * Handle step failure based on on_failure policy
+ * Handle step failure based on onFailure policy
  */
 function handleStepFailure(
   step: Step,
@@ -272,15 +272,15 @@ function handleStepFailure(
 ): StepResult {
   const { logger, workflowRunId } = deps;
   const errorMessage = error instanceof Error ? error.message : String(error);
-  const onFailure = step.on_failure || 'abort';
+  const onFailure = step.onFailure || 'abort';
 
   logger.warn({
-    event_type: 'step_failure',
+    eventType: 'step_failure',
     message: `Step failed with policy: ${onFailure}`,
-    trace_id: workflowRunId,
+    traceId: workflowRunId,
     metadata: {
-      step_ref: step.ref,
-      on_failure: onFailure,
+      stepRef: step.ref,
+      onFailure: onFailure,
       error: errorMessage,
     },
   });

@@ -11,41 +11,41 @@ import { ValidationError } from '~/shared/errors';
 export type NodeInput = {
   ref: string;
   name: string;
-  task_id?: string;
-  task_version?: number;
-  input_mapping?: object;
-  output_mapping?: object;
-  resource_bindings?: Record<string, string>;
+  taskId?: string;
+  taskVersion?: number;
+  inputMapping?: object;
+  outputMapping?: object;
+  resourceBindings?: Record<string, string>;
 };
 
 export type TransitionInput = {
   ref?: string;
-  from_node_ref: string;
-  to_node_ref: string;
+  fromNodeRef: string;
+  toNodeRef: string;
   priority: number;
   condition?: object;
-  spawn_count?: number;
-  sibling_group?: string; // Named sibling group identifier for fan-out coordination
+  spawnCount?: number;
+  siblingGroup?: string; // Named sibling group identifier for fan-out coordination
   foreach?: object;
   synchronization?: {
     strategy: string;
-    sibling_group: string; // Must reference a declared sibling_group
+    siblingGroup: string; // Must reference a declared siblingGroup
     merge?: object;
   };
-  loop_config?: object;
+  loopConfig?: object;
 };
 
 export type WorkflowDefInput = {
   name: string;
   description: string;
-  project_id?: string;
-  library_id?: string;
+  projectId?: string;
+  libraryId?: string;
   tags?: string[];
-  input_schema: object;
-  output_schema: object;
-  output_mapping?: object;
-  context_schema?: object;
-  initial_node_ref: string;
+  inputSchema: object;
+  outputSchema: object;
+  outputMapping?: object;
+  contextSchema?: object;
+  initialNodeRef: string;
   nodes: NodeInput[];
   transitions?: TransitionInput[];
   autoversion?: boolean;
@@ -67,8 +67,8 @@ export function validateWorkflowDef(data: WorkflowDefInput): ValidationResult {
   const transitionRefs = validateTransitionRefs(data.transitions ?? []);
 
   validateTransitionNodeRefs(data.transitions ?? [], nodeRefs);
-  validateInitialNodeRef(data.initial_node_ref, nodeRefs);
-  validateOwnership(data.project_id, data.library_id);
+  validateInitialNodeRef(data.initialNodeRef, nodeRefs);
+  validateOwnership(data.projectId, data.libraryId);
   validateSiblingGroups(data.transitions ?? [], transitionRefs);
 
   return { nodeRefs, transitionRefs };
@@ -119,21 +119,21 @@ function validateTransitionRefs(transitions: TransitionInput[]): Set<string> {
 }
 
 /**
- * Validates all transition from_node_ref and to_node_ref point to valid nodes.
+ * Validates all transition fromNodeRef and toNodeRef point to valid nodes.
  */
 function validateTransitionNodeRefs(transitions: TransitionInput[], nodeRefs: Set<string>): void {
   for (const transition of transitions) {
-    if (!nodeRefs.has(transition.from_node_ref)) {
+    if (!nodeRefs.has(transition.fromNodeRef)) {
       throw new ValidationError(
-        `Invalid from_node_ref: ${transition.from_node_ref}`,
-        'transitions.from_node_ref',
+        `Invalid fromNodeRef: ${transition.fromNodeRef}`,
+        'transitions.fromNodeRef',
         'INVALID_NODE_REF',
       );
     }
-    if (!nodeRefs.has(transition.to_node_ref)) {
+    if (!nodeRefs.has(transition.toNodeRef)) {
       throw new ValidationError(
-        `Invalid to_node_ref: ${transition.to_node_ref}`,
-        'transitions.to_node_ref',
+        `Invalid toNodeRef: ${transition.toNodeRef}`,
+        'transitions.toNodeRef',
         'INVALID_NODE_REF',
       );
     }
@@ -146,7 +146,7 @@ function validateTransitionNodeRefs(transitions: TransitionInput[], nodeRefs: Se
 function validateInitialNodeRef(initialNodeRef: string, nodeRefs: Set<string>): void {
   if (!nodeRefs.has(initialNodeRef)) {
     throw new ValidationError(
-      `Invalid initial_node_ref: ${initialNodeRef}`,
+      `Invalid initialNodeRef: ${initialNodeRef}`,
       'initial_node_ref',
       'INVALID_NODE_REF',
     );
@@ -174,29 +174,29 @@ function validateOwnership(projectId?: string, libraryId?: string): void {
 }
 
 /**
- * Validates sibling_group usage across transitions.
+ * Validates siblingGroup usage across transitions.
  *
- * synchronization.sibling_group must reference a sibling_group declared on one or more transitions.
+ * synchronization.siblingGroup must reference a siblingGroup declared on one or more transitions.
  * This is the only way to create sibling relationships for fan-in coordination.
  */
 function validateSiblingGroups(transitions: TransitionInput[], _transitionRefs: Set<string>): void {
-  // Collect all declared sibling groups (from transition.sibling_group)
+  // Collect all declared sibling groups (from transition.siblingGroup)
   const declaredGroups = new Set<string>();
   for (const transition of transitions) {
-    if (transition.sibling_group) {
-      declaredGroups.add(transition.sibling_group);
+    if (transition.siblingGroup) {
+      declaredGroups.add(transition.siblingGroup);
     }
   }
 
-  // Validate synchronization.sibling_group references
+  // Validate synchronization.siblingGroup references
   for (const transition of transitions) {
-    if (transition.synchronization?.sibling_group) {
-      const siblingGroupRef = transition.synchronization.sibling_group;
+    if (transition.synchronization?.siblingGroup) {
+      const siblingGroupRef = transition.synchronization.siblingGroup;
 
       if (!declaredGroups.has(siblingGroupRef)) {
         throw new ValidationError(
-          `Invalid synchronization.sibling_group: '${siblingGroupRef}' is not a declared sibling group`,
-          'transitions.synchronization.sibling_group',
+          `Invalid synchronization.siblingGroup: '${siblingGroupRef}' is not a declared sibling group`,
+          'transitions.synchronization.siblingGroup',
           'INVALID_SIBLING_GROUP',
         );
       }

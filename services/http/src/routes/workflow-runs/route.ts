@@ -11,7 +11,7 @@ export const workflowRuns = new OpenAPIHono<HttpEnv>();
 
 /** GET / - List workflow runs */
 workflowRuns.openapi(listWorkflowRunsRoute, async (c) => {
-  const { limit, offset, status, project_id } = c.req.valid('query');
+  const { limit, offset, status, projectId } = c.req.valid('query');
 
   using workflowRunsResource = c.env.RESOURCES.workflowRuns();
   const result = await workflowRunsResource.list({
@@ -20,7 +20,7 @@ workflowRuns.openapi(listWorkflowRunsRoute, async (c) => {
     status: status
       ? (status.split(',') as ('running' | 'completed' | 'failed' | 'waiting')[])
       : undefined,
-    project_id,
+    projectId,
   });
 
   return c.json(result);
@@ -34,7 +34,7 @@ workflowRuns.get('/stream', async (c) => {
     return c.json(
       {
         error: 'WebSocket upgrade required',
-        received_upgrade: upgradeHeader,
+        receivedUpgrade: upgradeHeader,
       },
       400,
     );
@@ -61,7 +61,7 @@ workflowRuns.openapi(streamWorkflowRunRoute, async (c) => {
     return c.json(
       {
         error: 'WebSocket upgrade required',
-        received_upgrade: upgradeHeader,
+        receivedUpgrade: upgradeHeader,
       },
       400,
     );

@@ -34,8 +34,8 @@ export const loggerMiddleware = createMiddleware<HttpEnv>(async (c, next) => {
 
   // Log request start
   logger.info({
-    event_type: 'http_request_started',
-    request_id: requestId,
+    eventType: 'http_request_started',
+    requestId: requestId,
     message: `${method} ${path}`,
     metadata: {
       method,
@@ -60,14 +60,14 @@ export const loggerMiddleware = createMiddleware<HttpEnv>(async (c, next) => {
 
   // Log request completion
   logger.info({
-    event_type: 'http_request_completed',
-    request_id: requestId,
+    eventType: 'http_request_completed',
+    requestId: requestId,
     message: `${method} ${path} ${status} ${duration}ms`,
     metadata: {
       method,
       path,
       status,
-      duration_ms: duration,
+      durationMs: duration,
     },
   });
 });

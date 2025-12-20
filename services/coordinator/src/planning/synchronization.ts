@@ -5,7 +5,7 @@
  * when tokens arrive at nodes with synchronization requirements.
  *
  * Key concepts:
- * - Sibling group: Tokens that share the same sibling_group identifier
+ * - Sibling group: Tokens that share the same siblingGroup identifier
  * - Strategy: 'any' (first wins), 'all' (wait for all), m_of_n (quorum)
  * - Returns { decisions, events } tuple for dispatch to execute and emit
  */
@@ -49,8 +49,8 @@ export function decideSynchronization(params: {
   // Emit sync start event
   events.push({
     type: 'decision.sync.start',
-    token_id: token.id,
-    payload: { sibling_count: siblingCounts.total },
+    tokenId: token.id,
+    payload: { siblingCount: siblingCounts.total },
   });
 
   // No synchronization config → pass through
@@ -60,23 +60,23 @@ export function decideSynchronization(params: {
 
   const sync = transition.synchronization;
 
-  // Emit sibling_group comparison event for tracing
+  // Emit siblingGroup comparison event for tracing
   events.push({
-    type: 'decision.sync.sibling_group_check',
+    type: 'decision.sync.siblingGroup_check',
     payload: {
-      token_sibling_group: token.sibling_group,
-      sync_sibling_group: sync.sibling_group,
-      matches: token.sibling_group === sync.sibling_group,
+      tokenSiblingGroup: token.siblingGroup,
+      syncSiblingGroup: sync.siblingGroup,
+      matches: token.siblingGroup === sync.siblingGroup,
     },
   });
 
   // Token not in the specified sibling group → pass through
-  if (token.sibling_group !== sync.sibling_group) {
+  if (token.siblingGroup !== sync.siblingGroup) {
     events.push({
-      type: 'decision.sync.skipped_wrong_sibling_group',
+      type: 'decision.sync.skipped_wrong_siblingGroup',
       payload: {
-        token_sibling_group: token.sibling_group,
-        sync_sibling_group: sync.sibling_group,
+        tokenSiblingGroup: token.siblingGroup,
+        syncSiblingGroup: sync.siblingGroup,
       },
     });
     return { decisions: [{ type: 'MARK_FOR_DISPATCH', tokenId: token.id }], events };
@@ -89,10 +89,10 @@ export function decideSynchronization(params: {
 
   // Check if synchronization condition is met
   const strategyStr =
-    typeof sync.strategy === 'object' ? `m_of_n(${sync.strategy.m_of_n})` : sync.strategy;
+    typeof sync.strategy === 'object' ? `m_of_n(${sync.strategy.mOfN})` : sync.strategy;
   const required =
-    sync.strategy === 'all' ? token.branch_total : (sync.strategy as { m_of_n: number }).m_of_n;
-  const conditionMet = checkSyncCondition(sync.strategy, siblingCounts, token.branch_total);
+    sync.strategy === 'all' ? token.branchTotal : (sync.strategy as { mOfN: number }).mOfN;
+  const conditionMet = checkSyncCondition(sync.strategy, siblingCounts, token.branchTotal);
 
   // Emit condition check event
   events.push({
@@ -108,7 +108,7 @@ export function decideSynchronization(params: {
     // Condition met → activate fan-in
     events.push({
       type: 'decision.sync.activate',
-      payload: { merge_config: sync.merge ?? null },
+      payload: { mergeConfig: sync.merge ?? null },
     });
 
     return {
@@ -116,8 +116,8 @@ export function decideSynchronization(params: {
         {
           type: 'ACTIVATE_FAN_IN',
           workflowRunId,
-          nodeId: transition.to_node_id,
-          fanInPath: buildFanInPath(token.sibling_group!, transition.to_node_id),
+          nodeId: transition.toNodeId,
+          fanInPath: buildFanInPath(token.siblingGroup!, transition.toNodeId),
           // Note: mergedTokenIds is intentionally empty here. Planning is pure and
           // cannot query state. The dispatch layer (activateFanIn) queries the actual
           // completed siblings and performs the merge. This field exists for future
@@ -167,8 +167,8 @@ function checkSyncCondition(
     return counts.terminal >= branchTotal;
   }
 
-  // m_of_n quorum
-  const required = strategy.m_of_n;
+  // mOfN quorum
+  const required = strategy.mOfN;
 
   // Count successful completions (not failed/cancelled)
   // For quorum, typically we want completed (successful) tokens
@@ -176,9 +176,9 @@ function checkSyncCondition(
 }
 
 /**
- * Build the fan-in path from sibling_group and target node ID.
+ * Build the fan-in path from siblingGroup and target node ID.
  *
- * Uses sibling_group:target_node_id so all transitions in the same sibling group
+ * Uses siblingGroup:targetNodeId so all transitions in the same sibling group
  * going to the same target node share one fan-in coordination path. This ensures
  * the SQL UNIQUE constraint properly prevents duplicate activations even when
  * multiple transitions exist (explicit fan-out pattern).
@@ -218,7 +218,7 @@ export function decideOnTimeout(params: {
   }
 
   const sync = transition.synchronization;
-  const onTimeout = sync.on_timeout ?? 'fail';
+  const onTimeout = sync.onTimeout ?? 'fail';
 
   if (onTimeout === 'fail') {
     // Fail all waiting tokens
@@ -234,7 +234,7 @@ export function decideOnTimeout(params: {
     // Optionally fail the entire workflow
     decisions.push({
       type: 'FAIL_WORKFLOW',
-      error: `Synchronization timeout for sibling group '${sync.sibling_group}'`,
+      error: `Synchronization timeout for sibling group '${sync.siblingGroup}'`,
     });
 
     return decisions;
@@ -248,8 +248,8 @@ export function decideOnTimeout(params: {
       {
         type: 'ACTIVATE_FAN_IN',
         workflowRunId,
-        nodeId: transition.to_node_id,
-        fanInPath: buildFanInPath(winnerToken.sibling_group!, transition.to_node_id),
+        nodeId: transition.toNodeId,
+        fanInPath: buildFanInPath(winnerToken.siblingGroup!, transition.toNodeId),
         mergedTokenIds: [], // Dispatch populates with available completed siblings
       },
     ];
@@ -274,7 +274,7 @@ export function hasTimedOut(
   transition: TransitionDef,
   oldestWaitingTimestamp: Date | null,
 ): boolean {
-  if (!transition.synchronization?.timeout_ms) {
+  if (!transition.synchronization?.timeoutMs) {
     return false;
   }
 
@@ -283,7 +283,7 @@ export function hasTimedOut(
   }
 
   const elapsedMs = Date.now() - oldestWaitingTimestamp.getTime();
-  return elapsedMs >= transition.synchronization.timeout_ms;
+  return elapsedMs >= transition.synchronization.timeoutMs;
 }
 
 // ============================================================================
@@ -306,26 +306,26 @@ export function decideFanInContinuation(params: {
   // Emit fan-in continuation planning event
   events.push({
     type: 'decision.sync.continuation',
-    node_id: nodeId,
+    nodeId: nodeId,
     payload: {
-      workflow_run_id: workflowRunId,
-      fan_in_path: fanInPath,
+      workflowRunId: workflowRunId,
+      fanInPath: fanInPath,
     },
   });
 
   // Create continuation token to proceed after merge
-  // Inherits iteration_counts from fan-out origin (parent of siblings), not from siblings
+  // Inherits iterationCounts from fan-out origin (parent of siblings), not from siblings
   decisions.push({
     type: 'CREATE_TOKEN',
     params: {
-      workflow_run_id: workflowRunId,
-      node_id: nodeId,
-      parent_token_id: parentTokenId,
-      path_id: fanInPath,
-      sibling_group: null, // Merged token is not part of a fan-out
-      branch_index: 0,
-      branch_total: 1,
-      iteration_counts: parentIterationCounts ?? null,
+      workflowRunId: workflowRunId,
+      nodeId: nodeId,
+      parentTokenId: parentTokenId,
+      pathId: fanInPath,
+      siblingGroup: null, // Merged token is not part of a fan-out
+      branchIndex: 0,
+      branchTotal: 1,
+      iterationCounts: parentIterationCounts ?? null,
     },
   });
 

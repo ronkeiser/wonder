@@ -15,7 +15,7 @@ export interface ActionInput {
   /** The action definition */
   action: Action;
 
-  /** Mapped input from step.input_mapping */
+  /** Mapped input from step.inputMapping */
   input: Record<string, unknown>;
 
   /** Execution context */
@@ -33,7 +33,7 @@ export interface ActionOutput {
   /** Whether the action succeeded */
   success: boolean;
 
-  /** Output data to be mapped via step.output_mapping */
+  /** Output data to be mapped via step.outputMapping */
   output: Record<string, unknown>;
 
   /** Error details if failed */
@@ -45,11 +45,11 @@ export interface ActionOutput {
 
   /** Execution metrics */
   metrics?: {
-    duration_ms: number;
-    llm_tokens?: {
+    durationMs: number;
+    llmTokens?: {
       input: number;
       output: number;
-      cost_usd: number;
+      costUsd: number;
     };
   };
 }

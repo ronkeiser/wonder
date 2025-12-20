@@ -50,7 +50,7 @@ export function decideRouting(params: {
 }): PlanningResult {
   const { completedToken, workflowRunId, nodeId, transitions, context } = params;
   const completedTokenId = completedToken.id;
-  const completedTokenPath = completedToken.path_id;
+  const completedTokenPath = completedToken.pathId;
 
   const events: TraceEventInput[] = [];
   const decisions: Decision[] = [];
@@ -58,8 +58,8 @@ export function decideRouting(params: {
   // Emit routing start event
   events.push({
     type: 'decision.routing.start',
-    token_id: completedTokenId,
-    node_id: nodeId,
+    tokenId: completedTokenId,
+    nodeId: nodeId,
   });
 
   // Group by priority tier
@@ -72,18 +72,18 @@ export function decideRouting(params: {
     const tier = grouped.get(priority) ?? [];
 
     for (const t of tier) {
-      // Check loop_config.max_iterations before evaluating condition
-      const loopConfig = t.loop_config as LoopConfig | null;
-      if (loopConfig?.max_iterations) {
-        const currentCount = completedToken.iteration_counts?.[t.id] ?? 0;
-        if (currentCount >= loopConfig.max_iterations) {
+      // Check loopConfig.maxIterations before evaluating condition
+      const loopConfig = t.loopConfig as LoopConfig | null;
+      if (loopConfig?.maxIterations) {
+        const currentCount = completedToken.iterationCounts?.[t.id] ?? 0;
+        if (currentCount >= loopConfig.maxIterations) {
           // Skip this transition - max iterations reached
           events.push({
             type: 'decision.routing.loop_limit_reached',
             payload: {
-              transition_id: t.id,
-              current_count: currentCount,
-              max_iterations: loopConfig.max_iterations,
+              transitionId: t.id,
+              currentCount: currentCount,
+              maxIterations: loopConfig.maxIterations,
             },
           });
           continue;
@@ -94,7 +94,7 @@ export function decideRouting(params: {
       events.push({
         type: 'decision.routing.evaluate_transition',
         payload: {
-          transition_id: t.id,
+          transitionId: t.id,
           condition: t.condition,
         },
       });
@@ -120,54 +120,54 @@ export function decideRouting(params: {
     return { decisions: [], events };
   }
 
-  // Pre-compute total tokens per sibling_group for fan-out transitions
+  // Pre-compute total tokens per siblingGroup for fan-out transitions
   const siblingGroupTotals = new Map<string, number>();
   for (const t of matchedTransitions) {
-    if (t.sibling_group) {
+    if (t.siblingGroup) {
       const count = determineSpawnCount(t, context);
-      siblingGroupTotals.set(t.sibling_group, (siblingGroupTotals.get(t.sibling_group) ?? 0) + count);
+      siblingGroupTotals.set(t.siblingGroup, (siblingGroupTotals.get(t.siblingGroup) ?? 0) + count);
     }
   }
 
-  // Track branch_index per sibling_group for sequential indexing during fan-out
+  // Track branchIndex per siblingGroup for sequential indexing during fan-out
   const siblingGroupIndices = new Map<string, number>();
 
   for (const transition of matchedTransitions) {
     const spawnCount = determineSpawnCount(transition, context);
 
-    // Fan-out origin: transition declares sibling_group
+    // Fan-out origin: transition declares siblingGroup
     // Continuation: inherit sibling identity from parent token
-    const siblingGroup = transition.sibling_group ?? completedToken.sibling_group ?? null;
-    const isFanOutOrigin = transition.sibling_group !== null;
+    const siblingGroup = transition.siblingGroup ?? completedToken.siblingGroup ?? null;
+    const isFanOutOrigin = transition.siblingGroup !== null;
 
-    // branch_total: from pre-computed totals for fan-out, otherwise inherit
+    // branchTotal: from pre-computed totals for fan-out, otherwise inherit
     const branchTotal = isFanOutOrigin
-      ? siblingGroupTotals.get(transition.sibling_group!)!
-      : completedToken.branch_total;
+      ? siblingGroupTotals.get(transition.siblingGroup!)!
+      : completedToken.branchTotal;
 
     events.push({
       type: 'decision.routing.transition_matched',
       payload: {
-        transition_id: transition.id,
-        spawn_count: spawnCount,
+        transitionId: transition.id,
+        spawnCount: spawnCount,
       },
     });
 
-    // Build iteration_counts for child tokens: copy parent's counts and increment for this transition
-    const parentCounts = completedToken.iteration_counts ?? {};
+    // Build iterationCounts for child tokens: copy parent's counts and increment for this transition
+    const parentCounts = completedToken.iterationCounts ?? {};
     const childIterationCounts: Record<string, number> = {
       ...parentCounts,
       [transition.id]: (parentCounts[transition.id] ?? 0) + 1,
     };
 
     for (let i = 0; i < spawnCount; i++) {
-      // branch_index: sequential for fan-out origin, inherited for continuation
+      // branchIndex: sequential for fan-out origin, inherited for continuation
       let branchIndex: number;
       if (isFanOutOrigin) {
-        branchIndex = siblingGroupIndices.get(transition.sibling_group!) ?? 0;
-        siblingGroupIndices.set(transition.sibling_group!, branchIndex + 1);
+        branchIndex = siblingGroupIndices.get(transition.siblingGroup!) ?? 0;
+        siblingGroupIndices.set(transition.siblingGroup!, branchIndex + 1);
       } else {
-        branchIndex = completedToken.branch_index;
+        branchIndex = completedToken.branchIndex;
       }
 
       const pathId = buildPathId(completedTokenPath, nodeId, branchIndex, branchTotal);
@@ -175,14 +175,14 @@ export function decideRouting(params: {
       decisions.push({
         type: 'CREATE_TOKEN',
         params: {
-          workflow_run_id: workflowRunId,
-          node_id: transition.to_node_id,
-          parent_token_id: completedTokenId,
-          path_id: pathId,
-          sibling_group: siblingGroup,
-          branch_index: branchIndex,
-          branch_total: branchTotal,
-          iteration_counts: childIterationCounts,
+          workflowRunId: workflowRunId,
+          nodeId: transition.toNodeId,
+          parentTokenId: completedTokenId,
+          pathId: pathId,
+          siblingGroup: siblingGroup,
+          branchIndex: branchIndex,
+          branchTotal: branchTotal,
+          iterationCounts: childIterationCounts,
         },
       });
     }
@@ -245,8 +245,8 @@ function determineSpawnCount(transition: TransitionRow, context: ContextSnapshot
     return 1;
   }
 
-  // Static: use spawn_count or default to 1
-  return transition.spawn_count ?? 1;
+  // Static: use spawnCount or default to 1
+  return transition.spawnCount ?? 1;
 }
 
 // ============================================================================
@@ -288,15 +288,15 @@ function groupByPriority(transitions: TransitionRow[]): Map<number, TransitionRo
 export function toTransitionDef(row: TransitionRow): TransitionDef {
   return {
     id: row.id,
-    ref: row.ref,
-    from_node_id: row.from_node_id,
-    to_node_id: row.to_node_id,
+    ref: row.ref ?? undefined,
+    fromNodeId: row.fromNodeId,
+    toNodeId: row.toNodeId,
     priority: row.priority,
-    condition: row.condition as Condition | null,
-    spawn_count: row.spawn_count,
-    sibling_group: row.sibling_group ?? null,
-    foreach: row.foreach as ForeachConfig | null,
-    synchronization: row.synchronization as SynchronizationConfig | null,
+    condition: row.condition as Condition | undefined,
+    spawnCount: row.spawnCount ?? undefined,
+    siblingGroup: row.siblingGroup ?? undefined,
+    foreach: row.foreach as ForeachConfig | undefined,
+    synchronization: row.synchronization as SynchronizationConfig | undefined,
   };
 }
 

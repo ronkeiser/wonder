@@ -11,7 +11,7 @@ export const CreateModelProfileSchema = z
     provider: z
       .enum(['anthropic', 'openai', 'google', 'cloudflare', 'local'])
       .openapi({ example: 'openai' }),
-    model_id: z
+    modelId: z
       .enum([
         '@cf/meta/llama-4-scout-17b-16e-instruct',
         '@cf/meta/llama-3.3-70b-instruct-fp8-fast',
@@ -24,9 +24,9 @@ export const CreateModelProfileSchema = z
       ])
       .openapi({ example: '@cf/meta/llama-4-scout-17b-16e-instruct' }),
     parameters: z.record(z.string(), z.unknown()).openapi({ example: { temperature: 0.7 } }),
-    execution_config: z.record(z.string(), z.unknown()).optional(),
-    cost_per_1k_input_tokens: z.number().nonnegative().openapi({ example: 0.03 }),
-    cost_per_1k_output_tokens: z.number().nonnegative().openapi({ example: 0.06 }),
+    executionConfig: z.record(z.string(), z.unknown()).optional(),
+    costPer1kInputTokens: z.number().nonnegative().openapi({ example: 0.03 }),
+    costPer1kOutputTokens: z.number().nonnegative().openapi({ example: 0.06 }),
   })
   .openapi('CreateModelProfile');
 
@@ -35,7 +35,7 @@ export const ModelProfileSchema = z
     id: ulid(),
     name: z.string(),
     provider: z.enum(['anthropic', 'openai', 'google', 'cloudflare', 'local']),
-    model_id: z.enum([
+    modelId: z.enum([
       '@cf/meta/llama-4-scout-17b-16e-instruct',
       '@cf/meta/llama-3.3-70b-instruct-fp8-fast',
       '@cf/openai/gpt-oss-120b',
@@ -46,21 +46,21 @@ export const ModelProfileSchema = z
       'local-dummy',
     ]),
     parameters: z.any().nullable(),
-    execution_config: z.any().nullable(),
-    cost_per_1k_input_tokens: z.number(),
-    cost_per_1k_output_tokens: z.number(),
+    executionConfig: z.any().nullable(),
+    costPer1kInputTokens: z.number(),
+    costPer1kOutputTokens: z.number(),
   })
   .openapi('ModelProfile');
 
 export const ModelProfileCreateResponseSchema = z
   .object({
-    model_profile_id: ulid(),
-    model_profile: ModelProfileSchema,
+    modelProfileId: ulid(),
+    modelProfile: ModelProfileSchema,
   })
   .openapi('ModelProfileCreateResponse');
 
 export const ModelProfileGetResponseSchema = z
   .object({
-    model_profile: ModelProfileSchema,
+    modelProfile: ModelProfileSchema,
   })
   .openapi('ModelProfileGetResponse');

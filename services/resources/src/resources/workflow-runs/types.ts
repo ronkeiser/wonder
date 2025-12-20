@@ -3,27 +3,27 @@
 /** Lightweight workflow run data for listing/sidebar */
 export interface WorkflowRunSummary {
   id: string;
-  project_id: string;
-  workflow_id: string;
-  workflow_name: string;
-  workflow_def_id: string;
-  workflow_version: number;
+  projectId: string;
+  workflowId: string;
+  workflowName: string;
+  workflowDefId: string;
+  workflowVersion: number;
   status: 'running' | 'completed' | 'failed' | 'waiting';
-  parent_run_id: string | null;
-  created_at: string;
-  updated_at: string;
-  completed_at: string | null;
+  parentRunId: string | null;
+  createdAt: string;
+  updatedAt: string;
+  completedAt: string | null;
 }
 
 /** Filters for listing workflow runs */
 export interface ListWorkflowRunsFilters {
-  project_id?: string;
-  workflow_id?: string;
-  workflow_def_id?: string;
+  projectId?: string;
+  workflowId?: string;
+  workflowDefId?: string;
   status?: ('running' | 'completed' | 'failed' | 'waiting')[];
-  parent_run_id?: string | null; // null = only root runs
-  created_after?: string;
-  created_before?: string;
+  parentRunId?: string | null; // null = only root runs
+  createdAfter?: string;
+  createdBefore?: string;
   limit?: number;
   offset?: number;
 }

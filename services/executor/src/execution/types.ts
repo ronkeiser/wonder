@@ -38,11 +38,11 @@ export interface ActionResult {
     retryable: boolean;
   };
   metrics?: {
-    duration_ms: number;
-    llm_tokens?: {
+    durationMs: number;
+    llmTokens?: {
       input: number;
       output: number;
-      cost_usd: number;
+      costUsd: number;
     };
   };
 }
@@ -78,12 +78,12 @@ export class TaskRetryError extends Error {
  * Execution metrics collected during task run
  */
 export interface ExecutionMetrics {
-  duration_ms: number;
-  steps_executed: number;
-  steps_skipped: number;
-  llm_tokens?: {
+  durationMs: number;
+  stepsExecuted: number;
+  stepsSkipped: number;
+  llmTokens?: {
     input: number;
     output: number;
-    cost_usd: number;
+    costUsd: number;
   };
 }

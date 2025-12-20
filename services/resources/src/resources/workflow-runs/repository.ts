@@ -20,20 +20,20 @@ export async function getWorkflowRunWithProject(
   id: string,
 ): Promise<
   | (WorkflowRun & {
-      workspace_id: string;
+      workspaceId: string;
     })
   | null
 > {
   const run = await getWorkflowRun(db, id);
   if (!run) return null;
 
-  // Get workspace_id from project
-  const project = await db.select().from(projects).where(eq(projects.id, run.project_id)).get();
+  // Get workspaceId from project
+  const project = await db.select().from(projects).where(eq(projects.id, run.projectId)).get();
   if (!project) return null;
 
   return {
     ...run,
-    workspace_id: project.workspace_id,
+    workspaceId: project.workspaceId,
   };
 }
 
@@ -42,7 +42,7 @@ export async function updateWorkflowRun(
   id: string,
   updates: {
     status?: 'running' | 'completed' | 'failed' | 'waiting';
-    completed_at?: string;
+    completedAt?: string;
     context?: object;
   },
 ): Promise<boolean> {
@@ -50,7 +50,7 @@ export async function updateWorkflowRun(
     .update(workflow_runs)
     .set({
       ...updates,
-      updated_at: new Date().toISOString(),
+      updatedAt: new Date().toISOString(),
     })
     .where(eq(workflow_runs.id, id))
     .returning({ id: workflow_runs.id });
@@ -72,32 +72,32 @@ export async function listWorkflowRuns(
 ): Promise<{ runs: WorkflowRunWithName[]; total: number }> {
   const conditions = [];
 
-  if (filters.project_id) {
-    conditions.push(eq(workflow_runs.project_id, filters.project_id));
+  if (filters.projectId) {
+    conditions.push(eq(workflow_runs.projectId, filters.projectId));
   }
-  if (filters.workflow_id) {
-    conditions.push(eq(workflow_runs.workflow_id, filters.workflow_id));
+  if (filters.workflowId) {
+    conditions.push(eq(workflow_runs.workflowId, filters.workflowId));
   }
-  if (filters.workflow_def_id) {
-    conditions.push(eq(workflow_runs.workflow_def_id, filters.workflow_def_id));
+  if (filters.workflowDefId) {
+    conditions.push(eq(workflow_runs.workflowDefId, filters.workflowDefId));
   }
   if (filters.status && filters.status.length > 0) {
     conditions.push(inArray(workflow_runs.status, filters.status));
   }
-  if (filters.parent_run_id !== undefined) {
+  if (filters.parentRunId !== undefined) {
     // null means only root runs (no parent)
     // a string means runs with that specific parent
-    if (filters.parent_run_id === null) {
-      conditions.push(eq(workflow_runs.parent_run_id, null as unknown as string));
+    if (filters.parentRunId === null) {
+      conditions.push(eq(workflow_runs.parentRunId, null as unknown as string));
     } else {
-      conditions.push(eq(workflow_runs.parent_run_id, filters.parent_run_id));
+      conditions.push(eq(workflow_runs.parentRunId, filters.parentRunId));
     }
   }
-  if (filters.created_after) {
-    conditions.push(gte(workflow_runs.created_at, filters.created_after));
+  if (filters.createdAfter) {
+    conditions.push(gte(workflow_runs.createdAt, filters.createdAfter));
   }
-  if (filters.created_before) {
-    conditions.push(lte(workflow_runs.created_at, filters.created_before));
+  if (filters.createdBefore) {
+    conditions.push(lte(workflow_runs.createdAt, filters.createdBefore));
   }
 
   const whereClause = conditions.length > 0 ? and(...conditions) : undefined;
@@ -120,9 +120,9 @@ export async function listWorkflowRuns(
       workflow_name: workflows.name,
     })
     .from(workflow_runs)
-    .leftJoin(workflows, eq(workflow_runs.workflow_id, workflows.id))
+    .leftJoin(workflows, eq(workflow_runs.workflowId, workflows.id))
     .where(whereClause)
-    .orderBy(desc(workflow_runs.created_at))
+    .orderBy(desc(workflow_runs.createdAt))
     .limit(limit)
     .offset(offset)
     .all();

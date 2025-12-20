@@ -20,7 +20,7 @@ function normalizeInput(input: LoggerInput | string): LoggerInput {
  * Main service
  */
 export class LogsService extends WorkerEntrypoint<Env> {
-  private db = drizzle(this.env.DB);
+  private db = drizzle(this.env.DB, { casing: 'snake_case' });
 
   /**
    * HTTP entrypoint
@@ -39,7 +39,7 @@ export class LogsService extends WorkerEntrypoint<Env> {
       level,
       ...context,
       ...input,
-      message: input.message || input.event_type,
+      message: input.message || input.eventType,
       metadata: JSON.stringify(input.metadata || {}),
     };
 
@@ -113,12 +113,12 @@ export class LogsService extends WorkerEntrypoint<Env> {
 
     if (options.service) conditions.push(eq(logs.service, options.service));
     if (options.level) conditions.push(eq(logs.level, options.level));
-    if (options.event_type) conditions.push(eq(logs.event_type, options.event_type));
-    if (options.trace_id) conditions.push(eq(logs.trace_id, options.trace_id));
-    if (options.request_id) conditions.push(eq(logs.request_id, options.request_id));
-    if (options.workspace_id) conditions.push(eq(logs.workspace_id, options.workspace_id));
-    if (options.project_id) conditions.push(eq(logs.project_id, options.project_id));
-    if (options.user_id) conditions.push(eq(logs.user_id, options.user_id));
+    if (options.eventType) conditions.push(eq(logs.eventType, options.eventType));
+    if (options.traceId) conditions.push(eq(logs.traceId, options.traceId));
+    if (options.requestId) conditions.push(eq(logs.requestId, options.requestId));
+    if (options.workspaceId) conditions.push(eq(logs.workspaceId, options.workspaceId));
+    if (options.projectId) conditions.push(eq(logs.projectId, options.projectId));
+    if (options.userId) conditions.push(eq(logs.userId, options.userId));
 
     const limit = options.limit || 100;
 

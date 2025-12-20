@@ -18,20 +18,20 @@ export interface LogContext {
   service: string;
   environment: string;
   version?: string;
-  instance_id?: string;
+  instanceId?: string;
 }
 
 export interface LoggerInput {
   id?: string;
   timestamp?: number;
-  event_type?: string;
+  eventType?: string;
   message?: string;
-  source_location?: string;
-  trace_id?: string;
-  request_id?: string;
-  workspace_id?: string;
-  project_id?: string;
-  user_id?: string;
+  sourceLocation?: string;
+  traceId?: string;
+  requestId?: string;
+  workspaceId?: string;
+  projectId?: string;
+  userId?: string;
   highlight?: HighlightColor;
   metadata?: Record<string, unknown>;
 }
@@ -40,14 +40,14 @@ export interface LogEntry extends LogContext {
   id: string;
   timestamp: number;
   level: LogLevel;
-  event_type: string;
+  eventType: string;
   message?: string;
-  source_location?: string;
-  trace_id?: string;
-  request_id?: string;
-  workspace_id?: string;
-  project_id?: string;
-  user_id?: string;
+  sourceLocation?: string;
+  traceId?: string;
+  requestId?: string;
+  workspaceId?: string;
+  projectId?: string;
+  userId?: string;
   highlight?: string;
   metadata: string;
 }
@@ -63,11 +63,11 @@ export interface Logger {
 export interface GetLogsOptions {
   service?: string;
   level?: LogLevel;
-  event_type?: string;
-  trace_id?: string;
-  request_id?: string;
-  workspace_id?: string;
-  project_id?: string;
-  user_id?: string;
+  eventType?: string;
+  traceId?: string;
+  requestId?: string;
+  workspaceId?: string;
+  projectId?: string;
+  userId?: string;
   limit?: number;
 }

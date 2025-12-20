@@ -35,12 +35,12 @@ export async function executeMockAction(
   // Validate implementation has schema
   if (!implementation?.schema) {
     logger.error({
-      event_type: 'mock_action_invalid',
+      eventType: 'mock_action_invalid',
       message: 'Mock action missing schema in implementation',
-      trace_id: context.workflowRunId,
+      traceId: context.workflowRunId,
       metadata: {
-        step_ref: context.stepRef,
-        action_id: action.id,
+        stepRef: context.stepRef,
+        actionId: action.id,
       },
     });
 
@@ -58,8 +58,8 @@ export async function executeMockAction(
   try {
     // Apply configured delay if specified
     if (implementation.options?.delay) {
-      const { min_ms, max_ms } = implementation.options.delay;
-      const delayMs = Math.floor(Math.random() * (max_ms - min_ms + 1)) + min_ms;
+      const { minMs, maxMs } = implementation.options.delay;
+      const delayMs = Math.floor(Math.random() * (maxMs - minMs + 1)) + minMs;
       await new Promise((resolve) => setTimeout(resolve, delayMs));
     }
 
@@ -71,27 +71,27 @@ export async function executeMockAction(
     // Emit trace event for mock data generation
     emitter.emitTrace({
       type: 'executor.mock.generated',
-      token_id: context.tokenId,
-      duration_ms: duration,
+      tokenId: context.tokenId,
+      durationMs: duration,
       payload: {
-        step_ref: context.stepRef,
-        action_id: action.id,
-        schema_type: implementation.schema.type,
-        has_seed: implementation.options?.seed !== undefined,
+        stepRef: context.stepRef,
+        actionId: action.id,
+        schemaType: implementation.schema.type,
+        hasSeed: implementation.options?.seed !== undefined,
       },
     });
 
     logger.info({
-      event_type: 'mock_action_completed',
+      eventType: 'mock_action_completed',
       message: 'Mock data generated successfully',
-      trace_id: context.workflowRunId,
+      traceId: context.workflowRunId,
       metadata: {
-        step_ref: context.stepRef,
-        action_id: action.id,
-        duration_ms: duration,
-        schema_type: implementation.schema.type,
-        has_seed: implementation.options?.seed !== undefined,
-        has_delay: implementation.options?.delay !== undefined,
+        stepRef: context.stepRef,
+        actionId: action.id,
+        durationMs: duration,
+        schemaType: implementation.schema.type,
+        hasSeed: implementation.options?.seed !== undefined,
+        hasDelay: implementation.options?.delay !== undefined,
       },
     });
 
@@ -106,19 +106,19 @@ export async function executeMockAction(
       success: true,
       output,
       metrics: {
-        duration_ms: duration,
+        durationMs: duration,
       },
     };
   } catch (error) {
     const duration = Date.now() - startTime;
 
     logger.error({
-      event_type: 'mock_action_failed',
+      eventType: 'mock_action_failed',
       message: 'Failed to generate mock data',
-      trace_id: context.workflowRunId,
+      traceId: context.workflowRunId,
       metadata: {
-        step_ref: context.stepRef,
-        action_id: action.id,
+        stepRef: context.stepRef,
+        actionId: action.id,
         error: error instanceof Error ? error.message : String(error),
       },
     });
@@ -132,7 +132,7 @@ export async function executeMockAction(
         retryable: false,
       },
       metrics: {
-        duration_ms: duration,
+        durationMs: duration,
       },
     };
   }

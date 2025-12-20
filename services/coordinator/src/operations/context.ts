@@ -29,7 +29,7 @@ export type OutputMappingEntry = {
  *
  * Data flow for linear execution (no fan-out):
  *   1. Task completes with output
- *   2. Node's output_mapping transforms task output to context paths
+ *   2. Node's outputMapping transforms task output to context paths
  *   3. applyOutputMapping() writes directly to schema-driven state/output tables
  *
  * Data flow for parallel execution (fan-out):
@@ -62,7 +62,7 @@ export class ContextManager {
       onQuery: (query, params, durationMs) => {
         this.emitter.emitTrace({
           type: 'sql.query',
-          duration_ms: durationMs,
+          durationMs: durationMs,
           payload: {
             sql: query,
             params,
@@ -78,14 +78,14 @@ export class ContextManager {
 
     const workflowDef = this.defs.getWorkflowDef();
 
-    const inputSchema = new Schema(workflowDef.input_schema as JSONSchema);
-    const outputSchema = new Schema(workflowDef.output_schema as JSONSchema);
+    const inputSchema = new Schema(workflowDef.inputSchema as JSONSchema);
+    const outputSchema = new Schema(workflowDef.outputSchema as JSONSchema);
 
     this.inputTable = inputSchema.bind(this.sql, 'context_input', this.sqlHook);
     this.outputTable = outputSchema.bind(this.sql, 'context_output', this.sqlHook);
 
-    if (workflowDef.context_schema) {
-      const stateSchema = new Schema(workflowDef.context_schema as JSONSchema);
+    if (workflowDef.contextSchema) {
+      const stateSchema = new Schema(workflowDef.contextSchema as JSONSchema);
       this.stateTable = stateSchema.bind(this.sql, 'context_state', this.sqlHook);
     }
 
@@ -117,10 +117,10 @@ export class ContextManager {
     this.emitter.emitTrace({
       type: 'operation.context.initialized',
       payload: {
-        has_input_schema: true,
-        has_context_schema: this.stateTable !== null,
-        table_count: tablesCreated.length,
-        tables_created: tablesCreated,
+        hasInputSchema: true,
+        hasContextSchema: this.stateTable !== null,
+        tableCount: tablesCreated.length,
+        tablesCreated: tablesCreated,
       },
     });
 
@@ -131,9 +131,9 @@ export class ContextManager {
       type: 'operation.context.validate',
       payload: {
         path: 'input',
-        schema_type: 'object',
+        schemaType: 'object',
         valid: result.valid,
-        error_count: result.errors.length,
+        errorCount: result.errors.length,
         errors: result.errors.slice(0, 5).map((e) => e.message),
       },
     });
@@ -278,10 +278,10 @@ export class ContextManager {
   // ============================================================================
 
   /**
-   * Apply node's output_mapping to write task output to context.
+   * Apply node's outputMapping to write task output to context.
    *
    * For linear flows (no fan-out), task output is written directly to
-   * schema-driven context tables via the node's output_mapping.
+   * schema-driven context tables via the node's outputMapping.
    *
    * Mappings are JSONPath-style: { "state.result": "$.response", "output.greeting": "$.message" }
    * - Target paths (keys) specify where in context to write (state.* or output.*)
@@ -295,16 +295,16 @@ export class ContextManager {
 
     // Emit start event with input context
     this.emitter.emitTrace({
-      type: 'operation.context.output_mapping.started',
+      type: 'operation.context.outputMapping.started',
       payload: {
-        output_mapping: outputMapping,
-        task_output_keys: Object.keys(taskOutput),
+        outputMapping: outputMapping,
+        taskOutputKeys: Object.keys(taskOutput),
       },
     });
 
     if (!outputMapping) {
       this.emitter.emitTrace({
-        type: 'operation.context.output_mapping.skipped',
+        type: 'operation.context.outputMapping.skipped',
         payload: { reason: 'no_mapping' },
       });
       return;
@@ -318,11 +318,11 @@ export class ContextManager {
       this.setField(targetPath, value);
 
       this.emitter.emitTrace({
-        type: 'operation.context.output_mapping.applied',
+        type: 'operation.context.outputMapping.applied',
         payload: {
-          target_path: targetPath,
-          source_path: sourcePath,
-          extracted_value: value,
+          targetPath: targetPath,
+          sourcePath: sourcePath,
+          extractedValue: value,
         },
       });
     }
@@ -360,10 +360,10 @@ export class ContextManager {
 
     this.emitter.emitTrace({
       type: 'operation.context.branch_table.created',
-      token_id: tokenId,
+      tokenId: tokenId,
       payload: {
-        table_name: tableName,
-        schema_type: outputSchema.type as string,
+        tableName: tableName,
+        schemaType: outputSchema.type as string,
       },
     });
   }
@@ -380,10 +380,10 @@ export class ContextManager {
 
     this.emitter.emitTrace({
       type: 'operation.context.branch.validate',
-      token_id: tokenId,
+      tokenId: tokenId,
       payload: {
         valid: result.valid,
-        error_count: result.errors.length,
+        errorCount: result.errors.length,
         errors: result.errors.slice(0, 5).map((e) => e.message),
       },
     });
@@ -398,7 +398,7 @@ export class ContextManager {
 
     this.emitter.emitTrace({
       type: 'operation.context.branch.written',
-      token_id: tokenId,
+      tokenId: tokenId,
       payload: { output },
     });
   }
@@ -428,11 +428,11 @@ export class ContextManager {
 
       this.emitter.emitTrace({
         type: 'operation.context.branch.read',
-        token_id: tokenId,
+        tokenId: tokenId,
         payload: {
-          branch_index: branchIndex,
+          branchIndex: branchIndex,
           output,
-          from_cache: this.branchTables.has(tokenId),
+          fromCache: this.branchTables.has(tokenId),
         },
       });
 
@@ -446,8 +446,8 @@ export class ContextManager {
     this.emitter.emitTrace({
       type: 'operation.context.branches_read',
       payload: {
-        token_ids: tokenIds,
-        output_count: outputs.length,
+        tokenIds: tokenIds,
+        outputCount: outputs.length,
       },
     });
 
@@ -459,10 +459,10 @@ export class ContextManager {
     this.emitter.emitTrace({
       type: 'operation.context.merge.started',
       payload: {
-        sibling_count: branchOutputs.length,
+        siblingCount: branchOutputs.length,
         strategy: merge.strategy,
-        source_path: merge.source,
-        target_path: merge.target,
+        sourcePath: merge.source,
+        targetPath: merge.target,
       },
     });
 
@@ -533,8 +533,8 @@ export class ContextManager {
     this.emitter.emitTrace({
       type: 'operation.context.merged',
       payload: {
-        target_path: merge.target,
-        branch_count: branchOutputs.length,
+        targetPath: merge.target,
+        branchCount: branchOutputs.length,
       },
     });
   }
@@ -560,8 +560,8 @@ export class ContextManager {
     this.emitter.emitTrace({
       type: 'operation.context.branch_table.dropped',
       payload: {
-        token_ids: tokenIds,
-        tables_dropped: tokenIds.length,
+        tokenIds: tokenIds,
+        tablesDropped: tokenIds.length,
       },
     });
   }

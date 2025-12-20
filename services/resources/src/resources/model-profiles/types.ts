@@ -160,11 +160,11 @@ export type ModelProfile = {
   [K in ModelId]: {
     id: string;
     name: string;
-    model_id: K;
+    modelId: K;
     provider: (typeof MODEL_CATALOG)[K]['provider'];
     parameters: (typeof MODEL_CATALOG)[K]['parameters'];
-    execution_config: object | null;
-    cost_per_1k_input_tokens: number;
-    cost_per_1k_output_tokens: number;
+    executionConfig: object | null;
+    costPer1kInputTokens: number;
+    costPer1kOutputTokens: number;
   };
 }[ModelId];

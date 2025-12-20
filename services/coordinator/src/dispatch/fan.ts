@@ -41,7 +41,7 @@ type Node = ReturnType<DefinitionManager['getNode']>;
  * 1. Fetch TaskDef to get output_schema
  * 2. Initialize branch table (lazy - creates if not exists)
  * 3. Write task output to branch table
- * 4. Apply any state.* mappings from node's output_mapping to shared context
+ * 4. Apply any state.* mappings from node's outputMapping to shared context
  *
  * Note: Fan-in activation is handled by processSynchronization in the routing
  * path, ensuring a single deterministic path for all sync logic.
@@ -53,43 +53,43 @@ export async function handleBranchOutput(
   output: Record<string, unknown>,
 ): Promise<void> {
   // Fetch TaskDef to get output schema
-  if (!node.task_id) {
+  if (!node.taskId) {
     ctx.logger.debug({
-      event_type: 'branch.output.skip',
-      message: 'No task_id on node - skipping branch output',
-      metadata: { token_id: token.id, node_id: node.id },
+      eventType: 'branch.output.skip',
+      message: 'No taskId on node - skipping branch output',
+      metadata: { tokenId: token.id, nodeId: node.id },
     });
     return;
   }
 
   const tasksResource = ctx.resources.tasks();
-  const { task } = await tasksResource.get(node.task_id, node.task_version ?? 1);
+  const { task } = await tasksResource.get(node.taskId, node.taskVersion ?? 1);
 
-  if (!task.output_schema) {
+  if (!task.outputSchema) {
     ctx.logger.debug({
-      event_type: 'branch.output.skip',
+      eventType: 'branch.output.skip',
       message: 'No output_schema on Task - skipping branch output',
-      metadata: { token_id: token.id, task_id: task.id },
+      metadata: { tokenId: token.id, taskId: task.id },
     });
     return;
   }
 
   // Initialize branch table (creates if not exists)
-  ctx.context.initializeBranchTable(token.id, task.output_schema as JSONSchema);
+  ctx.context.initializeBranchTable(token.id, task.outputSchema as JSONSchema);
 
   // Write output to branch table
   ctx.context.applyBranchOutput(token.id, output);
 
   ctx.emitter.emitTrace({
     type: 'operation.context.branch.written',
-    token_id: token.id,
+    tokenId: token.id,
     payload: { output },
   });
 
-  // Apply state.* mappings from node's output_mapping to shared context
+  // Apply state.* mappings from node's outputMapping to shared context
   // This allows fan-out branches to write to shared state in addition to their branch output
   // (output.* mappings are handled by the branch table, state.* go to shared context)
-  const outputMapping = node.output_mapping as Record<string, string> | null;
+  const outputMapping = node.outputMapping as Record<string, string> | null;
   if (outputMapping) {
     // Filter to only state.* mappings (not output.* which go to branch table)
     const stateMappings: Record<string, string> = {};
@@ -131,11 +131,11 @@ export async function processSynchronization(
     const createdToken = ctx.tokens.get(createdTokenId);
 
     // Find matching sync transition for this token's target node
-    const syncTransition = syncTransitions.find((t) => t.to_node_id === createdToken.node_id);
+    const syncTransition = syncTransitions.find((t) => t.toNodeId === createdToken.nodeId);
 
     if (syncTransition && syncTransition.synchronization) {
       // Get sibling counts for synchronization check
-      const siblingGroup = syncTransition.synchronization.sibling_group;
+      const siblingGroup = syncTransition.synchronization.siblingGroup;
       const siblingCounts = ctx.tokens.getSiblingCounts(ctx.workflowRunId, siblingGroup);
 
       // Plan synchronization decisions (returns decisions + trace events)
@@ -214,7 +214,7 @@ export async function activateFanIn(
     return null;
   }
 
-  const siblings = getSiblingsForMerge(ctx, workflowRunId, sync.sibling_group, fanInPath);
+  const siblings = getSiblingsForMerge(ctx, workflowRunId, sync.siblingGroup, fanInPath);
   if (!siblings) {
     return null;
   }
@@ -224,17 +224,17 @@ export async function activateFanIn(
   // Emit trace event
   ctx.emitter.emitTrace({
     type: 'dispatch.sync.fan_in_activated',
-    node_id: nodeId,
+    nodeId: nodeId,
     payload: {
-      fan_in_path: fanInPath,
-      merged_count: completedSiblings.length,
-      waiting_count: waitingSiblings.length,
+      fanInPath: fanInPath,
+      mergedCount: completedSiblings.length,
+      waitingCount: waitingSiblings.length,
     },
   });
 
   // Step 3: Merge branch outputs if configured
   if (sync.merge) {
-    await mergeBranchOutputs(ctx, transition.from_node_id, completedSiblings, sync.merge);
+    await mergeBranchOutputs(ctx, transition.fromNodeId, completedSiblings, sync.merge);
   }
 
   // Step 4: Mark siblings as completed
@@ -242,7 +242,7 @@ export async function activateFanIn(
 
   // Step 5: Create continuation token
   // Fetch parent token (fan-out origin) to inherit its iteration_counts
-  const parentTokenId = completedSiblings[0].parent_token_id ?? '';
+  const parentTokenId = completedSiblings[0].parentTokenId ?? '';
   const parentToken = parentTokenId ? ctx.tokens.get(parentTokenId) : null;
 
   return createFanInContinuation(ctx, {
@@ -250,7 +250,7 @@ export async function activateFanIn(
     nodeId,
     fanInPath,
     parentTokenId,
-    parentIterationCounts: parentToken?.iteration_counts ?? undefined,
+    parentIterationCounts: parentToken?.iterationCounts ?? undefined,
   });
 }
 
@@ -294,9 +294,9 @@ function tryWinFanInRace(
     // Lost the race - mark triggering token as completed (absorbed by winner)
     ctx.tokens.updateStatus(triggeringTokenId, 'completed');
     ctx.logger.debug({
-      event_type: 'fan_in.race.lost',
+      eventType: 'fan_in.race.lost',
       message: 'Another token already activated this fan-in',
-      metadata: { fan_in_path: fanInPath },
+      metadata: { fanInPath: fanInPath },
     });
     return false;
   }
@@ -323,9 +323,9 @@ function getSiblingsForMerge(
 
   if (completedSiblings.length === 0) {
     ctx.logger.debug({
-      event_type: 'fan_in.no_completed',
+      eventType: 'fan_in.no_completed',
       message: 'No completed siblings found',
-      metadata: { fan_in_path: fanInPath },
+      metadata: { fanInPath: fanInPath },
     });
     return null;
   }
@@ -345,19 +345,19 @@ async function mergeBranchOutputs(
   if (!mergeConfig) return;
 
   const sourceNode = ctx.defs.getNode(sourceNodeId);
-  if (!sourceNode.task_id) return;
+  if (!sourceNode.taskId) return;
 
   const tasksResource = ctx.resources.tasks();
   const { task } = await tasksResource.get(
-    sourceNode.task_id,
-    sourceNode.task_version ?? 1,
+    sourceNode.taskId,
+    sourceNode.taskVersion ?? 1,
   );
 
-  if (task.output_schema) {
+  if (task.outputSchema) {
     const branchOutputs = ctx.context.getBranchOutputs(
       completedSiblings.map((s) => s.id),
-      completedSiblings.map((s) => s.branch_index),
-      task.output_schema as JSONSchema,
+      completedSiblings.map((s) => s.branchIndex),
+      task.outputSchema as JSONSchema,
     );
     ctx.context.mergeBranches(branchOutputs, mergeConfig);
   }
@@ -405,9 +405,9 @@ function createFanInContinuation(
 
   if (applyResult.tokensCreated.length === 0) {
     ctx.logger.debug({
-      event_type: 'fan_in.no_continuation',
+      eventType: 'fan_in.no_continuation',
       message: 'No continuation token created',
-      metadata: { fan_in_path: params.fanInPath },
+      metadata: { fanInPath: params.fanInPath },
     });
     return null;
   }

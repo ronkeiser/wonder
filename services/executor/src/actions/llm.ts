@@ -24,11 +24,11 @@ import type { ActionDeps, ActionInput, ActionOutput } from './types';
  * LLM implementation schema
  */
 interface LLMImplementation {
-  model_profile_id: string;
-  prompt_spec_id?: string;
-  prompt_template?: string;
-  system_prompt?: string;
-  json_schema?: object;
+  modelProfileId: string;
+  promptSpecId?: string;
+  promptTemplate?: string;
+  systemPrompt?: string;
+  jsonSchema?: object;
 }
 
 /**
@@ -47,44 +47,44 @@ export async function executeLLMAction(
   try {
     // Load model profile from Resources
     using modelProfilesResource = env.RESOURCES.modelProfiles();
-    const { model_profile } = await modelProfilesResource.get(impl.model_profile_id);
+    const { modelProfile } = await modelProfilesResource.get(impl.modelProfileId);
 
     // Resolve prompt template - either from prompt spec or directly provided
     let promptTemplate: string;
-    let systemPrompt: string | undefined = impl.system_prompt;
-    let jsonSchema: object | undefined = impl.json_schema;
+    let systemPrompt: string | undefined = impl.systemPrompt;
+    let jsonSchema: object | undefined = impl.jsonSchema;
 
-    if (impl.prompt_spec_id) {
+    if (impl.promptSpecId) {
       // Load prompt spec from Resources
       using promptSpecsResource = env.RESOURCES.promptSpecs();
-      const { prompt_spec } = await promptSpecsResource.get(impl.prompt_spec_id);
-      promptTemplate = prompt_spec.template;
+      const { promptSpec } = await promptSpecsResource.get(impl.promptSpecId);
+      promptTemplate = promptSpec.template;
       // Use prompt spec's system prompt if not overridden
-      if (!systemPrompt && prompt_spec.system_prompt) {
-        systemPrompt = prompt_spec.system_prompt;
+      if (!systemPrompt && promptSpec.systemPrompt) {
+        systemPrompt = promptSpec.systemPrompt;
       }
-      // Use prompt spec's produces schema as json_schema if not overridden
-      if (!jsonSchema && prompt_spec.produces) {
-        jsonSchema = prompt_spec.produces as object;
+      // Use prompt spec's produces schema as jsonSchema if not overridden
+      if (!jsonSchema && promptSpec.produces) {
+        jsonSchema = promptSpec.produces as object;
       }
 
       // Log prompt spec details for debugging
       logger.info({
-        event_type: 'llm_prompt_spec_loaded',
+        eventType: 'llm_prompt_spec_loaded',
         message: 'Prompt spec loaded',
-        trace_id: context.workflowRunId,
+        traceId: context.workflowRunId,
         metadata: {
-          step_ref: context.stepRef,
-          prompt_spec_id: impl.prompt_spec_id,
-          has_produces: !!prompt_spec.produces,
-          produces: prompt_spec.produces,
-          template_length: promptTemplate.length,
+          stepRef: context.stepRef,
+          promptSpecId: impl.promptSpecId,
+          hasProduces: !!promptSpec.produces,
+          produces: promptSpec.produces,
+          templateLength: promptTemplate.length,
         },
       });
-    } else if (impl.prompt_template) {
-      promptTemplate = impl.prompt_template;
+    } else if (impl.promptTemplate) {
+      promptTemplate = impl.promptTemplate;
     } else {
-      throw new Error('LLM action requires either prompt_spec_id or prompt_template');
+      throw new Error('LLM action requires either promptSpecId or promptTemplate');
     }
 
     // Render prompt template with input values
@@ -108,10 +108,10 @@ export async function executeLLMAction(
     // Build AI.run options
     const aiOptions: Record<string, unknown> = {
       messages,
-      ...model_profile.parameters,
+      ...modelProfile.parameters,
     };
 
-    // Add response_format if json_schema provided (from impl or prompt spec produces)
+    // Add response_format if jsonSchema provided (from impl or prompt spec produces)
     if (jsonSchema) {
       aiOptions.response_format = {
         type: 'json_schema',
@@ -124,22 +124,22 @@ export async function executeLLMAction(
     }
 
     logger.info({
-      event_type: 'llm_action_started',
+      eventType: 'llm_action_started',
       message: 'LLM action started',
-      trace_id: context.workflowRunId,
+      traceId: context.workflowRunId,
       metadata: {
-        step_ref: context.stepRef,
-        action_id: action.id,
-        model: model_profile.model_id,
-        provider: model_profile.provider,
-        prompt_length: prompt.length,
-        has_json_schema: !!jsonSchema,
+        stepRef: context.stepRef,
+        actionId: action.id,
+        model: modelProfile.modelId,
+        provider: modelProfile.provider,
+        promptLength: prompt.length,
+        hasJsonSchema: !!jsonSchema,
       },
     });
 
     // Call Workers AI
     const response = (await env.AI.run(
-      model_profile.model_id as Parameters<Ai['run']>[0],
+      modelProfile.modelId as Parameters<Ai['run']>[0],
       aiOptions,
     )) as {
       response?: unknown;
@@ -150,17 +150,17 @@ export async function executeLLMAction(
 
     // Log raw LLM response for debugging
     logger.info({
-      event_type: 'llm_raw_response',
+      eventType: 'llm_raw_response',
       message: 'LLM raw response received',
-      trace_id: context.workflowRunId,
+      traceId: context.workflowRunId,
       metadata: {
-        step_ref: context.stepRef,
-        raw_response: rawResponse,
-        raw_response_type: typeof rawResponse,
+        stepRef: context.stepRef,
+        rawResponse: rawResponse,
+        rawResponseType: typeof rawResponse,
       },
     });
 
-    // Process response based on json_schema presence
+    // Process response based on jsonSchema presence
     let processedResponse: unknown;
 
     if (jsonSchema) {
@@ -173,10 +173,10 @@ export async function executeLLMAction(
           processedResponse = JSON.parse(rawResponse);
         } catch {
           logger.warn({
-            event_type: 'llm_json_parse_fallback',
+            eventType: 'llm_json_parse_fallback',
             message: 'Could not parse JSON response, using raw string',
-            trace_id: context.workflowRunId,
-            metadata: { step_ref: context.stepRef, raw_response: rawResponse },
+            traceId: context.workflowRunId,
+            metadata: { stepRef: context.stepRef, rawResponse: rawResponse },
           });
           processedResponse = rawResponse;
         }
@@ -188,14 +188,14 @@ export async function executeLLMAction(
     }
 
     logger.info({
-      event_type: 'llm_action_completed',
+      eventType: 'llm_action_completed',
       message: 'LLM action completed',
-      trace_id: context.workflowRunId,
+      traceId: context.workflowRunId,
       metadata: {
-        step_ref: context.stepRef,
-        action_id: action.id,
-        duration_ms: duration,
-        response_type: typeof processedResponse,
+        stepRef: context.stepRef,
+        actionId: action.id,
+        durationMs: duration,
+        responseType: typeof processedResponse,
       },
     });
 
@@ -205,7 +205,7 @@ export async function executeLLMAction(
         response: processedResponse,
       },
       metrics: {
-        duration_ms: duration,
+        durationMs: duration,
         // TODO: Extract token counts from response if available
       },
     };
@@ -213,13 +213,13 @@ export async function executeLLMAction(
     const duration = Date.now() - startTime;
 
     logger.error({
-      event_type: 'llm_action_failed',
+      eventType: 'llm_action_failed',
       message: 'LLM action failed',
-      trace_id: context.workflowRunId,
+      traceId: context.workflowRunId,
       metadata: {
-        step_ref: context.stepRef,
-        action_id: action.id,
-        duration_ms: duration,
+        stepRef: context.stepRef,
+        actionId: action.id,
+        durationMs: duration,
         error: error instanceof Error ? error.message : String(error),
       },
     });
@@ -232,7 +232,7 @@ export async function executeLLMAction(
         retryable: isRetryableError(error),
       },
       metrics: {
-        duration_ms: duration,
+        durationMs: duration,
       },
     };
   }

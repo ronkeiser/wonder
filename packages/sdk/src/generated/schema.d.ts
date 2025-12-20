@@ -510,7 +510,7 @@ export interface paths {
                     };
                     content: {
                         "application/json": {
-                            model_profiles: components["schemas"]["ModelProfile"][];
+                            modelProfiles: components["schemas"]["ModelProfile"][];
                         };
                     };
                 };
@@ -617,8 +617,8 @@ export interface paths {
         get: {
             parameters: {
                 query?: {
-                    project_id?: string;
-                    library_id?: string;
+                    projectId?: string;
+                    libraryId?: string;
                     limit?: number;
                 };
                 header?: never;
@@ -1097,7 +1097,7 @@ export interface paths {
                     /** @description Filter by status (comma-separated: running,completed,failed) */
                     status?: string;
                     /** @description Filter by project ID */
-                    project_id?: string;
+                    projectId?: string;
                 };
                 header?: never;
                 path?: never;
@@ -1157,7 +1157,7 @@ export interface paths {
                     content: {
                         "application/json": {
                             error: string;
-                            received_upgrade?: string;
+                            receivedUpgrade?: string;
                         };
                     };
                 };
@@ -1219,14 +1219,14 @@ export interface paths {
         get: {
             parameters: {
                 query?: {
-                    workflow_run_id?: string;
-                    parent_run_id?: string;
-                    project_id?: string;
-                    event_type?: string;
-                    node_id?: string;
-                    token_id?: string;
+                    workflowRunId?: string;
+                    parentRunId?: string;
+                    projectId?: string;
+                    eventType?: string;
+                    nodeId?: string;
+                    tokenId?: string;
                     limit?: number;
-                    after_sequence?: number | null;
+                    afterSequence?: number | null;
                 };
                 header?: never;
                 path?: never;
@@ -1264,14 +1264,14 @@ export interface paths {
         get: {
             parameters: {
                 query?: {
-                    workflow_run_id?: string;
-                    token_id?: string;
-                    node_id?: string;
+                    workflowRunId?: string;
+                    tokenId?: string;
+                    nodeId?: string;
                     type?: string;
                     category?: "decision" | "operation" | "dispatch" | "sql";
-                    project_id?: string;
+                    projectId?: string;
                     limit?: number;
-                    min_duration_ms?: number | null;
+                    minDurationMs?: number | null;
                 };
                 header?: never;
                 path?: never;
@@ -1310,12 +1310,12 @@ export interface paths {
                 query?: {
                     service?: string;
                     level?: "error" | "warn" | "info" | "debug" | "fatal";
-                    event_type?: string;
-                    trace_id?: string;
-                    request_id?: string;
-                    workspace_id?: string;
-                    project_id?: string;
-                    user_id?: string;
+                    eventType?: string;
+                    traceId?: string;
+                    requestId?: string;
+                    workspaceId?: string;
+                    projectId?: string;
+                    userId?: string;
                     limit?: number;
                 };
                 header?: never;
@@ -1337,16 +1337,16 @@ export interface paths {
                                 level: string;
                                 service: string;
                                 environment: string;
-                                event_type: string | null;
+                                eventType: string | null;
                                 message: string | null;
-                                source_location: string | null;
-                                trace_id: string | null;
-                                request_id: string | null;
-                                workspace_id: string | null;
-                                project_id: string | null;
-                                user_id: string | null;
+                                sourceLocation: string | null;
+                                traceId: string | null;
+                                requestId: string | null;
+                                workspaceId: string | null;
+                                projectId: string | null;
+                                userId: string | null;
                                 version: string | null;
-                                instance_id: string | null;
+                                instanceId: string | null;
                                 metadata: string;
                             }[];
                         };
@@ -1377,15 +1377,15 @@ export interface components {
                 [key: string]: unknown;
             } | null;
             /** @example 2024-01-01T00:00:00Z */
-            created_at: string;
+            createdAt: string;
             /** @example 2024-01-01T00:00:00Z */
-            updated_at: string;
+            updatedAt: string;
         };
         WorkspaceListResponse: {
             workspaces: components["schemas"]["Workspace"][];
         };
         WorkspaceCreateResponse: {
-            workspace_id: string;
+            workspaceId: string;
             workspace: components["schemas"]["Workspace"];
         };
         CreateWorkspace: {
@@ -1412,25 +1412,25 @@ export interface components {
         };
         Project: {
             id: string;
-            workspace_id: string;
+            workspaceId: string;
             name: string;
             description: string | null;
             settings: {
                 [key: string]: unknown;
             } | null;
-            created_at: string;
-            updated_at: string;
+            createdAt: string;
+            updatedAt: string;
         };
         WorkspaceProjectsResponse: {
             projects: components["schemas"]["Project"][];
         };
         ProjectCreateResponse: {
-            project_id: string;
+            projectId: string;
             project: components["schemas"]["Project"];
         };
         CreateProject: {
             /** @example 01ARZ3NDEKTSV4RRFFQ69G5FAV */
-            workspace_id: string;
+            workspaceId: string;
             /** @example My Project */
             name: string;
             /** @example Project description */
@@ -1466,12 +1466,12 @@ export interface components {
             idempotency: {
                 [key: string]: unknown;
             } | null;
-            content_hash: string | null;
-            created_at: string;
-            updated_at: string;
+            contentHash: string | null;
+            createdAt: string;
+            updatedAt: string;
         };
         ActionCreateResponse: {
-            action_id: string;
+            actionId: string;
             action: components["schemas"]["Action"];
             /** @description True if an existing action was reused (autoversion matched) */
             reused: boolean;
@@ -1523,7 +1523,7 @@ export interface components {
             name: string;
             description: string;
             version: number;
-            system_prompt: string | null;
+            systemPrompt: string | null;
             template: string;
             requires: {
                 [key: string]: unknown;
@@ -1531,13 +1531,13 @@ export interface components {
             produces: JSONSchema;
             examples: unknown[] | null;
             tags: string[] | null;
-            content_hash: string | null;
-            created_at: string;
-            updated_at: string;
+            contentHash: string | null;
+            createdAt: string;
+            updatedAt: string;
         };
         PromptSpecCreateResponse: {
-            prompt_spec_id: string;
-            prompt_spec: components["schemas"]["PromptSpec"];
+            promptSpecId: string;
+            promptSpec: components["schemas"]["PromptSpec"];
             /** @description True if an existing prompt spec was reused (autoversion matched) */
             reused: boolean;
         };
@@ -1552,7 +1552,7 @@ export interface components {
              */
             version: number;
             /** @example You are a helpful assistant. */
-            system_prompt?: string;
+            systemPrompt?: string;
             /** @example Summarize: {{text}} */
             template: string;
             /**
@@ -1575,7 +1575,7 @@ export interface components {
             autoversion?: boolean;
         };
         PromptSpecGetResponse: {
-            prompt_spec: components["schemas"]["PromptSpec"];
+            promptSpec: components["schemas"]["PromptSpec"];
         };
         ModelProfile: {
             id: string;
@@ -1583,18 +1583,18 @@ export interface components {
             /** @enum {string} */
             provider: "anthropic" | "openai" | "google" | "cloudflare" | "local";
             /** @enum {string} */
-            model_id: "@cf/meta/llama-4-scout-17b-16e-instruct" | "@cf/meta/llama-3.3-70b-instruct-fp8-fast" | "@cf/openai/gpt-oss-120b" | "@cf/openai/gpt-oss-20b" | "anthropic-dummy" | "openai-dummy" | "google-dummy" | "local-dummy";
+            modelId: "@cf/meta/llama-4-scout-17b-16e-instruct" | "@cf/meta/llama-3.3-70b-instruct-fp8-fast" | "@cf/openai/gpt-oss-120b" | "@cf/openai/gpt-oss-20b" | "anthropic-dummy" | "openai-dummy" | "google-dummy" | "local-dummy";
             parameters?: unknown;
-            execution_config?: unknown;
-            cost_per_1k_input_tokens: number;
-            cost_per_1k_output_tokens: number;
+            executionConfig?: unknown;
+            costPer1kInputTokens: number;
+            costPer1kOutputTokens: number;
         };
         ModelProfileGetResponse: {
-            model_profile: components["schemas"]["ModelProfile"];
+            modelProfile: components["schemas"]["ModelProfile"];
         };
         ModelProfileCreateResponse: {
-            model_profile_id: string;
-            model_profile: components["schemas"]["ModelProfile"];
+            modelProfileId: string;
+            modelProfile: components["schemas"]["ModelProfile"];
         };
         CreateModelProfile: {
             /** @example GPT-4 Default */
@@ -1608,7 +1608,7 @@ export interface components {
              * @example @cf/meta/llama-4-scout-17b-16e-instruct
              * @enum {string}
              */
-            model_id: "@cf/meta/llama-4-scout-17b-16e-instruct" | "@cf/meta/llama-3.3-70b-instruct-fp8-fast" | "@cf/openai/gpt-oss-120b" | "@cf/openai/gpt-oss-20b" | "anthropic-dummy" | "openai-dummy" | "google-dummy" | "local-dummy";
+            modelId: "@cf/meta/llama-4-scout-17b-16e-instruct" | "@cf/meta/llama-3.3-70b-instruct-fp8-fast" | "@cf/openai/gpt-oss-120b" | "@cf/openai/gpt-oss-20b" | "anthropic-dummy" | "openai-dummy" | "google-dummy" | "local-dummy";
             /**
              * @example {
              *       "temperature": 0.7
@@ -1617,13 +1617,13 @@ export interface components {
             parameters: {
                 [key: string]: unknown;
             };
-            execution_config?: {
+            executionConfig?: {
                 [key: string]: unknown;
             };
             /** @example 0.03 */
-            cost_per_1k_input_tokens: number;
+            costPer1kInputTokens: number;
             /** @example 0.06 */
-            cost_per_1k_output_tokens: number;
+            costPer1kOutputTokens: number;
         };
         Step: {
             /** @example 01ARZ3NDEKTSV4RRFFQ69G5FAV */
@@ -1633,15 +1633,15 @@ export interface components {
             /** @example 0 */
             ordinal: number;
             /** @example 01ARZ3NDEKTSV4RRFFQ69G5FAV */
-            action_id: string;
+            actionId: string;
             /** @example 1 */
-            action_version: number;
+            actionVersion: number;
             /**
              * @example {
              *       "prompt": "$.input.prompt"
              *     }
              */
-            input_mapping: {
+            inputMapping: {
                 [key: string]: unknown;
             } | null;
             /**
@@ -1649,7 +1649,7 @@ export interface components {
              *       "response": "$.result.text"
              *     }
              */
-            output_mapping: {
+            outputMapping: {
                 [key: string]: unknown;
             } | null;
             /**
@@ -1657,7 +1657,7 @@ export interface components {
              * @example abort
              * @enum {string}
              */
-            on_failure: "abort" | "retry" | "continue";
+            onFailure: "abort" | "retry" | "continue";
             condition?: {
                 if: string;
                 /** @enum {string} */
@@ -1668,16 +1668,16 @@ export interface components {
         };
         RetryConfig: {
             /** @example 3 */
-            max_attempts: number;
+            maxAttempts: number;
             /**
              * @example exponential
              * @enum {string}
              */
             backoff: "none" | "linear" | "exponential";
             /** @example 1000 */
-            initial_delay_ms: number;
+            initialDelayMs: number;
             /** @example 30000 */
-            max_delay_ms: number | null;
+            maxDelayMs: number | null;
         } | null;
         TaskDef: {
             /** @example 01ARZ3NDEKTSV4RRFFQ69G5FAV */
@@ -1685,24 +1685,24 @@ export interface components {
             version: number;
             name: string;
             description: string;
-            project_id: string | null;
-            library_id: string | null;
+            projectId: string | null;
+            libraryId: string | null;
             tags: string[] | null;
-            input_schema: {
+            inputSchema: {
                 [key: string]: unknown;
             };
-            output_schema: {
+            outputSchema: {
                 [key: string]: unknown;
             };
             steps: components["schemas"]["Step"][];
             retry: components["schemas"]["RetryConfig"];
-            timeout_ms: number | null;
-            content_hash: string | null;
-            created_at: string;
-            updated_at: string;
+            timeoutMs: number | null;
+            contentHash: string | null;
+            createdAt: string;
+            updatedAt: string;
         };
         TaskCreateResponse: {
-            task_id: string;
+            taskId: string;
             task: components["schemas"]["TaskDef"];
             /** @description True if an existing task was reused (autoversion matched) */
             reused: boolean;
@@ -1713,16 +1713,16 @@ export interface components {
             /** @example 0 */
             ordinal: number;
             /** @example 01ARZ3NDEKTSV4RRFFQ69G5FAV */
-            action_id: string;
+            actionId: string;
             /** @example 1 */
-            action_version: number;
+            actionVersion: number;
             /**
              * @default null
              * @example {
              *       "prompt": "$.input.prompt"
              *     }
              */
-            input_mapping: {
+            inputMapping: {
                 [key: string]: unknown;
             } | null;
             /**
@@ -1731,7 +1731,7 @@ export interface components {
              *       "response": "$.result.text"
              *     }
              */
-            output_mapping: {
+            outputMapping: {
                 [key: string]: unknown;
             } | null;
             /**
@@ -1739,7 +1739,7 @@ export interface components {
              * @example abort
              * @enum {string}
              */
-            on_failure: "abort" | "retry" | "continue";
+            onFailure: "abort" | "retry" | "continue";
             /** @default null */
             condition: {
                 if: string;
@@ -1760,8 +1760,8 @@ export interface components {
              */
             version: number;
             /** @example 01ARZ3NDEKTSV4RRFFQ69G5FAV */
-            project_id?: string;
-            library_id?: string;
+            projectId?: string;
+            libraryId?: string;
             tags?: string[];
             /**
              * @example {
@@ -1776,7 +1776,7 @@ export interface components {
              *       }
              *     }
              */
-            input_schema: {
+            inputSchema: {
                 [key: string]: unknown;
             };
             /**
@@ -1789,7 +1789,7 @@ export interface components {
              *       }
              *     }
              */
-            output_schema: {
+            outputSchema: {
                 [key: string]: unknown;
             };
             /**
@@ -1797,16 +1797,16 @@ export interface components {
              *       {
              *         "ref": "write",
              *         "ordinal": 0,
-             *         "action_id": "write_file_action",
-             *         "action_version": 1,
-             *         "on_failure": "abort"
+             *         "actionId": "write_file_action",
+             *         "actionVersion": 1,
+             *         "onFailure": "abort"
              *       }
              *     ]
              */
             steps: components["schemas"]["CreateStep"][];
             retry?: components["schemas"]["RetryConfig"];
             /** @example 30000 */
-            timeout_ms?: number;
+            timeoutMs?: number;
             /** @description When true, compute content hash for deduplication. If existing task with same name/owner and content exists, return it. Otherwise auto-increment version. */
             autoversion?: boolean;
         };
@@ -1821,20 +1821,26 @@ export interface components {
             name: string;
             description: string;
             version: number;
-            project_id: string | null;
-            library_id: string | null;
+            projectId: string | null;
+            libraryId: string | null;
             tags: string[] | null;
-            input_schema: JSONSchema;
-            output_schema: JSONSchema;
-            context_schema: JSONSchema | null;
-            initial_node_id: string | null;
-            content_hash: string | null;
-            created_at: string;
-            updated_at: string;
+            inputSchema: {
+                [key: string]: unknown;
+            };
+            outputSchema: {
+                [key: string]: unknown;
+            };
+            contextSchema: {
+                [key: string]: unknown;
+            } | null;
+            initialNodeId: string | null;
+            contentHash: string | null;
+            createdAt: string;
+            updatedAt: string;
         };
         WorkflowDefCreateResponse: {
-            workflow_def_id: string;
-            workflow_def: components["schemas"]["WorkflowDef"];
+            workflowDefId: string;
+            workflowDef: components["schemas"]["WorkflowDef"];
             reused: boolean;
         };
         CreateWorkflowDef: {
@@ -1843,44 +1849,50 @@ export interface components {
             /** @example Generates and reviews content */
             description: string;
             /** @example 01ARZ3NDEKTSV4RRFFQ69G5FAV */
-            project_id?: string;
-            library_id?: string;
+            projectId?: string;
+            libraryId?: string;
             tags?: string[];
             /**
              * @example {
              *       "topic": "string"
              *     }
              */
-            input_schema: JSONSchema;
+            inputSchema: {
+                [key: string]: unknown;
+            };
             /**
              * @example {
              *       "content": "string"
              *     }
              */
-            output_schema: JSONSchema;
+            outputSchema: {
+                [key: string]: unknown;
+            };
             /**
              * @example {
              *       "result": "$.final_node_output.response"
              *     }
              */
-            output_mapping?: {
+            outputMapping?: {
                 [key: string]: string;
             };
-            context_schema?: JSONSchema;
+            contextSchema?: {
+                [key: string]: unknown;
+            };
             /** @example start_node */
-            initial_node_ref: string;
+            initialNodeRef: string;
             nodes: {
                 /** @example llm_call_node */
                 ref: string;
                 name: string;
                 /** @example my-task */
-                task_id?: string;
+                taskId?: string;
                 /** @example 1 */
-                task_version?: number;
-                input_mapping?: {
+                taskVersion?: number;
+                inputMapping?: {
                     [key: string]: unknown;
                 };
-                output_mapping?: {
+                outputMapping?: {
                     [key: string]: unknown;
                 };
                 /**
@@ -1888,31 +1900,31 @@ export interface components {
                  *       "container": "dev_env"
                  *     }
                  */
-                resource_bindings?: {
+                resourceBindings?: {
                     [key: string]: string;
                 };
             }[];
             transitions?: {
                 ref?: string;
-                from_node_ref: string;
-                to_node_ref: string;
+                fromNodeRef: string;
+                toNodeRef: string;
                 priority: number;
                 condition?: {
                     [key: string]: unknown;
                 };
-                spawn_count?: number;
-                sibling_group?: string;
+                spawnCount?: number;
+                siblingGroup?: string;
                 foreach?: {
                     [key: string]: unknown;
                 };
                 synchronization?: {
                     strategy: string;
-                    sibling_group: string;
+                    siblingGroup: string;
                     merge?: {
                         [key: string]: unknown;
                     };
                 };
-                loop_config?: {
+                loopConfig?: {
                     [key: string]: unknown;
                 };
             }[];
@@ -1921,67 +1933,67 @@ export interface components {
         };
         Node: {
             id: string;
-            workflow_def_id: string;
-            workflow_def_version: number;
+            workflowDefId: string;
+            workflowDefVersion: number;
             ref: string;
             name: string;
-            task_id: string | null;
-            task_version: number | null;
-            input_mapping: {
+            taskId: string | null;
+            taskVersion: number | null;
+            inputMapping: {
                 [key: string]: unknown;
             } | null;
-            output_mapping: {
+            outputMapping: {
                 [key: string]: unknown;
             } | null;
-            resource_bindings: {
+            resourceBindings: {
                 [key: string]: string;
             } | null;
         };
         Transition: {
             id: string;
-            workflow_def_id: string;
-            workflow_def_version: number;
+            workflowDefId: string;
+            workflowDefVersion: number;
             ref: string | null;
-            from_node_id: string;
-            to_node_id: string;
+            fromNodeId: string;
+            toNodeId: string;
             priority: number;
             condition: {
                 [key: string]: unknown;
             } | null;
-            spawn_count: number | null;
+            spawnCount: number | null;
             foreach: {
                 [key: string]: unknown;
             } | null;
             synchronization: {
                 [key: string]: unknown;
             } | null;
-            loop_config: {
+            loopConfig: {
                 [key: string]: unknown;
             } | null;
         };
         WorkflowDefGetResponse: {
-            workflow_def: components["schemas"]["WorkflowDef"];
+            workflowDef: components["schemas"]["WorkflowDef"];
             nodes: components["schemas"]["Node"][];
             transitions: components["schemas"]["Transition"][];
         };
         Workflow: {
             id: string;
-            project_id: string;
-            workflow_def_id: string;
+            projectId: string;
+            workflowDefId: string;
             name: string;
             description: string | null;
-            created_at: string;
-            updated_at: string;
+            createdAt: string;
+            updatedAt: string;
         };
         WorkflowCreateResponse: {
-            workflow_id: string;
+            workflowId: string;
             workflow: components["schemas"]["Workflow"];
         };
         CreateWorkflow: {
             /** @example 01ARZ3NDEKTSV4RRFFQ69G5FAV */
-            project_id: string;
+            projectId: string;
             /** @example 01ARZ3NDEKTSV4RRFFQ69G5FAV */
-            workflow_def_id: string;
+            workflowDefId: string;
             /** @example My Workflow Instance */
             name: string;
             /** @example Production workflow instance */
@@ -1991,8 +2003,8 @@ export interface components {
             workflow: components["schemas"]["Workflow"];
         };
         WorkflowStartResponse: {
-            workflow_run_id: string;
-            durable_object_id: string;
+            workflowRunId: string;
+            durableObjectId: string;
         };
         WorkflowStartError: {
             error: string;
@@ -2001,9 +2013,9 @@ export interface components {
             success: boolean;
         };
         WorkflowRunCreateResponse: {
-            workflow_run_id: string;
-            project_id: string;
-            workspace_id: string;
+            workflowRunId: string;
+            projectId: string;
+            workspaceId: string;
         };
         WorkflowRunCreateError: {
             error: string;
@@ -2019,24 +2031,24 @@ export interface components {
             };
         };
         WorkflowRunStartResponse: {
-            durable_object_id: string;
+            durableObjectId: string;
         };
         WorkflowRunStartError: {
             error: string;
         };
         WorkflowRunSummary: {
             id: string;
-            project_id: string;
-            workflow_id: string;
-            workflow_name: string;
-            workflow_def_id: string;
-            workflow_version: number;
+            projectId: string;
+            workflowId: string;
+            workflowName: string;
+            workflowDefId: string;
+            workflowVersion: number;
             /** @enum {string} */
             status: "running" | "completed" | "failed" | "waiting";
-            parent_run_id: string | null;
-            created_at: string;
-            updated_at: string;
-            completed_at: string | null;
+            parentRunId: string | null;
+            createdAt: string;
+            updatedAt: string;
+            completedAt: string | null;
         };
         WorkflowRunListResponse: {
             runs: components["schemas"]["WorkflowRunSummary"][];
@@ -2051,16 +2063,16 @@ export interface components {
             id: string;
             timestamp: number;
             sequence: number;
-            event_type: string;
-            workflow_run_id: string;
-            parent_run_id?: string | null;
-            workflow_def_id: string;
-            node_id?: string | null;
-            token_id?: string | null;
-            path_id?: string | null;
-            project_id: string;
+            eventType: string;
+            workflowRunId: string;
+            parentRunId?: string | null;
+            workflowDefId: string;
+            nodeId?: string | null;
+            tokenId?: string | null;
+            pathId?: string | null;
+            projectId: string;
             tokens?: number | null;
-            cost_usd?: number | null;
+            costUsd?: number | null;
             message?: string | null;
             metadata: string;
         };
@@ -2078,11 +2090,11 @@ export interface components {
             type: string;
             /** @enum {string} */
             category: "decision" | "operation" | "dispatch" | "sql" | "debug";
-            workflow_run_id: string;
-            token_id: string | null;
-            node_id: string | null;
-            project_id: string;
-            duration_ms: number | null;
+            workflowRunId: string;
+            tokenId: string | null;
+            nodeId: string | null;
+            projectId: string;
+            durationMs: number | null;
             payload: components["schemas"]["TraceEventPayload"];
         };
         TraceEventsResponse: {

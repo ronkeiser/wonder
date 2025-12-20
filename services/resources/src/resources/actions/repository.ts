@@ -6,7 +6,7 @@ import { ulid } from 'ulid';
 import { actions } from '~/schema';
 import type { Action } from './types';
 
-type NewAction = Omit<typeof actions.$inferInsert, 'id' | 'created_at' | 'updated_at'>;
+type NewAction = Omit<typeof actions.$inferInsert, 'id' | 'createdAt' | 'updatedAt'>;
 
 type ActionKind = Action['kind'];
 
@@ -15,8 +15,8 @@ export async function createAction(db: DrizzleD1Database, data: NewAction): Prom
   const action = {
     id: ulid(),
     ...data,
-    created_at: now,
-    updated_at: now,
+    createdAt: now,
+    updatedAt: now,
   };
 
   await db.insert(actions).values(action).run();
@@ -86,7 +86,7 @@ export async function getActionByNameAndHash(
   const result = await db
     .select()
     .from(actions)
-    .where(and(eq(actions.name, name), eq(actions.content_hash, contentHash)))
+    .where(and(eq(actions.name, name), eq(actions.contentHash, contentHash)))
     .get();
   return result ?? null;
 }

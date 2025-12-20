@@ -19,7 +19,7 @@ export class ArtifactTypes extends Resource {
     reused: boolean;
   }> {
     this.serviceCtx.logger.info({
-      event_type: 'artifact_type.create.started',
+      eventType: 'artifact_type.create.started',
       metadata: { name: data.name, autoversion: data.autoversion ?? false },
     });
 
@@ -45,7 +45,7 @@ export class ArtifactTypes extends Resource {
         name: data.name,
         description: data.description ?? '',
         schema: data.schema,
-        content_hash: autoversionResult.contentHash,
+        contentHash: autoversionResult.contentHash,
       });
 
       return {

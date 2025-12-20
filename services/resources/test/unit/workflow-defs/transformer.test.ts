@@ -1,7 +1,7 @@
 /**
  * Unit tests for workflow-defs transformer
  *
- * Critical test: synchronization.sibling_group ref → ID transformation
+ * Critical test: synchronization.siblingGroup ref → ID transformation
  */
 
 import { describe, expect, it } from 'vitest';
@@ -26,7 +26,7 @@ describe('transformer', () => {
           { ref: 'end', name: 'End' },
         ],
         transitions: [
-          { ref: 'start-to-end', from_node_ref: 'start', to_node_ref: 'end', priority: 0 },
+          { ref: 'start-to-end', fromNodeRef: 'start', toNodeRef: 'end', priority: 0 },
         ],
       };
 
@@ -60,7 +60,7 @@ describe('transformer', () => {
           { ref: 'end', name: 'End' },
         ],
         transitions: [
-          { from_node_ref: 'start', to_node_ref: 'end', priority: 0 }, // No ref
+          { fromNodeRef: 'start', toNodeRef: 'end', priority: 0 }, // No ref
         ],
       };
 
@@ -114,7 +114,7 @@ describe('transformer', () => {
       expect(result.nodes[1].id).toBe(ids.nodeIds.get('end'));
     });
 
-    it('transforms transition from_node_ref and to_node_ref to IDs', () => {
+    it('transforms transition fromNodeRef and toNodeRef to IDs', () => {
       const input: WorkflowDefInput = {
         name: 'test-workflow',
         description: 'Test',
@@ -126,31 +126,31 @@ describe('transformer', () => {
           { ref: 'start', name: 'Start' },
           { ref: 'end', name: 'End' },
         ],
-        transitions: [{ ref: 'go', from_node_ref: 'start', to_node_ref: 'end', priority: 0 }],
+        transitions: [{ ref: 'go', fromNodeRef: 'start', toNodeRef: 'end', priority: 0 }],
       };
 
       const ids = generateIds(input);
       const result = transformWorkflowDef(input, ids);
 
       expect(result.transitions).toHaveLength(1);
-      expect(result.transitions[0].from_node_id).toBe(ids.nodeIds.get('start'));
-      expect(result.transitions[0].to_node_id).toBe(ids.nodeIds.get('end'));
+      expect(result.transitions[0].fromNodeId).toBe(ids.nodeIds.get('start'));
+      expect(result.transitions[0].toNodeId).toBe(ids.nodeIds.get('end'));
     });
   });
 
-  describe('synchronization.sibling_group ref → ID transformation', () => {
+  describe('synchronization.siblingGroup ref → ID transformation', () => {
     /**
      * CRITICAL TEST: This is the core behavior being verified.
      *
      * Fan-out/fan-in pattern:
-     * - fan-out transition spawns multiple parallel activations (spawn_count: 3)
+     * - fan-out transition spawns multiple parallel activations (spawnCount: 3)
      * - fan-in transition waits for all spawned activations to complete
-     * - fan-in references fan-out via sibling_group
+     * - fan-in references fan-out via siblingGroup
      *
-     * At authoring time: sibling_group = "fan-out" (the ref)
-     * At runtime: sibling_group must be the ULID of the fan-out transition
+     * At authoring time: siblingGroup = "fan-out" (the ref)
+     * At runtime: siblingGroup must be the ULID of the fan-out transition
      */
-    it('transforms sibling_group from ref to transition ID', () => {
+    it('transforms siblingGroup from ref to transition ID', () => {
       const input: WorkflowDefInput = {
         name: 'fan-out-fan-in-workflow',
         description: 'Parallel processing with synchronization',
@@ -166,19 +166,19 @@ describe('transformer', () => {
         transitions: [
           {
             ref: 'fan-out',
-            from_node_ref: 'start',
-            to_node_ref: 'parallel-task',
+            fromNodeRef: 'start',
+            toNodeRef: 'parallel-task',
             priority: 0,
-            spawn_count: 3, // Creates 3 parallel activations
+            spawnCount: 3, // Creates 3 parallel activations
           },
           {
             ref: 'fan-in',
-            from_node_ref: 'parallel-task',
-            to_node_ref: 'collect',
+            fromNodeRef: 'parallel-task',
+            toNodeRef: 'collect',
             priority: 0,
             synchronization: {
               strategy: 'wait_all',
-              sibling_group: 'fan-out', // <-- This is a REF at authoring time
+              siblingGroup: 'fan-out', // <-- This is a REF at authoring time
               merge: { strategy: 'array' },
             },
           },
@@ -193,16 +193,16 @@ describe('transformer', () => {
       expect(fanInTransition).toBeDefined();
       expect(fanInTransition!.synchronization).not.toBeNull();
 
-      // The critical assertion: sibling_group should now be the ID, not the ref
+      // The critical assertion: siblingGroup should now be the ID, not the ref
       const fanOutId = ids.transitionIds.get('fan-out');
       expect(fanOutId).toBeTruthy();
-      expect(fanInTransition!.synchronization!.sibling_group).toBe(fanOutId);
+      expect(fanInTransition!.synchronization!.siblingGroup).toBe(fanOutId);
 
       // Verify it's NOT the ref string
-      expect(fanInTransition!.synchronization!.sibling_group).not.toBe('fan-out');
+      expect(fanInTransition!.synchronization!.siblingGroup).not.toBe('fan-out');
 
       // Verify it looks like a ULID (26 chars, alphanumeric)
-      expect(fanInTransition!.synchronization!.sibling_group).toMatch(/^[0-9A-Z]{26}$/);
+      expect(fanInTransition!.synchronization!.siblingGroup).toMatch(/^[0-9A-Z]{26}$/);
     });
 
     it('preserves other synchronization fields during transformation', () => {
@@ -219,15 +219,15 @@ describe('transformer', () => {
           { ref: 'c', name: 'C' },
         ],
         transitions: [
-          { ref: 'spawn', from_node_ref: 'a', to_node_ref: 'b', priority: 0, spawn_count: 5 },
+          { ref: 'spawn', fromNodeRef: 'a', toNodeRef: 'b', priority: 0, spawnCount: 5 },
           {
             ref: 'join',
-            from_node_ref: 'b',
-            to_node_ref: 'c',
+            fromNodeRef: 'b',
+            toNodeRef: 'c',
             priority: 0,
             synchronization: {
               strategy: 'wait_first',
-              sibling_group: 'spawn',
+              siblingGroup: 'spawn',
               merge: { strategy: 'first_success', timeout_ms: 5000 },
             },
           },
@@ -240,7 +240,7 @@ describe('transformer', () => {
       const joinTransition = result.transitions.find((t) => t.ref === 'join');
       expect(joinTransition!.synchronization).toEqual({
         strategy: 'wait_first',
-        sibling_group: ids.transitionIds.get('spawn'), // ID, not ref
+        siblingGroup: ids.transitionIds.get('spawn'), // ID, not ref
         merge: { strategy: 'first_success', timeout_ms: 5000 },
       });
     });
@@ -257,7 +257,7 @@ describe('transformer', () => {
           { ref: 'start', name: 'Start' },
           { ref: 'end', name: 'End' },
         ],
-        transitions: [{ ref: 'simple', from_node_ref: 'start', to_node_ref: 'end', priority: 0 }],
+        transitions: [{ ref: 'simple', fromNodeRef: 'start', toNodeRef: 'end', priority: 0 }],
       };
 
       const ids = generateIds(input);
@@ -266,7 +266,7 @@ describe('transformer', () => {
       expect(result.transitions[0].synchronization).toBeNull();
     });
 
-    it('throws if sibling_group ref is not in transition map', () => {
+    it('throws if siblingGroup ref is not in transition map', () => {
       // This simulates a bug where validation passed but transformer fails
       // In practice, validator.ts should catch this first
       const input: WorkflowDefInput = {
@@ -283,12 +283,12 @@ describe('transformer', () => {
         transitions: [
           {
             ref: 'bad-sync',
-            from_node_ref: 'a',
-            to_node_ref: 'b',
+            fromNodeRef: 'a',
+            toNodeRef: 'b',
             priority: 0,
             synchronization: {
               strategy: 'wait_all',
-              sibling_group: 'nonexistent', // References a transition that doesn't exist
+              siblingGroup: 'nonexistent', // References a transition that doesn't exist
             },
           },
         ],
@@ -297,7 +297,7 @@ describe('transformer', () => {
       const ids = generateIds(input);
 
       expect(() => transformWorkflowDef(input, ids)).toThrow(
-        /sibling_group ref 'nonexistent' not found/,
+        /siblingGroup ref 'nonexistent' not found/,
       );
     });
   });
@@ -335,7 +335,7 @@ describe('transformer', () => {
           { ref: 'end', name: 'End' },
         ],
         transitions: [
-          { from_node_ref: 'start', to_node_ref: 'end', priority: 0 }, // No ref
+          { fromNodeRef: 'start', toNodeRef: 'end', priority: 0 }, // No ref
         ],
       };
 

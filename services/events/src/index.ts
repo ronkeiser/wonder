@@ -24,7 +24,7 @@ export type { WorkflowStatusChange, WorkflowRunStatus } from './hub';
  * All event writes go through the Streamer DO (one per workflow_run_id).
  */
 export class EventsService extends WorkerEntrypoint<Env> {
-  private db = drizzle(this.env.DB);
+  private db = drizzle(this.env.DB, { casing: 'snake_case' });
 
   /**
    * HTTP entrypoint
@@ -42,16 +42,16 @@ export class EventsService extends WorkerEntrypoint<Env> {
       .from(workflowEvents)
       .where(
         and(
-          options.workflow_run_id
-            ? eq(workflowEvents.workflow_run_id, options.workflow_run_id)
+          options.workflowRunId
+            ? eq(workflowEvents.workflowRunId, options.workflowRunId)
             : undefined,
-          options.parent_run_id
-            ? eq(workflowEvents.parent_run_id, options.parent_run_id)
+          options.parentRunId
+            ? eq(workflowEvents.parentRunId, options.parentRunId)
             : undefined,
-          options.project_id ? eq(workflowEvents.project_id, options.project_id) : undefined,
-          options.event_type ? eq(workflowEvents.event_type, options.event_type) : undefined,
-          options.node_id ? eq(workflowEvents.node_id, options.node_id) : undefined,
-          options.token_id ? eq(workflowEvents.token_id, options.token_id) : undefined,
+          options.projectId ? eq(workflowEvents.projectId, options.projectId) : undefined,
+          options.eventType ? eq(workflowEvents.eventType, options.eventType) : undefined,
+          options.nodeId ? eq(workflowEvents.nodeId, options.nodeId) : undefined,
+          options.tokenId ? eq(workflowEvents.tokenId, options.tokenId) : undefined,
         ),
       )
       .orderBy(desc(workflowEvents.timestamp))
@@ -71,16 +71,16 @@ export class EventsService extends WorkerEntrypoint<Env> {
       .from(traceEvents)
       .where(
         and(
-          options.workflow_run_id
-            ? eq(traceEvents.workflow_run_id, options.workflow_run_id)
+          options.workflowRunId
+            ? eq(traceEvents.workflowRunId, options.workflowRunId)
             : undefined,
-          options.token_id ? eq(traceEvents.token_id, options.token_id) : undefined,
-          options.node_id ? eq(traceEvents.node_id, options.node_id) : undefined,
+          options.tokenId ? eq(traceEvents.tokenId, options.tokenId) : undefined,
+          options.nodeId ? eq(traceEvents.nodeId, options.nodeId) : undefined,
           options.type ? eq(traceEvents.type, options.type) : undefined,
           options.category ? eq(traceEvents.category, options.category) : undefined,
-          options.project_id ? eq(traceEvents.project_id, options.project_id) : undefined,
-          options.min_duration_ms
-            ? gte(traceEvents.duration_ms, options.min_duration_ms)
+          options.projectId ? eq(traceEvents.projectId, options.projectId) : undefined,
+          options.minDurationMs
+            ? gte(traceEvents.durationMs, options.minDurationMs)
             : undefined,
         ),
       )

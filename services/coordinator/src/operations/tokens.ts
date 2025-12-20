@@ -17,7 +17,7 @@ import { drizzle, type DrizzleSqliteDODatabase } from 'drizzle-orm/durable-sqlit
 import { ulid } from 'ulid';
 
 import * as schema from '../schema';
-import { fan_ins, tokens } from '../schema';
+import { fanIns, tokens } from '../schema';
 import type { CreateTokenParams, SiblingCounts, TokenStatus } from '../types';
 import type { DefinitionManager } from './defs';
 
@@ -38,12 +38,10 @@ const ACTIVE_STATES: TokenStatus[] = ['pending', 'dispatched', 'executing', 'wai
  */
 export class TokenManager {
   private readonly db: DrizzleSqliteDODatabase<typeof schema>;
-  private readonly defs: DefinitionManager;
   private readonly emitter: Emitter;
 
-  constructor(ctx: DurableObjectState, defs: DefinitionManager, emitter: Emitter) {
-    this.db = drizzle(ctx.storage, { schema });
-    this.defs = defs;
+  constructor(ctx: DurableObjectState, _defs: DefinitionManager, emitter: Emitter) {
+    this.db = drizzle(ctx.storage, { schema, casing: 'snake_case' });
     this.emitter = emitter;
   }
 
@@ -60,22 +58,22 @@ export class TokenManager {
         ...params,
         id: tokenId,
         status: 'pending',
-        created_at: now,
-        updated_at: now,
+        createdAt: now,
+        updatedAt: now,
       })
       .run();
 
     this.emitter.emitTrace({
       type: 'operation.tokens.created',
-      token_id: tokenId,
-      node_id: params.node_id,
+      tokenId: tokenId,
+      nodeId: params.nodeId,
       payload: {
-        task_id: params.node_id,
-        parent_token_id: params.parent_token_id,
-        path_id: params.path_id,
-        sibling_group: params.sibling_group,
-        branch_index: params.branch_index,
-        branch_total: params.branch_total,
+        taskId: params.nodeId,
+        parentTokenId: params.parentTokenId,
+        pathId: params.pathId,
+        siblingGroup: params.siblingGroup,
+        branchIndex: params.branchIndex,
+        branchTotal: params.branchTotal,
       },
     });
 
@@ -105,15 +103,15 @@ export class TokenManager {
       .update(tokens)
       .set({
         status,
-        updated_at: new Date(),
+        updatedAt: new Date(),
       })
       .where(eq(tokens.id, tokenId))
       .run();
 
     this.emitter.emitTrace({
       type: 'operation.tokens.status_updated',
-      token_id: tokenId,
-      node_id: token.node_id,
+      tokenId: tokenId,
+      nodeId: token.nodeId,
       payload: {
         from: token.status,
         to: status,
@@ -128,7 +126,7 @@ export class TokenManager {
     const result = this.db
       .select({ count: count() })
       .from(tokens)
-      .where(and(eq(tokens.workflow_run_id, workflowRunId), inArray(tokens.status, ACTIVE_STATES)))
+      .where(and(eq(tokens.workflowRunId, workflowRunId), inArray(tokens.status, ACTIVE_STATES)))
       .all();
 
     return result[0]?.count ?? 0;
@@ -145,7 +143,7 @@ export class TokenManager {
     return this.db
       .select()
       .from(tokens)
-      .where(and(eq(tokens.workflow_run_id, workflowRunId), eq(tokens.sibling_group, siblingGroup)))
+      .where(and(eq(tokens.workflowRunId, workflowRunId), eq(tokens.siblingGroup, siblingGroup)))
       .all();
   }
 
@@ -187,16 +185,16 @@ export class TokenManager {
       .update(tokens)
       .set({
         status: 'waiting_for_siblings',
-        arrived_at: arrivedAt,
-        updated_at: new Date(),
+        arrivedAt: arrivedAt,
+        updatedAt: new Date(),
       })
       .where(eq(tokens.id, tokenId))
       .run();
 
     this.emitter.emitTrace({
       type: 'operation.tokens.status_updated',
-      token_id: tokenId,
-      node_id: token.node_id,
+      tokenId: tokenId,
+      nodeId: token.nodeId,
       payload: {
         from: token.status,
         to: 'waiting_for_siblings',
@@ -213,8 +211,8 @@ export class TokenManager {
       .from(tokens)
       .where(
         and(
-          eq(tokens.workflow_run_id, workflowRunId),
-          eq(tokens.sibling_group, siblingGroup),
+          eq(tokens.workflowRunId, workflowRunId),
+          eq(tokens.siblingGroup, siblingGroup),
           eq(tokens.status, 'waiting_for_siblings'),
         ),
       )
@@ -233,7 +231,7 @@ export class TokenManager {
     return this.db
       .select()
       .from(tokens)
-      .where(and(eq(tokens.workflow_run_id, workflowRunId), like(tokens.path_id, `${pathPrefix}%`)))
+      .where(and(eq(tokens.workflowRunId, workflowRunId), like(tokens.pathId, `${pathPrefix}%`)))
       .all();
   }
 
@@ -244,8 +242,8 @@ export class TokenManager {
     const ancestors: TokenRow[] = [];
     let currentToken = this.get(tokenId);
 
-    while (currentToken.parent_token_id) {
-      const parent = this.get(currentToken.parent_token_id);
+    while (currentToken.parentTokenId) {
+      const parent = this.get(currentToken.parentTokenId);
       ancestors.push(parent);
       currentToken = parent;
     }
@@ -260,7 +258,7 @@ export class TokenManager {
     const result = this.db
       .select()
       .from(tokens)
-      .where(and(eq(tokens.workflow_run_id, workflowRunId), isNull(tokens.parent_token_id)))
+      .where(and(eq(tokens.workflowRunId, workflowRunId), isNull(tokens.parentTokenId)))
       .limit(1)
       .all();
 
@@ -296,7 +294,7 @@ export class TokenManager {
       .update(tokens)
       .set({
         status: 'completed',
-        updated_at: now,
+        updatedAt: now,
       })
       .where(inArray(tokens.id, tokenIds))
       .run();
@@ -305,8 +303,8 @@ export class TokenManager {
       const token = tokenMap.get(tokenId);
       this.emitter.emitTrace({
         type: 'operation.tokens.status_updated',
-        token_id: tokenId,
-        node_id: token?.node_id ?? 'unknown',
+        tokenId: tokenId,
+        nodeId: token?.nodeId ?? 'unknown',
         payload: {
           from: 'waiting_for_siblings',
           to: 'completed',
@@ -331,7 +329,7 @@ export class TokenManager {
       .update(tokens)
       .set({
         status: 'cancelled',
-        updated_at: now,
+        updatedAt: now,
       })
       .where(inArray(tokens.id, tokenIds))
       .run();
@@ -340,8 +338,8 @@ export class TokenManager {
       const token = tokenMap.get(tokenId);
       this.emitter.emitTrace({
         type: 'operation.tokens.status_updated',
-        token_id: tokenId,
-        node_id: token?.node_id ?? 'unknown',
+        tokenId: tokenId,
+        nodeId: token?.nodeId ?? 'unknown',
         payload: {
           from: token?.status ?? 'unknown',
           to: 'cancelled',
@@ -355,7 +353,7 @@ export class TokenManager {
   // ============================================================================
 
   /**
-   * Build path_id for a new token
+   * Build pathId for a new token
    * Format: parentPath[.nodeId.branchIndex] (only adds if fan-out)
    */
   buildPathId(
@@ -392,22 +390,22 @@ export class TokenManager {
     transitionId: string;
     tokenId: string;
   }): boolean {
-    const { workflowRunId, nodeId, fanInPath, transitionId, tokenId } = params;
+    const { workflowRunId, nodeId, fanInPath, transitionId } = params;
     const fanInId = ulid();
     const now = new Date();
 
     try {
       // INSERT OR IGNORE - if unique constraint violated, nothing happens
       this.db
-        .insert(fan_ins)
+        .insert(fanIns)
         .values({
           id: fanInId,
-          workflow_run_id: workflowRunId,
-          node_id: nodeId,
-          fan_in_path: fanInPath,
+          workflowRunId: workflowRunId,
+          nodeId: nodeId,
+          fanInPath: fanInPath,
           status: 'waiting',
-          transition_id: transitionId,
-          first_arrival_at: now,
+          transitionId: transitionId,
+          firstArrivalAt: now,
         })
         .onConflictDoNothing()
         .run();
@@ -415,15 +413,15 @@ export class TokenManager {
       // Check if our insert succeeded by querying
       const result = this.db
         .select()
-        .from(fan_ins)
-        .where(and(eq(fan_ins.workflow_run_id, workflowRunId), eq(fan_ins.fan_in_path, fanInPath)))
+        .from(fanIns)
+        .where(and(eq(fanIns.workflowRunId, workflowRunId), eq(fanIns.fanInPath, fanInPath)))
         .limit(1)
         .all();
 
       const created = result.length > 0 && result[0].id === fanInId;
 
       return created;
-    } catch (error) {
+    } catch {
       // Constraint violation means another token already created it
       return false;
     }
@@ -447,17 +445,17 @@ export class TokenManager {
 
     // UPDATE ... WHERE status='waiting' - only succeeds if not already activated
     this.db
-      .update(fan_ins)
+      .update(fanIns)
       .set({
         status: 'activated',
-        activated_at: now,
-        activated_by_token_id: activatedByTokenId,
+        activatedAt: now,
+        activatedByTokenId: activatedByTokenId,
       })
       .where(
         and(
-          eq(fan_ins.workflow_run_id, workflowRunId),
-          eq(fan_ins.fan_in_path, fanInPath),
-          eq(fan_ins.status, 'waiting'),
+          eq(fanIns.workflowRunId, workflowRunId),
+          eq(fanIns.fanInPath, fanInPath),
+          eq(fanIns.status, 'waiting'),
         ),
       )
       .run();
@@ -465,15 +463,15 @@ export class TokenManager {
     // Check if we activated it by verifying our token ID is recorded
     const result = this.db
       .select()
-      .from(fan_ins)
-      .where(and(eq(fan_ins.workflow_run_id, workflowRunId), eq(fan_ins.fan_in_path, fanInPath)))
+      .from(fanIns)
+      .where(and(eq(fanIns.workflowRunId, workflowRunId), eq(fanIns.fanInPath, fanInPath)))
       .limit(1)
       .all();
 
     const activated =
       result.length > 0 &&
       result[0].status === 'activated' &&
-      result[0].activated_by_token_id === activatedByTokenId;
+      result[0].activatedByTokenId === activatedByTokenId;
 
     return activated;
   }
@@ -481,11 +479,11 @@ export class TokenManager {
   /**
    * Get fan-in record for a path
    */
-  getFanIn(workflowRunId: string, fanInPath: string): typeof fan_ins.$inferSelect | null {
+  getFanIn(workflowRunId: string, fanInPath: string): typeof fanIns.$inferSelect | null {
     const result = this.db
       .select()
-      .from(fan_ins)
-      .where(and(eq(fan_ins.workflow_run_id, workflowRunId), eq(fan_ins.fan_in_path, fanInPath)))
+      .from(fanIns)
+      .where(and(eq(fanIns.workflowRunId, workflowRunId), eq(fanIns.fanInPath, fanInPath)))
       .limit(1)
       .all();
 

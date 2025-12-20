@@ -10,21 +10,21 @@ export const StepSchema = z
     id: z.string().openapi({ example: '01ARZ3NDEKTSV4RRFFQ69G5FAV' }),
     ref: z.string().min(1).openapi({ example: 'call_llm' }),
     ordinal: z.number().int().min(0).openapi({ example: 0 }),
-    action_id: z.string().openapi({ example: '01ARZ3NDEKTSV4RRFFQ69G5FAV' }),
-    action_version: z.number().int().positive().openapi({ example: 1 }),
-    input_mapping: z
+    actionId: z.string().openapi({ example: '01ARZ3NDEKTSV4RRFFQ69G5FAV' }),
+    actionVersion: z.number().int().positive().openapi({ example: 1 }),
+    inputMapping: z
       .record(z.string(), z.unknown())
       .nullable()
       .openapi({
         example: { prompt: '$.input.prompt' },
       }),
-    output_mapping: z
+    outputMapping: z
       .record(z.string(), z.unknown())
       .nullable()
       .openapi({
         example: { response: '$.result.text' },
       }),
-    on_failure: z
+    onFailure: z
       .enum(['abort', 'retry', 'continue'])
       .default('abort')
       .openapi({ example: 'abort' }),
@@ -42,10 +42,10 @@ export const StepSchema = z
 /** Retry configuration schema */
 export const RetryConfigSchema = z
   .object({
-    max_attempts: z.number().int().positive().openapi({ example: 3 }),
+    maxAttempts: z.number().int().positive().openapi({ example: 3 }),
     backoff: z.enum(['none', 'linear', 'exponential']).openapi({ example: 'exponential' }),
-    initial_delay_ms: z.number().int().positive().openapi({ example: 1000 }),
-    max_delay_ms: z.number().int().positive().nullable().openapi({ example: 30000 }),
+    initialDelayMs: z.number().int().positive().openapi({ example: 1000 }),
+    maxDelayMs: z.number().int().positive().nullable().openapi({ example: 30000 }),
   })
   .openapi('RetryConfig');
 
@@ -54,23 +54,23 @@ export const CreateStepSchema = z
   .object({
     ref: z.string().min(1).openapi({ example: 'call_llm' }),
     ordinal: z.number().int().min(0).openapi({ example: 0 }),
-    action_id: z.string().openapi({ example: '01ARZ3NDEKTSV4RRFFQ69G5FAV' }),
-    action_version: z.number().int().positive().openapi({ example: 1 }),
-    input_mapping: z
+    actionId: z.string().openapi({ example: '01ARZ3NDEKTSV4RRFFQ69G5FAV' }),
+    actionVersion: z.number().int().positive().openapi({ example: 1 }),
+    inputMapping: z
       .record(z.string(), z.unknown())
       .nullable()
       .default(null)
       .openapi({
         example: { prompt: '$.input.prompt' },
       }),
-    output_mapping: z
+    outputMapping: z
       .record(z.string(), z.unknown())
       .nullable()
       .default(null)
       .openapi({
         example: { response: '$.result.text' },
       }),
-    on_failure: z
+    onFailure: z
       .enum(['abort', 'retry', 'continue'])
       .default('abort')
       .openapi({ example: 'abort' }),
@@ -93,16 +93,16 @@ export const CreateTaskDefSchema = z
       .optional()
       .openapi({ example: 'Write file with read-back verification' }),
     version: z.number().int().positive().default(1).openapi({ example: 1 }),
-    project_id: z.string().optional().openapi({ example: '01ARZ3NDEKTSV4RRFFQ69G5FAV' }),
-    library_id: z.string().optional(),
+    projectId: z.string().optional().openapi({ example: '01ARZ3NDEKTSV4RRFFQ69G5FAV' }),
+    libraryId: z.string().optional(),
     tags: z.array(z.string()).optional(),
-    input_schema: z.record(z.string(), z.unknown()).openapi({
+    inputSchema: z.record(z.string(), z.unknown()).openapi({
       example: {
         type: 'object',
         properties: { path: { type: 'string' }, content: { type: 'string' } },
       },
     }),
-    output_schema: z.record(z.string(), z.unknown()).openapi({
+    outputSchema: z.record(z.string(), z.unknown()).openapi({
       example: { type: 'object', properties: { success: { type: 'boolean' } } },
     }),
     steps: z
@@ -113,14 +113,14 @@ export const CreateTaskDefSchema = z
           {
             ref: 'write',
             ordinal: 0,
-            action_id: 'write_file_action',
-            action_version: 1,
-            on_failure: 'abort',
+            actionId: 'write_file_action',
+            actionVersion: 1,
+            onFailure: 'abort',
           },
         ],
       }),
     retry: RetryConfigSchema.optional(),
-    timeout_ms: z.number().int().positive().optional().openapi({ example: 30000 }),
+    timeoutMs: z.number().int().positive().optional().openapi({ example: 30000 }),
     autoversion: z
       .boolean()
       .optional()
@@ -140,17 +140,17 @@ export const TaskDefSchema = z
     version: z.number().int(),
     name: z.string(),
     description: z.string(),
-    project_id: z.string().nullable(),
-    library_id: z.string().nullable(),
+    projectId: z.string().nullable(),
+    libraryId: z.string().nullable(),
     tags: z.array(z.string()).nullable(),
-    input_schema: z.record(z.string(), z.unknown()),
-    output_schema: z.record(z.string(), z.unknown()),
+    inputSchema: z.record(z.string(), z.unknown()),
+    outputSchema: z.record(z.string(), z.unknown()),
     steps: z.array(StepSchema),
     retry: RetryConfigSchema.nullable(),
-    timeout_ms: z.number().int().nullable(),
-    content_hash: z.string().nullable(),
-    created_at: z.string(),
-    updated_at: z.string(),
+    timeoutMs: z.number().int().nullable(),
+    contentHash: z.string().nullable(),
+    createdAt: z.string(),
+    updatedAt: z.string(),
   })
   .openapi('TaskDef');
 
@@ -159,7 +159,7 @@ export const TaskSchema = TaskDefSchema;
 
 export const TaskCreateResponseSchema = z
   .object({
-    task_id: z.string(),
+    taskId: z.string(),
     task: TaskSchema,
     reused: z
       .boolean()

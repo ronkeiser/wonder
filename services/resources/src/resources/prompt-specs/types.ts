@@ -17,7 +17,7 @@ export type PromptSpecInput = {
   version?: number;
   name: string;
   description?: string;
-  system_prompt?: string;
+  systemPrompt?: string;
   template: string;
   requires?: object;
   produces?: object;

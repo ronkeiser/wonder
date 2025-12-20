@@ -2,7 +2,7 @@
  * Completion Planning
  *
  * Pure planning module for workflow finalization.
- * Determines final output by applying workflow's output_mapping to context.
+ * Determines final output by applying workflow's outputMapping to context.
  *
  * Key principles:
  * - No side effects (pure functions)
@@ -19,7 +19,7 @@ import type { CompletionResult, ContextSnapshot } from '../types';
 // Main Completion Entry Point
 // ============================================================================
 
-/** Extract final workflow output by applying output_mapping to context. */
+/** Extract final workflow output by applying outputMapping to context. */
 export function extractFinalOutput(
   outputMapping: Record<string, string> | null,
   context: ContextSnapshot,
@@ -29,7 +29,7 @@ export function extractFinalOutput(
   events.push({
     type: 'decision.completion.start',
     payload: {
-      output_mapping: outputMapping,
+      outputMapping: outputMapping,
       context_keys: {
         input: Object.keys(context.input),
         state: Object.keys(context.state),

@@ -18,13 +18,13 @@ export class Actions extends Resource {
     idempotency?: object;
     autoversion?: boolean;
   }): Promise<{
-    action_id: string;
+    actionId: string;
     action: Action;
     /** True if an existing action was reused (autoversion matched content hash) */
     reused: boolean;
   }> {
     this.serviceCtx.logger.info({
-      event_type: 'action.create.started',
+      eventType: 'action.create.started',
       metadata: { name: data.name, kind: data.kind, autoversion: data.autoversion ?? false },
     });
 
@@ -36,7 +36,7 @@ export class Actions extends Resource {
 
     if (autoversionResult.reused) {
       return {
-        action_id: autoversionResult.entity.id,
+        actionId: autoversionResult.entity.id,
         action: autoversionResult.entity,
         reused: true,
       };
@@ -55,11 +55,11 @@ export class Actions extends Resource {
         produces: data.produces ?? null,
         execution: data.execution ?? null,
         idempotency: data.idempotency ?? null,
-        content_hash: autoversionResult.contentHash,
+        contentHash: autoversionResult.contentHash,
       });
 
       return {
-        action_id: action.id,
+        actionId: action.id,
         action,
         reused: false,
       };
@@ -90,7 +90,7 @@ export class Actions extends Resource {
   }> {
     return this.withLogging(
       'get',
-      { action_id: id, version, metadata: { action_id: id, version } },
+      { actionId: id, version, metadata: { actionId: id, version } },
       async () => {
         const action =
           version !== undefined
@@ -111,20 +111,7 @@ export class Actions extends Resource {
   }
 
   async list(params?: { limit?: number; kind?: ActionKind }): Promise<{
-    actions: Array<{
-      id: string;
-      name: string;
-      description: string;
-      version: number;
-      kind: ActionKind;
-      implementation: object;
-      requires: object | null;
-      produces: object | null;
-      execution: object | null;
-      idempotency: object | null;
-      created_at: string;
-      updated_at: string;
-    }>;
+    actions: Action[];
   }> {
     return this.withLogging('list', { metadata: params }, async () => {
       const actionsResult = params?.kind
@@ -138,7 +125,7 @@ export class Actions extends Resource {
   async delete(id: string, version?: number): Promise<{ success: boolean }> {
     return this.withLogging(
       'delete',
-      { action_id: id, version, metadata: { action_id: id, version } },
+      { actionId: id, version, metadata: { actionId: id, version } },
       async () => {
         const action =
           version !== undefined

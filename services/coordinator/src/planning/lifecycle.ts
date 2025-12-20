@@ -30,8 +30,8 @@ export function decideWorkflowStart(params: {
   events.push({
     type: 'decision.lifecycle.start',
     payload: {
-      workflow_run_id: workflowRunId,
-      initial_node_id: initialNodeId,
+      workflowRunId: workflowRunId,
+      initialNodeId: initialNodeId,
     },
   });
 
@@ -39,20 +39,20 @@ export function decideWorkflowStart(params: {
   decisions.push({
     type: 'CREATE_TOKEN',
     params: {
-      workflow_run_id: workflowRunId,
-      node_id: initialNodeId,
-      parent_token_id: null,
-      path_id: 'root',
-      sibling_group: null,
-      branch_index: 0,
-      branch_total: 1,
-      iteration_counts: null,
+      workflowRunId: workflowRunId,
+      nodeId: initialNodeId,
+      parentTokenId: null,
+      pathId: 'root',
+      siblingGroup: null,
+      branchIndex: 0,
+      branchTotal: 1,
+      iterationCounts: null,
     },
   });
 
   events.push({
     type: 'decision.lifecycle.root_token_planned',
-    payload: { node_id: initialNodeId },
+    payload: { nodeId: initialNodeId },
   });
 
   return { decisions, events };

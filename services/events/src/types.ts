@@ -45,23 +45,23 @@ export type EventType =
  * Context required for emitting events - provided by coordinator
  */
 export interface EventContext {
-  workflow_run_id: string;
-  project_id: string;
-  workflow_def_id: string;
-  parent_run_id?: string | null;
+  workflowRunId: string;
+  projectId: string;
+  workflowDefId: string;
+  parentRunId?: string | null;
 }
 
 /**
  * Input for emitting an event - caller provides event data
  */
 export interface EventInput {
-  event_type: EventType | string; // Allow custom event types
+  eventType: EventType | string; // Allow custom event types
   sequence?: number;
-  node_id?: string | null;
-  token_id?: string | null;
-  path_id?: string | null;
+  nodeId?: string | null;
+  tokenId?: string | null;
+  pathId?: string | null;
   tokens?: number | null; // For LLM calls
-  cost_usd?: number | null; // For LLM calls
+  costUsd?: number | null; // For LLM calls
   message?: string | null;
   metadata?: Record<string, unknown>;
 }
@@ -90,14 +90,14 @@ export interface BroadcastEventEntry extends EventContext, EventInput {
  * Options for querying events
  */
 export interface GetEventsOptions {
-  workflow_run_id?: string;
-  parent_run_id?: string;
-  project_id?: string;
-  event_type?: string;
-  node_id?: string;
-  token_id?: string;
+  workflowRunId?: string;
+  parentRunId?: string;
+  projectId?: string;
+  eventType?: string;
+  nodeId?: string;
+  tokenId?: string;
   limit?: number;
-  after_sequence?: number; // For replay from checkpoint
+  afterSequence?: number; // For replay from checkpoint
 }
 
 /**
@@ -125,7 +125,7 @@ export type TraceEventCategory =
  * Convention: type = `{category}.{domain}.{action}`
  * Examples: 'decision.routing.start', 'operation.tokens.created', 'sql.query'
  *
- * Indexed fields (promoted to DB columns): token_id, node_id, duration_ms
+ * Indexed fields (promoted to DB columns): tokenId, nodeId, durationMs
  * Payload: Event-specific data, stored as JSON blob
  */
 export interface TraceEventInput {
@@ -133,11 +133,11 @@ export interface TraceEventInput {
   type: `${TraceEventCategory}.${string}`;
 
   /** Execution context (promoted to indexed DB columns) */
-  token_id?: string;
-  node_id?: string;
+  tokenId?: string;
+  nodeId?: string;
 
   /** Performance tracking (promoted to indexed DB column) */
-  duration_ms?: number;
+  durationMs?: number;
 
   /** Event-specific data (stored as JSON blob) */
   payload?: Record<string, unknown>;
@@ -165,8 +165,8 @@ export function getEventCategory(type: string): TraceEventCategory {
  * Context required for emitting trace events
  */
 export interface TraceEventContext {
-  workflow_run_id: string;
-  project_id: string;
+  workflowRunId: string;
+  projectId: string;
 }
 
 /**
@@ -178,9 +178,9 @@ export interface TraceEventEntry extends TraceEventContext {
   timestamp: number;
   type: string;
   category: TraceEventCategory;
-  token_id: string | null;
-  node_id: string | null;
-  duration_ms: number | null;
+  tokenId: string | null;
+  nodeId: string | null;
+  durationMs: number | null;
   payload: string; // JSON string in DB
 }
 
@@ -193,9 +193,9 @@ export interface BroadcastTraceEventEntry extends TraceEventContext {
   timestamp: number;
   type: string;
   category: TraceEventCategory;
-  token_id: string | null;
-  node_id: string | null;
-  duration_ms: number | null;
+  tokenId: string | null;
+  nodeId: string | null;
+  durationMs: number | null;
   payload: Record<string, unknown>; // Parsed object
 }
 
@@ -203,14 +203,14 @@ export interface BroadcastTraceEventEntry extends TraceEventContext {
  * Options for querying trace events
  */
 export interface GetTraceEventsOptions {
-  workflow_run_id?: string;
-  token_id?: string;
-  node_id?: string;
+  workflowRunId?: string;
+  tokenId?: string;
+  nodeId?: string;
   type?: string;
   category?: TraceEventCategory;
-  project_id?: string;
+  projectId?: string;
   limit?: number;
-  min_duration_ms?: number; // Filter slow queries
+  minDurationMs?: number; // Filter slow queries
 }
 
 /**
@@ -230,17 +230,17 @@ export interface TraceEventEmitter {
  * Filter for server-side event filtering on WebSocket subscriptions
  */
 export interface SubscriptionFilter {
-  workflow_run_id?: string;
-  parent_run_id?: string;
-  project_id?: string;
-  event_type?: string;
-  event_types?: string[];
-  node_id?: string;
-  token_id?: string;
-  path_id?: string;
+  workflowRunId?: string;
+  parentRunId?: string;
+  projectId?: string;
+  eventType?: string;
+  eventTypes?: string[];
+  nodeId?: string;
+  tokenId?: string;
+  pathId?: string;
   category?: TraceEventCategory;
   type?: string;
-  min_duration_ms?: number;
+  minDurationMs?: number;
 }
 
 /**
@@ -275,10 +275,10 @@ export type WorkflowRunStatus = 'running' | 'completed' | 'failed' | 'waiting';
  * Status change notification payload
  */
 export interface WorkflowStatusChange {
-  workflow_run_id: string;
-  workflow_def_id: string;
-  project_id: string;
-  parent_run_id: string | null;
+  workflowRunId: string;
+  workflowDefId: string;
+  projectId: string;
+  parentRunId: string | null;
   status: WorkflowRunStatus;
   timestamp: number;
 }
@@ -287,8 +287,8 @@ export interface WorkflowStatusChange {
  * Subscription filter for hub events
  */
 export interface HubSubscriptionFilter {
-  project_id?: string;
-  workflow_def_id?: string;
+  projectId?: string;
+  workflowDefId?: string;
   status?: WorkflowRunStatus;
 }
 

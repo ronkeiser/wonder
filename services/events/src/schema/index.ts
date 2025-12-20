@@ -4,51 +4,51 @@ import { index, integer, real, sqliteTable, text } from 'drizzle-orm/sqlite-core
  * Workflow events table for workflow execution tracking
  *
  * Schema optimized for execution observability:
- * - workflow_run_id: primary execution context
- * - parent_run_id: track sub-workflow hierarchy
- * - node_id: which node in the workflow graph
- * - token_id: which token (for parallel execution tracking)
- * - path_id: execution path for tracing
+ * - workflowRunId: primary execution context
+ * - parentRunId: track sub-workflow hierarchy
+ * - nodeId: which node in the workflow graph
+ * - tokenId: which token (for parallel execution tracking)
+ * - pathId: execution path for tracing
  * - sequence: total ordering for replay
- * - project_id: tenant filtering
- * - cost_usd/tokens: LLM cost tracking
+ * - projectId: tenant filtering
+ * - costUsd/tokens: LLM cost tracking
  */
 export const workflowEvents = sqliteTable(
   'workflow_events',
   {
-    id: text('id').primaryKey(),
-    timestamp: integer('timestamp').notNull(),
-    sequence: integer('sequence').notNull(), // For replay ordering
-    event_type: text('event_type').notNull(),
+    id: text().primaryKey(),
+    timestamp: integer().notNull(),
+    sequence: integer().notNull(), // For replay ordering
+    eventType: text().notNull(),
 
     // Execution context
-    workflow_run_id: text('workflow_run_id').notNull(),
-    parent_run_id: text('parent_run_id'), // For sub-workflows
-    workflow_def_id: text('workflow_def_id').notNull(),
-    node_id: text('node_id'),
-    token_id: text('token_id'),
-    path_id: text('path_id'), // Execution path tracing
+    workflowRunId: text().notNull(),
+    parentRunId: text(), // For sub-workflows
+    workflowDefId: text().notNull(),
+    nodeId: text(),
+    tokenId: text(),
+    pathId: text(), // Execution path tracing
 
     // Tenant context
-    project_id: text('project_id').notNull(),
+    projectId: text().notNull(),
 
     // Cost tracking (for LLM calls)
-    tokens: integer('tokens'),
-    cost_usd: real('cost_usd'),
+    tokens: integer(),
+    costUsd: real(),
 
     // Event payload
-    message: text('message'),
-    metadata: text('metadata').notNull(), // JSON blob with event-specific data
+    message: text(),
+    metadata: text().notNull(), // JSON blob with event-specific data
   },
   (table) => [
     index('idx_events_timestamp').on(table.timestamp),
-    index('idx_events_event_type').on(table.event_type),
-    index('idx_events_workflow_run_id').on(table.workflow_run_id),
-    index('idx_events_parent_run_id').on(table.parent_run_id),
-    index('idx_events_project_id').on(table.project_id),
-    index('idx_events_node_id').on(table.node_id),
-    index('idx_events_token_id').on(table.token_id),
-    index('idx_events_sequence').on(table.workflow_run_id, table.sequence),
+    index('idx_events_event_type').on(table.eventType),
+    index('idx_events_workflow_run_id').on(table.workflowRunId),
+    index('idx_events_parent_run_id').on(table.parentRunId),
+    index('idx_events_project_id').on(table.projectId),
+    index('idx_events_node_id').on(table.nodeId),
+    index('idx_events_token_id').on(table.tokenId),
+    index('idx_events_sequence').on(table.workflowRunId, table.sequence),
   ],
 );
 
@@ -58,48 +58,48 @@ export const workflowEvents = sqliteTable(
  * Schema optimized for line-by-line execution visibility:
  * - sequence: per-workflow ordered execution trace
  * - category: fast filtering by layer (decision/operation/dispatch/sql)
- * - token_id/node_id: execution context for path tracing
- * - project_id: tenant isolation
- * - duration_ms: performance profiling and alerting
+ * - tokenId/nodeId: execution context for path tracing
+ * - projectId: tenant isolation
+ * - durationMs: performance profiling and alerting
  *
  * Note: Opt-in per workflow run via header or env var
  */
 export const traceEvents = sqliteTable(
   'trace_events',
   {
-    id: text('id').primaryKey(),
+    id: text().primaryKey(),
 
     // Ordering & timing
-    sequence: integer('sequence').notNull(),
-    timestamp: integer('timestamp').notNull(),
+    sequence: integer().notNull(),
+    timestamp: integer().notNull(),
 
     // Event classification
-    type: text('type').notNull(), // 'decision.routing.start', 'operation.context.read', etc.
-    category: text('category').notNull(), // 'decision', 'operation', 'dispatch', 'sql'
+    type: text().notNull(), // 'decision.routing.start', 'operation.context.read', etc.
+    category: text().notNull(), // 'decision', 'operation', 'dispatch', 'sql'
 
     // Execution context
-    workflow_run_id: text('workflow_run_id').notNull(),
-    token_id: text('token_id'), // Most events relate to specific token
-    node_id: text('node_id'), // Many events happen at specific node
+    workflowRunId: text().notNull(),
+    tokenId: text(), // Most events relate to specific token
+    nodeId: text(), // Many events happen at specific node
 
     // Tenant context
-    project_id: text('project_id').notNull(),
+    projectId: text().notNull(),
 
     // Performance tracking
-    duration_ms: real('duration_ms'), // For SQL queries, operation timing
+    durationMs: real(), // For SQL queries, operation timing
 
     // Payload (structured data specific to event type)
-    payload: text('payload').notNull(),
+    payload: text().notNull(),
 
     // Human-readable message (optional, for UI display)
-    message: text('message'),
+    message: text(),
   },
   (table) => [
-    index('idx_trace_events_workflow_sequence').on(table.workflow_run_id, table.sequence),
+    index('idx_trace_events_workflow_sequence').on(table.workflowRunId, table.sequence),
     index('idx_trace_events_type').on(table.type),
     index('idx_trace_events_category').on(table.category),
-    index('idx_trace_events_token').on(table.token_id),
-    index('idx_trace_events_project').on(table.project_id, table.timestamp),
-    index('idx_trace_events_duration').on(table.duration_ms),
+    index('idx_trace_events_token').on(table.tokenId),
+    index('idx_trace_events_project').on(table.projectId, table.timestamp),
+    index('idx_trace_events_duration').on(table.durationMs),
   ],
 );

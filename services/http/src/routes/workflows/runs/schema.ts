@@ -13,14 +13,14 @@ export const CreateWorkflowRunSchema = z
 
 export const WorkflowRunCreateResponseSchema = z
   .object({
-    workflow_run_id: ulid(),
-    project_id: ulid(),
-    workspace_id: ulid(),
+    workflowRunId: ulid(),
+    projectId: ulid(),
+    workspaceId: ulid(),
   })
   .openapi('WorkflowRunCreateResponse');
 
 export const WorkflowRunStartResponseSchema = z
   .object({
-    durable_object_id: z.string(),
+    durableObjectId: z.string(),
   })
   .openapi('WorkflowRunStartResponse');

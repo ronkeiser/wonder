@@ -18,14 +18,14 @@ export const WorkspaceSchema = z
     id: ulid().openapi({ example: '01ARZ3NDEKTSV4RRFFQ69G5FAV' }),
     name: z.string().openapi({ example: 'My Workspace' }),
     settings: z.record(z.string(), z.unknown()).nullable(),
-    created_at: z.string().openapi({ example: '2024-01-01T00:00:00Z' }),
-    updated_at: z.string().openapi({ example: '2024-01-01T00:00:00Z' }),
+    createdAt: z.string().openapi({ example: '2024-01-01T00:00:00Z' }),
+    updatedAt: z.string().openapi({ example: '2024-01-01T00:00:00Z' }),
   })
   .openapi('Workspace');
 
 export const WorkspaceCreateResponseSchema = z
   .object({
-    workspace_id: ulid(),
+    workspaceId: ulid(),
     workspace: WorkspaceSchema,
   })
   .openapi('WorkspaceCreateResponse');

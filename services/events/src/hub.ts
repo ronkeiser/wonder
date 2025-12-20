@@ -121,7 +121,7 @@ export class EventHub extends DurableObject<Env> {
             ws.send(
               JSON.stringify({
                 type: 'status_change',
-                subscription_id: sub.id,
+                subscriptionId: sub.id,
                 change,
               }),
             );
@@ -141,8 +141,8 @@ export class EventHub extends DurableObject<Env> {
   // ============================================================================
 
   private matchesFilter(change: WorkflowStatusChange, filter: HubSubscriptionFilter): boolean {
-    if (filter.project_id && change.project_id !== filter.project_id) return false;
-    if (filter.workflow_def_id && change.workflow_def_id !== filter.workflow_def_id) return false;
+    if (filter.projectId && change.projectId !== filter.projectId) return false;
+    if (filter.workflowDefId && change.workflowDefId !== filter.workflowDefId) return false;
     if (filter.status && change.status !== filter.status) return false;
     return true;
   }

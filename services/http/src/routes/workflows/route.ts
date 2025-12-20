@@ -38,14 +38,14 @@ workflows.openapi(startWorkflowRoute, async (c) => {
 
   // 1. Create workflow run
   using workflowRunsResource = c.env.RESOURCES.workflowRuns();
-  const { workflow_run_id } = await workflowRunsResource.create(id, input);
+  const { workflowRunId } = await workflowRunsResource.create(id, input);
 
   // 2. Start the coordinator DO
-  const coordinatorId = c.env.COORDINATOR.idFromName(workflow_run_id);
+  const coordinatorId = c.env.COORDINATOR.idFromName(workflowRunId);
   const coordinator = c.env.COORDINATOR.get(coordinatorId);
-  await coordinator.start(workflow_run_id);
+  await coordinator.start(workflowRunId);
 
-  return c.json({ workflow_run_id, durable_object_id: workflow_run_id }, 200);
+  return c.json({ workflowRunId, durableObjectId: workflowRunId }, 200);
 });
 
 /** DELETE /{id} */

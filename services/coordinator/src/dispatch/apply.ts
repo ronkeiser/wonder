@@ -60,7 +60,7 @@ export function applyDecisions(decisions: Decision[], ctx: DispatchContext): App
       ctx.emitter.emitTrace({
         type: 'dispatch.error',
         payload: {
-          decision_type: decision.type,
+          decisionType: decision.type,
           error: error instanceof Error ? error.message : String(error),
         },
       });
@@ -71,11 +71,11 @@ export function applyDecisions(decisions: Decision[], ctx: DispatchContext): App
   ctx.emitter.emitTrace({
     type: 'dispatch.batch.complete',
     payload: {
-      total_decisions: decisions.length,
-      batched_decisions: batched.length,
+      totalDecisions: decisions.length,
+      batchedDecisions: batched.length,
       applied: result.applied,
-      tokens_created: result.tokensCreated.length,
-      tokens_dispatched: result.tokensDispatched.length,
+      tokensCreated: result.tokensCreated.length,
+      tokensDispatched: result.tokensDispatched.length,
       errors: result.errors.length,
     },
   });
@@ -92,9 +92,9 @@ export function applyTracedDecisions(traced: TracedDecision[], ctx: DispatchCont
   for (const t of traced) {
     ctx.emitter.emitTrace({
       type: 'dispatch.decision.planned',
-      token_id: t.tokenId ?? undefined,
+      tokenId: t.tokenId ?? undefined,
       payload: {
-        decision_type: t.decision.type,
+        decisionType: t.decision.type,
         source: t.source,
         timestamp: t.timestamp,
       },
@@ -128,13 +128,13 @@ function applyOne(decision: Decision, ctx: DispatchContext): ApplyOutcome {
 
       // Emit workflow event for token creation milestone
       ctx.emitter.emit({
-        event_type: 'token.created',
+        eventType: 'token.created',
         message: 'Token created',
         metadata: {
-          token_id: tokenId,
-          node_id: decision.params.node_id,
-          branch_index: decision.params.branch_index,
-          branch_total: decision.params.branch_total,
+          tokenId: tokenId,
+          nodeId: decision.params.nodeId,
+          branchIndex: decision.params.branchIndex,
+          branchTotal: decision.params.branchTotal,
         },
       });
 
@@ -150,12 +150,12 @@ function applyOne(decision: Decision, ctx: DispatchContext): ApplyOutcome {
 
       // Emit workflow event for fan-out (parallel branch creation)
       ctx.emitter.emit({
-        event_type: 'fan_out.started',
+        eventType: 'fan_out.started',
         message: 'Fan-out started',
         metadata: {
-          token_count: tokenIds.length,
-          target_node_id: decision.allParams[0]?.node_id,
-          branch_total: decision.allParams[0]?.branch_total,
+          tokenCount: tokenIds.length,
+          targetNodeId: decision.allParams[0]?.nodeId,
+          branchTotal: decision.allParams[0]?.branchTotal,
         },
       });
 
@@ -169,20 +169,20 @@ function applyOne(decision: Decision, ctx: DispatchContext): ApplyOutcome {
       // Emit workflow event for terminal states (significant milestones)
       if (decision.status === 'completed') {
         ctx.emitter.emit({
-          event_type: 'token.completed',
+          eventType: 'token.completed',
           message: 'Token completed',
           metadata: {
-            token_id: decision.tokenId,
-            node_id: token.node_id,
+            tokenId: decision.tokenId,
+            nodeId: token.nodeId,
           },
         });
       } else if (decision.status === 'failed') {
         ctx.emitter.emit({
-          event_type: 'token.failed',
+          eventType: 'token.failed',
           message: 'Token failed',
           metadata: {
-            token_id: decision.tokenId,
-            node_id: token.node_id,
+            tokenId: decision.tokenId,
+            nodeId: token.nodeId,
           },
         });
       }
@@ -203,12 +203,12 @@ function applyOne(decision: Decision, ctx: DispatchContext): ApplyOutcome {
 
       // Emit workflow event for waiting state (important for debugging delays)
       ctx.emitter.emit({
-        event_type: 'token.waiting',
+        eventType: 'token.waiting',
         message: 'Token waiting for siblings',
         metadata: {
-          token_id: decision.tokenId,
-          node_id: token.node_id,
-          arrived_at: decision.arrivedAt.toISOString(),
+          tokenId: decision.tokenId,
+          nodeId: token.nodeId,
+          arrivedAt: decision.arrivedAt.toISOString(),
         },
       });
 
@@ -226,11 +226,11 @@ function applyOne(decision: Decision, ctx: DispatchContext): ApplyOutcome {
 
       // Emit workflow event for context update
       ctx.emitter.emit({
-        event_type: 'context.updated',
+        eventType: 'context.updated',
         message: 'Context updated',
         metadata: {
           path: decision.path,
-          has_value: decision.value !== null && decision.value !== undefined,
+          hasValue: decision.value !== null && decision.value !== undefined,
         },
       });
 
@@ -243,11 +243,11 @@ function applyOne(decision: Decision, ctx: DispatchContext): ApplyOutcome {
 
       // Emit workflow event for task output application
       ctx.emitter.emit({
-        event_type: 'context.output_applied',
+        eventType: 'context.output_applied',
         message: 'Task output applied to context',
         metadata: {
           path: decision.path,
-          output_keys: Object.keys(decision.output),
+          outputKeys: Object.keys(decision.output),
         },
       });
 
@@ -277,12 +277,12 @@ function applyOne(decision: Decision, ctx: DispatchContext): ApplyOutcome {
 
       // Emit workflow event for branch merge completion
       ctx.emitter.emit({
-        event_type: 'branches.merged',
+        eventType: 'branches.merged',
         message: 'Branches merged',
         metadata: {
-          branch_count: decision.tokenIds.length,
-          merge_strategy: decision.merge.strategy,
-          merge_target: decision.merge.target,
+          branchCount: decision.tokenIds.length,
+          mergeStrategy: decision.merge.strategy,
+          mergeTarget: decision.merge.target,
         },
       });
 
@@ -304,12 +304,12 @@ function applyOne(decision: Decision, ctx: DispatchContext): ApplyOutcome {
     case 'ACTIVATE_FAN_IN': {
       // Fan-in activation - creates a new merged token
       ctx.emitter.emit({
-        event_type: 'fan_in.completed',
+        eventType: 'fan_in.completed',
         message: 'Fan-in synchronization completed',
         metadata: {
-          node_id: decision.nodeId,
-          fan_in_path: decision.fanInPath,
-          merged_count: decision.mergedTokenIds.length,
+          nodeId: decision.nodeId,
+          fanInPath: decision.fanInPath,
+          mergedCount: decision.mergedTokenIds.length,
         },
       });
       return {};
@@ -318,11 +318,11 @@ function applyOne(decision: Decision, ctx: DispatchContext): ApplyOutcome {
     // Workflow lifecycle
     case 'COMPLETE_WORKFLOW': {
       ctx.emitter.emit({
-        event_type: 'workflow.completed',
+        eventType: 'workflow.completed',
         message: 'Workflow completed successfully',
         metadata: {
-          has_output: Object.keys(decision.output).length > 0,
-          output_keys: Object.keys(decision.output),
+          hasOutput: Object.keys(decision.output).length > 0,
+          outputKeys: Object.keys(decision.output),
         },
       });
       return {};
@@ -330,7 +330,7 @@ function applyOne(decision: Decision, ctx: DispatchContext): ApplyOutcome {
 
     case 'FAIL_WORKFLOW': {
       ctx.emitter.emit({
-        event_type: 'workflow.failed',
+        eventType: 'workflow.failed',
         message: 'Workflow failed',
         metadata: {
           error: decision.error,

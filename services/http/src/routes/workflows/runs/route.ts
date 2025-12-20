@@ -24,5 +24,5 @@ workflowRuns.openapi(startWorkflowRunRoute, async (c) => {
   const coordinatorId = c.env.COORDINATOR.idFromName(run_id);
   const coordinator = c.env.COORDINATOR.get(coordinatorId);
   await coordinator.start(run_id);
-  return c.json({ durable_object_id: run_id }, 200);
+  return c.json({ durableObjectId: run_id }, 200);
 });

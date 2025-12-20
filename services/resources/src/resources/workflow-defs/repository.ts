@@ -18,7 +18,7 @@ export async function createWorkflowDef(
     tags?: string[] | null;
     input_schema: object;
     output_schema: object;
-    output_mapping?: object | null;
+    outputMapping?: object | null;
     context_schema?: object | null;
     initial_node_id: string | null;
     content_hash?: string | null;
@@ -31,17 +31,17 @@ export async function createWorkflowDef(
     version: 1,
     name: data.name,
     description: data.description,
-    project_id: data.project_id ?? null,
-    library_id: data.library_id ?? null,
+    projectId: data.project_id ?? null,
+    libraryId: data.library_id ?? null,
     tags: data.tags ?? null,
-    input_schema: data.input_schema,
-    output_schema: data.output_schema,
-    output_mapping: data.output_mapping ?? null,
-    context_schema: data.context_schema ?? null,
-    initial_node_id: data.initial_node_id,
-    content_hash: data.content_hash ?? null,
-    created_at: now,
-    updated_at: now,
+    inputSchema: data.input_schema,
+    outputSchema: data.output_schema,
+    outputMapping: data.outputMapping ?? null,
+    contextSchema: data.context_schema ?? null,
+    initialNodeId: data.initial_node_id,
+    contentHash: data.content_hash ?? null,
+    createdAt: now,
+    updatedAt: now,
   };
 
   await db.insert(workflow_defs).values(row).run();
@@ -59,15 +59,15 @@ export async function createWorkflowDefWithId(
     name: string;
     description: string;
     version?: number;
-    project_id?: string | null;
-    library_id?: string | null;
+    projectId?: string | null;
+    libraryId?: string | null;
     tags?: string[] | null;
-    input_schema: object;
-    output_schema: object;
-    output_mapping?: object | null;
-    context_schema?: object | null;
-    initial_node_id: string | null;
-    content_hash?: string | null;
+    inputSchema: object;
+    outputSchema: object;
+    outputMapping?: object | null;
+    contextSchema?: object | null;
+    initialNodeId: string | null;
+    contentHash?: string | null;
   },
 ): Promise<WorkflowDef> {
   const now = new Date().toISOString();
@@ -77,17 +77,17 @@ export async function createWorkflowDefWithId(
     version: data.version ?? 1,
     name: data.name,
     description: data.description,
-    project_id: data.project_id ?? null,
-    library_id: data.library_id ?? null,
+    projectId: data.projectId ?? null,
+    libraryId: data.libraryId ?? null,
     tags: data.tags ?? null,
-    input_schema: data.input_schema,
-    output_schema: data.output_schema,
-    output_mapping: data.output_mapping ?? null,
-    context_schema: data.context_schema ?? null,
-    initial_node_id: data.initial_node_id,
-    content_hash: data.content_hash ?? null,
-    created_at: now,
-    updated_at: now,
+    inputSchema: data.inputSchema,
+    outputSchema: data.outputSchema,
+    outputMapping: data.outputMapping ?? null,
+    contextSchema: data.contextSchema ?? null,
+    initialNodeId: data.initialNodeId,
+    contentHash: data.contentHash ?? null,
+    createdAt: now,
+    updatedAt: now,
   };
 
   await db.insert(workflow_defs).values(row).run();
@@ -124,8 +124,8 @@ export async function updateWorkflowDef(
   await db
     .update(workflow_defs)
     .set({
-      ...data,
-      updated_at: now,
+      ...(data.initial_node_id !== undefined && { initialNodeId: data.initial_node_id }),
+      updatedAt: now,
     })
     .where(and(eq(workflow_defs.id, id), eq(workflow_defs.version, version)))
     .run();
@@ -138,7 +138,7 @@ export async function listWorkflowDefsByProject(
   return await db
     .select()
     .from(workflow_defs)
-    .where(eq(workflow_defs.project_id, project_id))
+    .where(eq(workflow_defs.projectId, project_id))
     .all();
 }
 
@@ -149,7 +149,7 @@ export async function listWorkflowDefsByLibrary(
   return await db
     .select()
     .from(workflow_defs)
-    .where(eq(workflow_defs.library_id, library_id))
+    .where(eq(workflow_defs.libraryId, library_id))
     .all();
 }
 
@@ -169,14 +169,14 @@ export async function getWorkflowDefByNameAndHash(
   if (projectId) {
     whereClause = and(
       eq(workflow_defs.name, name),
-      eq(workflow_defs.project_id, projectId),
-      eq(workflow_defs.content_hash, contentHash),
+      eq(workflow_defs.projectId, projectId),
+      eq(workflow_defs.contentHash, contentHash),
     );
   } else if (libraryId) {
     whereClause = and(
       eq(workflow_defs.name, name),
-      eq(workflow_defs.library_id, libraryId),
-      eq(workflow_defs.content_hash, contentHash),
+      eq(workflow_defs.libraryId, libraryId),
+      eq(workflow_defs.contentHash, contentHash),
     );
   } else {
     return null;
@@ -199,9 +199,9 @@ export async function getMaxVersionByName(
   let whereClause;
 
   if (projectId) {
-    whereClause = and(eq(workflow_defs.name, name), eq(workflow_defs.project_id, projectId));
+    whereClause = and(eq(workflow_defs.name, name), eq(workflow_defs.projectId, projectId));
   } else if (libraryId) {
-    whereClause = and(eq(workflow_defs.name, name), eq(workflow_defs.library_id, libraryId));
+    whereClause = and(eq(workflow_defs.name, name), eq(workflow_defs.libraryId, libraryId));
   } else {
     return 0;
   }
@@ -226,24 +226,24 @@ export async function createNode(
     workflow_def_id: string;
     workflow_def_version: number;
     name: string;
-    task_id?: string | null;
-    task_version?: number | null;
-    input_mapping?: object | null;
-    output_mapping?: object | null;
-    resource_bindings?: Record<string, string> | null;
+    taskId?: string | null;
+    taskVersion?: number | null;
+    inputMapping?: object | null;
+    outputMapping?: object | null;
+    resourceBindings?: Record<string, string> | null;
   },
 ): Promise<Node> {
   const row = {
     id: ulid(),
     ref: data.ref,
-    workflow_def_id: data.workflow_def_id,
-    workflow_def_version: data.workflow_def_version,
+    workflowDefId: data.workflow_def_id,
+    workflowDefVersion: data.workflow_def_version,
     name: data.name,
-    task_id: data.task_id ?? null,
-    task_version: data.task_version ?? null,
-    input_mapping: data.input_mapping ?? null,
-    output_mapping: data.output_mapping ?? null,
-    resource_bindings: data.resource_bindings ?? null,
+    taskId: data.taskId ?? null,
+    taskVersion: data.taskVersion ?? null,
+    inputMapping: data.inputMapping ?? null,
+    outputMapping: data.outputMapping ?? null,
+    resourceBindings: data.resourceBindings ?? null,
   };
 
   await db.insert(nodes).values(row).run();
@@ -259,27 +259,27 @@ export async function createNodeWithId(
   data: {
     id: string;
     ref: string;
-    workflow_def_id: string;
-    workflow_def_version: number;
+    workflowDefId: string;
+    workflowDefVersion: number;
     name: string;
-    task_id?: string | null;
-    task_version?: number | null;
-    input_mapping?: object | null;
-    output_mapping?: object | null;
-    resource_bindings?: Record<string, string> | null;
+    taskId?: string | null;
+    taskVersion?: number | null;
+    inputMapping?: object | null;
+    outputMapping?: object | null;
+    resourceBindings?: Record<string, string> | null;
   },
 ): Promise<Node> {
   const row = {
     id: data.id,
     ref: data.ref,
-    workflow_def_id: data.workflow_def_id,
-    workflow_def_version: data.workflow_def_version,
+    workflowDefId: data.workflowDefId,
+    workflowDefVersion: data.workflowDefVersion,
     name: data.name,
-    task_id: data.task_id ?? null,
-    task_version: data.task_version ?? null,
-    input_mapping: data.input_mapping ?? null,
-    output_mapping: data.output_mapping ?? null,
-    resource_bindings: data.resource_bindings ?? null,
+    taskId: data.taskId ?? null,
+    taskVersion: data.taskVersion ?? null,
+    inputMapping: data.inputMapping ?? null,
+    outputMapping: data.outputMapping ?? null,
+    resourceBindings: data.resourceBindings ?? null,
   };
 
   await db.insert(nodes).values(row).run();
@@ -297,8 +297,8 @@ export async function getNode(
     .from(nodes)
     .where(
       and(
-        eq(nodes.workflow_def_id, workflowDefId),
-        eq(nodes.workflow_def_version, workflowDefVersion),
+        eq(nodes.workflowDefId, workflowDefId),
+        eq(nodes.workflowDefVersion, workflowDefVersion),
         eq(nodes.id, nodeId),
       ),
     )
@@ -312,7 +312,7 @@ export async function listNodesByWorkflowDef(
   db: DrizzleD1Database,
   workflowDefId: string,
 ): Promise<Node[]> {
-  return await db.select().from(nodes).where(eq(nodes.workflow_def_id, workflowDefId)).all();
+  return await db.select().from(nodes).where(eq(nodes.workflowDefId, workflowDefId)).all();
 }
 
 /** Transition */
@@ -323,29 +323,29 @@ export async function createTransition(
     ref?: string | null;
     workflow_def_id: string;
     workflow_def_version: number;
-    from_node_id: string;
-    to_node_id: string;
+    fromNodeId: string;
+    toNodeId: string;
     priority: number;
     condition?: object | null;
-    spawn_count?: number | null;
+    spawnCount?: number | null;
     foreach?: object | null;
     synchronization?: object | null;
-    loop_config?: object | null;
+    loopConfig?: object | null;
   },
 ): Promise<Transition> {
   const row = {
     id: ulid(),
     ref: data.ref ?? null,
-    workflow_def_id: data.workflow_def_id,
-    workflow_def_version: data.workflow_def_version,
-    from_node_id: data.from_node_id,
-    to_node_id: data.to_node_id,
+    workflowDefId: data.workflow_def_id,
+    workflowDefVersion: data.workflow_def_version,
+    fromNodeId: data.fromNodeId,
+    toNodeId: data.toNodeId,
     priority: data.priority,
     condition: data.condition ?? null,
-    spawn_count: data.spawn_count ?? null,
+    spawnCount: data.spawnCount ?? null,
     foreach: data.foreach ?? null,
     synchronization: data.synchronization ?? null,
-    loop_config: data.loop_config ?? null,
+    loopConfig: data.loopConfig ?? null,
   };
 
   await db.insert(transitions).values(row).run();
@@ -361,33 +361,33 @@ export async function createTransitionWithId(
   data: {
     id: string;
     ref?: string | null;
-    workflow_def_id: string;
-    workflow_def_version: number;
-    from_node_id: string;
-    to_node_id: string;
+    workflowDefId: string;
+    workflowDefVersion: number;
+    fromNodeId: string;
+    toNodeId: string;
     priority: number;
     condition?: object | null;
-    spawn_count?: number | null;
-    sibling_group?: string | null;
+    spawnCount?: number | null;
+    siblingGroup?: string | null;
     foreach?: object | null;
     synchronization?: object | null;
-    loop_config?: object | null;
+    loopConfig?: object | null;
   },
 ): Promise<Transition> {
   const row = {
     id: data.id,
     ref: data.ref ?? null,
-    workflow_def_id: data.workflow_def_id,
-    workflow_def_version: data.workflow_def_version,
-    from_node_id: data.from_node_id,
-    to_node_id: data.to_node_id,
+    workflowDefId: data.workflowDefId,
+    workflowDefVersion: data.workflowDefVersion,
+    fromNodeId: data.fromNodeId,
+    toNodeId: data.toNodeId,
     priority: data.priority,
     condition: data.condition ?? null,
-    spawn_count: data.spawn_count ?? null,
-    sibling_group: data.sibling_group ?? null,
+    spawnCount: data.spawnCount ?? null,
+    siblingGroup: data.siblingGroup ?? null,
     foreach: data.foreach ?? null,
     synchronization: data.synchronization ?? null,
-    loop_config: data.loop_config ?? null,
+    loopConfig: data.loopConfig ?? null,
   };
 
   await db.insert(transitions).values(row).run();
@@ -401,7 +401,7 @@ export async function listTransitionsByWorkflowDef(
   return await db
     .select()
     .from(transitions)
-    .where(eq(transitions.workflow_def_id, workflowDefId))
+    .where(eq(transitions.workflowDefId, workflowDefId))
     .all();
 }
 
@@ -413,10 +413,10 @@ export async function deleteWorkflowDef(
   version?: number,
 ): Promise<void> {
   // Delete associated nodes
-  await db.delete(nodes).where(eq(nodes.workflow_def_id, id)).run();
+  await db.delete(nodes).where(eq(nodes.workflowDefId, id)).run();
 
   // Delete associated transitions
-  await db.delete(transitions).where(eq(transitions.workflow_def_id, id)).run();
+  await db.delete(transitions).where(eq(transitions.workflowDefId, id)).run();
 
   // Delete workflow_def(s)
   if (version !== undefined) {

@@ -9,17 +9,17 @@ export const CreateWorkflowDefSchema = z
   .object({
     name: z.string().min(1).max(255).openapi({ example: 'Content Generation Pipeline' }),
     description: z.string().min(1).openapi({ example: 'Generates and reviews content' }),
-    project_id: ulid().optional().openapi({ example: '01ARZ3NDEKTSV4RRFFQ69G5FAV' }),
-    library_id: ulid().optional(),
+    projectId: ulid().optional().openapi({ example: '01ARZ3NDEKTSV4RRFFQ69G5FAV' }),
+    libraryId: ulid().optional(),
     tags: z.array(z.string()).optional(),
-    input_schema: z.record(z.string(), z.unknown()).openapi({ example: { topic: 'string' } }),
-    output_schema: z.record(z.string(), z.unknown()).openapi({ example: { content: 'string' } }),
-    output_mapping: z
+    inputSchema: z.record(z.string(), z.unknown()).openapi({ example: { topic: 'string' } }),
+    outputSchema: z.record(z.string(), z.unknown()).openapi({ example: { content: 'string' } }),
+    outputMapping: z
       .record(z.string(), z.string())
       .optional()
       .openapi({ example: { result: '$.final_node_output.response' } }),
-    context_schema: z.record(z.string(), z.unknown()).optional(),
-    initial_node_ref: z
+    contextSchema: z.record(z.string(), z.unknown()).optional(),
+    initialNodeRef: z
       .string()
       .min(1)
       .regex(/^[a-z_][a-z0-9_]*$/)
@@ -32,11 +32,11 @@ export const CreateWorkflowDefSchema = z
           .regex(/^[a-z_][a-z0-9_]*$/)
           .openapi({ example: 'llm_call_node' }),
         name: z.string().min(1),
-        task_id: z.string().min(1).optional().openapi({ example: 'my-task' }),
-        task_version: z.number().int().positive().optional().openapi({ example: 1 }),
-        input_mapping: z.record(z.string(), z.unknown()).optional(),
-        output_mapping: z.record(z.string(), z.unknown()).optional(),
-        resource_bindings: z
+        taskId: z.string().min(1).optional().openapi({ example: 'my-task' }),
+        taskVersion: z.number().int().positive().optional().openapi({ example: 1 }),
+        inputMapping: z.record(z.string(), z.unknown()).optional(),
+        outputMapping: z.record(z.string(), z.unknown()).optional(),
+        resourceBindings: z
           .record(z.string(), z.string())
           .optional()
           .openapi({ example: { container: 'dev_env' } }),
@@ -49,21 +49,21 @@ export const CreateWorkflowDefSchema = z
             .string()
             .regex(/^[a-z_][a-z0-9_]*$/)
             .optional(),
-          from_node_ref: z.string().min(1),
-          to_node_ref: z.string().min(1),
+          fromNodeRef: z.string().min(1),
+          toNodeRef: z.string().min(1),
           priority: z.number().int(),
           condition: z.record(z.string(), z.unknown()).optional(),
-          spawn_count: z.number().int().optional(),
-          sibling_group: z.string().optional(),
+          spawnCount: z.number().int().optional(),
+          siblingGroup: z.string().optional(),
           foreach: z.record(z.string(), z.unknown()).optional(),
           synchronization: z
             .object({
               strategy: z.string(),
-              sibling_group: z.string(),
+              siblingGroup: z.string(),
               merge: z.record(z.string(), z.unknown()).optional(),
             })
             .optional(),
-          loop_config: z.record(z.string(), z.unknown()).optional(),
+          loopConfig: z.record(z.string(), z.unknown()).optional(),
         }),
       )
       .optional(),
@@ -76,32 +76,32 @@ export const CreateWorkflowDefSchema = z
 export const NodeSchema = z
   .object({
     id: ulid(),
-    workflow_def_id: ulid(),
-    workflow_def_version: z.number().int(),
+    workflowDefId: ulid(),
+    workflowDefVersion: z.number().int(),
     ref: z.string(),
     name: z.string(),
-    task_id: z.string().nullable(),
-    task_version: z.number().int().nullable(),
-    input_mapping: z.record(z.string(), z.unknown()).nullable(),
-    output_mapping: z.record(z.string(), z.unknown()).nullable(),
-    resource_bindings: z.record(z.string(), z.string()).nullable(),
+    taskId: z.string().nullable(),
+    taskVersion: z.number().int().nullable(),
+    inputMapping: z.record(z.string(), z.unknown()).nullable(),
+    outputMapping: z.record(z.string(), z.unknown()).nullable(),
+    resourceBindings: z.record(z.string(), z.string()).nullable(),
   })
   .openapi('Node');
 
 export const TransitionSchema = z
   .object({
     id: ulid(),
-    workflow_def_id: ulid(),
-    workflow_def_version: z.number().int(),
+    workflowDefId: ulid(),
+    workflowDefVersion: z.number().int(),
     ref: z.string().nullable(),
-    from_node_id: z.string(),
-    to_node_id: z.string(),
+    fromNodeId: z.string(),
+    toNodeId: z.string(),
     priority: z.number().int(),
     condition: z.record(z.string(), z.unknown()).nullable(),
-    spawn_count: z.number().int().nullable(),
+    spawnCount: z.number().int().nullable(),
     foreach: z.record(z.string(), z.unknown()).nullable(),
     synchronization: z.record(z.string(), z.unknown()).nullable(),
-    loop_config: z.record(z.string(), z.unknown()).nullable(),
+    loopConfig: z.record(z.string(), z.unknown()).nullable(),
   })
   .openapi('Transition');
 
@@ -111,23 +111,23 @@ export const WorkflowDefSchema = z
     name: z.string(),
     description: z.string(),
     version: z.number().int(),
-    project_id: ulid().nullable(),
-    library_id: ulid().nullable(),
+    projectId: ulid().nullable(),
+    libraryId: ulid().nullable(),
     tags: z.array(z.string()).nullable(),
-    input_schema: z.record(z.string(), z.unknown()),
-    output_schema: z.record(z.string(), z.unknown()),
-    context_schema: z.record(z.string(), z.unknown()).nullable(),
-    initial_node_id: z.string().nullable(),
-    content_hash: z.string().nullable(),
-    created_at: z.string(),
-    updated_at: z.string(),
+    inputSchema: z.record(z.string(), z.unknown()),
+    outputSchema: z.record(z.string(), z.unknown()),
+    contextSchema: z.record(z.string(), z.unknown()).nullable(),
+    initialNodeId: z.string().nullable(),
+    contentHash: z.string().nullable(),
+    createdAt: z.string(),
+    updatedAt: z.string(),
   })
   .openapi('WorkflowDef');
 
 export const WorkflowDefCreateResponseSchema = z
   .object({
-    workflow_def_id: ulid(),
-    workflow_def: WorkflowDefSchema,
+    workflowDefId: ulid(),
+    workflowDef: WorkflowDefSchema,
     /** True if an existing workflow def was reused (autoversion matched content hash) */
     reused: z.boolean(),
   })
@@ -135,7 +135,7 @@ export const WorkflowDefCreateResponseSchema = z
 
 export const WorkflowDefGetResponseSchema = z
   .object({
-    workflow_def: WorkflowDefSchema,
+    workflowDef: WorkflowDefSchema,
     nodes: z.array(NodeSchema),
     transitions: z.array(TransitionSchema),
   })

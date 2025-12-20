@@ -39,7 +39,7 @@ export function createEmitter(
   // Cached context and stub (lazy initialized on first emit)
   let cached: {
     context: EventContext;
-    traceContext: { workflow_run_id: string; project_id: string };
+    traceContext: { workflowRunId: string; projectId: string };
     stub: StreamerStub;
   } | null = null;
 
@@ -49,10 +49,10 @@ export function createEmitter(
       cached = {
         context: ctx,
         traceContext: {
-          workflow_run_id: ctx.workflow_run_id,
-          project_id: ctx.project_id,
+          workflowRunId: ctx.workflowRunId,
+          projectId: ctx.projectId,
         },
-        stub: streamer.get(streamer.idFromName(ctx.workflow_run_id)),
+        stub: streamer.get(streamer.idFromName(ctx.workflowRunId)),
       };
     }
     return cached;

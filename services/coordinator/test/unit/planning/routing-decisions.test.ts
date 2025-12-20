@@ -23,7 +23,7 @@ function createToken(overrides: Partial<TokenRow> = {}): TokenRow {
     node_id: 'nodeA',
     parent_token_id: null,
     path_id: 'root',
-    sibling_group: null,
+    siblingGroup: null,
     branch_index: 0,
     branch_total: 1,
     iteration_counts: null,
@@ -41,15 +41,15 @@ function createTransition(overrides: Partial<TransitionRow> = {}): TransitionRow
     ref: 'trans_1',
     workflow_def_id: 'wfd_123',
     workflow_def_version: 1,
-    from_node_id: 'nodeA',
-    to_node_id: 'nodeB',
+    fromNodeId: 'nodeA',
+    toNodeId: 'nodeB',
     priority: 1,
     condition: null,
-    spawn_count: null,
-    sibling_group: null,
+    spawnCount: null,
+    siblingGroup: null,
     foreach: null,
     synchronization: null,
-    loop_config: null,
+    loopConfig: null,
     ...overrides,
   };
 }
@@ -162,7 +162,7 @@ describe('decideRouting - priority tiers', () => {
       createTransition({
         id: 'trans_p1',
         priority: 1,
-        to_node_id: 'nodeB',
+        toNodeId: 'nodeB',
         condition: {
           type: 'comparison',
           left: { field: 'state.status' },
@@ -173,7 +173,7 @@ describe('decideRouting - priority tiers', () => {
       createTransition({
         id: 'trans_p2',
         priority: 2,
-        to_node_id: 'nodeC',
+        toNodeId: 'nodeC',
         condition: null, // Would match, but priority 1 already matched
       }),
     ];
@@ -198,7 +198,7 @@ describe('decideRouting - priority tiers', () => {
       createTransition({
         id: 'trans_p1',
         priority: 1,
-        to_node_id: 'nodeB',
+        toNodeId: 'nodeB',
         condition: {
           type: 'comparison',
           left: { field: 'state.status' },
@@ -209,7 +209,7 @@ describe('decideRouting - priority tiers', () => {
       createTransition({
         id: 'trans_p2',
         priority: 2,
-        to_node_id: 'nodeC',
+        toNodeId: 'nodeC',
         condition: null, // Fallback
       }),
     ];
@@ -234,7 +234,7 @@ describe('decideRouting - priority tiers', () => {
       createTransition({
         id: 'trans_1',
         priority: 1,
-        to_node_id: 'nodeB',
+        toNodeId: 'nodeB',
         condition: {
           type: 'comparison',
           left: { field: 'state.score' },
@@ -245,7 +245,7 @@ describe('decideRouting - priority tiers', () => {
       createTransition({
         id: 'trans_2',
         priority: 1,
-        to_node_id: 'nodeC',
+        toNodeId: 'nodeC',
         condition: {
           type: 'comparison',
           left: { field: 'state.status' },
@@ -275,7 +275,7 @@ describe('decideRouting - priority tiers', () => {
       createTransition({
         id: 'trans_1',
         priority: 1,
-        to_node_id: 'nodeB',
+        toNodeId: 'nodeB',
         condition: {
           type: 'comparison',
           left: { field: 'state.score' },
@@ -286,7 +286,7 @@ describe('decideRouting - priority tiers', () => {
       createTransition({
         id: 'trans_2',
         priority: 1,
-        to_node_id: 'nodeC',
+        toNodeId: 'nodeC',
         condition: {
           type: 'comparison',
           left: { field: 'state.score' },
@@ -317,26 +317,26 @@ describe('decideRouting - priority tiers', () => {
 // Spawn Count (Static Fan-out)
 // ============================================================================
 
-describe('decideRouting - spawn_count', () => {
-  test('spawn_count=1 (default) creates single token', () => {
+describe('decideRouting - spawnCount', () => {
+  test('spawnCount=1 (default) creates single token', () => {
     const result = decideRouting({
       completedToken: createToken(),
       workflowRunId: 'wfr_123',
       nodeId: 'nodeA',
-      transitions: [createTransition({ spawn_count: 1 })],
+      transitions: [createTransition({ spawnCount: 1 })],
       context: baseContext,
     });
 
     expect(result.decisions).toHaveLength(1);
   });
 
-  test('spawn_count=3 creates three tokens with correct paths', () => {
+  test('spawnCount=3 creates three tokens with correct paths', () => {
     const result = decideRouting({
       completedToken: createToken(),
       workflowRunId: 'wfr_123',
       nodeId: 'nodeA',
       transitions: [
-        createTransition({ id: 'trans_fanout', spawn_count: 3, sibling_group: 'fanout-group' }),
+        createTransition({ id: 'trans_fanout', spawnCount: 3, siblingGroup: 'fanout-group' }),
       ],
       context: baseContext,
     });
@@ -349,38 +349,38 @@ describe('decideRouting - spawn_count', () => {
       path_id: 'root.nodeA.0',
       branch_index: 0,
       branch_total: 3,
-      sibling_group: 'fanout-group',
+      siblingGroup: 'fanout-group',
     });
     expect(params[1]).toMatchObject({
       path_id: 'root.nodeA.1',
       branch_index: 1,
       branch_total: 3,
-      sibling_group: 'fanout-group',
+      siblingGroup: 'fanout-group',
     });
     expect(params[2]).toMatchObject({
       path_id: 'root.nodeA.2',
       branch_index: 2,
       branch_total: 3,
-      sibling_group: 'fanout-group',
+      siblingGroup: 'fanout-group',
     });
   });
 
-  test('spawn_count=5 creates five siblings', () => {
+  test('spawnCount=5 creates five siblings', () => {
     const result = decideRouting({
       completedToken: createToken(),
       workflowRunId: 'wfr_123',
       nodeId: 'nodeA',
       transitions: [
-        createTransition({ id: 'trans_judges', spawn_count: 5, sibling_group: 'judges-group' }),
+        createTransition({ id: 'trans_judges', spawnCount: 5, siblingGroup: 'judges-group' }),
       ],
       context: baseContext,
     });
 
     expect(result.decisions).toHaveLength(5);
 
-    // All share same sibling_group
+    // All share same siblingGroup
     const siblingGroups = result.decisions.map(
-      (d) => (d as { params: { sibling_group: string } }).params.sibling_group,
+      (d) => (d as { params: { siblingGroup: string } }).params.siblingGroup,
     );
     expect(new Set(siblingGroups).size).toBe(1);
     expect(siblingGroups[0]).toBe('judges-group');
@@ -465,10 +465,10 @@ describe('decideRouting - foreach', () => {
 // Sibling Group Inheritance
 // ============================================================================
 
-describe('decideRouting - sibling_group inheritance', () => {
-  test('single token inherits parent sibling_group', () => {
+describe('decideRouting - siblingGroup inheritance', () => {
+  test('single token inherits parent siblingGroup', () => {
     const completedToken = createToken({
-      sibling_group: 'parent_group',
+      siblingGroup: 'parent_group',
       branch_index: 2,
       branch_total: 5,
     });
@@ -477,7 +477,7 @@ describe('decideRouting - sibling_group inheritance', () => {
       completedToken,
       workflowRunId: 'wfr_123',
       nodeId: 'nodeA',
-      transitions: [createTransition({ spawn_count: 1 })], // No new fan-out
+      transitions: [createTransition({ spawnCount: 1 })], // No new fan-out
       context: baseContext,
     });
 
@@ -485,15 +485,15 @@ describe('decideRouting - sibling_group inheritance', () => {
     expect(result.decisions[0]).toMatchObject({
       type: 'CREATE_TOKEN',
       params: {
-        sibling_group: 'parent_group', // Inherited
+        siblingGroup: 'parent_group', // Inherited
         branch_total: 5, // Inherited
       },
     });
   });
 
-  test('new fan-out creates new sibling_group', () => {
+  test('new fan-out creates new siblingGroup', () => {
     const completedToken = createToken({
-      sibling_group: 'parent_group',
+      siblingGroup: 'parent_group',
       branch_index: 2,
       branch_total: 5,
     });
@@ -503,16 +503,16 @@ describe('decideRouting - sibling_group inheritance', () => {
       workflowRunId: 'wfr_123',
       nodeId: 'nodeA',
       transitions: [
-        createTransition({ id: 'new_fanout', spawn_count: 3, sibling_group: 'new_group' }),
+        createTransition({ id: 'new_fanout', spawnCount: 3, siblingGroup: 'new_group' }),
       ],
       context: baseContext,
     });
 
     expect(result.decisions).toHaveLength(3);
 
-    // All new tokens get the new sibling_group
+    // All new tokens get the new siblingGroup
     for (const d of result.decisions) {
-      expect((d as { params: { sibling_group: string } }).params.sibling_group).toBe('new_group');
+      expect((d as { params: { siblingGroup: string } }).params.siblingGroup).toBe('new_group');
     }
   });
 });
@@ -547,7 +547,7 @@ describe('decideRouting - events', () => {
       nodeId: 'nodeA',
       transitions: [
         createTransition({ id: 'trans_1' }),
-        createTransition({ id: 'trans_2', to_node_id: 'nodeC' }),
+        createTransition({ id: 'trans_2', toNodeId: 'nodeC' }),
       ],
       context: baseContext,
     });
@@ -563,7 +563,7 @@ describe('decideRouting - events', () => {
       completedToken: createToken(),
       workflowRunId: 'wfr_123',
       nodeId: 'nodeA',
-      transitions: [createTransition({ spawn_count: 3, sibling_group: 'test-group' })],
+      transitions: [createTransition({ spawnCount: 3, siblingGroup: 'test-group' })],
       context: baseContext,
     });
 
@@ -571,7 +571,7 @@ describe('decideRouting - events', () => {
     expect(matchEvent).toMatchObject({
       type: 'decision.routing.transition_matched',
       payload: {
-        spawn_count: 3,
+        spawnCount: 3,
       },
     });
   });
@@ -591,10 +591,10 @@ describe('decideRouting - events', () => {
 });
 
 // ============================================================================
-// Loop Iteration Limits (loop_config.max_iterations)
+// Loop Iteration Limits (loopConfig.max_iterations)
 // ============================================================================
 
-describe('decideRouting - loop_config.max_iterations', () => {
+describe('decideRouting - loopConfig.max_iterations', () => {
   test('transition fires when iteration count is below max', () => {
     const completedToken = createToken({
       iteration_counts: { trans_loop: 1 },
@@ -607,7 +607,7 @@ describe('decideRouting - loop_config.max_iterations', () => {
       transitions: [
         createTransition({
           id: 'trans_loop',
-          loop_config: { max_iterations: 3 },
+          loopConfig: { max_iterations: 3 },
         }),
       ],
       context: baseContext,
@@ -629,7 +629,7 @@ describe('decideRouting - loop_config.max_iterations', () => {
       transitions: [
         createTransition({
           id: 'trans_loop',
-          loop_config: { max_iterations: 3 },
+          loopConfig: { max_iterations: 3 },
         }),
       ],
       context: baseContext,
@@ -650,7 +650,7 @@ describe('decideRouting - loop_config.max_iterations', () => {
       transitions: [
         createTransition({
           id: 'trans_loop',
-          loop_config: { max_iterations: 3 },
+          loopConfig: { max_iterations: 3 },
         }),
       ],
       context: baseContext,
@@ -671,7 +671,7 @@ describe('decideRouting - loop_config.max_iterations', () => {
       transitions: [
         createTransition({
           id: 'trans_loop',
-          loop_config: { max_iterations: 3 },
+          loopConfig: { max_iterations: 3 },
         }),
       ],
       context: baseContext,
@@ -697,13 +697,13 @@ describe('decideRouting - loop_config.max_iterations', () => {
       createTransition({
         id: 'trans_loop',
         priority: 1,
-        to_node_id: 'loopNode',
-        loop_config: { max_iterations: 3 },
+        toNodeId: 'loopNode',
+        loopConfig: { max_iterations: 3 },
       }),
       createTransition({
         id: 'trans_exit',
         priority: 2,
-        to_node_id: 'exitNode',
+        toNodeId: 'exitNode',
       }),
     ];
 
@@ -734,7 +734,7 @@ describe('decideRouting - loop_config.max_iterations', () => {
       transitions: [
         createTransition({
           id: 'trans_loop',
-          loop_config: { max_iterations: 3 },
+          loopConfig: { max_iterations: 3 },
         }),
       ],
       context: baseContext,
@@ -756,7 +756,7 @@ describe('decideRouting - loop_config.max_iterations', () => {
       transitions: [
         createTransition({
           id: 'trans_loop',
-          loop_config: { max_iterations: 3 },
+          loopConfig: { max_iterations: 3 },
         }),
       ],
       context: baseContext,
@@ -845,8 +845,8 @@ describe('decideRouting - iteration_counts propagation', () => {
       transitions: [
         createTransition({
           id: 'trans_fanout',
-          spawn_count: 3,
-          sibling_group: 'fanout-group',
+          spawnCount: 3,
+          siblingGroup: 'fanout-group',
         }),
       ],
       context: baseContext,

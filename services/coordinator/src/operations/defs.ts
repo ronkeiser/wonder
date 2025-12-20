@@ -12,12 +12,12 @@ import { drizzle, type DrizzleSqliteDODatabase } from 'drizzle-orm/durable-sqlit
 import { migrate } from 'drizzle-orm/durable-sqlite/migrator';
 
 import * as schema from '../schema';
-import { nodes, transitions, workflow_defs, workflow_runs } from '../schema';
+import { nodes, transitions, workflowDefs, workflowRuns } from '../schema';
 import migrations from '../schema/migrations';
 
 // Types inferred from schema
-export type WorkflowRunRow = typeof workflow_runs.$inferSelect;
-export type WorkflowDefRow = typeof workflow_defs.$inferSelect;
+export type WorkflowRunRow = typeof workflowRuns.$inferSelect;
+export type WorkflowDefRow = typeof workflowDefs.$inferSelect;
 export type NodeRow = typeof nodes.$inferSelect;
 export type TransitionRow = typeof transitions.$inferSelect;
 
@@ -36,7 +36,7 @@ export class DefinitionManager {
   private initialized = false;
 
   constructor(ctx: DurableObjectState, env: Env) {
-    this.db = drizzle(ctx.storage, { schema });
+    this.db = drizzle(ctx.storage, { schema, casing: 'snake_case' });
     this.env = env;
     this.logger = createLogger(ctx, env.LOGS, {
       service: env.SERVICE,
@@ -57,18 +57,18 @@ export class DefinitionManager {
       // Run migrations (idempotent - creates tables if not exist)
       migrate(this.db, migrations);
       this.logger.info({
-        event_type: 'defs.migrations.complete',
+        eventType: 'defs.migrations.complete',
         message: 'DO SQLite migrations applied',
-        trace_id: workflow_run_id,
+        traceId: workflow_run_id,
       });
 
       // Check if already populated (DO wake-up case)
-      const existing = this.db.select({ id: workflow_runs.id }).from(workflow_runs).limit(1).all();
+      const existing = this.db.select({ id: workflowRuns.id }).from(workflowRuns).limit(1).all();
       if (existing.length > 0) {
         this.logger.info({
-          event_type: 'defs.already_populated',
+          eventType: 'defs.already_populated',
           message: 'DO SQLite already populated (wake-up)',
-          trace_id: workflow_run_id,
+          traceId: workflow_run_id,
         });
         this.initialized = true;
         return;
@@ -85,24 +85,24 @@ export class DefinitionManager {
       const nodeCount = this.db.select({ id: nodes.id }).from(nodes).all().length;
       const transitionCount = this.db.select({ id: transitions.id }).from(transitions).all().length;
       this.logger.info({
-        event_type: 'defs.populated',
+        eventType: 'defs.populated',
         message: 'DO SQLite populated from RESOURCES',
-        trace_id: workflow_run_id,
+        traceId: workflow_run_id,
         metadata: {
-          workflow_run_id,
-          node_count: nodeCount,
-          transition_count: transitionCount,
+          workflowRunId: workflow_run_id,
+          nodeCount: nodeCount,
+          transitionCount: transitionCount,
         },
       });
 
       this.initialized = true;
     } catch (error) {
       this.logger.error({
-        event_type: 'defs.initialize.failed',
+        eventType: 'defs.initialize.failed',
         message: 'Failed to initialize DefinitionManager',
-        trace_id: workflow_run_id,
+        traceId: workflow_run_id,
         metadata: {
-          workflow_run_id,
+          workflowRunId: workflow_run_id,
           error: error instanceof Error ? error.message : String(error),
           stack: error instanceof Error ? error.stack : undefined,
         },
@@ -122,51 +122,51 @@ export class DefinitionManager {
 
     // 2. Fetch workflow def with nodes and transitions
     const workflowDefsResource = this.env.RESOURCES.workflowDefs();
-    const defResponse = await workflowDefsResource.get(run.workflow_def_id, run.workflow_version);
-    const def = defResponse.workflow_def;
+    const defResponse = await workflowDefsResource.get(run.workflowDefId, run.workflowVersion);
+    const def = defResponse.workflowDef;
     const nodesList = defResponse.nodes;
     const transitionsList = defResponse.transitions;
 
     // 3. Insert workflow run
     this.db
-      .insert(workflow_runs)
+      .insert(workflowRuns)
       .values({
         id: run.id,
-        project_id: run.project_id,
-        workflow_id: run.workflow_id,
-        workflow_def_id: run.workflow_def_id,
-        workflow_version: run.workflow_version,
+        projectId: run.projectId,
+        workflowId: run.workflowId,
+        workflowDefId: run.workflowDefId,
+        workflowVersion: run.workflowVersion,
         status: run.status as 'running' | 'completed' | 'failed' | 'waiting',
         context: run.context,
-        active_tokens: run.active_tokens,
-        durable_object_id: run.durable_object_id,
-        latest_snapshot: run.latest_snapshot,
-        parent_run_id: run.parent_run_id,
-        parent_node_id: run.parent_node_id,
-        created_at: run.created_at,
-        updated_at: run.updated_at,
-        completed_at: run.completed_at,
+        activeTokens: run.activeTokens,
+        durableObjectId: run.durableObjectId,
+        latestSnapshot: run.latestSnapshot,
+        parentRunId: run.parentRunId,
+        parentNodeId: run.parentNodeId,
+        createdAt: run.createdAt,
+        updatedAt: run.updatedAt,
+        completedAt: run.completedAt,
       })
       .run();
 
     // 4. Insert workflow def
     this.db
-      .insert(workflow_defs)
+      .insert(workflowDefs)
       .values({
         id: def.id,
         version: def.version,
         name: def.name,
         description: def.description,
-        project_id: def.project_id,
-        library_id: def.library_id,
+        projectId: def.projectId,
+        libraryId: def.libraryId,
         tags: def.tags,
-        input_schema: def.input_schema,
-        output_schema: def.output_schema,
-        output_mapping: def.output_mapping,
-        context_schema: def.context_schema,
-        initial_node_id: def.initial_node_id,
-        created_at: def.created_at,
-        updated_at: def.updated_at,
+        inputSchema: def.inputSchema,
+        outputSchema: def.outputSchema,
+        outputMapping: def.outputMapping,
+        contextSchema: def.contextSchema,
+        initialNodeId: def.initialNodeId,
+        createdAt: def.createdAt,
+        updatedAt: def.updatedAt,
       })
       .run();
 
@@ -177,14 +177,14 @@ export class DefinitionManager {
         .values({
           id: node.id,
           ref: node.ref,
-          workflow_def_id: node.workflow_def_id,
-          workflow_def_version: node.workflow_def_version,
+          workflowDefId: node.workflowDefId,
+          workflowDefVersion: node.workflowDefVersion,
           name: node.name,
-          task_id: node.task_id,
-          task_version: node.task_version,
-          input_mapping: node.input_mapping,
-          output_mapping: node.output_mapping,
-          resource_bindings: node.resource_bindings,
+          taskId: node.taskId,
+          taskVersion: node.taskVersion,
+          inputMapping: node.inputMapping,
+          outputMapping: node.outputMapping,
+          resourceBindings: node.resourceBindings,
         })
         .run();
     }
@@ -196,17 +196,17 @@ export class DefinitionManager {
         .values({
           id: transition.id,
           ref: transition.ref,
-          workflow_def_id: transition.workflow_def_id,
-          workflow_def_version: transition.workflow_def_version,
-          from_node_id: transition.from_node_id,
-          to_node_id: transition.to_node_id,
+          workflowDefId: transition.workflowDefId,
+          workflowDefVersion: transition.workflowDefVersion,
+          fromNodeId: transition.fromNodeId,
+          toNodeId: transition.toNodeId,
           priority: transition.priority,
           condition: transition.condition,
-          spawn_count: transition.spawn_count,
-          sibling_group: transition.sibling_group,
+          spawnCount: transition.spawnCount,
+          siblingGroup: transition.siblingGroup,
           foreach: transition.foreach,
           synchronization: transition.synchronization,
-          loop_config: transition.loop_config,
+          loopConfig: transition.loopConfig,
         })
         .run();
     }
@@ -227,7 +227,7 @@ export class DefinitionManager {
    */
   getWorkflowRun(): WorkflowRunRow {
     this.ensureInitialized();
-    const result = this.db.select().from(workflow_runs).limit(1).all();
+    const result = this.db.select().from(workflowRuns).limit(1).all();
     if (result.length === 0) {
       throw new Error('WorkflowRun not found');
     }
@@ -239,7 +239,7 @@ export class DefinitionManager {
    */
   getWorkflowDef(): WorkflowDefRow {
     this.ensureInitialized();
-    const result = this.db.select().from(workflow_defs).limit(1).all();
+    const result = this.db.select().from(workflowDefs).limit(1).all();
     if (result.length === 0) {
       throw new Error('WorkflowDef not found');
     }
@@ -257,8 +257,8 @@ export class DefinitionManager {
       .from(nodes)
       .where(
         and(
-          eq(nodes.workflow_def_id, def.id),
-          eq(nodes.workflow_def_version, def.version),
+          eq(nodes.workflowDefId, def.id),
+          eq(nodes.workflowDefVersion, def.version),
           eq(nodes.id, nodeId),
         ),
       )
@@ -280,7 +280,7 @@ export class DefinitionManager {
     return this.db
       .select()
       .from(nodes)
-      .where(and(eq(nodes.workflow_def_id, def.id), eq(nodes.workflow_def_version, def.version)))
+      .where(and(eq(nodes.workflowDefId, def.id), eq(nodes.workflowDefVersion, def.version)))
       .all();
   }
 
@@ -295,9 +295,9 @@ export class DefinitionManager {
       .from(transitions)
       .where(
         and(
-          eq(transitions.workflow_def_id, def.id),
-          eq(transitions.workflow_def_version, def.version),
-          eq(transitions.from_node_id, nodeId),
+          eq(transitions.workflowDefId, def.id),
+          eq(transitions.workflowDefVersion, def.version),
+          eq(transitions.fromNodeId, nodeId),
         ),
       )
       .all();
@@ -314,8 +314,8 @@ export class DefinitionManager {
       .from(transitions)
       .where(
         and(
-          eq(transitions.workflow_def_id, def.id),
-          eq(transitions.workflow_def_version, def.version),
+          eq(transitions.workflowDefId, def.id),
+          eq(transitions.workflowDefVersion, def.version),
         ),
       )
       .all();
@@ -332,8 +332,8 @@ export class DefinitionManager {
       .from(transitions)
       .where(
         and(
-          eq(transitions.workflow_def_id, def.id),
-          eq(transitions.workflow_def_version, def.version),
+          eq(transitions.workflowDefId, def.id),
+          eq(transitions.workflowDefVersion, def.version),
           eq(transitions.id, transitionId),
         ),
       )

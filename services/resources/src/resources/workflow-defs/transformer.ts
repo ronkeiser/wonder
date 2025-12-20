@@ -20,30 +20,30 @@ export type TransformedNode = {
   id: string;
   ref: string;
   name: string;
-  task_id: string | null;
-  task_version: number | null;
-  input_mapping: object | null;
-  output_mapping: object | null;
-  resource_bindings: Record<string, string> | null;
+  taskId: string | null;
+  taskVersion: number | null;
+  inputMapping: object | null;
+  outputMapping: object | null;
+  resourceBindings: Record<string, string> | null;
 };
 
 /** Transformed transition ready for database insertion */
 export type TransformedTransition = {
   id: string;
   ref: string | null;
-  from_node_id: string;
-  to_node_id: string;
+  fromNodeId: string;
+  toNodeId: string;
   priority: number;
   condition: object | null;
-  spawn_count: number | null;
-  sibling_group: string | null; // Named sibling group for fan-in coordination
+  spawnCount: number | null;
+  siblingGroup: string | null; // Named sibling group for fan-in coordination
   foreach: object | null;
   synchronization: {
     strategy: string;
-    sibling_group: string; // Must reference a declared sibling_group
+    siblingGroup: string; // Must reference a declared siblingGroup
     merge?: object;
   } | null;
-  loop_config: object | null;
+  loopConfig: object | null;
 };
 
 /** Result of transformation */
@@ -69,7 +69,7 @@ export function generateIds(data: WorkflowDefInput): GeneratedIds {
 
   // Generate transition IDs
   // IMPORTANT: We need to map ALL transitions by ref, not just ones with refs,
-  // because synchronization.sibling_group references transitions by ref
+  // because synchronization.siblingGroup references transitions by ref
   const transitionIds = new Map<string, string>();
   for (const transition of data.transitions ?? []) {
     if (transition.ref) {
@@ -85,7 +85,7 @@ export function generateIds(data: WorkflowDefInput): GeneratedIds {
  * All refs are resolved to IDs at this boundary.
  */
 export function transformWorkflowDef(data: WorkflowDefInput, ids: GeneratedIds): TransformResult {
-  const initialNodeId = ids.nodeIds.get(data.initial_node_ref)!;
+  const initialNodeId = ids.nodeIds.get(data.initialNodeRef)!;
 
   const nodes = transformNodes(data.nodes, ids.nodeIds);
   const transitions = transformTransitions(data.transitions ?? [], ids);
@@ -106,11 +106,11 @@ function transformNodes(nodes: NodeInput[], nodeIds: Map<string, string>): Trans
     id: nodeIds.get(node.ref)!,
     ref: node.ref,
     name: node.name,
-    task_id: node.task_id ?? null,
-    task_version: node.task_version ?? null,
-    input_mapping: node.input_mapping ?? null,
-    output_mapping: node.output_mapping ?? null,
-    resource_bindings: node.resource_bindings ?? null,
+    taskId: node.taskId ?? null,
+    taskVersion: node.taskVersion ?? null,
+    inputMapping: node.inputMapping ?? null,
+    outputMapping: node.outputMapping ?? null,
+    resourceBindings: node.resourceBindings ?? null,
   }));
 }
 
@@ -128,22 +128,22 @@ function transformTransitions(
     return {
       id: transitionId,
       ref: transition.ref ?? null,
-      from_node_id: ids.nodeIds.get(transition.from_node_ref)!,
-      to_node_id: ids.nodeIds.get(transition.to_node_ref)!,
+      fromNodeId: ids.nodeIds.get(transition.fromNodeRef)!,
+      toNodeId: ids.nodeIds.get(transition.toNodeRef)!,
       priority: transition.priority,
       condition: transition.condition ?? null,
-      spawn_count: transition.spawn_count ?? null,
-      sibling_group: transition.sibling_group ?? null,
+      spawnCount: transition.spawnCount ?? null,
+      siblingGroup: transition.siblingGroup ?? null,
       foreach: transition.foreach ?? null,
       synchronization: transformSynchronization(transition.synchronization),
-      loop_config: transition.loop_config ?? null,
+      loopConfig: transition.loopConfig ?? null,
     };
   });
 }
 
 /**
  * Transforms synchronization config.
- * sibling_group is passed through as-is - it's a string identifier declared on transitions.
+ * siblingGroup is passed through as-is - it's a string identifier declared on transitions.
  */
 function transformSynchronization(
   sync: TransitionInput['synchronization'],
@@ -154,7 +154,7 @@ function transformSynchronization(
 
   return {
     strategy: sync.strategy,
-    sibling_group: sync.sibling_group,
+    siblingGroup: sync.siblingGroup,
     merge: sync.merge,
   };
 }

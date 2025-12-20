@@ -14,7 +14,7 @@ export class Workspaces extends Resource {
       budget_alert_threshold_cents?: number;
     };
   }): Promise<{
-    workspace_id: string;
+    workspaceId: string;
     workspace: {
       id: string;
       name: string;
@@ -24,20 +24,39 @@ export class Workspaces extends Resource {
         budget_max_monthly_spend_cents?: number;
         budget_alert_threshold_cents?: number;
       } | null;
-      created_at: string;
-      updated_at: string;
+      createdAt: string;
+      updatedAt: string;
     };
   }> {
     return this.withLogging('create', { metadata: { name: data.name } }, async () => {
       try {
         const workspace = await repo.createWorkspace(this.serviceCtx.db, {
           name: data.name,
-          settings: data.settings ?? null,
+          settings: data.settings
+            ? {
+                allowedModelProviders: data.settings.allowed_model_providers,
+                allowedMcpServers: data.settings.allowed_mcp_servers,
+                budgetMaxMonthlySpendCents: data.settings.budget_max_monthly_spend_cents,
+                budgetAlertThresholdCents: data.settings.budget_alert_threshold_cents,
+              }
+            : null,
         });
 
         return {
-          workspace_id: workspace.id,
-          workspace,
+          workspaceId: workspace.id,
+          workspace: {
+            ...workspace,
+            createdAt: workspace.createdAt,
+            updatedAt: workspace.updatedAt,
+            settings: workspace.settings
+              ? {
+                  allowed_model_providers: workspace.settings.allowedModelProviders,
+                  allowed_mcp_servers: workspace.settings.allowedMcpServers,
+                  budget_max_monthly_spend_cents: workspace.settings.budgetMaxMonthlySpendCents,
+                  budget_alert_threshold_cents: workspace.settings.budgetAlertThresholdCents,
+                }
+              : null,
+          },
         };
       } catch (error) {
         const dbError = extractDbError(error);
@@ -65,19 +84,33 @@ export class Workspaces extends Resource {
         budget_max_monthly_spend_cents?: number;
         budget_alert_threshold_cents?: number;
       } | null;
-      created_at: string;
-      updated_at: string;
+      createdAt: string;
+      updatedAt: string;
     };
   }> {
     return this.withLogging(
       'get',
-      { workspace_id: id, metadata: { workspace_id: id } },
+      { workspaceId: id, metadata: { workspaceId: id } },
       async () => {
         const workspace = await repo.getWorkspace(this.serviceCtx.db, id);
         if (!workspace) {
           throw new NotFoundError(`Workspace not found: ${id}`, 'workspace', id);
         }
-        return { workspace };
+        return {
+          workspace: {
+            ...workspace,
+            createdAt: workspace.createdAt,
+            updatedAt: workspace.updatedAt,
+            settings: workspace.settings
+              ? {
+                  allowed_model_providers: workspace.settings.allowedModelProviders,
+                  allowed_mcp_servers: workspace.settings.allowedMcpServers,
+                  budget_max_monthly_spend_cents: workspace.settings.budgetMaxMonthlySpendCents,
+                  budget_alert_threshold_cents: workspace.settings.budgetAlertThresholdCents,
+                }
+              : null,
+          },
+        };
       },
     );
   }
@@ -92,13 +125,27 @@ export class Workspaces extends Resource {
         budget_max_monthly_spend_cents?: number;
         budget_alert_threshold_cents?: number;
       } | null;
-      created_at: string;
-      updated_at: string;
+      createdAt: string;
+      updatedAt: string;
     }>;
   }> {
     return this.withLogging('list', { metadata: params }, async () => {
       const workspaces = await repo.listWorkspaces(this.serviceCtx.db, params?.limit);
-      return { workspaces };
+      return {
+        workspaces: workspaces.map((workspace) => ({
+          ...workspace,
+          createdAt: workspace.createdAt,
+          updatedAt: workspace.updatedAt,
+          settings: workspace.settings
+            ? {
+                allowed_model_providers: workspace.settings.allowedModelProviders,
+                allowed_mcp_servers: workspace.settings.allowedMcpServers,
+                budget_max_monthly_spend_cents: workspace.settings.budgetMaxMonthlySpendCents,
+                budget_alert_threshold_cents: workspace.settings.budgetAlertThresholdCents,
+              }
+            : null,
+        })),
+      };
     });
   }
 
@@ -123,19 +170,43 @@ export class Workspaces extends Resource {
         budget_max_monthly_spend_cents?: number;
         budget_alert_threshold_cents?: number;
       } | null;
-      created_at: string;
-      updated_at: string;
+      createdAt: string;
+      updatedAt: string;
     };
   }> {
     return this.withLogging(
       'update',
-      { workspace_id: id, metadata: { workspace_id: id } },
+      { workspaceId: id, metadata: { workspaceId: id } },
       async () => {
-        const workspace = await repo.updateWorkspace(this.serviceCtx.db, id, data);
+        const workspace = await repo.updateWorkspace(this.serviceCtx.db, id, {
+          name: data.name,
+          settings: data.settings
+            ? {
+                allowedModelProviders: data.settings.allowed_model_providers,
+                allowedMcpServers: data.settings.allowed_mcp_servers,
+                budgetMaxMonthlySpendCents: data.settings.budget_max_monthly_spend_cents,
+                budgetAlertThresholdCents: data.settings.budget_alert_threshold_cents,
+              }
+            : undefined,
+        });
         if (!workspace) {
           throw new NotFoundError(`Workspace not found: ${id}`, 'workspace', id);
         }
-        return { workspace };
+        return {
+          workspace: {
+            ...workspace,
+            createdAt: workspace.createdAt,
+            updatedAt: workspace.updatedAt,
+            settings: workspace.settings
+              ? {
+                  allowed_model_providers: workspace.settings.allowedModelProviders,
+                  allowed_mcp_servers: workspace.settings.allowedMcpServers,
+                  budget_max_monthly_spend_cents: workspace.settings.budgetMaxMonthlySpendCents,
+                  budget_alert_threshold_cents: workspace.settings.budgetAlertThresholdCents,
+                }
+              : null,
+          },
+        };
       },
     );
   }
@@ -143,7 +214,7 @@ export class Workspaces extends Resource {
   async delete(id: string): Promise<{ success: boolean }> {
     return this.withLogging(
       'delete',
-      { workspace_id: id, metadata: { workspace_id: id } },
+      { workspaceId: id, metadata: { workspaceId: id } },
       async () => {
         const workspace = await repo.getWorkspace(this.serviceCtx.db, id);
         if (!workspace) {

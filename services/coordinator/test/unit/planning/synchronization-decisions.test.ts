@@ -17,7 +17,7 @@ describe('decideSynchronization()', () => {
     node_id: 'node_collect',
     parent_token_id: 'tok_q1',
     path_id: 'root.question.0',
-    sibling_group: 'fanout_group', // Token's sibling group membership
+    siblingGroup: 'fanout_group', // Token's sibling group membership
     branch_index: 0,
     branch_total: 3,
     status: 'pending',
@@ -30,11 +30,11 @@ describe('decideSynchronization()', () => {
     test('returns MARK_FOR_DISPATCH (routing handles dispatch)', () => {
       const transition: TransitionDef = {
         id: 'trans_1',
-        from_node_id: 'node_question',
-        to_node_id: 'node_collect',
+        fromNodeId: 'node_question',
+        toNodeId: 'node_collect',
         priority: 1,
         condition: null,
-        spawn_count: null,
+        spawnCount: null,
         synchronization: null,
       };
 
@@ -54,14 +54,14 @@ describe('decideSynchronization()', () => {
     test('returns MARK_FOR_DISPATCH if token not in specified sibling group', () => {
       const transition: TransitionDef = {
         id: 'trans_1',
-        from_node_id: 'node_question',
-        to_node_id: 'node_collect',
+        fromNodeId: 'node_question',
+        toNodeId: 'node_collect',
         priority: 1,
         condition: null,
-        spawn_count: null,
+        spawnCount: null,
         synchronization: {
           strategy: 'all',
-          sibling_group: 'different_group', // baseToken.sibling_group = 'fanout_group'
+          siblingGroup: 'different_group', // baseToken.siblingGroup = 'fanout_group'
           timeout_ms: null,
           on_timeout: 'fail',
           merge: undefined,
@@ -82,14 +82,14 @@ describe('decideSynchronization()', () => {
     test('evaluates synchronization if token matches sibling group', () => {
       const transition: TransitionDef = {
         id: 'trans_1',
-        from_node_id: 'node_question',
-        to_node_id: 'node_collect',
+        fromNodeId: 'node_question',
+        toNodeId: 'node_collect',
         priority: 1,
         condition: null,
-        spawn_count: null,
+        spawnCount: null,
         synchronization: {
           strategy: 'all',
-          sibling_group: 'fanout_group', // Matches baseToken.sibling_group
+          siblingGroup: 'fanout_group', // Matches baseToken.siblingGroup
           timeout_ms: null,
           on_timeout: 'fail',
           merge: undefined,
@@ -112,14 +112,14 @@ describe('decideSynchronization()', () => {
   describe('strategy: all', () => {
     const makeTransition = (): TransitionDef => ({
       id: 'trans_1',
-      from_node_id: 'node_question',
-      to_node_id: 'node_collect',
+      fromNodeId: 'node_question',
+      toNodeId: 'node_collect',
       priority: 1,
       condition: null,
-      spawn_count: null,
+      spawnCount: null,
       synchronization: {
         strategy: 'all',
-        sibling_group: 'fanout_group', // Matches baseToken.sibling_group
+        siblingGroup: 'fanout_group', // Matches baseToken.siblingGroup
         timeout_ms: null,
         on_timeout: 'fail',
         merge: undefined,
@@ -164,14 +164,14 @@ describe('decideSynchronization()', () => {
   describe('strategy: any', () => {
     const makeTransition = (): TransitionDef => ({
       id: 'trans_1',
-      from_node_id: 'node_question',
-      to_node_id: 'node_collect',
+      fromNodeId: 'node_question',
+      toNodeId: 'node_collect',
       priority: 1,
       condition: null,
-      spawn_count: null,
+      spawnCount: null,
       synchronization: {
         strategy: 'any',
-        sibling_group: 'fanout_group', // Matches baseToken.sibling_group
+        siblingGroup: 'fanout_group', // Matches baseToken.siblingGroup
         timeout_ms: null,
         on_timeout: 'fail',
         merge: undefined,
@@ -194,14 +194,14 @@ describe('decideSynchronization()', () => {
   describe('strategy: m_of_n', () => {
     const makeTransition = (m: number): TransitionDef => ({
       id: 'trans_1',
-      from_node_id: 'node_question',
-      to_node_id: 'node_collect',
+      fromNodeId: 'node_question',
+      toNodeId: 'node_collect',
       priority: 1,
       condition: null,
-      spawn_count: null,
+      spawnCount: null,
       synchronization: {
         strategy: { m_of_n: m },
-        sibling_group: 'fanout_group', // Matches baseToken.sibling_group
+        siblingGroup: 'fanout_group', // Matches baseToken.siblingGroup
         timeout_ms: null,
         on_timeout: 'fail',
         merge: undefined,
@@ -312,9 +312,9 @@ describe('decideFanInContinuation()', () => {
 
     const createTokenDecision = result.decisions[0] as {
       type: 'CREATE_TOKEN';
-      params: { sibling_group: string | null };
+      params: { siblingGroup: string | null };
     };
-    expect(createTokenDecision.params.sibling_group).toBeNull();
+    expect(createTokenDecision.params.siblingGroup).toBeNull();
   });
 
   test('continuation token has branch_index 0 and branch_total 1', () => {

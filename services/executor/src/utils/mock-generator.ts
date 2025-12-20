@@ -25,7 +25,7 @@ export interface MockOptions {
   maxDepth?: number;
 
   /** Simulate execution delay (useful for timeout/performance testing) */
-  delay?: { min_ms: number; max_ms: number };
+  delay?: { minMs: number; maxMs: number };
 
   /** String generation mode: 'random' for alphanumeric, 'words' for human-readable English words */
   stringMode?: 'random' | 'words';

@@ -9,16 +9,16 @@ import { ulid } from '../../validators';
 const workflowRunSummarySchema = z
   .object({
     id: z.string(),
-    project_id: z.string(),
-    workflow_id: z.string(),
-    workflow_name: z.string(),
-    workflow_def_id: z.string(),
-    workflow_version: z.number(),
+    projectId: z.string(),
+    workflowId: z.string(),
+    workflowName: z.string(),
+    workflowDefId: z.string(),
+    workflowVersion: z.number(),
     status: z.enum(['running', 'completed', 'failed', 'waiting']),
-    parent_run_id: z.string().nullable(),
-    created_at: z.string(),
-    updated_at: z.string(),
-    completed_at: z.string().nullable(),
+    parentRunId: z.string().nullable(),
+    createdAt: z.string(),
+    updatedAt: z.string(),
+    completedAt: z.string().nullable(),
   })
   .openapi('WorkflowRunSummary');
 
@@ -35,7 +35,7 @@ export const listWorkflowRunsRoute = createRoute({
         .string()
         .optional()
         .openapi({ description: 'Filter by status (comma-separated: running,completed,failed)' }),
-      project_id: z.string().optional().openapi({ description: 'Filter by project ID' }),
+      projectId: z.string().optional().openapi({ description: 'Filter by project ID' }),
     }),
   },
   responses: {
@@ -75,7 +75,7 @@ export const streamWorkflowRunRoute = createRoute({
         'application/json': {
           schema: z.object({
             error: z.string(),
-            received_upgrade: z.string().optional(),
+            receivedUpgrade: z.string().optional(),
           }),
         },
       },

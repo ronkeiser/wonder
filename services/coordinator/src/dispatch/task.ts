@@ -27,16 +27,16 @@ import { handleBranchOutput, processSynchronization } from './fan';
  * Dispatch token to Executor
  *
  * Per the 5-layer execution model (WorkflowDef → Node → TaskDef → Step → ActionDef):
- * - Coordinator just sends { task_id, task_version, input, resources } to Executor
+ * - Coordinator just sends { taskId, taskVersion, input, resources } to Executor
  * - Executor handles everything: loading TaskDef, iterating Steps, executing Actions
  */
 export async function dispatchToken(ctx: DispatchContext, tokenId: string): Promise<void> {
   const token = ctx.tokens.get(tokenId);
-  const node = ctx.defs.getNode(token.node_id);
+  const node = ctx.defs.getNode(token.nodeId);
 
   ctx.emitter.emitTrace({
     type: 'dispatch.batch.start',
-    payload: { decision_count: 1 },
+    payload: { decisionCount: 1 },
   });
 
   // Mark token as dispatched (sent to executor, awaiting execution)
@@ -45,12 +45,12 @@ export async function dispatchToken(ctx: DispatchContext, tokenId: string): Prom
 
   // Emit workflow event for task dispatch
   ctx.emitter.emit({
-    event_type: 'task.dispatched',
+    eventType: 'task.dispatched',
     message: 'Task dispatched to executor',
     metadata: {
-      token_id: tokenId,
-      task_id: node.task_id ?? 'none',
-      node_id: node.id,
+      tokenId: tokenId,
+      taskId: node.taskId ?? 'none',
+      nodeId: node.id,
     },
   });
 
@@ -58,11 +58,11 @@ export async function dispatchToken(ctx: DispatchContext, tokenId: string): Prom
   const context = ctx.context.getSnapshot();
 
   ctx.emitter.emitTrace({
-    type: 'dispatch.task.input_mapping.context',
-    token_id: tokenId,
-    node_id: node.id,
+    type: 'dispatch.task.inputMapping.context',
+    tokenId: tokenId,
+    nodeId: node.id,
     payload: {
-      context_keys: {
+      contextKeys: {
         input: Object.keys(context.input),
         state: Object.keys(context.state),
         output: Object.keys(context.output),
@@ -71,38 +71,38 @@ export async function dispatchToken(ctx: DispatchContext, tokenId: string): Prom
   });
 
   // If node has no task, complete immediately (e.g., pass-through nodes)
-  if (!node.task_id) {
-    await processTaskResult(ctx, tokenId, { output_data: {} });
+  if (!node.taskId) {
+    await processTaskResult(ctx, tokenId, { outputData: {} });
     return;
   }
 
   // Apply input mapping to get task input (pure function from planning/completion)
-  const taskInput = applyInputMapping(node.input_mapping as Record<string, string> | null, context);
+  const taskInput = applyInputMapping(node.inputMapping as Record<string, string> | null, context);
 
   ctx.emitter.emitTrace({
-    type: 'dispatch.task.input_mapping.applied',
-    token_id: tokenId,
-    node_id: node.id,
+    type: 'dispatch.task.inputMapping.applied',
+    tokenId: tokenId,
+    nodeId: node.id,
     payload: {
-      input_mapping: node.input_mapping,
-      task_input: taskInput,
+      inputMapping: node.inputMapping,
+      taskInput: taskInput,
     },
   });
 
   // Resolve resource bindings from node to workflow resources
   const resolvedResources = resolveResourceBindings(
     ctx,
-    node.resource_bindings as Record<string, string> | null,
+    node.resourceBindings as Record<string, string> | null,
   );
 
   // Emit trace event for what we're sending to executor
   ctx.emitter.emitTrace({
     type: 'dispatch.task.sent',
-    token_id: tokenId,
-    node_id: node.id,
+    tokenId: tokenId,
+    nodeId: node.id,
     payload: {
-      task_id: node.task_id,
-      task_version: node.task_version ?? 1,
+      taskId: node.taskId,
+      taskVersion: node.taskVersion ?? 1,
       resources: resolvedResources,
     },
   });
@@ -110,11 +110,11 @@ export async function dispatchToken(ctx: DispatchContext, tokenId: string): Prom
   // Dispatch to Executor (fire-and-forget, Executor calls back)
   ctx.waitUntil(
     ctx.executor.executeTask({
-      token_id: tokenId,
-      workflow_run_id: token.workflow_run_id,
-      project_id: ctx.defs.getWorkflowRun().project_id,
-      task_id: node.task_id,
-      task_version: node.task_version ?? 1,
+      tokenId: tokenId,
+      workflowRunId: token.workflowRunId,
+      projectId: ctx.defs.getWorkflowRun().projectId,
+      taskId: node.taskId,
+      taskVersion: node.taskVersion ?? 1,
       input: taskInput,
       resources: resolvedResources,
     }),
@@ -128,12 +128,12 @@ export async function dispatchToken(ctx: DispatchContext, tokenId: string): Prom
 /**
  * Process task result from Executor
  *
- * For linear flows: Apply node's output_mapping to write directly to context
+ * For linear flows: Apply node's outputMapping to write directly to context
  * For fan-out flows: Write to branch table, then check if siblings can merge
  *
- * The distinction is determined by whether this token has sibling_group:
- * - No sibling_group: Linear flow, use output_mapping to write to context
- * - Has sibling_group: Branch flow, output goes to branch table for later merge
+ * The distinction is determined by whether this token has siblingGroup:
+ * - No siblingGroup: Linear flow, use outputMapping to write to context
+ * - Has siblingGroup: Branch flow, output goes to branch table for later merge
  */
 export async function processTaskResult(
   ctx: DispatchContext,
@@ -145,20 +145,20 @@ export async function processTaskResult(
   const token = ctx.tokens.get(tokenId);
 
   // Get node for output mapping
-  const node = ctx.defs.getNode(token.node_id);
+  const node = ctx.defs.getNode(token.nodeId);
 
   // Handle output based on flow type
-  if (token.sibling_group) {
+  if (token.siblingGroup) {
     // Fan-out flow: Write to branch table
     // Fan-in activation happens in processSynchronization below, not here
     // This ensures all sync logic goes through a single deterministic path
-    await handleBranchOutput(ctx, token, node, result.output_data);
+    await handleBranchOutput(ctx, token, node, result.outputData);
   } else {
-    // Linear flow: Apply node's output_mapping to transform and store output
-    // e.g., { "state.result": "$.greeting" } writes result.output_data.greeting to context.state.result
+    // Linear flow: Apply node's outputMapping to transform and store output
+    // e.g., { "state.result": "$.greeting" } writes result.outputData.greeting to context.state.result
     ctx.context.applyOutputMapping(
-      node.output_mapping as Record<string, string> | null,
-      result.output_data,
+      node.outputMapping as Record<string, string> | null,
+      result.outputData,
     );
   }
 
@@ -167,19 +167,19 @@ export async function processTaskResult(
 
   // Emit task completed workflow event
   ctx.emitter.emit({
-    event_type: 'task.completed',
+    eventType: 'task.completed',
     message: 'Task completed successfully',
     metadata: {
-      token_id: tokenId,
-      task_id: node.task_id ?? 'none',
-      node_id: node.id,
-      output: result.output_data,
-      context_output: contextOutput,
+      tokenId: tokenId,
+      taskId: node.taskId ?? 'none',
+      nodeId: node.id,
+      output: result.outputData,
+      contextOutput: contextOutput,
     },
   });
 
   // Get outgoing transitions from completed node
-  const transitions = ctx.defs.getTransitionsFrom(token.node_id);
+  const transitions = ctx.defs.getTransitionsFrom(token.nodeId);
 
   // Get context snapshot for routing decisions
   const contextSnapshot = ctx.context.getSnapshot();
@@ -189,7 +189,7 @@ export async function processTaskResult(
   const routingResult = decideRouting({
     completedToken: token,
     workflowRunId: ctx.workflowRunId,
-    nodeId: token.node_id,
+    nodeId: token.nodeId,
     transitions,
     context: contextSnapshot,
   });
@@ -259,7 +259,7 @@ async function finalizeWorkflow(ctx: DispatchContext): Promise<void> {
 
     // Extract final output using pure planning function
     const completionResult = extractFinalOutput(
-      workflowDef.output_mapping as Record<string, string> | null,
+      workflowDef.outputMapping as Record<string, string> | null,
       context,
     );
 
@@ -272,7 +272,7 @@ async function finalizeWorkflow(ctx: DispatchContext): Promise<void> {
 
     // Emit workflow completed event
     ctx.emitter.emit({
-      event_type: 'workflow.completed',
+      eventType: 'workflow.completed',
       message: 'Workflow completed',
       metadata: { output: finalOutput },
     });
@@ -282,9 +282,9 @@ async function finalizeWorkflow(ctx: DispatchContext): Promise<void> {
     await workflowRunsResource.complete(ctx.workflowRunId, finalOutput);
   } catch (error) {
     ctx.logger.error({
-      event_type: 'coordinator.finalize.failed',
+      eventType: 'coordinator.finalize.failed',
       message: 'Critical error in finalizeWorkflow()',
-      trace_id: ctx.workflowRunId,
+      traceId: ctx.workflowRunId,
       metadata: {
         error: error instanceof Error ? error.message : String(error),
         stack: error instanceof Error ? error.stack : undefined,
@@ -298,7 +298,7 @@ async function finalizeWorkflow(ctx: DispatchContext): Promise<void> {
 /**
  * Resolve resource bindings from generic names to actual container DO IDs
  *
- * Node.resource_bindings maps generic names to workflow resource IDs:
+ * Node.resourceBindings maps generic names to workflow resource IDs:
  *   { "container": "dev_env" }
  *
  * WorkflowDef.resources defines the actual containers:

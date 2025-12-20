@@ -15,8 +15,8 @@ export const errorLoggerMiddleware = createMiddleware<HttpEnv>(async (c, next) =
     await next();
   } catch (error) {
     c.var.logger.error({
-      event_type: 'http_request_error',
-      request_id: c.var.requestId,
+      eventType: 'http_request_error',
+      requestId: c.var.requestId,
       message: error instanceof Error ? error.message : String(error),
       metadata: {
         error_name: error instanceof Error ? error.name : 'Unknown',

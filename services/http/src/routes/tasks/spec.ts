@@ -68,8 +68,8 @@ export const listTasksRoute = createRoute({
   tags: ['tasks'],
   request: {
     query: z.object({
-      project_id: z.string().optional(),
-      library_id: z.string().optional(),
+      projectId: z.string().optional(),
+      libraryId: z.string().optional(),
       limit: z.coerce.number().int().positive().max(100).optional(),
     }),
   },

@@ -12,8 +12,8 @@ describe('needsMerge', () => {
   it('returns false when synchronization is null', () => {
     const transition: TransitionDef = {
       id: 'trans-1',
-      from_node_id: 'a',
-      to_node_id: 'b',
+      fromNodeId: 'a',
+      toNodeId: 'b',
       priority: 0,
       synchronization: null,
     };
@@ -24,8 +24,8 @@ describe('needsMerge', () => {
   it('returns false when synchronization is undefined', () => {
     const transition: TransitionDef = {
       id: 'trans-1',
-      from_node_id: 'a',
-      to_node_id: 'b',
+      fromNodeId: 'a',
+      toNodeId: 'b',
       priority: 0,
     };
 
@@ -35,12 +35,12 @@ describe('needsMerge', () => {
   it('returns false when synchronization has no merge config', () => {
     const transition: TransitionDef = {
       id: 'trans-1',
-      from_node_id: 'a',
-      to_node_id: 'b',
+      fromNodeId: 'a',
+      toNodeId: 'b',
       priority: 0,
       synchronization: {
         strategy: 'all',
-        sibling_group: 'fan-out-1',
+        siblingGroup: 'fan-out-1',
       },
     };
 
@@ -50,12 +50,12 @@ describe('needsMerge', () => {
   it('returns true when merge config is present', () => {
     const transition: TransitionDef = {
       id: 'trans-1',
-      from_node_id: 'a',
-      to_node_id: 'b',
+      fromNodeId: 'a',
+      toNodeId: 'b',
       priority: 0,
       synchronization: {
         strategy: 'all',
-        sibling_group: 'fan-out-1',
+        siblingGroup: 'fan-out-1',
         merge: {
           source: '_branch.output',
           target: 'state.results',
@@ -72,8 +72,8 @@ describe('getMergeConfig', () => {
   it('returns null when synchronization is null', () => {
     const transition: TransitionDef = {
       id: 'trans-1',
-      from_node_id: 'a',
-      to_node_id: 'b',
+      fromNodeId: 'a',
+      toNodeId: 'b',
       priority: 0,
       synchronization: null,
     };
@@ -84,8 +84,8 @@ describe('getMergeConfig', () => {
   it('returns null when synchronization is undefined', () => {
     const transition: TransitionDef = {
       id: 'trans-1',
-      from_node_id: 'a',
-      to_node_id: 'b',
+      fromNodeId: 'a',
+      toNodeId: 'b',
       priority: 0,
     };
 
@@ -95,12 +95,12 @@ describe('getMergeConfig', () => {
   it('returns null when synchronization has no merge config', () => {
     const transition: TransitionDef = {
       id: 'trans-1',
-      from_node_id: 'a',
-      to_node_id: 'b',
+      fromNodeId: 'a',
+      toNodeId: 'b',
       priority: 0,
       synchronization: {
         strategy: 'all',
-        sibling_group: 'fan-out-1',
+        siblingGroup: 'fan-out-1',
       },
     };
 
@@ -116,12 +116,12 @@ describe('getMergeConfig', () => {
 
     const transition: TransitionDef = {
       id: 'trans-1',
-      from_node_id: 'a',
-      to_node_id: 'b',
+      fromNodeId: 'a',
+      toNodeId: 'b',
       priority: 0,
       synchronization: {
         strategy: 'all',
-        sibling_group: 'fan-out-1',
+        siblingGroup: 'fan-out-1',
         merge,
       },
     };
@@ -141,12 +141,12 @@ describe('getMergeConfig', () => {
 
       const transition: TransitionDef = {
         id: 'trans-1',
-        from_node_id: 'a',
-        to_node_id: 'b',
+        fromNodeId: 'a',
+        toNodeId: 'b',
         priority: 0,
         synchronization: {
           strategy: 'all',
-          sibling_group: 'fan-out-1',
+          siblingGroup: 'fan-out-1',
           merge,
         },
       };
@@ -161,12 +161,12 @@ describe('hasTimedOut', () => {
     it('returns false when timeout_ms is null', () => {
       const transition: TransitionDef = {
         id: 'trans-1',
-        from_node_id: 'a',
-        to_node_id: 'b',
+        fromNodeId: 'a',
+        toNodeId: 'b',
         priority: 0,
         synchronization: {
           strategy: 'all',
-          sibling_group: 'fan-out-1',
+          siblingGroup: 'fan-out-1',
           timeout_ms: null,
         },
       };
@@ -178,12 +178,12 @@ describe('hasTimedOut', () => {
     it('returns false when timeout_ms is undefined', () => {
       const transition: TransitionDef = {
         id: 'trans-1',
-        from_node_id: 'a',
-        to_node_id: 'b',
+        fromNodeId: 'a',
+        toNodeId: 'b',
         priority: 0,
         synchronization: {
           strategy: 'all',
-          sibling_group: 'fan-out-1',
+          siblingGroup: 'fan-out-1',
         },
       };
 
@@ -194,8 +194,8 @@ describe('hasTimedOut', () => {
     it('returns false when synchronization is null', () => {
       const transition: TransitionDef = {
         id: 'trans-1',
-        from_node_id: 'a',
-        to_node_id: 'b',
+        fromNodeId: 'a',
+        toNodeId: 'b',
         priority: 0,
         synchronization: null,
       };
@@ -209,12 +209,12 @@ describe('hasTimedOut', () => {
     it('returns false when oldestWaitingTimestamp is null', () => {
       const transition: TransitionDef = {
         id: 'trans-1',
-        from_node_id: 'a',
-        to_node_id: 'b',
+        fromNodeId: 'a',
+        toNodeId: 'b',
         priority: 0,
         synchronization: {
           strategy: 'all',
-          sibling_group: 'fan-out-1',
+          siblingGroup: 'fan-out-1',
           timeout_ms: 5000,
         },
       };
@@ -227,12 +227,12 @@ describe('hasTimedOut', () => {
     it('returns false when time has not elapsed', () => {
       const transition: TransitionDef = {
         id: 'trans-1',
-        from_node_id: 'a',
-        to_node_id: 'b',
+        fromNodeId: 'a',
+        toNodeId: 'b',
         priority: 0,
         synchronization: {
           strategy: 'all',
-          sibling_group: 'fan-out-1',
+          siblingGroup: 'fan-out-1',
           timeout_ms: 10000, // 10s timeout
         },
       };
@@ -244,12 +244,12 @@ describe('hasTimedOut', () => {
     it('returns true when time has just elapsed', () => {
       const transition: TransitionDef = {
         id: 'trans-1',
-        from_node_id: 'a',
-        to_node_id: 'b',
+        fromNodeId: 'a',
+        toNodeId: 'b',
         priority: 0,
         synchronization: {
           strategy: 'all',
-          sibling_group: 'fan-out-1',
+          siblingGroup: 'fan-out-1',
           timeout_ms: 5000, // 5s timeout
         },
       };
@@ -261,12 +261,12 @@ describe('hasTimedOut', () => {
     it('returns true when time has well elapsed', () => {
       const transition: TransitionDef = {
         id: 'trans-1',
-        from_node_id: 'a',
-        to_node_id: 'b',
+        fromNodeId: 'a',
+        toNodeId: 'b',
         priority: 0,
         synchronization: {
           strategy: 'all',
-          sibling_group: 'fan-out-1',
+          siblingGroup: 'fan-out-1',
           timeout_ms: 1000, // 1s timeout
         },
       };
@@ -278,12 +278,12 @@ describe('hasTimedOut', () => {
     it('returns false for exact boundary (not >= but >=)', () => {
       const transition: TransitionDef = {
         id: 'trans-1',
-        from_node_id: 'a',
-        to_node_id: 'b',
+        fromNodeId: 'a',
+        toNodeId: 'b',
         priority: 0,
         synchronization: {
           strategy: 'all',
-          sibling_group: 'fan-out-1',
+          siblingGroup: 'fan-out-1',
           timeout_ms: 5000, // 5s timeout
         },
       };
@@ -297,12 +297,12 @@ describe('hasTimedOut', () => {
     it('handles very short timeouts (100ms)', () => {
       const transition: TransitionDef = {
         id: 'trans-1',
-        from_node_id: 'a',
-        to_node_id: 'b',
+        fromNodeId: 'a',
+        toNodeId: 'b',
         priority: 0,
         synchronization: {
           strategy: 'all',
-          sibling_group: 'fan-out-1',
+          siblingGroup: 'fan-out-1',
           timeout_ms: 100,
         },
       };
@@ -314,12 +314,12 @@ describe('hasTimedOut', () => {
     it('handles very long timeouts (1 hour)', () => {
       const transition: TransitionDef = {
         id: 'trans-1',
-        from_node_id: 'a',
-        to_node_id: 'b',
+        fromNodeId: 'a',
+        toNodeId: 'b',
         priority: 0,
         synchronization: {
           strategy: 'all',
-          sibling_group: 'fan-out-1',
+          siblingGroup: 'fan-out-1',
           timeout_ms: 3600000, // 1 hour
         },
       };
@@ -331,12 +331,12 @@ describe('hasTimedOut', () => {
     it('treats zero timeout as no timeout (falsy check)', () => {
       const transition: TransitionDef = {
         id: 'trans-1',
-        from_node_id: 'a',
-        to_node_id: 'b',
+        fromNodeId: 'a',
+        toNodeId: 'b',
         priority: 0,
         synchronization: {
           strategy: 'all',
-          sibling_group: 'fan-out-1',
+          siblingGroup: 'fan-out-1',
           timeout_ms: 0, // 0 is falsy, treated as no timeout
         },
       };
@@ -348,12 +348,12 @@ describe('hasTimedOut', () => {
     it('handles future timestamp (clock skew)', () => {
       const transition: TransitionDef = {
         id: 'trans-1',
-        from_node_id: 'a',
-        to_node_id: 'b',
+        fromNodeId: 'a',
+        toNodeId: 'b',
         priority: 0,
         synchronization: {
           strategy: 'all',
-          sibling_group: 'fan-out-1',
+          siblingGroup: 'fan-out-1',
           timeout_ms: 5000,
         },
       };

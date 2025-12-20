@@ -6,57 +6,57 @@ import * as repo from './repository';
 
 export class Projects extends Resource {
   async create(data: {
-    workspace_id: string;
+    workspaceId: string;
     name: string;
     description?: string;
     settings?: {
-      default_model_profile_id?: string;
-      rate_limit_max_concurrent_runs?: number;
-      rate_limit_max_llm_calls_per_hour?: number;
-      budget_max_monthly_spend_cents?: number;
-      budget_alert_threshold_cents?: number;
-      snapshot_policy_every_n_events?: number;
-      snapshot_policy_every_n_seconds?: number;
-      snapshot_policy_on_fan_in_complete?: boolean;
+      defaultModelProfileId?: string;
+      rateLimitMaxConcurrentRuns?: number;
+      rateLimitMaxLlmCallsPerHour?: number;
+      budgetMaxMonthlySpendCents?: number;
+      budgetAlertThresholdCents?: number;
+      snapshotPolicyEveryNEvents?: number;
+      snapshotPolicyEveryNSeconds?: number;
+      snapshotPolicyOnFanInComplete?: boolean;
     };
   }): Promise<{
-    project_id: string;
+    projectId: string;
     project: {
       id: string;
-      workspace_id: string;
+      workspaceId: string;
       name: string;
       description: string | null;
       settings: {
-        default_model_profile_id?: string;
-        rate_limit_max_concurrent_runs?: number;
-        rate_limit_max_llm_calls_per_hour?: number;
-        budget_max_monthly_spend_cents?: number;
-        budget_alert_threshold_cents?: number;
-        snapshot_policy_every_n_events?: number;
-        snapshot_policy_every_n_seconds?: number;
-        snapshot_policy_on_fan_in_complete?: boolean;
+        defaultModelProfileId?: string;
+        rateLimitMaxConcurrentRuns?: number;
+        rateLimitMaxLlmCallsPerHour?: number;
+        budgetMaxMonthlySpendCents?: number;
+        budgetAlertThresholdCents?: number;
+        snapshotPolicyEveryNEvents?: number;
+        snapshotPolicyEveryNSeconds?: number;
+        snapshotPolicyOnFanInComplete?: boolean;
       } | null;
-      created_at: string;
-      updated_at: string;
+      createdAt: string;
+      updatedAt: string;
     };
   }> {
     return this.withLogging(
       'create',
       {
-        workspace_id: data.workspace_id,
-        metadata: { workspace_id: data.workspace_id, name: data.name },
+        workspaceId: data.workspaceId,
+        metadata: { workspaceId: data.workspaceId, name: data.name },
       },
       async () => {
         try {
           const project = await repo.createProject(this.serviceCtx.db, {
-            workspace_id: data.workspace_id,
+            workspaceId: data.workspaceId,
             name: data.name,
             description: data.description ?? null,
             settings: data.settings ?? null,
           });
 
           return {
-            project_id: project.id,
+            projectId: project.id,
             project,
           };
         } catch (error) {
@@ -72,9 +72,9 @@ export class Projects extends Resource {
 
           if (dbError.constraint === 'foreign_key') {
             throw new NotFoundError(
-              `Workspace not found: ${data.workspace_id}`,
+              `Workspace not found: ${data.workspaceId}`,
               'workspace',
-              data.workspace_id,
+              data.workspaceId,
             );
           }
 
@@ -87,24 +87,24 @@ export class Projects extends Resource {
   async get(id: string): Promise<{
     project: {
       id: string;
-      workspace_id: string;
+      workspaceId: string;
       name: string;
       description: string | null;
       settings: {
-        default_model_profile_id?: string;
-        rate_limit_max_concurrent_runs?: number;
-        rate_limit_max_llm_calls_per_hour?: number;
-        budget_max_monthly_spend_cents?: number;
-        budget_alert_threshold_cents?: number;
-        snapshot_policy_every_n_events?: number;
-        snapshot_policy_every_n_seconds?: number;
-        snapshot_policy_on_fan_in_complete?: boolean;
+        defaultModelProfileId?: string;
+        rateLimitMaxConcurrentRuns?: number;
+        rateLimitMaxLlmCallsPerHour?: number;
+        budgetMaxMonthlySpendCents?: number;
+        budgetAlertThresholdCents?: number;
+        snapshotPolicyEveryNEvents?: number;
+        snapshotPolicyEveryNSeconds?: number;
+        snapshotPolicyOnFanInComplete?: boolean;
       } | null;
-      created_at: string;
-      updated_at: string;
+      createdAt: string;
+      updatedAt: string;
     };
   }> {
-    return this.withLogging('get', { project_id: id, metadata: { project_id: id } }, async () => {
+    return this.withLogging('get', { projectId: id, metadata: { projectId: id } }, async () => {
       const project = await repo.getProject(this.serviceCtx.db, id);
       if (!project) {
         throw new NotFoundError(`Project not found: ${id}`, 'project', id);
@@ -113,30 +113,30 @@ export class Projects extends Resource {
     });
   }
 
-  async list(params?: { workspace_id?: string; limit?: number }): Promise<{
+  async list(params?: { workspaceId?: string; limit?: number }): Promise<{
     projects: Array<{
       id: string;
-      workspace_id: string;
+      workspaceId: string;
       name: string;
       description: string | null;
       settings: {
-        default_model_profile_id?: string;
-        rate_limit_max_concurrent_runs?: number;
-        rate_limit_max_llm_calls_per_hour?: number;
-        budget_max_monthly_spend_cents?: number;
-        budget_alert_threshold_cents?: number;
-        snapshot_policy_every_n_events?: number;
-        snapshot_policy_every_n_seconds?: number;
-        snapshot_policy_on_fan_in_complete?: boolean;
+        defaultModelProfileId?: string;
+        rateLimitMaxConcurrentRuns?: number;
+        rateLimitMaxLlmCallsPerHour?: number;
+        budgetMaxMonthlySpendCents?: number;
+        budgetAlertThresholdCents?: number;
+        snapshotPolicyEveryNEvents?: number;
+        snapshotPolicyEveryNSeconds?: number;
+        snapshotPolicyOnFanInComplete?: boolean;
       } | null;
-      created_at: string;
-      updated_at: string;
+      createdAt: string;
+      updatedAt: string;
     }>;
   }> {
     return this.withLogging('list', { metadata: params }, async () => {
       const projects = await repo.listProjects(
         this.serviceCtx.db,
-        params?.workspace_id,
+        params?.workspaceId,
         params?.limit,
       );
       return { projects };
@@ -149,41 +149,45 @@ export class Projects extends Resource {
       name?: string;
       description?: string;
       settings?: {
-        default_model_profile_id?: string;
-        rate_limit_max_concurrent_runs?: number;
-        rate_limit_max_llm_calls_per_hour?: number;
-        budget_max_monthly_spend_cents?: number;
-        budget_alert_threshold_cents?: number;
-        snapshot_policy_every_n_events?: number;
-        snapshot_policy_every_n_seconds?: number;
-        snapshot_policy_on_fan_in_complete?: boolean;
+        defaultModelProfileId?: string;
+        rateLimitMaxConcurrentRuns?: number;
+        rateLimitMaxLlmCallsPerHour?: number;
+        budgetMaxMonthlySpendCents?: number;
+        budgetAlertThresholdCents?: number;
+        snapshotPolicyEveryNEvents?: number;
+        snapshotPolicyEveryNSeconds?: number;
+        snapshotPolicyOnFanInComplete?: boolean;
       };
     },
   ): Promise<{
     project: {
       id: string;
-      workspace_id: string;
+      workspaceId: string;
       name: string;
       description: string | null;
       settings: {
-        default_model_profile_id?: string;
-        rate_limit_max_concurrent_runs?: number;
-        rate_limit_max_llm_calls_per_hour?: number;
-        budget_max_monthly_spend_cents?: number;
-        budget_alert_threshold_cents?: number;
-        snapshot_policy_every_n_events?: number;
-        snapshot_policy_every_n_seconds?: number;
-        snapshot_policy_on_fan_in_complete?: boolean;
+        defaultModelProfileId?: string;
+        rateLimitMaxConcurrentRuns?: number;
+        rateLimitMaxLlmCallsPerHour?: number;
+        budgetMaxMonthlySpendCents?: number;
+        budgetAlertThresholdCents?: number;
+        snapshotPolicyEveryNEvents?: number;
+        snapshotPolicyEveryNSeconds?: number;
+        snapshotPolicyOnFanInComplete?: boolean;
       } | null;
-      created_at: string;
-      updated_at: string;
+      createdAt: string;
+      updatedAt: string;
     };
   }> {
     return this.withLogging(
       'update',
-      { project_id: id, metadata: { project_id: id } },
+      { projectId: id, metadata: { projectId: id } },
       async () => {
-        const project = await repo.updateProject(this.serviceCtx.db, id, data);
+        const project = await repo.updateProject(this.serviceCtx.db, id, {
+          name: data.name,
+          description: data.description,
+          settings: data.settings,
+        });
         if (!project) {
           throw new NotFoundError(`Project not found: ${id}`, 'project', id);
         }
@@ -195,7 +199,7 @@ export class Projects extends Resource {
   async delete(id: string): Promise<{ success: boolean }> {
     return this.withLogging(
       'delete',
-      { project_id: id, metadata: { project_id: id } },
+      { projectId: id, metadata: { projectId: id } },
       async () => {
         const project = await repo.getProject(this.serviceCtx.db, id);
         if (!project) {

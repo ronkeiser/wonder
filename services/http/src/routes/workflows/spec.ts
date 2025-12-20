@@ -78,8 +78,8 @@ export const startWorkflowRoute = createRoute({
         'application/json': {
           schema: z
             .object({
-              workflow_run_id: ulid(),
-              durable_object_id: z.string(),
+              workflowRunId: ulid(),
+              durableObjectId: z.string(),
             })
             .openapi('WorkflowStartResponse'),
         },

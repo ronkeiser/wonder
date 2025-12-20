@@ -12,29 +12,29 @@ export class Tasks extends Resource {
     version?: number;
     name: string;
     description?: string;
-    project_id?: string;
-    library_id?: string;
+    projectId?: string;
+    libraryId?: string;
     tags?: string[];
-    input_schema: object;
-    output_schema: object;
+    inputSchema: object;
+    outputSchema: object;
     steps: StepInput[];
     retry?: RetryConfig;
     timeout_ms?: number;
     autoversion?: boolean;
   }): Promise<{
-    task_id: string;
+    taskId: string;
     task: Task;
     /** True if an existing task was reused (autoversion matched content hash) */
     reused: boolean;
   }> {
     this.serviceCtx.logger.info({
-      event_type: 'task.create.started',
+      eventType: 'task.create.started',
       metadata: { name: data.name, autoversion: data.autoversion ?? false },
     });
 
     const scope = {
-      project_id: data.project_id ?? null,
-      library_id: data.library_id ?? null,
+      project_id: data.projectId ?? null,
+      library_id: data.libraryId ?? null,
     };
 
     const autoversionResult = await this.withAutoversion(
@@ -61,7 +61,7 @@ export class Tasks extends Resource {
 
     if (autoversionResult.reused) {
       return {
-        task_id: autoversionResult.entity.id,
+        taskId: autoversionResult.entity.id,
         task: autoversionResult.entity,
         reused: true,
       };
@@ -74,11 +74,11 @@ export class Tasks extends Resource {
       id: ulid(),
       ref: step.ref,
       ordinal: step.ordinal,
-      action_id: step.action_id,
-      action_version: step.action_version,
-      input_mapping: step.input_mapping ?? null,
-      output_mapping: step.output_mapping ?? null,
-      on_failure: step.on_failure,
+      actionId: step.actionId,
+      actionVersion: step.actionVersion,
+      inputMapping: step.inputMapping ?? null,
+      outputMapping: step.outputMapping ?? null,
+      onFailure: step.onFailure,
       condition: step.condition ?? null,
     }));
 
@@ -87,19 +87,19 @@ export class Tasks extends Resource {
         version,
         name: data.name,
         description: data.description ?? '',
-        project_id: data.project_id ?? null,
-        library_id: data.library_id ?? null,
+        projectId: data.projectId ?? null,
+        libraryId: data.libraryId ?? null,
         tags: data.tags ?? null,
-        input_schema: data.input_schema,
-        output_schema: data.output_schema,
+        inputSchema: data.inputSchema,
+        outputSchema: data.outputSchema,
         steps: stepsWithIds,
         retry: data.retry ?? null,
-        timeout_ms: data.timeout_ms ?? null,
-        content_hash: autoversionResult.contentHash,
+        timeoutMs: data.timeout_ms ?? null,
+        contentHash: autoversionResult.contentHash,
       });
 
       return {
-        task_id: task.id,
+        taskId: task.id,
         task,
         reused: false,
       };
@@ -128,7 +128,7 @@ export class Tasks extends Resource {
   ): Promise<{
     task: Task;
   }> {
-    return this.withLogging('get', { metadata: { task_id: id, version } }, async () => {
+    return this.withLogging('get', { metadata: { taskId: id, version } }, async () => {
       const task = version
         ? await repo.getTaskVersion(this.serviceCtx.db, id, version)
         : await repo.getLatestTask(this.serviceCtx.db, id);
@@ -145,22 +145,22 @@ export class Tasks extends Resource {
     });
   }
 
-  async list(options?: { project_id?: string; library_id?: string; limit?: number }): Promise<{
+  async list(options?: { projectId?: string; libraryId?: string; limit?: number }): Promise<{
     tasks: Task[];
   }> {
     return this.withLogging('list', { metadata: options }, async () => {
       let tasks: Task[];
 
-      if (options?.project_id) {
+      if (options?.projectId) {
         tasks = await repo.listTasksByProject(
           this.serviceCtx.db,
-          options.project_id,
+          options.projectId,
           options?.limit,
         );
-      } else if (options?.library_id) {
+      } else if (options?.libraryId) {
         tasks = await repo.listTasksByLibrary(
           this.serviceCtx.db,
-          options.library_id,
+          options.libraryId,
           options?.limit,
         );
       } else {
@@ -172,7 +172,7 @@ export class Tasks extends Resource {
   }
 
   async delete(id: string, version?: number): Promise<{ success: boolean }> {
-    return this.withLogging('delete', { metadata: { task_id: id, version } }, async () => {
+    return this.withLogging('delete', { metadata: { taskId: id, version } }, async () => {
       // Check if exists first
       const existing = version
         ? await repo.getTaskVersion(this.serviceCtx.db, id, version)

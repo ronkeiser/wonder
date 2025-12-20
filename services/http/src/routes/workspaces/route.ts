@@ -61,6 +61,6 @@ workspaces.openapi(updateWorkspaceRoute, async (c) => {
 workspaces.openapi(listWorkspaceProjectsRoute, async (c) => {
   const { id } = c.req.valid('param');
   using projects = c.env.RESOURCES.projects();
-  const result = await projects.list({ workspace_id: id });
+  const result = await projects.list({ workspaceId: id });
   return c.json(result);
 });

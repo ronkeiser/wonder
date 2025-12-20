@@ -14,7 +14,7 @@ export interface WorkflowTask {
  * TaskResult - Result format returned via RPC
  */
 export interface TaskResult {
-  task_id: string;
+  taskId: string;
   workflow_run_id: string;
   token_id: string;
   node_id: string;

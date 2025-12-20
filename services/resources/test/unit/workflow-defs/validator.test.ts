@@ -1,7 +1,7 @@
 /**
  * Unit tests for workflow-defs validator
  *
- * Tests validation of synchronization.sibling_group refs
+ * Tests validation of synchronization.siblingGroup refs
  */
 
 import { describe, expect, it } from 'vitest';
@@ -24,7 +24,7 @@ function createValidInput(overrides: Partial<WorkflowDefInput> = {}): WorkflowDe
       { ref: 'start', name: 'Start' },
       { ref: 'end', name: 'End' },
     ],
-    transitions: [{ from_node_ref: 'start', to_node_ref: 'end', priority: 0 }],
+    transitions: [{ fromNodeRef: 'start', toNodeRef: 'end', priority: 0 }],
     ...overrides,
   };
 }
@@ -41,7 +41,7 @@ describe('validateWorkflowDef', () => {
 
     it('returns collected refs for transformer use', () => {
       const input = createValidInput({
-        transitions: [{ ref: 'go', from_node_ref: 'start', to_node_ref: 'end', priority: 0 }],
+        transitions: [{ ref: 'go', fromNodeRef: 'start', toNodeRef: 'end', priority: 0 }],
       });
       const result = validateWorkflowDef(input);
 
@@ -68,8 +68,8 @@ describe('validateWorkflowDef', () => {
     it('rejects duplicate transition refs', () => {
       const input = createValidInput({
         transitions: [
-          { ref: 'dup', from_node_ref: 'start', to_node_ref: 'end', priority: 0 },
-          { ref: 'dup', from_node_ref: 'start', to_node_ref: 'end', priority: 1 },
+          { ref: 'dup', fromNodeRef: 'start', toNodeRef: 'end', priority: 0 },
+          { ref: 'dup', fromNodeRef: 'start', toNodeRef: 'end', priority: 1 },
         ],
       });
 
@@ -80,8 +80,8 @@ describe('validateWorkflowDef', () => {
     it('allows transitions without refs', () => {
       const input = createValidInput({
         transitions: [
-          { from_node_ref: 'start', to_node_ref: 'end', priority: 0 },
-          { from_node_ref: 'start', to_node_ref: 'end', priority: 1 },
+          { fromNodeRef: 'start', toNodeRef: 'end', priority: 0 },
+          { fromNodeRef: 'start', toNodeRef: 'end', priority: 1 },
         ],
       });
 
@@ -90,22 +90,22 @@ describe('validateWorkflowDef', () => {
   });
 
   describe('transition node ref validation', () => {
-    it('rejects invalid from_node_ref', () => {
+    it('rejects invalid fromNodeRef', () => {
       const input = createValidInput({
-        transitions: [{ from_node_ref: 'nonexistent', to_node_ref: 'end', priority: 0 }],
+        transitions: [{ fromNodeRef: 'nonexistent', toNodeRef: 'end', priority: 0 }],
       });
 
       expect(() => validateWorkflowDef(input)).toThrow(ValidationError);
-      expect(() => validateWorkflowDef(input)).toThrow(/Invalid from_node_ref: nonexistent/);
+      expect(() => validateWorkflowDef(input)).toThrow(/Invalid fromNodeRef: nonexistent/);
     });
 
-    it('rejects invalid to_node_ref', () => {
+    it('rejects invalid toNodeRef', () => {
       const input = createValidInput({
-        transitions: [{ from_node_ref: 'start', to_node_ref: 'nonexistent', priority: 0 }],
+        transitions: [{ fromNodeRef: 'start', toNodeRef: 'nonexistent', priority: 0 }],
       });
 
       expect(() => validateWorkflowDef(input)).toThrow(ValidationError);
-      expect(() => validateWorkflowDef(input)).toThrow(/Invalid to_node_ref: nonexistent/);
+      expect(() => validateWorkflowDef(input)).toThrow(/Invalid toNodeRef: nonexistent/);
     });
   });
 
@@ -164,14 +164,14 @@ describe('validateWorkflowDef', () => {
     });
   });
 
-  describe('synchronization.sibling_group validation', () => {
+  describe('synchronization.siblingGroup validation', () => {
     /**
-     * CRITICAL: sibling_group must reference a valid transition ref
+     * CRITICAL: siblingGroup must reference a valid transition ref
      *
      * This validation ensures that at transformation time, the ref
      * can be resolved to a transition ID.
      */
-    it('accepts valid sibling_group ref', () => {
+    it('accepts valid siblingGroup ref', () => {
       const input = createValidInput({
         nodes: [
           { ref: 'start', name: 'Start' },
@@ -181,19 +181,19 @@ describe('validateWorkflowDef', () => {
         transitions: [
           {
             ref: 'fan-out',
-            from_node_ref: 'start',
-            to_node_ref: 'parallel',
+            fromNodeRef: 'start',
+            toNodeRef: 'parallel',
             priority: 0,
-            spawn_count: 3,
+            spawnCount: 3,
           },
           {
             ref: 'fan-in',
-            from_node_ref: 'parallel',
-            to_node_ref: 'collect',
+            fromNodeRef: 'parallel',
+            toNodeRef: 'collect',
             priority: 0,
             synchronization: {
               strategy: 'wait_all',
-              sibling_group: 'fan-out', // Valid - references 'fan-out' transition
+              siblingGroup: 'fan-out', // Valid - references 'fan-out' transition
             },
           },
         ],
@@ -202,7 +202,7 @@ describe('validateWorkflowDef', () => {
       expect(() => validateWorkflowDef(input)).not.toThrow();
     });
 
-    it('rejects invalid sibling_group ref', () => {
+    it('rejects invalid siblingGroup ref', () => {
       const input = createValidInput({
         nodes: [
           { ref: 'start', name: 'Start' },
@@ -211,12 +211,12 @@ describe('validateWorkflowDef', () => {
         transitions: [
           {
             ref: 'bad-sync',
-            from_node_ref: 'start',
-            to_node_ref: 'end',
+            fromNodeRef: 'start',
+            toNodeRef: 'end',
             priority: 0,
             synchronization: {
               strategy: 'wait_all',
-              sibling_group: 'nonexistent', // Invalid - no such transition
+              siblingGroup: 'nonexistent', // Invalid - no such transition
             },
           },
         ],
@@ -224,11 +224,11 @@ describe('validateWorkflowDef', () => {
 
       expect(() => validateWorkflowDef(input)).toThrow(ValidationError);
       expect(() => validateWorkflowDef(input)).toThrow(
-        /Invalid synchronization.sibling_group: 'nonexistent'/,
+        /Invalid synchronization.siblingGroup: 'nonexistent'/,
       );
     });
 
-    it('rejects sibling_group referencing a transition without a ref', () => {
+    it('rejects siblingGroup referencing a transition without a ref', () => {
       // Edge case: if transition has no ref, it can't be referenced
       const input = createValidInput({
         initial_node_ref: 'a', // Must match a valid node
@@ -239,20 +239,20 @@ describe('validateWorkflowDef', () => {
         ],
         transitions: [
           {
-            // No ref! Can't be referenced by sibling_group
-            from_node_ref: 'a',
-            to_node_ref: 'b',
+            // No ref! Can't be referenced by siblingGroup
+            fromNodeRef: 'a',
+            toNodeRef: 'b',
             priority: 0,
-            spawn_count: 3,
+            spawnCount: 3,
           },
           {
             ref: 'join',
-            from_node_ref: 'b',
-            to_node_ref: 'c',
+            fromNodeRef: 'b',
+            toNodeRef: 'c',
             priority: 0,
             synchronization: {
               strategy: 'wait_all',
-              sibling_group: 'spawn', // Invalid - 'spawn' doesn't exist as a ref
+              siblingGroup: 'spawn', // Invalid - 'spawn' doesn't exist as a ref
             },
           },
         ],
@@ -260,7 +260,7 @@ describe('validateWorkflowDef', () => {
 
       expect(() => validateWorkflowDef(input)).toThrow(ValidationError);
       expect(() => validateWorkflowDef(input)).toThrow(
-        /Invalid synchronization.sibling_group: 'spawn'/,
+        /Invalid synchronization.siblingGroup: 'spawn'/,
       );
     });
 
@@ -269,8 +269,8 @@ describe('validateWorkflowDef', () => {
         transitions: [
           {
             ref: 'simple',
-            from_node_ref: 'start',
-            to_node_ref: 'end',
+            fromNodeRef: 'start',
+            toNodeRef: 'end',
             priority: 0,
             // No synchronization
           },
@@ -301,17 +301,17 @@ describe('validateWorkflowDef', () => {
       }
     });
 
-    it('includes INVALID_SIBLING_GROUP_REF code for bad sibling_group', () => {
+    it('includes INVALID_SIBLING_GROUP_REF code for bad siblingGroup', () => {
       const input = createValidInput({
         transitions: [
           {
             ref: 'bad',
-            from_node_ref: 'start',
-            to_node_ref: 'end',
+            fromNodeRef: 'start',
+            toNodeRef: 'end',
             priority: 0,
             synchronization: {
               strategy: 'wait_all',
-              sibling_group: 'ghost',
+              siblingGroup: 'ghost',
             },
           },
         ],

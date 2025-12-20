@@ -51,12 +51,12 @@ export async function executeUpdateContextAction(
   // If no implementation or no merge, passthrough
   if (!implementation?.merge) {
     logger.info({
-      event_type: 'update_context_passthrough',
+      eventType: 'update_context_passthrough',
       message: 'Update context action (passthrough)',
-      trace_id: context.workflowRunId,
+      traceId: context.workflowRunId,
       metadata: {
         step_ref: context.stepRef,
-        action_id: action.id,
+        actionId: action.id,
         input_keys: Object.keys(input),
       },
     });
@@ -64,7 +64,7 @@ export async function executeUpdateContextAction(
     return {
       success: true,
       output: input,
-      metrics: { duration_ms: Date.now() - startTime },
+      metrics: { durationMs: Date.now() - startTime },
     };
   }
 
@@ -108,12 +108,12 @@ export async function executeUpdateContextAction(
   };
 
   logger.info({
-    event_type: 'update_context_merge',
+    eventType: 'update_context_merge',
     message: 'Update context action (merge)',
-    trace_id: context.workflowRunId,
+    traceId: context.workflowRunId,
     metadata: {
       step_ref: context.stepRef,
-      action_id: action.id,
+      actionId: action.id,
       target,
       sources,
       mode,
@@ -124,6 +124,6 @@ export async function executeUpdateContextAction(
   return {
     success: true,
     output,
-    metrics: { duration_ms: Date.now() - startTime },
+    metrics: { durationMs: Date.now() - startTime },
   };
 }

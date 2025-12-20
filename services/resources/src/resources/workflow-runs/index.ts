@@ -17,13 +17,13 @@ export class WorkflowRuns extends Resource {
     workflowId: string,
     input: Record<string, unknown>,
   ): Promise<{
-    workflow_run_id: string;
-    project_id: string;
-    workspace_id: string;
+    workflowRunId: string;
+    projectId: string;
+    workspaceId: string;
   }> {
     this.serviceCtx.logger.info({
-      event_type: 'workflow_run.create.requested',
-      metadata: { workflow_id: workflowId },
+      eventType: 'workflow_run.create.requested',
+      metadata: { workflowId: workflowId },
     });
 
     try {
@@ -31,8 +31,8 @@ export class WorkflowRuns extends Resource {
       const result = await workflowRepo.getWorkflowWithDef(this.serviceCtx.db, workflowId);
       if (!result) {
         this.serviceCtx.logger.warn({
-          event_type: 'workflow.not_found',
-          metadata: { workflow_id: workflowId },
+          eventType: 'workflow.not_found',
+          metadata: { workflowId: workflowId },
         });
         throw new NotFoundError(`Workflow not found: ${workflowId}`, 'workflow', workflowId);
       }
@@ -43,13 +43,13 @@ export class WorkflowRuns extends Resource {
       const project = await this.serviceCtx.db
         .select()
         .from(schema.projects)
-        .where(eq(schema.projects.id, workflow.project_id))
+        .where(eq(schema.projects.id, workflow.projectId))
         .get();
       if (!project) {
         throw new NotFoundError(
-          `Project not found: ${workflow.project_id}`,
+          `Project not found: ${workflow.projectId}`,
           'project',
-          workflow.project_id,
+          workflow.projectId,
         );
       }
 
@@ -68,7 +68,7 @@ export class WorkflowRuns extends Resource {
       const activeTokens = [
         {
           id: ulid(),
-          node_id: workflow_def.initial_node_id,
+          node_id: workflow_def.initialNodeId,
           status: 'ready',
           context: {},
         },
@@ -77,32 +77,32 @@ export class WorkflowRuns extends Resource {
       // Create workflow run record (status: waiting until start is called)
       await workflowRepo.createWorkflowRun(this.serviceCtx.db, {
         id: workflowRunId,
-        project_id: workflow.project_id,
-        workflow_id: workflow.id,
-        workflow_def_id: workflow_def.id,
-        workflow_version: workflow_def.version,
+        projectId: workflow.projectId,
+        workflowId: workflow.id,
+        workflowDefId: workflow_def.id,
+        workflowVersion: workflow_def.version,
         status: 'waiting',
         context,
-        active_tokens: activeTokens,
-        durable_object_id: workflowRunId,
+        activeTokens: activeTokens,
+        durableObjectId: workflowRunId,
       });
 
       this.serviceCtx.logger.info({
-        event_type: 'workflow_run.created',
-        metadata: { workflow_id: workflowId, workflow_run_id: workflowRunId },
+        eventType: 'workflow_run.created',
+        metadata: { workflowId: workflowId, workflowRunId: workflowRunId },
       });
 
       return {
-        workflow_run_id: workflowRunId,
-        project_id: workflow.project_id,
-        workspace_id: project.workspace_id,
+        workflowRunId: workflowRunId,
+        projectId: workflow.projectId,
+        workspaceId: project.workspaceId,
       };
     } catch (error) {
       this.serviceCtx.logger.error({
-        event_type: 'workflow_run.create.failed',
+        eventType: 'workflow_run.create.failed',
         message: error instanceof Error ? error.message : String(error),
         metadata: {
-          workflow_id: workflowId,
+          workflowId: workflowId,
           stack: error instanceof Error ? error.stack : undefined,
         },
       });
@@ -116,7 +116,7 @@ export class WorkflowRuns extends Resource {
   ): Promise<void> {
     return this.withLogging(
       'updateStatus',
-      { workflow_run_id: workflowRunId, metadata: { workflow_run_id: workflowRunId, status } },
+      { workflowRunId: workflowRunId, metadata: { workflowRunId: workflowRunId, status } },
       async () => {
         // Fetch workflow run first to get details for EventHub notification
         const workflowRun = await repo.getWorkflowRun(this.serviceCtx.db, workflowRunId);
@@ -146,10 +146,10 @@ export class WorkflowRuns extends Resource {
         const hubId = eventHub.idFromName('global');
         const hubStub = eventHub.get(hubId);
         hubStub.notifyStatusChange({
-          workflow_run_id: workflowRunId,
-          workflow_def_id: workflowRun.workflow_def_id,
-          project_id: workflowRun.project_id,
-          parent_run_id: workflowRun.parent_run_id,
+          workflowRunId: workflowRunId,
+          workflowDefId: workflowRun.workflowDefId,
+          projectId: workflowRun.projectId,
+          parentRunId: workflowRun.parentRunId,
           status,
           timestamp: Date.now(),
         });
@@ -160,26 +160,26 @@ export class WorkflowRuns extends Resource {
   async get(id: string): Promise<{
     workflow_run: {
       id: string;
-      project_id: string;
-      workspace_id: string;
-      workflow_id: string;
-      workflow_def_id: string;
-      workflow_version: number;
+      projectId: string;
+      workspaceId: string;
+      workflowId: string;
+      workflowDefId: string;
+      workflowVersion: number;
       status: string;
       context: object;
-      active_tokens: object[];
-      durable_object_id: string;
-      parent_run_id: string | null;
-      parent_node_id: string | null;
-      latest_snapshot: object | null;
-      created_at: string;
-      updated_at: string;
-      completed_at: string | null;
+      activeTokens: object[];
+      durableObjectId: string;
+      parentRunId: string | null;
+      parentNodeId: string | null;
+      latestSnapshot: object | null;
+      createdAt: string;
+      updatedAt: string;
+      completedAt: string | null;
     };
   }> {
     return this.withLogging(
       'get',
-      { workflow_run_id: id, metadata: { workflow_run_id: id } },
+      { workflowRunId: id, metadata: { workflowRunId: id } },
       async () => {
         const workflowRun = await repo.getWorkflowRunWithProject(this.serviceCtx.db, id);
         if (!workflowRun) {
@@ -193,7 +193,7 @@ export class WorkflowRuns extends Resource {
   async complete(id: string, final_output: object): Promise<void> {
     return this.withLogging(
       'complete',
-      { trace_id: id, workflow_run_id: id, metadata: { workflow_run_id: id, final_output } },
+      { trace_id: id, workflowRunId: id, metadata: { workflowRunId: id, final_output } },
       async () => {
         // Fetch workflow run first to get details for EventHub notification
         const workflowRun = await repo.getWorkflowRun(this.serviceCtx.db, id);
@@ -203,7 +203,7 @@ export class WorkflowRuns extends Resource {
 
         const updated = await repo.updateWorkflowRun(this.serviceCtx.db, id, {
           status: 'completed',
-          completed_at: new Date().toISOString(),
+          completedAt: new Date().toISOString(),
           context: { final_output },
         });
 
@@ -217,10 +217,10 @@ export class WorkflowRuns extends Resource {
         const hubId = eventHub.idFromName('global');
         const hubStub = eventHub.get(hubId);
         hubStub.notifyStatusChange({
-          workflow_run_id: id,
-          workflow_def_id: workflowRun.workflow_def_id,
-          project_id: workflowRun.project_id,
-          parent_run_id: workflowRun.parent_run_id,
+          workflowRunId: id,
+          workflowDefId: workflowRun.workflowDefId,
+          projectId: workflowRun.projectId,
+          parentRunId: workflowRun.parentRunId,
           status: 'completed',
           timestamp: Date.now(),
         });
@@ -231,7 +231,7 @@ export class WorkflowRuns extends Resource {
   async delete(id: string): Promise<{ success: boolean }> {
     return this.withLogging(
       'delete',
-      { workflow_run_id: id, metadata: { workflow_run_id: id } },
+      { workflowRunId: id, metadata: { workflowRunId: id } },
       async () => {
         const workflowRun = await repo.getWorkflowRun(this.serviceCtx.db, id);
         if (!workflowRun) {
@@ -256,19 +256,19 @@ export class WorkflowRuns extends Resource {
       async () => {
         const { runs, total } = await repo.listWorkflowRuns(this.serviceCtx.db, filters);
 
-        // Return summary (exclude heavy fields like context, active_tokens, latest_snapshot)
+        // Return summary (exclude heavy fields like context, activeTokens, latestSnapshot)
         const summaries: WorkflowRunSummary[] = runs.map((run) => ({
           id: run.id,
-          project_id: run.project_id,
-          workflow_id: run.workflow_id,
-          workflow_name: run.workflow_name,
-          workflow_def_id: run.workflow_def_id,
-          workflow_version: run.workflow_version,
+          projectId: run.projectId,
+          workflowId: run.workflowId,
+          workflowName: run.workflow_name,
+          workflowDefId: run.workflowDefId,
+          workflowVersion: run.workflowVersion,
           status: run.status as WorkflowRunSummary['status'],
-          parent_run_id: run.parent_run_id,
-          created_at: run.created_at,
-          updated_at: run.updated_at,
-          completed_at: run.completed_at,
+          parentRunId: run.parentRunId,
+          createdAt: run.createdAt,
+          updatedAt: run.updatedAt,
+          completedAt: run.completedAt,
         }));
 
         return {

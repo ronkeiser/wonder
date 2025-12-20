@@ -25,8 +25,8 @@ const app = new OpenAPIHono<HttpEnv>({
   defaultHook: (result, c) => {
     if (!result.success) {
       c.var.logger?.warn({
-        event_type: 'validation_error',
-        request_id: c.var.requestId,
+        eventType: 'validation_error',
+        requestId: c.var.requestId,
         message: 'Request validation failed',
         metadata: { error: result.error },
       });

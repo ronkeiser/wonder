@@ -6,7 +6,7 @@ import { ulid } from 'ulid';
 import { prompt_specs } from '~/schema';
 import type { PromptSpec } from './types';
 
-type NewPromptSpec = Omit<typeof prompt_specs.$inferInsert, 'id' | 'created_at' | 'updated_at'>;
+type NewPromptSpec = Omit<typeof prompt_specs.$inferInsert, 'id' | 'createdAt' | 'updatedAt'>;
 
 export async function createPromptSpec(
   db: DrizzleD1Database,
@@ -16,8 +16,8 @@ export async function createPromptSpec(
   const spec = {
     id: ulid(),
     ...data,
-    created_at: now,
-    updated_at: now,
+    createdAt: now,
+    updatedAt: now,
   };
 
   await db.insert(prompt_specs).values(spec).run();
@@ -89,7 +89,7 @@ export async function getPromptSpecByNameAndHash(
   const result = await db
     .select()
     .from(prompt_specs)
-    .where(and(eq(prompt_specs.name, name), eq(prompt_specs.content_hash, contentHash)))
+    .where(and(eq(prompt_specs.name, name), eq(prompt_specs.contentHash, contentHash)))
     .get();
   return result ?? null;
 }

@@ -25,7 +25,7 @@ export const listModelProfilesRoute = createRoute({
       content: {
         'application/json': {
           schema: z.object({
-            model_profiles: z.array(ModelProfileSchema),
+            modelProfiles: z.array(ModelProfileSchema),
           }),
         },
       },

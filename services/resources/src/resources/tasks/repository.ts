@@ -6,15 +6,15 @@ import { ulid } from 'ulid';
 import { tasks } from '../../schema';
 import type { Task } from './types';
 
-type NewTask = Omit<typeof tasks.$inferInsert, 'id' | 'created_at' | 'updated_at'>;
+type NewTask = Omit<typeof tasks.$inferInsert, 'id' | 'createdAt' | 'updatedAt'>;
 
 export async function createTask(db: DrizzleD1Database, data: NewTask): Promise<Task> {
   const now = new Date().toISOString();
   const task = {
     id: ulid(),
     ...data,
-    created_at: now,
-    updated_at: now,
+    createdAt: now,
+    updatedAt: now,
   };
 
   await db.insert(tasks).values(task).run();
@@ -61,7 +61,7 @@ export async function listTasksByProject(
   return await db
     .select()
     .from(tasks)
-    .where(eq(tasks.project_id, projectId))
+    .where(eq(tasks.projectId, projectId))
     .limit(limit)
     .all();
 }
@@ -74,7 +74,7 @@ export async function listTasksByLibrary(
   return await db
     .select()
     .from(tasks)
-    .where(eq(tasks.library_id, libraryId))
+    .where(eq(tasks.libraryId, libraryId))
     .limit(limit)
     .all();
 }
@@ -107,9 +107,9 @@ export async function getTaskByNameAndHash(
     .where(
       and(
         eq(tasks.name, name),
-        eq(tasks.content_hash, contentHash),
-        projectId ? eq(tasks.project_id, projectId) : isNull(tasks.project_id),
-        libraryId ? eq(tasks.library_id, libraryId) : isNull(tasks.library_id),
+        eq(tasks.contentHash, contentHash),
+        projectId ? eq(tasks.projectId, projectId) : isNull(tasks.projectId),
+        libraryId ? eq(tasks.libraryId, libraryId) : isNull(tasks.libraryId),
       ),
     )
     .get();
@@ -128,8 +128,8 @@ export async function getMaxVersionByName(
     .where(
       and(
         eq(tasks.name, name),
-        projectId ? eq(tasks.project_id, projectId) : isNull(tasks.project_id),
-        libraryId ? eq(tasks.library_id, libraryId) : isNull(tasks.library_id),
+        projectId ? eq(tasks.projectId, projectId) : isNull(tasks.projectId),
+        libraryId ? eq(tasks.libraryId, libraryId) : isNull(tasks.libraryId),
       ),
     )
     .orderBy(desc(tasks.version))

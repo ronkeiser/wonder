@@ -15,54 +15,54 @@ import { runTask } from './execution/task-runner';
  * TaskPayload - from Coordinator per execution-model.md
  */
 export interface TaskPayload {
-  token_id: string; // For result correlation
-  workflow_run_id: string; // For sub-workflow context
-  project_id: string; // For trace event context
-  task_id: string; // TaskDef to execute
-  task_version: number;
+  tokenId: string; // For result correlation
+  workflowRunId: string; // For sub-workflow context
+  projectId: string; // For trace event context
+  taskId: string; // TaskDef to execute
+  taskVersion: number;
   input: Record<string, unknown>; // Mapped from workflow context
 
   // Resource mappings (generic_name → container_do_id)
   resources?: Record<string, string>;
 
   // Execution config
-  timeout_ms?: number;
-  retry_attempt?: number; // Current retry count (for retry logic)
+  timeoutMs?: number;
+  retryAttempt?: number; // Current retry count (for retry logic)
 }
 
 /**
  * TaskResult - to Coordinator per execution-model.md
  */
 export interface TaskResult {
-  token_id: string;
+  tokenId: string;
   success: boolean;
   output: Record<string, unknown>;
 
   error?: {
     type: 'step_failure' | 'task_timeout' | 'validation_error';
-    step_ref?: string;
+    stepRef?: string;
     message: string;
     retryable: boolean;
   };
 
   metrics: {
-    duration_ms: number;
-    steps_executed: number;
-    llm_tokens?: {
+    durationMs: number;
+    stepsExecuted: number;
+    llmTokens?: {
       input: number;
       output: number;
-      cost_usd: number;
+      costUsd: number;
     };
   };
 }
 
 // Legacy interface - to be removed after migration
 export interface LLMCallParams {
-  model_profile: ModelProfile;
+  modelProfile: ModelProfile;
   prompt: string;
-  json_schema?: object;
-  workflow_run_id: string;
-  token_id: string;
+  jsonSchema?: object;
+  workflowRunId: string;
+  tokenId: string;
 }
 
 export interface LLMCallResult {
@@ -95,36 +95,36 @@ export default class ExecutorService extends WorkerEntrypoint<Env> {
     const emitter = createEmitter(
       this.env.STREAMER,
       {
-        workflow_run_id: payload.workflow_run_id,
-        project_id: payload.project_id,
-        workflow_def_id: '',
-        parent_run_id: null,
+        workflowRunId: payload.workflowRunId,
+        projectId: payload.projectId,
+        workflowDefId: '',
+        parentRunId: null,
       },
       { traceEnabled: this.env.TRACE_EVENTS_ENABLED === 'true' },
     );
 
     this.logger.info({
-      event_type: 'task_execution_started',
+      eventType: 'task_execution_started',
       message: 'Task execution started',
-      trace_id: payload.workflow_run_id,
+      traceId: payload.workflowRunId,
       metadata: {
-        token_id: payload.token_id,
-        task_id: payload.task_id,
-        task_version: payload.task_version,
-        input_keys: Object.keys(payload.input),
-        has_resources: payload.resources ? Object.keys(payload.resources).length > 0 : false,
+        tokenId: payload.tokenId,
+        taskId: payload.taskId,
+        taskVersion: payload.taskVersion,
+        inputKeys: Object.keys(payload.input),
+        hasResources: payload.resources ? Object.keys(payload.resources).length > 0 : false,
       },
     });
 
     // Mark token as executing (ack to coordinator that we received the task)
-    const coordinatorId = this.env.COORDINATOR.idFromName(payload.workflow_run_id);
+    const coordinatorId = this.env.COORDINATOR.idFromName(payload.workflowRunId);
     const coordinator = this.env.COORDINATOR.get(coordinatorId);
-    await coordinator.markTokenExecuting(payload.token_id);
+    await coordinator.markTokenExecuting(payload.tokenId);
 
     try {
       // Load task definition from Resources
       using tasksResource = this.env.RESOURCES.tasks();
-      const { task } = await tasksResource.get(payload.task_id, payload.task_version);
+      const { task } = await tasksResource.get(payload.taskId, payload.taskVersion);
 
       // Execute the task using the task runner
       const result = await runTask(payload, task, {
@@ -134,55 +134,55 @@ export default class ExecutorService extends WorkerEntrypoint<Env> {
       });
 
       // Callback to coordinator with result
-      const coordinatorId = this.env.COORDINATOR.idFromName(payload.workflow_run_id);
+      const coordinatorId = this.env.COORDINATOR.idFromName(payload.workflowRunId);
       const coordinator = this.env.COORDINATOR.get(coordinatorId);
 
       if (result.success) {
         this.logger.info({
-          event_type: 'task_result_sending',
+          eventType: 'task_result_sending',
           message: 'Sending task result to coordinator',
-          trace_id: payload.workflow_run_id,
+          traceId: payload.workflowRunId,
           metadata: {
-            token_id: payload.token_id,
-            output_data: result.output,
-            output_keys: result.output ? Object.keys(result.output) : [],
+            tokenId: payload.tokenId,
+            outputData: result.output,
+            outputKeys: result.output ? Object.keys(result.output) : [],
           },
         });
-        await coordinator.handleTaskResult(payload.token_id, {
-          output_data: result.output,
+        await coordinator.handleTaskResult(payload.tokenId, {
+          outputData: result.output,
         });
       } else {
         // Send error to coordinator (may trigger retry if retryable)
-        await coordinator.handleTaskError(payload.token_id, {
+        await coordinator.handleTaskError(payload.tokenId, {
           error: result.error!,
           metrics: result.metrics,
         });
       }
     } catch (error) {
       this.logger.error({
-        event_type: 'task_execution_failed',
+        eventType: 'task_execution_failed',
         message: 'Task execution failed with unexpected error',
-        trace_id: payload.workflow_run_id,
+        traceId: payload.workflowRunId,
         metadata: {
-          token_id: payload.token_id,
-          task_id: payload.task_id,
+          tokenId: payload.tokenId,
+          taskId: payload.taskId,
           error: error instanceof Error ? error.message : String(error),
           stack: error instanceof Error ? error.stack : undefined,
         },
       });
 
       // Callback with error result
-      const coordinatorId = this.env.COORDINATOR.idFromName(payload.workflow_run_id);
+      const coordinatorId = this.env.COORDINATOR.idFromName(payload.workflowRunId);
       const coordinator = this.env.COORDINATOR.get(coordinatorId);
-      await coordinator.handleTaskError(payload.token_id, {
+      await coordinator.handleTaskError(payload.tokenId, {
         error: {
           type: 'step_failure',
           message: error instanceof Error ? error.message : String(error),
           retryable: false,
         },
         metrics: {
-          duration_ms: 0,
-          steps_executed: 0,
+          durationMs: 0,
+          stepsExecuted: 0,
         },
       });
     }
@@ -205,42 +205,42 @@ export default class ExecutorService extends WorkerEntrypoint<Env> {
             content: params.prompt,
           },
         ],
-        ...params.model_profile.parameters,
+        ...params.modelProfile.parameters,
       };
 
-      // Add response_format if json_schema provided
-      if (params.json_schema) {
+      // Add response_format if jsonSchema provided
+      if (params.jsonSchema) {
         aiOptions.response_format = {
           type: 'json_schema',
           json_schema: {
             name: 'response_schema',
             strict: true,
-            schema: params.json_schema,
+            schema: params.jsonSchema,
           },
         };
       }
 
       this.logger.info({
-        event_type: 'llm_call_started',
+        eventType: 'llm_call_started',
         message: 'LLM call started',
-        trace_id: params.workflow_run_id,
+        traceId: params.workflowRunId,
         metadata: {
-          model: params.model_profile.model_id,
-          provider: params.model_profile.provider,
+          model: params.modelProfile.modelId,
+          provider: params.modelProfile.provider,
           prompt: params.prompt,
-          prompt_length: params.prompt.length,
-          parameters: params.model_profile.parameters,
-          has_json_schema: !!params.json_schema,
-          json_schema: params.json_schema,
-          response_format: aiOptions.response_format,
-          full_ai_options: aiOptions,
-          workflow_run_id: params.workflow_run_id,
-          token_id: params.token_id,
+          promptLength: params.prompt.length,
+          parameters: params.modelProfile.parameters,
+          hasJsonSchema: !!params.jsonSchema,
+          jsonSchema: params.jsonSchema,
+          responseFormat: aiOptions.response_format,
+          fullAiOptions: aiOptions,
+          workflowRunId: params.workflowRunId,
+          tokenId: params.tokenId,
         },
       });
 
       const response = (await this.env.AI.run(
-        params.model_profile.model_id as any,
+        params.modelProfile.modelId as any,
         aiOptions,
       )) as any;
 
@@ -248,32 +248,32 @@ export default class ExecutorService extends WorkerEntrypoint<Env> {
       const rawResponse = response?.response || 'No response from LLM';
 
       this.logger.info({
-        event_type: 'llm_raw_response',
+        eventType: 'llm_raw_response',
         message: 'Raw response from Workers AI',
-        trace_id: params.workflow_run_id,
+        traceId: params.workflowRunId,
         metadata: {
-          workflow_run_id: params.workflow_run_id,
-          token_id: params.token_id,
-          raw_response: rawResponse,
-          response_type: typeof rawResponse,
-          full_response: response,
+          workflowRunId: params.workflowRunId,
+          tokenId: params.tokenId,
+          rawResponse: rawResponse,
+          responseType: typeof rawResponse,
+          fullResponse: response,
         },
       });
 
-      // When using json_schema, Workers AI returns parsed JSON automatically
+      // When using jsonSchema, Workers AI returns parsed JSON automatically
       let result: { response: any };
-      if (params.json_schema) {
+      if (params.jsonSchema) {
         // Workers AI already parsed the JSON for us when response_format is set
         if (typeof rawResponse === 'object') {
           result = { response: rawResponse };
 
           this.logger.info({
-            event_type: 'json_response_received',
+            eventType: 'json_response_received',
             message: 'Structured JSON response received from Workers AI',
-            trace_id: params.workflow_run_id,
+            traceId: params.workflowRunId,
             metadata: {
-              workflow_run_id: params.workflow_run_id,
-              token_id: params.token_id,
+              workflowRunId: params.workflowRunId,
+              tokenId: params.tokenId,
               response: rawResponse,
             },
           });
@@ -284,25 +284,25 @@ export default class ExecutorService extends WorkerEntrypoint<Env> {
             result = { response: parsed };
 
             this.logger.info({
-              event_type: 'json_parsed_successfully',
+              eventType: 'json_parsed_successfully',
               message: 'JSON response parsed from string',
-              trace_id: params.workflow_run_id,
+              traceId: params.workflowRunId,
               metadata: {
-                workflow_run_id: params.workflow_run_id,
-                token_id: params.token_id,
-                raw_response: rawResponse,
-                parsed_response: parsed,
+                workflowRunId: params.workflowRunId,
+                tokenId: params.tokenId,
+                rawResponse: rawResponse,
+                parsedResponse: parsed,
               },
             });
           } catch (parseError) {
             this.logger.error({
-              event_type: 'json_parse_failed',
+              eventType: 'json_parse_failed',
               message: 'Failed to parse JSON response',
-              trace_id: params.workflow_run_id,
+              traceId: params.workflowRunId,
               metadata: {
-                workflow_run_id: params.workflow_run_id,
-                token_id: params.token_id,
-                raw_response: rawResponse,
+                workflowRunId: params.workflowRunId,
+                tokenId: params.tokenId,
+                rawResponse: rawResponse,
                 error: parseError instanceof Error ? parseError.message : String(parseError),
               },
             });
@@ -316,39 +316,39 @@ export default class ExecutorService extends WorkerEntrypoint<Env> {
       }
 
       this.logger.info({
-        event_type: 'llm_call_completed',
+        eventType: 'llm_call_completed',
         message: 'LLM call completed successfully',
-        trace_id: params.workflow_run_id,
+        traceId: params.workflowRunId,
         metadata: {
-          model: params.model_profile.model_id,
-          provider: params.model_profile.provider,
-          duration_ms: duration,
-          response_length:
+          model: params.modelProfile.modelId,
+          provider: params.modelProfile.provider,
+          durationMs: duration,
+          responseLength:
             typeof result.response === 'string'
               ? result.response.length
               : JSON.stringify(result.response).length,
-          workflow_run_id: params.workflow_run_id,
-          token_id: params.token_id,
+          workflowRunId: params.workflowRunId,
+          tokenId: params.tokenId,
           output: result,
         },
       });
 
       // Callback to coordinator with result
-      const coordinatorId = this.env.COORDINATOR.idFromName(params.workflow_run_id);
+      const coordinatorId = this.env.COORDINATOR.idFromName(params.workflowRunId);
       const coordinator = this.env.COORDINATOR.get(coordinatorId);
-      await coordinator.handleTaskResult(params.token_id, { output_data: result });
+      await coordinator.handleTaskResult(params.tokenId, { outputData: result });
     } catch (error) {
       this.logger.error({
-        event_type: 'llm_call_failed',
+        eventType: 'llm_call_failed',
         message: 'LLM call failed',
-        trace_id: params.workflow_run_id,
+        traceId: params.workflowRunId,
         metadata: {
-          model: params.model_profile.model_id,
-          provider: params.model_profile.provider,
-          duration_ms: Date.now() - startTime,
+          model: params.modelProfile.modelId,
+          provider: params.modelProfile.provider,
+          durationMs: Date.now() - startTime,
           error: error instanceof Error ? error.message : String(error),
-          workflow_run_id: params.workflow_run_id,
-          token_id: params.token_id,
+          workflowRunId: params.workflowRunId,
+          tokenId: params.tokenId,
         },
       });
 

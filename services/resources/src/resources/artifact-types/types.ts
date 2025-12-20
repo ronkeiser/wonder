@@ -6,9 +6,9 @@ export type ArtifactType = {
   name: string;
   description: string;
   schema: object;
-  content_hash: string | null;
-  created_at: string;
-  updated_at: string;
+  contentHash: string | null;
+  createdAt: string;
+  updatedAt: string;
 };
 
 export type ArtifactTypeInput = {

@@ -16,15 +16,15 @@ type TransitionRow = {
   ref: string | null;
   workflow_def_id: string;
   workflow_def_version: number;
-  from_node_id: string;
-  to_node_id: string;
+  fromNodeId: string;
+  toNodeId: string;
   priority: number;
   condition: object | null;
-  spawn_count: number | null;
-  sibling_group: string | null;
+  spawnCount: number | null;
+  siblingGroup: string | null;
   foreach: object | null;
   synchronization: object | null;
-  loop_config: object | null;
+  loopConfig: object | null;
 };
 
 describe('toTransitionDef', () => {
@@ -34,15 +34,15 @@ describe('toTransitionDef', () => {
       ref: null,
       workflow_def_id: 'wf-1',
       workflow_def_version: 1,
-      from_node_id: 'node-a',
-      to_node_id: 'node-b',
+      fromNodeId: 'node-a',
+      toNodeId: 'node-b',
       priority: 0,
       condition: null,
-      spawn_count: null,
-      sibling_group: null,
+      spawnCount: null,
+      siblingGroup: null,
       foreach: null,
       synchronization: null,
-      loop_config: null,
+      loopConfig: null,
     };
 
     const result = toTransitionDef(row);
@@ -50,12 +50,12 @@ describe('toTransitionDef', () => {
     expect(result).toEqual({
       id: 'trans-1',
       ref: null,
-      from_node_id: 'node-a',
-      to_node_id: 'node-b',
+      fromNodeId: 'node-a',
+      toNodeId: 'node-b',
       priority: 0,
       condition: null,
-      spawn_count: null,
-      sibling_group: null,
+      spawnCount: null,
+      siblingGroup: null,
       foreach: null,
       synchronization: null,
     });
@@ -67,15 +67,15 @@ describe('toTransitionDef', () => {
       ref: 'approval-to-review',
       workflow_def_id: 'wf-1',
       workflow_def_version: 1,
-      from_node_id: 'approval',
-      to_node_id: 'review',
+      fromNodeId: 'approval',
+      toNodeId: 'review',
       priority: 1,
       condition: null,
-      spawn_count: null,
-      sibling_group: null,
+      spawnCount: null,
+      siblingGroup: null,
       foreach: null,
       synchronization: null,
-      loop_config: null,
+      loopConfig: null,
     };
 
     const result = toTransitionDef(row);
@@ -84,26 +84,26 @@ describe('toTransitionDef', () => {
     expect(result.priority).toBe(1);
   });
 
-  it('converts TransitionRow with spawn_count', () => {
+  it('converts TransitionRow with spawnCount', () => {
     const row: TransitionRow = {
       id: 'fan-out-trans',
       ref: 'parallel-judges',
       workflow_def_id: 'wf-1',
       workflow_def_version: 1,
-      from_node_id: 'input',
-      to_node_id: 'judge',
+      fromNodeId: 'input',
+      toNodeId: 'judge',
       priority: 0,
       condition: null,
-      spawn_count: 3,
-      sibling_group: null,
+      spawnCount: 3,
+      siblingGroup: null,
       foreach: null,
       synchronization: null,
-      loop_config: null,
+      loopConfig: null,
     };
 
     const result = toTransitionDef(row);
 
-    expect(result.spawn_count).toBe(3);
+    expect(result.spawnCount).toBe(3);
   });
 
   it('converts TransitionRow with condition', () => {
@@ -119,15 +119,15 @@ describe('toTransitionDef', () => {
       ref: 'pass-if-score-high',
       workflow_def_id: 'wf-1',
       workflow_def_version: 1,
-      from_node_id: 'score',
-      to_node_id: 'pass',
+      fromNodeId: 'score',
+      toNodeId: 'pass',
       priority: 0,
       condition,
-      spawn_count: null,
-      sibling_group: null,
+      spawnCount: null,
+      siblingGroup: null,
       foreach: null,
       synchronization: null,
-      loop_config: null,
+      loopConfig: null,
     };
 
     const result = toTransitionDef(row);
@@ -146,15 +146,15 @@ describe('toTransitionDef', () => {
       ref: 'iterate-judges',
       workflow_def_id: 'wf-1',
       workflow_def_version: 1,
-      from_node_id: 'input',
-      to_node_id: 'evaluate',
+      fromNodeId: 'input',
+      toNodeId: 'evaluate',
       priority: 0,
       condition: null,
-      spawn_count: null,
-      sibling_group: null,
+      spawnCount: null,
+      siblingGroup: null,
       foreach,
       synchronization: null,
-      loop_config: null,
+      loopConfig: null,
     };
 
     const result = toTransitionDef(row);
@@ -165,7 +165,7 @@ describe('toTransitionDef', () => {
   it('converts TransitionRow with synchronization config', () => {
     const synchronization = {
       strategy: 'all' as const,
-      sibling_group: 'fan-out-trans',
+      siblingGroup: 'fan-out-trans',
       timeout_ms: 30000,
       on_timeout: 'fail' as const,
       merge: {
@@ -180,15 +180,15 @@ describe('toTransitionDef', () => {
       ref: 'collect-results',
       workflow_def_id: 'wf-1',
       workflow_def_version: 1,
-      from_node_id: 'evaluate',
-      to_node_id: 'aggregate',
+      fromNodeId: 'evaluate',
+      toNodeId: 'aggregate',
       priority: 0,
       condition: null,
-      spawn_count: null,
-      sibling_group: null,
+      spawnCount: null,
+      siblingGroup: null,
       foreach: null,
       synchronization,
-      loop_config: null,
+      loopConfig: null,
     };
 
     const result = toTransitionDef(row);
@@ -202,15 +202,15 @@ describe('toTransitionDef', () => {
       ref: null,
       workflow_def_id: 'should-not-appear',
       workflow_def_version: 99,
-      from_node_id: 'node-a',
-      to_node_id: 'node-b',
+      fromNodeId: 'node-a',
+      toNodeId: 'node-b',
       priority: 0,
       condition: null,
-      spawn_count: null,
-      sibling_group: null,
+      spawnCount: null,
+      siblingGroup: null,
       foreach: null,
       synchronization: null,
-      loop_config: null,
+      loopConfig: null,
     };
 
     const result = toTransitionDef(row);
@@ -219,26 +219,26 @@ describe('toTransitionDef', () => {
     expect(result).not.toHaveProperty('workflow_def_version');
   });
 
-  it('strips loop_config from output', () => {
+  it('strips loopConfig from output', () => {
     const row: TransitionRow = {
       id: 'trans-1',
       ref: null,
       workflow_def_id: 'wf-1',
       workflow_def_version: 1,
-      from_node_id: 'node-a',
-      to_node_id: 'node-b',
+      fromNodeId: 'node-a',
+      toNodeId: 'node-b',
       priority: 0,
       condition: null,
-      spawn_count: null,
-      sibling_group: null,
+      spawnCount: null,
+      siblingGroup: null,
       foreach: null,
       synchronization: null,
-      loop_config: { max_iterations: 10 },
+      loopConfig: { max_iterations: 10 },
     };
 
     const result = toTransitionDef(row);
 
-    expect(result).not.toHaveProperty('loop_config');
+    expect(result).not.toHaveProperty('loopConfig');
   });
 });
 
@@ -246,8 +246,8 @@ describe('getMergeConfig', () => {
   it('returns null when synchronization is null', () => {
     const transition: TransitionDef = {
       id: 'trans-1',
-      from_node_id: 'a',
-      to_node_id: 'b',
+      fromNodeId: 'a',
+      toNodeId: 'b',
       priority: 0,
       synchronization: null,
     };
@@ -258,8 +258,8 @@ describe('getMergeConfig', () => {
   it('returns null when synchronization is undefined', () => {
     const transition: TransitionDef = {
       id: 'trans-1',
-      from_node_id: 'a',
-      to_node_id: 'b',
+      fromNodeId: 'a',
+      toNodeId: 'b',
       priority: 0,
     };
 
@@ -269,12 +269,12 @@ describe('getMergeConfig', () => {
   it('returns null when synchronization has no merge config', () => {
     const transition: TransitionDef = {
       id: 'trans-1',
-      from_node_id: 'a',
-      to_node_id: 'b',
+      fromNodeId: 'a',
+      toNodeId: 'b',
       priority: 0,
       synchronization: {
         strategy: 'all',
-        sibling_group: 'fan-out-1',
+        siblingGroup: 'fan-out-1',
       },
     };
 
@@ -290,12 +290,12 @@ describe('getMergeConfig', () => {
 
     const transition: TransitionDef = {
       id: 'trans-1',
-      from_node_id: 'a',
-      to_node_id: 'b',
+      fromNodeId: 'a',
+      toNodeId: 'b',
       priority: 0,
       synchronization: {
         strategy: 'all',
-        sibling_group: 'fan-out-1',
+        siblingGroup: 'fan-out-1',
         merge,
       },
     };
@@ -312,12 +312,12 @@ describe('getMergeConfig', () => {
 
     const transition: TransitionDef = {
       id: 'trans-1',
-      from_node_id: 'a',
-      to_node_id: 'b',
+      fromNodeId: 'a',
+      toNodeId: 'b',
       priority: 0,
       synchronization: {
         strategy: 'any',
-        sibling_group: 'fan-out-1',
+        siblingGroup: 'fan-out-1',
         merge,
       },
     };
@@ -334,12 +334,12 @@ describe('getMergeConfig', () => {
 
     const transition: TransitionDef = {
       id: 'trans-1',
-      from_node_id: 'a',
-      to_node_id: 'b',
+      fromNodeId: 'a',
+      toNodeId: 'b',
       priority: 0,
       synchronization: {
         strategy: { m_of_n: 2 },
-        sibling_group: 'fan-out-1',
+        siblingGroup: 'fan-out-1',
         merge,
       },
     };
@@ -356,12 +356,12 @@ describe('getMergeConfig', () => {
 
     const transition: TransitionDef = {
       id: 'trans-1',
-      from_node_id: 'a',
-      to_node_id: 'b',
+      fromNodeId: 'a',
+      toNodeId: 'b',
       priority: 0,
       synchronization: {
         strategy: 'any',
-        sibling_group: 'fan-out-1',
+        siblingGroup: 'fan-out-1',
         timeout_ms: 5000,
         on_timeout: 'proceed_with_available',
         merge,

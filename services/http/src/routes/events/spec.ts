@@ -12,14 +12,14 @@ export const getEventsRoute = createRoute({
   summary: 'Get workflow events',
   request: {
     query: z.object({
-      workflow_run_id: z.string().optional(),
-      parent_run_id: z.string().optional(),
-      project_id: z.string().optional(),
-      event_type: z.string().optional(),
-      node_id: z.string().optional(),
-      token_id: z.string().optional(),
+      workflowRunId: z.string().optional(),
+      parentRunId: z.string().optional(),
+      projectId: z.string().optional(),
+      eventType: z.string().optional(),
+      nodeId: z.string().optional(),
+      tokenId: z.string().optional(),
       limit: z.coerce.number().int().positive().max(10000).optional().default(100),
-      after_sequence: z.coerce.number().int().nonnegative().optional(),
+      afterSequence: z.coerce.number().int().nonnegative().optional(),
     }),
   },
   responses: {
@@ -41,14 +41,14 @@ export const getTraceEventsRoute = createRoute({
   summary: 'Get trace events',
   request: {
     query: z.object({
-      workflow_run_id: z.string().optional(),
-      token_id: z.string().optional(),
-      node_id: z.string().optional(),
+      workflowRunId: z.string().optional(),
+      tokenId: z.string().optional(),
+      nodeId: z.string().optional(),
       type: z.string().optional(),
       category: z.enum(['decision', 'operation', 'dispatch', 'sql']).optional(),
-      project_id: z.string().optional(),
+      projectId: z.string().optional(),
       limit: z.coerce.number().int().positive().max(10000).optional().default(1000),
-      min_duration_ms: z.coerce.number().nonnegative().optional(),
+      minDurationMs: z.coerce.number().nonnegative().optional(),
     }),
   },
   responses: {

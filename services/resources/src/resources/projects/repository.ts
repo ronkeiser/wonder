@@ -10,7 +10,7 @@ type ProjectRow = typeof projects.$inferSelect;
 type ProjectSettingsRow = typeof project_settings.$inferSelect;
 
 type NewProject = {
-  workspace_id: string;
+  workspaceId: string;
   name: string;
   description?: string | null;
   settings?: ProjectSettings | null;
@@ -18,15 +18,15 @@ type NewProject = {
 
 export async function createProject(db: DrizzleD1Database, data: NewProject): Promise<Project> {
   const now = new Date().toISOString();
-  const project_id = ulid();
+  const projectId = ulid();
 
   const projectRow: ProjectRow = {
-    id: project_id,
-    workspace_id: data.workspace_id,
+    id: projectId,
+    workspaceId: data.workspaceId,
     name: data.name,
     description: data.description ?? null,
-    created_at: now,
-    updated_at: now,
+    createdAt: now,
+    updatedAt: now,
   };
 
   await db.insert(projects).values(projectRow).run();
@@ -35,16 +35,16 @@ export async function createProject(db: DrizzleD1Database, data: NewProject): Pr
     await db
       .insert(project_settings)
       .values({
-        project_id,
-        default_model_profile_id: data.settings.default_model_profile_id ?? null,
-        rate_limit_max_concurrent_runs: data.settings.rate_limit_max_concurrent_runs ?? null,
-        rate_limit_max_llm_calls_per_hour: data.settings.rate_limit_max_llm_calls_per_hour ?? null,
-        budget_max_monthly_spend_cents: data.settings.budget_max_monthly_spend_cents ?? null,
-        budget_alert_threshold_cents: data.settings.budget_alert_threshold_cents ?? null,
-        snapshot_policy_every_n_events: data.settings.snapshot_policy_every_n_events ?? null,
-        snapshot_policy_every_n_seconds: data.settings.snapshot_policy_every_n_seconds ?? null,
-        snapshot_policy_on_fan_in_complete:
-          data.settings.snapshot_policy_on_fan_in_complete ?? null,
+        projectId,
+        defaultModelProfileId: data.settings.defaultModelProfileId ?? null,
+        rateLimitMaxConcurrentRuns: data.settings.rateLimitMaxConcurrentRuns ?? null,
+        rateLimitMaxLlmCallsPerHour: data.settings.rateLimitMaxLlmCallsPerHour ?? null,
+        budgetMaxMonthlySpendCents: data.settings.budgetMaxMonthlySpendCents ?? null,
+        budgetAlertThresholdCents: data.settings.budgetAlertThresholdCents ?? null,
+        snapshotPolicyEveryNEvents: data.settings.snapshotPolicyEveryNEvents ?? null,
+        snapshotPolicyEveryNSeconds: data.settings.snapshotPolicyEveryNSeconds ?? null,
+        snapshotPolicyOnFanInComplete:
+          data.settings.snapshotPolicyOnFanInComplete ?? null,
       })
       .run();
   }
@@ -62,23 +62,23 @@ export async function getProject(db: DrizzleD1Database, id: string): Promise<Pro
   const settingsRow = await db
     .select()
     .from(project_settings)
-    .where(eq(project_settings.project_id, id))
+    .where(eq(project_settings.projectId, id))
     .get();
 
   return {
     ...projectRow,
     settings: settingsRow
       ? {
-          default_model_profile_id: settingsRow.default_model_profile_id ?? undefined,
-          rate_limit_max_concurrent_runs: settingsRow.rate_limit_max_concurrent_runs ?? undefined,
-          rate_limit_max_llm_calls_per_hour:
-            settingsRow.rate_limit_max_llm_calls_per_hour ?? undefined,
-          budget_max_monthly_spend_cents: settingsRow.budget_max_monthly_spend_cents ?? undefined,
-          budget_alert_threshold_cents: settingsRow.budget_alert_threshold_cents ?? undefined,
-          snapshot_policy_every_n_events: settingsRow.snapshot_policy_every_n_events ?? undefined,
-          snapshot_policy_every_n_seconds: settingsRow.snapshot_policy_every_n_seconds ?? undefined,
-          snapshot_policy_on_fan_in_complete:
-            settingsRow.snapshot_policy_on_fan_in_complete ?? undefined,
+          defaultModelProfileId: settingsRow.defaultModelProfileId ?? undefined,
+          rateLimitMaxConcurrentRuns: settingsRow.rateLimitMaxConcurrentRuns ?? undefined,
+          rateLimitMaxLlmCallsPerHour:
+            settingsRow.rateLimitMaxLlmCallsPerHour ?? undefined,
+          budgetMaxMonthlySpendCents: settingsRow.budgetMaxMonthlySpendCents ?? undefined,
+          budgetAlertThresholdCents: settingsRow.budgetAlertThresholdCents ?? undefined,
+          snapshotPolicyEveryNEvents: settingsRow.snapshotPolicyEveryNEvents ?? undefined,
+          snapshotPolicyEveryNSeconds: settingsRow.snapshotPolicyEveryNSeconds ?? undefined,
+          snapshotPolicyOnFanInComplete:
+            settingsRow.snapshotPolicyOnFanInComplete ?? undefined,
         }
       : null,
   };
@@ -90,11 +90,11 @@ export async function listProjects(
   limit: number = 100,
 ): Promise<Project[]> {
   const baseQuery = db.select().from(projects);
-  const query = workspaceId ? baseQuery.where(eq(projects.workspace_id, workspaceId)) : baseQuery;
+  const query = workspaceId ? baseQuery.where(eq(projects.workspaceId, workspaceId)) : baseQuery;
   const projectRows = await query.limit(limit).all();
 
   const allSettings = await db.select().from(project_settings).all();
-  const settingsMap = new Map(allSettings.map((s) => [s.project_id, s]));
+  const settingsMap = new Map(allSettings.map((s) => [s.projectId, s]));
 
   return projectRows.map((projectRow) => {
     const settingsRow = settingsMap.get(projectRow.id);
@@ -102,17 +102,17 @@ export async function listProjects(
       ...projectRow,
       settings: settingsRow
         ? {
-            default_model_profile_id: settingsRow.default_model_profile_id ?? undefined,
-            rate_limit_max_concurrent_runs: settingsRow.rate_limit_max_concurrent_runs ?? undefined,
-            rate_limit_max_llm_calls_per_hour:
-              settingsRow.rate_limit_max_llm_calls_per_hour ?? undefined,
-            budget_max_monthly_spend_cents: settingsRow.budget_max_monthly_spend_cents ?? undefined,
-            budget_alert_threshold_cents: settingsRow.budget_alert_threshold_cents ?? undefined,
-            snapshot_policy_every_n_events: settingsRow.snapshot_policy_every_n_events ?? undefined,
-            snapshot_policy_every_n_seconds:
-              settingsRow.snapshot_policy_every_n_seconds ?? undefined,
-            snapshot_policy_on_fan_in_complete:
-              settingsRow.snapshot_policy_on_fan_in_complete ?? undefined,
+            defaultModelProfileId: settingsRow.defaultModelProfileId ?? undefined,
+            rateLimitMaxConcurrentRuns: settingsRow.rateLimitMaxConcurrentRuns ?? undefined,
+            rateLimitMaxLlmCallsPerHour:
+              settingsRow.rateLimitMaxLlmCallsPerHour ?? undefined,
+            budgetMaxMonthlySpendCents: settingsRow.budgetMaxMonthlySpendCents ?? undefined,
+            budgetAlertThresholdCents: settingsRow.budgetAlertThresholdCents ?? undefined,
+            snapshotPolicyEveryNEvents: settingsRow.snapshotPolicyEveryNEvents ?? undefined,
+            snapshotPolicyEveryNSeconds:
+              settingsRow.snapshotPolicyEveryNSeconds ?? undefined,
+            snapshotPolicyOnFanInComplete:
+              settingsRow.snapshotPolicyOnFanInComplete ?? undefined,
           }
         : null,
     };
@@ -132,7 +132,7 @@ export async function updateProject(
       .set({
         ...(data.name !== undefined && { name: data.name }),
         ...(data.description !== undefined && { description: data.description }),
-        updated_at: now,
+        updatedAt: now,
       })
       .where(eq(projects.id, id))
       .run();
@@ -142,41 +142,41 @@ export async function updateProject(
     const existingSettings = await db
       .select()
       .from(project_settings)
-      .where(eq(project_settings.project_id, id))
+      .where(eq(project_settings.projectId, id))
       .get();
 
     if (existingSettings) {
       await db
         .update(project_settings)
         .set({
-          default_model_profile_id: data.settings.default_model_profile_id ?? null,
-          rate_limit_max_concurrent_runs: data.settings.rate_limit_max_concurrent_runs ?? null,
-          rate_limit_max_llm_calls_per_hour:
-            data.settings.rate_limit_max_llm_calls_per_hour ?? null,
-          budget_max_monthly_spend_cents: data.settings.budget_max_monthly_spend_cents ?? null,
-          budget_alert_threshold_cents: data.settings.budget_alert_threshold_cents ?? null,
-          snapshot_policy_every_n_events: data.settings.snapshot_policy_every_n_events ?? null,
-          snapshot_policy_every_n_seconds: data.settings.snapshot_policy_every_n_seconds ?? null,
-          snapshot_policy_on_fan_in_complete:
-            data.settings.snapshot_policy_on_fan_in_complete ?? null,
+          defaultModelProfileId: data.settings.defaultModelProfileId ?? null,
+          rateLimitMaxConcurrentRuns: data.settings.rateLimitMaxConcurrentRuns ?? null,
+          rateLimitMaxLlmCallsPerHour:
+            data.settings.rateLimitMaxLlmCallsPerHour ?? null,
+          budgetMaxMonthlySpendCents: data.settings.budgetMaxMonthlySpendCents ?? null,
+          budgetAlertThresholdCents: data.settings.budgetAlertThresholdCents ?? null,
+          snapshotPolicyEveryNEvents: data.settings.snapshotPolicyEveryNEvents ?? null,
+          snapshotPolicyEveryNSeconds: data.settings.snapshotPolicyEveryNSeconds ?? null,
+          snapshotPolicyOnFanInComplete:
+            data.settings.snapshotPolicyOnFanInComplete ?? null,
         })
-        .where(eq(project_settings.project_id, id))
+        .where(eq(project_settings.projectId, id))
         .run();
     } else {
       await db
         .insert(project_settings)
         .values({
-          project_id: id,
-          default_model_profile_id: data.settings.default_model_profile_id ?? null,
-          rate_limit_max_concurrent_runs: data.settings.rate_limit_max_concurrent_runs ?? null,
-          rate_limit_max_llm_calls_per_hour:
-            data.settings.rate_limit_max_llm_calls_per_hour ?? null,
-          budget_max_monthly_spend_cents: data.settings.budget_max_monthly_spend_cents ?? null,
-          budget_alert_threshold_cents: data.settings.budget_alert_threshold_cents ?? null,
-          snapshot_policy_every_n_events: data.settings.snapshot_policy_every_n_events ?? null,
-          snapshot_policy_every_n_seconds: data.settings.snapshot_policy_every_n_seconds ?? null,
-          snapshot_policy_on_fan_in_complete:
-            data.settings.snapshot_policy_on_fan_in_complete ?? null,
+          projectId: id,
+          defaultModelProfileId: data.settings.defaultModelProfileId ?? null,
+          rateLimitMaxConcurrentRuns: data.settings.rateLimitMaxConcurrentRuns ?? null,
+          rateLimitMaxLlmCallsPerHour:
+            data.settings.rateLimitMaxLlmCallsPerHour ?? null,
+          budgetMaxMonthlySpendCents: data.settings.budgetMaxMonthlySpendCents ?? null,
+          budgetAlertThresholdCents: data.settings.budgetAlertThresholdCents ?? null,
+          snapshotPolicyEveryNEvents: data.settings.snapshotPolicyEveryNEvents ?? null,
+          snapshotPolicyEveryNSeconds: data.settings.snapshotPolicyEveryNSeconds ?? null,
+          snapshotPolicyOnFanInComplete:
+            data.settings.snapshotPolicyOnFanInComplete ?? null,
         })
         .run();
     }

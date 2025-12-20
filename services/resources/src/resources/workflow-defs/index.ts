@@ -9,13 +9,13 @@ import { validateWorkflowDef, type WorkflowDefInput } from './validator';
 
 export class WorkflowDefs extends Resource {
   async create(data: WorkflowDefInput): Promise<{
-    workflow_def_id: string;
-    workflow_def: WorkflowDef;
+    workflowDefId: string;
+    workflowDef: WorkflowDef;
     /** True if an existing workflow def was reused (autoversion matched content hash) */
     reused: boolean;
   }> {
     this.serviceCtx.logger.info({
-      event_type: 'workflow_def.create.started',
+      eventType: 'workflow_def.create.started',
       metadata: { name: data.name, autoversion: data.autoversion ?? false },
     });
 
@@ -25,7 +25,7 @@ export class WorkflowDefs extends Resource {
     } catch (error) {
       if (error instanceof ValidationError) {
         this.serviceCtx.logger.warn({
-          event_type: 'workflow_def.validation.failed',
+          eventType: 'workflow_def.validation.failed',
           metadata: { error: error.code, path: error.path },
         });
       }
@@ -33,8 +33,8 @@ export class WorkflowDefs extends Resource {
     }
 
     const scope = {
-      project_id: data.project_id ?? null,
-      library_id: data.library_id ?? null,
+      projectId: data.projectId ?? null,
+      library_id: data.libraryId ?? null,
     };
 
     // 2. Autoversion deduplication check
@@ -62,8 +62,8 @@ export class WorkflowDefs extends Resource {
 
     if (autoversionResult.reused) {
       return {
-        workflow_def_id: autoversionResult.entity.id,
-        workflow_def: autoversionResult.entity,
+        workflowDefId: autoversionResult.entity.id,
+        workflowDef: autoversionResult.entity,
         reused: true,
       };
     }
@@ -77,13 +77,13 @@ export class WorkflowDefs extends Resource {
 
     // DEBUG: Log transformed transitions
     this.serviceCtx.logger.info({
-      event_type: 'workflow_def.transitions.transformed',
+      eventType: 'workflow_def.transitions.transformed',
       metadata: {
-        workflow_def_id: ids.workflowDefId,
+        workflowDefId: ids.workflowDefId,
         transitions: transformed.transitions.map((t) => ({
           id: t.id,
           ref: t.ref,
-          spawn_count: t.spawn_count,
+          spawnCount: t.spawnCount,
           synchronization: t.synchronization,
         })),
       },
@@ -97,22 +97,22 @@ export class WorkflowDefs extends Resource {
         name: data.name,
         description: data.description,
         version,
-        project_id: data.project_id ?? null,
-        library_id: data.library_id ?? null,
+        projectId: data.projectId ?? null,
+        libraryId: data.libraryId ?? null,
         tags: data.tags ?? null,
-        input_schema: data.input_schema,
-        output_schema: data.output_schema,
-        output_mapping: data.output_mapping ?? null,
-        context_schema: data.context_schema ?? null,
-        initial_node_id: transformed.initialNodeId,
-        content_hash: autoversionResult.contentHash,
+        inputSchema: data.inputSchema,
+        outputSchema: data.outputSchema,
+        outputMapping: data.outputMapping ?? null,
+        contextSchema: data.contextSchema ?? null,
+        initialNodeId: transformed.initialNodeId,
+        contentHash: autoversionResult.contentHash,
       });
     } catch (error) {
       const dbError = extractDbError(error);
 
       if (dbError.constraint === 'unique') {
         this.serviceCtx.logger.warn({
-          event_type: 'workflow_def.create.conflict',
+          eventType: 'workflow_def.create.conflict',
           metadata: { name: data.name, field: dbError.field },
         });
         throw new ConflictError(
@@ -123,7 +123,7 @@ export class WorkflowDefs extends Resource {
       }
 
       this.serviceCtx.logger.error({
-        event_type: 'workflow_def.create.failed',
+        eventType: 'workflow_def.create.failed',
         message: dbError.message,
         metadata: { name: data.name },
       });
@@ -135,47 +135,47 @@ export class WorkflowDefs extends Resource {
       for (const node of transformed.nodes) {
         await repo.createNodeWithId(this.serviceCtx.db, {
           ...node,
-          workflow_def_id: workflowDef.id,
-          workflow_def_version: workflowDef.version,
+          workflowDefId: workflowDef.id,
+          workflowDefVersion: workflowDef.version,
         });
       }
     } catch (error) {
       this.serviceCtx.logger.error({
-        event_type: 'workflow_def.node.create.failed',
+        eventType: 'workflow_def.node.create.failed',
         message: error instanceof Error ? error.message : String(error),
-        metadata: { workflow_def_id: workflowDef.id, name: data.name },
+        metadata: { workflowDefId: workflowDef.id, name: data.name },
       });
       throw error;
     }
 
-    // Create transitions with transformed IDs (including synchronization.sibling_group)
+    // Create transitions with transformed IDs (including synchronization.siblingGroup)
     try {
       for (const transition of transformed.transitions) {
         console.log('[RESOURCES] Creating transition:', {
           id: transition.id,
           ref: transition.ref,
-          spawn_count: transition.spawn_count,
+          spawnCount: transition.spawnCount,
           synchronization: transition.synchronization,
         });
         await repo.createTransitionWithId(this.serviceCtx.db, {
           ...transition,
-          workflow_def_id: workflowDef.id,
-          workflow_def_version: workflowDef.version,
+          workflowDefId: workflowDef.id,
+          workflowDefVersion: workflowDef.version,
         });
       }
     } catch (error) {
       this.serviceCtx.logger.error({
-        event_type: 'workflow_def.transition.create.failed',
+        eventType: 'workflow_def.transition.create.failed',
         message: error instanceof Error ? error.message : String(error),
-        metadata: { workflow_def_id: workflowDef.id, name: data.name },
+        metadata: { workflowDefId: workflowDef.id, name: data.name },
       });
       throw error;
     }
 
     this.serviceCtx.logger.info({
-      event_type: 'workflow_def.created',
+      eventType: 'workflow_def.created',
       metadata: {
-        workflow_def_id: workflowDef.id,
+        workflowDefId: workflowDef.id,
         version: workflowDef.version,
         name: workflowDef.name,
         content_hash: autoversionResult.contentHash,
@@ -183,8 +183,8 @@ export class WorkflowDefs extends Resource {
     });
 
     return {
-      workflow_def_id: workflowDef.id,
-      workflow_def: workflowDef,
+      workflowDefId: workflowDef.id,
+      workflowDef: workflowDef,
       reused: false,
     };
   }
@@ -193,16 +193,16 @@ export class WorkflowDefs extends Resource {
     workflowDefId: string,
     version?: number,
   ): Promise<{
-    workflow_def: WorkflowDef;
+    workflowDef: WorkflowDef;
     nodes: Node[];
     transitions: Transition[];
   }> {
     return this.withLogging(
       'get',
       {
-        workflow_def_id: workflowDefId,
+        workflowDefId: workflowDefId,
         version,
-        metadata: { workflow_def_id: workflowDefId, version },
+        metadata: { workflowDefId: workflowDefId, version },
       },
       async () => {
         const workflowDef = await repo.getWorkflowDef(this.serviceCtx.db, workflowDefId, version);
@@ -221,7 +221,7 @@ export class WorkflowDefs extends Resource {
         );
 
         return {
-          workflow_def: workflowDef,
+          workflowDef: workflowDef,
           nodes,
           transitions,
         };
@@ -233,9 +233,9 @@ export class WorkflowDefs extends Resource {
     return this.withLogging(
       'delete',
       {
-        workflow_def_id: workflowDefId,
+        workflowDefId: workflowDefId,
         version,
-        metadata: { workflow_def_id: workflowDefId, version },
+        metadata: { workflowDefId: workflowDefId, version },
       },
       async () => {
         const workflowDef = await repo.getWorkflowDef(this.serviceCtx.db, workflowDefId, version);

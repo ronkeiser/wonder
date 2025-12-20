@@ -85,16 +85,16 @@ export class Streamer extends DurableObject<Env> {
       id: ulid(),
       timestamp: Date.now(),
       sequence: this.eventSeq,
-      event_type: input.event_type,
-      workflow_run_id: context.workflow_run_id,
-      parent_run_id: context.parent_run_id ?? null,
-      workflow_def_id: context.workflow_def_id,
-      node_id: input.node_id ?? null,
-      token_id: input.token_id ?? null,
-      path_id: input.path_id ?? null,
-      project_id: context.project_id,
+      eventType: input.eventType,
+      workflowRunId: context.workflowRunId,
+      parentRunId: context.parentRunId ?? null,
+      workflowDefId: context.workflowDefId,
+      nodeId: input.nodeId ?? null,
+      tokenId: input.tokenId ?? null,
+      pathId: input.pathId ?? null,
+      projectId: context.projectId,
       tokens: input.tokens ?? null,
-      cost_usd: input.cost_usd ?? null,
+      costUsd: input.costUsd ?? null,
       message: input.message ?? null,
       metadata: JSON.stringify(input.metadata ?? {}),
     };
@@ -118,7 +118,7 @@ export class Streamer extends DurableObject<Env> {
    * and broadcasts immediately to WebSocket subscribers.
    */
   emitTrace(
-    context: { workflow_run_id: string; project_id: string },
+    context: { workflowRunId: string; projectId: string },
     input: TraceEventInput,
   ): void {
     this.traceSeq++;
@@ -130,11 +130,11 @@ export class Streamer extends DurableObject<Env> {
       sequence: this.traceSeq,
       type: input.type,
       category: getEventCategory(input.type),
-      workflow_run_id: context.workflow_run_id,
-      token_id: input.token_id ?? null,
-      node_id: input.node_id ?? null,
-      project_id: context.project_id,
-      duration_ms: input.duration_ms ?? null,
+      workflowRunId: context.workflowRunId,
+      tokenId: input.tokenId ?? null,
+      nodeId: input.nodeId ?? null,
+      projectId: context.projectId,
+      durationMs: input.durationMs ?? null,
       payload: JSON.stringify(input.payload ?? {}),
     };
 
@@ -252,16 +252,16 @@ export class Streamer extends DurableObject<Env> {
       'id',
       'timestamp',
       'sequence',
-      'event_type',
-      'workflow_run_id',
-      'parent_run_id',
-      'workflow_def_id',
-      'node_id',
-      'token_id',
-      'path_id',
-      'project_id',
+      'eventType',
+      'workflowRunId',
+      'parentRunId',
+      'workflowDefId',
+      'nodeId',
+      'tokenId',
+      'pathId',
+      'projectId',
       'tokens',
-      'cost_usd',
+      'costUsd',
       'message',
       'metadata',
     ]);
@@ -274,11 +274,11 @@ export class Streamer extends DurableObject<Env> {
       'sequence',
       'type',
       'category',
-      'workflow_run_id',
-      'token_id',
-      'node_id',
-      'project_id',
-      'duration_ms',
+      'workflowRunId',
+      'tokenId',
+      'nodeId',
+      'projectId',
+      'durationMs',
       'payload',
     ]);
   }
@@ -362,7 +362,7 @@ export class Streamer extends DurableObject<Env> {
               JSON.stringify({
                 type: 'event',
                 stream: 'events',
-                subscription_id: sub.id,
+                subscriptionId: sub.id,
                 event: entry,
               }),
             );
@@ -388,7 +388,7 @@ export class Streamer extends DurableObject<Env> {
               JSON.stringify({
                 type: 'event',
                 stream: 'trace',
-                subscription_id: sub.id,
+                subscriptionId: sub.id,
                 event: entry,
               }),
             );
@@ -426,28 +426,28 @@ function buildMultiRowInsert<T>(
 }
 
 function matchesEventFilter(event: BroadcastEventEntry, filter: SubscriptionFilter): boolean {
-  if (filter.workflow_run_id && event.workflow_run_id !== filter.workflow_run_id) return false;
-  if (filter.parent_run_id && event.parent_run_id !== filter.parent_run_id) return false;
-  if (filter.project_id && event.project_id !== filter.project_id) return false;
-  if (filter.node_id && event.node_id !== filter.node_id) return false;
-  if (filter.token_id && event.token_id !== filter.token_id) return false;
-  if (filter.path_id && event.path_id !== filter.path_id) return false;
-  if (filter.event_type && event.event_type !== filter.event_type) return false;
-  if (filter.event_types && !filter.event_types.includes(event.event_type)) return false;
+  if (filter.workflowRunId && event.workflowRunId !== filter.workflowRunId) return false;
+  if (filter.parentRunId && event.parentRunId !== filter.parentRunId) return false;
+  if (filter.projectId && event.projectId !== filter.projectId) return false;
+  if (filter.nodeId && event.nodeId !== filter.nodeId) return false;
+  if (filter.tokenId && event.tokenId !== filter.tokenId) return false;
+  if (filter.pathId && event.pathId !== filter.pathId) return false;
+  if (filter.eventType && event.eventType !== filter.eventType) return false;
+  if (filter.eventTypes && !filter.eventTypes.includes(event.eventType)) return false;
   return true;
 }
 
 function matchesTraceFilter(event: BroadcastTraceEventEntry, filter: SubscriptionFilter): boolean {
-  if (filter.workflow_run_id && event.workflow_run_id !== filter.workflow_run_id) return false;
-  if (filter.project_id && event.project_id !== filter.project_id) return false;
-  if (filter.token_id && event.token_id !== filter.token_id) return false;
-  if (filter.node_id && event.node_id !== filter.node_id) return false;
+  if (filter.workflowRunId && event.workflowRunId !== filter.workflowRunId) return false;
+  if (filter.projectId && event.projectId !== filter.projectId) return false;
+  if (filter.tokenId && event.tokenId !== filter.tokenId) return false;
+  if (filter.nodeId && event.nodeId !== filter.nodeId) return false;
   if (filter.category && event.category !== filter.category) return false;
   if (filter.type && event.type !== filter.type) return false;
   if (
-    filter.min_duration_ms !== undefined &&
-    event.duration_ms !== null &&
-    event.duration_ms < filter.min_duration_ms
+    filter.minDurationMs !== undefined &&
+    event.durationMs !== null &&
+    event.durationMs < filter.minDurationMs
   ) {
     return false;
   }

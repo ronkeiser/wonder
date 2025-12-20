@@ -42,14 +42,14 @@ export type WorkflowStatus = 'running' | 'completed' | 'failed' | 'timed_out' | 
 
 /** Parameters for creating a new token */
 export type CreateTokenParams = {
-  workflow_run_id: string;
-  node_id: string;
-  parent_token_id: string | null;
-  path_id: string;
-  sibling_group: string | null;
-  branch_index: number;
-  branch_total: number;
-  iteration_counts: Record<string, number> | null;
+  workflowRunId: string;
+  nodeId: string;
+  parentTokenId: string | null;
+  pathId: string;
+  siblingGroup: string | null;
+  branchIndex: number;
+  branchTotal: number;
+  iterationCounts: Record<string, number> | null;
 };
 
 /** Sibling count breakdown for synchronization checks */
@@ -122,13 +122,13 @@ export type ApplyResult = {
 export type TaskErrorResult = {
   error: {
     type: 'step_failure' | 'task_timeout' | 'validation_error';
-    step_ref?: string;
+    stepRef?: string;
     message: string;
     retryable: boolean;
   };
   metrics: {
-    duration_ms: number;
-    steps_executed: number;
+    durationMs: number;
+    stepsExecuted: number;
   };
 };
 
@@ -154,7 +154,7 @@ export type ContextSnapshot = {
  * Task execution result from Executor
  */
 export type TaskResult = {
-  output_data: Record<string, unknown>;
+  outputData: Record<string, unknown>;
 };
 
 // ============================================================================
@@ -189,24 +189,24 @@ export type ComparisonOperator = '==' | '!=' | '>' | '>=' | '<' | '<=';
  */
 export type ForeachConfig = {
   collection: string; // Path to array in context (e.g., 'input.judges')
-  item_var: string; // Variable name for each item
+  itemVar: string; // Variable name for each item
 };
 
 /**
  * Loop configuration for cycle control
  */
 export type LoopConfig = {
-  max_iterations: number; // Maximum times this transition can fire per token lineage
+  maxIterations: number; // Maximum times this transition can fire per token lineage
 };
 
 /**
  * Synchronization configuration for fan-in
  */
 export type SynchronizationConfig = {
-  strategy: 'any' | 'all' | { m_of_n: number };
-  sibling_group: string; // Named sibling group identifier (not transition ID)
-  timeout_ms?: number | null; // Max wait time (null = no timeout)
-  on_timeout?: 'proceed_with_available' | 'fail';
+  strategy: 'any' | 'all' | { mOfN: number };
+  siblingGroup: string; // Named sibling group identifier (not transition ID)
+  timeoutMs?: number; // Max wait time (undefined = no timeout)
+  onTimeout?: 'proceed_with_available' | 'fail';
   merge?: MergeConfig;
 };
 
@@ -224,15 +224,15 @@ export type MergeConfig = {
  */
 export type TransitionDef = {
   id: string;
-  ref?: string | null;
-  from_node_id: string;
-  to_node_id: string;
+  ref?: string;
+  fromNodeId: string;
+  toNodeId: string;
   priority: number;
-  condition?: Condition | null;
-  spawn_count?: number | null;
-  sibling_group?: string | null;
-  foreach?: ForeachConfig | null;
-  synchronization?: SynchronizationConfig | null;
+  condition?: Condition;
+  spawnCount?: number;
+  siblingGroup?: string;
+  foreach?: ForeachConfig;
+  synchronization?: SynchronizationConfig;
 };
 
 // ============================================================================

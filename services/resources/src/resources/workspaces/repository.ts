@@ -19,8 +19,8 @@ export async function createWorkspace(
   const workspaceRow: WorkspaceRow = {
     id: workspaceId,
     name: data.name,
-    created_at: now,
-    updated_at: now,
+    createdAt: now,
+    updatedAt: now,
   };
 
   await db.insert(workspaces).values(workspaceRow).run();
@@ -30,7 +30,7 @@ export async function createWorkspace(
     await db
       .insert(workspace_settings)
       .values({
-        workspace_id: workspaceId,
+        workspaceId: workspaceId,
         ...data.settings,
       })
       .run();
@@ -49,17 +49,17 @@ export async function getWorkspace(db: DrizzleD1Database, id: string): Promise<W
   const settingsRow = await db
     .select()
     .from(workspace_settings)
-    .where(eq(workspace_settings.workspace_id, id))
+    .where(eq(workspace_settings.workspaceId, id))
     .get();
 
   return {
     ...workspaceRow,
     settings: settingsRow
       ? {
-          allowed_model_providers: settingsRow.allowed_model_providers ?? undefined,
-          allowed_mcp_servers: settingsRow.allowed_mcp_servers ?? undefined,
-          budget_max_monthly_spend_cents: settingsRow.budget_max_monthly_spend_cents ?? undefined,
-          budget_alert_threshold_cents: settingsRow.budget_alert_threshold_cents ?? undefined,
+          allowedModelProviders: settingsRow.allowedModelProviders ?? undefined,
+          allowedMcpServers: settingsRow.allowedMcpServers ?? undefined,
+          budgetMaxMonthlySpendCents: settingsRow.budgetMaxMonthlySpendCents ?? undefined,
+          budgetAlertThresholdCents: settingsRow.budgetAlertThresholdCents ?? undefined,
         }
       : null,
   };
@@ -76,7 +76,7 @@ export async function listWorkspaces(
   const settingsRows =
     workspaceIds.length > 0 ? await db.select().from(workspace_settings).all() : [];
 
-  const settingsMap = new Map(settingsRows.map((s) => [s.workspace_id, s]));
+  const settingsMap = new Map(settingsRows.map((s) => [s.workspaceId, s]));
 
   return workspaceRows.map((workspace) => {
     const settingsRow = settingsMap.get(workspace.id);
@@ -84,10 +84,10 @@ export async function listWorkspaces(
       ...workspace,
       settings: settingsRow
         ? {
-            allowed_model_providers: settingsRow.allowed_model_providers ?? undefined,
-            allowed_mcp_servers: settingsRow.allowed_mcp_servers ?? undefined,
-            budget_max_monthly_spend_cents: settingsRow.budget_max_monthly_spend_cents ?? undefined,
-            budget_alert_threshold_cents: settingsRow.budget_alert_threshold_cents ?? undefined,
+            allowedModelProviders: settingsRow.allowedModelProviders ?? undefined,
+            allowedMcpServers: settingsRow.allowedMcpServers ?? undefined,
+            budgetMaxMonthlySpendCents: settingsRow.budgetMaxMonthlySpendCents ?? undefined,
+            budgetAlertThresholdCents: settingsRow.budgetAlertThresholdCents ?? undefined,
           }
         : null,
     };
@@ -107,7 +107,7 @@ export async function updateWorkspace(
       .update(workspaces)
       .set({
         name: data.name,
-        updated_at: now,
+        updatedAt: now,
       })
       .where(eq(workspaces.id, id))
       .run();
@@ -118,20 +118,20 @@ export async function updateWorkspace(
     const existingSettings = await db
       .select()
       .from(workspace_settings)
-      .where(eq(workspace_settings.workspace_id, id))
+      .where(eq(workspace_settings.workspaceId, id))
       .get();
 
     if (existingSettings) {
       await db
         .update(workspace_settings)
         .set(data.settings)
-        .where(eq(workspace_settings.workspace_id, id))
+        .where(eq(workspace_settings.workspaceId, id))
         .run();
     } else {
       await db
         .insert(workspace_settings)
         .values({
-          workspace_id: id,
+          workspaceId: id,
           ...data.settings,
         })
         .run();

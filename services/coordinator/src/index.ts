@@ -53,10 +53,10 @@ export class WorkflowCoordinator extends DurableObject {
       () => {
         const run = this.defs.getWorkflowRun();
         return {
-          workflow_run_id: run.id,
-          project_id: run.project_id,
-          workflow_def_id: run.workflow_def_id,
-          parent_run_id: run.parent_run_id,
+          workflowRunId: run.id,
+          projectId: run.projectId,
+          workflowDefId: run.workflowDefId,
+          parentRunId: run.parentRunId,
         };
       },
       { traceEnabled: this.env.TRACE_EVENTS_ENABLED === 'true' },
@@ -88,22 +88,22 @@ export class WorkflowCoordinator extends DurableObject {
   /**
    * Start workflow execution
    *
-   * Note: workflow_run_id must be passed because ctx.id.name is undefined inside DO
+   * Note: workflowRunId must be passed because ctx.id.name is undefined inside DO
    * (see https://github.com/cloudflare/workerd/issues/2240)
    */
-  async start(workflow_run_id: string): Promise<void> {
+  async start(workflowRunId: string): Promise<void> {
     try {
       // Initialize definition manager (loads/fetches definitions)
-      await this.defs.initialize(workflow_run_id);
+      await this.defs.initialize(workflowRunId);
 
       // Delegate to lifecycle module
-      const ctx = this.getDispatchContext(workflow_run_id);
+      const ctx = this.getDispatchContext(workflowRunId);
       await startWorkflow(ctx);
     } catch (error) {
       this.logger.error({
-        event_type: 'coordinator.start.failed',
+        eventType: 'coordinator.start.failed',
         message: 'Critical error in start()',
-        trace_id: workflow_run_id,
+        traceId: workflowRunId,
         metadata: {
           error: error instanceof Error ? error.message : String(error),
           stack: error instanceof Error ? error.stack : undefined,
@@ -120,21 +120,21 @@ export class WorkflowCoordinator extends DurableObject {
    * Routes to linear flow (output mapping) or fan-out flow (branch table).
    */
   async handleTaskResult(tokenId: string, result: TaskResult): Promise<void> {
-    let workflow_run_id: string | undefined;
+    let workflowRunId: string | undefined;
 
     try {
-      // Get workflow_run_id from token for context
+      // Get workflowRunId from token for context
       const token = this.tokens.get(tokenId);
-      workflow_run_id = token.workflow_run_id;
+      workflowRunId = token.workflowRunId;
 
       // Delegate to task module
-      const ctx = this.getDispatchContext(workflow_run_id);
+      const ctx = this.getDispatchContext(workflowRunId);
       await processTaskResult(ctx, tokenId, result);
     } catch (error) {
       this.logger.error({
-        event_type: 'coordinator.task_result.failed',
+        eventType: 'coordinator.task_result.failed',
         message: 'Critical error in handleTaskResult()',
-        trace_id: workflow_run_id,
+        traceId: workflowRunId,
         metadata: {
           error: error instanceof Error ? error.message : String(error),
           stack: error instanceof Error ? error.stack : undefined,
@@ -159,9 +159,9 @@ export class WorkflowCoordinator extends DurableObject {
     // State guard: only transition from dispatched
     if (token.status !== 'dispatched') {
       this.logger.warn({
-        event_type: 'coordinator.mark_executing.invalid_state',
+        eventType: 'coordinator.mark_executing.invalid_state',
         message: `Cannot transition to executing from ${token.status}`,
-        trace_id: token.workflow_run_id,
+        traceId: token.workflowRunId,
         metadata: {
           tokenId,
           currentStatus: token.status,
@@ -175,9 +175,9 @@ export class WorkflowCoordinator extends DurableObject {
       this.tokens.updateStatus(tokenId, 'executing');
     } catch (error) {
       this.logger.error({
-        event_type: 'coordinator.mark_executing.failed',
+        eventType: 'coordinator.mark_executing.failed',
         message: 'Failed to mark token as executing',
-        trace_id: token.workflow_run_id,
+        traceId: token.workflowRunId,
         metadata: {
           error: error instanceof Error ? error.message : String(error),
           tokenId,
@@ -193,21 +193,21 @@ export class WorkflowCoordinator extends DurableObject {
    * Called when task execution fails. May trigger retry based on error type.
    */
   async handleTaskError(tokenId: string, errorResult: TaskErrorResult): Promise<void> {
-    let workflow_run_id: string | undefined;
+    let workflowRunId: string | undefined;
 
     try {
-      // Get workflow_run_id from token for context
+      // Get workflowRunId from token for context
       const token = this.tokens.get(tokenId);
-      workflow_run_id = token.workflow_run_id;
+      workflowRunId = token.workflowRunId;
 
       // Delegate to lifecycle module
-      const ctx = this.getDispatchContext(workflow_run_id);
+      const ctx = this.getDispatchContext(workflowRunId);
       await processTaskError(ctx, tokenId, errorResult);
     } catch (error) {
       this.logger.error({
-        event_type: 'coordinator.task_error.failed',
+        eventType: 'coordinator.task_error.failed',
         message: 'Critical error in handleTaskError()',
-        trace_id: workflow_run_id,
+        traceId: workflowRunId,
         metadata: {
           error: error instanceof Error ? error.message : String(error),
           stack: error instanceof Error ? error.stack : undefined,

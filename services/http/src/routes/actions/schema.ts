@@ -61,15 +61,15 @@ export const ActionSchema = z
     produces: z.record(z.string(), z.unknown()).nullable(),
     execution: z.record(z.string(), z.unknown()).nullable(),
     idempotency: z.record(z.string(), z.unknown()).nullable(),
-    content_hash: z.string().nullable(),
-    created_at: z.string(),
-    updated_at: z.string(),
+    contentHash: z.string().nullable(),
+    createdAt: z.string(),
+    updatedAt: z.string(),
   })
   .openapi('Action');
 
 export const ActionCreateResponseSchema = z
   .object({
-    action_id: z.string(),
+    actionId: z.string(),
     action: ActionSchema,
     reused: z
       .boolean()

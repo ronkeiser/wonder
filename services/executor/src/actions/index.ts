@@ -40,12 +40,12 @@ export async function dispatchAction(
   };
 
   logger.info({
-    event_type: 'action_dispatch_started',
+    eventType: 'action_dispatch_started',
     message: `Dispatching action: ${action.kind}`,
-    trace_id: context.workflowRunId,
+    traceId: context.workflowRunId,
     metadata: {
       step_ref: context.stepRef,
-      action_id: action.id,
+      actionId: action.id,
       action_kind: action.kind,
       input_keys: Object.keys(input),
     },
@@ -92,10 +92,10 @@ export async function dispatchAction(
     default: {
       const _exhaustive: never = action.kind;
       logger.error({
-        event_type: 'action_unknown_kind',
+        eventType: 'action_unknown_kind',
         message: `Unknown action kind: ${action.kind}`,
-        trace_id: context.workflowRunId,
-        metadata: { step_ref: context.stepRef, action_id: action.id },
+        traceId: context.workflowRunId,
+        metadata: { step_ref: context.stepRef, actionId: action.id },
       });
       return {
         success: false,
@@ -118,12 +118,12 @@ function notImplemented(
   logger: Logger,
 ): ActionOutput {
   logger.warn({
-    event_type: 'action_not_implemented',
+    eventType: 'action_not_implemented',
     message: `Action kind not yet implemented: ${action.kind}`,
-    trace_id: context.workflowRunId,
+    traceId: context.workflowRunId,
     metadata: {
       step_ref: context.stepRef,
-      action_id: action.id,
+      actionId: action.id,
       action_kind: action.kind,
     },
   });

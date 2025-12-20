@@ -9,7 +9,7 @@ export const CreatePromptSpecSchema = z
     name: z.string().min(1).max(255).openapi({ example: 'Summarization Prompt' }),
     description: z.string().min(1).openapi({ example: 'Prompt for summarizing text' }),
     version: z.number().int().positive().default(1).openapi({ example: 1 }),
-    system_prompt: z.string().optional().openapi({ example: 'You are a helpful assistant.' }),
+    systemPrompt: z.string().optional().openapi({ example: 'You are a helpful assistant.' }),
     template: z.string().min(1).openapi({ example: 'Summarize: {{text}}' }),
     requires: z.record(z.string(), z.unknown()).openapi({ example: { text: 'string' } }),
     produces: z.record(z.string(), z.unknown()).openapi({ example: { summary: 'string' } }),
@@ -31,22 +31,22 @@ export const PromptSpecSchema = z
     name: z.string(),
     description: z.string(),
     version: z.number().int(),
-    system_prompt: z.string().nullable(),
+    systemPrompt: z.string().nullable(),
     template: z.string(),
     requires: z.record(z.string(), z.unknown()),
     produces: z.record(z.string(), z.unknown()),
     examples: z.array(z.unknown()).nullable(),
     tags: z.array(z.string()).nullable(),
-    content_hash: z.string().nullable(),
-    created_at: z.string(),
-    updated_at: z.string(),
+    contentHash: z.string().nullable(),
+    createdAt: z.string(),
+    updatedAt: z.string(),
   })
   .openapi('PromptSpec');
 
 export const PromptSpecCreateResponseSchema = z
   .object({
-    prompt_spec_id: z.string(),
-    prompt_spec: PromptSpecSchema,
+    promptSpecId: z.string(),
+    promptSpec: PromptSpecSchema,
     reused: z
       .boolean()
       .openapi({ description: 'True if an existing prompt spec was reused (autoversion matched)' }),
@@ -55,6 +55,6 @@ export const PromptSpecCreateResponseSchema = z
 
 export const PromptSpecGetResponseSchema = z
   .object({
-    prompt_spec: PromptSpecSchema,
+    promptSpec: PromptSpecSchema,
   })
   .openapi('PromptSpecGetResponse');

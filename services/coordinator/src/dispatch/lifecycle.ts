@@ -42,7 +42,7 @@ export async function startWorkflow(ctx: DispatchContext): Promise<void> {
 
   // Emit workflow started event
   ctx.emitter.emit({
-    event_type: 'workflow.started',
+    eventType: 'workflow.started',
     message: 'Workflow started',
     metadata: { input },
   });
@@ -53,7 +53,7 @@ export async function startWorkflow(ctx: DispatchContext): Promise<void> {
   // Plan initial token creation (pure function)
   const startResult = decideWorkflowStart({
     workflowRunId: workflowRun.id,
-    initialNodeId: workflowDef.initial_node_id!,
+    initialNodeId: workflowDef.initialNodeId!,
   });
 
   // Emit trace events from planning
@@ -90,7 +90,7 @@ export async function processTaskError(
   errorResult: TaskErrorResult,
 ): Promise<void> {
   const token = ctx.tokens.get(tokenId);
-  const _node = ctx.defs.getNode(token.node_id);
+  const _node = ctx.defs.getNode(token.nodeId);
 
   // TODO: Check retry policy and retry_attempt count
   // For now, just fail the workflow
@@ -98,12 +98,12 @@ export async function processTaskError(
 
   // Emit task failed workflow event
   ctx.emitter.emit({
-    event_type: 'task.failed',
+    eventType: 'task.failed',
     message: `Task failed: ${errorResult.error.message}`,
     metadata: {
-      token_id: tokenId,
-      task_id: _node.task_id ?? 'none',
-      node_id: token.node_id,
+      tokenId: tokenId,
+      taskId: _node.taskId ?? 'none',
+      nodeId: token.nodeId,
       error: errorResult.error,
       metrics: errorResult.metrics,
     },
@@ -123,7 +123,7 @@ export async function processTaskError(
  */
 export async function failWorkflow(ctx: DispatchContext, errorMessage: string): Promise<void> {
   ctx.emitter.emit({
-    event_type: 'workflow.failed',
+    eventType: 'workflow.failed',
     message: `Workflow failed: ${errorMessage}`,
     metadata: { error: errorMessage },
   });
