@@ -1,7 +1,7 @@
 {
   "version": "6",
   "dialect": "sqlite",
-  "id": "4489a8ad-0dec-42ed-b2df-e1ac6bb57981",
+  "id": "a3f0d2e5-1998-4cf3-a488-2e3c6b64aafe",
   "prevId": "00000000-0000-0000-0000-000000000000",
   "tables": {
     "fan_ins": {
@@ -283,13 +283,6 @@
           "notNull": false,
           "autoincrement": false
         },
-        "fan_out_transition_id": {
-          "name": "fan_out_transition_id",
-          "type": "text",
-          "primaryKey": false,
-          "notNull": false,
-          "autoincrement": false
-        },
         "branch_index": {
           "name": "branch_index",
           "type": "integer",
@@ -302,6 +295,13 @@
           "type": "integer",
           "primaryKey": false,
           "notNull": true,
+          "autoincrement": false
+        },
+        "iteration_counts": {
+          "name": "iteration_counts",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false,
           "autoincrement": false
         },
         "created_at": {
@@ -341,17 +341,10 @@
           ],
           "isUnique": false
         },
-        "idx_tokens_sibling_group": {
-          "name": "idx_tokens_sibling_group",
+        "idx_tokens_siblingGroup": {
+          "name": "idx_tokens_siblingGroup",
           "columns": [
             "sibling_group"
-          ],
-          "isUnique": false
-        },
-        "idx_tokens_fan_out": {
-          "name": "idx_tokens_fan_out",
-          "columns": [
-            "fan_out_transition_id"
           ],
           "isUnique": false
         },
@@ -582,7 +575,8 @@
           "type": "text",
           "primaryKey": false,
           "notNull": true,
-          "autoincrement": false
+          "autoincrement": false,
+          "default": "''"
         },
         "version": {
           "name": "version",
@@ -648,6 +642,13 @@
           "notNull": false,
           "autoincrement": false
         },
+        "content_hash": {
+          "name": "content_hash",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false,
+          "autoincrement": false
+        },
         "created_at": {
           "name": "created_at",
           "type": "text",
@@ -685,6 +686,16 @@
             "project_id",
             "library_id",
             "version"
+          ],
+          "isUnique": false
+        },
+        "idx_workflow_defs_content_hash": {
+          "name": "idx_workflow_defs_content_hash",
+          "columns": [
+            "name",
+            "project_id",
+            "library_id",
+            "content_hash"
           ],
           "isUnique": false
         }

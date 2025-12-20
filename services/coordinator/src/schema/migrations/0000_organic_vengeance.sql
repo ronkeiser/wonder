@@ -39,9 +39,9 @@ CREATE TABLE `tokens` (
 	`parent_token_id` text,
 	`path_id` text NOT NULL,
 	`sibling_group` text,
-	`fan_out_transition_id` text,
 	`branch_index` integer NOT NULL,
 	`branch_total` integer NOT NULL,
+	`iteration_counts` text,
 	`created_at` integer NOT NULL,
 	`updated_at` integer NOT NULL,
 	`arrived_at` integer
@@ -49,8 +49,7 @@ CREATE TABLE `tokens` (
 --> statement-breakpoint
 CREATE INDEX `idx_tokens_workflow_run` ON `tokens` (`workflow_run_id`);--> statement-breakpoint
 CREATE INDEX `idx_tokens_status` ON `tokens` (`status`);--> statement-breakpoint
-CREATE INDEX `idx_tokens_sibling_group` ON `tokens` (`sibling_group`);--> statement-breakpoint
-CREATE INDEX `idx_tokens_fan_out` ON `tokens` (`fan_out_transition_id`);--> statement-breakpoint
+CREATE INDEX `idx_tokens_siblingGroup` ON `tokens` (`sibling_group`);--> statement-breakpoint
 CREATE INDEX `idx_tokens_path` ON `tokens` (`path_id`);--> statement-breakpoint
 CREATE TABLE `transitions` (
 	`id` text NOT NULL,
@@ -79,7 +78,7 @@ CREATE INDEX `idx_transitions_ref` ON `transitions` (`workflow_def_id`,`workflow
 CREATE TABLE `workflow_defs` (
 	`id` text NOT NULL,
 	`name` text NOT NULL,
-	`description` text NOT NULL,
+	`description` text DEFAULT '' NOT NULL,
 	`version` integer DEFAULT 1 NOT NULL,
 	`project_id` text,
 	`library_id` text,
@@ -89,6 +88,7 @@ CREATE TABLE `workflow_defs` (
 	`output_mapping` text,
 	`context_schema` text,
 	`initial_node_id` text,
+	`content_hash` text,
 	`created_at` text NOT NULL,
 	`updated_at` text NOT NULL,
 	PRIMARY KEY(`id`, `version`)
@@ -97,6 +97,7 @@ CREATE TABLE `workflow_defs` (
 CREATE INDEX `idx_workflow_defs_project` ON `workflow_defs` (`project_id`);--> statement-breakpoint
 CREATE INDEX `idx_workflow_defs_library` ON `workflow_defs` (`library_id`);--> statement-breakpoint
 CREATE INDEX `idx_workflow_defs_name_version` ON `workflow_defs` (`name`,`project_id`,`library_id`,`version`);--> statement-breakpoint
+CREATE INDEX `idx_workflow_defs_content_hash` ON `workflow_defs` (`name`,`project_id`,`library_id`,`content_hash`);--> statement-breakpoint
 CREATE TABLE `workflow_runs` (
 	`id` text PRIMARY KEY NOT NULL,
 	`project_id` text NOT NULL,
