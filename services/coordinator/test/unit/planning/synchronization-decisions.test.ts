@@ -7,7 +7,7 @@
 
 import { describe, expect, test } from 'vitest';
 import type { SiblingCounts, TokenRow } from '../../../src/operations/tokens';
-import { decideSynchronization } from '../../../src/planning/synchronization';
+import { decideFanInContinuation, decideSynchronization } from '../../../src/planning/synchronization';
 import type { TransitionDef } from '../../../src/types';
 
 describe('decideSynchronization()', () => {
@@ -253,6 +253,102 @@ describe('decideSynchronization()', () => {
 
       // 2 completed >= M=2, activates even with failures
       expect(result.decisions).toContainEqual(expect.objectContaining({ type: 'ACTIVATE_FAN_IN' }));
+    });
+  });
+});
+
+// ============================================================================
+// Fan-In Continuation (decideFanInContinuation)
+// ============================================================================
+
+describe('decideFanInContinuation()', () => {
+  test('creates continuation token with inherited iteration_counts', () => {
+    const result = decideFanInContinuation({
+      workflowRunId: 'run_1',
+      nodeId: 'node_after_merge',
+      fanInPath: 'fanout_group:node_after_merge',
+      parentTokenId: 'tok_origin',
+      parentIterationCounts: { trans_loop: 2, trans_other: 1 },
+    });
+
+    expect(result.decisions).toHaveLength(1);
+    expect(result.decisions[0]).toMatchObject({
+      type: 'CREATE_TOKEN',
+      params: {
+        workflow_run_id: 'run_1',
+        node_id: 'node_after_merge',
+        parent_token_id: 'tok_origin',
+        iteration_counts: { trans_loop: 2, trans_other: 1 },
+      },
+    });
+  });
+
+  test('creates continuation token with null iteration_counts when parent has none', () => {
+    const result = decideFanInContinuation({
+      workflowRunId: 'run_1',
+      nodeId: 'node_after_merge',
+      fanInPath: 'fanout_group:node_after_merge',
+      parentTokenId: 'tok_origin',
+      parentIterationCounts: undefined,
+    });
+
+    expect(result.decisions).toHaveLength(1);
+    expect(result.decisions[0]).toMatchObject({
+      type: 'CREATE_TOKEN',
+      params: {
+        iteration_counts: null,
+      },
+    });
+  });
+
+  test('continuation token is not part of any sibling group', () => {
+    const result = decideFanInContinuation({
+      workflowRunId: 'run_1',
+      nodeId: 'node_after_merge',
+      fanInPath: 'fanout_group:node_after_merge',
+      parentTokenId: 'tok_origin',
+      parentIterationCounts: { trans_loop: 3 },
+    });
+
+    const createTokenDecision = result.decisions[0] as {
+      type: 'CREATE_TOKEN';
+      params: { sibling_group: string | null };
+    };
+    expect(createTokenDecision.params.sibling_group).toBeNull();
+  });
+
+  test('continuation token has branch_index 0 and branch_total 1', () => {
+    const result = decideFanInContinuation({
+      workflowRunId: 'run_1',
+      nodeId: 'node_after_merge',
+      fanInPath: 'fanout_group:node_after_merge',
+      parentTokenId: 'tok_origin',
+    });
+
+    expect(result.decisions[0]).toMatchObject({
+      type: 'CREATE_TOKEN',
+      params: {
+        branch_index: 0,
+        branch_total: 1,
+      },
+    });
+  });
+
+  test('emits continuation event with correct metadata', () => {
+    const result = decideFanInContinuation({
+      workflowRunId: 'run_1',
+      nodeId: 'node_after_merge',
+      fanInPath: 'fanout_group:node_after_merge',
+      parentTokenId: 'tok_origin',
+    });
+
+    expect(result.events).toContainEqual({
+      type: 'decision.sync.continuation',
+      node_id: 'node_after_merge',
+      payload: {
+        workflow_run_id: 'run_1',
+        fan_in_path: 'fanout_group:node_after_merge',
+      },
     });
   });
 });

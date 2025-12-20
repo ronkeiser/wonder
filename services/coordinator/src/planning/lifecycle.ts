@@ -46,6 +46,7 @@ export function decideWorkflowStart(params: {
       sibling_group: null,
       branch_index: 0,
       branch_total: 1,
+      iteration_counts: null,
     },
   });
 

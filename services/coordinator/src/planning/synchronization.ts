@@ -296,8 +296,9 @@ export function decideFanInContinuation(params: {
   nodeId: string;
   fanInPath: string;
   parentTokenId: string;
+  parentIterationCounts?: Record<string, number>;
 }): PlanningResult {
-  const { workflowRunId, nodeId, fanInPath, parentTokenId } = params;
+  const { workflowRunId, nodeId, fanInPath, parentTokenId, parentIterationCounts } = params;
 
   const events: TraceEventInput[] = [];
   const decisions: Decision[] = [];
@@ -313,6 +314,7 @@ export function decideFanInContinuation(params: {
   });
 
   // Create continuation token to proceed after merge
+  // Inherits iteration_counts from fan-out origin (parent of siblings), not from siblings
   decisions.push({
     type: 'CREATE_TOKEN',
     params: {
@@ -323,6 +325,7 @@ export function decideFanInContinuation(params: {
       sibling_group: null, // Merged token is not part of a fan-out
       branch_index: 0,
       branch_total: 1,
+      iteration_counts: parentIterationCounts ?? null,
     },
   });
 

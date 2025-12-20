@@ -26,6 +26,7 @@ function createToken(overrides: Partial<TokenRow> = {}): TokenRow {
     sibling_group: null,
     branch_index: 0,
     branch_total: 1,
+    iteration_counts: null,
     status: 'completed',
     created_at: new Date(),
     updated_at: new Date(),
@@ -586,5 +587,276 @@ describe('decideRouting - events', () => {
 
     const completeEvent = result.events.find((e) => e.type === 'decision.routing.complete');
     expect(completeEvent).toBeDefined();
+  });
+});
+
+// ============================================================================
+// Loop Iteration Limits (loop_config.max_iterations)
+// ============================================================================
+
+describe('decideRouting - loop_config.max_iterations', () => {
+  test('transition fires when iteration count is below max', () => {
+    const completedToken = createToken({
+      iteration_counts: { trans_loop: 1 },
+    });
+
+    const result = decideRouting({
+      completedToken,
+      workflowRunId: 'wfr_123',
+      nodeId: 'nodeA',
+      transitions: [
+        createTransition({
+          id: 'trans_loop',
+          loop_config: { max_iterations: 3 },
+        }),
+      ],
+      context: baseContext,
+    });
+
+    expect(result.decisions).toHaveLength(1);
+    expect(result.decisions[0].type).toBe('CREATE_TOKEN');
+  });
+
+  test('transition is skipped when iteration count equals max', () => {
+    const completedToken = createToken({
+      iteration_counts: { trans_loop: 3 },
+    });
+
+    const result = decideRouting({
+      completedToken,
+      workflowRunId: 'wfr_123',
+      nodeId: 'nodeA',
+      transitions: [
+        createTransition({
+          id: 'trans_loop',
+          loop_config: { max_iterations: 3 },
+        }),
+      ],
+      context: baseContext,
+    });
+
+    expect(result.decisions).toHaveLength(0);
+  });
+
+  test('transition is skipped when iteration count exceeds max', () => {
+    const completedToken = createToken({
+      iteration_counts: { trans_loop: 5 },
+    });
+
+    const result = decideRouting({
+      completedToken,
+      workflowRunId: 'wfr_123',
+      nodeId: 'nodeA',
+      transitions: [
+        createTransition({
+          id: 'trans_loop',
+          loop_config: { max_iterations: 3 },
+        }),
+      ],
+      context: baseContext,
+    });
+
+    expect(result.decisions).toHaveLength(0);
+  });
+
+  test('emits loop_limit_reached event when max exceeded', () => {
+    const completedToken = createToken({
+      iteration_counts: { trans_loop: 3 },
+    });
+
+    const result = decideRouting({
+      completedToken,
+      workflowRunId: 'wfr_123',
+      nodeId: 'nodeA',
+      transitions: [
+        createTransition({
+          id: 'trans_loop',
+          loop_config: { max_iterations: 3 },
+        }),
+      ],
+      context: baseContext,
+    });
+
+    const limitEvent = result.events.find((e) => e.type === 'decision.routing.loop_limit_reached');
+    expect(limitEvent).toMatchObject({
+      type: 'decision.routing.loop_limit_reached',
+      payload: {
+        transition_id: 'trans_loop',
+        current_count: 3,
+        max_iterations: 3,
+      },
+    });
+  });
+
+  test('fallback transition fires when loop limit reached', () => {
+    const completedToken = createToken({
+      iteration_counts: { trans_loop: 3 },
+    });
+
+    const transitions: TransitionRow[] = [
+      createTransition({
+        id: 'trans_loop',
+        priority: 1,
+        to_node_id: 'loopNode',
+        loop_config: { max_iterations: 3 },
+      }),
+      createTransition({
+        id: 'trans_exit',
+        priority: 2,
+        to_node_id: 'exitNode',
+      }),
+    ];
+
+    const result = decideRouting({
+      completedToken,
+      workflowRunId: 'wfr_123',
+      nodeId: 'nodeA',
+      transitions,
+      context: baseContext,
+    });
+
+    expect(result.decisions).toHaveLength(1);
+    expect(result.decisions[0]).toMatchObject({
+      type: 'CREATE_TOKEN',
+      params: { node_id: 'exitNode' },
+    });
+  });
+
+  test('loop transition with null iteration_counts starts at 0', () => {
+    const completedToken = createToken({
+      iteration_counts: null,
+    });
+
+    const result = decideRouting({
+      completedToken,
+      workflowRunId: 'wfr_123',
+      nodeId: 'nodeA',
+      transitions: [
+        createTransition({
+          id: 'trans_loop',
+          loop_config: { max_iterations: 3 },
+        }),
+      ],
+      context: baseContext,
+    });
+
+    expect(result.decisions).toHaveLength(1);
+    expect(result.decisions[0].type).toBe('CREATE_TOKEN');
+  });
+
+  test('loop transition with undefined key starts at 0', () => {
+    const completedToken = createToken({
+      iteration_counts: { other_transition: 5 },
+    });
+
+    const result = decideRouting({
+      completedToken,
+      workflowRunId: 'wfr_123',
+      nodeId: 'nodeA',
+      transitions: [
+        createTransition({
+          id: 'trans_loop',
+          loop_config: { max_iterations: 3 },
+        }),
+      ],
+      context: baseContext,
+    });
+
+    expect(result.decisions).toHaveLength(1);
+  });
+});
+
+// ============================================================================
+// Iteration Counts Propagation
+// ============================================================================
+
+describe('decideRouting - iteration_counts propagation', () => {
+  test('child token inherits parent iteration_counts with increment', () => {
+    const completedToken = createToken({
+      iteration_counts: { trans_prev: 2 },
+    });
+
+    const result = decideRouting({
+      completedToken,
+      workflowRunId: 'wfr_123',
+      nodeId: 'nodeA',
+      transitions: [createTransition({ id: 'trans_1' })],
+      context: baseContext,
+    });
+
+    expect(result.decisions).toHaveLength(1);
+    const params = (result.decisions[0] as { params: { iteration_counts: Record<string, number> } })
+      .params;
+    expect(params.iteration_counts).toEqual({
+      trans_prev: 2, // Inherited
+      trans_1: 1, // Incremented for this transition
+    });
+  });
+
+  test('first traversal of transition sets count to 1', () => {
+    const completedToken = createToken({
+      iteration_counts: null,
+    });
+
+    const result = decideRouting({
+      completedToken,
+      workflowRunId: 'wfr_123',
+      nodeId: 'nodeA',
+      transitions: [createTransition({ id: 'trans_1' })],
+      context: baseContext,
+    });
+
+    const params = (result.decisions[0] as { params: { iteration_counts: Record<string, number> } })
+      .params;
+    expect(params.iteration_counts).toEqual({
+      trans_1: 1,
+    });
+  });
+
+  test('repeat traversal increments existing count', () => {
+    const completedToken = createToken({
+      iteration_counts: { trans_1: 2 },
+    });
+
+    const result = decideRouting({
+      completedToken,
+      workflowRunId: 'wfr_123',
+      nodeId: 'nodeA',
+      transitions: [createTransition({ id: 'trans_1' })],
+      context: baseContext,
+    });
+
+    const params = (result.decisions[0] as { params: { iteration_counts: Record<string, number> } })
+      .params;
+    expect(params.iteration_counts).toEqual({
+      trans_1: 3,
+    });
+  });
+
+  test('fan-out tokens all get same iteration_counts', () => {
+    const completedToken = createToken({
+      iteration_counts: { trans_prev: 1 },
+    });
+
+    const result = decideRouting({
+      completedToken,
+      workflowRunId: 'wfr_123',
+      nodeId: 'nodeA',
+      transitions: [
+        createTransition({
+          id: 'trans_fanout',
+          spawn_count: 3,
+          sibling_group: 'fanout-group',
+        }),
+      ],
+      context: baseContext,
+    });
+
+    expect(result.decisions).toHaveLength(3);
+    const expectedCounts = { trans_prev: 1, trans_fanout: 1 };
+    for (const decision of result.decisions) {
+      const params = (decision as { params: { iteration_counts: Record<string, number> } }).params;
+      expect(params.iteration_counts).toEqual(expectedCounts);
+    }
   });
 });

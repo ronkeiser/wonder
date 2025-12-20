@@ -11,3 +11,7 @@ Type casting and type assertions should almost never be used. There are few exce
 ### **_Always check for type errors after writing/editing code:_**
 
 You can _ONLY_ do this by running `pnpm types` from the root of the monorepo.
+
+### Remember that your training data is out of date.
+
+It's December 2025. You need to constantly validate your assumptions and knowledge against documentation and code you find _online_, particularly when it comes to infrastructure (Cloudflare) and third-party tooling.

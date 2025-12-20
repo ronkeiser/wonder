@@ -57,15 +57,9 @@ export class TokenManager {
     this.db
       .insert(tokens)
       .values({
+        ...params,
         id: tokenId,
-        workflow_run_id: params.workflow_run_id,
-        node_id: params.node_id,
         status: 'pending',
-        parent_token_id: params.parent_token_id,
-        path_id: params.path_id,
-        sibling_group: params.sibling_group,
-        branch_index: params.branch_index,
-        branch_total: params.branch_total,
         created_at: now,
         updated_at: now,
       })

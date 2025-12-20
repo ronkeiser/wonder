@@ -15,6 +15,13 @@
       "when": 1766094102848,
       "tag": "0001_amazing_carmella_unuscione",
       "breakpoints": true
+    },
+    {
+      "idx": 2,
+      "version": "6",
+      "when": 1766206083320,
+      "tag": "0002_stiff_major_mapleleaf",
+      "breakpoints": true
     }
   ]
 }

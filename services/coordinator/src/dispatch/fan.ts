@@ -241,11 +241,16 @@ export async function activateFanIn(
   markSiblingsCompleted(ctx, triggeringTokenId, waitingSiblings);
 
   // Step 5: Create continuation token
+  // Fetch parent token (fan-out origin) to inherit its iteration_counts
+  const parentTokenId = completedSiblings[0].parent_token_id ?? '';
+  const parentToken = parentTokenId ? ctx.tokens.get(parentTokenId) : null;
+
   return createFanInContinuation(ctx, {
     workflowRunId,
     nodeId,
     fanInPath,
-    parentTokenId: completedSiblings[0].parent_token_id ?? '',
+    parentTokenId,
+    parentIterationCounts: parentToken?.iteration_counts ?? undefined,
   });
 }
 
@@ -385,6 +390,7 @@ function createFanInContinuation(
     nodeId: string;
     fanInPath: string;
     parentTokenId: string;
+    parentIterationCounts?: Record<string, number>;
   },
 ): string | null {
   const continuationResult = decideFanInContinuation(params);

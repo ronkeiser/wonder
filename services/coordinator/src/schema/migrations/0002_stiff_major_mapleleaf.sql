@@ -1,0 +1,1 @@
+ALTER TABLE `tokens` ADD `iteration_counts` text;

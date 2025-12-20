@@ -47,6 +47,9 @@ export const tokens = sqliteTable(
     branch_index: integer('branch_index').notNull(),
     branch_total: integer('branch_total').notNull(),
 
+    /** Loop iteration tracking - counts per transition ID for cycle control */
+    iteration_counts: text('iteration_counts', { mode: 'json' }).$type<Record<string, number>>(),
+
     /** Timestamps */
     created_at: integer('created_at', { mode: 'timestamp_ms' }).notNull(),
     updated_at: integer('updated_at', { mode: 'timestamp_ms' }).notNull(),

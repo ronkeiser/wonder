@@ -49,6 +49,7 @@ export type CreateTokenParams = {
   sibling_group: string | null;
   branch_index: number;
   branch_total: number;
+  iteration_counts: Record<string, number> | null;
 };
 
 /** Sibling count breakdown for synchronization checks */
@@ -189,6 +190,13 @@ export type ComparisonOperator = '==' | '!=' | '>' | '>=' | '<' | '<=';
 export type ForeachConfig = {
   collection: string; // Path to array in context (e.g., 'input.judges')
   item_var: string; // Variable name for each item
+};
+
+/**
+ * Loop configuration for cycle control
+ */
+export type LoopConfig = {
+  max_iterations: number; // Maximum times this transition can fire per token lineage
 };
 
 /**

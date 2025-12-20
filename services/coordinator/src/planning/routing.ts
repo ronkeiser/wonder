@@ -21,6 +21,7 @@ import type {
   ContextSnapshot,
   Decision,
   ForeachConfig,
+  LoopConfig,
   PlanningResult,
   SynchronizationConfig,
   TransitionDef,
@@ -71,6 +72,24 @@ export function decideRouting(params: {
     const tier = grouped.get(priority) ?? [];
 
     for (const t of tier) {
+      // Check loop_config.max_iterations before evaluating condition
+      const loopConfig = t.loop_config as LoopConfig | null;
+      if (loopConfig?.max_iterations) {
+        const currentCount = completedToken.iteration_counts?.[t.id] ?? 0;
+        if (currentCount >= loopConfig.max_iterations) {
+          // Skip this transition - max iterations reached
+          events.push({
+            type: 'decision.routing.loop_limit_reached',
+            payload: {
+              transition_id: t.id,
+              current_count: currentCount,
+              max_iterations: loopConfig.max_iterations,
+            },
+          });
+          continue;
+        }
+      }
+
       // Emit evaluation event for each transition
       events.push({
         type: 'decision.routing.evaluate_transition',
@@ -134,6 +153,13 @@ export function decideRouting(params: {
       },
     });
 
+    // Build iteration_counts for child tokens: copy parent's counts and increment for this transition
+    const parentCounts = completedToken.iteration_counts ?? {};
+    const childIterationCounts: Record<string, number> = {
+      ...parentCounts,
+      [transition.id]: (parentCounts[transition.id] ?? 0) + 1,
+    };
+
     for (let i = 0; i < spawnCount; i++) {
       // branch_index: sequential for fan-out origin, inherited for continuation
       let branchIndex: number;
@@ -156,6 +182,7 @@ export function decideRouting(params: {
           sibling_group: siblingGroup,
           branch_index: branchIndex,
           branch_total: branchTotal,
+          iteration_counts: childIterationCounts,
         },
       });
     }
