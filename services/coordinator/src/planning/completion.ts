@@ -30,7 +30,7 @@ export function extractFinalOutput(
     type: 'decision.completion.start',
     payload: {
       outputMapping: outputMapping,
-      context_keys: {
+      contextKeys: {
         input: Object.keys(context.input),
         state: Object.keys(context.state),
         output: Object.keys(context.output),
@@ -54,9 +54,9 @@ export function extractFinalOutput(
     events.push({
       type: 'decision.completion.extract',
       payload: {
-        target_field: targetField,
-        source_path: sourcePath,
-        extracted_value: value,
+        targetField: targetField,
+        sourcePath: sourcePath,
+        extractedValue: value,
       },
     });
 
@@ -65,7 +65,7 @@ export function extractFinalOutput(
 
   events.push({
     type: 'decision.completion.complete',
-    payload: { final_output: output },
+    payload: { finalOutput: output },
   });
 
   return { output, events };

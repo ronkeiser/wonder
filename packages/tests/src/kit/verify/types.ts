@@ -10,12 +10,12 @@ import type { EmbeddedWorkflowDef, TraceEventCollection } from '@wonder/sdk';
  * Token creation payload type (mirrors SDK's TracePayloads.TokenCreatedPayload)
  */
 export interface TokenCreatedPayload {
-  task_id: string;
-  parent_token_id: string | null;
-  path_id: string;
-  sibling_group: string | null;
-  branch_index: number;
-  branch_total: number;
+  taskId: string;
+  parentTokenId: string | null;
+  pathId: string;
+  siblingGroup: string | null;
+  branchIndex: number;
+  branchTotal: number;
 }
 
 /**
@@ -23,9 +23,9 @@ export interface TokenCreatedPayload {
  */
 export interface TypedTraceEvent<TPayload = Record<string, unknown>> {
   type: string;
-  token_id: string | null;
-  node_id: string | null;
-  duration_ms: number | null;
+  tokenId: string | null;
+  nodeId: string | null;
+  durationMs: number | null;
   sequence: number;
   timestamp: number;
   category: string;
@@ -44,7 +44,7 @@ export interface FanOutSpec {
   /** Number of sibling tokens in this fan-out group */
   count: number;
 
-  /** Expected branch_total on each sibling (should equal count) */
+  /** Expected branchTotal on each sibling (should equal count) */
   branchTotal: number;
 
   /** Expected output fields from this fan-out's branches (optional) */
@@ -185,7 +185,7 @@ export interface VerificationConfig {
  * Fan-out group with its sibling tokens.
  */
 export interface FanOutGroup {
-  /** The sibling_group identifier for this group */
+  /** The siblingGroup identifier for this group */
   siblingGroup: string;
   /** Sibling tokens in this group */
   siblings: TypedTraceEvent<TokenCreatedPayload>[];
@@ -209,7 +209,7 @@ export interface VerificationContext {
     rootTokens: TypedTraceEvent<TokenCreatedPayload>[];
     /** All fan-out siblings (flat list for backward compat) */
     fanOutSiblings: TypedTraceEvent<TokenCreatedPayload>[];
-    /** Fan-out groups organized by sibling_group */
+    /** Fan-out groups organized by siblingGroup */
     fanOutGroups: FanOutGroup[];
     fanInArrivals: TypedTraceEvent<TokenCreatedPayload>[];
     fanInContinuations: TypedTraceEvent<TokenCreatedPayload>[];
@@ -244,8 +244,8 @@ export interface WorkflowFailure {
 
   /** Execution metrics at time of failure */
   metrics?: {
-    duration_ms?: number;
-    steps_executed?: number;
+    durationMs?: number;
+    stepsExecuted?: number;
   };
 }
 

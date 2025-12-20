@@ -41,8 +41,8 @@ export function handleCompletion(
     return getActionKindCompletions();
   }
 
-  // action_id completions - suggest imported actions
-  if (isTask && trimmed.match(/^action_id\s*:\s*/)) {
+  // actionId completions - suggest imported actions
+  if (isTask && trimmed.match(/^actionId\s*:\s*/)) {
     if (imports) {
       const actionImports = imports.all.filter(
         (imp) => imp.fileType === 'action' || imp.fileType === 'unknown',
@@ -56,8 +56,8 @@ export function handleCompletion(
     return [];
   }
 
-  // task_id completions - suggest imported tasks
-  if (isWorkflow && trimmed.match(/^task_id\s*:\s*/)) {
+  // taskId completions - suggest imported tasks
+  if (isWorkflow && trimmed.match(/^taskId\s*:\s*/)) {
     if (imports) {
       const taskImports = imports.all.filter(
         (imp) => imp.fileType === 'task' || imp.fileType === 'unknown',
@@ -105,26 +105,26 @@ function getTopLevelCompletions(fileType: string): CompletionItem[] {
       { label: 'description', kind: CompletionItemKind.Keyword, insertText: 'description: ' },
       { label: 'tags', kind: CompletionItemKind.Keyword, insertText: 'tags:\n  - ' },
       {
-        label: 'input_schema',
+        label: 'inputSchema',
         kind: CompletionItemKind.Keyword,
-        insertText: 'input_schema:\n  type: object\n  properties:\n    ',
+        insertText: 'inputSchema:\n  type: object\n  properties:\n    ',
       },
       {
-        label: 'output_schema',
+        label: 'outputSchema',
         kind: CompletionItemKind.Keyword,
-        insertText: 'output_schema:\n  type: object\n  properties:\n    ',
+        insertText: 'outputSchema:\n  type: object\n  properties:\n    ',
       },
       {
         label: 'steps',
         kind: CompletionItemKind.Keyword,
-        insertText: 'steps:\n  - ref: \n    ordinal: 0\n    action_id: ',
+        insertText: 'steps:\n  - ref: \n    ordinal: 0\n    actionId: ',
       },
       {
         label: 'retry',
         kind: CompletionItemKind.Keyword,
-        insertText: 'retry:\n  max_attempts: 3\n  backoff: exponential\n  initial_delay_ms: 1000',
+        insertText: 'retry:\n  maxAttempts: 3\n  backoff: exponential\n  initialDelayMs: 1000',
       },
-      { label: 'timeout_ms', kind: CompletionItemKind.Keyword, insertText: 'timeout_ms: ' },
+      { label: 'timeoutMs', kind: CompletionItemKind.Keyword, insertText: 'timeoutMs: ' },
     ];
   }
 
@@ -154,7 +154,7 @@ function getTopLevelCompletions(fileType: string): CompletionItem[] {
       {
         label: 'execution',
         kind: CompletionItemKind.Keyword,
-        insertText: 'execution:\n  timeout_ms: \n  retry_policy:\n    max_attempts: 3',
+        insertText: 'execution:\n  timeoutMs: \n  retry_policy:\n    maxAttempts: 3',
       },
       {
         label: 'idempotency',
@@ -171,19 +171,19 @@ function getTopLevelCompletions(fileType: string): CompletionItem[] {
     { label: 'version', kind: CompletionItemKind.Keyword, insertText: 'version: ' },
     { label: 'description', kind: CompletionItemKind.Keyword, insertText: 'description: ' },
     {
-      label: 'input_schema',
+      label: 'inputSchema',
       kind: CompletionItemKind.Keyword,
-      insertText: 'input_schema:\n  type: object\n  properties:\n    ',
+      insertText: 'inputSchema:\n  type: object\n  properties:\n    ',
     },
     {
-      label: 'context_schema',
+      label: 'contextSchema',
       kind: CompletionItemKind.Keyword,
-      insertText: 'context_schema:\n  type: object\n  properties:\n    ',
+      insertText: 'contextSchema:\n  type: object\n  properties:\n    ',
     },
     {
-      label: 'output_schema',
+      label: 'outputSchema',
       kind: CompletionItemKind.Keyword,
-      insertText: 'output_schema:\n  type: object\n  properties:\n    ',
+      insertText: 'outputSchema:\n  type: object\n  properties:\n    ',
     },
     { label: 'nodes', kind: CompletionItemKind.Keyword, insertText: 'nodes:\n  ' },
     { label: 'transitions', kind: CompletionItemKind.Keyword, insertText: 'transitions:\n  ' },
@@ -192,7 +192,7 @@ function getTopLevelCompletions(fileType: string): CompletionItem[] {
       kind: CompletionItemKind.Keyword,
       insertText: 'initial_node_ref: ',
     },
-    { label: 'timeout_ms', kind: CompletionItemKind.Keyword, insertText: 'timeout_ms: ' },
+    { label: 'timeoutMs', kind: CompletionItemKind.Keyword, insertText: 'timeoutMs: ' },
     { label: 'on_timeout', kind: CompletionItemKind.Keyword, insertText: 'on_timeout: ' },
   ];
 }
@@ -235,23 +235,23 @@ function getTaskCompletions(
     return [
       { label: 'ref', kind: CompletionItemKind.Property, insertText: 'ref: ' },
       { label: 'ordinal', kind: CompletionItemKind.Property, insertText: 'ordinal: ' },
-      { label: 'action_id', kind: CompletionItemKind.Property, insertText: 'action_id: ' },
+      { label: 'actionId', kind: CompletionItemKind.Property, insertText: 'actionId: ' },
       {
-        label: 'action_version',
+        label: 'actionVersion',
         kind: CompletionItemKind.Property,
-        insertText: 'action_version: ',
+        insertText: 'actionVersion: ',
       },
       {
-        label: 'input_mapping',
+        label: 'inputMapping',
         kind: CompletionItemKind.Property,
-        insertText: 'input_mapping:\n      ',
+        insertText: 'inputMapping:\n      ',
       },
       {
-        label: 'output_mapping',
+        label: 'outputMapping',
         kind: CompletionItemKind.Property,
-        insertText: 'output_mapping:\n      ',
+        insertText: 'outputMapping:\n      ',
       },
-      { label: 'on_failure', kind: CompletionItemKind.Property, insertText: 'on_failure: ' },
+      { label: 'onFailure', kind: CompletionItemKind.Property, insertText: 'onFailure: ' },
       {
         label: 'condition',
         kind: CompletionItemKind.Property,
@@ -260,8 +260,8 @@ function getTaskCompletions(
     ];
   }
 
-  // on_failure value completions
-  if (trimmed.startsWith('on_failure:')) {
+  // onFailure value completions
+  if (trimmed.startsWith('onFailure:')) {
     return [
       { label: 'abort', kind: CompletionItemKind.EnumMember, detail: 'Task fails immediately' },
       { label: 'retry', kind: CompletionItemKind.EnumMember, detail: 'Restart task from step 0' },
@@ -292,9 +292,9 @@ function getWorkflowCompletions(
   if (!parsed) return [];
 
   // Extract valid paths from schemas
-  const inputPaths = extractPaths(parsed.input_schema, 'input');
-  const contextPaths = extractPaths(parsed.context_schema, 'state');
-  const outputPaths = extractPaths(parsed.output_schema, 'output');
+  const inputPaths = extractPaths(parsed.inputSchema, 'input');
+  const contextPaths = extractPaths(parsed.contextSchema, 'state');
+  const outputPaths = extractPaths(parsed.outputSchema, 'output');
   const nodeRefs = Object.keys(parsed.nodes || {});
   const transitionRefs = Object.keys(parsed.transitions || {});
 
@@ -328,22 +328,22 @@ function getWorkflowCompletions(
   if (inNodes && indent === 4 && !trimmed.includes(':')) {
     return [
       { label: 'name', kind: CompletionItemKind.Property, insertText: 'name: ' },
-      { label: 'task_id', kind: CompletionItemKind.Property, insertText: 'task_id: ' },
-      { label: 'task_version', kind: CompletionItemKind.Property, insertText: 'task_version: ' },
+      { label: 'taskId', kind: CompletionItemKind.Property, insertText: 'taskId: ' },
+      { label: 'taskVersion', kind: CompletionItemKind.Property, insertText: 'taskVersion: ' },
       {
-        label: 'input_mapping',
+        label: 'inputMapping',
         kind: CompletionItemKind.Property,
-        insertText: 'input_mapping:\n      ',
+        insertText: 'inputMapping:\n      ',
       },
       {
-        label: 'output_mapping',
+        label: 'outputMapping',
         kind: CompletionItemKind.Property,
-        insertText: 'output_mapping:\n      ',
+        insertText: 'outputMapping:\n      ',
       },
       {
-        label: 'resource_bindings',
+        label: 'resourceBindings',
         kind: CompletionItemKind.Property,
-        insertText: 'resource_bindings:\n      ',
+        insertText: 'resourceBindings:\n      ',
       },
     ];
   }
@@ -351,15 +351,15 @@ function getWorkflowCompletions(
   // Transition property completions
   if (inTransitions && indent === 4 && !trimmed.includes(':')) {
     return [
-      { label: 'from_node_ref', kind: CompletionItemKind.Property, insertText: 'from_node_ref: ' },
-      { label: 'to_node_ref', kind: CompletionItemKind.Property, insertText: 'to_node_ref: ' },
+      { label: 'fromNodeRef', kind: CompletionItemKind.Property, insertText: 'fromNodeRef: ' },
+      { label: 'toNodeRef', kind: CompletionItemKind.Property, insertText: 'toNodeRef: ' },
       { label: 'priority', kind: CompletionItemKind.Property, insertText: 'priority: ' },
       {
         label: 'condition',
         kind: CompletionItemKind.Property,
         insertText: 'condition:\n      type: ',
       },
-      { label: 'spawn_count', kind: CompletionItemKind.Property, insertText: 'spawn_count: ' },
+      { label: 'spawnCount', kind: CompletionItemKind.Property, insertText: 'spawnCount: ' },
       {
         label: 'foreach',
         kind: CompletionItemKind.Property,
@@ -373,23 +373,23 @@ function getWorkflowCompletions(
     ];
   }
 
-  // from_node_ref / to_node_ref value completions
-  if (trimmed.match(/^(from_node_ref|to_node_ref)\s*:\s*/)) {
+  // fromNodeRef / toNodeRef value completions
+  if (trimmed.match(/^(fromNodeRef|toNodeRef)\s*:\s*/)) {
     return nodeRefs.map((ref) => ({
       label: ref,
       kind: CompletionItemKind.Reference,
     }));
   }
 
-  // sibling_group value completions
-  if (trimmed.match(/^sibling_group\s*:\s*/)) {
+  // siblingGroup value completions
+  if (trimmed.match(/^siblingGroup\s*:\s*/)) {
     return transitionRefs.map((ref) => ({
       label: ref,
       kind: CompletionItemKind.Reference,
     }));
   }
 
-  // JSONPath completions for input_mapping values
+  // JSONPath completions for inputMapping values
   if (trimmed.includes('"$.') || trimmed.endsWith('"$')) {
     const items: CompletionItem[] = [];
     for (const path of inputPaths) {
@@ -409,8 +409,8 @@ function getWorkflowCompletions(
     return items;
   }
 
-  // output_mapping key completions
-  if (inNodes && indent === 6 && linePrefix.includes('output_mapping')) {
+  // outputMapping key completions
+  if (inNodes && indent === 6 && linePrefix.includes('outputMapping')) {
     const items: CompletionItem[] = [];
     for (const path of contextPaths) {
       items.push({

@@ -7,15 +7,15 @@ import { actions } from '../../schema';
 // ============================================================================
 
 export type ActionKind =
-  | 'llm_call'
-  | 'mcp_tool'
-  | 'http_request'
-  | 'human_input'
-  | 'update_context'
-  | 'write_artifact'
-  | 'workflow_call'
-  | 'vector_search'
-  | 'emit_metric'
+  | 'llm'
+  | 'mcp'
+  | 'http'
+  | 'human'
+  | 'context'
+  | 'artifact'
+  | 'workflow'
+  | 'vector'
+  | 'metric'
   | 'mock';
 
 // ============================================================================

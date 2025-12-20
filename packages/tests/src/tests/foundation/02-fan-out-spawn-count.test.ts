@@ -5,11 +5,11 @@ import { assertInvariants, runTestWorkflow, TIME_JITTER, verify } from '~/kit';
 /**
  * Foundation Test 02: Fan-out with Spawn Count + Fan-in
  *
- * Tests parallel execution via spawn_count on a transition,
+ * Tests parallel execution via spawnCount on a transition,
  * followed by fan-in synchronization that merges results.
  *
  * Workflow structure:
- *   [nodeA] → (spawn_count: 3) → [nodeB] × 3 → (synchronization) → [nodeC]
+ *   [nodeA] → (spawnCount: 3) → [nodeB] × 3 → (synchronization) → [nodeC]
  *
  * Data flow with state transformations:
  *   1. nodeA: Reads input.prefix, writes state.seed (transformed from input)
@@ -25,7 +25,7 @@ import { assertInvariants, runTestWorkflow, TIME_JITTER, verify } from '~/kit';
  *
  * This proves:
  * 1. Multiple tokens created from single transition
- * 2. Sibling group structure (shared fan_out_transition_id)
+ * 2. Sibling group structure (shared fanOut_transition_id)
  * 3. Branch table isolation (each token writes to its own table)
  * 4. Fan-in synchronization (strategy: 'all')
  * 5. Branch merge into context.state
@@ -63,7 +63,7 @@ describe('Foundation: 02 - Fan-out with Spawn Count + Fan-in', () => {
     const workflowOutputSchema = s.object({
       prefix: s.string(), // From input
       seed: s.string(), // From state (written by nodeA)
-      merged_results: s.array(s.string()), // From state (written by fan-in)
+      mergedResults: s.array(s.string()), // From state (written by fan-in)
       summary: s.string(), // From state (written by nodeC)
     });
 
@@ -80,18 +80,18 @@ describe('Foundation: 02 - Fan-out with Spawn Count + Fan-in', () => {
     });
 
     const nodeAStep = step({
-      ref: 'init_step',
+      ref: 'initStep',
       ordinal: 0,
       action: nodeAAction,
-      input_mapping: {},
-      output_mapping: { 'output.seed': '$.seed' },
+      inputMapping: {},
+      outputMapping: { 'output.seed': '$.seed' },
     });
 
     const nodeATask = task({
       name: 'Initialize Task',
       description: 'Initialize workflow state from input',
-      input_schema: s.object({ prefix: s.string() }),
-      output_schema: nodeAOutputSchema,
+      inputSchema: s.object({ prefix: s.string() }),
+      outputSchema: nodeAOutputSchema,
       steps: [nodeAStep],
     });
 
@@ -99,9 +99,9 @@ describe('Foundation: 02 - Fan-out with Spawn Count + Fan-in', () => {
       ref: 'node_a',
       name: 'Node A - Initialize',
       task: nodeATask,
-      task_version: 1,
-      input_mapping: { prefix: '$.input.prefix' },
-      output_mapping: { 'state.seed': '$.seed' },
+      taskVersion: 1,
+      inputMapping: { prefix: '$.input.prefix' },
+      outputMapping: { 'state.seed': '$.seed' },
     });
 
     // Node B: Executes in parallel (3 times)
@@ -117,18 +117,18 @@ describe('Foundation: 02 - Fan-out with Spawn Count + Fan-in', () => {
     });
 
     const nodeBStep = step({
-      ref: 'process_step',
+      ref: 'processStep',
       ordinal: 0,
       action: nodeBAction,
-      input_mapping: {},
-      output_mapping: { 'output.result': '$.result' },
+      inputMapping: {},
+      outputMapping: { 'output.result': '$.result' },
     });
 
     const nodeBTask = task({
       name: 'Process Task',
       description: 'Process with seed value',
-      input_schema: s.object({ seed: s.string() }),
-      output_schema: nodeBOutputSchema,
+      inputSchema: s.object({ seed: s.string() }),
+      outputSchema: nodeBOutputSchema,
       steps: [nodeBStep],
     });
 
@@ -136,9 +136,9 @@ describe('Foundation: 02 - Fan-out with Spawn Count + Fan-in', () => {
       ref: 'node_b',
       name: 'Node B - Process',
       task: nodeBTask,
-      task_version: 1,
-      input_mapping: { seed: '$.state.seed' },
-      output_mapping: { 'output.result': '$.result' },
+      taskVersion: 1,
+      inputMapping: { seed: '$.state.seed' },
+      outputMapping: { 'output.result': '$.result' },
     });
 
     // Node C: Post-merge node that reads merged results and produces summary
@@ -150,20 +150,20 @@ describe('Foundation: 02 - Fan-out with Spawn Count + Fan-in', () => {
     });
 
     const nodeCStep = step({
-      ref: 'summarize_step',
+      ref: 'summarizeStep',
       ordinal: 0,
       action: nodeCAction,
-      input_mapping: {},
-      output_mapping: { 'output.summary': '$.summary' },
+      inputMapping: {},
+      outputMapping: { 'output.summary': '$.summary' },
     });
 
     const nodeCTask = task({
       name: 'Summarize Task',
       description: 'Produce summary from merged results',
-      input_schema: s.object({
+      inputSchema: s.object({
         results: s.array(s.string()),
       }),
-      output_schema: nodeCOutputSchema,
+      outputSchema: nodeCOutputSchema,
       steps: [nodeCStep],
     });
 
@@ -171,30 +171,30 @@ describe('Foundation: 02 - Fan-out with Spawn Count + Fan-in', () => {
       ref: 'node_c',
       name: 'Node C - Summarize',
       task: nodeCTask,
-      task_version: 1,
-      input_mapping: { results: '$.state.results' },
-      output_mapping: { 'state.summary': '$.summary' },
+      taskVersion: 1,
+      inputMapping: { results: '$.state.results' },
+      outputMapping: { 'state.summary': '$.summary' },
     });
 
-    // Transition: Fan-out from A to B with spawn_count
+    // Transition: Fan-out from A to B with spawnCount
     const fanOutTransition = transition({
-      ref: 'fanout_transition',
-      from_node_ref: 'node_a',
-      to_node_ref: 'node_b',
+      ref: 'fanoutTransition',
+      fromNodeRef: 'node_a',
+      toNodeRef: 'node_b',
       priority: 1,
-      spawn_count: 3,
-      sibling_group: 'fanout_group', // Explicitly declare sibling group for fan-in coordination
+      spawnCount: 3,
+      siblingGroup: 'fanoutGroup', // Explicitly declare sibling group for fan-in coordination
     });
 
     // Transition: Fan-in from B to C with synchronization
     const fanInTransition = transition({
-      ref: 'fanin_transition',
-      from_node_ref: 'node_b',
-      to_node_ref: 'node_c',
+      ref: 'faninTransition',
+      fromNodeRef: 'node_b',
+      toNodeRef: 'node_c',
       priority: 1,
       synchronization: {
         strategy: 'all',
-        sibling_group: 'fanout_group', // References the sibling group declared on fan-out
+        siblingGroup: 'fanoutGroup', // References the sibling group declared on fan-out
         merge: {
           source: '_branch.output.result',
           target: 'state.results',
@@ -205,17 +205,17 @@ describe('Foundation: 02 - Fan-out with Spawn Count + Fan-in', () => {
 
     const workflowDef = workflow({
       name: 'Fan-out Fan-in Test',
-      description: 'Foundation test 02 - fan-out with spawn_count + fan-in synchronization',
-      input_schema: inputSchema,
-      output_schema: workflowOutputSchema,
-      context_schema: contextSchema,
-      output_mapping: {
+      description: 'Foundation test 02 - fan-out with spawnCount + fan-in synchronization',
+      inputSchema: inputSchema,
+      outputSchema: workflowOutputSchema,
+      contextSchema: contextSchema,
+      outputMapping: {
         prefix: '$.input.prefix',
         seed: '$.state.seed',
-        merged_results: '$.state.results',
+        mergedResults: '$.state.results',
         summary: '$.state.summary',
       },
-      initial_node_ref: 'node_a',
+      initialNodeRef: 'node_a',
       nodes: [nodeA, nodeB, nodeC],
       transitions: [fanOutTransition, fanInTransition],
     });
@@ -262,7 +262,7 @@ describe('Foundation: 02 - Fan-out with Spawn Count + Fan-in', () => {
         .withOutput({
           prefix: workflowInput.prefix,
           seed: { type: 'string', defined: true },
-          merged_results: { type: 'array', arrayLength: 3 },
+          mergedResults: { type: 'array', arrayLength: 3 },
           summary: { type: 'string', defined: true },
         })
         .withSnapshots({

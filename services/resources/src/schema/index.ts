@@ -239,18 +239,7 @@ export const actions = sqliteTable(
     version: integer().notNull(),
 
     kind: text({
-      enum: [
-        'llm_call',
-        'mcp_tool',
-        'http_request',
-        'human_input',
-        'update_context',
-        'write_artifact',
-        'workflow_call',
-        'vector_search',
-        'emit_metric',
-        'mock',
-      ],
+      enum: ['llm', 'mcp', 'http', 'human', 'context', 'artifact', 'workflow', 'vector', 'metric', 'mock'],
     }).notNull(),
 
     implementation: text({ mode: 'json' }).$type<object>().notNull(), // discriminated by kind
@@ -358,8 +347,8 @@ export const modelProfiles = sqliteTable('model_profiles', {
   parameters: text({ mode: 'json' }).$type<ModelProfile['parameters']>().notNull(),
   executionConfig: text({ mode: 'json' }).$type<object>(),
 
-  costPer1kInputTokens: real().notNull(),
-  costPer1kOutputTokens: real().notNull(),
+  costPer1kInputTokens: real('cost_per_1k_input_tokens').notNull(),
+  costPer1kOutputTokens: real('cost_per_1k_output_tokens').notNull(),
 });
 
 /** Workflow Runs & Execution */

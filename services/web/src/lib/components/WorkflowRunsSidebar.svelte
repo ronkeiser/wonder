@@ -4,23 +4,23 @@
 
   interface WorkflowRunSummary {
     id: string;
-    project_id: string;
-    workflow_id: string;
-    workflow_name: string;
-    workflow_def_id: string;
-    workflow_version: number;
+    projectId: string;
+    workflowId: string;
+    workflowName: string;
+    workflowDefId: string;
+    workflowVersion: number;
     status: 'running' | 'completed' | 'failed' | 'waiting';
-    parent_run_id: string | null;
-    created_at: string;
-    updated_at: string;
-    completed_at: string | null;
+    parentRunId: string | null;
+    createdAt: string;
+    updatedAt: string;
+    completedAt: string | null;
   }
 
   interface WorkflowStatusChange {
-    workflow_run_id: string;
-    workflow_def_id: string;
-    project_id: string;
-    parent_run_id: string | null;
+    workflowRunId: string;
+    workflowDefId: string;
+    projectId: string;
+    parentRunId: string | null;
     status: 'running' | 'completed' | 'failed' | 'waiting';
     timestamp: number;
   }
@@ -119,7 +119,7 @@
   }
 
   function updateRunStatus(change: WorkflowStatusChange) {
-    const existingIndex = runs.findIndex((r) => r.id === change.workflow_run_id);
+    const existingIndex = runs.findIndex((r) => r.id === change.workflowRunId);
 
     if (existingIndex >= 0) {
       // Update existing run's status
@@ -219,10 +219,10 @@
       >
         <span class="status-icon status-{run.status}">{getStatusIcon(run.status)}</span>
         <div class="run-info">
-          <span class="workflow-name">{run.workflow_name}</span>
+          <span class="workflow-name">{run.workflowName}</span>
           <span class="run-id">{run.id.slice(-6)}</span>
         </div>
-        <span class="run-time">{getRelativeTime(run.created_at)}</span>
+        <span class="run-time">{getRelativeTime(run.createdAt)}</span>
       </button>
     {/each}
 

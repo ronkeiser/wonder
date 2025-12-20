@@ -19,7 +19,7 @@ export type HttpMethod = 'get' | 'post' | 'put' | 'delete' | 'patch';
 export enum NodeType {
   /** Resource collection (e.g., workspaces, projects) */
   Collection = 'collection',
-  /** Path parameter (e.g., {id}, {workspace_id}) */
+  /** Path parameter (e.g., {id}, {workspaceId}) */
   Param = 'param',
   /** Custom action endpoint (e.g., start, cancel) */
   Action = 'action',

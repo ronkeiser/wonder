@@ -9,37 +9,37 @@ export const WORKFLOW_ALLOWED_PROPS = new Set([
   'workflow',
   'version',
   'description',
-  'input_schema',
-  'context_schema',
-  'output_schema',
+  'inputSchema',
+  'contextSchema',
+  'outputSchema',
   'resources',
   'nodes',
   'transitions',
   'initial_node_ref',
-  'timeout_ms',
+  'timeoutMs',
   'on_timeout',
 ]);
 
 export const NODE_ALLOWED_PROPS = new Set([
   // Note: 'ref' is NOT allowed - the YAML map key IS the ref
   'name',
-  'task_id',
-  'task_version',
-  'input_mapping',
-  'output_mapping',
-  'resource_bindings',
+  'taskId',
+  'taskVersion',
+  'inputMapping',
+  'outputMapping',
+  'resourceBindings',
 ]);
 
 export const TRANSITION_ALLOWED_PROPS = new Set([
   // Note: 'ref' is NOT allowed - the YAML map key IS the ref
-  'from_node_ref',
-  'to_node_ref',
+  'fromNodeRef',
+  'toNodeRef',
   'priority',
   'condition',
-  'spawn_count',
+  'spawnCount',
   'foreach',
   'synchronization',
-  'loop_config',
+  'loopConfig',
 ]);
 
 export const CONDITION_ALLOWED_PROPS = new Set(['type', 'expr', 'definition', 'reads']);
@@ -48,8 +48,8 @@ export const FOREACH_ALLOWED_PROPS = new Set(['collection', 'item_var']);
 
 export const SYNCHRONIZATION_ALLOWED_PROPS = new Set([
   'strategy',
-  'sibling_group',
-  'timeout_ms',
+  'siblingGroup',
+  'timeoutMs',
   'on_timeout',
   'merge',
 ]);
@@ -73,31 +73,31 @@ export const TASK_ALLOWED_PROPS = new Set([
   'name',
   'description',
   'tags',
-  'input_schema',
-  'output_schema',
+  'inputSchema',
+  'outputSchema',
   'steps',
   'retry',
-  'timeout_ms',
+  'timeoutMs',
 ]);
 
 export const STEP_ALLOWED_PROPS = new Set([
   'ref',
   'ordinal',
-  'action_id',
-  'action_version',
-  'input_mapping',
-  'output_mapping',
-  'on_failure',
+  'actionId',
+  'actionVersion',
+  'inputMapping',
+  'outputMapping',
+  'onFailure',
   'condition',
 ]);
 
 export const STEP_CONDITION_ALLOWED_PROPS = new Set(['if', 'then', 'else']);
 
 export const RETRY_ALLOWED_PROPS = new Set([
-  'max_attempts',
+  'maxAttempts',
   'backoff',
-  'initial_delay_ms',
-  'max_delay_ms',
+  'initialDelayMs',
+  'maxDelayMs',
 ]);
 
 // ActionDef allowed properties
@@ -115,13 +115,13 @@ export const ACTION_ALLOWED_PROPS = new Set([
   'idempotency',
 ]);
 
-export const ACTION_EXECUTION_ALLOWED_PROPS = new Set(['timeout_ms', 'retry_policy']);
+export const ACTION_EXECUTION_ALLOWED_PROPS = new Set(['timeoutMs', 'retry_policy']);
 
 export const ACTION_RETRY_POLICY_ALLOWED_PROPS = new Set([
-  'max_attempts',
+  'maxAttempts',
   'backoff',
-  'initial_delay_ms',
-  'max_delay_ms',
+  'initialDelayMs',
+  'maxDelayMs',
   'retryable_errors',
 ]);
 
@@ -129,7 +129,7 @@ export const ACTION_IDEMPOTENCY_ALLOWED_PROPS = new Set(['key_template', 'ttl_se
 
 // Kind-specific implementation properties
 export const IMPLEMENTATION_PROPS_BY_KIND: Record<string, Set<string>> = {
-  llm: new Set(['prompt_spec_id', 'model_profile_id']),
+  llm: new Set(['promptSpecId', 'modelProfileId']),
   mcp: new Set(['mcp_server_id', 'tool_name']),
   http: new Set(['url_template', 'method', 'headers', 'body_template']),
   tool: new Set(['tool_name', 'tool_version']),
@@ -139,12 +139,12 @@ export const IMPLEMENTATION_PROPS_BY_KIND: Record<string, Set<string>> = {
     'version',
     'inherit_artifacts',
     'pass_resources',
-    'on_failure',
+    'onFailure',
   ]),
   context: new Set(['updates']),
   vector: new Set(['vector_index_id', 'top_k', 'similarity_threshold']),
   metric: new Set(['metric_name', 'value', 'dimensions']),
-  human: new Set(['prompt', 'timeout_ms', 'on_timeout']),
+  human: new Set(['prompt', 'timeoutMs', 'on_timeout']),
 };
 
 // Valid action kinds

@@ -22,15 +22,15 @@ export const CreateWorkflowDefSchema = z
     initialNodeRef: z
       .string()
       .min(1)
-      .regex(/^[a-z_][a-z0-9_]*$/)
-      .openapi({ example: 'start_node' }),
+      .regex(/^[a-zA-Z_][a-zA-Z0-9_]*$/)
+      .openapi({ example: 'startNode' }),
     nodes: z.array(
       z.object({
         ref: z
           .string()
           .min(1)
-          .regex(/^[a-z_][a-z0-9_]*$/)
-          .openapi({ example: 'llm_call_node' }),
+          .regex(/^[a-zA-Z_][a-zA-Z0-9_]*$/)
+          .openapi({ example: 'llmCallNode' }),
         name: z.string().min(1),
         taskId: z.string().min(1).optional().openapi({ example: 'my-task' }),
         taskVersion: z.number().int().positive().optional().openapi({ example: 1 }),
@@ -47,7 +47,7 @@ export const CreateWorkflowDefSchema = z
         z.object({
           ref: z
             .string()
-            .regex(/^[a-z_][a-z0-9_]*$/)
+            .regex(/^[a-zA-Z_][a-zA-Z0-9_]*$/)
             .optional(),
           fromNodeRef: z.string().min(1),
           toNodeRef: z.string().min(1),

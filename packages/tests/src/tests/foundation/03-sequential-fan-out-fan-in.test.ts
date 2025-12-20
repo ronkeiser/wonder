@@ -75,18 +75,18 @@ describe('Foundation: 03 - Sequential Fan-out/Fan-in', () => {
     });
 
     const initStep = step({
-      ref: 'init_step',
+      ref: 'initStep',
       ordinal: 0,
       action: initAction,
-      input_mapping: {},
-      output_mapping: { 'output.seed': '$.seed' },
+      inputMapping: {},
+      outputMapping: { 'output.seed': '$.seed' },
     });
 
     const initTask = task({
       name: 'Init Task',
       description: 'Initialize workflow',
-      input_schema: s.object({ seed: s.string() }),
-      output_schema: initOutputSchema,
+      inputSchema: s.object({ seed: s.string() }),
+      outputSchema: initOutputSchema,
       steps: [initStep],
     });
 
@@ -94,9 +94,9 @@ describe('Foundation: 03 - Sequential Fan-out/Fan-in', () => {
       ref: 'init',
       name: 'Init',
       task: initTask,
-      task_version: 1,
-      input_mapping: { seed: '$.input.seed' },
-      output_mapping: { 'state.seed': '$.seed' },
+      taskVersion: 1,
+      inputMapping: { seed: '$.input.seed' },
+      outputMapping: { 'state.seed': '$.seed' },
     });
 
     // =========================================================================
@@ -117,15 +117,15 @@ describe('Foundation: 03 - Sequential Fan-out/Fan-in', () => {
       ref: 'phase1_step',
       ordinal: 0,
       action: phase1Action,
-      input_mapping: {},
-      output_mapping: { 'output.value': '$.value' },
+      inputMapping: {},
+      outputMapping: { 'output.value': '$.value' },
     });
 
     const phase1Task = task({
       name: 'Phase 1 Task',
       description: 'Process in phase 1',
-      input_schema: s.object({ seed: s.string() }),
-      output_schema: phase1OutputSchema,
+      inputSchema: s.object({ seed: s.string() }),
+      outputSchema: phase1OutputSchema,
       steps: [phase1Step],
     });
 
@@ -133,9 +133,9 @@ describe('Foundation: 03 - Sequential Fan-out/Fan-in', () => {
       ref: 'phase1',
       name: 'Phase 1',
       task: phase1Task,
-      task_version: 1,
-      input_mapping: { seed: '$.state.seed' },
-      output_mapping: { 'output.value': '$.value' },
+      taskVersion: 1,
+      inputMapping: { seed: '$.state.seed' },
+      outputMapping: { 'output.value': '$.value' },
     });
 
     // =========================================================================
@@ -152,15 +152,15 @@ describe('Foundation: 03 - Sequential Fan-out/Fan-in', () => {
       ref: 'bridge_step',
       ordinal: 0,
       action: bridgeAction,
-      input_mapping: {},
-      output_mapping: { 'output.count': '$.count' },
+      inputMapping: {},
+      outputMapping: { 'output.count': '$.count' },
     });
 
     const bridgeTask = task({
       name: 'Bridge Task',
       description: 'Bridge processing',
-      input_schema: s.object({ phase1_results: s.array(s.string()) }),
-      output_schema: bridgeOutputSchema,
+      inputSchema: s.object({ phase1_results: s.array(s.string()) }),
+      outputSchema: bridgeOutputSchema,
       steps: [bridgeStep],
     });
 
@@ -168,9 +168,9 @@ describe('Foundation: 03 - Sequential Fan-out/Fan-in', () => {
       ref: 'bridge',
       name: 'Bridge',
       task: bridgeTask,
-      task_version: 1,
-      input_mapping: { phase1_results: '$.state.phase1_results' },
-      output_mapping: { 'state.phase1_count': '$.count' },
+      taskVersion: 1,
+      inputMapping: { phase1_results: '$.state.phase1_results' },
+      outputMapping: { 'state.phase1_count': '$.count' },
     });
 
     // =========================================================================
@@ -191,18 +191,18 @@ describe('Foundation: 03 - Sequential Fan-out/Fan-in', () => {
       ref: 'phase2_step',
       ordinal: 0,
       action: phase2Action,
-      input_mapping: {},
-      output_mapping: { 'output.transformed': '$.transformed' },
+      inputMapping: {},
+      outputMapping: { 'output.transformed': '$.transformed' },
     });
 
     const phase2Task = task({
       name: 'Phase 2 Task',
       description: 'Process in phase 2 using phase 1 results',
-      input_schema: s.object({
+      inputSchema: s.object({
         phase1_results: s.array(s.string()),
         phase1_count: s.number(),
       }),
-      output_schema: phase2OutputSchema,
+      outputSchema: phase2OutputSchema,
       steps: [phase2Step],
     });
 
@@ -210,12 +210,12 @@ describe('Foundation: 03 - Sequential Fan-out/Fan-in', () => {
       ref: 'phase2',
       name: 'Phase 2',
       task: phase2Task,
-      task_version: 1,
-      input_mapping: {
+      taskVersion: 1,
+      inputMapping: {
         phase1_results: '$.state.phase1_results',
         phase1_count: '$.state.phase1_count',
       },
-      output_mapping: { 'output.transformed': '$.transformed' },
+      outputMapping: { 'output.transformed': '$.transformed' },
     });
 
     // =========================================================================
@@ -229,21 +229,21 @@ describe('Foundation: 03 - Sequential Fan-out/Fan-in', () => {
     });
 
     const summarizeStep = step({
-      ref: 'summarize_step',
+      ref: 'summarizeStep',
       ordinal: 0,
       action: summarizeAction,
-      input_mapping: {},
-      output_mapping: { 'output.summary': '$.summary' },
+      inputMapping: {},
+      outputMapping: { 'output.summary': '$.summary' },
     });
 
     const summarizeTask = task({
       name: 'Summarize Task',
       description: 'Produce final summary',
-      input_schema: s.object({
+      inputSchema: s.object({
         phase1_results: s.array(s.string()),
         phase2_results: s.array(s.string()),
       }),
-      output_schema: summarizeOutputSchema,
+      outputSchema: summarizeOutputSchema,
       steps: [summarizeStep],
     });
 
@@ -251,12 +251,12 @@ describe('Foundation: 03 - Sequential Fan-out/Fan-in', () => {
       ref: 'summarize',
       name: 'Summarize',
       task: summarizeTask,
-      task_version: 1,
-      input_mapping: {
+      taskVersion: 1,
+      inputMapping: {
         phase1_results: '$.state.phase1_results',
         phase2_results: '$.state.phase2_results',
       },
-      output_mapping: { 'state.summary': '$.summary' },
+      outputMapping: { 'state.summary': '$.summary' },
     });
 
     // =========================================================================
@@ -266,22 +266,22 @@ describe('Foundation: 03 - Sequential Fan-out/Fan-in', () => {
     // Fan-out #1: init → phase1 (spawn 3)
     const fanOut1 = transition({
       ref: 'fanout_1',
-      from_node_ref: 'init',
-      to_node_ref: 'phase1',
+      fromNodeRef: 'init',
+      toNodeRef: 'phase1',
       priority: 1,
-      spawn_count: 3,
-      sibling_group: 'phase1_group',
+      spawnCount: 3,
+      siblingGroup: 'phase1_group',
     });
 
     // Fan-in #1: phase1 → bridge (synchronize all phase1 branches)
     const fanIn1 = transition({
       ref: 'fanin_1',
-      from_node_ref: 'phase1',
-      to_node_ref: 'bridge',
+      fromNodeRef: 'phase1',
+      toNodeRef: 'bridge',
       priority: 1,
       synchronization: {
         strategy: 'all',
-        sibling_group: 'phase1_group',
+        siblingGroup: 'phase1_group',
         merge: {
           source: '_branch.output.value',
           target: 'state.phase1_results',
@@ -293,22 +293,22 @@ describe('Foundation: 03 - Sequential Fan-out/Fan-in', () => {
     // Fan-out #2: bridge → phase2 (spawn 3)
     const fanOut2 = transition({
       ref: 'fanout_2',
-      from_node_ref: 'bridge',
-      to_node_ref: 'phase2',
+      fromNodeRef: 'bridge',
+      toNodeRef: 'phase2',
       priority: 1,
-      spawn_count: 3,
-      sibling_group: 'phase2_group',
+      spawnCount: 3,
+      siblingGroup: 'phase2_group',
     });
 
     // Fan-in #2: phase2 → summarize (synchronize all phase2 branches)
     const fanIn2 = transition({
       ref: 'fanin_2',
-      from_node_ref: 'phase2',
-      to_node_ref: 'summarize',
+      fromNodeRef: 'phase2',
+      toNodeRef: 'summarize',
       priority: 1,
       synchronization: {
         strategy: 'all',
-        sibling_group: 'phase2_group',
+        siblingGroup: 'phase2_group',
         merge: {
           source: '_branch.output.transformed',
           target: 'state.phase2_results',
@@ -323,17 +323,17 @@ describe('Foundation: 03 - Sequential Fan-out/Fan-in', () => {
     const workflowDef = workflow({
       name: 'Sequential Fan-out/Fan-in Test',
       description: 'Foundation test 03 - two sequential fan-out/fan-in phases',
-      input_schema: inputSchema,
-      output_schema: workflowOutputSchema,
-      context_schema: contextSchema,
-      output_mapping: {
+      inputSchema: inputSchema,
+      outputSchema: workflowOutputSchema,
+      contextSchema: contextSchema,
+      outputMapping: {
         seed: '$.state.seed',
         phase1_results: '$.state.phase1_results',
         phase1_count: '$.state.phase1_count',
         phase2_results: '$.state.phase2_results',
         summary: '$.state.summary',
       },
-      initial_node_ref: 'init',
+      initialNodeRef: 'init',
       nodes: [initNode, phase1Node, bridgeNode, phase2Node, summarizeNode],
       transitions: [fanOut1, fanIn1, fanOut2, fanIn2],
     });

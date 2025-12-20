@@ -161,7 +161,7 @@ describe('Task 2.2: buildPathTemplate', () => {
     };
     const projectIdNode: RouteNode = {
       type: NodeType.Param,
-      name: 'project_id',
+      name: 'projectId',
       methods: [],
       children: [],
       parent: projectsNode,
@@ -181,7 +181,7 @@ describe('Task 2.2: buildPathTemplate', () => {
       parent: workflowsNode,
     };
     expect(buildPathTemplate(workflowIdNode)).toBe(
-      '/api/projects/${project_id}/workflows/${workflow_id}',
+      '/api/projects/${projectId}/workflows/${workflow_id}',
     );
   });
 
@@ -195,12 +195,12 @@ describe('Task 2.2: buildPathTemplate', () => {
     };
     const paramNode: RouteNode = {
       type: NodeType.Param,
-      name: 'workspace_id',
+      name: 'workspaceId',
       methods: [],
       children: [],
       parent: parentNode,
     };
-    expect(buildPathTemplate(paramNode)).toBe('/api/workspaces/${workspace_id}');
+    expect(buildPathTemplate(paramNode)).toBe('/api/workspaces/${workspaceId}');
   });
 });
 
@@ -349,7 +349,7 @@ describe('Task 2.3: generateMethodSignature', () => {
     };
     const projectIdNode: RouteNode = {
       type: NodeType.Param,
-      name: 'project_id',
+      name: 'projectId',
       methods: [],
       children: [],
       parent: projectsNode,
@@ -373,7 +373,7 @@ describe('Task 2.3: generateMethodSignature', () => {
 
     expect(sig.parameters).toHaveLength(3);
     expect(sig.parameters[0]).toEqual({
-      name: 'project_id',
+      name: 'projectId',
       type: 'string',
       optional: false,
     });

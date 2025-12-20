@@ -22,25 +22,25 @@ type WorkflowDefConfig = Omit<CreateWorkflowDef, 'nodes'> & {
  * const myWorkflow = workflowDef({
  *   name: 'My Workflow',
  *   description: 'A workflow that does something',
- *   project_id: 'my-project-id',
- *   input_schema: schema.object({ ... }),
- *   output_schema: schema.object({ ... }),
- *   initial_node_ref: 'start',
+ *   projectId: 'my-project-id',
+ *   inputSchema: schema.object({ ... }),
+ *   outputSchema: schema.object({ ... }),
+ *   initialNodeRef: 'start',
  *   nodes: [
  *     node({ ref: 'start', name: 'Start', ... }),
  *     node({ ref: 'end', name: 'End', ... })
  *   ],
  *   transitions: [
- *     transition({ from_node_ref: 'start', to_node_ref: 'end', priority: 1 })
+ *     transition({ fromNodeRef: 'start', toNodeRef: 'end', priority: 1 })
  *   ]
  * });
  */
 export function workflow(config: WorkflowDefConfig): EmbeddedWorkflowDef {
-  // Validate that initial_node_ref exists in nodes
+  // Validate that initialNodeRef exists in nodes
   const nodeRefs = new Set(config.nodes.map((n) => n.ref));
-  if (!nodeRefs.has(config.initial_node_ref)) {
+  if (!nodeRefs.has(config.initialNodeRef)) {
     throw new Error(
-      `initial_node_ref '${config.initial_node_ref}' does not match any node ref. ` +
+      `initialNodeRef '${config.initialNodeRef}' does not match any node ref. ` +
         `Available nodes: ${Array.from(nodeRefs).join(', ')}`,
     );
   }
@@ -48,14 +48,14 @@ export function workflow(config: WorkflowDefConfig): EmbeddedWorkflowDef {
   // Validate transitions reference existing nodes
   if (config.transitions) {
     for (const transition of config.transitions) {
-      if (!nodeRefs.has(transition.from_node_ref)) {
+      if (!nodeRefs.has(transition.fromNodeRef)) {
         throw new Error(
-          `Transition from_node_ref '${transition.from_node_ref}' does not match any node ref`,
+          `Transition fromNodeRef '${transition.fromNodeRef}' does not match any node ref`,
         );
       }
-      if (!nodeRefs.has(transition.to_node_ref)) {
+      if (!nodeRefs.has(transition.toNodeRef)) {
         throw new Error(
-          `Transition to_node_ref '${transition.to_node_ref}' does not match any node ref`,
+          `Transition toNodeRef '${transition.toNodeRef}' does not match any node ref`,
         );
       }
     }
@@ -65,15 +65,15 @@ export function workflow(config: WorkflowDefConfig): EmbeddedWorkflowDef {
     [WORKFLOW_DEF]: true,
     name: config.name,
     description: config.description,
-    input_schema: config.input_schema,
-    output_schema: config.output_schema,
-    initial_node_ref: config.initial_node_ref,
+    inputSchema: config.inputSchema,
+    outputSchema: config.outputSchema,
+    initialNodeRef: config.initialNodeRef,
     nodes: config.nodes,
-    ...(config.project_id !== undefined && { project_id: config.project_id }),
-    ...(config.library_id !== undefined && { library_id: config.library_id }),
+    ...(config.projectId !== undefined && { projectId: config.projectId }),
+    ...(config.libraryId !== undefined && { libraryId: config.libraryId }),
     ...(config.tags !== undefined && { tags: config.tags }),
-    ...(config.context_schema !== undefined && { context_schema: config.context_schema }),
-    ...(config.output_mapping !== undefined && { output_mapping: config.output_mapping }),
+    ...(config.contextSchema !== undefined && { contextSchema: config.contextSchema }),
+    ...(config.outputMapping !== undefined && { outputMapping: config.outputMapping }),
     ...(config.transitions !== undefined && { transitions: config.transitions }),
   };
 }

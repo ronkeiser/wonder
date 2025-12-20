@@ -36,7 +36,7 @@ export const TEST_CASE_ALLOWED_PROPS = new Set([
   'input',
   'context',
   'mocks',
-  'timeout_ms',
+  'timeoutMs',
   'assert',
   'snapshot',
   'tags',
@@ -90,7 +90,7 @@ export const ASSERTION_PRIMITIVES = new Set([
 export const TEST_CONFIG_ALLOWED_PROPS = new Set([
   'parallel',
   'max_concurrent',
-  'timeout_ms',
+  'timeoutMs',
   'fail_fast',
 ]);
 

@@ -14,24 +14,24 @@ const WS_MESSAGE_TYPE = {
 
 export interface SubscriptionFilter {
   // Workflow execution context
-  workflow_run_id?: string;
-  parent_run_id?: string;
-  workspace_id?: string;
-  project_id?: string;
+  workflowRunId?: string;
+  parentRunId?: string;
+  workspaceId?: string;
+  projectId?: string;
 
   // Event classification
-  event_type?: string;
-  event_types?: string[];
+  eventType?: string;
+  eventTypes?: string[];
 
   // Execution elements
-  node_id?: string;
-  token_id?: string;
-  path_id?: string;
+  nodeId?: string;
+  tokenId?: string;
+  pathId?: string;
 
   // Trace event specific
   category?: 'decision' | 'operation' | 'dispatch' | 'sql';
   type?: string;
-  min_duration_ms?: number;
+  minDurationMs?: number;
 }
 
 export interface EventStreamSubscription {
@@ -54,7 +54,7 @@ export type WorkflowEvent =
 interface WebSocketMessage {
   type: string;
   stream?: 'events' | 'trace';
-  subscription_id?: string;
+  subscriptionId?: string;
   event?: WorkflowEvent;
   message?: string;
 }
@@ -119,8 +119,8 @@ export class EventsClient {
       };
 
       // Route to subscription-specific callback
-      if (data.subscription_id) {
-        callbacks.get(data.subscription_id)?.(eventWithStream);
+      if (data.subscriptionId) {
+        callbacks.get(data.subscriptionId)?.(eventWithStream);
       }
 
       // Notify general event callbacks

@@ -221,21 +221,21 @@ export class WorkflowVerifier {
    */
   private extractWorkflowFailure(): WorkflowFailure | null {
     // Look for task.failed event first (has more details)
-    const taskFailed = this.events.find((e) => e.event_type === 'task.failed');
+    const taskFailed = this.events.find((e) => e.eventType === 'task.failed');
     if (taskFailed) {
       const metadata = this.parseMetadata(taskFailed.metadata);
       return {
         message: taskFailed.message ?? 'Task failed',
-        tokenId: metadata?.token_id as string | undefined,
-        nodeId: metadata?.node_id as string | undefined,
-        taskId: metadata?.task_id as string | undefined,
+        tokenId: metadata?.tokenId as string | undefined,
+        nodeId: metadata?.nodeId as string | undefined,
+        taskId: metadata?.taskId as string | undefined,
         error: metadata?.error as WorkflowFailure['error'],
         metrics: metadata?.metrics as WorkflowFailure['metrics'],
       };
     }
 
     // Fall back to workflow.failed
-    const workflowFailed = this.events.find((e) => e.event_type === 'workflow.failed');
+    const workflowFailed = this.events.find((e) => e.eventType === 'workflow.failed');
     if (workflowFailed) {
       const metadata = this.parseMetadata(workflowFailed.metadata);
       const errorMsg = metadata?.error;
@@ -312,21 +312,21 @@ export class WorkflowVerifier {
           );
         }
 
-        // Verify branch_total
+        // Verify branchTotal
         const wrongTotals = group.siblings.filter(
-          (s) => s.payload.branch_total !== spec.branchTotal,
+          (s) => s.payload.branchTotal !== spec.branchTotal,
         );
         if (wrongTotals.length > 0) {
           throw new WorkflowVerificationError(
             `tokens.${groupLabel}.branchTotal`,
-            `Expected fan-out group ${i} siblings to have branch_total=${spec.branchTotal}.`,
+            `Expected fan-out group ${i} siblings to have branchTotal=${spec.branchTotal}.`,
             diagnostics,
             {
               expected: spec.branchTotal,
               siblingGroup: group.siblingGroup,
               mismatches: wrongTotals.map((s) => ({
-                tokenId: s.token_id,
-                branchTotal: s.payload.branch_total,
+                tokenId: s.tokenId,
+                branchTotal: s.payload.branchTotal,
               })),
             },
           );
@@ -335,7 +335,7 @@ export class WorkflowVerifier {
         // Verify branch indices are 0..count-1
         const expectedIndices = Array.from({ length: spec.count }, (_, j) => j);
         const actualIndices = group.siblings
-          .map((s) => s.payload.branch_index)
+          .map((s) => s.payload.branchIndex)
           .sort((a, b) => a - b);
         if (JSON.stringify(actualIndices) !== JSON.stringify(expectedIndices)) {
           throw new WorkflowVerificationError(
@@ -350,7 +350,7 @@ export class WorkflowVerifier {
         if (spec.outputFields) {
           const { branchOutputs } = ctx.collected;
           for (const sibling of group.siblings) {
-            const tokenId = sibling.token_id!;
+            const tokenId = sibling.tokenId!;
             const output = branchOutputs.get(tokenId);
             if (!output) {
               throw new WorkflowVerificationError(
@@ -727,32 +727,32 @@ export class WorkflowVerifier {
     const tokenCreations = this.trace.tokens.creations();
 
     // Classify tokens
-    const rootTokens = tokenCreations.filter((tc) => tc.payload.path_id === 'root');
+    const rootTokens = tokenCreations.filter((tc) => tc.payload.pathId === 'root');
 
-    // Fan-out siblings: tokens with sibling_group, branch_total > 1, AND
+    // Fan-out siblings: tokens with siblingGroup, branchTotal > 1, AND
     // a unique branch path (not index 0 continuing from a completed branch).
     // The key insight: true fan-out siblings are the FIRST tokens in their branch path,
-    // meaning their parent doesn't have the same sibling_group.
-    // Fan-in arrivals (child of a sibling going into sync) inherit sibling_group but are NOT siblings.
-    const tokenMap = new Map(tokenCreations.map((tc) => [tc.token_id, tc]));
+    // meaning their parent doesn't have the same siblingGroup.
+    // Fan-in arrivals (child of a sibling going into sync) inherit siblingGroup but are NOT siblings.
+    const tokenMap = new Map(tokenCreations.map((tc) => [tc.tokenId, tc]));
 
     const fanOutSiblings = tokenCreations.filter((tc) => {
-      if (tc.payload.sibling_group === null) return false;
-      if (tc.payload.branch_total <= 1) return false;
-      // Check if parent has the same sibling_group
+      if (tc.payload.siblingGroup === null) return false;
+      if (tc.payload.branchTotal <= 1) return false;
+      // Check if parent has the same siblingGroup
       // If yes, this is a continuation/arrival, not a true sibling
-      const parent = tc.payload.parent_token_id ? tokenMap.get(tc.payload.parent_token_id) : null;
-      if (parent && parent.payload.sibling_group === tc.payload.sibling_group) {
+      const parent = tc.payload.parentTokenId ? tokenMap.get(tc.payload.parentTokenId) : null;
+      if (parent && parent.payload.siblingGroup === tc.payload.siblingGroup) {
         return false; // This is a fan-in arrival, not a new sibling
       }
       return true;
     });
-    const siblingIds = new Set(fanOutSiblings.map((s) => s.token_id));
+    const siblingIds = new Set(fanOutSiblings.map((s) => s.tokenId));
 
-    // Group siblings by sibling_group (preserving order of first occurrence)
+    // Group siblings by siblingGroup (preserving order of first occurrence)
     const fanOutGroupMap = new Map<string, typeof fanOutSiblings>();
     for (const sibling of fanOutSiblings) {
-      const siblingGroup = sibling.payload.sibling_group!;
+      const siblingGroup = sibling.payload.siblingGroup!;
       if (!fanOutGroupMap.has(siblingGroup)) {
         fanOutGroupMap.set(siblingGroup, []);
       }
@@ -763,30 +763,30 @@ export class WorkflowVerifier {
       siblings,
     }));
 
-    // Fan-in arrivals: have sibling_group, but parent is a fan-out sibling
-    // (so they inherit the sibling_group from their parent)
+    // Fan-in arrivals: have siblingGroup, but parent is a fan-out sibling
+    // (so they inherit the siblingGroup from their parent)
     const fanInArrivals = tokenCreations.filter((tc) => {
-      if (tc.payload.sibling_group === null) return false;
-      return siblingIds.has(tc.payload.parent_token_id!);
+      if (tc.payload.siblingGroup === null) return false;
+      return siblingIds.has(tc.payload.parentTokenId!);
     });
 
     // Fan-in continuations: tokens created after synchronization completes
-    // These are tokens with no sibling_group, not root, and branch_total of 1
+    // These are tokens with no siblingGroup, not root, and branchTotal of 1
     const fanInContinuations = tokenCreations.filter((tc) => {
       // Not root
-      if (tc.payload.path_id === 'root') return false;
-      // Has no sibling_group (distinguishes from siblings and arrivals)
-      if (tc.payload.sibling_group !== null) return false;
-      // Has branch_total of 1 (single continuation after sync)
-      return tc.payload.branch_total === 1;
+      if (tc.payload.pathId === 'root') return false;
+      // Has no siblingGroup (distinguishes from siblings and arrivals)
+      if (tc.payload.siblingGroup !== null) return false;
+      // Has branchTotal of 1 (single continuation after sync)
+      return tc.payload.branchTotal === 1;
     });
 
     // Collect branch outputs
     const branchOutputs = new Map<string, Record<string, unknown>>();
     const branchWrites = this.trace.branches.writes();
     for (const bw of branchWrites) {
-      if (bw.token_id && siblingIds.has(bw.token_id)) {
-        branchOutputs.set(bw.token_id, bw.payload.output as Record<string, unknown>);
+      if (bw.tokenId && siblingIds.has(bw.tokenId)) {
+        branchOutputs.set(bw.tokenId, bw.payload.output as Record<string, unknown>);
       }
     }
 
@@ -800,7 +800,7 @@ export class WorkflowVerifier {
     // Get final output
     const completion = this.trace.completion.complete();
     const finalOutput = completion
-      ? (completion.payload.final_output as Record<string, unknown>)
+      ? (completion.payload.finalOutput as Record<string, unknown>)
       : null;
 
     this._context = {
@@ -844,12 +844,12 @@ export class WorkflowVerifier {
     this._diagnostics = {
       input: this.input,
       tokenCreations: tokenCreations.map((tc) => ({
-        tokenId: tc.token_id,
-        pathId: tc.payload.path_id,
-        parentId: tc.payload.parent_token_id,
-        siblingGroup: tc.payload.sibling_group,
-        branchIndex: tc.payload.branch_index,
-        branchTotal: tc.payload.branch_total,
+        tokenId: tc.tokenId,
+        pathId: tc.payload.pathId,
+        parentId: tc.payload.parentTokenId,
+        siblingGroup: tc.payload.siblingGroup,
+        branchIndex: tc.payload.branchIndex,
+        branchTotal: tc.payload.branchTotal,
       })),
       tokenSummary: {
         root: ctx.collected.rootTokens.length,
@@ -863,7 +863,7 @@ export class WorkflowVerifier {
         .map(([path, { value, sequence }]) => ({ path, value, sequence }))
         .sort((a, b) => a.sequence - b.sequence),
       branchWrites: this.trace.branches.writes().map((bw) => ({
-        tokenId: bw.token_id,
+        tokenId: bw.tokenId,
         output: bw.payload.output,
       })),
       finalOutput: ctx.collected.finalOutput,
@@ -918,7 +918,7 @@ export class WorkflowVerifier {
  *   .withStateWriteOrder(['state.seed', 'state.results', 'state.summary'])
  *   .withOutput({
  *     prefix: 'TEST',
- *     merged_results: { type: 'array', arrayLength: 3 },
+ *     mergedResults: { type: 'array', arrayLength: 3 },
  *     summary: { defined: true }
  *   })
  *   .run();

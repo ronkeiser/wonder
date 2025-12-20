@@ -16,15 +16,15 @@ import {
 type CreateAction = components['schemas']['CreateAction'];
 
 type ActionKind =
-  | 'llm_call'
-  | 'mcp_tool'
-  | 'http_request'
-  | 'human_input'
-  | 'update_context'
-  | 'write_artifact'
-  | 'workflow_call'
-  | 'vector_search'
-  | 'emit_metric'
+  | 'llm'
+  | 'mcp'
+  | 'http'
+  | 'human'
+  | 'context'
+  | 'artifact'
+  | 'workflow'
+  | 'vector'
+  | 'metric'
   | 'mock';
 
 /**
@@ -35,10 +35,10 @@ type ActionKind =
  * const myAction = action({
  *   name: 'Generate Summary',
  *   description: 'Generates a summary using LLM',
- *   kind: 'llm_call',
+ *   kind: 'llm',
  *   implementation: {
- *     prompt_spec_id: 'existing-id',
- *     model_profile_id: 'existing-id'
+ *     promptSpecId: 'existing-id',
+ *     modelProfileId: 'existing-id'
  *   }
  * });
  *
@@ -46,9 +46,9 @@ type ActionKind =
  * const myAction = action({
  *   name: 'Generate Summary',
  *   description: 'Generates a summary using LLM',
- *   kind: 'llm_call',
+ *   kind: 'llm',
  *   implementation: {
- *     prompt_spec: promptSpec({...}),  // will be created automatically
+ *     promptSpec: promptSpec({...}),  // will be created automatically
  *   }
  * });
  */
@@ -58,10 +58,10 @@ export function action(config: {
   version?: number;
   kind: ActionKind;
   implementation: {
-    prompt_spec_id?: string;
-    prompt_spec?: EmbeddedPromptSpec;
-    model_profile_id?: string;
-    model_profile?: EmbeddedModelProfile;
+    promptSpecId?: string;
+    promptSpec?: EmbeddedPromptSpec;
+    modelProfileId?: string;
+    modelProfile?: EmbeddedModelProfile;
     [key: string]: unknown;
   };
   requires?: Record<string, unknown>;

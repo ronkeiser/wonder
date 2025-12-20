@@ -242,11 +242,11 @@ function validateTaskDocument(
     diagnostics,
   );
 
-  if (parsed.input_schema && typeof parsed.input_schema === 'object') {
-    validateJsonSchema(parsed.input_schema as unknown as Record<string, unknown>, 'input_schema', lines, diagnostics);
+  if (parsed.inputSchema && typeof parsed.inputSchema === 'object') {
+    validateJsonSchema(parsed.inputSchema as unknown as Record<string, unknown>, 'inputSchema', lines, diagnostics);
   }
-  if (parsed.output_schema && typeof parsed.output_schema === 'object') {
-    validateJsonSchema(parsed.output_schema as unknown as Record<string, unknown>, 'output_schema', lines, diagnostics);
+  if (parsed.outputSchema && typeof parsed.outputSchema === 'object') {
+    validateJsonSchema(parsed.outputSchema as unknown as Record<string, unknown>, 'outputSchema', lines, diagnostics);
   }
 
   if (parsed.retry && typeof parsed.retry === 'object') {
@@ -270,36 +270,36 @@ function validateTaskDocument(
         stepStartLine,
       );
 
-      if (step.action_id && typeof step.action_id === 'string') {
-        const imp = imports.byAlias.get(step.action_id);
+      if (step.actionId && typeof step.actionId === 'string') {
+        const imp = imports.byAlias.get(step.actionId);
         if (imp) {
-          usedImports.add(step.action_id);
+          usedImports.add(step.actionId);
           if (imp.fileType !== 'action' && imp.fileType !== 'unknown') {
-            const lineIndex = findLineContainingAfter(lines, 'action_id:', stepStartLine);
+            const lineIndex = findLineContainingAfter(lines, 'actionId:', stepStartLine);
             if (lineIndex !== -1) {
               const line = lines[lineIndex];
-              const charIndex = line.indexOf(step.action_id);
+              const charIndex = line.indexOf(step.actionId);
               diagnostics.push({
                 severity: LSPDiagnosticSeverity.Error,
                 range: {
                   start: { line: lineIndex, character: charIndex },
-                  end: { line: lineIndex, character: charIndex + step.action_id.length },
+                  end: { line: lineIndex, character: charIndex + step.actionId.length },
                 },
-                message: `Import '${step.action_id}' resolves to a ${imp.fileType} file, but action_id requires an action`,
+                message: `Import '${step.actionId}' resolves to a ${imp.fileType} file, but actionId requires an action`,
                 source: 'wflow',
               });
             }
           }
-        } else if (!step.action_id.startsWith('@')) {
-          const lineIndex = findLineContainingAfter(lines, 'action_id:', stepStartLine);
+        } else if (!step.actionId.startsWith('@')) {
+          const lineIndex = findLineContainingAfter(lines, 'actionId:', stepStartLine);
           if (lineIndex !== -1) {
             const line = lines[lineIndex];
-            const charIndex = line.indexOf(step.action_id);
+            const charIndex = line.indexOf(step.actionId);
             const availableImports = [...imports.byAlias.keys()].filter((alias) => {
               const i = imports.byAlias.get(alias);
               return i?.fileType === 'action' || i?.fileType === 'unknown';
             });
-            let message = `Action '${step.action_id}' is not imported.`;
+            let message = `Action '${step.actionId}' is not imported.`;
             if (availableImports.length > 0) {
               message += ` Available actions: ${availableImports.join(', ')}`;
             } else {
@@ -309,7 +309,7 @@ function validateTaskDocument(
               severity: LSPDiagnosticSeverity.Error,
               range: {
                 start: { line: lineIndex, character: charIndex },
-                end: { line: lineIndex, character: charIndex + step.action_id.length },
+                end: { line: lineIndex, character: charIndex + step.actionId.length },
               },
               message,
               source: 'wflow',
@@ -456,14 +456,14 @@ function validateWorkflowDocument(
     diagnostics,
   );
 
-  if (parsed.input_schema && typeof parsed.input_schema === 'object') {
-    validateJsonSchema(parsed.input_schema as unknown as Record<string, unknown>, 'input_schema', lines, diagnostics);
+  if (parsed.inputSchema && typeof parsed.inputSchema === 'object') {
+    validateJsonSchema(parsed.inputSchema as unknown as Record<string, unknown>, 'inputSchema', lines, diagnostics);
   }
-  if (parsed.context_schema && typeof parsed.context_schema === 'object') {
-    validateJsonSchema(parsed.context_schema as unknown as Record<string, unknown>, 'context_schema', lines, diagnostics);
+  if (parsed.contextSchema && typeof parsed.contextSchema === 'object') {
+    validateJsonSchema(parsed.contextSchema as unknown as Record<string, unknown>, 'contextSchema', lines, diagnostics);
   }
-  if (parsed.output_schema && typeof parsed.output_schema === 'object') {
-    validateJsonSchema(parsed.output_schema as unknown as Record<string, unknown>, 'output_schema', lines, diagnostics);
+  if (parsed.outputSchema && typeof parsed.outputSchema === 'object') {
+    validateJsonSchema(parsed.outputSchema as unknown as Record<string, unknown>, 'outputSchema', lines, diagnostics);
   }
 
   // Validate nodes
@@ -482,36 +482,36 @@ function validateWorkflowDocument(
         nodeStartLine !== -1 ? nodeStartLine : 0,
       );
 
-      if (node.task_id && typeof node.task_id === 'string') {
-        const imp = imports.byAlias.get(node.task_id);
+      if (node.taskId && typeof node.taskId === 'string') {
+        const imp = imports.byAlias.get(node.taskId);
         if (imp) {
-          usedImports.add(node.task_id);
+          usedImports.add(node.taskId);
           if (imp.fileType !== 'task' && imp.fileType !== 'unknown') {
-            const lineIndex = findLineContainingAfter(lines, 'task_id:', nodeStartLine);
+            const lineIndex = findLineContainingAfter(lines, 'taskId:', nodeStartLine);
             if (lineIndex !== -1) {
               const line = lines[lineIndex];
-              const charIndex = line.indexOf(node.task_id);
+              const charIndex = line.indexOf(node.taskId);
               diagnostics.push({
                 severity: LSPDiagnosticSeverity.Error,
                 range: {
                   start: { line: lineIndex, character: charIndex },
-                  end: { line: lineIndex, character: charIndex + node.task_id.length },
+                  end: { line: lineIndex, character: charIndex + node.taskId.length },
                 },
-                message: `Import '${node.task_id}' resolves to a ${imp.fileType} file, but task_id requires a task`,
+                message: `Import '${node.taskId}' resolves to a ${imp.fileType} file, but taskId requires a task`,
                 source: 'wflow',
               });
             }
           }
-        } else if (!node.task_id.startsWith('@')) {
-          const lineIndex = findLineContainingAfter(lines, 'task_id:', nodeStartLine);
+        } else if (!node.taskId.startsWith('@')) {
+          const lineIndex = findLineContainingAfter(lines, 'taskId:', nodeStartLine);
           if (lineIndex !== -1) {
             const line = lines[lineIndex];
-            const charIndex = line.indexOf(node.task_id);
+            const charIndex = line.indexOf(node.taskId);
             const availableImports = [...imports.byAlias.keys()].filter((alias) => {
               const i = imports.byAlias.get(alias);
               return i?.fileType === 'task' || i?.fileType === 'unknown';
             });
-            let message = `Task '${node.task_id}' is not imported.`;
+            let message = `Task '${node.taskId}' is not imported.`;
             if (availableImports.length > 0) {
               message += ` Available tasks: ${availableImports.join(', ')}`;
             } else {
@@ -521,7 +521,7 @@ function validateWorkflowDocument(
               severity: LSPDiagnosticSeverity.Error,
               range: {
                 start: { line: lineIndex, character: charIndex },
-                end: { line: lineIndex, character: charIndex + node.task_id.length },
+                end: { line: lineIndex, character: charIndex + node.taskId.length },
               },
               message,
               source: 'wflow',
@@ -597,9 +597,9 @@ function validateWorkflowDocument(
   }
 
   // Schema path validation
-  const inputPaths = extractPaths(parsed.input_schema, 'input');
-  const contextPaths = extractPaths(parsed.context_schema, 'state');
-  const outputPaths = extractPaths(parsed.output_schema, 'output');
+  const inputPaths = extractPaths(parsed.inputSchema, 'input');
+  const contextPaths = extractPaths(parsed.contextSchema, 'state');
+  const outputPaths = extractPaths(parsed.outputSchema, 'output');
   const readablePaths = new Set([...inputPaths, ...contextPaths]);
   const writablePaths = new Set([...contextPaths, ...outputPaths]);
   const nodeRefs = new Set(Object.keys(parsed.nodes || {}));
@@ -623,12 +623,12 @@ function validateWorkflowDocument(
     }
   }
 
-  // Validate input_mapping and output_mapping paths
+  // Validate inputMapping and outputMapping paths
   for (const [nodeRef, node] of Object.entries(parsed.nodes || {})) {
     if (!node) continue;
 
-    if (node.input_mapping) {
-      for (const [_taskInputKey, jsonPath] of Object.entries(node.input_mapping)) {
+    if (node.inputMapping) {
+      for (const [_taskInputKey, jsonPath] of Object.entries(node.inputMapping)) {
         if (typeof jsonPath !== 'string') continue;
         const pathMatch = jsonPath.match(/^\$\.(.+)$/);
         if (!pathMatch) continue;
@@ -640,7 +640,7 @@ function validateWorkflowDocument(
             const line = lines[lineIndex];
             const charIndex = line.indexOf(jsonPath);
             const suggestions = findSimilarPaths(path, readablePaths);
-            let message = `Path '${jsonPath}' does not exist in input_schema or context_schema.`;
+            let message = `Path '${jsonPath}' does not exist in inputSchema or contextSchema.`;
             if (suggestions.length > 0) {
               message += ` Did you mean: ${suggestions.map((s) => `$.${s}`).join(', ')}?`;
             }
@@ -658,8 +658,8 @@ function validateWorkflowDocument(
       }
     }
 
-    if (node.output_mapping) {
-      for (const [contextPath, _taskOutputPath] of Object.entries(node.output_mapping)) {
+    if (node.outputMapping) {
+      for (const [contextPath, _taskOutputPath] of Object.entries(node.outputMapping)) {
         if (typeof contextPath !== 'string') continue;
 
         if (!writablePaths.has(contextPath)) {
@@ -668,7 +668,7 @@ function validateWorkflowDocument(
             const line = lines[lineIndex];
             const charIndex = line.indexOf(contextPath);
             const suggestions = findSimilarPaths(contextPath, writablePaths);
-            let message = `Path '${contextPath}' does not exist in context_schema or output_schema.`;
+            let message = `Path '${contextPath}' does not exist in contextSchema or outputSchema.`;
             if (suggestions.length > 0) {
               message += ` Did you mean: ${suggestions.join(', ')}?`;
             }
@@ -691,11 +691,11 @@ function validateWorkflowDocument(
   for (const [_transitionRef, transition] of Object.entries(parsed.transitions || {})) {
     if (typeof transition !== 'object' || transition === null) continue;
 
-    const fromNodeRef = transition.from_node_ref;
-    const toNodeRef = transition.to_node_ref;
+    const fromNodeRef = transition.fromNodeRef;
+    const toNodeRef = transition.toNodeRef;
 
     if (fromNodeRef && !nodeRefs.has(fromNodeRef)) {
-      const lineIndex = findTransitionFieldLine(lines, fromNodeRef, 'from_node_ref');
+      const lineIndex = findTransitionFieldLine(lines, fromNodeRef, 'fromNodeRef');
       if (lineIndex !== -1) {
         const line = lines[lineIndex];
         const charIndex = line.indexOf(fromNodeRef);
@@ -712,7 +712,7 @@ function validateWorkflowDocument(
     }
 
     if (toNodeRef !== null && toNodeRef !== undefined && !nodeRefs.has(toNodeRef)) {
-      const lineIndex = findTransitionFieldLine(lines, toNodeRef, 'to_node_ref');
+      const lineIndex = findTransitionFieldLine(lines, toNodeRef, 'toNodeRef');
       if (lineIndex !== -1) {
         const line = lines[lineIndex];
         const charIndex = line.indexOf(toNodeRef);
@@ -728,21 +728,21 @@ function validateWorkflowDocument(
       }
     }
 
-    // Validate sibling_group
+    // Validate siblingGroup
     const sync = transition.synchronization as unknown as Record<string, unknown> | undefined;
-    if (sync?.sibling_group && typeof sync.sibling_group === 'string') {
-      if (!transitionRefs.has(sync.sibling_group)) {
-        const lineIndex = findMappingLine(lines, sync.sibling_group);
+    if (sync?.siblingGroup && typeof sync.siblingGroup === 'string') {
+      if (!transitionRefs.has(sync.siblingGroup)) {
+        const lineIndex = findMappingLine(lines, sync.siblingGroup);
         if (lineIndex !== -1) {
           const line = lines[lineIndex];
-          const charIndex = line.indexOf(sync.sibling_group);
+          const charIndex = line.indexOf(sync.siblingGroup);
           diagnostics.push({
             severity: LSPDiagnosticSeverity.Error,
             range: {
               start: { line: lineIndex, character: charIndex },
-              end: { line: lineIndex, character: charIndex + sync.sibling_group.length },
+              end: { line: lineIndex, character: charIndex + sync.siblingGroup.length },
             },
-            message: `Transition '${sync.sibling_group}' does not exist. sibling_group must reference a fan-out transition. Available transitions: ${[...transitionRefs].join(', ') || 'none'}`,
+            message: `Transition '${sync.siblingGroup}' does not exist. siblingGroup must reference a fan-out transition. Available transitions: ${[...transitionRefs].join(', ') || 'none'}`,
             source: 'wflow',
           });
         }
@@ -773,7 +773,7 @@ function validateWorkflowDocument(
           const line = lines[lineIndex];
           const charIndex = line.indexOf(foreach.collection);
           const suggestions = findSimilarPaths(foreach.collection, contextPaths);
-          let message = `Path '${foreach.collection}' does not exist in context_schema.`;
+          let message = `Path '${foreach.collection}' does not exist in contextSchema.`;
           if (suggestions.length > 0) {
             message += ` Did you mean: ${suggestions.join(', ')}?`;
           }
@@ -843,11 +843,11 @@ function validateWorkflowDocument(
 
   // Data flow validation
   for (const [nodeRef, node] of Object.entries(parsed.nodes || {})) {
-    if (!node?.input_mapping) continue;
+    if (!node?.inputMapping) continue;
 
     const available = dataFlow.availableWrites.get(nodeRef) || new Set();
 
-    for (const [_taskInputKey, jsonPath] of Object.entries(node.input_mapping)) {
+    for (const [_taskInputKey, jsonPath] of Object.entries(node.inputMapping)) {
       if (typeof jsonPath !== 'string') continue;
 
       const pathMatch = jsonPath.match(/^\$\.state\.(.+)$/);

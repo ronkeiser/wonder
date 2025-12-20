@@ -23,7 +23,7 @@ export interface DataFlowAnalysis {
  * Analyze data flow in a workflow
  *
  * Tracks which state paths are available (written) at each node based on
- * the execution order and output_mappings of predecessor nodes.
+ * the execution order and outputMappings of predecessor nodes.
  */
 export function analyzeDataFlow(
   doc: WflowDocument,
@@ -48,7 +48,7 @@ export function analyzeDataFlow(
 
     for (const pred of preds) {
       const predNode = doc.nodes?.[pred];
-      if (!predNode?.output_mapping) continue;
+      if (!predNode?.outputMapping) continue;
 
       // Check if transition from pred to this node is conditional
       const transitionKey = `${pred}->${nodeRef}`;
@@ -56,7 +56,7 @@ export function analyzeDataFlow(
       const isConditional = transitions.some((t) => t.condition !== undefined);
 
       // Add all writes from predecessor
-      for (const contextPath of Object.keys(predNode.output_mapping)) {
+      for (const contextPath of Object.keys(predNode.outputMapping)) {
         if (contextPath.startsWith('state.')) {
           // Only state paths propagate (not output paths)
           if (!isConditional) {

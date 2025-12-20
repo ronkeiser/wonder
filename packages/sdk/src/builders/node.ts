@@ -18,9 +18,9 @@ type NodeConfig = components['schemas']['CreateWorkflowDef']['nodes'][number];
  * const myNode = node({
  *   ref: 'process',
  *   name: 'Process Data',
- *   task_id: 'my-task-id',
- *   task_version: 1,
- *   input_mapping: { data: '$.input.rawData' }
+ *   taskId: 'my-task-id',
+ *   taskVersion: 1,
+ *   inputMapping: { data: '$.input.rawData' }
  * });
  *
  * // With embedded task (auto-created by createWorkflow)
@@ -30,30 +30,30 @@ type NodeConfig = components['schemas']['CreateWorkflowDef']['nodes'][number];
  *   task: taskDef({
  *     steps: [step({ action: action({...}) })]
  *   }),
- *   task_version: 1,
+ *   taskVersion: 1,
  * });
  */
 export function node(config: {
   ref: string;
   name: string;
-  task_id?: string;
+  taskId?: string;
   task?: EmbeddedTaskDef;
-  task_version?: number;
-  input_mapping?: Record<string, unknown>;
-  output_mapping?: Record<string, unknown>;
-  resource_bindings?: Record<string, unknown>;
+  taskVersion?: number;
+  inputMapping?: Record<string, unknown>;
+  outputMapping?: Record<string, unknown>;
+  resourceBindings?: Record<string, unknown>;
 }): EmbeddedNode {
-  if (!config.task_id && !config.task) {
-    throw new Error('Node must have either task_id or task');
+  if (!config.taskId && !config.task) {
+    throw new Error('Node must have either taskId or task');
   }
   return {
     ref: config.ref,
     name: config.name,
-    ...(config.task_id !== undefined && { task_id: config.task_id }),
+    ...(config.taskId !== undefined && { taskId: config.taskId }),
     ...(config.task !== undefined && { task: config.task }),
-    ...(config.task_version !== undefined && { task_version: config.task_version }),
-    ...(config.input_mapping !== undefined && { input_mapping: config.input_mapping }),
-    ...(config.output_mapping !== undefined && { output_mapping: config.output_mapping }),
-    ...(config.resource_bindings !== undefined && { resource_bindings: config.resource_bindings }),
+    ...(config.taskVersion !== undefined && { taskVersion: config.taskVersion }),
+    ...(config.inputMapping !== undefined && { inputMapping: config.inputMapping }),
+    ...(config.outputMapping !== undefined && { outputMapping: config.outputMapping }),
+    ...(config.resourceBindings !== undefined && { resourceBindings: config.resourceBindings }),
   };
 }

@@ -1450,7 +1450,7 @@ export interface components {
             description: string;
             version: number;
             /** @enum {string} */
-            kind: "llm_call" | "mcp_tool" | "http_request" | "human_input" | "update_context" | "write_artifact" | "workflow_call" | "vector_search" | "emit_metric" | "mock";
+            kind: "llm" | "mcp" | "http" | "human" | "context" | "artifact" | "workflow" | "vector" | "metric" | "mock";
             implementation: {
                 [key: string]: unknown;
             };
@@ -1487,10 +1487,10 @@ export interface components {
              */
             version: number;
             /**
-             * @example llm_call
+             * @example llm
              * @enum {string}
              */
-            kind: "llm_call" | "mcp_tool" | "http_request" | "human_input" | "update_context" | "write_artifact" | "workflow_call" | "vector_search" | "emit_metric" | "mock";
+            kind: "llm" | "mcp" | "http" | "human" | "context" | "artifact" | "workflow" | "vector" | "metric" | "mock";
             /**
              * @example {
              *       "model": "gpt-4"
@@ -1824,15 +1824,9 @@ export interface components {
             projectId: string | null;
             libraryId: string | null;
             tags: string[] | null;
-            inputSchema: {
-                [key: string]: unknown;
-            };
-            outputSchema: {
-                [key: string]: unknown;
-            };
-            contextSchema: {
-                [key: string]: unknown;
-            } | null;
+            inputSchema: JSONSchema;
+            outputSchema: JSONSchema;
+            contextSchema: JSONSchema | null;
             initialNodeId: string | null;
             contentHash: string | null;
             createdAt: string;
@@ -1857,17 +1851,13 @@ export interface components {
              *       "topic": "string"
              *     }
              */
-            inputSchema: {
-                [key: string]: unknown;
-            };
+            inputSchema: JSONSchema;
             /**
              * @example {
              *       "content": "string"
              *     }
              */
-            outputSchema: {
-                [key: string]: unknown;
-            };
+            outputSchema: JSONSchema;
             /**
              * @example {
              *       "result": "$.final_node_output.response"
@@ -1876,9 +1866,7 @@ export interface components {
             outputMapping?: {
                 [key: string]: string;
             };
-            contextSchema?: {
-                [key: string]: unknown;
-            };
+            contextSchema?: JSONSchema;
             /** @example start_node */
             initialNodeRef: string;
             nodes: {

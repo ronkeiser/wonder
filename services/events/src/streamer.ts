@@ -1,6 +1,8 @@
 import { createLogger, type Logger } from '@wonder/logs';
 import { DurableObject } from 'cloudflare:workers';
+import { drizzle } from 'drizzle-orm/d1';
 import { ulid } from 'ulid';
+import { traceEvents, workflowEvents } from './schema';
 import type {
   BroadcastEventEntry,
   BroadcastTraceEventEntry,
@@ -182,7 +184,7 @@ export class Streamer extends DurableObject<Env> {
   }
 
   /**
-   * Flush all buffered events to D1 using batched multi-row inserts
+   * Flush all buffered events to D1 using Drizzle insert
    */
   private async flushBuffers(): Promise<void> {
     const eventBatch = this.eventBuffer.splice(0);
@@ -193,20 +195,22 @@ export class Streamer extends DurableObject<Env> {
     }
 
     try {
-      const statements: Parameters<typeof this.env.DB.batch>[0] = [];
+      const db = drizzle(this.env.DB, { casing: 'snake_case' });
 
-      // Build multi-row insert statements for events
-      for (const chunk of chunkArray(eventBatch, ROWS_PER_INSERT)) {
-        statements.push(this.buildEventInsert(chunk));
-      }
-
-      // Build multi-row insert statements for traces
-      for (const chunk of chunkArray(traceBatch, ROWS_PER_INSERT)) {
-        statements.push(this.buildTraceInsert(chunk));
-      }
+      // Build insert statements for events and traces (chunked for efficiency)
+      const eventStatements = chunkArray(eventBatch, ROWS_PER_INSERT).map((chunk) =>
+        db.insert(workflowEvents).values(chunk),
+      );
+      const traceStatements = chunkArray(traceBatch, ROWS_PER_INSERT).map((chunk) =>
+        db.insert(traceEvents).values(chunk),
+      );
+      const allStatements = [...eventStatements, ...traceStatements];
 
       // Execute all inserts in a single batch (transactional)
-      await this.env.DB.batch(statements);
+      // Drizzle batch requires at least one statement
+      if (allStatements.length > 0) {
+        await db.batch(allStatements as [typeof allStatements[0], ...typeof allStatements]);
+      }
       this.retryCount = 0;
 
       // Clear persisted buffers after successful write
@@ -245,42 +249,6 @@ export class Streamer extends DurableObject<Env> {
         await this.ctx.storage.delete(['eventBuffer', 'traceBuffer']);
       }
     }
-  }
-
-  private buildEventInsert(entries: EventEntry[]): D1PreparedStatement {
-    return buildMultiRowInsert(this.env.DB, 'workflow_events', entries, [
-      'id',
-      'timestamp',
-      'sequence',
-      'eventType',
-      'workflowRunId',
-      'parentRunId',
-      'workflowDefId',
-      'nodeId',
-      'tokenId',
-      'pathId',
-      'projectId',
-      'tokens',
-      'costUsd',
-      'message',
-      'metadata',
-    ]);
-  }
-
-  private buildTraceInsert(entries: TraceEventEntry[]): D1PreparedStatement {
-    return buildMultiRowInsert(this.env.DB, 'trace_events', entries, [
-      'id',
-      'timestamp',
-      'sequence',
-      'type',
-      'category',
-      'workflowRunId',
-      'tokenId',
-      'nodeId',
-      'projectId',
-      'durationMs',
-      'payload',
-    ]);
   }
 
   // ============================================================================
@@ -411,18 +379,6 @@ function chunkArray<T>(array: T[], size: number): T[][] {
     chunks.push(array.slice(i, i + size));
   }
   return chunks;
-}
-
-function buildMultiRowInsert<T>(
-  db: D1Database,
-  table: string,
-  entries: T[],
-  columns: (keyof T)[],
-): D1PreparedStatement {
-  const colNames = columns as string[];
-  const placeholders = entries.map(() => `(${colNames.map(() => '?').join(', ')})`).join(', ');
-  const values = entries.flatMap((e) => columns.map((col) => e[col]));
-  return db.prepare(`INSERT INTO ${table} (${colNames.join(', ')}) VALUES ${placeholders}`).bind(...values);
 }
 
 function matchesEventFilter(event: BroadcastEventEntry, filter: SubscriptionFilter): boolean {

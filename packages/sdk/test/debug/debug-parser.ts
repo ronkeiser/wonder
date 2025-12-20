@@ -33,7 +33,7 @@ console.log('TEST 1.2: Path Segment Parser');
 const testPaths = [
   '/api/workspaces',
   '/api/workspaces/{id}',
-  '/api/projects/{project_id}/workflows',
+  '/api/projects/{projectId}/workflows',
 ];
 
 testPaths.forEach((path) => {
@@ -45,7 +45,7 @@ console.log();
 
 // Test 1.3: Segment Classifier
 console.log('TEST 1.3: Segment Classifier');
-const testSegments = ['workspaces', '{id}', ':workspace_id', 'start'];
+const testSegments = ['workspaces', '{id}', ':workspaceId', 'start'];
 testSegments.forEach((segment) => {
   const type = classifySegment(segment);
   console.log(`  '${segment}' → ${type}`);

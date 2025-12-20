@@ -8,22 +8,22 @@ import { transition } from '../../src/builders/transition';
 describe('transition()', () => {
   it('creates transition with required fields', () => {
     const result = transition({
-      from_node_ref: 'start',
-      to_node_ref: 'end',
+      fromNodeRef: 'start',
+      toNodeRef: 'end',
       priority: 1,
     });
 
     expect(result).toEqual({
-      from_node_ref: 'start',
-      to_node_ref: 'end',
+      fromNodeRef: 'start',
+      toNodeRef: 'end',
       priority: 1,
     });
   });
 
   it('creates transition with condition', () => {
     const result = transition({
-      from_node_ref: 'check',
-      to_node_ref: 'process',
+      fromNodeRef: 'check',
+      toNodeRef: 'process',
       priority: 1,
       condition: {
         expression: '$.check.success == true',
@@ -31,8 +31,8 @@ describe('transition()', () => {
     });
 
     expect(result).toEqual({
-      from_node_ref: 'check',
-      to_node_ref: 'process',
+      fromNodeRef: 'check',
+      toNodeRef: 'process',
       priority: 1,
       condition: {
         expression: '$.check.success == true',
@@ -43,39 +43,39 @@ describe('transition()', () => {
   it('creates transition with ref', () => {
     const result = transition({
       ref: 'my-transition',
-      from_node_ref: 'a',
-      to_node_ref: 'b',
+      fromNodeRef: 'a',
+      toNodeRef: 'b',
       priority: 1,
     });
 
     expect(result).toEqual({
       ref: 'my-transition',
-      from_node_ref: 'a',
-      to_node_ref: 'b',
+      fromNodeRef: 'a',
+      toNodeRef: 'b',
       priority: 1,
     });
   });
 
-  it('creates transition with spawn_count', () => {
+  it('creates transition with spawnCount', () => {
     const result = transition({
-      from_node_ref: 'fan-out',
-      to_node_ref: 'worker',
+      fromNodeRef: 'fan-out',
+      toNodeRef: 'worker',
       priority: 1,
-      spawn_count: 5,
+      spawnCount: 5,
     });
 
     expect(result).toEqual({
-      from_node_ref: 'fan-out',
-      to_node_ref: 'worker',
+      fromNodeRef: 'fan-out',
+      toNodeRef: 'worker',
       priority: 1,
-      spawn_count: 5,
+      spawnCount: 5,
     });
   });
 
   it('creates transition with foreach', () => {
     const result = transition({
-      from_node_ref: 'iterate',
-      to_node_ref: 'process',
+      fromNodeRef: 'iterate',
+      toNodeRef: 'process',
       priority: 1,
       foreach: {
         items: '$.input.items',
@@ -83,8 +83,8 @@ describe('transition()', () => {
     });
 
     expect(result).toEqual({
-      from_node_ref: 'iterate',
-      to_node_ref: 'process',
+      fromNodeRef: 'iterate',
+      toNodeRef: 'process',
       priority: 1,
       foreach: {
         items: '$.input.items',
@@ -94,8 +94,8 @@ describe('transition()', () => {
 
   it('creates transition with synchronization', () => {
     const result = transition({
-      from_node_ref: 'parallel',
-      to_node_ref: 'join',
+      fromNodeRef: 'parallel',
+      toNodeRef: 'join',
       priority: 1,
       synchronization: {
         wait_for: ['task1', 'task2'],
@@ -103,8 +103,8 @@ describe('transition()', () => {
     });
 
     expect(result).toEqual({
-      from_node_ref: 'parallel',
-      to_node_ref: 'join',
+      fromNodeRef: 'parallel',
+      toNodeRef: 'join',
       priority: 1,
       synchronization: {
         wait_for: ['task1', 'task2'],
@@ -112,21 +112,21 @@ describe('transition()', () => {
     });
   });
 
-  it('creates transition with loop_config', () => {
+  it('creates transition with loopConfig', () => {
     const result = transition({
-      from_node_ref: 'loop-start',
-      to_node_ref: 'loop-body',
+      fromNodeRef: 'loop-start',
+      toNodeRef: 'loop-body',
       priority: 1,
-      loop_config: {
+      loopConfig: {
         max_iterations: 10,
       },
     });
 
     expect(result).toEqual({
-      from_node_ref: 'loop-start',
-      to_node_ref: 'loop-body',
+      fromNodeRef: 'loop-start',
+      toNodeRef: 'loop-body',
       priority: 1,
-      loop_config: {
+      loopConfig: {
         max_iterations: 10,
       },
     });
@@ -135,40 +135,40 @@ describe('transition()', () => {
   it('creates transition with all fields', () => {
     const result = transition({
       ref: 'complex-transition',
-      from_node_ref: 'source',
-      to_node_ref: 'target',
+      fromNodeRef: 'source',
+      toNodeRef: 'target',
       priority: 5,
       condition: {
         expression: 'true',
       },
-      spawn_count: 3,
+      spawnCount: 3,
       foreach: {
         items: '$.items',
       },
       synchronization: {
         wait_for: ['node1'],
       },
-      loop_config: {
+      loopConfig: {
         max_iterations: 5,
       },
     });
 
     expect(result).toEqual({
       ref: 'complex-transition',
-      from_node_ref: 'source',
-      to_node_ref: 'target',
+      fromNodeRef: 'source',
+      toNodeRef: 'target',
       priority: 5,
       condition: {
         expression: 'true',
       },
-      spawn_count: 3,
+      spawnCount: 3,
       foreach: {
         items: '$.items',
       },
       synchronization: {
         wait_for: ['node1'],
       },
-      loop_config: {
+      loopConfig: {
         max_iterations: 5,
       },
     });

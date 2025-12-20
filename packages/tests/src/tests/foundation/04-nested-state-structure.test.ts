@@ -6,7 +6,7 @@ import { assertInvariants, runTestWorkflow, TIME_JITTER, verify } from '~/kit';
  * Foundation Test 04: Nested State Structure with Value Flow Validation
  *
  * Tests that ACTUAL VALUES flow through the pipeline, not just that paths are written.
- * Uses update_context (passthrough) actions to prove data aggregation works.
+ * Uses updateContext (passthrough) actions to prove data aggregation works.
  *
  * Workflow structure:
  *   [init] → (spawn 3) → [phase1] ×3 → (fan-in: merge) →
@@ -15,10 +15,10 @@ import { assertInvariants, runTestWorkflow, TIME_JITTER, verify } from '~/kit';
  * Data flow proof:
  * 1. Phase1 branches generate words: ["word1", "word2", "word3"]
  * 2. Fan-in merges to state.phase1.results
- * 3. Bridge reads phase1.results, passes through as inherited_words
- * 4. Bridge writes inherited_words to state.bridge.phase1_words (PROVES IT RECEIVED THEM)
+ * 3. Bridge reads phase1.results, passes through as inheritedWords
+ * 4. Bridge writes inheritedWords to state.bridge.phase1_words (PROVES IT RECEIVED THEM)
  * 5. Phase2 branches read state.bridge.phase1_words, pass through
- * 6. Phase2 branches write to output.inherited_words (PROVES THEY RECEIVED THEM)
+ * 6. Phase2 branches write to output.inheritedWords (PROVES THEY RECEIVED THEM)
  * 7. Summarize reads ALL accumulated state and produces final object
  * 8. Custom verification checks actual values match across the pipeline
  *
@@ -54,7 +54,7 @@ describe('Foundation: 04 - Nested State Structure', () => {
     // Phase2 accumulates: inherited words + new word = grown array
     const phase2OutputSchema = s.object(
       {
-        accumulated: s.array(s.string()), // inherited_words + word merged together
+        accumulated: s.array(s.string()), // inheritedWords + word merged together
       },
       { required: ['accumulated'] },
     );
@@ -117,18 +117,18 @@ describe('Foundation: 04 - Nested State Structure', () => {
     });
 
     const initStep = step({
-      ref: 'init_step',
+      ref: 'initStep',
       ordinal: 0,
       action: initAction,
-      input_mapping: {},
-      output_mapping: { 'output.seed': '$.seed' },
+      inputMapping: {},
+      outputMapping: { 'output.seed': '$.seed' },
     });
 
     const initTask = task({
       name: 'Init Task',
       description: 'Initialize workflow',
-      input_schema: s.object({ seed: s.string() }),
-      output_schema: initOutputSchema,
+      inputSchema: s.object({ seed: s.string() }),
+      outputSchema: initOutputSchema,
       steps: [initStep],
     });
 
@@ -136,10 +136,10 @@ describe('Foundation: 04 - Nested State Structure', () => {
       ref: 'init',
       name: 'Init',
       task: initTask,
-      task_version: 1,
-      input_mapping: { seed: '$.input.seed' },
+      taskVersion: 1,
+      inputMapping: { seed: '$.input.seed' },
       // Write to nested path: state.init.seed
-      output_mapping: { 'state.init.seed': '$.seed' },
+      outputMapping: { 'state.init.seed': '$.seed' },
     });
 
     // =========================================================================
@@ -160,15 +160,15 @@ describe('Foundation: 04 - Nested State Structure', () => {
       ref: 'phase1_step',
       ordinal: 0,
       action: phase1Action,
-      input_mapping: {},
-      output_mapping: { 'output.value': '$.value' },
+      inputMapping: {},
+      outputMapping: { 'output.value': '$.value' },
     });
 
     const phase1Task = task({
       name: 'Phase 1 Task',
       description: 'Process in phase 1',
-      input_schema: s.object({ seed: s.string() }),
-      output_schema: phase1OutputSchema,
+      inputSchema: s.object({ seed: s.string() }),
+      outputSchema: phase1OutputSchema,
       steps: [phase1Step],
     });
 
@@ -176,20 +176,20 @@ describe('Foundation: 04 - Nested State Structure', () => {
       ref: 'phase1',
       name: 'Phase 1',
       task: phase1Task,
-      task_version: 1,
+      taskVersion: 1,
       // Read from nested path: state.init.seed
-      input_mapping: { seed: '$.state.init.seed' },
-      output_mapping: { 'output.value': '$.value' },
+      inputMapping: { seed: '$.state.init.seed' },
+      outputMapping: { 'output.value': '$.value' },
     });
 
     // =========================================================================
     // Node: bridge (between fan-in #1 and fan-out #2)
-    // Uses update_context (passthrough) to prove it receives phase1.results
+    // Uses updateContext (passthrough) to prove it receives phase1.results
     // =========================================================================
     const bridgeAction = action({
       name: 'Bridge Action',
       description: 'Passthrough - proves bridge receives aggregated phase1 results',
-      kind: 'update_context',
+      kind: 'context',
       implementation: {},
     });
 
@@ -198,16 +198,16 @@ describe('Foundation: 04 - Nested State Structure', () => {
       ordinal: 0,
       action: bridgeAction,
       // Pass phase1_words from task input to step input
-      input_mapping: { phase1_words: '$.input.phase1_words' },
+      inputMapping: { phase1_words: '$.input.phase1_words' },
       // Passthrough returns input as output - map it to task output
-      output_mapping: { 'output.phase1_words': '$.phase1_words' },
+      outputMapping: { 'output.phase1_words': '$.phase1_words' },
     });
 
     const bridgeTask = task({
       name: 'Bridge Task',
       description: 'Passthrough bridge - receives and forwards phase1 results',
-      input_schema: s.object({ phase1_words: s.array(s.string()) }),
-      output_schema: bridgeOutputSchema,
+      inputSchema: s.object({ phase1_words: s.array(s.string()) }),
+      outputSchema: bridgeOutputSchema,
       steps: [bridgeStep],
     });
 
@@ -215,11 +215,11 @@ describe('Foundation: 04 - Nested State Structure', () => {
       ref: 'bridge',
       name: 'Bridge',
       task: bridgeTask,
-      task_version: 1,
+      taskVersion: 1,
       // Read aggregated phase1 results
-      input_mapping: { phase1_words: '$.state.phase1.results' },
+      inputMapping: { phase1_words: '$.state.phase1.results' },
       // Write to state.bridge.phase1_words - PROVES bridge received the data
-      output_mapping: {
+      outputMapping: {
         'state.bridge.phase1_words': '$.phase1_words',
       },
     });
@@ -245,19 +245,19 @@ describe('Foundation: 04 - Nested State Structure', () => {
       ref: 'phase2_word_step',
       ordinal: 0,
       action: phase2WordAction,
-      input_mapping: {},
-      output_mapping: { 'output.word': '$.word' },
+      inputMapping: {},
+      outputMapping: { 'output.word': '$.word' },
     });
 
-    // Step 2: Merge inherited_words + word into accumulated
+    // Step 2: Merge inheritedWords + word into accumulated
     const phase2MergeAction = action({
       name: 'Phase 2 Merge Action',
       description: 'Merges inherited words with new word - proves accumulation',
-      kind: 'update_context',
+      kind: 'context',
       implementation: {
         merge: {
           target: 'accumulated',
-          sources: ['inherited_words', 'word'],
+          sources: ['inheritedWords', 'word'],
         },
       },
     });
@@ -266,11 +266,11 @@ describe('Foundation: 04 - Nested State Structure', () => {
       ref: 'phase2_merge_step',
       ordinal: 1,
       action: phase2MergeAction,
-      input_mapping: {
-        inherited_words: '$.input.inherited_words',
+      inputMapping: {
+        inheritedWords: '$.input.inheritedWords',
         word: '$.output.word',
       },
-      output_mapping: {
+      outputMapping: {
         'output.accumulated': '$.accumulated',
       },
     });
@@ -278,10 +278,10 @@ describe('Foundation: 04 - Nested State Structure', () => {
     const phase2Task = task({
       name: 'Phase 2 Task',
       description: 'Generates word and accumulates with inherited - array grows',
-      input_schema: s.object({
-        inherited_words: s.array(s.string()),
+      inputSchema: s.object({
+        inheritedWords: s.array(s.string()),
       }),
-      output_schema: phase2OutputSchema,
+      outputSchema: phase2OutputSchema,
       steps: [phase2WordStep, phase2MergeStep],
     });
 
@@ -289,37 +289,37 @@ describe('Foundation: 04 - Nested State Structure', () => {
       ref: 'phase2',
       name: 'Phase 2',
       task: phase2Task,
-      task_version: 1,
-      input_mapping: {
-        inherited_words: '$.state.bridge.phase1_words',
+      taskVersion: 1,
+      inputMapping: {
+        inheritedWords: '$.state.bridge.phase1_words',
       },
-      output_mapping: {
+      outputMapping: {
         'output.accumulated': '$.accumulated',
       },
     });
 
     // =========================================================================
     // Node: summarize (after fan-in #2)
-    // Uses update_context (passthrough) to prove it receives all accumulated state
+    // Uses updateContext (passthrough) to prove it receives all accumulated state
     // =========================================================================
     const summarizeAction = action({
       name: 'Summarize Action',
       description: 'Passthrough - proves summarize receives all accumulated state',
-      kind: 'update_context',
+      kind: 'context',
       implementation: {},
     });
 
     const summarizeStep = step({
-      ref: 'summarize_step',
+      ref: 'summarizeStep',
       ordinal: 0,
       action: summarizeAction,
       // Pass all accumulated data through
-      input_mapping: {
+      inputMapping: {
         phase1_words: '$.input.phase1_words',
         phase2_accumulated: '$.input.phase2_accumulated',
         bridge_inherited: '$.input.bridge_inherited',
       },
-      output_mapping: {
+      outputMapping: {
         'output.phase1_words': '$.phase1_words',
         'output.phase2_accumulated': '$.phase2_accumulated',
         'output.bridge_inherited': '$.bridge_inherited',
@@ -329,12 +329,12 @@ describe('Foundation: 04 - Nested State Structure', () => {
     const summarizeTask = task({
       name: 'Summarize Task',
       description: 'Passthrough - receives and forwards all accumulated state',
-      input_schema: s.object({
+      inputSchema: s.object({
         phase1_words: s.array(s.string()),
         phase2_accumulated: s.array(s.array(s.string())), // Array of arrays (collect preserves structure)
         bridge_inherited: s.array(s.string()),
       }),
-      output_schema: summarizeOutputSchema,
+      outputSchema: summarizeOutputSchema,
       steps: [summarizeStep],
     });
 
@@ -342,15 +342,15 @@ describe('Foundation: 04 - Nested State Structure', () => {
       ref: 'summarize',
       name: 'Summarize',
       task: summarizeTask,
-      task_version: 1,
+      taskVersion: 1,
       // Read all accumulated state
-      input_mapping: {
+      inputMapping: {
         phase1_words: '$.state.phase1.results',
         phase2_accumulated: '$.state.phase2.accumulated',
         bridge_inherited: '$.state.bridge.phase1_words',
       },
       // Write all to summary state - PROVES summarize received everything
-      output_mapping: {
+      outputMapping: {
         'state.summary.phase1_words': '$.phase1_words',
         'state.summary.phase2_accumulated': '$.phase2_accumulated',
         'state.summary.bridge_inherited': '$.bridge_inherited',
@@ -364,22 +364,22 @@ describe('Foundation: 04 - Nested State Structure', () => {
     // Fan-out #1: init → phase1 (spawn 3)
     const fanOut1 = transition({
       ref: 'fanout_1',
-      from_node_ref: 'init',
-      to_node_ref: 'phase1',
+      fromNodeRef: 'init',
+      toNodeRef: 'phase1',
       priority: 1,
-      spawn_count: 3,
-      sibling_group: 'phase1_group',
+      spawnCount: 3,
+      siblingGroup: 'phase1_group',
     });
 
     // Fan-in #1: phase1 → bridge (merge to nested path)
     const fanIn1 = transition({
       ref: 'fanin_1',
-      from_node_ref: 'phase1',
-      to_node_ref: 'bridge',
+      fromNodeRef: 'phase1',
+      toNodeRef: 'bridge',
       priority: 1,
       synchronization: {
         strategy: 'all',
-        sibling_group: 'phase1_group',
+        siblingGroup: 'phase1_group',
         merge: {
           source: '_branch.output.value',
           target: 'state.phase1.results', // Nested merge target
@@ -391,22 +391,22 @@ describe('Foundation: 04 - Nested State Structure', () => {
     // Fan-out #2: bridge → phase2 (spawn 3)
     const fanOut2 = transition({
       ref: 'fanout_2',
-      from_node_ref: 'bridge',
-      to_node_ref: 'phase2',
+      fromNodeRef: 'bridge',
+      toNodeRef: 'phase2',
       priority: 1,
-      spawn_count: 3,
-      sibling_group: 'phase2_group',
+      spawnCount: 3,
+      siblingGroup: 'phase2_group',
     });
 
     // Fan-in #2: phase2 → summarize (collect accumulated arrays, preserve structure)
     const fanIn2 = transition({
       ref: 'fanin_2',
-      from_node_ref: 'phase2',
-      to_node_ref: 'summarize',
+      fromNodeRef: 'phase2',
+      toNodeRef: 'summarize',
       priority: 1,
       synchronization: {
         strategy: 'all',
-        sibling_group: 'phase2_group',
+        siblingGroup: 'phase2_group',
         merge: {
           source: '_branch.output.accumulated', // Each branch's accumulated array
           target: 'state.phase2.accumulated', // Collect as array of arrays (no flattening)
@@ -421,11 +421,11 @@ describe('Foundation: 04 - Nested State Structure', () => {
     const workflowDef = workflow({
       name: 'Nested State Structure Test',
       description: 'Foundation test 04 - proves actual values flow through pipeline',
-      input_schema: inputSchema,
-      output_schema: workflowOutputSchema,
-      context_schema: contextSchema,
+      inputSchema: inputSchema,
+      outputSchema: workflowOutputSchema,
+      contextSchema: contextSchema,
       // Output mapping exposes all paths for value flow verification
-      output_mapping: {
+      outputMapping: {
         seed: '$.state.init.seed',
         // Direct from fan-in merges
         phase1_results: '$.state.phase1.results',
@@ -437,7 +437,7 @@ describe('Foundation: 04 - Nested State Structure', () => {
         summary_phase2_accumulated: '$.state.summary.phase2_accumulated',
         summary_bridge_inherited: '$.state.summary.bridge_inherited',
       },
-      initial_node_ref: 'init',
+      initialNodeRef: 'init',
       nodes: [initNode, phase1Node, bridgeNode, phase2Node, summarizeNode],
       transitions: [fanOut1, fanIn1, fanOut2, fanIn2],
     });

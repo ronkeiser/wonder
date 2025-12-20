@@ -47,11 +47,11 @@ export interface SourceLocation {
 export interface NodeDecl {
   ref?: string;
   name?: string;
-  task_id?: string;
-  task_version?: number;
-  input_mapping?: Record<string, string>;
-  output_mapping?: Record<string, string>;
-  resource_bindings?: Record<string, string>;
+  taskId?: string;
+  taskVersion?: number;
+  inputMapping?: Record<string, string>;
+  outputMapping?: Record<string, string>;
+  resourceBindings?: Record<string, string>;
   _loc?: SourceLocation;
 }
 
@@ -75,26 +75,26 @@ export interface MergeConfig {
 
 export interface SyncConfig {
   strategy: 'all' | 'any' | { m_of_n: number };
-  sibling_group: string;
-  timeout_ms?: number;
+  siblingGroup: string;
+  timeoutMs?: number;
   on_timeout?: 'proceed_with_available' | 'fail';
   merge?: MergeConfig;
 }
 
 export interface LoopConfig {
   max_iterations?: number;
-  timeout_ms?: number;
+  timeoutMs?: number;
 }
 
 export interface TransitionDecl {
-  from_node_ref?: string;
-  to_node_ref?: string | null;
+  fromNodeRef?: string;
+  toNodeRef?: string | null;
   priority?: number;
   condition?: ConditionDecl;
-  spawn_count?: number;
+  spawnCount?: number;
   foreach?: ForeachConfig;
   synchronization?: SyncConfig;
-  loop_config?: LoopConfig;
+  loopConfig?: LoopConfig;
   _loc?: SourceLocation;
 }
 
@@ -112,14 +112,14 @@ export interface WflowDocument {
   workflow?: string;
   version?: number;
   description?: string;
-  input_schema?: JSONSchemaProperty;
-  context_schema?: JSONSchemaProperty;
-  output_schema?: JSONSchemaProperty;
+  inputSchema?: JSONSchemaProperty;
+  contextSchema?: JSONSchemaProperty;
+  outputSchema?: JSONSchemaProperty;
   resources?: Record<string, ResourceDecl>;
   nodes?: Record<string, NodeDecl>;
   transitions?: Record<string, TransitionDecl>;
   initial_node_ref?: string;
-  timeout_ms?: number;
+  timeoutMs?: number;
   on_timeout?: 'human_gate' | 'fail' | 'cancel_all';
   _loc?: SourceLocation;
 }
@@ -137,20 +137,20 @@ export interface StepCondition {
 export interface StepDecl {
   ref?: string;
   ordinal?: number;
-  action_id?: string;
-  action_version?: number;
-  input_mapping?: Record<string, string>;
-  output_mapping?: Record<string, string>;
-  on_failure?: 'abort' | 'retry' | 'continue';
+  actionId?: string;
+  actionVersion?: number;
+  inputMapping?: Record<string, string>;
+  outputMapping?: Record<string, string>;
+  onFailure?: 'abort' | 'retry' | 'continue';
   condition?: StepCondition;
   _loc?: SourceLocation;
 }
 
 export interface RetryConfig {
-  max_attempts: number;
+  maxAttempts: number;
   backoff: 'none' | 'linear' | 'exponential';
-  initial_delay_ms: number;
-  max_delay_ms?: number;
+  initialDelayMs: number;
+  maxDelayMs?: number;
 }
 
 export interface TaskDocument {
@@ -160,11 +160,11 @@ export interface TaskDocument {
   name?: string;
   description?: string;
   tags?: string[];
-  input_schema?: JSONSchemaProperty;
-  output_schema?: JSONSchemaProperty;
+  inputSchema?: JSONSchemaProperty;
+  outputSchema?: JSONSchemaProperty;
   steps?: StepDecl[];
   retry?: RetryConfig;
-  timeout_ms?: number;
+  timeoutMs?: number;
   _loc?: SourceLocation;
 }
 
@@ -185,15 +185,15 @@ export type ActionKind =
   | 'human';
 
 export interface ActionRetryPolicy {
-  max_attempts: number;
+  maxAttempts: number;
   backoff: 'none' | 'linear' | 'exponential';
-  initial_delay_ms: number;
-  max_delay_ms?: number;
+  initialDelayMs: number;
+  maxDelayMs?: number;
   retryable_errors?: string[];
 }
 
 export interface ActionExecution {
-  timeout_ms?: number;
+  timeoutMs?: number;
   retry_policy?: ActionRetryPolicy;
 }
 
@@ -339,7 +339,7 @@ export interface TestCaseDecl {
   /** Test-specific mock overrides */
   mocks?: Record<string, MockDecl | MockResponseDecl>;
   /** Maximum execution time */
-  timeout_ms?: number;
+  timeoutMs?: number;
   /** Assertions to verify */
   assert?: AssertionsDecl;
   /** Expected output for snapshot testing */
@@ -391,7 +391,7 @@ export interface TestHooksDecl {
 export interface TestConfigDecl {
   parallel?: boolean;
   max_concurrent?: number;
-  timeout_ms?: number;
+  timeoutMs?: number;
   fail_fast?: boolean;
 }
 
@@ -440,8 +440,8 @@ export interface TestDocument {
  */
 export interface EnvironmentOverrideDecl {
   input?: Record<string, unknown>;
-  resource_bindings?: Record<string, string>;
-  timeout_ms?: number;
+  resourceBindings?: Record<string, string>;
+  timeoutMs?: number;
   priority?: 'low' | 'normal' | 'high';
 }
 
@@ -455,7 +455,7 @@ export interface RunDocument {
   /** Path to workflow */
   workflow?: string;
   /** Project ID this run belongs to */
-  project_id?: string;
+  projectId?: string;
   /** Execution environment */
   environment?: 'development' | 'staging' | 'production';
   /** Input data */
@@ -465,9 +465,9 @@ export interface RunDocument {
   /** Initial context state */
   context?: Record<string, unknown>;
   /** Override resource bindings */
-  resource_bindings?: Record<string, string>;
+  resourceBindings?: Record<string, string>;
   /** Override timeout */
-  timeout_ms?: number;
+  timeoutMs?: number;
   /** Execution priority */
   priority?: 'low' | 'normal' | 'high';
   /** Idempotency key */

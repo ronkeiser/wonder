@@ -24,27 +24,27 @@ export async function setupTestContext(): Promise<TestContext> {
 
   // Create a fresh project in the workspace
   const { project } = await wonder.projects.create({
-    workspace_id: workspace.id,
+    workspaceId: workspace.id,
     name: `Test Project ${Date.now()}`,
   });
 
   // Create a fresh model profile
-  const { model_profile } = await wonder.modelProfiles.create({
+  const { modelProfile } = await wonder.modelProfiles.create({
     name: `Test Model Profile ${Date.now()}`,
     provider: 'cloudflare',
-    model_id: '@cf/meta/llama-3.3-70b-instruct-fp8-fast',
+    modelId: '@cf/meta/llama-3.3-70b-instruct-fp8-fast',
     parameters: {
-      max_tokens: 512,
+      maxTokens: 512,
       temperature: 2.5,
     },
-    cost_per_1k_input_tokens: 0.0,
-    cost_per_1k_output_tokens: 0.0,
+    costPer1kInputTokens: 0.0,
+    costPer1kOutputTokens: 0.0,
   });
 
   return {
     workspaceId: workspace.id,
     projectId: project.id,
-    modelProfileId: model_profile.id,
+    modelProfileId: modelProfile.id,
   };
 }
 

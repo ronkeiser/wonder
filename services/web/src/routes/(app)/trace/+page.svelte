@@ -81,13 +81,13 @@
     const parts: string[] = [];
 
     // Add token context if present
-    if (item.token_id) {
-      parts.push(`token:${item.token_id.slice(-8)}`);
+    if (item.tokenId) {
+      parts.push(`token:${item.tokenId.slice(-8)}`);
     }
 
     // Add node context if present
-    if (item.node_id) {
-      parts.push(`node:${item.node_id.slice(-8)}`);
+    if (item.nodeId) {
+      parts.push(`node:${item.nodeId.slice(-8)}`);
     }
 
     // Determine the message to display
@@ -109,7 +109,7 @@
         text: item.category,
         color: categoryColorMap[item.category] || 'var(--gray)',
       },
-      identifier: `${item.workflow_run_id.slice(-8)}-${item.sequence}`,
+      identifier: `${item.workflowRunId.slice(-8)}-${item.sequence}`,
       message,
     };
   }

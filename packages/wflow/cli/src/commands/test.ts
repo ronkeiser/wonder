@@ -53,7 +53,7 @@ export const testCommand = new Command('test')
       const runOptions = {
         filter: options.filter,
         tags: options.tags ? options.tags.split(',') : undefined,
-        timeout_ms: parseInt(options.timeout, 10),
+        timeoutMs: parseInt(options.timeout, 10),
         failFast: options.failFast,
         parallel: options.parallel,
         maxConcurrent: parseInt(options.maxConcurrent, 10),

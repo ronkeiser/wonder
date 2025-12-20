@@ -32,11 +32,11 @@ export async function createEmbeddedTaskDef(
   const resolvedSteps: Array<{
     ref: string;
     ordinal: number;
-    action_id: string;
-    action_version: number;
-    input_mapping?: Record<string, unknown> | null;
-    output_mapping?: Record<string, unknown> | null;
-    on_failure?: 'abort' | 'retry' | 'continue';
+    actionId: string;
+    actionVersion: number;
+    inputMapping?: Record<string, unknown> | null;
+    outputMapping?: Record<string, unknown> | null;
+    onFailure?: 'abort' | 'retry' | 'continue';
     condition?: {
       if: string;
       then: 'continue' | 'skip' | 'succeed' | 'fail';
@@ -48,9 +48,9 @@ export async function createEmbeddedTaskDef(
     let actionId: string;
     let actionVersion: number;
 
-    if (s.action_id) {
+    if (s.actionId) {
       // Reference to existing action - get latest version
-      const actionResponse = await wonder.actions(s.action_id).get();
+      const actionResponse = await wonder.actions(s.actionId).get();
       actionId = actionResponse.action.id;
       actionVersion = actionResponse.action.version;
     } else if (s.action && isEmbeddedAction(s.action)) {
@@ -59,17 +59,17 @@ export async function createEmbeddedTaskDef(
       actionId = result.id;
       actionVersion = result.version;
     } else {
-      throw new Error(`Step ${s.ref} must have either action_id or action`);
+      throw new Error(`Step ${s.ref} must have either actionId or action`);
     }
 
     resolvedSteps.push({
       ref: s.ref,
       ordinal: s.ordinal,
-      action_id: actionId,
-      action_version: actionVersion,
-      input_mapping: s.input_mapping ?? null,
-      output_mapping: s.output_mapping ?? null,
-      on_failure: s.on_failure ?? 'abort',
+      actionId: actionId,
+      actionVersion: actionVersion,
+      inputMapping: s.inputMapping ?? null,
+      outputMapping: s.outputMapping ?? null,
+      onFailure: s.onFailure ?? 'abort',
       condition: s.condition ?? null,
     });
   }
@@ -79,14 +79,14 @@ export async function createEmbeddedTaskDef(
     name: taskDef.name,
     description: taskDef.description,
     version: 1,
-    project_id: ctx.projectId,
-    library_id: taskDef.library_id,
+    projectId: ctx.projectId,
+    libraryId: taskDef.libraryId,
     tags: taskDef.tags,
-    input_schema: taskDef.input_schema,
-    output_schema: taskDef.output_schema,
+    inputSchema: taskDef.inputSchema,
+    outputSchema: taskDef.outputSchema,
     steps: resolvedSteps,
     retry: taskDef.retry,
-    timeout_ms: taskDef.timeout_ms,
+    timeoutMs: taskDef.timeoutMs,
   };
 
   const response = await wonder.tasks.create(resolvedTask as any);
@@ -110,28 +110,28 @@ export async function createEmbeddedAction(
   const implementation = { ...action.implementation };
 
   // Resolve embedded prompt spec
-  if (implementation.prompt_spec && isEmbeddedPromptSpec(implementation.prompt_spec)) {
+  if (implementation.promptSpec && isEmbeddedPromptSpec(implementation.promptSpec)) {
     const promptSpecId = await createEmbeddedPromptSpec(
-      implementation.prompt_spec,
+      implementation.promptSpec,
       createdResources,
     );
-    implementation.prompt_spec_id = promptSpecId;
-    delete implementation.prompt_spec;
+    implementation.promptSpecId = promptSpecId;
+    delete implementation.promptSpec;
   }
 
   // Resolve embedded model profile if provided
-  if (implementation.model_profile && isEmbeddedModelProfile(implementation.model_profile)) {
+  if (implementation.modelProfile && isEmbeddedModelProfile(implementation.modelProfile)) {
     const mpResponse = await wonder.modelProfiles.create({
-      name: implementation.model_profile.name,
-      provider: implementation.model_profile.provider,
-      model_id: implementation.model_profile.model_id,
-      parameters: implementation.model_profile.parameters,
-      execution_config: implementation.model_profile.execution_config,
-      cost_per_1k_input_tokens: implementation.model_profile.cost_per_1k_input_tokens ?? 0,
-      cost_per_1k_output_tokens: implementation.model_profile.cost_per_1k_output_tokens ?? 0,
+      name: implementation.modelProfile.name,
+      provider: implementation.modelProfile.provider,
+      modelId: implementation.modelProfile.modelId,
+      parameters: implementation.modelProfile.parameters,
+      executionConfig: implementation.modelProfile.executionConfig,
+      costPer1kInputTokens: implementation.modelProfile.costPer1kInputTokens ?? 0,
+      costPer1kOutputTokens: implementation.modelProfile.costPer1kOutputTokens ?? 0,
     });
-    implementation.model_profile_id = mpResponse.model_profile.id;
-    delete implementation.model_profile;
+    implementation.modelProfileId = mpResponse.modelProfile.id;
+    delete implementation.modelProfile;
   }
 
   // Create action
@@ -167,7 +167,7 @@ export async function createEmbeddedPromptSpec(
     name: promptSpec.name,
     description: promptSpec.description,
     version: 1,
-    system_prompt: promptSpec.system_prompt,
+    systemPrompt: promptSpec.systemPrompt,
     template: promptSpec.template,
     requires: promptSpec.requires,
     produces: promptSpec.produces,
@@ -175,10 +175,10 @@ export async function createEmbeddedPromptSpec(
     tags: promptSpec.tags,
   });
 
-  if (!response?.prompt_spec_id) {
+  if (!response?.promptSpecId) {
     throw new Error('Failed to create prompt spec');
   }
 
-  createdResources.promptSpecIds.push(response.prompt_spec_id);
-  return response.prompt_spec_id;
+  createdResources.promptSpecIds.push(response.promptSpecId);
+  return response.promptSpecId;
 }

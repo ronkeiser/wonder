@@ -81,8 +81,8 @@ function collectWorkflowTokens(
 
     const lineIndent = line.length - line.trimStart().length;
 
-    // Highlight task_id values that are imports
-    const taskIdMatch = trimmed.match(/^task_id:\s*(\S+)/);
+    // Highlight taskId values that are imports
+    const taskIdMatch = trimmed.match(/^taskId:\s*(\S+)/);
     if (taskIdMatch && importAliases.has(taskIdMatch[1])) {
       const col = line.lastIndexOf(taskIdMatch[1]);
       tokens.push({ line: lineNum, col, length: taskIdMatch[1].length, type: 2, modifier: 0 });
@@ -137,13 +137,13 @@ function collectWorkflowTokens(
         }
       }
 
-      const nodeRefMatch = trimmed.match(/^(from_node_ref|to_node_ref):\s*(\S+)/);
+      const nodeRefMatch = trimmed.match(/^(fromNodeRef|toNodeRef):\s*(\S+)/);
       if (nodeRefMatch && nodeRefs.has(nodeRefMatch[2])) {
         const col = line.lastIndexOf(nodeRefMatch[2]);
         tokens.push({ line: lineNum, col, length: nodeRefMatch[2].length, type: 0, modifier: 0 });
       }
 
-      const siblingMatch = trimmed.match(/^sibling_group:\s*(\S+)/);
+      const siblingMatch = trimmed.match(/^siblingGroup:\s*(\S+)/);
       if (siblingMatch && transitionRefs.has(siblingMatch[1])) {
         const col = line.lastIndexOf(siblingMatch[1]);
         tokens.push({ line: lineNum, col, length: siblingMatch[1].length, type: 1, modifier: 0 });
@@ -167,8 +167,8 @@ function collectTaskTokens(
 
     const lineIndent = line.length - line.trimStart().length;
 
-    // Highlight action_id values that are imports
-    const actionIdMatch = trimmed.match(/^action_id:\s*(\S+)/);
+    // Highlight actionId values that are imports
+    const actionIdMatch = trimmed.match(/^actionId:\s*(\S+)/);
     if (actionIdMatch && importAliases.has(actionIdMatch[1])) {
       const col = line.lastIndexOf(actionIdMatch[1]);
       tokens.push({ line: lineNum, col, length: actionIdMatch[1].length, type: 2, modifier: 0 });

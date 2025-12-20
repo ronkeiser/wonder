@@ -17,7 +17,7 @@
  *   .withStateWriteOrder(['state.seed', 'state.results', 'state.summary'])
  *   .withOutput({
  *     prefix: 'TEST',
- *     merged_results: { type: 'array', arrayLength: 3 },
+ *     mergedResults: { type: 'array', arrayLength: 3 },
  *   })
  *   .run();
  */

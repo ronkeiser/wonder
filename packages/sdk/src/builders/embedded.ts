@@ -35,7 +35,7 @@ export interface EmbeddedPromptSpec {
   name: string;
   description: string;
   version?: number;
-  system_prompt?: string;
+  systemPrompt?: string;
   template: string;
   requires: Record<string, unknown>;
   produces: JSONSchema;
@@ -47,10 +47,10 @@ export interface EmbeddedPromptSpec {
 export interface EmbeddedAction extends Omit<CreateAction, 'implementation'> {
   [ACTION]: true;
   implementation: {
-    prompt_spec_id?: string;
-    prompt_spec?: EmbeddedPromptSpec;
-    model_profile_id?: string;
-    model_profile?: EmbeddedModelProfile;
+    promptSpecId?: string;
+    promptSpec?: EmbeddedPromptSpec;
+    modelProfileId?: string;
+    modelProfile?: EmbeddedModelProfile;
     [key: string]: unknown;
   };
 }
@@ -65,11 +65,11 @@ export interface EmbeddedTaskDef extends Omit<CreateTaskDef, 'steps'> {
 export interface EmbeddedStep {
   ref: string;
   ordinal: number;
-  action_id?: string;
+  actionId?: string;
   action?: EmbeddedAction;
-  input_mapping?: Record<string, unknown> | null;
-  output_mapping?: Record<string, unknown> | null;
-  on_failure?: 'abort' | 'retry' | 'continue';
+  inputMapping?: Record<string, unknown> | null;
+  outputMapping?: Record<string, unknown> | null;
+  onFailure?: 'abort' | 'retry' | 'continue';
   condition?: {
     if: string;
     then: 'continue' | 'skip' | 'succeed' | 'fail';
@@ -86,12 +86,12 @@ export interface EmbeddedModelProfile extends CreateModelProfile {
 export interface EmbeddedNode {
   ref: string;
   name: string;
-  task_id?: string;
+  taskId?: string;
   task?: EmbeddedTaskDef;
-  task_version?: number;
-  input_mapping?: Record<string, unknown>;
-  output_mapping?: Record<string, unknown>;
-  resource_bindings?: Record<string, unknown>;
+  taskVersion?: number;
+  inputMapping?: Record<string, unknown>;
+  outputMapping?: Record<string, unknown>;
+  resourceBindings?: Record<string, unknown>;
 }
 
 /** Symbol to mark embedded workflow defs */

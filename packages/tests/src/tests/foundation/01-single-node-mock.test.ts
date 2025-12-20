@@ -17,7 +17,7 @@ import { assertInvariants, runTestWorkflow } from '~/kit';
  * 3. Context initialization with input/state/output tables
  * 4. Task dispatch and result handling
  * 5. Output mapping from task → workflow context
- * 6. Completion extraction via output_mapping
+ * 6. Completion extraction via outputMapping
  * 7. Decision Pattern architecture: Planning → Dispatch → Operations
  *
  * Assertion strategy:
@@ -55,15 +55,15 @@ describe('Foundation: 01 - Single Node Mock', () => {
       ref: 'generate_step',
       ordinal: 0,
       action: generateAction,
-      input_mapping: {},
-      output_mapping: { 'output.code': '$.code' },
+      inputMapping: {},
+      outputMapping: { 'output.code': '$.code' },
     });
 
     const generateTask = task({
       name: 'Generate Task',
       description: 'Generates random code',
-      input_schema: s.object({}),
-      output_schema: mockOutputSchema,
+      inputSchema: s.object({}),
+      outputSchema: mockOutputSchema,
       steps: [generateStep],
     });
 
@@ -71,18 +71,18 @@ describe('Foundation: 01 - Single Node Mock', () => {
       ref: 'generate',
       name: 'Generate',
       task: generateTask,
-      task_version: 1,
-      input_mapping: {},
-      output_mapping: { 'output.code': '$.code' },
+      taskVersion: 1,
+      inputMapping: {},
+      outputMapping: { 'output.code': '$.code' },
     });
 
     const workflowDef = workflow({
       name: 'Single Node Mock Test',
       description: 'Foundation test 01 - single node lifecycle',
-      input_schema: inputSchema,
-      output_schema: workflowOutputSchema,
-      output_mapping: { code: '$.output.code' },
-      initial_node_ref: 'generate',
+      inputSchema: inputSchema,
+      outputSchema: workflowOutputSchema,
+      outputMapping: { code: '$.output.code' },
+      initialNodeRef: 'generate',
       nodes: [generateNode],
       transitions: [],
     });
@@ -114,10 +114,10 @@ describe('Foundation: 01 - Single Node Mock', () => {
       // =========================================================================
       // WORKFLOW EVENTS (what users see)
       // =========================================================================
-      const workflowStarted = events.find((e) => e.event_type === 'workflow.started');
-      const workflowCompleted = events.find((e) => e.event_type === 'workflow.completed');
-      const taskDispatched = events.find((e) => e.event_type === 'task.dispatched');
-      const taskCompleted = events.find((e) => e.event_type === 'task.completed');
+      const workflowStarted = events.find((e) => e.eventType === 'workflow.started');
+      const workflowCompleted = events.find((e) => e.eventType === 'workflow.completed');
+      const taskDispatched = events.find((e) => e.eventType === 'task.dispatched');
+      const taskCompleted = events.find((e) => e.eventType === 'task.completed');
 
       expect(workflowStarted, 'workflow.started event must exist').toBeDefined();
       expect(workflowCompleted, 'workflow.completed event must exist').toBeDefined();
@@ -131,16 +131,16 @@ describe('Foundation: 01 - Single Node Mock', () => {
       expect(tokenCreations, 'Exactly one token should be created').toHaveLength(1);
 
       const rootToken = tokenCreations[0];
-      expect(rootToken.token_id, 'Root token must have token_id').toBeDefined();
-      const tokenId = rootToken.token_id!;
+      expect(rootToken.tokenId, 'Root token must have tokenId').toBeDefined();
+      const tokenId = rootToken.tokenId!;
 
       // Root token lineage
-      expect(rootToken.payload.parent_token_id).toBeNull();
-      expect(rootToken.payload.path_id, 'Root token path_id must be "root"').toBe('root');
-      expect(rootToken.payload.branch_index).toBe(0);
-      expect(rootToken.payload.branch_total).toBe(1);
-      expect(rootToken.payload.sibling_group).toBeNull();
-      expect(rootToken.node_id).toBeDefined();
+      expect(rootToken.payload.parentTokenId).toBeNull();
+      expect(rootToken.payload.pathId, 'Root token pathId must be "root"').toBe('root');
+      expect(rootToken.payload.branchIndex).toBe(0);
+      expect(rootToken.payload.branchTotal).toBe(1);
+      expect(rootToken.payload.siblingGroup).toBeNull();
+      expect(rootToken.nodeId).toBeDefined();
 
       // Token state transitions
       const statuses = trace.tokens.statusTransitions(tokenId);
@@ -153,16 +153,16 @@ describe('Foundation: 01 - Single Node Mock', () => {
       expect(contextInit, 'Context initialization event must exist').toBeDefined();
 
       // Tables created
-      const tablesCreated = contextInit!.payload.tables_created;
+      const tablesCreated = contextInit!.payload.tablesCreated;
       expect(tablesCreated).toContain('context_input');
       expect(tablesCreated).toContain('context_output');
-      expect(tablesCreated, 'No state table (no context_schema)').not.toContain('context_state');
+      expect(tablesCreated, 'No state table (no contextSchema)').not.toContain('context_state');
 
       // Input validated
       const inputValidation = trace.context.validateAt('input');
       expect(inputValidation, 'Input validation event must exist').toBeDefined();
       expect(inputValidation!.payload.valid).toBe(true);
-      expect(inputValidation!.payload.error_count).toBe(0);
+      expect(inputValidation!.payload.errorCount).toBe(0);
 
       // =========================================================================
       // ROUTING
@@ -180,14 +180,14 @@ describe('Foundation: 01 - Single Node Mock', () => {
       // Verify input mapping was applied
       const inputMappingEvent = trace.dispatch.taskDispatch(tokenId);
       expect(inputMappingEvent, 'Task input mapping event must exist').toBeDefined();
-      expect(inputMappingEvent!.payload.input_mapping).toEqual({});
-      expect(inputMappingEvent!.payload.task_input).toEqual({});
+      expect(inputMappingEvent!.payload.inputMapping).toEqual({});
+      expect(inputMappingEvent!.payload.taskInput).toEqual({});
 
       // Verify task was sent to executor with correct payload
       const taskSentEvent = trace.dispatch.send(tokenId);
       expect(taskSentEvent, 'Task sent event must exist').toBeDefined();
-      expect(taskSentEvent!.payload.task_id, 'Task ID must be defined').toBeDefined();
-      expect(taskSentEvent!.payload.task_version).toBe(1);
+      expect(taskSentEvent!.payload.taskId, 'Task ID must be defined').toBeDefined();
+      expect(taskSentEvent!.payload.taskVersion).toBe(1);
       expect(taskSentEvent!.payload.resources).toEqual({});
 
       // =========================================================================
@@ -195,59 +195,59 @@ describe('Foundation: 01 - Single Node Mock', () => {
       // =========================================================================
       const executorTaskStart = trace.executor.taskStart(tokenId);
       expect(executorTaskStart, 'Executor task started event must exist').toBeDefined();
-      expect(executorTaskStart!.payload.task_id).toBe(taskSentEvent!.payload.task_id);
-      expect(executorTaskStart!.payload.task_version).toBe(1);
-      expect(executorTaskStart!.payload.step_count).toBe(1);
-      expect(executorTaskStart!.payload.input_keys).toEqual([]);
+      expect(executorTaskStart!.payload.taskId).toBe(taskSentEvent!.payload.taskId);
+      expect(executorTaskStart!.payload.taskVersion).toBe(1);
+      expect(executorTaskStart!.payload.stepCount).toBe(1);
+      expect(executorTaskStart!.payload.inputKeys).toEqual([]);
 
       const executorTaskCompletion = trace.executor.taskCompletion(tokenId);
       expect(executorTaskCompletion, 'Executor task completed event must exist').toBeDefined();
-      expect(executorTaskCompletion!.payload.task_id).toBe(taskSentEvent!.payload.task_id);
-      expect(executorTaskCompletion!.payload.steps_executed).toBe(1);
-      expect(executorTaskCompletion!.payload.steps_skipped).toBe(0);
-      expect(executorTaskCompletion!.duration_ms).toBeGreaterThanOrEqual(0);
+      expect(executorTaskCompletion!.payload.taskId).toBe(taskSentEvent!.payload.taskId);
+      expect(executorTaskCompletion!.payload.stepsExecuted).toBe(1);
+      expect(executorTaskCompletion!.payload.stepsSkipped).toBe(0);
+      expect(executorTaskCompletion!.durationMs).toBeGreaterThanOrEqual(0);
 
       // =========================================================================
       // EXECUTOR - Step Execution
       // =========================================================================
       const stepStarts = trace.executor.stepStartsFor(tokenId);
       expect(stepStarts, 'Exactly one step started').toHaveLength(1);
-      expect(stepStarts[0].payload.step_ref).toBe('generate_step');
-      expect(stepStarts[0].payload.step_ordinal).toBe(0);
-      expect(stepStarts[0].payload.has_condition).toBe(false);
+      expect(stepStarts[0].payload.stepRef).toBe('generate_step');
+      expect(stepStarts[0].payload.stepOrdinal).toBe(0);
+      expect(stepStarts[0].payload.hasCondition).toBe(false);
 
       const stepCompletions = trace.executor.stepCompletionsFor(tokenId);
       expect(stepCompletions, 'Exactly one step completed').toHaveLength(1);
-      expect(stepCompletions[0].payload.step_ref).toBe('generate_step');
+      expect(stepCompletions[0].payload.stepRef).toBe('generate_step');
       expect(stepCompletions[0].payload.success).toBe(true);
-      expect(stepCompletions[0].payload.output_keys).toEqual(['code']);
-      expect(stepCompletions[0].duration_ms).toBeGreaterThanOrEqual(0);
+      expect(stepCompletions[0].payload.outputKeys).toEqual(['code']);
+      expect(stepCompletions[0].durationMs).toBeGreaterThanOrEqual(0);
 
       // =========================================================================
       // EXECUTOR - Action Execution
       // =========================================================================
       const actionStarts = trace.executor.actionStartsFor(tokenId);
       expect(actionStarts, 'Exactly one action started').toHaveLength(1);
-      expect(actionStarts[0].payload.step_ref).toBe('generate_step');
-      expect(actionStarts[0].payload.action_kind).toBe('mock');
-      expect(actionStarts[0].payload.input_keys).toEqual([]);
+      expect(actionStarts[0].payload.stepRef).toBe('generate_step');
+      expect(actionStarts[0].payload.actionKind).toBe('mock');
+      expect(actionStarts[0].payload.inputKeys).toEqual([]);
 
       const actionCompletions = trace.executor.actionCompletionsFor(tokenId);
       expect(actionCompletions, 'Exactly one action completed').toHaveLength(1);
-      expect(actionCompletions[0].payload.step_ref).toBe('generate_step');
-      expect(actionCompletions[0].payload.action_kind).toBe('mock');
-      expect(actionCompletions[0].payload.output_keys).toEqual(['code']);
-      expect(actionCompletions[0].duration_ms).toBeGreaterThanOrEqual(0);
+      expect(actionCompletions[0].payload.stepRef).toBe('generate_step');
+      expect(actionCompletions[0].payload.actionKind).toBe('mock');
+      expect(actionCompletions[0].payload.outputKeys).toEqual(['code']);
+      expect(actionCompletions[0].durationMs).toBeGreaterThanOrEqual(0);
 
       // =========================================================================
       // EXECUTOR - Mock Data Generation
       // =========================================================================
       const mockGeneration = trace.executor.mockGeneration(tokenId);
       expect(mockGeneration, 'Mock generation event must exist').toBeDefined();
-      expect(mockGeneration!.payload.step_ref).toBe('generate_step');
-      expect(mockGeneration!.payload.schema_type).toBe('object');
-      expect(mockGeneration!.payload.has_seed).toBe(false);
-      expect(mockGeneration!.duration_ms).toBeGreaterThanOrEqual(0);
+      expect(mockGeneration!.payload.stepRef).toBe('generate_step');
+      expect(mockGeneration!.payload.schemaType).toBe('object');
+      expect(mockGeneration!.payload.hasSeed).toBe(false);
+      expect(mockGeneration!.durationMs).toBeGreaterThanOrEqual(0);
 
       // =========================================================================
       // EXECUTOR - Causal Ordering
@@ -265,7 +265,7 @@ describe('Foundation: 01 - Single Node Mock', () => {
       const completionComplete = trace.completion.complete();
       expect(completionComplete, 'Completion event must exist').toBeDefined();
 
-      const finalOutput = completionComplete!.payload.final_output as { code: string };
+      const finalOutput = completionComplete!.payload.finalOutput as { code: string };
       expect(typeof finalOutput.code).toBe('string');
       expect(finalOutput.code.length, 'Code must be non-empty').toBeGreaterThan(0);
 
@@ -314,8 +314,8 @@ describe('Foundation: 01 - Single Node Mock', () => {
       // ROUTING PLANNING
       const routingPlanningStarts = trace.routing.starts();
       expect(routingPlanningStarts, 'Routing planning invoked').toHaveLength(1);
-      expect(routingPlanningStarts[0].token_id, 'Planning for completed token').toBe(tokenId);
-      expect(routingPlanningStarts[0].node_id, 'Planning has node context').toBeDefined();
+      expect(routingPlanningStarts[0].tokenId, 'Planning for completed token').toBe(tokenId);
+      expect(routingPlanningStarts[0].nodeId, 'Planning has node context').toBeDefined();
 
       // No transitions should be evaluated (workflow has no outgoing transitions)
       const transitionEvaluations = trace.routing.evaluations();
@@ -331,10 +331,10 @@ describe('Foundation: 01 - Single Node Mock', () => {
       // COMPLETION PLANNING
       const completionPlanningStart = trace.completion.start();
       expect(completionPlanningStart, 'Completion planning started').toBeDefined();
-      expect(completionPlanningStart!.payload.output_mapping).toEqual({ code: '$.output.code' });
+      expect(completionPlanningStart!.payload.outputMapping).toEqual({ code: '$.output.code' });
 
       // Verify context structure available to planning
-      const contextKeys = completionPlanningStart!.payload.context_keys;
+      const contextKeys = completionPlanningStart!.payload.contextKeys;
       expect(contextKeys.input, 'Input available to planning').toBeDefined();
       expect(contextKeys.state, 'State available to planning').toBeDefined();
       expect(contextKeys.output, 'Output available to planning').toBeDefined();
@@ -342,18 +342,18 @@ describe('Foundation: 01 - Single Node Mock', () => {
 
       const completionPlanningExtracts = trace.completion.extracts();
       expect(completionPlanningExtracts, 'Output fields extracted via planning').toHaveLength(1);
-      expect(completionPlanningExtracts[0].payload.target_field).toBe('code');
-      expect(completionPlanningExtracts[0].payload.source_path).toBe('$.output.code');
+      expect(completionPlanningExtracts[0].payload.targetField).toBe('code');
+      expect(completionPlanningExtracts[0].payload.sourcePath).toBe('$.output.code');
 
       // RELATIONAL: Extracted value must match final output
-      const extractedCode = completionPlanningExtracts[0].payload.extracted_value;
+      const extractedCode = completionPlanningExtracts[0].payload.extractedValue;
       expect(typeof extractedCode).toBe('string');
       expect((extractedCode as string).length).toBeGreaterThan(0);
       expect(extractedCode, 'Extracted value must equal final output').toBe(finalOutput.code);
 
       const completionPlanningComplete = trace.completion.complete();
       expect(completionPlanningComplete, 'Completion planning finished').toBeDefined();
-      expect(completionPlanningComplete!.payload.final_output).toEqual({ code: finalOutput.code });
+      expect(completionPlanningComplete!.payload.finalOutput).toEqual({ code: finalOutput.code });
 
       // DISPATCH LAYER
       // The dispatch layer converts decisions into operations.
@@ -370,8 +370,8 @@ describe('Foundation: 01 - Single Node Mock', () => {
         const payload = batch.payload as any;
         expect(payload.errors, `Batch errors`).toBe(0);
         totalApplied += payload.applied;
-        totalTokensCreated += payload.tokens_created;
-        totalTokensDispatched += payload.tokens_dispatched;
+        totalTokensCreated += payload.tokensCreated;
+        totalTokensDispatched += payload.tokensDispatched;
         totalErrors += payload.errors;
       }
 
@@ -426,8 +426,8 @@ describe('Foundation: 01 - Single Node Mock', () => {
         'decision.completion.extract': 1,
         'decision.completion.complete': 1,
         // Dispatch layer
-        'dispatch.task.input_mapping.context': 1,
-        'dispatch.task.input_mapping.applied': 1,
+        'dispatch.task.inputMapping.context': 1,
+        'dispatch.task.inputMapping.applied': 1,
         'dispatch.task.sent': 1,
         // Executor operations
         'executor.task.started': 1,

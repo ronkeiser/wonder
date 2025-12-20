@@ -48,27 +48,27 @@ function createNodeHover(nodeRef: string, node: NodeDecl, imports?: ImportsMap):
   }
   lines.push('');
 
-  if (node.task_id) {
-    const imp = imports?.byAlias.get(node.task_id);
+  if (node.taskId) {
+    const imp = imports?.byAlias.get(node.taskId);
     if (imp) {
-      lines.push(`**Task:** \`${node.task_id}\` → \`${imp.path}\` v${node.task_version || 1}`);
+      lines.push(`**Task:** \`${node.taskId}\` → \`${imp.path}\` v${node.taskVersion || 1}`);
     } else {
-      lines.push(`**Task:** \`${node.task_id}\` v${node.task_version || 1}`);
+      lines.push(`**Task:** \`${node.taskId}\` v${node.taskVersion || 1}`);
     }
   }
 
-  if (node.input_mapping && Object.keys(node.input_mapping).length > 0) {
+  if (node.inputMapping && Object.keys(node.inputMapping).length > 0) {
     lines.push('');
     lines.push('**Input Mapping:**');
-    for (const [key, value] of Object.entries(node.input_mapping)) {
+    for (const [key, value] of Object.entries(node.inputMapping)) {
       lines.push(`- \`${key}\` ← \`${value}\``);
     }
   }
 
-  if (node.output_mapping && Object.keys(node.output_mapping).length > 0) {
+  if (node.outputMapping && Object.keys(node.outputMapping).length > 0) {
     lines.push('');
     lines.push('**Output Mapping:**');
-    for (const [contextPath, taskOutput] of Object.entries(node.output_mapping)) {
+    for (const [contextPath, taskOutput] of Object.entries(node.outputMapping)) {
       lines.push(`- \`${contextPath}\` ← \`${taskOutput}\``);
     }
   }
@@ -194,8 +194,8 @@ export function handleHover(
   if (imports) {
     const imp = imports.byAlias.get(word);
     if (imp) {
-      const isTaskIdRef = line.includes('task_id:');
-      const isActionIdRef = line.includes('action_id:');
+      const isTaskIdRef = line.includes('taskId:');
+      const isActionIdRef = line.includes('actionId:');
       const isImportDef = line.match(new RegExp(`^\\s*${escapeRegex(word)}\\s*:`));
 
       if (isTaskIdRef || isActionIdRef || isImportDef) {
@@ -214,7 +214,7 @@ export function handleHover(
   const jsonPathMatch = word.match(/^\$\.(input|state)\.(.+)$/);
   if (jsonPathMatch && wflowDoc) {
     const [, schemaType, pathRest] = jsonPathMatch;
-    const schema = schemaType === 'input' ? wflowDoc.input_schema : wflowDoc.context_schema;
+    const schema = schemaType === 'input' ? wflowDoc.inputSchema : wflowDoc.contextSchema;
     return createPathHover(word, pathRest, schema, schemaType);
   }
 
@@ -222,7 +222,7 @@ export function handleHover(
   const contextPathMatch = word.match(/^(state|output)\.(.+)$/);
   if (contextPathMatch && wflowDoc) {
     const [, schemaType, pathRest] = contextPathMatch;
-    const schema = schemaType === 'state' ? wflowDoc.context_schema : wflowDoc.output_schema;
+    const schema = schemaType === 'state' ? wflowDoc.contextSchema : wflowDoc.outputSchema;
     return createPathHover(word, pathRest, schema, schemaType);
   }
 

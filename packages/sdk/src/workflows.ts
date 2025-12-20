@@ -36,7 +36,7 @@ export interface StreamOptions {
 }
 
 export interface StreamResult {
-  workflow_run_id: string;
+  workflowRunId: string;
   status: 'completed' | 'failed' | 'timeout' | 'idle_timeout';
   events: EventEntry[];
   traceEvents: TraceEventEntry[];
@@ -82,11 +82,11 @@ export function createWorkflowsClient(
       body: { input: input as Record<string, unknown> },
     });
 
-    if (!createResponse.data?.workflow_run_id) {
+    if (!createResponse.data?.workflowRunId) {
       throw new Error(`Failed to create workflow run`);
     }
 
-    const { workflow_run_id } = createResponse.data;
+    const { workflowRunId } = createResponse.data;
 
     // Phase 2: Subscribe to events BEFORE starting execution
     return new Promise<StreamResult>((resolve, reject) => {
@@ -109,7 +109,7 @@ export function createWorkflowsClient(
       ) => {
         cleanup();
         resolve({
-          workflow_run_id,
+          workflowRunId,
           status,
           events: finalEvents,
           traceEvents: finalTraceEvents,
@@ -145,20 +145,20 @@ export function createWorkflowsClient(
         }
 
         // Check for terminal conditions (only applies to EventEntry, not TraceEventEntry)
-        if ('event_type' in event && event.event_type === 'workflow.completed') {
+        if ('eventType' in event && event.eventType === 'workflow.completed') {
           // Wait for grace period to collect any in-flight events before closing
           setTimeout(() => resolveWithCleanup('completed'), gracePeriod);
           return;
         }
 
-        if ('event_type' in event && event.event_type === 'workflow.failed') {
+        if ('eventType' in event && event.eventType === 'workflow.failed') {
           // Wait for grace period to collect any in-flight events before closing
           setTimeout(() => resolveWithCleanup('failed'), gracePeriod);
           return;
         }
 
-        // Check custom predicate (only EventEntry has event_type for until callback)
-        if (until && 'event_type' in event) {
+        // Check custom predicate (only EventEntry has eventType for until callback)
+        if (until && 'eventType' in event) {
           if (until(event as EventEntry)) {
             // Wait for grace period to collect any in-flight events before closing
             setTimeout(() => resolveWithCleanup('completed'), gracePeriod);
@@ -171,12 +171,12 @@ export function createWorkflowsClient(
       const subscriptions = (['events', 'trace'] as const).map((stream) => ({
         id: stream,
         stream,
-        filters: { workflow_run_id, ...subscribe },
+        filters: { workflowRunId, ...subscribe },
         callback: eventCallback,
       }));
 
       eventsClient
-        .subscribe(subscriptions, workflow_run_id)
+        .subscribe(subscriptions, workflowRunId)
         .then((sub) => {
           subscription = sub;
           resetIdleTimer();
@@ -186,7 +186,7 @@ export function createWorkflowsClient(
           setTimeout(async () => {
             try {
               await sdk.POST('/workflows/{id}/runs/{run_id}/start', {
-                params: { path: { id: workflowId, run_id: workflow_run_id } },
+                params: { path: { id: workflowId, run_id: workflowRunId } },
               });
             } catch (error) {
               cleanup();

@@ -31,7 +31,7 @@ const AUTO_GENERATED_HEADER = `/**
  * Check if a path should use JSONSchema reference
  */
 function shouldUseJSONSchema(path: string): boolean {
-  const workflowSchemas = ['input_schema', 'output_schema', 'context_schema'];
+  const workflowSchemas = ['inputSchema', 'outputSchema', 'contextSchema'];
   return (
     (path.includes('WorkflowDef') && workflowSchemas.some((schema) => path.endsWith(schema))) ||
     (path.includes('PromptSpec') && path.endsWith('produces'))

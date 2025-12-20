@@ -103,7 +103,7 @@
   };
 
   function getEventColor(item: any): string {
-    return colorMap[item.event_type] || 'var(--gray)';
+    return colorMap[item.eventType] || 'var(--gray)';
   }
 
   function formatTime(timestamp: number): string {
@@ -121,10 +121,10 @@
     return {
       time: formatTime(item.timestamp),
       badge: {
-        text: item.event_type,
-        color: colorMap[item.event_type] || 'var(--gray-lighter)',
+        text: item.eventType,
+        color: colorMap[item.eventType] || 'var(--gray-lighter)',
       },
-      identifier: item.workflow_run_id ? item.workflow_run_id.slice(-8) : undefined,
+      identifier: item.workflowRunId ? item.workflowRunId.slice(-8) : undefined,
       message: item.message,
     };
   }
@@ -159,7 +159,7 @@
     title="Events"
     apiPath="/api/events"
     filterLabel="Event Types"
-    filterParam="event_type"
+    filterParam="eventType"
     filterOptions={eventTypeOptions}
     itemsKey="events"
     itemKey="event"

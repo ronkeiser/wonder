@@ -28,7 +28,7 @@ export type { TestWorkflowResult, WorkflowTestSetup } from './types';
  *           step({
  *             action: action({
  *               implementation: {
- *                 prompt_spec: promptSpec({...}),
+ *                 promptSpec: promptSpec({...}),
  *               }
  *             }),
  *           })
@@ -55,57 +55,57 @@ export async function createWorkflow(
   const resolvedNodes: Array<{
     ref: string;
     name: string;
-    task_id: string;
-    task_version?: number;
-    input_mapping?: Record<string, unknown>;
-    output_mapping?: Record<string, unknown>;
-    resource_bindings?: Record<string, unknown>;
+    taskId: string;
+    taskVersion?: number;
+    inputMapping?: Record<string, unknown>;
+    outputMapping?: Record<string, unknown>;
+    resourceBindings?: Record<string, unknown>;
   }> = [];
 
   for (const n of workflow.nodes as EmbeddedNode[]) {
     let taskId: string;
 
-    if (n.task_id) {
+    if (n.taskId) {
       // Already has an ID
-      taskId = n.task_id;
+      taskId = n.taskId;
     } else if (n.task && isEmbeddedTaskDef(n.task)) {
       // Embedded task def - need to create it and its dependencies
       taskId = await createEmbeddedTaskDef(ctx, n.task, createdResources);
     } else {
-      throw new Error(`Node ${n.ref} must have either task_id or task`);
+      throw new Error(`Node ${n.ref} must have either taskId or task`);
     }
 
     resolvedNodes.push({
       ref: n.ref,
       name: n.name,
-      task_id: taskId,
-      task_version: n.task_version,
-      input_mapping: n.input_mapping,
-      output_mapping: n.output_mapping,
-      resource_bindings: n.resource_bindings as Record<string, string> | undefined,
+      taskId: taskId,
+      taskVersion: n.taskVersion,
+      inputMapping: n.inputMapping,
+      outputMapping: n.outputMapping,
+      resourceBindings: n.resourceBindings as Record<string, string> | undefined,
     });
   }
 
   // Create workflow def with resolved nodes
   const resolvedWorkflow = {
     ...workflow,
-    project_id: ctx.projectId,
+    projectId: ctx.projectId,
     nodes: resolvedNodes,
   };
 
   const workflowDefResponse = await wonder.workflowDefs.create(resolvedWorkflow as any);
 
-  if (!workflowDefResponse?.workflow_def_id) {
+  if (!workflowDefResponse?.workflowDefId) {
     throw new Error('Failed to create workflow definition');
   }
-  const workflowDefId = workflowDefResponse.workflow_def_id;
-  const version = workflowDefResponse.workflow_def?.version ?? 1;
+  const workflowDefId = workflowDefResponse.workflowDefId;
+  const version = workflowDefResponse.workflowDef?.version ?? 1;
 
   console.log(`📦 Created workflow def (version ${version})`);
 
   const workflowResponse = await wonder.workflows.create({
-    project_id: ctx.projectId,
-    workflow_def_id: workflowDefId,
+    projectId: ctx.projectId,
+    workflowDefId: workflowDefId,
     name: options?.name ?? workflow.name,
     description: workflow.description || 'Test workflow',
   });
@@ -141,8 +141,8 @@ export async function executeWorkflow(
     idleTimeout: options?.idleTimeout ?? 10000,
     onEvent: options?.logEvents
       ? (event) => {
-          if ('event_type' in event) {
-            console.log(`📨 ${event.event_type}`, JSON.stringify(event.metadata ?? {}, null, 2));
+          if ('eventType' in event) {
+            console.log(`📨 ${event.eventType}`, JSON.stringify(event.metadata ?? {}, null, 2));
           } else if ('type' in event) {
             console.log(`🔍 ${event.type}`, JSON.stringify(event.payload ?? {}, null, 2));
           }
@@ -151,7 +151,7 @@ export async function executeWorkflow(
   });
 
   return {
-    workflowRunId: result.workflow_run_id,
+    workflowRunId: result.workflowRunId,
     status: result.status,
     events: result.events,
     trace: result.trace,
@@ -178,7 +178,7 @@ export async function executeWorkflow(
  *             step({
  *               action: action({
  *                 implementation: {
- *                   prompt_spec: promptSpec({...}),
+ *                   promptSpec: promptSpec({...}),
  *                 }
  *               }),
  *             })
@@ -219,16 +219,16 @@ export async function runTestWorkflow(
   // Output workflow run ID for debugging queries
   const apiKey = process.env.API_KEY ?? '$API_KEY';
   console.log('\n📋 Workflow Run Info:');
-  console.log(`   workflow_run_id: ${result.workflowRunId}`);
+  console.log(`   workflowRunId: ${result.workflowRunId}`);
   console.log(`   status: ${result.status}`);
   console.log('\n🔍 Debug Query Examples:');
   console.log('   # Events (workflow/task/token lifecycle, LLM calls):');
   console.log(
-    `   curl -H "X-API-Key: ${apiKey}" "https://api.wflow.app/events?workflow_run_id=${result.workflowRunId}"`,
+    `   curl -H "X-API-Key: ${apiKey}" "https://api.wflow.app/events?workflowRunId=${result.workflowRunId}"`,
   );
   console.log('   # Trace events (coordinator decisions, routing, sync):');
   console.log(
-    `   curl -H "X-API-Key: ${apiKey}" "https://api.wflow.app/events/trace?workflow_run_id=${result.workflowRunId}"`,
+    `   curl -H "X-API-Key: ${apiKey}" "https://api.wflow.app/events/trace?workflowRunId=${result.workflowRunId}"`,
   );
   console.log('\n🎁  Response is wrapped: { "events": [...] }');
   console.log("   Use jq to unwrap: curl ... | jq '.events'");

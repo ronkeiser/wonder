@@ -30,14 +30,14 @@ type ModelId =
  * const myModel = modelProfile({
  *   name: 'GPT-4 Default',
  *   provider: 'openai',
- *   model_id: 'gpt-4',
- *   parameters: { temperature: 0.7, max_tokens: 1024 }
+ *   modelId: 'gpt-4',
+ *   parameters: { temperature: 0.7, maxTokens: 1024 }
  * });
  *
  * // Or embed in action for automatic creation
  * const myAction = action({
  *   implementation: {
- *     model_profile: modelProfile({...}),  // will be created automatically
+ *     modelProfile: modelProfile({...}),  // will be created automatically
  *     ...
  *   }
  * });
@@ -45,20 +45,20 @@ type ModelId =
 export function modelProfile(config: {
   name: string;
   provider: ModelProvider;
-  model_id: ModelId;
+  modelId: ModelId;
   parameters: Record<string, unknown>;
-  execution_config?: Record<string, unknown>;
-  cost_per_1k_input_tokens?: number;
-  cost_per_1k_output_tokens?: number;
+  executionConfig?: Record<string, unknown>;
+  costPer1kInputTokens?: number;
+  costPer1kOutputTokens?: number;
 }): EmbeddedModelProfile {
   return {
     [MODEL_PROFILE]: true,
     name: config.name,
     provider: config.provider,
-    model_id: config.model_id,
+    modelId: config.modelId,
     parameters: config.parameters,
-    execution_config: config.execution_config,
-    cost_per_1k_input_tokens: config.cost_per_1k_input_tokens ?? 0,
-    cost_per_1k_output_tokens: config.cost_per_1k_output_tokens ?? 0,
+    executionConfig: config.executionConfig,
+    costPer1kInputTokens: config.costPer1kInputTokens ?? 0,
+    costPer1kOutputTokens: config.costPer1kOutputTokens ?? 0,
   };
 }

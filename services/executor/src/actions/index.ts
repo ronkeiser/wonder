@@ -52,37 +52,37 @@ export async function dispatchAction(
   });
 
   switch (action.kind) {
-    case 'llm_call':
+    case 'llm':
       return executeLLMAction(actionInput, deps);
 
-    case 'http_request':
+    case 'http':
       // TODO: Implement HTTP action handler
       return notImplemented(action, context, logger);
 
-    case 'mcp_tool':
+    case 'mcp':
       // TODO: Implement MCP tool action handler
       return notImplemented(action, context, logger);
 
-    case 'human_input':
+    case 'human':
       // TODO: Implement human input action handler
       return notImplemented(action, context, logger);
 
-    case 'update_context':
+    case 'context':
       return executeUpdateContextAction(actionInput, deps);
 
-    case 'write_artifact':
+    case 'artifact':
       // TODO: Implement artifact writing action handler
       return notImplemented(action, context, logger);
 
-    case 'workflow_call':
+    case 'workflow':
       // TODO: Implement sub-workflow action handler
       return notImplemented(action, context, logger);
 
-    case 'vector_search':
+    case 'vector':
       // TODO: Implement vector search action handler
       return notImplemented(action, context, logger);
 
-    case 'emit_metric':
+    case 'metric':
       // TODO: Implement metric emission action handler
       return notImplemented(action, context, logger);
 

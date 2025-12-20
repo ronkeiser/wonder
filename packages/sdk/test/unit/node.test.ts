@@ -22,15 +22,15 @@ describe('node()', () => {
     const result = node({
       ref: 'process',
       name: 'Process Data',
-      action_id: 'my-action',
-      action_version: 1,
+      actionId: 'my-action',
+      actionVersion: 1,
     });
 
     expect(result).toEqual({
       ref: 'process',
       name: 'Process Data',
-      action_id: 'my-action',
-      action_version: 1,
+      actionId: 'my-action',
+      actionVersion: 1,
     });
   });
 
@@ -38,8 +38,8 @@ describe('node()', () => {
     const result = node({
       ref: 'transform',
       name: 'Transform',
-      action_id: 'transformer',
-      input_mapping: {
+      actionId: 'transformer',
+      inputMapping: {
         data: '$.input.rawData',
         format: '$.context.format',
       },
@@ -48,8 +48,8 @@ describe('node()', () => {
     expect(result).toEqual({
       ref: 'transform',
       name: 'Transform',
-      action_id: 'transformer',
-      input_mapping: {
+      actionId: 'transformer',
+      inputMapping: {
         data: '$.input.rawData',
         format: '$.context.format',
       },
@@ -60,8 +60,8 @@ describe('node()', () => {
     const result = node({
       ref: 'extract',
       name: 'Extract',
-      action_id: 'extractor',
-      output_mapping: {
+      actionId: 'extractor',
+      outputMapping: {
         result: '$.response.data',
       },
     });
@@ -69,8 +69,8 @@ describe('node()', () => {
     expect(result).toEqual({
       ref: 'extract',
       name: 'Extract',
-      action_id: 'extractor',
-      output_mapping: {
+      actionId: 'extractor',
+      outputMapping: {
         result: '$.response.data',
       },
     });
@@ -80,12 +80,12 @@ describe('node()', () => {
     const result = node({
       ref: 'complete',
       name: 'Complete Node',
-      action_id: 'action-123',
-      action_version: 2,
-      input_mapping: {
+      actionId: 'action-123',
+      actionVersion: 2,
+      inputMapping: {
         input: '$.input',
       },
-      output_mapping: {
+      outputMapping: {
         output: '$.response',
       },
     });
@@ -93,12 +93,12 @@ describe('node()', () => {
     expect(result).toEqual({
       ref: 'complete',
       name: 'Complete Node',
-      action_id: 'action-123',
-      action_version: 2,
-      input_mapping: {
+      actionId: 'action-123',
+      actionVersion: 2,
+      inputMapping: {
         input: '$.input',
       },
-      output_mapping: {
+      outputMapping: {
         output: '$.response',
       },
     });

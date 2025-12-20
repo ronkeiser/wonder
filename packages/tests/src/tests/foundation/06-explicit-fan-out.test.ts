@@ -6,11 +6,11 @@ import { assertInvariants, runTestWorkflow, TIME_JITTER, verify } from '~/kit';
  * Foundation Test 06: Explicit Fan-Out with Synchronization
  *
  * This test validates explicit fan-out (multiple distinct transitions to different nodes)
- * with synchronization and merge semantics - the same semantics supported by spawn_count-based
+ * with synchronization and merge semantics - the same semantics supported by spawnCount-based
  * fan-out.
  *
  * The coordinator supports sibling grouping for explicit fan-out transitions. When multiple
- * transitions share the same `sibling_group` name in their synchronization config, the coordinator
+ * transitions share the same `siblingGroup` name in their synchronization config, the coordinator
  * treats tokens spawned by these transitions as siblings for fan-in coordination.
  *
  * Workflow structure:
@@ -19,28 +19,28 @@ import { assertInvariants, runTestWorkflow, TIME_JITTER, verify } from '~/kit';
  *          → [phase1_c]                                       → [phase2_b]  → (fan-in: sync + merge) → [summarize]
  *                                                             → [phase2_c]
  *
- * This enables the exact same semantics as spawn_count, but with explicit node targets:
+ * This enables the exact same semantics as spawnCount, but with explicit node targets:
  * - Explicit fan-out: Multiple transitions from one node to different target nodes
  * - Sibling grouping: Transitions declare membership in a synchronization group (e.g., 'phase1_fanin')
  * - Fan-in coordination: All siblings must arrive before continuation spawns
- * - Merge strategies: Append, collect, merge_object, etc. work identically to spawn_count
+ * - Merge strategies: Append, collect, merge_object, etc. work identically to spawnCount
  *
  * COMPARISON WITH TEST 04:
- * - Test 04: Uses spawn_count (single transition spawns 3 tokens to same node)
+ * - Test 04: Uses spawnCount (single transition spawns 3 tokens to same node)
  * - Test 06: Uses explicit fan-out (3 transitions to 3 different nodes)
  * - Both have identical synchronization and merge behavior
  *
  * WHAT THIS TEST VALIDATES:
- * - Explicit transitions can declare sibling_group membership
+ * - Explicit transitions can declare siblingGroup membership
  * - Coordinator recognizes explicit siblings for synchronization
  * - Fan-in waits for all siblings before continuation
- * - Merge strategies work identically to spawn_count
+ * - Merge strategies work identically to spawnCount
  * - Value flow through explicit branches
  * - Nested state structure with explicit nodes
  */
 
 describe('Foundation: 06 - Explicit Fan-Out', () => {
-  it('executes workflow with explicit parallel nodes (no spawn_count)', { timeout: 60000 }, async () => {
+  it('executes workflow with explicit parallel nodes (no spawnCount)', { timeout: 60000 }, async () => {
     // =========================================================================
     // Schemas
     // =========================================================================
@@ -63,7 +63,7 @@ describe('Foundation: 06 - Explicit Fan-Out', () => {
     // Phase2 accumulates: inherited words + new word = grown array
     const phase2OutputSchema = s.object(
       {
-        accumulated: s.array(s.string()), // inherited_words + word merged together
+        accumulated: s.array(s.string()), // inheritedWords + word merged together
       },
       { required: ['accumulated'] },
     );
@@ -126,18 +126,18 @@ describe('Foundation: 06 - Explicit Fan-Out', () => {
     });
 
     const initStep = step({
-      ref: 'init_step',
+      ref: 'initStep',
       ordinal: 0,
       action: initAction,
-      input_mapping: {},
-      output_mapping: { 'output.seed': '$.seed' },
+      inputMapping: {},
+      outputMapping: { 'output.seed': '$.seed' },
     });
 
     const initTask = task({
       name: 'Init Task',
       description: 'Initialize workflow',
-      input_schema: s.object({ seed: s.string() }),
-      output_schema: initOutputSchema,
+      inputSchema: s.object({ seed: s.string() }),
+      outputSchema: initOutputSchema,
       steps: [initStep],
     });
 
@@ -145,15 +145,15 @@ describe('Foundation: 06 - Explicit Fan-Out', () => {
       ref: 'init',
       name: 'Init',
       task: initTask,
-      task_version: 1,
-      input_mapping: { seed: '$.input.seed' },
+      taskVersion: 1,
+      inputMapping: { seed: '$.input.seed' },
       // Write to nested path: state.init.seed
-      output_mapping: { 'state.init.seed': '$.seed' },
+      outputMapping: { 'state.init.seed': '$.seed' },
     });
 
     // =========================================================================
     // Phase 1 Nodes: 3 explicit parallel nodes
-    // Each writes to output.value (same as spawn_count pattern)
+    // Each writes to output.value (same as spawnCount pattern)
     // =========================================================================
     const createPhase1Node = (suffix: string) => {
       const phase1Action = action({
@@ -170,15 +170,15 @@ describe('Foundation: 06 - Explicit Fan-Out', () => {
         ref: `phase1_${suffix}_step`,
         ordinal: 0,
         action: phase1Action,
-        input_mapping: {},
-        output_mapping: { 'output.value': '$.value' },
+        inputMapping: {},
+        outputMapping: { 'output.value': '$.value' },
       });
 
       const phase1Task = task({
         name: `Phase 1 ${suffix.toUpperCase()} Task`,
         description: `Process in phase 1 - branch ${suffix}`,
-        input_schema: s.object({ seed: s.string() }),
-        output_schema: phase1OutputSchema,
+        inputSchema: s.object({ seed: s.string() }),
+        outputSchema: phase1OutputSchema,
         steps: [phase1Step],
       });
 
@@ -186,10 +186,10 @@ describe('Foundation: 06 - Explicit Fan-Out', () => {
         ref: `phase1_${suffix}`,
         name: `Phase 1 ${suffix.toUpperCase()}`,
         task: phase1Task,
-        task_version: 1,
-        input_mapping: { seed: '$.state.init.seed' },
+        taskVersion: 1,
+        inputMapping: { seed: '$.state.init.seed' },
         // IMPORTANT: Writes to output.value (will be merged by fan-in transition)
-        output_mapping: { 'output.value': '$.value' },
+        outputMapping: { 'output.value': '$.value' },
       });
     };
 
@@ -203,7 +203,7 @@ describe('Foundation: 06 - Explicit Fan-Out', () => {
     const bridgeAction = action({
       name: 'Bridge Action',
       description: 'Passthrough - proves bridge receives aggregated phase1 results',
-      kind: 'update_context',
+      kind: 'context',
       implementation: {},
     });
 
@@ -211,15 +211,15 @@ describe('Foundation: 06 - Explicit Fan-Out', () => {
       ref: 'bridge_step',
       ordinal: 0,
       action: bridgeAction,
-      input_mapping: { phase1_words: '$.input.phase1_words' },
-      output_mapping: { 'output.phase1_words': '$.phase1_words' },
+      inputMapping: { phase1_words: '$.input.phase1_words' },
+      outputMapping: { 'output.phase1_words': '$.phase1_words' },
     });
 
     const bridgeTask = task({
       name: 'Bridge Task',
       description: 'Passthrough bridge - receives and forwards phase1 results',
-      input_schema: s.object({ phase1_words: s.array(s.string()) }),
-      output_schema: bridgeOutputSchema,
+      inputSchema: s.object({ phase1_words: s.array(s.string()) }),
+      outputSchema: bridgeOutputSchema,
       steps: [bridgeStep],
     });
 
@@ -227,16 +227,16 @@ describe('Foundation: 06 - Explicit Fan-Out', () => {
       ref: 'bridge',
       name: 'Bridge',
       task: bridgeTask,
-      task_version: 1,
+      taskVersion: 1,
       // Read from merged state (fan-in will have written here)
-      input_mapping: { phase1_words: '$.state.phase1.results' },
-      output_mapping: {
+      inputMapping: { phase1_words: '$.state.phase1.results' },
+      outputMapping: {
         'state.bridge.phase1_words': '$.phase1_words',
       },
     });
 
     // =========================================================================
-    // Phase 2 Nodes: 3 explicit parallel nodes (instead of spawn_count: 3)
+    // Phase 2 Nodes: 3 explicit parallel nodes (instead of spawnCount: 3)
     // Each branch: generates a word, then merges it with inherited words
     // =========================================================================
     // =========================================================================
@@ -257,18 +257,18 @@ describe('Foundation: 06 - Explicit Fan-Out', () => {
         ref: `phase2_${suffix}_word_step`,
         ordinal: 0,
         action: phase2WordAction,
-        input_mapping: {},
-        output_mapping: { 'output.word': '$.word' },
+        inputMapping: {},
+        outputMapping: { 'output.word': '$.word' },
       });
 
       const phase2MergeAction = action({
         name: `Phase 2 ${suffix.toUpperCase()} Merge Action`,
         description: `Merges inherited words with new word - branch ${suffix}`,
-        kind: 'update_context',
+        kind: 'context',
         implementation: {
           merge: {
             target: 'accumulated',
-            sources: ['inherited_words', 'word'],
+            sources: ['inheritedWords', 'word'],
           },
         },
       });
@@ -277,11 +277,11 @@ describe('Foundation: 06 - Explicit Fan-Out', () => {
         ref: `phase2_${suffix}_merge_step`,
         ordinal: 1,
         action: phase2MergeAction,
-        input_mapping: {
-          inherited_words: '$.input.inherited_words',
+        inputMapping: {
+          inheritedWords: '$.input.inheritedWords',
           word: '$.output.word',
         },
-        output_mapping: {
+        outputMapping: {
           'output.accumulated': '$.accumulated',
         },
       });
@@ -289,10 +289,10 @@ describe('Foundation: 06 - Explicit Fan-Out', () => {
       const phase2Task = task({
         name: `Phase 2 ${suffix.toUpperCase()} Task`,
         description: `Generates word and accumulates with inherited - branch ${suffix}`,
-        input_schema: s.object({
-          inherited_words: s.array(s.string()),
+        inputSchema: s.object({
+          inheritedWords: s.array(s.string()),
         }),
-        output_schema: phase2OutputSchema,
+        outputSchema: phase2OutputSchema,
         steps: [phase2WordStep, phase2MergeStep],
       });
 
@@ -300,12 +300,12 @@ describe('Foundation: 06 - Explicit Fan-Out', () => {
         ref: `phase2_${suffix}`,
         name: `Phase 2 ${suffix.toUpperCase()}`,
         task: phase2Task,
-        task_version: 1,
-        input_mapping: {
-          inherited_words: '$.state.bridge.phase1_words',
+        taskVersion: 1,
+        inputMapping: {
+          inheritedWords: '$.state.bridge.phase1_words',
         },
         // IMPORTANT: Writes to output.accumulated (will be collected by fan-in transition)
-        output_mapping: {
+        outputMapping: {
           'output.accumulated': '$.accumulated',
         },
       });
@@ -321,20 +321,20 @@ describe('Foundation: 06 - Explicit Fan-Out', () => {
     const summarizeAction = action({
       name: 'Summarize Action',
       description: 'Passthrough - proves summarize receives all accumulated state',
-      kind: 'update_context',
+      kind: 'context',
       implementation: {},
     });
 
     const summarizeStep = step({
-      ref: 'summarize_step',
+      ref: 'summarizeStep',
       ordinal: 0,
       action: summarizeAction,
-      input_mapping: {
+      inputMapping: {
         phase1_words: '$.input.phase1_words',
         phase2_accumulated: '$.input.phase2_accumulated',
         bridge_inherited: '$.input.bridge_inherited',
       },
-      output_mapping: {
+      outputMapping: {
         'output.phase1_words': '$.phase1_words',
         'output.phase2_accumulated': '$.phase2_accumulated',
         'output.bridge_inherited': '$.bridge_inherited',
@@ -344,12 +344,12 @@ describe('Foundation: 06 - Explicit Fan-Out', () => {
     const summarizeTask = task({
       name: 'Summarize Task',
       description: 'Passthrough - receives and forwards all accumulated state',
-      input_schema: s.object({
+      inputSchema: s.object({
         phase1_words: s.array(s.string()),
         phase2_accumulated: s.array(s.array(s.string())),
         bridge_inherited: s.array(s.string()),
       }),
-      output_schema: summarizeOutputSchema,
+      outputSchema: summarizeOutputSchema,
       steps: [summarizeStep],
     });
 
@@ -357,14 +357,14 @@ describe('Foundation: 06 - Explicit Fan-Out', () => {
       ref: 'summarize',
       name: 'Summarize',
       task: summarizeTask,
-      task_version: 1,
+      taskVersion: 1,
       // Read from merged state (fan-in will have written here)
-      input_mapping: {
+      inputMapping: {
         phase1_words: '$.state.phase1.results',
         phase2_accumulated: '$.state.phase2.accumulated',
         bridge_inherited: '$.state.bridge.phase1_words',
       },
-      output_mapping: {
+      outputMapping: {
         'state.summary.phase1_words': '$.phase1_words',
         'state.summary.phase2_accumulated': '$.phase2_accumulated',
         'state.summary.bridge_inherited': '$.bridge_inherited',
@@ -375,9 +375,9 @@ describe('Foundation: 06 - Explicit Fan-Out', () => {
     // TRANSITIONS - EXPLICIT fan-out WITH synchronization (IDEAL behavior)
     // =========================================================================
     // CRITICAL SPECIFICATION:
-    // Explicit fan-out should support the exact same synchronization semantics as spawn_count.
+    // Explicit fan-out should support the exact same synchronization semantics as spawnCount.
     //
-    // When multiple transitions share the same sibling_group name in their synchronization
+    // When multiple transitions share the same siblingGroup name in their synchronization
     // config, the coordinator MUST treat tokens spawned by these transitions as siblings
     // for fan-in coordination.
     //
@@ -386,42 +386,42 @@ describe('Foundation: 06 - Explicit Fan-Out', () => {
     // =========================================================================
 
     // Fan-out #1: init → phase1_a, phase1_b, phase1_c (3 explicit transitions)
-    // Each declares sibling_group to identify membership in the synchronization group
+    // Each declares siblingGroup to identify membership in the synchronization group
     const initToPhase1A = transition({
       ref: 'init_to_phase1_a',
-      from_node_ref: 'init',
-      to_node_ref: 'phase1_a',
+      fromNodeRef: 'init',
+      toNodeRef: 'phase1_a',
       priority: 1,
-      sibling_group: 'phase1_fanin', // Declares membership in 'phase1_fanin' group
+      siblingGroup: 'phase1_fanin', // Declares membership in 'phase1_fanin' group
     });
 
     const initToPhase1B = transition({
       ref: 'init_to_phase1_b',
-      from_node_ref: 'init',
-      to_node_ref: 'phase1_b',
+      fromNodeRef: 'init',
+      toNodeRef: 'phase1_b',
       priority: 1,
-      sibling_group: 'phase1_fanin', // Same group
+      siblingGroup: 'phase1_fanin', // Same group
     });
 
     const initToPhase1C = transition({
       ref: 'init_to_phase1_c',
-      from_node_ref: 'init',
-      to_node_ref: 'phase1_c',
+      fromNodeRef: 'init',
+      toNodeRef: 'phase1_c',
       priority: 1,
-      sibling_group: 'phase1_fanin', // Same group
+      siblingGroup: 'phase1_fanin', // Same group
     });
 
     // Fan-in #1: phase1_a, phase1_b, phase1_c → bridge
-    // IDEAL: All three transitions share sibling_group 'phase1_fanin'
+    // IDEAL: All three transitions share siblingGroup 'phase1_fanin'
     // Coordinator MUST recognize these as siblings and synchronize accordingly
     const phase1AToBridge = transition({
       ref: 'phase1_a_to_bridge',
-      from_node_ref: 'phase1_a',
-      to_node_ref: 'bridge',
+      fromNodeRef: 'phase1_a',
+      toNodeRef: 'bridge',
       priority: 1,
       synchronization: {
         strategy: 'all',
-        sibling_group: 'phase1_fanin', // Named group identifies siblings
+        siblingGroup: 'phase1_fanin', // Named group identifies siblings
         merge: {
           source: '_branch.output.value',
           target: 'state.phase1.results',
@@ -432,12 +432,12 @@ describe('Foundation: 06 - Explicit Fan-Out', () => {
 
     const phase1BToBridge = transition({
       ref: 'phase1_b_to_bridge',
-      from_node_ref: 'phase1_b',
-      to_node_ref: 'bridge',
+      fromNodeRef: 'phase1_b',
+      toNodeRef: 'bridge',
       priority: 1,
       synchronization: {
         strategy: 'all',
-        sibling_group: 'phase1_fanin', // Same group = siblings
+        siblingGroup: 'phase1_fanin', // Same group = siblings
         merge: {
           source: '_branch.output.value',
           target: 'state.phase1.results',
@@ -448,12 +448,12 @@ describe('Foundation: 06 - Explicit Fan-Out', () => {
 
     const phase1CToBridge = transition({
       ref: 'phase1_c_to_bridge',
-      from_node_ref: 'phase1_c',
-      to_node_ref: 'bridge',
+      fromNodeRef: 'phase1_c',
+      toNodeRef: 'bridge',
       priority: 1,
       synchronization: {
         strategy: 'all',
-        sibling_group: 'phase1_fanin', // Same group = siblings
+        siblingGroup: 'phase1_fanin', // Same group = siblings
         merge: {
           source: '_branch.output.value',
           target: 'state.phase1.results',
@@ -463,41 +463,41 @@ describe('Foundation: 06 - Explicit Fan-Out', () => {
     });
 
     // Fan-out #2: bridge → phase2_a, phase2_b, phase2_c (3 explicit transitions)
-    // Each declares sibling_group for the second synchronization point
+    // Each declares siblingGroup for the second synchronization point
     const bridgeToPhase2A = transition({
       ref: 'bridge_to_phase2_a',
-      from_node_ref: 'bridge',
-      to_node_ref: 'phase2_a',
+      fromNodeRef: 'bridge',
+      toNodeRef: 'phase2_a',
       priority: 1,
-      sibling_group: 'phase2_fanin', // Declares membership in 'phase2_fanin' group
+      siblingGroup: 'phase2_fanin', // Declares membership in 'phase2_fanin' group
     });
 
     const bridgeToPhase2B = transition({
       ref: 'bridge_to_phase2_b',
-      from_node_ref: 'bridge',
-      to_node_ref: 'phase2_b',
+      fromNodeRef: 'bridge',
+      toNodeRef: 'phase2_b',
       priority: 1,
-      sibling_group: 'phase2_fanin', // Same group
+      siblingGroup: 'phase2_fanin', // Same group
     });
 
     const bridgeToPhase2C = transition({
       ref: 'bridge_to_phase2_c',
-      from_node_ref: 'bridge',
-      to_node_ref: 'phase2_c',
+      fromNodeRef: 'bridge',
+      toNodeRef: 'phase2_c',
       priority: 1,
-      sibling_group: 'phase2_fanin', // Same group
+      siblingGroup: 'phase2_fanin', // Same group
     });
 
     // Fan-in #2: phase2_a, phase2_b, phase2_c → summarize
-    // IDEAL: All three transitions share sibling_group 'phase2_fanin'
+    // IDEAL: All three transitions share siblingGroup 'phase2_fanin'
     const phase2AToSummarize = transition({
       ref: 'phase2_a_to_summarize',
-      from_node_ref: 'phase2_a',
-      to_node_ref: 'summarize',
+      fromNodeRef: 'phase2_a',
+      toNodeRef: 'summarize',
       priority: 1,
       synchronization: {
         strategy: 'all',
-        sibling_group: 'phase2_fanin', // Named group identifies siblings
+        siblingGroup: 'phase2_fanin', // Named group identifies siblings
         merge: {
           source: '_branch.output.accumulated',
           target: 'state.phase2.accumulated',
@@ -508,12 +508,12 @@ describe('Foundation: 06 - Explicit Fan-Out', () => {
 
     const phase2BToSummarize = transition({
       ref: 'phase2_b_to_summarize',
-      from_node_ref: 'phase2_b',
-      to_node_ref: 'summarize',
+      fromNodeRef: 'phase2_b',
+      toNodeRef: 'summarize',
       priority: 1,
       synchronization: {
         strategy: 'all',
-        sibling_group: 'phase2_fanin', // Same group = siblings
+        siblingGroup: 'phase2_fanin', // Same group = siblings
         merge: {
           source: '_branch.output.accumulated',
           target: 'state.phase2.accumulated',
@@ -524,12 +524,12 @@ describe('Foundation: 06 - Explicit Fan-Out', () => {
 
     const phase2CToSummarize = transition({
       ref: 'phase2_c_to_summarize',
-      from_node_ref: 'phase2_c',
-      to_node_ref: 'summarize',
+      fromNodeRef: 'phase2_c',
+      toNodeRef: 'summarize',
       priority: 1,
       synchronization: {
         strategy: 'all',
-        sibling_group: 'phase2_fanin', // Same group = siblings
+        siblingGroup: 'phase2_fanin', // Same group = siblings
         merge: {
           source: '_branch.output.accumulated',
           target: 'state.phase2.accumulated',
@@ -545,11 +545,11 @@ describe('Foundation: 06 - Explicit Fan-Out', () => {
       name: 'Explicit Fan-Out Test',
       description:
         'Foundation test 06 - explicit fan-out with synchronization (IDEAL behavior spec)',
-      input_schema: inputSchema,
-      output_schema: workflowOutputSchema,
-      context_schema: contextSchema,
+      inputSchema: inputSchema,
+      outputSchema: workflowOutputSchema,
+      contextSchema: contextSchema,
       // Output mapping reads from merged state (written by fan-in transitions)
-      output_mapping: {
+      outputMapping: {
         seed: '$.state.init.seed',
         // Phase1 results merged by fan-in (IDEAL: append strategy)
         phase1_results: '$.state.phase1.results',
@@ -562,7 +562,7 @@ describe('Foundation: 06 - Explicit Fan-Out', () => {
         summary_phase2_accumulated: '$.state.summary.phase2_accumulated',
         summary_bridge_inherited: '$.state.summary.bridge_inherited',
       },
-      initial_node_ref: 'init',
+      initialNodeRef: 'init',
       nodes: [
         initNode,
         phase1ANode,

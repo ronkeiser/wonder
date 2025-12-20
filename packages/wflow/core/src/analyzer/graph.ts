@@ -25,8 +25,8 @@ export function buildGraph(doc: WflowDocument): GraphAnalysis {
 
   // Build edges from transitions
   for (const transition of Object.values(doc.transitions || {})) {
-    const from = transition.from_node_ref;
-    const to = transition.to_node_ref;
+    const from = transition.fromNodeRef;
+    const to = transition.toNodeRef;
 
     if (from && to && adjacency.has(from) && predecessors.has(to)) {
       adjacency.get(from)!.push(to);
@@ -160,8 +160,8 @@ export function buildTransitionMap(doc: WflowDocument): Map<string, TransitionDe
   const transitionMap = new Map<string, TransitionDecl[]>();
 
   for (const t of Object.values(doc.transitions || {})) {
-    if (t.from_node_ref && t.to_node_ref) {
-      const key = `${t.from_node_ref}->${t.to_node_ref}`;
+    if (t.fromNodeRef && t.toNodeRef) {
+      const key = `${t.fromNodeRef}->${t.toNodeRef}`;
       if (!transitionMap.has(key)) {
         transitionMap.set(key, []);
       }

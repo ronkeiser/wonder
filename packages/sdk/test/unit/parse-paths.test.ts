@@ -21,9 +21,9 @@ describe('Task 1.2: parsePathSegments', () => {
   });
 
   it('parses nested path', () => {
-    expect(parsePathSegments('/api/projects/{project_id}/workflows')).toEqual([
+    expect(parsePathSegments('/api/projects/{projectId}/workflows')).toEqual([
       'projects',
-      '{project_id}',
+      '{projectId}',
       'workflows',
     ]);
   });
@@ -51,7 +51,7 @@ describe('Task 1.3: classifySegment', () => {
   });
 
   it('classifies parameter with colon', () => {
-    expect(classifySegment(':workspace_id')).toBe(NodeType.Param);
+    expect(classifySegment(':workspaceId')).toBe(NodeType.Param);
   });
 
   it('classifies regular segment as collection (action detection happens in tree builder)', () => {
@@ -109,7 +109,7 @@ describe('Task 1.4: buildRouteTree', () => {
   });
 
   it('builds tree with parameter nodes', () => {
-    const paths: PathDefinition[] = [{ path: '/api/workspaces/{workspace_id}', method: 'get' }];
+    const paths: PathDefinition[] = [{ path: '/api/workspaces/{workspaceId}', method: 'get' }];
     const tree = buildRouteTree(paths);
 
     expect(tree).toHaveLength(1);
@@ -117,7 +117,7 @@ describe('Task 1.4: buildRouteTree', () => {
     expect(tree[0].children).toHaveLength(1);
     expect(tree[0].children[0]).toMatchObject({
       type: NodeType.Param,
-      name: 'workspace_id',
+      name: 'workspaceId',
       methods: [{ verb: 'get' }],
       parent: tree[0],
     });
@@ -150,8 +150,8 @@ describe('Task 1.4: buildRouteTree', () => {
 
   it('builds nested resource tree', () => {
     const paths: PathDefinition[] = [
-      { path: '/api/projects/{project_id}/workflows', method: 'get' },
-      { path: '/api/projects/{project_id}/workflows/{workflow_id}', method: 'get' },
+      { path: '/api/projects/{projectId}/workflows', method: 'get' },
+      { path: '/api/projects/{projectId}/workflows/{workflow_id}', method: 'get' },
     ];
     const tree = buildRouteTree(paths);
 

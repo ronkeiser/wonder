@@ -79,7 +79,7 @@ export interface TestSuiteResult {
 export interface TestRunOptions {
   filter?: string;
   tags?: string[];
-  timeout_ms?: number;
+  timeoutMs?: number;
   failFast?: boolean;
   parallel?: boolean;
   maxConcurrent?: number;
@@ -139,7 +139,7 @@ async function setupApiTestContext(client: WonderClient): Promise<ApiTestContext
 
   // Create project
   const projectResponse = await client.projects.create({
-    workspace_id: workspaceId,
+    workspaceId: workspaceId,
     name: `wflow-test-project-${Date.now()}`,
     description: 'Auto-created by wflow test CLI',
   });
@@ -149,15 +149,15 @@ async function setupApiTestContext(client: WonderClient): Promise<ApiTestContext
   const modelProfileResponse = await client.modelProfiles.create({
     name: `wflow-test-model-${Date.now()}`,
     provider: 'cloudflare',
-    model_id: '@cf/meta/llama-3.3-70b-instruct-fp8-fast',
+    modelId: '@cf/meta/llama-3.3-70b-instruct-fp8-fast',
     parameters: {
-      max_tokens: 512,
+      maxTokens: 512,
       temperature: 1.0,
     },
-    cost_per_1k_input_tokens: 0.0,
-    cost_per_1k_output_tokens: 0.0,
+    costPer1kInputTokens: 0.0,
+    costPer1kOutputTokens: 0.0,
   });
-  const modelProfileId = modelProfileResponse.model_profile.id;
+  const modelProfileId = modelProfileResponse.modelProfile.id;
 
   return { workspaceId, projectId, modelProfileId };
 }
@@ -257,7 +257,7 @@ function transformSchema(schemaDoc: JSONSchemaProperty | undefined): unknown {
  */
 function transformAction(actionDoc: ActionDocument, _testContext: TestContext): EmbeddedAction {
   let impl: Record<string, unknown> = { ...actionDoc.implementation };
-  let kind = actionDoc.kind || 'llm_call';
+  let kind = actionDoc.kind || 'llm';
 
   // Handle execution-based action definition (DSL format)
   // Transform execution.type: "prompt" into implementation with prompt_spec
@@ -273,9 +273,9 @@ function transformAction(actionDoc: ActionDocument, _testContext: TestContext): 
     }
 
     // Create embedded prompt spec
-    // Note: Parser may produce input_schema/output_schema instead of requires/produces
-    const inputSchema = (actionDoc as any).input_schema || actionDoc.requires;
-    const outputSchema = (actionDoc as any).output_schema || actionDoc.produces;
+    // Note: Parser may produce inputSchema/outputSchema instead of requires/produces
+    const inputSchema = (actionDoc as any).inputSchema || actionDoc.requires;
+    const outputSchema = (actionDoc as any).outputSchema || actionDoc.produces;
 
     const embeddedPrompt = promptSpec({
       name: `${actionDoc.action || 'action'}-prompt`,
@@ -286,7 +286,7 @@ function transformAction(actionDoc: ActionDocument, _testContext: TestContext): 
     });
 
     impl = { prompt_spec: embeddedPrompt };
-    kind = 'llm_call';
+    kind = 'llm';
   } else if (kind === 'llm' && impl.template && typeof impl.template === 'string') {
     // Legacy format: kind: 'llm' with impl.template
     const embeddedPrompt = promptSpec({
@@ -297,7 +297,7 @@ function transformAction(actionDoc: ActionDocument, _testContext: TestContext): 
       produces: transformSchema(actionDoc.produces) as any,
     });
     impl = { prompt_spec: embeddedPrompt };
-    kind = 'llm_call';
+    kind = 'llm';
   }
 
   return action({
@@ -324,8 +324,8 @@ function transformTask(taskDoc: TaskDocument, testContext: TestContext): Embedde
       let embeddedAction: EmbeddedAction | undefined;
 
       // Resolve action reference
-      if (stepDoc.action_id) {
-        const actionDoc = testContext.resolvedImports.get(stepDoc.action_id);
+      if (stepDoc.actionId) {
+        const actionDoc = testContext.resolvedImports.get(stepDoc.actionId);
         if (actionDoc && 'action' in actionDoc) {
           embeddedAction = transformAction(actionDoc as ActionDocument, testContext);
         }
@@ -336,10 +336,10 @@ function transformTask(taskDoc: TaskDocument, testContext: TestContext): Embedde
           ref: stepDoc.ref || `step-${stepDoc.ordinal || 0}`,
           ordinal: stepDoc.ordinal || 0,
           action: embeddedAction,
-          // Support both input_mapping and input_map (parser may produce either)
-          input_mapping: stepDoc.input_mapping || (stepDoc as any).input_map || undefined,
-          output_mapping: stepDoc.output_mapping || (stepDoc as any).output_map || undefined,
-          on_failure: stepDoc.on_failure,
+          // Support both inputMapping and input_map (parser may produce either)
+          inputMapping: stepDoc.inputMapping || (stepDoc as any).input_map || undefined,
+          outputMapping: stepDoc.outputMapping || (stepDoc as any).output_map || undefined,
+          onFailure: stepDoc.onFailure,
           condition: stepDoc.condition,
         }),
       );
@@ -350,11 +350,11 @@ function transformTask(taskDoc: TaskDocument, testContext: TestContext): Embedde
     name: taskDoc.task || taskDoc.name || 'unnamed-task',
     description: taskDoc.description || '',
     version: taskDoc.version || 1,
-    input_schema: transformSchema(taskDoc.input_schema) as any,
-    output_schema: transformSchema(taskDoc.output_schema) as any,
+    inputSchema: transformSchema(taskDoc.inputSchema) as any,
+    outputSchema: transformSchema(taskDoc.outputSchema) as any,
     steps: embeddedSteps,
     retry: taskDoc.retry,
-    timeout_ms: taskDoc.timeout_ms,
+    timeoutMs: taskDoc.timeoutMs,
   });
 }
 
@@ -367,14 +367,14 @@ function transformWorkflow(wflowDoc: WflowDocument, testContext: TestContext): E
   if (wflowDoc.nodes) {
     for (const [nodeRef, nodeDoc] of Object.entries(wflowDoc.nodes)) {
       // Resolve task reference
-      if (!nodeDoc.task_id) {
-        throw new Error(`Node '${nodeRef}' must have a task_id`);
+      if (!nodeDoc.taskId) {
+        throw new Error(`Node '${nodeRef}' must have a taskId`);
       }
 
-      const taskDoc = testContext.resolvedImports.get(nodeDoc.task_id);
+      const taskDoc = testContext.resolvedImports.get(nodeDoc.taskId);
       if (!taskDoc || !('task' in taskDoc)) {
         throw new Error(
-          `Task '${nodeDoc.task_id}' not found for node '${nodeRef}'. Available imports: ${[...testContext.resolvedImports.keys()].join(', ')}`,
+          `Task '${nodeDoc.taskId}' not found for node '${nodeRef}'. Available imports: ${[...testContext.resolvedImports.keys()].join(', ')}`,
         );
       }
 
@@ -385,10 +385,10 @@ function transformWorkflow(wflowDoc: WflowDocument, testContext: TestContext): E
           ref: nodeDoc.ref || nodeRef,
           name: nodeDoc.name || nodeRef,
           task: embeddedTask,
-          task_version: nodeDoc.task_version || 1,
-          input_mapping: nodeDoc.input_mapping as Record<string, unknown> | undefined,
-          output_mapping: nodeDoc.output_mapping as Record<string, unknown> | undefined,
-          resource_bindings: nodeDoc.resource_bindings as Record<string, unknown> | undefined,
+          taskVersion: nodeDoc.taskVersion || 1,
+          inputMapping: nodeDoc.inputMapping as Record<string, unknown> | undefined,
+          outputMapping: nodeDoc.outputMapping as Record<string, unknown> | undefined,
+          resourceBindings: nodeDoc.resourceBindings as Record<string, unknown> | undefined,
         }),
       );
     }
@@ -397,8 +397,8 @@ function transformWorkflow(wflowDoc: WflowDocument, testContext: TestContext): E
   // Transform transitions
   const transitions = wflowDoc.transitions
     ? Object.values(wflowDoc.transitions).map((t) => ({
-        from_node_ref: t.from_node_ref || '',
-        to_node_ref: t.to_node_ref || '',
+        fromNodeRef: t.fromNodeRef || '',
+        toNodeRef: t.toNodeRef || '',
         priority: t.priority || 1,
         condition: t.condition as Record<string, unknown> | undefined,
       }))
@@ -407,11 +407,11 @@ function transformWorkflow(wflowDoc: WflowDocument, testContext: TestContext): E
   return workflow({
     name: wflowDoc.workflow || 'unnamed-workflow',
     description: wflowDoc.description || '',
-    input_schema: transformSchema(wflowDoc.input_schema) as any,
-    output_schema: transformSchema(wflowDoc.output_schema) as any,
-    context_schema: transformSchema(wflowDoc.context_schema) as any,
-    // Note: output_mapping exists in parsed docs but not in type definition
-    output_mapping: (wflowDoc as any).output_mapping as Record<string, string> | undefined,
+    inputSchema: transformSchema(wflowDoc.inputSchema) as any,
+    outputSchema: transformSchema(wflowDoc.outputSchema) as any,
+    contextSchema: transformSchema(wflowDoc.contextSchema) as any,
+    // Note: outputMapping exists in parsed docs but not in type definition
+    outputMapping: (wflowDoc as any).outputMapping as Record<string, string> | undefined,
     initial_node_ref: wflowDoc.initial_node_ref || '',
     nodes: embeddedNodes,
     transitions,
@@ -623,7 +623,7 @@ async function executeTestCase(
 
     // Create workflow instance
     const workflowResponse = await testContext.client.workflows.create({
-      project_id: apiCtx.projectId,
+      projectId: apiCtx.projectId,
       workflow_def_id: workflowDefResponse.workflowDefId,
       name: embeddedWorkflow.name,
       description: embeddedWorkflow.description || 'Test workflow',
@@ -635,7 +635,7 @@ async function executeTestCase(
     const executionResult = await testContext.client
       .workflows(resources.workflowId)
       .stream(testCase.input || {}, {
-        timeout: testCase.timeout_ms || options.timeout_ms || 60000,
+        timeout: testCase.timeoutMs || options.timeoutMs || 60000,
         idleTimeout: 10000,
         onEvent: options.logEvents
           ? (event: Record<string, unknown>) => {
@@ -703,39 +703,39 @@ async function createWorkflowViaApi(
   const resolvedNodes: Array<{
     ref: string;
     name: string;
-    task_id: string;
-    task_version?: number;
-    input_mapping?: Record<string, unknown>;
-    output_mapping?: Record<string, unknown>;
-    resource_bindings?: Record<string, unknown>;
+    taskId: string;
+    taskVersion?: number;
+    inputMapping?: Record<string, unknown>;
+    outputMapping?: Record<string, unknown>;
+    resourceBindings?: Record<string, unknown>;
   }> = [];
 
   for (const n of embeddedWorkflow.nodes as EmbeddedNode[]) {
     let taskId: string;
 
-    if (n.task_id) {
-      taskId = n.task_id;
+    if (n.taskId) {
+      taskId = n.taskId;
     } else if (n.task) {
       taskId = await createEmbeddedTaskDef(client, apiCtx, n.task as EmbeddedTaskDef, resources);
     } else {
-      throw new Error(`Node ${n.ref} must have either task_id or task`);
+      throw new Error(`Node ${n.ref} must have either taskId or task`);
     }
 
     resolvedNodes.push({
       ref: n.ref,
       name: n.name,
-      task_id: taskId,
-      task_version: n.task_version,
-      input_mapping: n.input_mapping,
-      output_mapping: n.output_mapping,
-      resource_bindings: n.resource_bindings,
+      taskId: taskId,
+      taskVersion: n.taskVersion,
+      inputMapping: n.inputMapping,
+      outputMapping: n.outputMapping,
+      resourceBindings: n.resourceBindings,
     });
   }
 
   // Create workflow def
   const workflowDefResponse = await client.workflowDefs.create({
     ...embeddedWorkflow,
-    project_id: apiCtx.projectId,
+    projectId: apiCtx.projectId,
     nodes: resolvedNodes,
   } as any);
 
@@ -758,11 +758,11 @@ async function createEmbeddedTaskDef(
   const resolvedSteps: Array<{
     ref: string;
     ordinal: number;
-    action_id: string;
-    action_version: number;
-    input_mapping?: Record<string, unknown> | null;
-    output_mapping?: Record<string, unknown> | null;
-    on_failure?: 'abort' | 'retry' | 'continue';
+    actionId: string;
+    actionVersion: number;
+    inputMapping?: Record<string, unknown> | null;
+    outputMapping?: Record<string, unknown> | null;
+    onFailure?: 'abort' | 'retry' | 'continue';
     condition?: {
       if: string;
       then: 'continue' | 'skip' | 'succeed' | 'fail';
@@ -774,9 +774,9 @@ async function createEmbeddedTaskDef(
     let actionId: string;
     let actionVersion: number;
 
-    if (s.action_id) {
+    if (s.actionId) {
       // Reference to existing action - get latest version
-      const actionResponse = await client.actions(s.action_id).get();
+      const actionResponse = await client.actions(s.actionId).get();
       actionId = actionResponse.action.id;
       actionVersion = actionResponse.action.version;
     } else if (s.action) {
@@ -785,17 +785,17 @@ async function createEmbeddedTaskDef(
       actionId = result.id;
       actionVersion = result.version;
     } else {
-      throw new Error(`Step ${s.ref} must have either action_id or action`);
+      throw new Error(`Step ${s.ref} must have either actionId or action`);
     }
 
     resolvedSteps.push({
       ref: s.ref,
       ordinal: s.ordinal,
-      action_id: actionId,
-      action_version: actionVersion,
-      input_mapping: s.input_mapping ?? null,
-      output_mapping: s.output_mapping ?? null,
-      on_failure: s.on_failure ?? 'abort',
+      actionId: actionId,
+      actionVersion: actionVersion,
+      inputMapping: s.inputMapping ?? null,
+      outputMapping: s.outputMapping ?? null,
+      onFailure: s.onFailure ?? 'abort',
       condition: s.condition ?? null,
     });
   }
@@ -804,12 +804,12 @@ async function createEmbeddedTaskDef(
     name: taskDef.name,
     description: taskDef.description,
     version: taskDef.version ?? 1,
-    project_id: apiCtx.projectId,
-    input_schema: taskDef.input_schema,
-    output_schema: taskDef.output_schema,
+    projectId: apiCtx.projectId,
+    inputSchema: taskDef.inputSchema,
+    outputSchema: taskDef.outputSchema,
     steps: resolvedSteps,
     retry: taskDef.retry,
-    timeout_ms: taskDef.timeout_ms,
+    timeoutMs: taskDef.timeoutMs,
   } as any);
 
   if (!response?.task?.id) {
@@ -838,13 +838,13 @@ async function createEmbeddedAction(
       implementation.prompt_spec as EmbeddedPromptSpec,
       resources,
     );
-    implementation.prompt_spec_id = promptSpecId;
+    implementation.promptSpecId = promptSpecId;
     delete implementation.prompt_spec;
   }
 
   // Use context's model profile if not specified
-  if (!implementation.model_profile_id) {
-    implementation.model_profile_id = apiCtx.modelProfileId;
+  if (!implementation.modelProfileId) {
+    implementation.modelProfileId = apiCtx.modelProfileId;
   }
 
   const response = await client.actions.create({
@@ -879,7 +879,7 @@ async function createEmbeddedPromptSpec(
     name: promptSpecDef.name,
     description: promptSpecDef.description,
     version: promptSpecDef.version ?? 1,
-    system_prompt: promptSpecDef.system_prompt,
+    systemPrompt: promptSpecDef.systemPrompt,
     template: promptSpecDef.template,
     requires: promptSpecDef.requires,
     produces: promptSpecDef.produces,
@@ -887,12 +887,12 @@ async function createEmbeddedPromptSpec(
     tags: promptSpecDef.tags,
   } as any);
 
-  if (!response?.prompt_spec_id) {
+  if (!response?.promptSpecId) {
     throw new Error('Failed to create prompt spec');
   }
 
-  resources.promptSpecIds.push(response.prompt_spec_id);
-  return response.prompt_spec_id;
+  resources.promptSpecIds.push(response.promptSpecId);
+  return response.promptSpecId;
 }
 
 /**

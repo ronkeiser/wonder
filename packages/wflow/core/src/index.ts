@@ -14,7 +14,7 @@
  * const result = parseWorkflow(yamlText, 'workflow.wflow');
  * if (result.document) {
  *   const graph = buildGraph(result.document);
- *   const inputPaths = extractPaths(result.document.input_schema, 'input');
+ *   const inputPaths = extractPaths(result.document.inputSchema, 'input');
  *   const dataFlow = analyzeDataFlow(result.document, graph, inputPaths);
  * }
  * ```

@@ -34,7 +34,7 @@ export function promptSpec(config: {
   name: string;
   description: string;
   version?: number;
-  system_prompt?: string;
+  systemPrompt?: string;
   template: string;
   requires: Record<string, unknown>;
   produces: JSONSchema;
@@ -46,7 +46,7 @@ export function promptSpec(config: {
     name: config.name,
     description: config.description,
     version: config.version ?? 1,
-    system_prompt: config.system_prompt,
+    systemPrompt: config.systemPrompt,
     template: config.template,
     requires: config.requires,
     produces: config.produces,

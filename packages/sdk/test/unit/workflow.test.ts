@@ -13,14 +13,14 @@ describe('workflowDef()', () => {
     const result = workflowDef({
       name: 'Simple Workflow',
       description: 'A simple workflow',
-      input_schema: schema.object({ data: schema.string() }),
-      output_schema: schema.object({ result: schema.string() }),
+      inputSchema: schema.object({ data: schema.string() }),
+      outputSchema: schema.object({ result: schema.string() }),
       initial_node_ref: 'start',
       nodes: [
         node({
           ref: 'start',
           name: 'Start Node',
-          task_id: 'task-1',
+          taskId: 'task-1',
         }),
       ],
     });
@@ -28,14 +28,14 @@ describe('workflowDef()', () => {
     expect(result).toEqual({
       name: 'Simple Workflow',
       description: 'A simple workflow',
-      input_schema: {
+      inputSchema: {
         type: 'object',
         properties: {
           data: { type: 'string' },
         },
         additionalProperties: false,
       },
-      output_schema: {
+      outputSchema: {
         type: 'object',
         properties: {
           result: { type: 'string' },
@@ -47,7 +47,7 @@ describe('workflowDef()', () => {
         {
           ref: 'start',
           name: 'Start Node',
-          task_id: 'task-1',
+          taskId: 'task-1',
         },
       ],
     });
@@ -56,21 +56,21 @@ describe('workflowDef()', () => {
   // Version is not part of the builder API - it's always set to 1 by the repository layer
   // when creating new workflow definitions
 
-  it('creates workflow with project_id', () => {
+  it('creates workflow with projectId', () => {
     const result = workflowDef({
       name: 'Project Workflow',
       description: 'Workflow in project',
-      project_id: 'project-123',
-      input_schema: schema.object({}),
-      output_schema: schema.object({}),
+      projectId: 'project-123',
+      inputSchema: schema.object({}),
+      outputSchema: schema.object({}),
       initial_node_ref: 'start',
       nodes: [node({ ref: 'start', name: 'Start' })],
     });
 
-    expect(result.project_id).toBe('project-123');
+    expect(result.projectId).toBe('project-123');
   });
 
-  it('creates workflow with context_schema', () => {
+  it('creates workflow with contextSchema', () => {
     const contextSchema = schema.object({
       apiKey: schema.string(),
     });
@@ -78,28 +78,28 @@ describe('workflowDef()', () => {
     const result = workflowDef({
       name: 'Context Workflow',
       description: 'Workflow with context',
-      input_schema: schema.object({}),
-      output_schema: schema.object({}),
-      context_schema: contextSchema,
+      inputSchema: schema.object({}),
+      outputSchema: schema.object({}),
+      contextSchema: contextSchema,
       initial_node_ref: 'start',
       nodes: [node({ ref: 'start', name: 'Start' })],
     });
 
-    expect(result.context_schema).toEqual(contextSchema);
+    expect(result.contextSchema).toEqual(contextSchema);
   });
 
   it('creates workflow with transitions', () => {
     const result = workflowDef({
       name: 'Multi-Node Workflow',
       description: 'Workflow with transitions',
-      input_schema: schema.object({}),
-      output_schema: schema.object({}),
+      inputSchema: schema.object({}),
+      outputSchema: schema.object({}),
       initial_node_ref: 'start',
       nodes: [node({ ref: 'start', name: 'Start' }), node({ ref: 'end', name: 'End' })],
       transitions: [
         transition({
-          from_node_ref: 'start',
-          to_node_ref: 'end',
+          fromNodeRef: 'start',
+          toNodeRef: 'end',
           priority: 1,
         }),
       ],
@@ -107,27 +107,27 @@ describe('workflowDef()', () => {
 
     expect(result.transitions).toEqual([
       {
-        from_node_ref: 'start',
-        to_node_ref: 'end',
+        fromNodeRef: 'start',
+        toNodeRef: 'end',
         priority: 1,
       },
     ]);
   });
 
-  it('creates workflow with output_mapping', () => {
+  it('creates workflow with outputMapping', () => {
     const result = workflowDef({
       name: 'Mapped Workflow',
       description: 'Workflow with output mapping',
-      input_schema: schema.object({}),
-      output_schema: schema.object({}),
+      inputSchema: schema.object({}),
+      outputSchema: schema.object({}),
       initial_node_ref: 'start',
       nodes: [node({ ref: 'start', name: 'Start' })],
-      output_mapping: {
+      outputMapping: {
         finalResult: '$.start.result',
       },
     });
 
-    expect(result.output_mapping).toEqual({
+    expect(result.outputMapping).toEqual({
       finalResult: '$.start.result',
     });
   });
@@ -137,8 +137,8 @@ describe('workflowDef()', () => {
       name: 'Tagged Workflow',
       description: 'Workflow with tags',
       tags: ['production', 'automated'],
-      input_schema: schema.object({}),
-      output_schema: schema.object({}),
+      inputSchema: schema.object({}),
+      outputSchema: schema.object({}),
       initial_node_ref: 'start',
       nodes: [node({ ref: 'start', name: 'Start' })],
     });
@@ -150,31 +150,31 @@ describe('workflowDef()', () => {
     const result = workflowDef({
       name: 'Complete Workflow',
       description: 'Full-featured workflow',
-      project_id: 'proj-123',
-      library_id: 'lib-456',
+      projectId: 'proj-123',
+      libraryId: 'lib-456',
       tags: ['test'],
-      input_schema: schema.object({ input: schema.string() }),
-      output_schema: schema.object({ output: schema.string() }),
-      context_schema: schema.object({ apiKey: schema.string() }),
+      inputSchema: schema.object({ input: schema.string() }),
+      outputSchema: schema.object({ output: schema.string() }),
+      contextSchema: schema.object({ apiKey: schema.string() }),
       initial_node_ref: 'start',
       nodes: [
-        node({ ref: 'start', name: 'Start', task_id: 'task-1' }),
-        node({ ref: 'middle', name: 'Middle', task_id: 'task-2' }),
-        node({ ref: 'end', name: 'End', task_id: 'task-3' }),
+        node({ ref: 'start', name: 'Start', taskId: 'task-1' }),
+        node({ ref: 'middle', name: 'Middle', taskId: 'task-2' }),
+        node({ ref: 'end', name: 'End', taskId: 'task-3' }),
       ],
       transitions: [
-        transition({ from_node_ref: 'start', to_node_ref: 'middle', priority: 1 }),
-        transition({ from_node_ref: 'middle', to_node_ref: 'end', priority: 1 }),
+        transition({ fromNodeRef: 'start', toNodeRef: 'middle', priority: 1 }),
+        transition({ fromNodeRef: 'middle', toNodeRef: 'end', priority: 1 }),
       ],
-      output_mapping: {
+      outputMapping: {
         result: '$.end.output',
       },
     });
 
     expect(result).toMatchObject({
       name: 'Complete Workflow',
-      project_id: 'proj-123',
-      library_id: 'lib-456',
+      projectId: 'proj-123',
+      libraryId: 'lib-456',
       tags: ['test'],
       initial_node_ref: 'start',
     });
@@ -188,52 +188,52 @@ describe('workflowDef()', () => {
         workflowDef({
           name: 'Invalid',
           description: 'Bad initial node',
-          input_schema: schema.object({}),
-          output_schema: schema.object({}),
+          inputSchema: schema.object({}),
+          outputSchema: schema.object({}),
           initial_node_ref: 'nonexistent',
           nodes: [node({ ref: 'start', name: 'Start' })],
         }),
       ).toThrow(/initial_node_ref 'nonexistent' does not match any node ref/);
     });
 
-    it('throws if transition from_node_ref does not exist', () => {
+    it('throws if transition fromNodeRef does not exist', () => {
       expect(() =>
         workflowDef({
           name: 'Invalid',
           description: 'Bad transition',
-          input_schema: schema.object({}),
-          output_schema: schema.object({}),
+          inputSchema: schema.object({}),
+          outputSchema: schema.object({}),
           initial_node_ref: 'start',
           nodes: [node({ ref: 'start', name: 'Start' }), node({ ref: 'end', name: 'End' })],
           transitions: [
             transition({
-              from_node_ref: 'nonexistent',
-              to_node_ref: 'end',
+              fromNodeRef: 'nonexistent',
+              toNodeRef: 'end',
               priority: 1,
             }),
           ],
         }),
-      ).toThrow(/from_node_ref 'nonexistent' does not match any node ref/);
+      ).toThrow(/fromNodeRef 'nonexistent' does not match any node ref/);
     });
 
-    it('throws if transition to_node_ref does not exist', () => {
+    it('throws if transition toNodeRef does not exist', () => {
       expect(() =>
         workflowDef({
           name: 'Invalid',
           description: 'Bad transition',
-          input_schema: schema.object({}),
-          output_schema: schema.object({}),
+          inputSchema: schema.object({}),
+          outputSchema: schema.object({}),
           initial_node_ref: 'start',
           nodes: [node({ ref: 'start', name: 'Start' }), node({ ref: 'end', name: 'End' })],
           transitions: [
             transition({
-              from_node_ref: 'start',
-              to_node_ref: 'nonexistent',
+              fromNodeRef: 'start',
+              toNodeRef: 'nonexistent',
               priority: 1,
             }),
           ],
         }),
-      ).toThrow(/to_node_ref 'nonexistent' does not match any node ref/);
+      ).toThrow(/toNodeRef 'nonexistent' does not match any node ref/);
     });
   });
 });
