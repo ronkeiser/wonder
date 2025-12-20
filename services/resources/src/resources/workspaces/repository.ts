@@ -3,11 +3,11 @@
 import { eq } from 'drizzle-orm';
 import type { DrizzleD1Database } from 'drizzle-orm/d1';
 import { ulid } from 'ulid';
-import { workspace_settings, workspaces } from '~/schema';
+import { workspaceSettings, workspaces } from '~/schema';
 import type { Workspace, WorkspaceSettings } from './types';
 
 type WorkspaceRow = typeof workspaces.$inferSelect;
-type WorkspaceSettingsRow = typeof workspace_settings.$inferSelect;
+type WorkspaceSettingsRow = typeof workspaceSettings.$inferSelect;
 
 export async function createWorkspace(
   db: DrizzleD1Database,
@@ -28,7 +28,7 @@ export async function createWorkspace(
   // Insert settings if provided
   if (data.settings) {
     await db
-      .insert(workspace_settings)
+      .insert(workspaceSettings)
       .values({
         workspaceId: workspaceId,
         ...data.settings,
@@ -48,8 +48,8 @@ export async function getWorkspace(db: DrizzleD1Database, id: string): Promise<W
 
   const settingsRow = await db
     .select()
-    .from(workspace_settings)
-    .where(eq(workspace_settings.workspaceId, id))
+    .from(workspaceSettings)
+    .where(eq(workspaceSettings.workspaceId, id))
     .get();
 
   return {
@@ -74,7 +74,7 @@ export async function listWorkspaces(
   // Fetch settings for all workspaces
   const workspaceIds = workspaceRows.map((w) => w.id);
   const settingsRows =
-    workspaceIds.length > 0 ? await db.select().from(workspace_settings).all() : [];
+    workspaceIds.length > 0 ? await db.select().from(workspaceSettings).all() : [];
 
   const settingsMap = new Map(settingsRows.map((s) => [s.workspaceId, s]));
 
@@ -117,19 +117,19 @@ export async function updateWorkspace(
   if (data.settings !== undefined) {
     const existingSettings = await db
       .select()
-      .from(workspace_settings)
-      .where(eq(workspace_settings.workspaceId, id))
+      .from(workspaceSettings)
+      .where(eq(workspaceSettings.workspaceId, id))
       .get();
 
     if (existingSettings) {
       await db
-        .update(workspace_settings)
+        .update(workspaceSettings)
         .set(data.settings)
-        .where(eq(workspace_settings.workspaceId, id))
+        .where(eq(workspaceSettings.workspaceId, id))
         .run();
     } else {
       await db
-        .insert(workspace_settings)
+        .insert(workspaceSettings)
         .values({
           workspaceId: id,
           ...data.settings,

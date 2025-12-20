@@ -1,13 +1,13 @@
 /** Type definitions for prompt specs */
 
-import { prompt_specs } from '../../schema';
+import { promptSpecs } from '../../schema';
 
 // ============================================================================
 // Entity Types (inferred from schema)
 // ============================================================================
 
 /** PromptSpec entity - inferred from database schema */
-export type PromptSpec = typeof prompt_specs.$inferSelect;
+export type PromptSpec = typeof promptSpecs.$inferSelect;
 
 // ============================================================================
 // API DTOs (explicit - have fields not in DB)

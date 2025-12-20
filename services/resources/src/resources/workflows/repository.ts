@@ -3,22 +3,25 @@
 import { and, desc, eq } from 'drizzle-orm';
 import type { DrizzleD1Database } from 'drizzle-orm/d1';
 import { ulid } from 'ulid';
-import { workflow_defs, workflow_runs, workflows } from '~/schema';
+import { workflowDefs, workflowRuns, workflows } from '~/schema';
+import type { NewEntity } from '~/shared/types';
 import type { Workflow, WorkflowRun } from './types';
 
-type NewWorkflow = Omit<typeof workflows.$inferInsert, 'id' | 'createdAt' | 'updatedAt'>;
+type NewWorkflow = NewEntity<typeof workflows.$inferInsert>;
 
 export async function createWorkflow(db: DrizzleD1Database, data: NewWorkflow): Promise<Workflow> {
   const now = new Date().toISOString();
-  const workflow = {
-    id: ulid(),
-    ...data,
-    createdAt: now,
-    updatedAt: now,
-  };
+  const [workflow] = await db
+    .insert(workflows)
+    .values({
+      id: ulid(),
+      ...data,
+      createdAt: now,
+      updatedAt: now,
+    })
+    .returning();
 
-  await db.insert(workflows).values(workflow).run();
-  return workflow as Workflow;
+  return workflow;
 }
 
 export async function getWorkflow(db: DrizzleD1Database, id: string): Promise<Workflow | null> {
@@ -74,7 +77,7 @@ export async function getWorkflowWithDef(
   workflowId: string,
 ): Promise<{
   workflow: Workflow;
-  workflowDef: typeof workflow_defs.$inferSelect;
+  workflowDef: typeof workflowDefs.$inferSelect;
 } | null> {
   const workflow = await getWorkflow(db, workflowId);
   if (!workflow) return null;
@@ -83,18 +86,18 @@ export async function getWorkflowWithDef(
   const workflowDefQuery = workflow.pinnedVersion
     ? db
         .select()
-        .from(workflow_defs)
+        .from(workflowDefs)
         .where(
           and(
-            eq(workflow_defs.id, workflow.workflowDefId),
-            eq(workflow_defs.version, workflow.pinnedVersion),
+            eq(workflowDefs.id, workflow.workflowDefId),
+            eq(workflowDefs.version, workflow.pinnedVersion),
           ),
         )
     : db
         .select()
-        .from(workflow_defs)
-        .where(eq(workflow_defs.id, workflow.workflowDefId))
-        .orderBy(desc(workflow_defs.version))
+        .from(workflowDefs)
+        .where(eq(workflowDefs.id, workflow.workflowDefId))
+        .orderBy(desc(workflowDefs.version))
         .limit(1);
 
   const workflowDef = await workflowDefQuery.get();
@@ -110,7 +113,7 @@ export async function getWorkflowRun(
   db: DrizzleD1Database,
   id: string,
 ): Promise<WorkflowRun | null> {
-  const result = await db.select().from(workflow_runs).where(eq(workflow_runs.id, id)).get();
+  const result = await db.select().from(workflowRuns).where(eq(workflowRuns.id, id)).get();
   return result ?? null;
 }
 
@@ -131,14 +134,16 @@ export async function createWorkflowRun(
   },
 ): Promise<WorkflowRun> {
   const now = new Date().toISOString();
-  const run = {
-    ...data,
-    latestSnapshot: null,
-    createdAt: now,
-    updatedAt: now,
-    completedAt: null,
-  };
+  const [run] = await db
+    .insert(workflowRuns)
+    .values({
+      ...data,
+      latestSnapshot: null,
+      createdAt: now,
+      updatedAt: now,
+      completedAt: null,
+    })
+    .returning();
 
-  await db.insert(workflow_runs).values(run).run();
-  return run as WorkflowRun;
+  return run;
 }

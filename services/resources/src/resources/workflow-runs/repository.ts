@@ -2,16 +2,16 @@
 
 import { and, desc, eq, gte, inArray, lte } from 'drizzle-orm';
 import type { DrizzleD1Database } from 'drizzle-orm/d1';
-import { projects, workflow_runs, workflows } from '~/schema';
+import { projects, workflowRuns, workflows } from '~/schema';
 import type { ListWorkflowRunsFilters } from './types';
 
-type WorkflowRun = typeof workflow_runs.$inferSelect;
+type WorkflowRun = typeof workflowRuns.$inferSelect;
 
 export async function getWorkflowRun(
   db: DrizzleD1Database,
   id: string,
 ): Promise<WorkflowRun | null> {
-  const result = await db.select().from(workflow_runs).where(eq(workflow_runs.id, id)).get();
+  const result = await db.select().from(workflowRuns).where(eq(workflowRuns.id, id)).get();
   return result ?? null;
 }
 
@@ -47,19 +47,19 @@ export async function updateWorkflowRun(
   },
 ): Promise<boolean> {
   const result = await db
-    .update(workflow_runs)
+    .update(workflowRuns)
     .set({
       ...updates,
       updatedAt: new Date().toISOString(),
     })
-    .where(eq(workflow_runs.id, id))
-    .returning({ id: workflow_runs.id });
+    .where(eq(workflowRuns.id, id))
+    .returning({ id: workflowRuns.id });
 
   return result.length > 0;
 }
 
 export async function deleteWorkflowRun(db: DrizzleD1Database, id: string): Promise<void> {
-  await db.delete(workflow_runs).where(eq(workflow_runs.id, id)).run();
+  await db.delete(workflowRuns).where(eq(workflowRuns.id, id)).run();
 }
 
 /** Workflow run with joined workflow name */
@@ -73,31 +73,31 @@ export async function listWorkflowRuns(
   const conditions = [];
 
   if (filters.projectId) {
-    conditions.push(eq(workflow_runs.projectId, filters.projectId));
+    conditions.push(eq(workflowRuns.projectId, filters.projectId));
   }
   if (filters.workflowId) {
-    conditions.push(eq(workflow_runs.workflowId, filters.workflowId));
+    conditions.push(eq(workflowRuns.workflowId, filters.workflowId));
   }
   if (filters.workflowDefId) {
-    conditions.push(eq(workflow_runs.workflowDefId, filters.workflowDefId));
+    conditions.push(eq(workflowRuns.workflowDefId, filters.workflowDefId));
   }
   if (filters.status && filters.status.length > 0) {
-    conditions.push(inArray(workflow_runs.status, filters.status));
+    conditions.push(inArray(workflowRuns.status, filters.status));
   }
   if (filters.parentRunId !== undefined) {
     // null means only root runs (no parent)
     // a string means runs with that specific parent
     if (filters.parentRunId === null) {
-      conditions.push(eq(workflow_runs.parentRunId, null as unknown as string));
+      conditions.push(eq(workflowRuns.parentRunId, null as unknown as string));
     } else {
-      conditions.push(eq(workflow_runs.parentRunId, filters.parentRunId));
+      conditions.push(eq(workflowRuns.parentRunId, filters.parentRunId));
     }
   }
   if (filters.createdAfter) {
-    conditions.push(gte(workflow_runs.createdAt, filters.createdAfter));
+    conditions.push(gte(workflowRuns.createdAt, filters.createdAfter));
   }
   if (filters.createdBefore) {
-    conditions.push(lte(workflow_runs.createdAt, filters.createdBefore));
+    conditions.push(lte(workflowRuns.createdAt, filters.createdBefore));
   }
 
   const whereClause = conditions.length > 0 ? and(...conditions) : undefined;
@@ -105,7 +105,7 @@ export async function listWorkflowRuns(
   // Get total count
   const countResult = await db
     .select()
-    .from(workflow_runs)
+    .from(workflowRuns)
     .where(whereClause)
     .all();
   const total = countResult.length;
@@ -116,13 +116,13 @@ export async function listWorkflowRuns(
 
   const results = await db
     .select({
-      workflowRun: workflow_runs,
+      workflowRun: workflowRuns,
       workflowName: workflows.name,
     })
-    .from(workflow_runs)
-    .leftJoin(workflows, eq(workflow_runs.workflowId, workflows.id))
+    .from(workflowRuns)
+    .leftJoin(workflows, eq(workflowRuns.workflowId, workflows.id))
     .where(whereClause)
-    .orderBy(desc(workflow_runs.createdAt))
+    .orderBy(desc(workflowRuns.createdAt))
     .limit(limit)
     .offset(offset)
     .all();

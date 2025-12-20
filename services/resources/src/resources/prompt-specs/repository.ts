@@ -3,29 +3,32 @@
 import { and, desc, eq } from 'drizzle-orm';
 import type { DrizzleD1Database } from 'drizzle-orm/d1';
 import { ulid } from 'ulid';
-import { prompt_specs } from '~/schema';
+import { promptSpecs } from '~/schema';
+import type { NewEntity } from '~/shared/types';
 import type { PromptSpec } from './types';
 
-type NewPromptSpec = Omit<typeof prompt_specs.$inferInsert, 'id' | 'createdAt' | 'updatedAt'>;
+type NewPromptSpec = NewEntity<typeof promptSpecs.$inferInsert>;
 
 export async function createPromptSpec(
   db: DrizzleD1Database,
   data: NewPromptSpec,
 ): Promise<PromptSpec> {
   const now = new Date().toISOString();
-  const spec = {
-    id: ulid(),
-    ...data,
-    createdAt: now,
-    updatedAt: now,
-  };
+  const [spec] = await db
+    .insert(promptSpecs)
+    .values({
+      id: ulid(),
+      ...data,
+      createdAt: now,
+      updatedAt: now,
+    })
+    .returning();
 
-  await db.insert(prompt_specs).values(spec).run();
-  return spec as PromptSpec;
+  return spec;
 }
 
 export async function getPromptSpec(db: DrizzleD1Database, id: string): Promise<PromptSpec | null> {
-  const result = await db.select().from(prompt_specs).where(eq(prompt_specs.id, id)).get();
+  const result = await db.select().from(promptSpecs).where(eq(promptSpecs.id, id)).get();
   return result ?? null;
 }
 
@@ -36,8 +39,8 @@ export async function getPromptSpecVersion(
 ): Promise<PromptSpec | null> {
   const result = await db
     .select()
-    .from(prompt_specs)
-    .where(and(eq(prompt_specs.id, id), eq(prompt_specs.version, version)))
+    .from(promptSpecs)
+    .where(and(eq(promptSpecs.id, id), eq(promptSpecs.version, version)))
     .get();
   return result ?? null;
 }
@@ -48,9 +51,9 @@ export async function getLatestPromptSpec(
 ): Promise<PromptSpec | null> {
   const result = await db
     .select()
-    .from(prompt_specs)
-    .where(eq(prompt_specs.id, id))
-    .orderBy(desc(prompt_specs.version))
+    .from(promptSpecs)
+    .where(eq(promptSpecs.id, id))
+    .orderBy(desc(promptSpecs.version))
     .get();
   return result ?? null;
 }
@@ -59,7 +62,7 @@ export async function listPromptSpecs(
   db: DrizzleD1Database,
   limit: number = 100,
 ): Promise<PromptSpec[]> {
-  return await db.select().from(prompt_specs).limit(limit).all();
+  return await db.select().from(promptSpecs).limit(limit).all();
 }
 
 export async function deletePromptSpec(
@@ -69,11 +72,11 @@ export async function deletePromptSpec(
 ): Promise<void> {
   if (version !== undefined) {
     await db
-      .delete(prompt_specs)
-      .where(and(eq(prompt_specs.id, id), eq(prompt_specs.version, version)))
+      .delete(promptSpecs)
+      .where(and(eq(promptSpecs.id, id), eq(promptSpecs.version, version)))
       .run();
   } else {
-    await db.delete(prompt_specs).where(eq(prompt_specs.id, id)).run();
+    await db.delete(promptSpecs).where(eq(promptSpecs.id, id)).run();
   }
 }
 
@@ -88,8 +91,8 @@ export async function getPromptSpecByNameAndHash(
 ): Promise<PromptSpec | null> {
   const result = await db
     .select()
-    .from(prompt_specs)
-    .where(and(eq(prompt_specs.name, name), eq(prompt_specs.contentHash, contentHash)))
+    .from(promptSpecs)
+    .where(and(eq(promptSpecs.name, name), eq(promptSpecs.contentHash, contentHash)))
     .get();
   return result ?? null;
 }
@@ -100,10 +103,10 @@ export async function getPromptSpecByNameAndHash(
  */
 export async function getMaxVersionByName(db: DrizzleD1Database, name: string): Promise<number> {
   const result = await db
-    .select({ version: prompt_specs.version })
-    .from(prompt_specs)
-    .where(eq(prompt_specs.name, name))
-    .orderBy(desc(prompt_specs.version))
+    .select({ version: promptSpecs.version })
+    .from(promptSpecs)
+    .where(eq(promptSpecs.name, name))
+    .orderBy(desc(promptSpecs.version))
     .limit(1)
     .get();
 

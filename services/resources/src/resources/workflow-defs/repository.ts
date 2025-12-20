@@ -3,48 +3,32 @@
 import { and, desc, eq } from 'drizzle-orm';
 import type { DrizzleD1Database } from 'drizzle-orm/d1';
 import { ulid } from 'ulid';
-import { nodes, transitions, workflow_defs } from '~/schema';
+import { nodes, transitions, workflowDefs } from '~/schema';
+import type { NewEntity } from '~/shared/types';
 import type { Node, Transition, WorkflowDef } from './types';
+
+type NewWorkflowDef = NewEntity<typeof workflowDefs.$inferInsert>;
+type NewNode = Omit<typeof nodes.$inferInsert, 'id'>;
+type NewTransition = Omit<typeof transitions.$inferInsert, 'id'>;
 
 /** WorkflowDef */
 
 export async function createWorkflowDef(
   db: DrizzleD1Database,
-  data: {
-    name: string;
-    description: string;
-    projectId?: string | null;
-    libraryId?: string | null;
-    tags?: string[] | null;
-    inputSchema: object;
-    outputSchema: object;
-    outputMapping?: object | null;
-    contextSchema?: object | null;
-    initialNodeId: string | null;
-    contentHash?: string | null;
-  },
+  data: Omit<NewWorkflowDef, 'version'> & { version?: number },
 ): Promise<WorkflowDef> {
   const now = new Date().toISOString();
+  const [row] = await db
+    .insert(workflowDefs)
+    .values({
+      id: ulid(),
+      version: data.version ?? 1,
+      ...data,
+      createdAt: now,
+      updatedAt: now,
+    })
+    .returning();
 
-  const row = {
-    id: ulid(),
-    version: 1,
-    name: data.name,
-    description: data.description,
-    projectId: data.projectId ?? null,
-    libraryId: data.libraryId ?? null,
-    tags: data.tags ?? null,
-    inputSchema: data.inputSchema,
-    outputSchema: data.outputSchema,
-    outputMapping: data.outputMapping ?? null,
-    contextSchema: data.contextSchema ?? null,
-    initialNodeId: data.initialNodeId,
-    contentHash: data.contentHash ?? null,
-    createdAt: now,
-    updatedAt: now,
-  };
-
-  await db.insert(workflow_defs).values(row).run();
   return row;
 }
 
@@ -54,43 +38,19 @@ export async function createWorkflowDef(
  */
 export async function createWorkflowDefWithId(
   db: DrizzleD1Database,
-  data: {
-    id: string;
-    name: string;
-    description: string;
-    version?: number;
-    projectId?: string | null;
-    libraryId?: string | null;
-    tags?: string[] | null;
-    inputSchema: object;
-    outputSchema: object;
-    outputMapping?: object | null;
-    contextSchema?: object | null;
-    initialNodeId: string | null;
-    contentHash?: string | null;
-  },
+  data: Omit<NewWorkflowDef, 'version'> & { id: string; version?: number },
 ): Promise<WorkflowDef> {
   const now = new Date().toISOString();
+  const [row] = await db
+    .insert(workflowDefs)
+    .values({
+      ...data,
+      version: data.version ?? 1,
+      createdAt: now,
+      updatedAt: now,
+    })
+    .returning();
 
-  const row = {
-    id: data.id,
-    version: data.version ?? 1,
-    name: data.name,
-    description: data.description,
-    projectId: data.projectId ?? null,
-    libraryId: data.libraryId ?? null,
-    tags: data.tags ?? null,
-    inputSchema: data.inputSchema,
-    outputSchema: data.outputSchema,
-    outputMapping: data.outputMapping ?? null,
-    contextSchema: data.contextSchema ?? null,
-    initialNodeId: data.initialNodeId,
-    contentHash: data.contentHash ?? null,
-    createdAt: now,
-    updatedAt: now,
-  };
-
-  await db.insert(workflow_defs).values(row).run();
   return row;
 }
 
@@ -102,13 +62,13 @@ export async function getWorkflowDef(
   const query = version
     ? db
         .select()
-        .from(workflow_defs)
-        .where(and(eq(workflow_defs.id, id), eq(workflow_defs.version, version)))
+        .from(workflowDefs)
+        .where(and(eq(workflowDefs.id, id), eq(workflowDefs.version, version)))
     : db
         .select()
-        .from(workflow_defs)
-        .where(eq(workflow_defs.id, id))
-        .orderBy(workflow_defs.version);
+        .from(workflowDefs)
+        .where(eq(workflowDefs.id, id))
+        .orderBy(workflowDefs.version);
 
   const result = await query.get();
   return result ?? null;
@@ -122,12 +82,12 @@ export async function updateWorkflowDef(
 ): Promise<void> {
   const now = new Date().toISOString();
   await db
-    .update(workflow_defs)
+    .update(workflowDefs)
     .set({
       ...(data.initialNodeId !== undefined && { initialNodeId: data.initialNodeId }),
       updatedAt: now,
     })
-    .where(and(eq(workflow_defs.id, id), eq(workflow_defs.version, version)))
+    .where(and(eq(workflowDefs.id, id), eq(workflowDefs.version, version)))
     .run();
 }
 
@@ -137,8 +97,8 @@ export async function listWorkflowDefsByProject(
 ): Promise<WorkflowDef[]> {
   return await db
     .select()
-    .from(workflow_defs)
-    .where(eq(workflow_defs.projectId, projectId))
+    .from(workflowDefs)
+    .where(eq(workflowDefs.projectId, projectId))
     .all();
 }
 
@@ -148,8 +108,8 @@ export async function listWorkflowDefsByLibrary(
 ): Promise<WorkflowDef[]> {
   return await db
     .select()
-    .from(workflow_defs)
-    .where(eq(workflow_defs.libraryId, libraryId))
+    .from(workflowDefs)
+    .where(eq(workflowDefs.libraryId, libraryId))
     .all();
 }
 
@@ -168,21 +128,21 @@ export async function getWorkflowDefByNameAndHash(
 
   if (projectId) {
     whereClause = and(
-      eq(workflow_defs.name, name),
-      eq(workflow_defs.projectId, projectId),
-      eq(workflow_defs.contentHash, contentHash),
+      eq(workflowDefs.name, name),
+      eq(workflowDefs.projectId, projectId),
+      eq(workflowDefs.contentHash, contentHash),
     );
   } else if (libraryId) {
     whereClause = and(
-      eq(workflow_defs.name, name),
-      eq(workflow_defs.libraryId, libraryId),
-      eq(workflow_defs.contentHash, contentHash),
+      eq(workflowDefs.name, name),
+      eq(workflowDefs.libraryId, libraryId),
+      eq(workflowDefs.contentHash, contentHash),
     );
   } else {
     return null;
   }
 
-  const result = await db.select().from(workflow_defs).where(whereClause).get();
+  const result = await db.select().from(workflowDefs).where(whereClause).get();
   return result ?? null;
 }
 
@@ -199,18 +159,18 @@ export async function getMaxVersionByName(
   let whereClause;
 
   if (projectId) {
-    whereClause = and(eq(workflow_defs.name, name), eq(workflow_defs.projectId, projectId));
+    whereClause = and(eq(workflowDefs.name, name), eq(workflowDefs.projectId, projectId));
   } else if (libraryId) {
-    whereClause = and(eq(workflow_defs.name, name), eq(workflow_defs.libraryId, libraryId));
+    whereClause = and(eq(workflowDefs.name, name), eq(workflowDefs.libraryId, libraryId));
   } else {
     return 0;
   }
 
   const result = await db
-    .select({ version: workflow_defs.version })
-    .from(workflow_defs)
+    .select({ version: workflowDefs.version })
+    .from(workflowDefs)
     .where(whereClause)
-    .orderBy(desc(workflow_defs.version))
+    .orderBy(desc(workflowDefs.version))
     .limit(1)
     .get();
 
@@ -221,32 +181,16 @@ export async function getMaxVersionByName(
 
 export async function createNode(
   db: DrizzleD1Database,
-  data: {
-    ref: string;
-    workflowDefId: string;
-    workflowDefVersion: number;
-    name: string;
-    taskId?: string | null;
-    taskVersion?: number | null;
-    inputMapping?: object | null;
-    outputMapping?: object | null;
-    resourceBindings?: Record<string, string> | null;
-  },
+  data: NewNode,
 ): Promise<Node> {
-  const row = {
-    id: ulid(),
-    ref: data.ref,
-    workflowDefId: data.workflowDefId,
-    workflowDefVersion: data.workflowDefVersion,
-    name: data.name,
-    taskId: data.taskId ?? null,
-    taskVersion: data.taskVersion ?? null,
-    inputMapping: data.inputMapping ?? null,
-    outputMapping: data.outputMapping ?? null,
-    resourceBindings: data.resourceBindings ?? null,
-  };
+  const [row] = await db
+    .insert(nodes)
+    .values({
+      id: ulid(),
+      ...data,
+    })
+    .returning();
 
-  await db.insert(nodes).values(row).run();
   return row;
 }
 
@@ -256,33 +200,10 @@ export async function createNode(
  */
 export async function createNodeWithId(
   db: DrizzleD1Database,
-  data: {
-    id: string;
-    ref: string;
-    workflowDefId: string;
-    workflowDefVersion: number;
-    name: string;
-    taskId?: string | null;
-    taskVersion?: number | null;
-    inputMapping?: object | null;
-    outputMapping?: object | null;
-    resourceBindings?: Record<string, string> | null;
-  },
+  data: NewNode & { id: string },
 ): Promise<Node> {
-  const row = {
-    id: data.id,
-    ref: data.ref,
-    workflowDefId: data.workflowDefId,
-    workflowDefVersion: data.workflowDefVersion,
-    name: data.name,
-    taskId: data.taskId ?? null,
-    taskVersion: data.taskVersion ?? null,
-    inputMapping: data.inputMapping ?? null,
-    outputMapping: data.outputMapping ?? null,
-    resourceBindings: data.resourceBindings ?? null,
-  };
+  const [row] = await db.insert(nodes).values(data).returning();
 
-  await db.insert(nodes).values(row).run();
   return row;
 }
 
@@ -319,37 +240,17 @@ export async function listNodesByWorkflowDef(
 
 export async function createTransition(
   db: DrizzleD1Database,
-  data: {
-    ref?: string | null;
-    workflowDefId: string;
-    workflowDefVersion: number;
-    fromNodeId: string;
-    toNodeId: string;
-    priority: number;
-    condition?: object | null;
-    spawnCount?: number | null;
-    foreach?: object | null;
-    synchronization?: object | null;
-    loopConfig?: object | null;
-  },
+  data: NewTransition,
 ): Promise<Transition> {
-  const row = {
-    id: ulid(),
-    ref: data.ref ?? null,
-    workflowDefId: data.workflowDefId,
-    workflowDefVersion: data.workflowDefVersion,
-    fromNodeId: data.fromNodeId,
-    toNodeId: data.toNodeId,
-    priority: data.priority,
-    condition: data.condition ?? null,
-    spawnCount: data.spawnCount ?? null,
-    foreach: data.foreach ?? null,
-    synchronization: data.synchronization ?? null,
-    loopConfig: data.loopConfig ?? null,
-  };
+  const [row] = await db
+    .insert(transitions)
+    .values({
+      id: ulid(),
+      ...data,
+    })
+    .returning();
 
-  await db.insert(transitions).values(row).run();
-  return row as Transition;
+  return row;
 }
 
 /**
@@ -358,40 +259,11 @@ export async function createTransition(
  */
 export async function createTransitionWithId(
   db: DrizzleD1Database,
-  data: {
-    id: string;
-    ref?: string | null;
-    workflowDefId: string;
-    workflowDefVersion: number;
-    fromNodeId: string;
-    toNodeId: string;
-    priority: number;
-    condition?: object | null;
-    spawnCount?: number | null;
-    siblingGroup?: string | null;
-    foreach?: object | null;
-    synchronization?: object | null;
-    loopConfig?: object | null;
-  },
+  data: NewTransition & { id: string },
 ): Promise<Transition> {
-  const row = {
-    id: data.id,
-    ref: data.ref ?? null,
-    workflowDefId: data.workflowDefId,
-    workflowDefVersion: data.workflowDefVersion,
-    fromNodeId: data.fromNodeId,
-    toNodeId: data.toNodeId,
-    priority: data.priority,
-    condition: data.condition ?? null,
-    spawnCount: data.spawnCount ?? null,
-    siblingGroup: data.siblingGroup ?? null,
-    foreach: data.foreach ?? null,
-    synchronization: data.synchronization ?? null,
-    loopConfig: data.loopConfig ?? null,
-  };
+  const [row] = await db.insert(transitions).values(data).returning();
 
-  await db.insert(transitions).values(row).run();
-  return row as Transition;
+  return row;
 }
 
 export async function listTransitionsByWorkflowDef(
@@ -418,13 +290,13 @@ export async function deleteWorkflowDef(
   // Delete associated transitions
   await db.delete(transitions).where(eq(transitions.workflowDefId, id)).run();
 
-  // Delete workflow_def(s)
+  // Delete workflowDef(s)
   if (version !== undefined) {
     await db
-      .delete(workflow_defs)
-      .where(and(eq(workflow_defs.id, id), eq(workflow_defs.version, version)))
+      .delete(workflowDefs)
+      .where(and(eq(workflowDefs.id, id), eq(workflowDefs.version, version)))
       .run();
   } else {
-    await db.delete(workflow_defs).where(eq(workflow_defs.id, id)).run();
+    await db.delete(workflowDefs).where(eq(workflowDefs.id, id)).run();
   }
 }

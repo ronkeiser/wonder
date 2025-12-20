@@ -1,13 +1,13 @@
 /** Type definitions for workflow definitions */
 
-import { nodes, transitions, workflow_defs } from '../../schema';
+import { nodes, transitions, workflowDefs } from '../../schema';
 
 // ============================================================================
 // Entity Types (inferred from schema)
 // ============================================================================
 
 /** WorkflowDef entity - inferred from database schema */
-export type WorkflowDef = typeof workflow_defs.$inferSelect;
+export type WorkflowDef = typeof workflowDefs.$inferSelect;
 
 /** Node entity - inferred from database schema */
 export type Node = typeof nodes.$inferSelect;

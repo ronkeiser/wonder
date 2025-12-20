@@ -1,5 +1,8 @@
 /** Type definitions for projects */
 
+import { projects } from '../../schema';
+
+/** ProjectSettings - parsed from project_settings table with undefined for missing values */
 export type ProjectSettings = {
   defaultModelProfileId?: string;
   rateLimitMaxConcurrentRuns?: number;
@@ -11,12 +14,7 @@ export type ProjectSettings = {
   snapshotPolicyOnFanInComplete?: boolean;
 };
 
-export type Project = {
-  id: string;
-  workspaceId: string;
-  name: string;
-  description: string | null;
-  createdAt: string;
-  updatedAt: string;
+/** Project entity - base fields from schema plus joined settings */
+export type Project = typeof projects.$inferSelect & {
   settings: ProjectSettings | null;
 };

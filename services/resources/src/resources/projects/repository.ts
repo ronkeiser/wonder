@@ -3,11 +3,11 @@
 import { eq } from 'drizzle-orm';
 import type { DrizzleD1Database } from 'drizzle-orm/d1';
 import { ulid } from 'ulid';
-import { project_settings, projects } from '~/schema';
+import { projectSettings, projects } from '~/schema';
 import type { Project, ProjectSettings } from './types';
 
 type ProjectRow = typeof projects.$inferSelect;
-type ProjectSettingsRow = typeof project_settings.$inferSelect;
+type ProjectSettingsRow = typeof projectSettings.$inferSelect;
 
 type NewProject = {
   workspaceId: string;
@@ -33,7 +33,7 @@ export async function createProject(db: DrizzleD1Database, data: NewProject): Pr
 
   if (data.settings) {
     await db
-      .insert(project_settings)
+      .insert(projectSettings)
       .values({
         projectId,
         defaultModelProfileId: data.settings.defaultModelProfileId ?? null,
@@ -61,8 +61,8 @@ export async function getProject(db: DrizzleD1Database, id: string): Promise<Pro
 
   const settingsRow = await db
     .select()
-    .from(project_settings)
-    .where(eq(project_settings.projectId, id))
+    .from(projectSettings)
+    .where(eq(projectSettings.projectId, id))
     .get();
 
   return {
@@ -93,7 +93,7 @@ export async function listProjects(
   const query = workspaceId ? baseQuery.where(eq(projects.workspaceId, workspaceId)) : baseQuery;
   const projectRows = await query.limit(limit).all();
 
-  const allSettings = await db.select().from(project_settings).all();
+  const allSettings = await db.select().from(projectSettings).all();
   const settingsMap = new Map(allSettings.map((s) => [s.projectId, s]));
 
   return projectRows.map((projectRow) => {
@@ -141,13 +141,13 @@ export async function updateProject(
   if (data.settings) {
     const existingSettings = await db
       .select()
-      .from(project_settings)
-      .where(eq(project_settings.projectId, id))
+      .from(projectSettings)
+      .where(eq(projectSettings.projectId, id))
       .get();
 
     if (existingSettings) {
       await db
-        .update(project_settings)
+        .update(projectSettings)
         .set({
           defaultModelProfileId: data.settings.defaultModelProfileId ?? null,
           rateLimitMaxConcurrentRuns: data.settings.rateLimitMaxConcurrentRuns ?? null,
@@ -160,11 +160,11 @@ export async function updateProject(
           snapshotPolicyOnFanInComplete:
             data.settings.snapshotPolicyOnFanInComplete ?? null,
         })
-        .where(eq(project_settings.projectId, id))
+        .where(eq(projectSettings.projectId, id))
         .run();
     } else {
       await db
-        .insert(project_settings)
+        .insert(projectSettings)
         .values({
           projectId: id,
           defaultModelProfileId: data.settings.defaultModelProfileId ?? null,

@@ -4,21 +4,24 @@ import { and, desc, eq, isNull, or } from 'drizzle-orm';
 import type { DrizzleD1Database } from 'drizzle-orm/d1';
 import { ulid } from 'ulid';
 import { tasks } from '../../schema';
+import type { NewEntity } from '../../shared/types';
 import type { Task } from './types';
 
-type NewTask = Omit<typeof tasks.$inferInsert, 'id' | 'createdAt' | 'updatedAt'>;
+type NewTask = NewEntity<typeof tasks.$inferInsert>;
 
 export async function createTask(db: DrizzleD1Database, data: NewTask): Promise<Task> {
   const now = new Date().toISOString();
-  const task = {
-    id: ulid(),
-    ...data,
-    createdAt: now,
-    updatedAt: now,
-  };
+  const [task] = await db
+    .insert(tasks)
+    .values({
+      id: ulid(),
+      ...data,
+      createdAt: now,
+      updatedAt: now,
+    })
+    .returning();
 
-  await db.insert(tasks).values(task).run();
-  return task as Task;
+  return task;
 }
 
 export async function getTask(db: DrizzleD1Database, id: string): Promise<Task | null> {

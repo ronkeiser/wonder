@@ -4,23 +4,26 @@ import { and, desc, eq } from 'drizzle-orm';
 import type { DrizzleD1Database } from 'drizzle-orm/d1';
 import { ulid } from 'ulid';
 import { actions } from '~/schema';
+import type { NewEntity } from '~/shared/types';
 import type { Action } from './types';
 
-type NewAction = Omit<typeof actions.$inferInsert, 'id' | 'createdAt' | 'updatedAt'>;
+type NewAction = NewEntity<typeof actions.$inferInsert>;
 
 type ActionKind = Action['kind'];
 
 export async function createAction(db: DrizzleD1Database, data: NewAction): Promise<Action> {
   const now = new Date().toISOString();
-  const action = {
-    id: ulid(),
-    ...data,
-    createdAt: now,
-    updatedAt: now,
-  };
+  const [action] = await db
+    .insert(actions)
+    .values({
+      id: ulid(),
+      ...data,
+      createdAt: now,
+      updatedAt: now,
+    })
+    .returning();
 
-  await db.insert(actions).values(action).run();
-  return action as Action;
+  return action;
 }
 
 export async function getAction(db: DrizzleD1Database, id: string): Promise<Action | null> {
