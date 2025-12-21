@@ -23,8 +23,7 @@ import type {
   ForeachConfig,
   LoopConfig,
   PlanningResult,
-  SynchronizationConfig,
-  TransitionDef,
+  Transition,
 } from '../types';
 
 // ============================================================================
@@ -201,7 +200,7 @@ export function decideRouting(params: {
 export function getTransitionsWithSynchronization(
   transitions: TransitionRow[],
   context: ContextSnapshot,
-): TransitionDef[] {
+): Transition[] {
   // Group by priority tier
   const grouped = groupByPriority(transitions);
   const sortedPriorities = Array.from(grouped.keys()).sort((a, b) => a - b);
@@ -209,11 +208,11 @@ export function getTransitionsWithSynchronization(
   // Find first tier with matches
   for (const priority of sortedPriorities) {
     const tier = grouped.get(priority) ?? [];
-    const matches = tier.filter((t) => evaluateCondition(t.condition as Condition | null, context));
+    const matches = tier.filter((t) => evaluateCondition(t.condition, context));
 
     if (matches.length > 0) {
       // Return only transitions that have synchronization config
-      return matches.filter((t) => t.synchronization !== null).map((t) => toTransitionDef(t));
+      return matches.filter((t) => t.synchronization !== null);
     }
   }
 
@@ -283,20 +282,3 @@ function groupByPriority(transitions: TransitionRow[]): Map<number, TransitionRo
 
   return grouped;
 }
-
-/** Convert TransitionRow to TransitionDef for type-safe planning. */
-export function toTransitionDef(row: TransitionRow): TransitionDef {
-  return {
-    id: row.id,
-    ref: row.ref ?? undefined,
-    fromNodeId: row.fromNodeId,
-    toNodeId: row.toNodeId,
-    priority: row.priority,
-    condition: row.condition as Condition | undefined,
-    spawnCount: row.spawnCount ?? undefined,
-    siblingGroup: row.siblingGroup ?? undefined,
-    foreach: row.foreach as ForeachConfig | undefined,
-    synchronization: row.synchronization as SynchronizationConfig | undefined,
-  };
-}
-

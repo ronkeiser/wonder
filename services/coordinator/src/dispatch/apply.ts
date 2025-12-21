@@ -185,6 +185,15 @@ function applyOne(decision: Decision, ctx: DispatchContext): ApplyOutcome {
             nodeId: token.nodeId,
           },
         });
+      } else if (decision.status === 'timed_out') {
+        ctx.emitter.emit({
+          eventType: 'token.timed_out',
+          message: 'Token timed out waiting for siblings',
+          metadata: {
+            tokenId: decision.tokenId,
+            nodeId: token.nodeId,
+          },
+        });
       }
 
       return {};
@@ -211,6 +220,18 @@ function applyOne(decision: Decision, ctx: DispatchContext): ApplyOutcome {
           arrivedAt: decision.arrivedAt.toISOString(),
         },
       });
+
+      // Schedule timeout alarm if configured for this sibling group
+      if (token.siblingGroup) {
+        const transitions = ctx.defs.getTransitions();
+        const syncTransition = transitions.find(
+          (t) => t.synchronization?.siblingGroup === token.siblingGroup,
+        );
+        if (syncTransition?.synchronization?.timeoutMs) {
+          // Fire-and-forget the alarm scheduling
+          ctx.waitUntil(ctx.scheduleTimeoutAlarm(syncTransition.synchronization.timeoutMs));
+        }
+      }
 
       return {};
     }

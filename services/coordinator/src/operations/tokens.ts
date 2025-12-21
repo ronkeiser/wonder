@@ -219,6 +219,37 @@ export class TokenManager {
       .all();
   }
 
+  /**
+   * Get all waiting tokens across all sibling groups.
+   * Used by timeout checking to find tokens that may have timed out.
+   */
+  getAllWaitingTokens(): TokenRow[] {
+    return this.db
+      .select()
+      .from(tokens)
+      .where(eq(tokens.status, 'waiting_for_siblings'))
+      .all();
+  }
+
+  /**
+   * Get the oldest arrivedAt timestamp among waiting tokens.
+   * Returns null if no tokens are waiting.
+   */
+  getOldestWaitingTimestamp(): Date | null {
+    const waiting = this.getAllWaitingTokens();
+    if (waiting.length === 0) return null;
+
+    let oldest: Date | null = null;
+    for (const token of waiting) {
+      if (token.arrivedAt) {
+        if (!oldest || token.arrivedAt < oldest) {
+          oldest = token.arrivedAt;
+        }
+      }
+    }
+    return oldest;
+  }
+
   // ============================================================================
   // Path-based Queries (for lineage traversal)
   // ============================================================================

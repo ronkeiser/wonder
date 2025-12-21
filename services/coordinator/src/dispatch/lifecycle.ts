@@ -10,6 +10,7 @@
  */
 
 import { decideWorkflowStart } from '../planning/index';
+import { decideOnTimeout, hasTimedOut } from '../planning/synchronization';
 import type { DispatchContext, TaskErrorResult } from '../types';
 import { applyDecisions } from './apply';
 import { dispatchToken } from './task';
@@ -131,4 +132,82 @@ export async function failWorkflow(ctx: DispatchContext, errorMessage: string): 
   // Update workflow run status in resources service
   const workflowRunsResource = ctx.resources.workflowRuns();
   await workflowRunsResource.updateStatus(ctx.workflowRunId, 'failed');
+}
+
+// ============================================================================
+// Timeout Handling
+// ============================================================================
+
+/**
+ * Check all waiting tokens for timeouts and handle them.
+ *
+ * Called by the alarm handler when it fires.
+ * Groups waiting tokens by their sibling group, checks each group's
+ * transition for timeout, and applies timeout decisions.
+ */
+export async function checkTimeouts(ctx: DispatchContext): Promise<void> {
+  const waitingTokens = ctx.tokens.getAllWaitingTokens();
+  if (waitingTokens.length === 0) {
+    return;
+  }
+
+  // Group waiting tokens by sibling group
+  const byGroup = new Map<string, typeof waitingTokens>();
+  for (const token of waitingTokens) {
+    if (!token.siblingGroup) continue;
+    const group = byGroup.get(token.siblingGroup) ?? [];
+    group.push(token);
+    byGroup.set(token.siblingGroup, group);
+  }
+
+  // Check each group for timeout
+  const transitions = ctx.defs.getTransitions();
+  const workflowRun = ctx.defs.getWorkflowRun();
+
+  for (const [siblingGroup, tokens] of byGroup) {
+    // Find the transition with synchronization config for this sibling group
+    const transition = transitions.find(
+      (t) => t.synchronization?.siblingGroup === siblingGroup,
+    );
+
+    if (!transition) continue;
+
+    // Find oldest waiting timestamp for this group
+    let oldest: Date | null = null;
+    for (const token of tokens) {
+      if (token.arrivedAt && (!oldest || token.arrivedAt < oldest)) {
+        oldest = token.arrivedAt;
+      }
+    }
+
+    // Check if timeout has elapsed
+    if (hasTimedOut(transition, oldest)) {
+      ctx.emitter.emit({
+        eventType: 'sync.timeout',
+        message: `Synchronization timeout for sibling group '${siblingGroup}'`,
+        metadata: {
+          siblingGroup,
+          waitingCount: tokens.length,
+          oldestWaiting: oldest?.toISOString(),
+        },
+      });
+
+      // Generate timeout decisions
+      const decisions = decideOnTimeout({
+        waitingTokens: tokens,
+        transition,
+        workflowRunId: workflowRun.id,
+      });
+
+      // Apply decisions
+      applyDecisions(decisions, ctx);
+
+      // If workflow failed, update resources
+      const failDecision = decisions.find((d) => d.type === 'FAIL_WORKFLOW');
+      if (failDecision && failDecision.type === 'FAIL_WORKFLOW') {
+        const workflowRunsResource = ctx.resources.workflowRuns();
+        await workflowRunsResource.updateStatus(ctx.workflowRunId, 'failed');
+      }
+    }
+  }
 }

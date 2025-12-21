@@ -1924,17 +1924,24 @@ export interface components {
                 spawnCount?: number;
                 siblingGroup?: string;
                 foreach?: {
-                    [key: string]: unknown;
+                    collection: string;
+                    itemVar: string;
                 };
                 synchronization?: {
                     strategy: string;
                     siblingGroup: string;
                     merge?: {
-                        [key: string]: unknown;
+                        source: string;
+                        target: string;
+                        /** @enum {string} */
+                        strategy: "append" | "collect" | "merge_object" | "keyed_by_branch" | "last_wins";
                     };
+                    timeoutMs?: number;
+                    /** @enum {string} */
+                    onTimeout?: "fail" | "proceed_with_available";
                 };
                 loopConfig?: {
-                    [key: string]: unknown;
+                    maxIterations: number;
                 };
             }[];
             /** @description Enable content-based deduplication. If true, returns existing workflow def when content matches. */

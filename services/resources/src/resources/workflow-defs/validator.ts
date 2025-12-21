@@ -6,50 +6,7 @@
  */
 
 import { ValidationError } from '~/shared/errors';
-
-/** Input types for validation */
-export type NodeInput = {
-  ref: string;
-  name: string;
-  taskId?: string;
-  taskVersion?: number;
-  inputMapping?: object;
-  outputMapping?: object;
-  resourceBindings?: Record<string, string>;
-};
-
-export type TransitionInput = {
-  ref?: string;
-  fromNodeRef: string;
-  toNodeRef: string;
-  priority: number;
-  condition?: string; // Expression string (e.g., "state.score >= 80")
-  spawnCount?: number;
-  siblingGroup?: string; // Named sibling group identifier for fan-out coordination
-  foreach?: object;
-  synchronization?: {
-    strategy: string;
-    siblingGroup: string; // Must reference a declared siblingGroup
-    merge?: object;
-  };
-  loopConfig?: object;
-};
-
-export type WorkflowDefInput = {
-  name: string;
-  description: string;
-  projectId?: string;
-  libraryId?: string;
-  tags?: string[];
-  inputSchema: object;
-  outputSchema: object;
-  outputMapping?: object;
-  contextSchema?: object;
-  initialNodeRef: string;
-  nodes: NodeInput[];
-  transitions?: TransitionInput[];
-  autoversion?: boolean;
-};
+import type { NodeInput, TransitionInput, WorkflowDefInput } from './types';
 
 /** Validation result with collected refs for transformation */
 export type ValidationResult = {
@@ -156,7 +113,7 @@ function validateInitialNodeRef(initialNodeRef: string, nodeRefs: Set<string>): 
 /**
  * Validates exactly one of project_id or library_id is set.
  */
-function validateOwnership(projectId?: string, libraryId?: string): void {
+function validateOwnership(projectId?: string | null, libraryId?: string | null): void {
   if (!projectId && !libraryId) {
     throw new ValidationError(
       'Either project_id or library_id must be provided',

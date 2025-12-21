@@ -33,5 +33,5 @@ export { activateFanIn, handleBranchOutput, processSynchronization } from './fan
 // Task: dispatch tokens and process results
 export { dispatchToken, processTaskResult } from './task';
 
-// Lifecycle: workflow start, error handling, failure
-export { failWorkflow, processTaskError, startWorkflow } from './lifecycle';
+// Lifecycle: workflow start, error handling, failure, timeout
+export { checkTimeouts, failWorkflow, processTaskError, startWorkflow } from './lifecycle';

@@ -232,26 +232,25 @@ describe('Foundation: 09 - Fan-in Any Strategy', () => {
     // =========================================================================
     // VERIFICATION
     // =========================================================================
-    // With 'any' strategy:
-    // - 3 race tokens spawn
-    // - First to complete proceeds to finish (no waiting)
-    // - The other 2 race tokens complete independently
-    // - Each race token that completes creates its own path to finish
+    // With 'any' strategy (true fan-in behavior):
+    // - 3 race tokens spawn (fan-out siblings)
+    // - First to complete creates arrival token and activates fan-in
+    // - Fan-in activation cancels in-flight siblings
+    // - Only 1 continuation token is created and proceeds to finish
     //
-    // Token structure with 'any':
+    // Token structure:
     // - 1 dispatch (root)
     // - 3 race tokens (fan-out siblings)
-    // - 3 finish tokens (each race sibling proceeds independently to finish)
-    //
-    // 'any' means NO merge, NO waiting - each token passes through on its own
+    // - 1+ arrival tokens (first wins, others may complete before cancellation)
+    // - 1 continuation token (fan-in activated)
+    // - 1 finish token
     verify(trace, { input: workflowInput, definition: workflowDef, events })
       .completed()
       .withTokens({
         root: 1,
         fanOuts: [{ count: 3, branchTotal: 3, outputFields: ['winner'] }],
-        // With 'any', each sibling proceeds independently - no fan-in arrivals/continuations
-        // Each race token becomes a "root" of its own path to finish
-        total: 7, // 1 dispatch + 3 race + 3 finish
+        // fanInArrivals is timing-dependent (1-3 may complete before cancellation)
+        fanInContinuations: 1, // Only one continuation - fan-in is a convergence point
       })
       .withOutput({
         // Winner and result are set - we don't know which contestant won
@@ -629,14 +628,20 @@ describe('Foundation: 09 - Fan-in Any Strategy', () => {
     // =========================================================================
     // VERIFICATION
     // =========================================================================
-    // Single sibling: effectively linear flow
-    // branchTotal=1, so verifier won't classify as fan-out
+    // Single sibling with 'any' strategy:
+    // - 1 start token (root)
+    // - 1 middle token (sibling with branchTotal=1)
+    // - 1 arrival token (middle completes, creates token for end node)
+    // - 1 continuation token (fan-in activates, creates continuation)
+    //
+    // Note: branchTotal=1 means verifier classifies middle/arrival as "root" tokens
+    // since its fan-out detection requires branchTotal > 1. This is a verifier
+    // limitation for edge cases, not a runtime issue.
     verify(trace, { input: workflowInput, definition: workflowDef, events })
       .completed()
       .withTokens({
-        // With branchTotal=1, all tokens appear as "root" path
-        root: 3, // start, middle, end all have pathId=root
-        total: 3,
+        root: 3, // Start + middle + arrival (classified as root due to branchTotal=1)
+        fanInContinuations: 1, // Continuation after fan-in activates
       })
       .withOutput({
         completed: { type: 'boolean', value: true },

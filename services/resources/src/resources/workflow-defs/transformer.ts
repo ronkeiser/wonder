@@ -6,166 +6,124 @@
  * Expression strings are parsed into ASTs at this boundary.
  */
 
-import { parse, type Expression } from '@wonder/expressions';
+import { parse } from '@wonder/expressions';
 import { ulid } from 'ulid';
-import type { NodeInput, TransitionInput, WorkflowDefInput } from './validator';
+import { nodes, transitions } from '../../schema';
+import type { SynchronizationConfig } from '../../schema/types';
+import type { NodeInput, TransitionInput, WorkflowDefInput } from './types';
 
-/** Pre-generated IDs for all entities */
-export type GeneratedIds = {
-  workflowDefId: string;
-  nodeIds: Map<string, string>; // ref → id
-  transitionIds: Map<string, string>; // ref → id (for transitions with refs)
-};
+// ============================================================================
+// Types (inferred from schema)
+// ============================================================================
 
-/** Transformed node ready for database insertion */
-export type TransformedNode = {
-  id: string;
-  ref: string;
-  name: string;
-  taskId: string | null;
-  taskVersion: number | null;
-  inputMapping: object | null;
-  outputMapping: object | null;
-  resourceBindings: Record<string, string> | null;
-};
+/** Transformed node ready for database insertion (inferred from schema) */
+export type TransformedNode = Omit<typeof nodes.$inferInsert, 'workflowDefId' | 'workflowDefVersion'>;
 
-/** Strategy type after parsing - 'any', 'all', or m_of_n quorum */
-export type SynchronizationStrategy = 'any' | 'all' | { mOfN: number };
-
-/** Transformed transition ready for database insertion */
-export type TransformedTransition = {
-  id: string;
-  ref: string | null;
-  fromNodeId: string;
-  toNodeId: string;
-  priority: number;
-  condition: Expression | null; // Parsed AST from expression string
-  spawnCount: number | null;
-  siblingGroup: string | null; // Named sibling group for fan-in coordination
-  foreach: object | null;
-  synchronization: {
-    strategy: SynchronizationStrategy;
-    siblingGroup: string; // Must reference a declared siblingGroup
-    merge?: object;
-  } | null;
-  loopConfig: object | null;
-};
+/** Transformed transition ready for database insertion (inferred from schema) */
+export type TransformedTransition = Omit<typeof transitions.$inferInsert, 'workflowDefId' | 'workflowDefVersion'>;
 
 /** Result of transformation */
 export type TransformResult = {
-  ids: GeneratedIds;
+  workflowDefId: string;
   initialNodeId: string;
   nodes: TransformedNode[];
   transitions: TransformedTransition[];
 };
 
+// ============================================================================
+// Transformation
+// ============================================================================
+
 /**
- * Pre-generates all IDs and builds ref→ID maps.
- * This must be called before any database operations so we know all IDs upfront.
+ * Transforms workflow definition input into database-ready format.
+ *
+ * Single-pass transformation:
+ * 1. Generate workflow def ID
+ * 2. Transform nodes (generating IDs inline)
+ * 3. Build ref→id mapping from transformed nodes
+ * 4. Transform transitions using that mapping
  */
-export function generateIds(data: WorkflowDefInput): GeneratedIds {
+export function transformWorkflowDef(data: WorkflowDefInput): TransformResult {
   const workflowDefId = ulid();
 
-  // Generate node IDs
-  const nodeIds = new Map<string, string>();
-  for (const node of data.nodes) {
-    nodeIds.set(node.ref, ulid());
+  // Transform nodes with inline ID generation
+  const transformedNodes = data.nodes.map((node) => transformNode(node));
+
+  // Build ref→id map from transformed nodes (guaranteed complete since we just built it)
+  const nodeIdByRef: Record<string, string> = {};
+  for (const node of transformedNodes) {
+    nodeIdByRef[node.ref] = node.id;
   }
 
-  // Generate transition IDs
-  // IMPORTANT: We need to map ALL transitions by ref, not just ones with refs,
-  // because synchronization.siblingGroup references transitions by ref
-  const transitionIds = new Map<string, string>();
-  for (const transition of data.transitions ?? []) {
-    if (transition.ref) {
-      transitionIds.set(transition.ref, ulid());
-    }
-  }
-
-  return { workflowDefId, nodeIds, transitionIds };
-}
-
-/**
- * Transforms all ref-based input data into ID-based data.
- * All refs are resolved to IDs at this boundary.
- */
-export function transformWorkflowDef(data: WorkflowDefInput, ids: GeneratedIds): TransformResult {
-  const initialNodeId = ids.nodeIds.get(data.initialNodeRef)!;
-
-  const nodes = transformNodes(data.nodes, ids.nodeIds);
-  const transitions = transformTransitions(data.transitions ?? [], ids);
+  // Transform transitions using the map
+  const transformedTransitions = (data.transitions ?? []).map((transition) =>
+    transformTransition(transition, nodeIdByRef),
+  );
 
   return {
-    ids,
-    initialNodeId,
-    nodes,
-    transitions,
+    workflowDefId,
+    initialNodeId: nodeIdByRef[data.initialNodeRef],
+    nodes: transformedNodes,
+    transitions: transformedTransitions,
   };
 }
 
 /**
- * Transforms nodes from input format to database format.
+ * Transforms a single node from input format to database format.
  */
-function transformNodes(nodes: NodeInput[], nodeIds: Map<string, string>): TransformedNode[] {
-  return nodes.map((node) => ({
-    id: nodeIds.get(node.ref)!,
+function transformNode(node: NodeInput): TransformedNode {
+  return {
+    id: ulid(),
     ref: node.ref,
     name: node.name,
-    taskId: node.taskId ?? null,
-    taskVersion: node.taskVersion ?? null,
-    inputMapping: node.inputMapping ?? null,
-    outputMapping: node.outputMapping ?? null,
-    resourceBindings: node.resourceBindings ?? null,
-  }));
+    taskId: node.taskId,
+    taskVersion: node.taskVersion,
+    inputMapping: node.inputMapping,
+    outputMapping: node.outputMapping,
+    resourceBindings: node.resourceBindings,
+  };
 }
 
 /**
- * Transforms transitions from input format to database format.
+ * Transforms a single transition from input format to database format.
  * Parses condition expression strings into ASTs.
  */
-function transformTransitions(
-  transitions: TransitionInput[],
-  ids: GeneratedIds,
-): TransformedTransition[] {
-  return transitions.map((transition) => {
-    // Get or generate the transition ID
-    const transitionId = transition.ref ? ids.transitionIds.get(transition.ref)! : ulid();
-
-    // Parse condition string into AST (throws on syntax error)
-    const condition = transition.condition ? parse(transition.condition) : null;
-
-    return {
-      id: transitionId,
-      ref: transition.ref ?? null,
-      fromNodeId: ids.nodeIds.get(transition.fromNodeRef)!,
-      toNodeId: ids.nodeIds.get(transition.toNodeRef)!,
-      priority: transition.priority,
-      condition,
-      spawnCount: transition.spawnCount ?? null,
-      siblingGroup: transition.siblingGroup ?? null,
-      foreach: transition.foreach ?? null,
-      synchronization: transformSynchronization(transition.synchronization),
-      loopConfig: transition.loopConfig ?? null,
-    };
-  });
+function transformTransition(
+  transition: TransitionInput,
+  nodeIdByRef: Record<string, string>,
+): TransformedTransition {
+  return {
+    id: ulid(),
+    ref: transition.ref,
+    fromNodeId: nodeIdByRef[transition.fromNodeRef],
+    toNodeId: nodeIdByRef[transition.toNodeRef],
+    priority: transition.priority,
+    condition: transition.condition ? parse(transition.condition) : undefined,
+    spawnCount: transition.spawnCount,
+    siblingGroup: transition.siblingGroup,
+    foreach: transition.foreach,
+    synchronization: transformSynchronization(transition.synchronization),
+    loopConfig: transition.loopConfig,
+  };
 }
 
 /**
  * Transforms synchronization config.
- * siblingGroup is passed through as-is - it's a string identifier declared on transitions.
  * Strategy is parsed from string format into typed format.
  */
 function transformSynchronization(
   sync: TransitionInput['synchronization'],
-): TransformedTransition['synchronization'] {
+): SynchronizationConfig | undefined {
   if (!sync) {
-    return null;
+    return undefined;
   }
 
   return {
     strategy: parseStrategy(sync.strategy),
     siblingGroup: sync.siblingGroup,
     merge: sync.merge,
+    timeoutMs: sync.timeoutMs,
+    onTimeout: sync.onTimeout,
   };
 }
 
@@ -177,7 +135,7 @@ function transformSynchronization(
  * - "all" → "all"
  * - "m_of_n:N" → { mOfN: N } (e.g., "m_of_n:2" → { mOfN: 2 })
  */
-function parseStrategy(strategy: string): SynchronizationStrategy {
+function parseStrategy(strategy: string): SynchronizationConfig['strategy'] {
   if (strategy === 'any' || strategy === 'all') {
     return strategy;
   }

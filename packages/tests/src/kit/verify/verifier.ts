@@ -450,10 +450,19 @@ export class WorkflowVerifier {
         }
 
         // Verify output fields for this fan-out group's branches
+        // Skip cancelled tokens - they were terminated before completing (e.g., 'any' or 'm_of_n' sync)
         if (spec.outputFields) {
           const { branchOutputs } = ctx.collected;
           for (const sibling of group.siblings) {
             const tokenId = sibling.tokenId!;
+
+            // Check if token was cancelled (skip output verification for cancelled tokens)
+            const statuses = this.trace.tokens.statusTransitions(tokenId);
+            const finalStatus = statuses[statuses.length - 1];
+            if (finalStatus === 'cancelled') {
+              continue; // Token was cancelled before completing, no branch output expected
+            }
+
             const output = branchOutputs.get(tokenId);
             if (!output) {
               throw new WorkflowVerificationError(

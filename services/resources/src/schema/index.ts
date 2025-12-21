@@ -14,8 +14,21 @@ import {
 
 import type { ModelId, ModelProfile } from '../resources/model-profiles/types';
 import type { RetryConfig, Step } from '../resources/tasks/types';
+import type {
+  Condition,
+  ForeachConfig,
+  LoopConfig,
+  SynchronizationConfig,
+} from './types';
 
-// Re-export for consumers that import from schema
+// Re-export schema types for consumers
+export type {
+  Condition,
+  ForeachConfig,
+  LoopConfig,
+  MergeConfig,
+  SynchronizationConfig,
+} from './types';
 export type { RetryConfig, Step } from '../resources/tasks/types';
 
 /** Workspace & Project */
@@ -200,12 +213,12 @@ export const transitions = sqliteTable(
     toNodeId: text().notNull(),
     priority: integer().notNull(),
 
-    condition: text({ mode: 'json' }).$type<object>(), // parsed AST from @wonder/expressions
-    spawnCount: integer(), // How many tokens to spawn (default: 1)
-    siblingGroup: text(), // Sibling group identifier for fan-in coordination
-    foreach: text({ mode: 'json' }).$type<object>(), // foreach config
-    synchronization: text({ mode: 'json' }).$type<object>(), // fan-in config
-    loopConfig: text({ mode: 'json' }).$type<object>(),
+    condition: text({ mode: 'json' }).$type<Condition>(),
+    spawnCount: integer(),
+    siblingGroup: text(),
+    foreach: text({ mode: 'json' }).$type<ForeachConfig>(),
+    synchronization: text({ mode: 'json' }).$type<SynchronizationConfig>(),
+    loopConfig: text({ mode: 'json' }).$type<LoopConfig>(),
   },
   (table) => [
     primaryKey({ columns: [table.workflowDefId, table.workflowDefVersion, table.id] }),

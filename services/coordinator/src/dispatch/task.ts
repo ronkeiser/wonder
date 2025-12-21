@@ -140,9 +140,24 @@ export async function processTaskResult(
   tokenId: string,
   result: TaskResult,
 ): Promise<void> {
+  const token = ctx.tokens.get(tokenId);
+
+  // Guard: Ignore results for tokens that are already in a terminal state.
+  // This can happen when a sibling completes and triggers fan-in activation,
+  // which cancels in-flight siblings. The executor may still call back with
+  // results for those cancelled tokens - we safely ignore them.
+  const terminalStates = ['completed', 'failed', 'cancelled', 'timed_out'];
+  if (terminalStates.includes(token.status)) {
+    ctx.logger.debug({
+      eventType: 'task.result.ignored',
+      message: `Ignoring task result for token in terminal state: ${token.status}`,
+      metadata: { tokenId, status: token.status },
+    });
+    return;
+  }
+
   // Mark token as completed
   ctx.tokens.updateStatus(tokenId, 'completed');
-  const token = ctx.tokens.get(tokenId);
 
   // Get node for output mapping
   const node = ctx.defs.getNode(token.nodeId);

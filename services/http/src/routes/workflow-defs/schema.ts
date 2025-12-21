@@ -5,6 +5,29 @@
 import { z } from '@hono/zod-openapi';
 import { ulid } from '../../validators';
 
+// ============================================================================
+// Shared Config Schemas (match schema/types.ts definitions)
+// ============================================================================
+
+const ForeachConfigSchema = z.object({
+  collection: z.string(), // Path to array in context (e.g., 'input.judges')
+  itemVar: z.string(), // Variable name for each item
+});
+
+const LoopConfigSchema = z.object({
+  maxIterations: z.number().int().positive(), // Maximum times this transition can fire per token lineage
+});
+
+const MergeConfigSchema = z.object({
+  source: z.string(), // Path in branch output (e.g., '_branch.output', '_branch.output.choice')
+  target: z.string(), // Where to write merged result (e.g., 'state.votes')
+  strategy: z.enum(['append', 'collect', 'merge_object', 'keyed_by_branch', 'last_wins']),
+});
+
+// ============================================================================
+// Create Workflow Def Schema
+// ============================================================================
+
 export const CreateWorkflowDefSchema = z
   .object({
     name: z.string().min(1).max(255).openapi({ example: 'Content Generation Pipeline' }),
@@ -55,15 +78,17 @@ export const CreateWorkflowDefSchema = z
           condition: z.string().optional(), // Expression string (e.g., "state.score >= 80")
           spawnCount: z.number().int().optional(),
           siblingGroup: z.string().optional(),
-          foreach: z.record(z.string(), z.unknown()).optional(),
+          foreach: ForeachConfigSchema.optional(),
           synchronization: z
             .object({
-              strategy: z.string(),
+              strategy: z.string(), // "any", "all", or "m_of_n:N" - parsed later
               siblingGroup: z.string(),
-              merge: z.record(z.string(), z.unknown()).optional(),
+              merge: MergeConfigSchema.optional(),
+              timeoutMs: z.number().int().positive().optional(),
+              onTimeout: z.enum(['fail', 'proceed_with_available']).optional(),
             })
             .optional(),
-          loopConfig: z.record(z.string(), z.unknown()).optional(),
+          loopConfig: LoopConfigSchema.optional(),
         }),
       )
       .optional(),

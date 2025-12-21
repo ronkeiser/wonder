@@ -18,7 +18,7 @@
 export type { CompletionResult, PlanningResult } from '../types';
 
 // Routing: transition evaluation and token creation decisions
-export { buildPathId, decideRouting, getTransitionsWithSynchronization, toTransitionDef } from './routing';
+export { buildPathId, decideRouting, getTransitionsWithSynchronization } from './routing';
 
 // Synchronization: fan-in and merge decisions
 export {

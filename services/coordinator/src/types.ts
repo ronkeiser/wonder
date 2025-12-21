@@ -108,6 +108,8 @@ export type DispatchContext = {
   executor: Env['EXECUTOR'];
   /** Register background work (fire-and-forget) */
   waitUntil: (promise: Promise<unknown>) => void;
+  /** Schedule timeout alarm for sync points */
+  scheduleTimeoutAlarm: (timeoutMs: number) => Promise<void>;
 };
 
 /** Result of applying decisions */
@@ -161,73 +163,23 @@ export type TaskResult = {
 // Transition Configuration Types (from workflow definition)
 // ============================================================================
 
-/**
- * Condition for transition evaluation.
- *
- * Conditions are pre-parsed ASTs from @wonder/expressions.
- * The expression is parsed at workflow creation time (in resources service)
- * and evaluated at runtime using evaluateAst().
- *
- * The expression context includes: input, state, output.
- *
- * Examples (as expression strings before parsing):
- * - "state.score >= 80"
- * - "state.status == 'approved' && state.count > 0"
- * - "len(state.items) > 0"
- * - "exists(state.optional)"
- */
-import type { Expression } from '@wonder/expressions';
-export type Condition = Expression;
+// Import and re-export types from resources (single source of truth)
+import type {
+  Condition,
+  ForeachConfig,
+  LoopConfig,
+  MergeConfig,
+  SynchronizationConfig,
+  Transition,
+} from '@wonder/resources/types';
 
-/**
- * Foreach configuration for dynamic iteration
- */
-export type ForeachConfig = {
-  collection: string; // Path to array in context (e.g., 'input.judges')
-  itemVar: string; // Variable name for each item
-};
-
-/**
- * Loop configuration for cycle control
- */
-export type LoopConfig = {
-  maxIterations: number; // Maximum times this transition can fire per token lineage
-};
-
-/**
- * Synchronization configuration for fan-in
- */
-export type SynchronizationConfig = {
-  strategy: 'any' | 'all' | { mOfN: number };
-  siblingGroup: string; // Named sibling group identifier (not transition ID)
-  timeoutMs?: number; // Max wait time (undefined = no timeout)
-  onTimeout?: 'proceed_with_available' | 'fail';
-  merge?: MergeConfig;
-};
-
-/**
- * Merge configuration for combining branch outputs
- */
-export type MergeConfig = {
-  source: string; // Path in branch output (e.g., '_branch.output', '_branch.output.choice')
-  target: string; // Where to write merged result (e.g., 'state.votes')
-  strategy: 'append' | 'collect' | 'merge_object' | 'keyed_by_branch' | 'last_wins';
-};
-
-/**
- * Transition definition (subset of schema for planning)
- */
-export type TransitionDef = {
-  id: string;
-  ref?: string;
-  fromNodeId: string;
-  toNodeId: string;
-  priority: number;
-  condition?: Condition;
-  spawnCount?: number;
-  siblingGroup?: string;
-  foreach?: ForeachConfig;
-  synchronization?: SynchronizationConfig;
+export type {
+  Condition,
+  ForeachConfig,
+  LoopConfig,
+  MergeConfig,
+  SynchronizationConfig,
+  Transition,
 };
 
 // ============================================================================
@@ -267,7 +219,7 @@ export type Decision =
   | { type: 'DROP_BRANCH_TABLES'; tokenIds: string[] }
 
   // Synchronization (triggers recursive decision generation)
-  | { type: 'CHECK_SYNCHRONIZATION'; tokenId: string; transition: TransitionDef }
+  | { type: 'CHECK_SYNCHRONIZATION'; tokenId: string; transition: Transition }
   | {
       type: 'ACTIVATE_FAN_IN';
       workflowRunId: string;

@@ -12,6 +12,7 @@ import { createEmitter, type Emitter } from '@wonder/events';
 import { createLogger, type Logger } from '@wonder/logs';
 import { DurableObject } from 'cloudflare:workers';
 import {
+  checkTimeouts,
   processTaskError,
   processTaskResult,
   startWorkflow,
@@ -82,6 +83,7 @@ export class WorkflowCoordinator extends DurableObject {
       resources: this.env.RESOURCES,
       executor: this.env.EXECUTOR,
       waitUntil: (promise) => this.ctx.waitUntil(promise),
+      scheduleTimeoutAlarm: (timeoutMs) => this.scheduleTimeoutAlarm(timeoutMs),
     };
   }
 
@@ -217,6 +219,89 @@ export class WorkflowCoordinator extends DurableObject {
       });
       throw error;
     }
+  }
+
+  /**
+   * Schedule an alarm to check for timeouts.
+   *
+   * Called when a token starts waiting. Sets an alarm for when the
+   * earliest timeout might fire.
+   */
+  async scheduleTimeoutAlarm(timeoutMs: number): Promise<void> {
+    const existingAlarm = await this.ctx.storage.getAlarm();
+    const newAlarmTime = Date.now() + timeoutMs;
+
+    // Only schedule if no alarm exists or new alarm is earlier
+    if (!existingAlarm || newAlarmTime < existingAlarm) {
+      await this.ctx.storage.setAlarm(newAlarmTime);
+
+      this.logger.info({
+        eventType: 'coordinator.alarm.scheduled',
+        message: `Timeout alarm scheduled for ${timeoutMs}ms from now`,
+        metadata: { timeoutMs, alarmTime: new Date(newAlarmTime).toISOString() },
+      });
+    }
+  }
+
+  /**
+   * Alarm handler - called by Cloudflare when the scheduled alarm fires.
+   *
+   * Checks all waiting tokens for timeouts and applies appropriate actions.
+   */
+  async alarm(): Promise<void> {
+    try {
+      const run = this.defs.getWorkflowRun();
+      const ctx = this.getDispatchContext(run.id);
+
+      this.logger.info({
+        eventType: 'coordinator.alarm.fired',
+        message: 'Timeout alarm fired',
+        traceId: run.id,
+      });
+
+      // Check for timed out tokens and handle them
+      await checkTimeouts(ctx);
+
+      // Schedule next alarm if there are still waiting tokens
+      const oldestWaiting = this.tokens.getOldestWaitingTimestamp();
+      if (oldestWaiting) {
+        // Find the earliest configured timeout among waiting tokens' transitions
+        const nextTimeoutMs = this.getEarliestTimeout();
+        if (nextTimeoutMs) {
+          await this.scheduleTimeoutAlarm(nextTimeoutMs);
+        }
+      }
+    } catch (error) {
+      this.logger.error({
+        eventType: 'coordinator.alarm.failed',
+        message: 'Error in alarm handler',
+        metadata: {
+          error: error instanceof Error ? error.message : String(error),
+          stack: error instanceof Error ? error.stack : undefined,
+        },
+      });
+      throw error; // Rethrow to trigger retry
+    }
+  }
+
+  /**
+   * Get the earliest timeout configuration among all transitions.
+   * Returns the shortest timeoutMs found, or null if none configured.
+   */
+  private getEarliestTimeout(): number | null {
+    const transitions = this.defs.getTransitions();
+    let earliest: number | null = null;
+
+    for (const t of transitions) {
+      const sync = t.synchronization as { timeoutMs?: number } | null;
+      if (sync?.timeoutMs) {
+        if (earliest === null || sync.timeoutMs < earliest) {
+          earliest = sync.timeoutMs;
+        }
+      }
+    }
+
+    return earliest;
   }
 }
 

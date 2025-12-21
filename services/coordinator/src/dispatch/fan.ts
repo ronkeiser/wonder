@@ -18,7 +18,7 @@ import type { DefinitionManager } from '../operations/defs';
 import type { TokenManager } from '../operations/tokens';
 import { decideFanInContinuation } from '../planning/index';
 import { decideSynchronization } from '../planning/synchronization';
-import type { Decision, DispatchContext, TransitionDef } from '../types';
+import type { Decision, DispatchContext, Transition } from '../types';
 import { applyDecisions } from './apply';
 
 // ============================================================================
@@ -123,7 +123,7 @@ export async function handleBranchOutput(
 export async function processSynchronization(
   ctx: DispatchContext,
   createdTokenIds: string[],
-  syncTransitions: TransitionDef[],
+  syncTransitions: Transition[],
 ): Promise<string[]> {
   const continuationTokenIds: string[] = [];
 
@@ -190,7 +190,7 @@ export async function processSynchronization(
 export async function activateFanIn(
   ctx: DispatchContext,
   decision: Extract<Decision, { type: 'ACTIVATE_FAN_IN' }>,
-  transition: TransitionDef,
+  transition: Transition,
   triggeringTokenId: string,
 ): Promise<string | null> {
   const { workflowRunId, nodeId, fanInPath } = decision;
@@ -205,6 +205,15 @@ export async function activateFanIn(
   });
 
   if (!raceWon) {
+    // Lost the race - fan-in was already activated by another token.
+    // Mark this arrival token as completed so it reaches a terminal state.
+    ctx.tokens.updateStatus(triggeringTokenId, 'completed');
+    ctx.emitter.emitTrace({
+      type: 'dispatch.sync.fan_in_race_lost',
+      tokenId: triggeringTokenId,
+      nodeId: nodeId,
+      payload: { fanInPath },
+    });
     return null;
   }
 
@@ -219,7 +228,7 @@ export async function activateFanIn(
     return null;
   }
 
-  const { completedSiblings, waitingSiblings } = siblings;
+  const { completedSiblings, waitingSiblings, inFlightSiblings } = siblings;
 
   // Emit trace event
   ctx.emitter.emitTrace({
@@ -229,6 +238,7 @@ export async function activateFanIn(
       fanInPath: fanInPath,
       mergedCount: completedSiblings.length,
       waitingCount: waitingSiblings.length,
+      cancelledCount: inFlightSiblings.length,
     },
   });
 
@@ -237,10 +247,24 @@ export async function activateFanIn(
     await mergeBranchOutputs(ctx, transition.fromNodeId, completedSiblings, sync.merge);
   }
 
-  // Step 4: Mark siblings as completed
+  // Step 4: Mark waiting siblings as completed and cancel in-flight siblings
+  // In-flight siblings (dispatched/executing) are cancelled because the sync condition
+  // has been met - their results are no longer needed. This prevents race conditions
+  // where late-completing siblings try to proceed after the fan-in has already activated.
   markSiblingsCompleted(ctx, triggeringTokenId, waitingSiblings);
+  if (inFlightSiblings.length > 0) {
+    ctx.tokens.cancelMany(
+      inFlightSiblings.map((s) => s.id),
+      'fan-in activated before completion',
+    );
+  }
 
-  // Step 5: Create continuation token
+  // Step 5: Mark the triggering arrival token as completed
+  // The arrival token has served its purpose - it triggered the fan-in activation.
+  // Now the continuation token will carry the workflow forward.
+  ctx.tokens.updateStatus(triggeringTokenId, 'completed');
+
+  // Step 6: Create continuation token
   // Fetch parent token (fan-out origin) to inherit its iteration_counts
   const parentTokenId = completedSiblings[0].parentTokenId ?? '';
   const parentToken = parentTokenId ? ctx.tokens.get(parentTokenId) : null;
@@ -308,18 +332,30 @@ function tryWinFanInRace(
 type SiblingToken = ReturnType<TokenManager['getSiblings']>[number];
 
 /**
- * Get completed and waiting siblings for fan-in merge.
+ * Get siblings categorized by state for fan-in merge.
  * Returns null if no completed siblings found.
+ *
+ * Categories:
+ * - completed: Already finished, can be merged
+ * - waiting: Arrived at sync point, waiting for condition
+ * - inFlight: Still executing (dispatched/executing), need to be cancelled
  */
 function getSiblingsForMerge(
   ctx: DispatchContext,
   workflowRunId: string,
   siblingGroup: string,
   fanInPath: string,
-): { completedSiblings: SiblingToken[]; waitingSiblings: SiblingToken[] } | null {
+): {
+  completedSiblings: SiblingToken[];
+  waitingSiblings: SiblingToken[];
+  inFlightSiblings: SiblingToken[];
+} | null {
   const siblings = ctx.tokens.getSiblings(workflowRunId, siblingGroup);
   const completedSiblings = siblings.filter((s) => s.status === 'completed');
   const waitingSiblings = siblings.filter((s) => s.status === 'waiting_for_siblings');
+  const inFlightSiblings = siblings.filter(
+    (s) => s.status === 'pending' || s.status === 'dispatched' || s.status === 'executing',
+  );
 
   if (completedSiblings.length === 0) {
     ctx.logger.debug({
@@ -330,7 +366,7 @@ function getSiblingsForMerge(
     return null;
   }
 
-  return { completedSiblings, waitingSiblings };
+  return { completedSiblings, waitingSiblings, inFlightSiblings };
 }
 
 /**
@@ -340,7 +376,7 @@ async function mergeBranchOutputs(
   ctx: DispatchContext,
   sourceNodeId: string,
   completedSiblings: SiblingToken[],
-  mergeConfig: NonNullable<TransitionDef['synchronization']>['merge'],
+  mergeConfig: NonNullable<Transition['synchronization']>['merge'],
 ): Promise<void> {
   if (!mergeConfig) return;
 

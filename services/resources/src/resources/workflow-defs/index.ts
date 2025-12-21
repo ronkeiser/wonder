@@ -3,9 +3,9 @@
 import { ConflictError, NotFoundError, ValidationError, extractDbError } from '~/shared/errors';
 import { Resource } from '~/shared/resource';
 import * as repo from './repository';
-import { generateIds, transformWorkflowDef } from './transformer';
-import type { Node, Transition, WorkflowDef } from './types';
-import { validateWorkflowDef, type WorkflowDefInput } from './validator';
+import { transformWorkflowDef } from './transformer';
+import type { Node, Transition, WorkflowDef, WorkflowDefInput } from './types';
+import { validateWorkflowDef } from './validator';
 
 export class WorkflowDefs extends Resource {
   async create(data: WorkflowDefInput): Promise<{
@@ -71,15 +71,14 @@ export class WorkflowDefs extends Resource {
     const version = data.autoversion ? autoversionResult.version : 1;
 
     // 3. Create with computed version and content hash
-    // Generate IDs and transform refs → IDs
-    const ids = generateIds(data);
-    const transformed = transformWorkflowDef(data, ids);
+    // Transform refs → IDs (single-pass: generates all IDs inline)
+    const transformed = transformWorkflowDef(data);
 
     // DEBUG: Log transformed transitions
     this.serviceCtx.logger.info({
       eventType: 'workflow_def.transitions.transformed',
       metadata: {
-        workflowDefId: ids.workflowDefId,
+        workflowDefId: transformed.workflowDefId,
         transitions: transformed.transitions.map((t) => ({
           id: t.id,
           ref: t.ref,
@@ -94,7 +93,7 @@ export class WorkflowDefs extends Resource {
     try {
       workflowDef = await repo.createWorkflowDefWithId(this.serviceCtx.db, {
         ...data,
-        id: ids.workflowDefId,
+        id: transformed.workflowDefId,
         version,
         initialNodeId: transformed.initialNodeId,
         contentHash: autoversionResult.contentHash,

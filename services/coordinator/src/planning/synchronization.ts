@@ -19,7 +19,7 @@ import type {
   PlanningResult,
   SiblingCounts,
   SynchronizationConfig,
-  TransitionDef,
+  Transition,
 } from '../types';
 
 // ============================================================================
@@ -38,7 +38,7 @@ import type {
  */
 export function decideSynchronization(params: {
   token: TokenRow;
-  transition: TransitionDef;
+  transition: Transition;
   siblingCounts: SiblingCounts;
   workflowRunId: string;
 }): PlanningResult {
@@ -82,9 +82,26 @@ export function decideSynchronization(params: {
     return { decisions: [{ type: 'MARK_FOR_DISPATCH', tokenId: token.id }], events };
   }
 
-  // 'any' strategy → first arrival proceeds immediately
+  // 'any' strategy → first arrival activates fan-in (same as m_of_n with m=1)
+  // Uses ACTIVATE_FAN_IN to go through race-protected path - only first arrival wins
   if (sync.strategy === 'any') {
-    return { decisions: [{ type: 'MARK_FOR_DISPATCH', tokenId: token.id }], events };
+    events.push({
+      type: 'decision.sync.activate',
+      payload: { mergeConfig: sync.merge ?? null, strategy: 'any' },
+    });
+
+    return {
+      decisions: [
+        {
+          type: 'ACTIVATE_FAN_IN',
+          workflowRunId,
+          nodeId: transition.toNodeId,
+          fanInPath: buildFanInPath(token.siblingGroup!, transition.toNodeId),
+          mergedTokenIds: [],
+        },
+      ],
+      events,
+    };
   }
 
   // Check if synchronization condition is met
@@ -192,12 +209,12 @@ function buildFanInPath(siblingGroup: string, targetNodeId: string): string {
 // ============================================================================
 
 /** Determine if branch merge is needed. */
-export function needsMerge(transition: TransitionDef): boolean {
+export function needsMerge(transition: Transition): boolean {
   return transition.synchronization?.merge !== undefined;
 }
 
 /** Get merge configuration from transition. */
-export function getMergeConfig(transition: TransitionDef): MergeConfig | null {
+export function getMergeConfig(transition: Transition): MergeConfig | null {
   return transition.synchronization?.merge ?? null;
 }
 
@@ -208,7 +225,7 @@ export function getMergeConfig(transition: TransitionDef): MergeConfig | null {
 /** Decide how to handle synchronization timeout based on policy. */
 export function decideOnTimeout(params: {
   waitingTokens: TokenRow[];
-  transition: TransitionDef;
+  transition: Transition;
   workflowRunId: string;
 }): Decision[] {
   const { waitingTokens, transition, workflowRunId } = params;
@@ -271,7 +288,7 @@ export function decideOnTimeout(params: {
 
 /** Check if a timeout is configured and has elapsed. */
 export function hasTimedOut(
-  transition: TransitionDef,
+  transition: Transition,
   oldestWaitingTimestamp: Date | null,
 ): boolean {
   if (!transition.synchronization?.timeoutMs) {
