@@ -56,7 +56,7 @@ describe('Foundation: 01 - Single Node Mock', () => {
       ordinal: 0,
       action: generateAction,
       inputMapping: {},
-      outputMapping: { 'output.code': '$.code' },
+      outputMapping: { 'output.code': 'result.code' },
     });
 
     const generateTask = task({
@@ -73,7 +73,7 @@ describe('Foundation: 01 - Single Node Mock', () => {
       task: generateTask,
       taskVersion: 1,
       inputMapping: {},
-      outputMapping: { 'output.code': '$.code' },
+      outputMapping: { 'output.code': 'result.code' },
     });
 
     const workflowDef = workflow({
@@ -81,7 +81,7 @@ describe('Foundation: 01 - Single Node Mock', () => {
       description: 'Foundation test 01 - single node lifecycle',
       inputSchema: inputSchema,
       outputSchema: workflowOutputSchema,
-      outputMapping: { code: '$.output.code' },
+      outputMapping: { code: 'output.code' },
       initialNodeRef: 'generate',
       nodes: [generateNode],
       transitions: [],
@@ -331,7 +331,7 @@ describe('Foundation: 01 - Single Node Mock', () => {
       // COMPLETION PLANNING
       const completionPlanningStart = trace.completion.start();
       expect(completionPlanningStart, 'Completion planning started').toBeDefined();
-      expect(completionPlanningStart!.payload.outputMapping).toEqual({ code: '$.output.code' });
+      expect(completionPlanningStart!.payload.outputMapping).toEqual({ code: 'output.code' });
 
       // Verify context structure available to planning
       const contextKeys = completionPlanningStart!.payload.contextKeys;
@@ -343,7 +343,7 @@ describe('Foundation: 01 - Single Node Mock', () => {
       const completionPlanningExtracts = trace.completion.extracts();
       expect(completionPlanningExtracts, 'Output fields extracted via planning').toHaveLength(1);
       expect(completionPlanningExtracts[0].payload.targetField).toBe('code');
-      expect(completionPlanningExtracts[0].payload.sourcePath).toBe('$.output.code');
+      expect(completionPlanningExtracts[0].payload.sourcePath).toBe('output.code');
 
       // RELATIONAL: Extracted value must match final output
       const extractedCode = completionPlanningExtracts[0].payload.extractedValue;

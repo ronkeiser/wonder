@@ -149,24 +149,14 @@ function parsePath(path: string): PathPart[] {
 }
 
 /**
- * Mapping mode affects how legacy $.path syntax is interpreted.
- */
-type MappingMode = 'input' | 'output';
-
-/**
  * Evaluate a mapping value using expressions.
  *
  * String values are evaluated as expressions.
  * Non-string values (numbers, booleans, arrays, objects) are passed through.
- *
- * Legacy support:
- * - Input mapping: `$.path` → `path` (looks up in context)
- * - Output mapping: `$.path` → `result.path` (looks up in action output)
  */
 function evaluateMappingValue(
   sourceValue: unknown,
   expressionContext: Record<string, unknown>,
-  mode: MappingMode,
 ): unknown {
   if (sourceValue === null || sourceValue === undefined) {
     return sourceValue;
@@ -177,17 +167,8 @@ function evaluateMappingValue(
     return sourceValue;
   }
 
-  // Convert legacy $.path syntax to expression syntax
-  let expression = sourceValue;
-  if (expression.startsWith('$.')) {
-    const path = expression.slice(2);
-    // In output mapping, $.path refers to action output (result)
-    // In input mapping, $.path refers to context root
-    expression = mode === 'output' ? `result.${path}` : path;
-  }
-
   // Evaluate as expression
-  return evaluate(expression, expressionContext);
+  return evaluate(sourceValue, expressionContext);
 }
 
 /**
@@ -216,7 +197,7 @@ export function applyInputMapping(
   const result: Record<string, unknown> = {};
 
   for (const [targetField, sourceValue] of Object.entries(mapping)) {
-    result[targetField] = evaluateMappingValue(sourceValue, expressionContext, 'input');
+    result[targetField] = evaluateMappingValue(sourceValue, expressionContext);
   }
 
   return result;
@@ -274,7 +255,7 @@ export function applyOutputMapping(
   for (const [targetPath, sourceValue] of Object.entries(mapping)) {
     if (sourceValue === null || sourceValue === undefined) continue;
 
-    const value = evaluateMappingValue(sourceValue, expressionContext, 'output');
+    const value = evaluateMappingValue(sourceValue, expressionContext);
 
     logger?.info({
       eventType: 'outputMapping_evaluated',

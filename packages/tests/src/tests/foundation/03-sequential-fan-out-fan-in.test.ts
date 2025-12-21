@@ -79,7 +79,7 @@ describe('Foundation: 03 - Sequential Fan-out/Fan-in', () => {
       ordinal: 0,
       action: initAction,
       inputMapping: {},
-      outputMapping: { 'output.seed': '$.seed' },
+      outputMapping: { 'output.seed': 'result.seed' },
     });
 
     const initTask = task({
@@ -95,8 +95,8 @@ describe('Foundation: 03 - Sequential Fan-out/Fan-in', () => {
       name: 'Init',
       task: initTask,
       taskVersion: 1,
-      inputMapping: { seed: '$.input.seed' },
-      outputMapping: { 'state.seed': '$.seed' },
+      inputMapping: { seed: 'input.seed' },
+      outputMapping: { 'state.seed': 'result.seed' },
     });
 
     // =========================================================================
@@ -118,7 +118,7 @@ describe('Foundation: 03 - Sequential Fan-out/Fan-in', () => {
       ordinal: 0,
       action: phase1Action,
       inputMapping: {},
-      outputMapping: { 'output.value': '$.value' },
+      outputMapping: { 'output.value': 'result.value' },
     });
 
     const phase1Task = task({
@@ -134,8 +134,8 @@ describe('Foundation: 03 - Sequential Fan-out/Fan-in', () => {
       name: 'Phase 1',
       task: phase1Task,
       taskVersion: 1,
-      inputMapping: { seed: '$.state.seed' },
-      outputMapping: { 'output.value': '$.value' },
+      inputMapping: { seed: 'state.seed' },
+      outputMapping: { 'output.value': 'result.value' },
     });
 
     // =========================================================================
@@ -153,7 +153,7 @@ describe('Foundation: 03 - Sequential Fan-out/Fan-in', () => {
       ordinal: 0,
       action: bridgeAction,
       inputMapping: {},
-      outputMapping: { 'output.count': '$.count' },
+      outputMapping: { 'output.count': 'result.count' },
     });
 
     const bridgeTask = task({
@@ -169,8 +169,8 @@ describe('Foundation: 03 - Sequential Fan-out/Fan-in', () => {
       name: 'Bridge',
       task: bridgeTask,
       taskVersion: 1,
-      inputMapping: { phase1_results: '$.state.phase1_results' },
-      outputMapping: { 'state.phase1_count': '$.count' },
+      inputMapping: { phase1_results: 'state.phase1_results' },
+      outputMapping: { 'state.phase1_count': 'result.count' },
     });
 
     // =========================================================================
@@ -192,7 +192,7 @@ describe('Foundation: 03 - Sequential Fan-out/Fan-in', () => {
       ordinal: 0,
       action: phase2Action,
       inputMapping: {},
-      outputMapping: { 'output.transformed': '$.transformed' },
+      outputMapping: { 'output.transformed': 'result.transformed' },
     });
 
     const phase2Task = task({
@@ -212,10 +212,10 @@ describe('Foundation: 03 - Sequential Fan-out/Fan-in', () => {
       task: phase2Task,
       taskVersion: 1,
       inputMapping: {
-        phase1_results: '$.state.phase1_results',
-        phase1_count: '$.state.phase1_count',
+        phase1_results: 'state.phase1_results',
+        phase1_count: 'state.phase1_count',
       },
-      outputMapping: { 'output.transformed': '$.transformed' },
+      outputMapping: { 'output.transformed': 'result.transformed' },
     });
 
     // =========================================================================
@@ -233,7 +233,7 @@ describe('Foundation: 03 - Sequential Fan-out/Fan-in', () => {
       ordinal: 0,
       action: summarizeAction,
       inputMapping: {},
-      outputMapping: { 'output.summary': '$.summary' },
+      outputMapping: { 'output.summary': 'result.summary' },
     });
 
     const summarizeTask = task({
@@ -253,10 +253,10 @@ describe('Foundation: 03 - Sequential Fan-out/Fan-in', () => {
       task: summarizeTask,
       taskVersion: 1,
       inputMapping: {
-        phase1_results: '$.state.phase1_results',
-        phase2_results: '$.state.phase2_results',
+        phase1_results: 'state.phase1_results',
+        phase2_results: 'state.phase2_results',
       },
-      outputMapping: { 'state.summary': '$.summary' },
+      outputMapping: { 'state.summary': 'result.summary' },
     });
 
     // =========================================================================
@@ -327,11 +327,11 @@ describe('Foundation: 03 - Sequential Fan-out/Fan-in', () => {
       outputSchema: workflowOutputSchema,
       contextSchema: contextSchema,
       outputMapping: {
-        seed: '$.state.seed',
-        phase1_results: '$.state.phase1_results',
-        phase1_count: '$.state.phase1_count',
-        phase2_results: '$.state.phase2_results',
-        summary: '$.state.summary',
+        seed: 'state.seed',
+        phase1_results: 'state.phase1_results',
+        phase1_count: 'state.phase1_count',
+        phase2_results: 'state.phase2_results',
+        summary: 'state.summary',
       },
       initialNodeRef: 'init',
       nodes: [initNode, phase1Node, bridgeNode, phase2Node, summarizeNode],

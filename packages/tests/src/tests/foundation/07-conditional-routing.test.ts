@@ -99,7 +99,7 @@ function buildEvaluateNode() {
     ref: 'evaluate_step',
     ordinal: 0,
     action: evaluateAction,
-    inputMapping: { score: '$.input.score' },
+    inputMapping: { score: 'input.score' },
     outputMapping: {
       'output.score': 'result.score',
       'output.evaluated': 'true',
@@ -119,8 +119,8 @@ function buildEvaluateNode() {
     name: 'Evaluate',
     task: evaluateTask,
     taskVersion: 1,
-    inputMapping: { score: '$.input.score' },
-    outputMapping: { 'state.score': '$.score' },
+    inputMapping: { score: 'input.score' },
+    outputMapping: { 'state.score': 'result.score' },
   });
 }
 
@@ -164,8 +164,8 @@ function buildDecisionNode(
     taskVersion: 1,
     inputMapping: {},
     outputMapping: {
-      'state.decision': '$.decision',
-      'state.reason': '$.reason',
+      'state.decision': 'result.decision',
+      'state.reason': 'result.reason',
     },
   });
 }
@@ -183,8 +183,8 @@ function buildFinalizeNode() {
     ordinal: 0,
     action: finalizeAction,
     inputMapping: {
-      decision: '$.input.decision',
-      reason: '$.input.reason',
+      decision: 'input.decision',
+      reason: 'input.reason',
     },
     outputMapping: {
       'output.finalDecision': 'result.decision',
@@ -206,8 +206,8 @@ function buildFinalizeNode() {
     task: finalizeTask,
     taskVersion: 1,
     inputMapping: {
-      decision: '$.state.decision',
-      reason: '$.state.reason',
+      decision: 'state.decision',
+      reason: 'state.reason',
     },
     outputMapping: {},
   });
@@ -300,9 +300,9 @@ function buildConditionalRoutingWorkflow() {
     outputSchema: workflowOutputSchema,
     contextSchema: contextSchema,
     outputMapping: {
-      score: '$.state.score',
-      decision: '$.state.decision',
-      reason: '$.state.reason',
+      score: 'state.score',
+      decision: 'state.decision',
+      reason: 'state.reason',
     },
     initialNodeRef: 'evaluate',
     nodes: [evaluateNode, approveNode, reviewNode, rejectNode, finalizeNode],

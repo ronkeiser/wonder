@@ -145,7 +145,7 @@ describe('Foundation: 05 - Deep Nested State Structure', () => {
         ordinal: 0,
         action: initAction,
         inputMapping: {},
-        outputMapping: { 'output.seed': '$.seed' },
+        outputMapping: { 'output.seed': 'result.seed' },
       });
 
       const initTask = task({
@@ -161,8 +161,8 @@ describe('Foundation: 05 - Deep Nested State Structure', () => {
         name: 'Init',
         task: initTask,
         taskVersion: 1,
-        inputMapping: { seed: '$.input.seed' },
-        outputMapping: { 'state.pipeline.stages.init.config.seed': '$.seed' },
+        inputMapping: { seed: 'input.seed' },
+        outputMapping: { 'state.pipeline.stages.init.config.seed': 'result.seed' },
       });
 
       // =========================================================================
@@ -183,7 +183,7 @@ describe('Foundation: 05 - Deep Nested State Structure', () => {
         ordinal: 0,
         action: phase1Action,
         inputMapping: {},
-        outputMapping: { 'output.word': '$.word' },
+        outputMapping: { 'output.word': 'result.word' },
       });
 
       const phase1Task = task({
@@ -199,8 +199,8 @@ describe('Foundation: 05 - Deep Nested State Structure', () => {
         name: 'Phase 1',
         task: phase1Task,
         taskVersion: 1,
-        inputMapping: { seed: '$.state.pipeline.stages.init.config.seed' },
-        outputMapping: { 'output.word': '$.word' },
+        inputMapping: { seed: 'state.pipeline.stages.init.config.seed' },
+        outputMapping: { 'output.word': 'result.word' },
       });
 
       // =========================================================================
@@ -217,8 +217,8 @@ describe('Foundation: 05 - Deep Nested State Structure', () => {
         ref: 'bridge1Step',
         ordinal: 0,
         action: bridge1Action,
-        inputMapping: { phase1_words: '$.input.phase1_words' },
-        outputMapping: { 'output.phase1_words': '$.phase1_words' },
+        inputMapping: { phase1_words: 'input.phase1_words' },
+        outputMapping: { 'output.phase1_words': 'result.phase1_words' },
       });
 
       const bridge1Task = task({
@@ -234,9 +234,9 @@ describe('Foundation: 05 - Deep Nested State Structure', () => {
         name: 'Bridge1',
         task: bridge1Task,
         taskVersion: 1,
-        inputMapping: { phase1_words: '$.state.pipeline.stages.phase1.results.words' },
+        inputMapping: { phase1_words: 'state.pipeline.stages.phase1.results.words' },
         outputMapping: {
-          'state.pipeline.bridges.bridge1.inherited.words': '$.phase1_words',
+          'state.pipeline.bridges.bridge1.inherited.words': 'result.phase1_words',
         },
       });
 
@@ -259,7 +259,7 @@ describe('Foundation: 05 - Deep Nested State Structure', () => {
         ordinal: 0,
         action: phase2WordAction,
         inputMapping: {},
-        outputMapping: { 'output.word': '$.word' },
+        outputMapping: { 'output.word': 'result.word' },
       });
 
       // Merge inheritedWords (string[3]) + word (string) → accumulated (string[4])
@@ -280,10 +280,10 @@ describe('Foundation: 05 - Deep Nested State Structure', () => {
         ordinal: 1,
         action: phase2MergeAction,
         inputMapping: {
-          inheritedWords: '$.input.inheritedWords',
-          word: '$.output.word',
+          inheritedWords: 'input.inheritedWords',
+          word: 'output.word',
         },
-        outputMapping: { 'output.accumulated': '$.accumulated' },
+        outputMapping: { 'output.accumulated': 'result.accumulated' },
       });
 
       const phase2Task = task({
@@ -300,9 +300,9 @@ describe('Foundation: 05 - Deep Nested State Structure', () => {
         task: phase2Task,
         taskVersion: 1,
         inputMapping: {
-          inheritedWords: '$.state.pipeline.bridges.bridge1.inherited.words',
+          inheritedWords: 'state.pipeline.bridges.bridge1.inherited.words',
         },
-        outputMapping: { 'output.accumulated': '$.accumulated' },
+        outputMapping: { 'output.accumulated': 'result.accumulated' },
       });
 
       // =========================================================================
@@ -319,8 +319,8 @@ describe('Foundation: 05 - Deep Nested State Structure', () => {
         ref: 'bridge2Step',
         ordinal: 0,
         action: bridge2Action,
-        inputMapping: { phase2_accumulated: '$.input.phase2_accumulated' },
-        outputMapping: { 'output.phase2_accumulated': '$.phase2_accumulated' },
+        inputMapping: { phase2_accumulated: 'input.phase2_accumulated' },
+        outputMapping: { 'output.phase2_accumulated': 'result.phase2_accumulated' },
       });
 
       const bridge2Task = task({
@@ -336,9 +336,9 @@ describe('Foundation: 05 - Deep Nested State Structure', () => {
         name: 'Bridge2',
         task: bridge2Task,
         taskVersion: 1,
-        inputMapping: { phase2_accumulated: '$.state.pipeline.stages.phase2.results.accumulated' },
+        inputMapping: { phase2_accumulated: 'state.pipeline.stages.phase2.results.accumulated' },
         outputMapping: {
-          'state.pipeline.bridges.bridge2.inherited.accumulated': '$.phase2_accumulated',
+          'state.pipeline.bridges.bridge2.inherited.accumulated': 'result.phase2_accumulated',
         },
       });
 
@@ -362,7 +362,7 @@ describe('Foundation: 05 - Deep Nested State Structure', () => {
         ordinal: 0,
         action: phase3WordAction,
         inputMapping: {},
-        outputMapping: { 'output.word': '$.word' },
+        outputMapping: { 'output.word': 'result.word' },
       });
 
       // IDEAL BEHAVIOR:
@@ -387,11 +387,11 @@ describe('Foundation: 05 - Deep Nested State Structure', () => {
         ordinal: 1,
         action: phase3MergeAction,
         inputMapping: {
-          inherited_accumulated: '$.input.inherited_accumulated',
+          inherited_accumulated: 'input.inherited_accumulated',
           // Wrap word in array so it becomes a row
-          word_row: '$.output.word_row',
+          word_row: 'output.word_row',
         },
-        outputMapping: { 'output.final': '$.final' },
+        outputMapping: { 'output.final': 'result.final' },
       });
 
       // Step to wrap word in array (creating a row)
@@ -411,8 +411,8 @@ describe('Foundation: 05 - Deep Nested State Structure', () => {
         ref: 'phase3_wrap_step',
         ordinal: 1,
         action: phase3WrapAction,
-        inputMapping: { word: '$.output.word' },
-        outputMapping: { 'output.word_row': '$.word_row' },
+        inputMapping: { word: 'output.word' },
+        outputMapping: { 'output.word_row': 'result.word_row' },
       });
 
       // Fix ordinal to 2 (third step)
@@ -421,10 +421,10 @@ describe('Foundation: 05 - Deep Nested State Structure', () => {
         ordinal: 2,
         action: phase3MergeAction,
         inputMapping: {
-          inherited_accumulated: '$.input.inherited_accumulated',
-          word_row: '$.output.word_row',
+          inherited_accumulated: 'input.inherited_accumulated',
+          word_row: 'output.word_row',
         },
-        outputMapping: { 'output.final': '$.final' },
+        outputMapping: { 'output.final': 'result.final' },
       });
 
       const phase3Task = task({
@@ -441,9 +441,9 @@ describe('Foundation: 05 - Deep Nested State Structure', () => {
         task: phase3Task,
         taskVersion: 1,
         inputMapping: {
-          inherited_accumulated: '$.state.pipeline.bridges.bridge2.inherited.accumulated',
+          inherited_accumulated: 'state.pipeline.bridges.bridge2.inherited.accumulated',
         },
-        outputMapping: { 'output.final': '$.final' },
+        outputMapping: { 'output.final': 'result.final' },
       });
 
       // =========================================================================
@@ -461,14 +461,14 @@ describe('Foundation: 05 - Deep Nested State Structure', () => {
         ordinal: 0,
         action: finalizeAction,
         inputMapping: {
-          phase1_words: '$.input.phase1_words',
-          phase2_accumulated: '$.input.phase2_accumulated',
-          phase3Final: '$.input.phase3Final',
+          phase1_words: 'input.phase1_words',
+          phase2_accumulated: 'input.phase2_accumulated',
+          phase3Final: 'input.phase3Final',
         },
         outputMapping: {
-          'output.phase1_words': '$.phase1_words',
-          'output.phase2_accumulated': '$.phase2_accumulated',
-          'output.phase3Final': '$.phase3Final',
+          'output.phase1_words': 'result.phase1_words',
+          'output.phase2_accumulated': 'result.phase2_accumulated',
+          'output.phase3Final': 'result.phase3Final',
         },
       });
 
@@ -490,9 +490,9 @@ describe('Foundation: 05 - Deep Nested State Structure', () => {
         task: finalizeTask,
         taskVersion: 1,
         inputMapping: {
-          phase1_words: '$.state.pipeline.stages.phase1.results.words',
-          phase2_accumulated: '$.state.pipeline.stages.phase2.results.accumulated',
-          phase3Final: '$.state.pipeline.stages.phase3.results.final',
+          phase1_words: 'state.pipeline.stages.phase1.results.words',
+          phase2_accumulated: 'state.pipeline.stages.phase2.results.accumulated',
+          phase3Final: 'state.pipeline.stages.phase3.results.final',
         },
         outputMapping: {},
       });
@@ -592,10 +592,10 @@ describe('Foundation: 05 - Deep Nested State Structure', () => {
         outputSchema: workflowOutputSchema,
         contextSchema: contextSchema,
         outputMapping: {
-          seed: '$.state.pipeline.stages.init.config.seed',
-          phase1_words: '$.state.pipeline.stages.phase1.results.words',
-          phase2_accumulated: '$.state.pipeline.stages.phase2.results.accumulated',
-          phase3Final: '$.state.pipeline.stages.phase3.results.final',
+          seed: 'state.pipeline.stages.init.config.seed',
+          phase1_words: 'state.pipeline.stages.phase1.results.words',
+          phase2_accumulated: 'state.pipeline.stages.phase2.results.accumulated',
+          phase3Final: 'state.pipeline.stages.phase3.results.final',
         },
         initialNodeRef: 'init',
         nodes: [

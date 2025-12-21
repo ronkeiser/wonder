@@ -84,7 +84,7 @@ describe('Foundation: 02 - Fan-out with Spawn Count + Fan-in', () => {
       ordinal: 0,
       action: nodeAAction,
       inputMapping: {},
-      outputMapping: { 'output.seed': '$.seed' },
+      outputMapping: { 'output.seed': 'result.seed' },
     });
 
     const nodeATask = task({
@@ -100,8 +100,8 @@ describe('Foundation: 02 - Fan-out with Spawn Count + Fan-in', () => {
       name: 'Node A - Initialize',
       task: nodeATask,
       taskVersion: 1,
-      inputMapping: { prefix: '$.input.prefix' },
-      outputMapping: { 'state.seed': '$.seed' },
+      inputMapping: { prefix: 'input.prefix' },
+      outputMapping: { 'state.seed': 'result.seed' },
     });
 
     // Node B: Executes in parallel (3 times)
@@ -121,7 +121,7 @@ describe('Foundation: 02 - Fan-out with Spawn Count + Fan-in', () => {
       ordinal: 0,
       action: nodeBAction,
       inputMapping: {},
-      outputMapping: { 'output.result': '$.result' },
+      outputMapping: { 'output.result': 'result.result' },
     });
 
     const nodeBTask = task({
@@ -137,8 +137,8 @@ describe('Foundation: 02 - Fan-out with Spawn Count + Fan-in', () => {
       name: 'Node B - Process',
       task: nodeBTask,
       taskVersion: 1,
-      inputMapping: { seed: '$.state.seed' },
-      outputMapping: { 'output.result': '$.result' },
+      inputMapping: { seed: 'state.seed' },
+      outputMapping: { 'output.result': 'result.result' },
     });
 
     // Node C: Post-merge node that reads merged results and produces summary
@@ -154,7 +154,7 @@ describe('Foundation: 02 - Fan-out with Spawn Count + Fan-in', () => {
       ordinal: 0,
       action: nodeCAction,
       inputMapping: {},
-      outputMapping: { 'output.summary': '$.summary' },
+      outputMapping: { 'output.summary': 'result.summary' },
     });
 
     const nodeCTask = task({
@@ -172,8 +172,8 @@ describe('Foundation: 02 - Fan-out with Spawn Count + Fan-in', () => {
       name: 'Node C - Summarize',
       task: nodeCTask,
       taskVersion: 1,
-      inputMapping: { results: '$.state.results' },
-      outputMapping: { 'state.summary': '$.summary' },
+      inputMapping: { results: 'state.results' },
+      outputMapping: { 'state.summary': 'result.summary' },
     });
 
     // Transition: Fan-out from A to B with spawnCount
@@ -210,10 +210,10 @@ describe('Foundation: 02 - Fan-out with Spawn Count + Fan-in', () => {
       outputSchema: workflowOutputSchema,
       contextSchema: contextSchema,
       outputMapping: {
-        prefix: '$.input.prefix',
-        seed: '$.state.seed',
-        mergedResults: '$.state.results',
-        summary: '$.state.summary',
+        prefix: 'input.prefix',
+        seed: 'state.seed',
+        mergedResults: 'state.results',
+        summary: 'state.summary',
       },
       initialNodeRef: 'node_a',
       nodes: [nodeA, nodeB, nodeC],

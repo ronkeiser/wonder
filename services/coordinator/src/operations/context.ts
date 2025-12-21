@@ -7,7 +7,7 @@ import type { Emitter } from '@wonder/events';
 import { Schema, type JSONSchema, type SchemaTable, type SqlHook } from '@wonder/schemas';
 
 import {
-  extractJsonPath,
+  extractFromTaskOutput,
   getNestedValue,
   parsePath,
   setNestedValue,
@@ -311,8 +311,8 @@ export class ContextManager {
     }
 
     for (const [targetPath, sourcePath] of Object.entries(outputMapping)) {
-      // Extract value from task output using source path
-      const value = extractJsonPath(taskOutput, sourcePath);
+      // Evaluate expression with `result` bound to task output
+      const value = extractFromTaskOutput(sourcePath, taskOutput);
 
       // Use setField for the write (handles path parsing and read-modify-write)
       this.setField(targetPath, value);

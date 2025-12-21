@@ -130,7 +130,7 @@ describe('Foundation: 06 - Explicit Fan-Out', () => {
       ordinal: 0,
       action: initAction,
       inputMapping: {},
-      outputMapping: { 'output.seed': '$.seed' },
+      outputMapping: { 'output.seed': 'result.seed' },
     });
 
     const initTask = task({
@@ -146,9 +146,9 @@ describe('Foundation: 06 - Explicit Fan-Out', () => {
       name: 'Init',
       task: initTask,
       taskVersion: 1,
-      inputMapping: { seed: '$.input.seed' },
+      inputMapping: { seed: 'input.seed' },
       // Write to nested path: state.init.seed
-      outputMapping: { 'state.init.seed': '$.seed' },
+      outputMapping: { 'state.init.seed': 'result.seed' },
     });
 
     // =========================================================================
@@ -171,7 +171,7 @@ describe('Foundation: 06 - Explicit Fan-Out', () => {
         ordinal: 0,
         action: phase1Action,
         inputMapping: {},
-        outputMapping: { 'output.value': '$.value' },
+        outputMapping: { 'output.value': 'result.value' },
       });
 
       const phase1Task = task({
@@ -187,9 +187,9 @@ describe('Foundation: 06 - Explicit Fan-Out', () => {
         name: `Phase 1 ${suffix.toUpperCase()}`,
         task: phase1Task,
         taskVersion: 1,
-        inputMapping: { seed: '$.state.init.seed' },
+        inputMapping: { seed: 'state.init.seed' },
         // IMPORTANT: Writes to output.value (will be merged by fan-in transition)
-        outputMapping: { 'output.value': '$.value' },
+        outputMapping: { 'output.value': 'result.value' },
       });
     };
 
@@ -211,8 +211,8 @@ describe('Foundation: 06 - Explicit Fan-Out', () => {
       ref: 'bridge_step',
       ordinal: 0,
       action: bridgeAction,
-      inputMapping: { phase1_words: '$.input.phase1_words' },
-      outputMapping: { 'output.phase1_words': '$.phase1_words' },
+      inputMapping: { phase1_words: 'input.phase1_words' },
+      outputMapping: { 'output.phase1_words': 'result.phase1_words' },
     });
 
     const bridgeTask = task({
@@ -229,9 +229,9 @@ describe('Foundation: 06 - Explicit Fan-Out', () => {
       task: bridgeTask,
       taskVersion: 1,
       // Read from merged state (fan-in will have written here)
-      inputMapping: { phase1_words: '$.state.phase1.results' },
+      inputMapping: { phase1_words: 'state.phase1.results' },
       outputMapping: {
-        'state.bridge.phase1_words': '$.phase1_words',
+        'state.bridge.phase1_words': 'result.phase1_words',
       },
     });
 
@@ -258,7 +258,7 @@ describe('Foundation: 06 - Explicit Fan-Out', () => {
         ordinal: 0,
         action: phase2WordAction,
         inputMapping: {},
-        outputMapping: { 'output.word': '$.word' },
+        outputMapping: { 'output.word': 'result.word' },
       });
 
       const phase2MergeAction = action({
@@ -278,11 +278,11 @@ describe('Foundation: 06 - Explicit Fan-Out', () => {
         ordinal: 1,
         action: phase2MergeAction,
         inputMapping: {
-          inheritedWords: '$.input.inheritedWords',
-          word: '$.output.word',
+          inheritedWords: 'input.inheritedWords',
+          word: 'output.word',
         },
         outputMapping: {
-          'output.accumulated': '$.accumulated',
+          'output.accumulated': 'result.accumulated',
         },
       });
 
@@ -302,11 +302,11 @@ describe('Foundation: 06 - Explicit Fan-Out', () => {
         task: phase2Task,
         taskVersion: 1,
         inputMapping: {
-          inheritedWords: '$.state.bridge.phase1_words',
+          inheritedWords: 'state.bridge.phase1_words',
         },
         // IMPORTANT: Writes to output.accumulated (will be collected by fan-in transition)
         outputMapping: {
-          'output.accumulated': '$.accumulated',
+          'output.accumulated': 'result.accumulated',
         },
       });
     };
@@ -330,14 +330,14 @@ describe('Foundation: 06 - Explicit Fan-Out', () => {
       ordinal: 0,
       action: summarizeAction,
       inputMapping: {
-        phase1_words: '$.input.phase1_words',
-        phase2_accumulated: '$.input.phase2_accumulated',
-        bridge_inherited: '$.input.bridge_inherited',
+        phase1_words: 'input.phase1_words',
+        phase2_accumulated: 'input.phase2_accumulated',
+        bridge_inherited: 'input.bridge_inherited',
       },
       outputMapping: {
-        'output.phase1_words': '$.phase1_words',
-        'output.phase2_accumulated': '$.phase2_accumulated',
-        'output.bridge_inherited': '$.bridge_inherited',
+        'output.phase1_words': 'result.phase1_words',
+        'output.phase2_accumulated': 'result.phase2_accumulated',
+        'output.bridge_inherited': 'result.bridge_inherited',
       },
     });
 
@@ -360,14 +360,14 @@ describe('Foundation: 06 - Explicit Fan-Out', () => {
       taskVersion: 1,
       // Read from merged state (fan-in will have written here)
       inputMapping: {
-        phase1_words: '$.state.phase1.results',
-        phase2_accumulated: '$.state.phase2.accumulated',
-        bridge_inherited: '$.state.bridge.phase1_words',
+        phase1_words: 'state.phase1.results',
+        phase2_accumulated: 'state.phase2.accumulated',
+        bridge_inherited: 'state.bridge.phase1_words',
       },
       outputMapping: {
-        'state.summary.phase1_words': '$.phase1_words',
-        'state.summary.phase2_accumulated': '$.phase2_accumulated',
-        'state.summary.bridge_inherited': '$.bridge_inherited',
+        'state.summary.phase1_words': 'result.phase1_words',
+        'state.summary.phase2_accumulated': 'result.phase2_accumulated',
+        'state.summary.bridge_inherited': 'result.bridge_inherited',
       },
     });
 
@@ -550,17 +550,17 @@ describe('Foundation: 06 - Explicit Fan-Out', () => {
       contextSchema: contextSchema,
       // Output mapping reads from merged state (written by fan-in transitions)
       outputMapping: {
-        seed: '$.state.init.seed',
+        seed: 'state.init.seed',
         // Phase1 results merged by fan-in (IDEAL: append strategy)
-        phase1_results: '$.state.phase1.results',
+        phase1_results: 'state.phase1.results',
         // Bridge reads from merged phase1 results
-        bridge_phase1_words: '$.state.bridge.phase1_words',
+        bridge_phase1_words: 'state.bridge.phase1_words',
         // Phase2 results merged by fan-in (IDEAL: collect strategy)
-        phase2_accumulated: '$.state.phase2.accumulated',
+        phase2_accumulated: 'state.phase2.accumulated',
         // Summary passthrough (proves all data flows correctly)
-        summary_phase1_words: '$.state.summary.phase1_words',
-        summary_phase2_accumulated: '$.state.summary.phase2_accumulated',
-        summary_bridge_inherited: '$.state.summary.bridge_inherited',
+        summary_phase1_words: 'state.summary.phase1_words',
+        summary_phase2_accumulated: 'state.summary.phase2_accumulated',
+        summary_bridge_inherited: 'state.summary.bridge_inherited',
       },
       initialNodeRef: 'init',
       nodes: [

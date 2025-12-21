@@ -5,6 +5,8 @@
  * Consolidates duplicated implementations from routing.ts, context.ts, and completion.ts.
  */
 
+import { evaluate } from '@wonder/expressions';
+
 import type { ContextSnapshot } from '../types';
 
 // ============================================================================
@@ -62,14 +64,16 @@ export function setNestedValue(
 // JSONPath Extraction
 // ============================================================================
 
-/** Extract value from object using JSONPath-style path (or return literal). */
-export function extractJsonPath(obj: Record<string, unknown>, path: string): unknown {
-  if (!path.startsWith('$.')) {
-    return path;
-  }
-
-  const pathParts = path.slice(2).split('.'); // Remove '$.' prefix
-  return getNestedValueByParts(obj, pathParts);
+/**
+ * Extract value from task output using expression evaluation.
+ *
+ * Expressions are evaluated with `result` bound to the task output:
+ * - result.score → taskOutput.score
+ * - result.data.items → taskOutput.data.items
+ * - 'literal' → string literal
+ */
+export function extractFromTaskOutput(expression: string, taskOutput: Record<string, unknown>): unknown {
+  return evaluate(expression, { result: taskOutput });
 }
 
 // ============================================================================
@@ -77,30 +81,21 @@ export function extractJsonPath(obj: Record<string, unknown>, path: string): unk
 // ============================================================================
 
 /**
- * Extract value from context using JSONPath-style path.
+ * Extract value from context using expression evaluation.
  *
- * Paths are structured as: $.{section}.{field}[.{nested}...]
- * - $.input.name → context.input.name
- * - $.state.result.data → context.state.result.data
- * - $.output.greeting → context.output.greeting
- *
- * Non-JSONPath values (not starting with $.) are returned as literals.
+ * Expressions are evaluated with input, state, and output as context variables:
+ * - input.name → context.input.name
+ * - state.result.data → context.state.result.data
+ * - output.greeting → context.output.greeting
+ * - 'literal string' → string literal
+ * - state.count * 2 → computed value
  */
-export function extractFromContext(path: string, context: ContextSnapshot): unknown {
-  if (!path.startsWith('$.')) {
-    return path;
-  }
-
-  const pathParts = path.slice(2).split('.'); // Remove '$.' prefix
-
-  // First part must be input, state, or output
-  const section = pathParts[0];
-  if (section !== 'input' && section !== 'state' && section !== 'output') {
-    return undefined;
-  }
-
-  const sectionData = context[section as keyof ContextSnapshot];
-  return getNestedValueByParts(sectionData, pathParts.slice(1));
+export function extractFromContext(expression: string, context: ContextSnapshot): unknown {
+  return evaluate(expression, {
+    input: context.input,
+    state: context.state,
+    output: context.output,
+  });
 }
 
 /**

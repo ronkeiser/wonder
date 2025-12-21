@@ -7,7 +7,7 @@
 export { evaluateCondition } from './conditions';
 export {
   extractFromContext,
-  extractJsonPath,
+  extractFromTaskOutput,
   filterByKeyPrefix,
   getNestedValue,
   getNestedValueByParts,
