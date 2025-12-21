@@ -29,6 +29,9 @@ export type TransformedNode = {
   resourceBindings: Record<string, string> | null;
 };
 
+/** Strategy type after parsing - 'any', 'all', or m_of_n quorum */
+export type SynchronizationStrategy = 'any' | 'all' | { mOfN: number };
+
 /** Transformed transition ready for database insertion */
 export type TransformedTransition = {
   id: string;
@@ -41,7 +44,7 @@ export type TransformedTransition = {
   siblingGroup: string | null; // Named sibling group for fan-in coordination
   foreach: object | null;
   synchronization: {
-    strategy: string;
+    strategy: SynchronizationStrategy;
     siblingGroup: string; // Must reference a declared siblingGroup
     merge?: object;
   } | null;
@@ -150,6 +153,7 @@ function transformTransitions(
 /**
  * Transforms synchronization config.
  * siblingGroup is passed through as-is - it's a string identifier declared on transitions.
+ * Strategy is parsed from string format into typed format.
  */
 function transformSynchronization(
   sync: TransitionInput['synchronization'],
@@ -159,8 +163,32 @@ function transformSynchronization(
   }
 
   return {
-    strategy: sync.strategy,
+    strategy: parseStrategy(sync.strategy),
     siblingGroup: sync.siblingGroup,
     merge: sync.merge,
   };
+}
+
+/**
+ * Parse strategy string into typed format.
+ *
+ * Formats:
+ * - "any" → "any"
+ * - "all" → "all"
+ * - "m_of_n:N" → { mOfN: N } (e.g., "m_of_n:2" → { mOfN: 2 })
+ */
+function parseStrategy(strategy: string): SynchronizationStrategy {
+  if (strategy === 'any' || strategy === 'all') {
+    return strategy;
+  }
+
+  // Parse m_of_n:N format
+  const match = strategy.match(/^m_of_n:(\d+)$/);
+  if (match) {
+    const n = parseInt(match[1], 10);
+    return { mOfN: n };
+  }
+
+  // Invalid strategy - should be caught by validator, but provide fallback
+  throw new Error(`Invalid synchronization strategy: ${strategy}`);
 }

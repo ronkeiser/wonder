@@ -188,18 +188,55 @@ function validateSiblingGroups(transitions: TransitionInput[], _transitionRefs: 
     }
   }
 
-  // Validate synchronization.siblingGroup references
+  // Validate synchronization config
   for (const transition of transitions) {
-    if (transition.synchronization?.siblingGroup) {
-      const siblingGroupRef = transition.synchronization.siblingGroup;
+    if (transition.synchronization) {
+      const sync = transition.synchronization;
 
-      if (!declaredGroups.has(siblingGroupRef)) {
+      // Validate siblingGroup reference
+      if (!declaredGroups.has(sync.siblingGroup)) {
         throw new ValidationError(
-          `Invalid synchronization.siblingGroup: '${siblingGroupRef}' is not a declared sibling group`,
+          `Invalid synchronization.siblingGroup: '${sync.siblingGroup}' is not a declared sibling group`,
           'transitions.synchronization.siblingGroup',
           'INVALID_SIBLING_GROUP',
         );
       }
+
+      // Validate strategy format
+      validateStrategy(sync.strategy);
     }
   }
+}
+
+/**
+ * Validates synchronization strategy format.
+ *
+ * Valid formats:
+ * - "any" - first arrival proceeds
+ * - "all" - wait for all siblings
+ * - "m_of_n:N" - wait for N siblings (e.g., "m_of_n:2")
+ */
+function validateStrategy(strategy: string): void {
+  if (strategy === 'any' || strategy === 'all') {
+    return;
+  }
+
+  const match = strategy.match(/^m_of_n:(\d+)$/);
+  if (match) {
+    const n = parseInt(match[1], 10);
+    if (n < 1) {
+      throw new ValidationError(
+        `Invalid m_of_n value: ${n}. Must be at least 1`,
+        'transitions.synchronization.strategy',
+        'INVALID_STRATEGY',
+      );
+    }
+    return;
+  }
+
+  throw new ValidationError(
+    `Invalid synchronization strategy: '${strategy}'. Must be 'any', 'all', or 'm_of_n:N'`,
+    'transitions.synchronization.strategy',
+    'INVALID_STRATEGY',
+  );
 }
