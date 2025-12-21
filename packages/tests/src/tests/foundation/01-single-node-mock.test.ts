@@ -377,13 +377,13 @@ describe('Foundation: 01 - Single Node Mock', () => {
 
       // SPEC: Single-node workflow decision flow
       // - Workflow start: CREATE_TOKEN decision for initial token
+      // - Initial dispatch: MARK_FOR_DISPATCH decision
       // - Routing: No decisions (no outgoing transitions)
-      // - No MARK_FOR_DISPATCH in decision layer (initial token dispatched separately)
       expect(totalTokensCreated, '1 token created via CREATE_TOKEN decision').toBe(1);
       expect(
         totalTokensDispatched,
-        'No tokens dispatched via decisions (initial dispatch happens outside decision flow)',
-      ).toBe(0);
+        '1 token dispatched via MARK_FOR_DISPATCH decision',
+      ).toBe(1);
       expect(totalErrors, 'No dispatch errors').toBe(0);
       expect(totalApplied, 'Decisions applied').toBeGreaterThan(0);
 

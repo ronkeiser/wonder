@@ -41,7 +41,7 @@ export async function dispatchToken(ctx: DispatchContext, tokenId: string): Prom
 
   // Mark token as dispatched (sent to executor, awaiting execution)
   // Executor will call markTokenExecuting when it starts the task
-  ctx.tokens.updateStatus(tokenId, 'dispatched');
+  await applyDecisions([{ type: 'MARK_FOR_DISPATCH', tokenId }], ctx);
 
   // Emit workflow event for task dispatch
   ctx.emitter.emit({
@@ -157,8 +157,8 @@ export async function processTaskResult(
     return;
   }
 
-  // Mark token as completed
-  ctx.tokens.updateStatus(tokenId, 'completed');
+  // Mark token as completed via decision
+  await applyDecisions([{ type: 'COMPLETE_TOKEN', tokenId }], ctx);
 
   // Get node for output mapping
   const node = ctx.defs.getNode(token.nodeId);
@@ -266,26 +266,13 @@ async function checkAndFinalizeWorkflow(ctx: DispatchContext): Promise<void> {
 /**
  * Finalize workflow and extract output.
  *
- * Guards against completing an already-failed workflow by checking
- * the workflow status before proceeding.
+ * Uses the COMPLETE_WORKFLOW decision which handles:
+ * - Terminal state guards
+ * - Status marking
+ * - Event emission
+ * - RESOURCES update
  */
 async function finalizeWorkflow(ctx: DispatchContext): Promise<void> {
-  // Guard: Check if workflow is already in terminal state (e.g., failed)
-  if (ctx.status.isTerminal(ctx.workflowRunId)) {
-    ctx.logger.debug({
-      eventType: 'workflow.finalize.skipped',
-      message: 'Workflow already in terminal state, skipping finalization',
-      metadata: { workflowRunId: ctx.workflowRunId },
-    });
-    return;
-  }
-
-  // Mark workflow as completed (returns false if already terminal)
-  const marked = ctx.status.markCompleted(ctx.workflowRunId);
-  if (!marked) {
-    return;
-  }
-
   try {
     // Get context snapshot and workflow def
     const context = ctx.context.getSnapshot();
@@ -302,18 +289,11 @@ async function finalizeWorkflow(ctx: DispatchContext): Promise<void> {
       ctx.emitter.emitTrace(event);
     }
 
-    const finalOutput = completionResult.output;
-
-    // Emit workflow completed event
-    ctx.emitter.emit({
-      eventType: 'workflow.completed',
-      message: 'Workflow completed',
-      metadata: { output: finalOutput },
-    });
-
-    // Update workflow run status in resources service
-    const workflowRunsResource = ctx.resources.workflowRuns();
-    await workflowRunsResource.complete(ctx.workflowRunId, finalOutput);
+    // Apply COMPLETE_WORKFLOW decision (handles guards, status, event, RESOURCES)
+    await applyDecisions(
+      [{ type: 'COMPLETE_WORKFLOW', output: completionResult.output }],
+      ctx,
+    );
   } catch (error) {
     ctx.logger.error({
       eventType: 'coordinator.finalize.failed',

@@ -205,6 +205,9 @@ export type Decision =
   | { type: 'UPDATE_TOKEN_STATUS'; tokenId: string; status: TokenStatus }
   | { type: 'MARK_WAITING'; tokenId: string; arrivedAt: Date }
   | { type: 'MARK_FOR_DISPATCH'; tokenId: string }
+  | { type: 'COMPLETE_TOKEN'; tokenId: string }
+  | { type: 'COMPLETE_TOKENS'; tokenIds: string[] }
+  | { type: 'CANCEL_TOKENS'; tokenIds: string[]; reason: string }
 
   // Context operations
   | { type: 'SET_CONTEXT'; path: string; value: unknown }
@@ -233,8 +236,12 @@ export type Decision =
     }
 
   // Workflow lifecycle
+  | { type: 'INITIALIZE_WORKFLOW'; input: Record<string, unknown> }
   | { type: 'COMPLETE_WORKFLOW'; output: Record<string, unknown> }
   | { type: 'FAIL_WORKFLOW'; error: string }
+
+  // Dispatch operations
+  | { type: 'DISPATCH_TOKEN'; tokenId: string }
 
   // Batched operations (optimization - created by dispatch/batch.ts)
   | { type: 'BATCH_CREATE_TOKENS'; allParams: CreateTokenParams[] }

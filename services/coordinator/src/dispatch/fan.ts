@@ -12,8 +12,6 @@
  * - Execute fan-in merge when conditions met
  */
 
-import type { JSONSchema } from '@wonder/schemas';
-
 import type { DefinitionManager } from '../operations/defs';
 import type { TokenManager } from '../operations/tokens';
 import { decideFanInContinuation } from '../planning/index';
@@ -74,11 +72,14 @@ export async function handleBranchOutput(
     return;
   }
 
-  // Initialize branch table (creates if not exists)
-  ctx.context.initializeBranchTable(token.id, task.outputSchema as JSONSchema);
-
-  // Write output to branch table
-  ctx.context.applyBranchOutput(token.id, output);
+  // Initialize branch table and write output via decisions
+  await applyDecisions(
+    [
+      { type: 'INIT_BRANCH_TABLE', tokenId: token.id, outputSchema: task.outputSchema },
+      { type: 'APPLY_BRANCH_OUTPUT', tokenId: token.id, output },
+    ],
+    ctx,
+  );
 
   ctx.emitter.emitTrace({
     type: 'operation.context.branch.written',
@@ -168,8 +169,8 @@ export async function processSynchronization(
         }
       }
     } else {
-      // No synchronization - mark for dispatch
-      ctx.tokens.updateStatus(createdTokenId, 'dispatched');
+      // No synchronization - mark for dispatch via decision
+      await applyDecisions([{ type: 'MARK_FOR_DISPATCH', tokenId: createdTokenId }], ctx);
     }
   }
 
@@ -207,7 +208,7 @@ export async function activateFanIn(
   if (!raceWon) {
     // Lost the race - fan-in was already activated by another token.
     // Mark this arrival token as completed so it reaches a terminal state.
-    ctx.tokens.updateStatus(triggeringTokenId, 'completed');
+    await applyDecisions([{ type: 'COMPLETE_TOKEN', tokenId: triggeringTokenId }], ctx);
     ctx.emitter.emitTrace({
       type: 'dispatch.sync.fan_in_race_lost',
       tokenId: triggeringTokenId,
@@ -251,18 +252,32 @@ export async function activateFanIn(
   // In-flight siblings (dispatched/executing) are cancelled because the sync condition
   // has been met - their results are no longer needed. This prevents race conditions
   // where late-completing siblings try to proceed after the fan-in has already activated.
-  markSiblingsCompleted(ctx, triggeringTokenId, waitingSiblings);
-  if (inFlightSiblings.length > 0) {
-    ctx.tokens.cancelMany(
-      inFlightSiblings.map((s) => s.id),
-      'fan-in activated before completion',
-    );
-  }
-
   // Step 5: Mark the triggering arrival token as completed
   // The arrival token has served its purpose - it triggered the fan-in activation.
   // Now the continuation token will carry the workflow forward.
-  ctx.tokens.updateStatus(triggeringTokenId, 'completed');
+  const siblingDecisions: Decision[] = [];
+
+  // Complete waiting siblings
+  if (waitingSiblings.length > 0) {
+    siblingDecisions.push({
+      type: 'COMPLETE_TOKENS',
+      tokenIds: waitingSiblings.map((s) => s.id),
+    });
+  }
+
+  // Cancel in-flight siblings
+  if (inFlightSiblings.length > 0) {
+    siblingDecisions.push({
+      type: 'CANCEL_TOKENS',
+      tokenIds: inFlightSiblings.map((s) => s.id),
+      reason: 'fan-in activated before completion',
+    });
+  }
+
+  // Complete the triggering token
+  siblingDecisions.push({ type: 'COMPLETE_TOKEN', tokenId: triggeringTokenId });
+
+  await applyDecisions(siblingDecisions, ctx);
 
   // Step 6: Create continuation token
   // Fetch parent token (fan-out origin) to inherit its iteration_counts
@@ -315,8 +330,7 @@ function tryWinFanInRace(
   });
 
   if (!activated) {
-    // Lost the race - mark triggering token as completed (absorbed by winner)
-    ctx.tokens.updateStatus(triggeringTokenId, 'completed');
+    // Lost the race - this is just a debug log, the caller handles token completion
     ctx.logger.debug({
       eventType: 'fan_in.race.lost',
       message: 'Another token already activated this fan-in',
@@ -390,30 +404,30 @@ async function mergeBranchOutputs(
   );
 
   if (task.outputSchema) {
-    const branchOutputs = ctx.context.getBranchOutputs(
-      completedSiblings.map((s) => s.id),
-      completedSiblings.map((s) => s.branchIndex),
-      task.outputSchema as JSONSchema,
+    // Merge branches and clean up via decisions
+    await applyDecisions(
+      [
+        {
+          type: 'MERGE_BRANCHES',
+          tokenIds: completedSiblings.map((s) => s.id),
+          branchIndices: completedSiblings.map((s) => s.branchIndex),
+          outputSchema: task.outputSchema,
+          merge: mergeConfig,
+        },
+        {
+          type: 'DROP_BRANCH_TABLES',
+          tokenIds: completedSiblings.map((s) => s.id),
+        },
+      ],
+      ctx,
     );
-    ctx.context.mergeBranches(branchOutputs, mergeConfig);
+  } else {
+    // No output schema - just clean up branch tables
+    await applyDecisions(
+      [{ type: 'DROP_BRANCH_TABLES', tokenIds: completedSiblings.map((s) => s.id) }],
+      ctx,
+    );
   }
-
-  // Clean up branch tables
-  ctx.context.dropBranchTables(completedSiblings.map((s) => s.id));
-}
-
-/**
- * Mark triggering token and waiting siblings as completed.
- */
-function markSiblingsCompleted(
-  ctx: DispatchContext,
-  triggeringTokenId: string,
-  waitingSiblings: SiblingToken[],
-): void {
-  if (waitingSiblings.length > 0) {
-    ctx.tokens.completeMany(waitingSiblings.map((s) => s.id));
-  }
-  ctx.tokens.updateStatus(triggeringTokenId, 'completed');
 }
 
 /**

@@ -244,6 +244,61 @@ async function applyOne(decision: Decision, ctx: DispatchContext): Promise<Apply
       return { dispatchedTokens: [decision.tokenId] };
     }
 
+    case 'COMPLETE_TOKEN': {
+      const token = ctx.tokens.get(decision.tokenId);
+      ctx.tokens.updateStatus(decision.tokenId, 'completed');
+
+      ctx.emitter.emit({
+        eventType: 'token.completed',
+        message: 'Token completed',
+        metadata: {
+          tokenId: decision.tokenId,
+          nodeId: token.nodeId,
+        },
+      });
+
+      return {};
+    }
+
+    case 'COMPLETE_TOKENS': {
+      ctx.tokens.completeMany(decision.tokenIds);
+
+      // Emit events for each completed token
+      for (const tokenId of decision.tokenIds) {
+        const token = ctx.tokens.get(tokenId);
+        ctx.emitter.emit({
+          eventType: 'token.completed',
+          message: 'Token completed',
+          metadata: {
+            tokenId: tokenId,
+            nodeId: token.nodeId,
+          },
+        });
+      }
+
+      return {};
+    }
+
+    case 'CANCEL_TOKENS': {
+      ctx.tokens.cancelMany(decision.tokenIds, decision.reason);
+
+      // Emit events for each cancelled token
+      for (const tokenId of decision.tokenIds) {
+        const token = ctx.tokens.get(tokenId);
+        ctx.emitter.emit({
+          eventType: 'token.cancelled',
+          message: 'Token cancelled',
+          metadata: {
+            tokenId: tokenId,
+            nodeId: token.nodeId,
+            reason: decision.reason,
+          },
+        });
+      }
+
+      return {};
+    }
+
     // Context operations
     case 'SET_CONTEXT': {
       ctx.context.setField(decision.path, decision.value);
@@ -340,7 +395,41 @@ async function applyOne(decision: Decision, ctx: DispatchContext): Promise<Apply
     }
 
     // Workflow lifecycle
+    case 'INITIALIZE_WORKFLOW': {
+      // Initialize workflow status to 'running'
+      ctx.status.initialize(ctx.workflowRunId);
+
+      // Initialize context tables and store input
+      await ctx.context.initialize(decision.input);
+
+      // Emit workflow started event
+      ctx.emitter.emit({
+        eventType: 'workflow.started',
+        message: 'Workflow started',
+        metadata: { input: decision.input },
+      });
+
+      return {};
+    }
+
     case 'COMPLETE_WORKFLOW': {
+      // Guard: Check if workflow is already in terminal state
+      if (ctx.status.isTerminal(ctx.workflowRunId)) {
+        ctx.logger.debug({
+          eventType: 'workflow.complete.skipped',
+          message: 'Workflow already in terminal state, skipping completion',
+          metadata: { workflowRunId: ctx.workflowRunId },
+        });
+        return {};
+      }
+
+      // Mark workflow as completed in coordinator DO (returns false if already terminal)
+      const marked = ctx.status.markCompleted(ctx.workflowRunId);
+      if (!marked) {
+        return {};
+      }
+
+      // Emit workflow.completed event
       ctx.emitter.emit({
         eventType: 'workflow.completed',
         message: 'Workflow completed successfully',
@@ -349,6 +438,11 @@ async function applyOne(decision: Decision, ctx: DispatchContext): Promise<Apply
           outputKeys: Object.keys(decision.output),
         },
       });
+
+      // Update workflow run status in resources service
+      const workflowRunsResource = ctx.resources.workflowRuns();
+      await workflowRunsResource.complete(ctx.workflowRunId, decision.output);
+
       return {};
     }
 
@@ -390,6 +484,15 @@ async function applyOne(decision: Decision, ctx: DispatchContext): Promise<Apply
       await workflowRunsResource.updateStatus(ctx.workflowRunId, 'failed');
 
       return {};
+    }
+
+    // Dispatch operations
+    case 'DISPATCH_TOKEN': {
+      // Import dispatchToken dynamically to avoid circular dependency
+      // The actual dispatch is handled by the caller after applyDecisions returns
+      // This decision just marks the token for dispatch
+      ctx.tokens.updateStatus(decision.tokenId, 'dispatched');
+      return { dispatchedTokens: [decision.tokenId] };
     }
 
     default: {

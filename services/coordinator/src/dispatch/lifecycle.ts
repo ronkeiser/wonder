@@ -23,7 +23,7 @@ import { dispatchToken } from './task';
  * Start workflow execution
  *
  * 1. Get workflow run and definition
- * 2. Initialize context tables with input
+ * 2. Initialize workflow (status + context) via decision
  * 3. Plan initial token creation
  * 4. Apply planning decisions
  * 5. Dispatch first token
@@ -33,9 +33,6 @@ export async function startWorkflow(ctx: DispatchContext): Promise<void> {
   const workflowRun = ctx.defs.getWorkflowRun();
   const workflowDef = ctx.defs.getWorkflowDef();
 
-  // Initialize workflow status to 'running'
-  ctx.status.initialize(ctx.workflowRunId);
-
   // Extract input from workflow run context
   const runContext = workflowRun.context as {
     input: Record<string, unknown>;
@@ -44,15 +41,8 @@ export async function startWorkflow(ctx: DispatchContext): Promise<void> {
   };
   const input = runContext.input;
 
-  // Emit workflow started event
-  ctx.emitter.emit({
-    eventType: 'workflow.started',
-    message: 'Workflow started',
-    metadata: { input },
-  });
-
-  // Initialize context tables and store input
-  await ctx.context.initialize(input);
+  // Initialize workflow via decision (status + context + event)
+  await applyDecisions([{ type: 'INITIALIZE_WORKFLOW', input }], ctx);
 
   // Plan initial token creation (pure function)
   const startResult = decideWorkflowStart({
@@ -87,7 +77,7 @@ export async function startWorkflow(ctx: DispatchContext): Promise<void> {
  * Handle task error from Executor
  *
  * Called when task execution fails. May trigger retry based on error type.
- * Uses the decision pattern for workflow failure.
+ * Uses the decision pattern for all state changes.
  */
 export async function processTaskError(
   ctx: DispatchContext,
@@ -96,10 +86,6 @@ export async function processTaskError(
 ): Promise<void> {
   const token = ctx.tokens.get(tokenId);
   const node = ctx.defs.getNode(token.nodeId);
-
-  // TODO: Check retry policy and retry_attempt count
-  // For now, just fail the workflow
-  ctx.tokens.updateStatus(tokenId, 'failed');
 
   // Emit task failed workflow event
   ctx.emitter.emit({
@@ -114,8 +100,15 @@ export async function processTaskError(
     },
   });
 
-  // Fail the workflow via decision pattern
-  await applyDecisions([{ type: 'FAIL_WORKFLOW', error: errorResult.error.message }], ctx);
+  // TODO: Check retry policy and retry_attempt count
+  // For now, mark token as failed and fail the workflow via decisions
+  await applyDecisions(
+    [
+      { type: 'UPDATE_TOKEN_STATUS', tokenId, status: 'failed' },
+      { type: 'FAIL_WORKFLOW', error: errorResult.error.message },
+    ],
+    ctx,
+  );
 }
 
 // ============================================================================
