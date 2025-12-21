@@ -20,7 +20,9 @@ import {
   type TaskErrorResult,
 } from './dispatch';
 import { ContextManager } from './operations/context';
+import { createDb } from './operations/db';
 import { DefinitionManager } from './operations/defs';
+import { StatusManager } from './operations/status';
 import { TokenManager } from './operations/tokens';
 import type { TaskResult } from './types';
 
@@ -35,6 +37,7 @@ export class WorkflowCoordinator extends DurableObject {
   private logger: Logger;
   private context: ContextManager;
   private tokens: TokenManager;
+  private status: StatusManager;
 
   constructor(ctx: DurableObjectState, env: Env) {
     super(ctx, env);
@@ -44,8 +47,11 @@ export class WorkflowCoordinator extends DurableObject {
       environment: this.env.ENVIRONMENT,
     });
 
-    // Initialize DefinitionManager first
-    this.defs = new DefinitionManager(ctx, this.env);
+    // Create shared database instance
+    const db = createDb(ctx);
+
+    // Initialize DefinitionManager first (needs db, ctx for logger, env for resources)
+    this.defs = new DefinitionManager(db, ctx, this.env);
 
     // Initialize emitter with lazy context (deferred until first emit)
     // Context comes from defs.getWorkflowRun() after initialize() is called
@@ -63,8 +69,10 @@ export class WorkflowCoordinator extends DurableObject {
       { traceEnabled: (this.env.TRACE_EVENTS_ENABLED as string) === 'true' },
     );
 
+    // All managers share the same db instance
     this.context = new ContextManager(ctx.storage.sql, this.defs, this.emitter);
-    this.tokens = new TokenManager(ctx, this.defs, this.emitter);
+    this.tokens = new TokenManager(db, this.emitter);
+    this.status = new StatusManager(db, this.emitter);
   }
 
   /**
@@ -80,6 +88,7 @@ export class WorkflowCoordinator extends DurableObject {
       tokens: this.tokens,
       context: this.context,
       defs: this.defs,
+      status: this.status,
       emitter: this.emitter,
       logger: this.logger,
       workflowRunId,

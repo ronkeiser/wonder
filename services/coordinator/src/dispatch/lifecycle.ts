@@ -33,6 +33,9 @@ export async function startWorkflow(ctx: DispatchContext): Promise<void> {
   const workflowRun = ctx.defs.getWorkflowRun();
   const workflowDef = ctx.defs.getWorkflowDef();
 
+  // Initialize workflow status to 'running'
+  ctx.status.initialize(ctx.workflowRunId);
+
   // Extract input from workflow run context
   const runContext = workflowRun.context as {
     input: Record<string, unknown>;
@@ -120,9 +123,42 @@ export async function processTaskError(
 // ============================================================================
 
 /**
- * Fail workflow due to unrecoverable error
+ * Fail workflow due to unrecoverable error.
+ *
+ * This function:
+ * 1. Checks if workflow is already in terminal state (guard)
+ * 2. Marks workflow status as 'failed' in coordinator DO
+ * 3. Cancels all active (non-terminal) tokens
+ * 4. Emits workflow.failed event
+ * 5. Updates status in resources service
  */
 export async function failWorkflow(ctx: DispatchContext, errorMessage: string): Promise<void> {
+  // Guard: Check if workflow is already in terminal state
+  if (ctx.status.isTerminal(ctx.workflowRunId)) {
+    ctx.logger.debug({
+      eventType: 'workflow.fail.skipped',
+      message: 'Workflow already in terminal state, skipping failure',
+      metadata: { workflowRunId: ctx.workflowRunId, error: errorMessage },
+    });
+    return;
+  }
+
+  // Mark workflow as failed in coordinator DO (returns false if already terminal)
+  const marked = ctx.status.markFailed(ctx.workflowRunId);
+  if (!marked) {
+    return;
+  }
+
+  // Cancel all active tokens to prevent further processing
+  const activeTokens = ctx.tokens.getActiveTokens(ctx.workflowRunId);
+  if (activeTokens.length > 0) {
+    ctx.tokens.cancelMany(
+      activeTokens.map((t) => t.id),
+      `workflow failed: ${errorMessage}`,
+    );
+  }
+
+  // Emit workflow.failed event
   ctx.emitter.emit({
     eventType: 'workflow.failed',
     message: `Workflow failed: ${errorMessage}`,
@@ -199,14 +235,13 @@ export async function checkTimeouts(ctx: DispatchContext): Promise<void> {
         workflowRunId: workflowRun.id,
       });
 
-      // Apply decisions
+      // Apply decisions (marks waiting tokens as timed_out)
       applyDecisions(decisions, ctx);
 
-      // If workflow failed, update resources
+      // If workflow should fail, use failWorkflow for proper status management
       const failDecision = decisions.find((d) => d.type === 'FAIL_WORKFLOW');
       if (failDecision && failDecision.type === 'FAIL_WORKFLOW') {
-        const workflowRunsResource = ctx.resources.workflowRuns();
-        await workflowRunsResource.updateStatus(ctx.workflowRunId, 'failed');
+        await failWorkflow(ctx, failDecision.error);
       }
     }
   }

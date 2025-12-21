@@ -8,12 +8,11 @@
 
 import { createLogger, type Logger } from '@wonder/logs';
 import { and, eq } from 'drizzle-orm';
-import { drizzle, type DrizzleSqliteDODatabase } from 'drizzle-orm/durable-sqlite';
 import { migrate } from 'drizzle-orm/durable-sqlite/migrator';
 
-import * as schema from '../schema';
 import { nodes, transitions, workflowDefs, workflowRuns } from '../schema';
 import migrations from '../schema/migrations';
+import type { CoordinatorDb } from './db';
 
 // Types inferred from schema
 export type WorkflowRunRow = typeof workflowRuns.$inferSelect;
@@ -30,13 +29,13 @@ export type TransitionRow = typeof transitions.$inferSelect;
  * 3. If not, fetches from RESOURCES and inserts all tables
  */
 export class DefinitionManager {
-  private readonly db: DrizzleSqliteDODatabase<typeof schema>;
+  private readonly db: CoordinatorDb;
   private readonly env: Env;
   private readonly logger: Logger;
   private initialized = false;
 
-  constructor(ctx: DurableObjectState, env: Env) {
-    this.db = drizzle(ctx.storage, { schema, casing: 'snake_case' });
+  constructor(db: CoordinatorDb, ctx: DurableObjectState, env: Env) {
+    this.db = db;
     this.env = env;
     this.logger = createLogger(ctx, env.LOGS, {
       service: env.SERVICE,

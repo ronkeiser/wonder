@@ -350,13 +350,9 @@ function applyOne(decision: Decision, ctx: DispatchContext): ApplyOutcome {
     }
 
     case 'FAIL_WORKFLOW': {
-      ctx.emitter.emit({
-        eventType: 'workflow.failed',
-        message: 'Workflow failed',
-        metadata: {
-          error: decision.error,
-        },
-      });
+      // Note: This decision is a signal only. The actual workflow failure
+      // (event emission, token cancellation, status update) is handled by
+      // failWorkflow() in lifecycle.ts which is called after applyDecisions.
       return {};
     }
 

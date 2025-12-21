@@ -99,6 +99,7 @@ export type DispatchContext = {
   tokens: TokenManager;
   context: ContextManager;
   defs: DefinitionManager;
+  status: StatusManager;
   emitter: Emitter;
   logger: Logger;
   workflowRunId: string;
@@ -139,6 +140,7 @@ export type TaskErrorResult = {
 // Forward declarations for manager types (to avoid circular imports)
 import type { ContextManager } from './operations/context';
 import type { DefinitionManager } from './operations/defs';
+import type { StatusManager } from './operations/status';
 import type { TokenManager } from './operations/tokens';
 
 // ============================================================================

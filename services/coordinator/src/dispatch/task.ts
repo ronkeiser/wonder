@@ -264,10 +264,28 @@ async function checkAndFinalizeWorkflow(ctx: DispatchContext): Promise<void> {
 }
 
 /**
- * Finalize workflow and extract output
+ * Finalize workflow and extract output.
+ *
+ * Guards against completing an already-failed workflow by checking
+ * the workflow status before proceeding.
  */
-
 async function finalizeWorkflow(ctx: DispatchContext): Promise<void> {
+  // Guard: Check if workflow is already in terminal state (e.g., failed)
+  if (ctx.status.isTerminal(ctx.workflowRunId)) {
+    ctx.logger.debug({
+      eventType: 'workflow.finalize.skipped',
+      message: 'Workflow already in terminal state, skipping finalization',
+      metadata: { workflowRunId: ctx.workflowRunId },
+    });
+    return;
+  }
+
+  // Mark workflow as completed (returns false if already terminal)
+  const marked = ctx.status.markCompleted(ctx.workflowRunId);
+  if (!marked) {
+    return;
+  }
+
   try {
     // Get context snapshot and workflow def
     const context = ctx.context.getSnapshot();

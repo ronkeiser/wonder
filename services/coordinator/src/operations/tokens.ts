@@ -13,13 +13,11 @@
 
 import type { Emitter } from '@wonder/events';
 import { and, count, eq, inArray, isNull, like } from 'drizzle-orm';
-import { drizzle, type DrizzleSqliteDODatabase } from 'drizzle-orm/durable-sqlite';
 import { ulid } from 'ulid';
 
-import * as schema from '../schema';
 import { fanIns, tokens } from '../schema';
 import type { CreateTokenParams, SiblingCounts, TokenStatus } from '../types';
-import type { DefinitionManager } from './defs';
+import type { CoordinatorDb } from './db';
 
 /** Token row type inferred from schema */
 export type TokenRow = typeof tokens.$inferSelect;
@@ -37,11 +35,11 @@ const ACTIVE_STATES: TokenStatus[] = ['pending', 'dispatched', 'executing', 'wai
  * creation, status updates, and queries.
  */
 export class TokenManager {
-  private readonly db: DrizzleSqliteDODatabase<typeof schema>;
+  private readonly db: CoordinatorDb;
   private readonly emitter: Emitter;
 
-  constructor(ctx: DurableObjectState, _defs: DefinitionManager, emitter: Emitter) {
-    this.db = drizzle(ctx.storage, { schema, casing: 'snake_case' });
+  constructor(db: CoordinatorDb, emitter: Emitter) {
+    this.db = db;
     this.emitter = emitter;
   }
 
@@ -130,6 +128,18 @@ export class TokenManager {
       .all();
 
     return result[0]?.count ?? 0;
+  }
+
+  /**
+   * Get all active (non-terminal) tokens for a workflow run.
+   * Used to cancel in-flight tokens when workflow fails.
+   */
+  getActiveTokens(workflowRunId: string): TokenRow[] {
+    return this.db
+      .select()
+      .from(tokens)
+      .where(and(eq(tokens.workflowRunId, workflowRunId), inArray(tokens.status, ACTIVE_STATES)))
+      .all();
   }
 
   // ============================================================================
