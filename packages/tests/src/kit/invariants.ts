@@ -7,22 +7,35 @@
 import { TraceEventCollection } from '@wonder/sdk';
 import { expect } from 'vitest';
 
+interface InvariantOptions {
+  /**
+   * If true, allows tokens to be in non-terminal states.
+   * Use this for failed workflows where tokens may be left in-flight.
+   */
+  allowNonTerminalTokens?: boolean;
+}
+
 /**
  * Universal invariants that must hold for every workflow run.
  * Call this in every test to verify fundamental system guarantees.
  */
-export function assertInvariants(trace: TraceEventCollection): void {
-  // 1. Every token reaches terminal state
-  const terminalStates = ['completed', 'failed', 'cancelled', 'timed_out'];
-  for (const creation of trace.tokens.creations()) {
-    const tokenId = creation.tokenId;
-    expect(tokenId, 'Token creation must have tokenId').toBeDefined();
-    const statuses = trace.tokens.statusTransitions(tokenId!);
-    const finalStatus = statuses.at(-1);
-    expect(
-      terminalStates,
-      `Token ${tokenId} did not reach terminal state. Statuses: ${statuses.join(' → ')}`,
-    ).toContain(finalStatus);
+export function assertInvariants(
+  trace: TraceEventCollection,
+  options: InvariantOptions = {},
+): void {
+  // 1. Every token reaches terminal state (unless allowNonTerminalTokens is set)
+  if (!options.allowNonTerminalTokens) {
+    const terminalStates = ['completed', 'failed', 'cancelled', 'timed_out'];
+    for (const creation of trace.tokens.creations()) {
+      const tokenId = creation.tokenId;
+      expect(tokenId, 'Token creation must have tokenId').toBeDefined();
+      const statuses = trace.tokens.statusTransitions(tokenId!);
+      const finalStatus = statuses.at(-1);
+      expect(
+        terminalStates,
+        `Token ${tokenId} did not reach terminal state. Statuses: ${statuses.join(' → ')}`,
+      ).toContain(finalStatus);
+    }
   }
 
   // 2. Sequences are positive (uniqueness not guaranteed with concurrent executors)

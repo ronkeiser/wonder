@@ -10,6 +10,7 @@ import { WorkflowVerificationError } from './error';
 import type {
   BranchWriteSpec,
   DiagnosticContext,
+  FailureSpec,
   OutputFieldSpec,
   OutputSpec,
   SnapshotSpec,
@@ -59,6 +60,14 @@ export class WorkflowVerifier {
    */
   completed(): this {
     this.config.completed = true;
+    return this;
+  }
+
+  /**
+   * Verify workflow failed with optional failure details.
+   */
+  failed(spec?: FailureSpec): this {
+    this.config.failed = spec ?? true;
     return this;
   }
 
@@ -145,6 +154,10 @@ export class WorkflowVerifier {
       this.verifyCompleted(diagnostics);
     }
 
+    if (this.config.failed) {
+      this.verifyFailed(diagnostics);
+    }
+
     if (this.config.tokens) {
       this.verifyTokens(this.config.tokens, ctx, diagnostics);
     }
@@ -213,6 +226,96 @@ export class WorkflowVerifier {
         'Workflow did not complete - no completion event found.',
         diagnostics,
       );
+    }
+  }
+
+  private verifyFailed(diagnostics: DiagnosticContext): void {
+    // First, check that the workflow did NOT complete successfully
+    const completion = this.trace.completion.complete();
+    if (completion) {
+      throw new WorkflowVerificationError(
+        'failed',
+        'Expected workflow to fail, but it completed successfully.',
+        diagnostics,
+        { finalOutput: completion.payload.finalOutput },
+      );
+    }
+
+    // Extract failure info
+    const failure = this.extractWorkflowFailure();
+    if (!failure) {
+      throw new WorkflowVerificationError(
+        'failed',
+        'Expected workflow to fail, but no failure event found.',
+        diagnostics,
+      );
+    }
+
+    // Update diagnostics with failure info
+    diagnostics.failure = failure;
+
+    // If a spec was provided, verify the details
+    const spec = this.config.failed;
+    if (spec && typeof spec === 'object') {
+      // Check message substring
+      if (spec.message && !failure.message.includes(spec.message)) {
+        throw new WorkflowVerificationError(
+          'failed.message',
+          `Expected failure message to contain "${spec.message}", got "${failure.message}".`,
+          diagnostics,
+          { expected: spec.message, actual: failure.message },
+        );
+      }
+
+      // Check message regex
+      if (spec.messageMatch && !spec.messageMatch.test(failure.message)) {
+        throw new WorkflowVerificationError(
+          'failed.messageMatch',
+          `Expected failure message to match ${spec.messageMatch}, got "${failure.message}".`,
+          diagnostics,
+          { pattern: spec.messageMatch.toString(), actual: failure.message },
+        );
+      }
+
+      // Check task ID
+      if (spec.taskId && failure.taskId !== spec.taskId) {
+        throw new WorkflowVerificationError(
+          'failed.taskId',
+          `Expected failure taskId "${spec.taskId}", got "${failure.taskId ?? 'undefined'}".`,
+          diagnostics,
+          { expected: spec.taskId, actual: failure.taskId },
+        );
+      }
+
+      // Check node ID
+      if (spec.nodeId && failure.nodeId !== spec.nodeId) {
+        throw new WorkflowVerificationError(
+          'failed.nodeId',
+          `Expected failure nodeId "${spec.nodeId}", got "${failure.nodeId ?? 'undefined'}".`,
+          diagnostics,
+          { expected: spec.nodeId, actual: failure.nodeId },
+        );
+      }
+
+      // Check error type
+      if (spec.errorType && failure.error?.type !== spec.errorType) {
+        throw new WorkflowVerificationError(
+          'failed.errorType',
+          `Expected error type "${spec.errorType}", got "${failure.error?.type ?? 'undefined'}".`,
+          diagnostics,
+          { expected: spec.errorType, actual: failure.error?.type },
+        );
+      }
+
+      // Check retryable
+      if (spec.retryable !== undefined && failure.error?.retryable !== spec.retryable) {
+        throw new WorkflowVerificationError(
+          'failed.retryable',
+          `Expected retryable=${spec.retryable}, got ${failure.error?.retryable ?? 'undefined'}.`,
+          diagnostics,
+          { expected: spec.retryable, actual: failure.error?.retryable },
+        );
+      }
     }
   }
 

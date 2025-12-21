@@ -150,11 +150,37 @@ export interface SnapshotSpec {
 }
 
 /**
+ * Failure specification for verifying failed workflows.
+ */
+export interface FailureSpec {
+  /** Expected error message (can be substring match) */
+  message?: string;
+
+  /** Expected error message regex */
+  messageMatch?: RegExp;
+
+  /** Expected task ID that failed */
+  taskId?: string;
+
+  /** Expected node ID where failure occurred */
+  nodeId?: string;
+
+  /** Expected error type (e.g., 'step_failure') */
+  errorType?: string;
+
+  /** Whether the error should be marked retryable */
+  retryable?: boolean;
+}
+
+/**
  * Full verification configuration.
  */
 export interface VerificationConfig {
   /** Verify workflow completed successfully */
   completed?: boolean;
+
+  /** Verify workflow failed with optional failure spec */
+  failed?: FailureSpec | boolean;
 
   /** Token structure verification */
   tokens?: TokenStructure;
