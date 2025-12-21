@@ -23,7 +23,7 @@ export type TransitionInput = {
   fromNodeRef: string;
   toNodeRef: string;
   priority: number;
-  condition?: object;
+  condition?: string; // Expression string (e.g., "state.score >= 80")
   spawnCount?: number;
   siblingGroup?: string; // Named sibling group identifier for fan-out coordination
   foreach?: object;

@@ -1,20 +1,19 @@
 /**
  * Context Mapping Module
  *
- * Implements JSONPath-like expressions for input/output mapping.
+ * Implements expression-based input/output mapping using @wonder/expressions.
  *
  * Supported syntax:
- * - $.input.name          → context.input.name
- * - $.state.items[0]      → first item in array
- * - $.state.items[-1]     → last item in array
- * - $.state.items[*].id   → array of all ids
- * - $.output.response     → context.output.response
- * - literal               → literal string value
- * - {{$.input.x}}         → template interpolation
+ * - input.name            → context.input.name (expression)
+ * - state.items[0]        → first item in array (expression)
+ * - 'literal string'      → string literal (quoted in expression)
+ * - state.score * 2       → computed expression
+ * - $.input.name          → legacy JSONPath (converted to expression)
  *
  * @see docs/architecture/executor.md
  */
 
+import { evaluate } from '@wonder/expressions';
 import type { Logger } from '@wonder/logs';
 import type { TaskContext } from '../execution/types';
 
@@ -150,9 +149,57 @@ function parsePath(path: string): PathPart[] {
 }
 
 /**
+ * Mapping mode affects how legacy $.path syntax is interpreted.
+ */
+type MappingMode = 'input' | 'output';
+
+/**
+ * Evaluate a mapping value using expressions.
+ *
+ * String values are evaluated as expressions.
+ * Non-string values (numbers, booleans, arrays, objects) are passed through.
+ *
+ * Legacy support:
+ * - Input mapping: `$.path` → `path` (looks up in context)
+ * - Output mapping: `$.path` → `result.path` (looks up in action output)
+ */
+function evaluateMappingValue(
+  sourceValue: unknown,
+  expressionContext: Record<string, unknown>,
+  mode: MappingMode,
+): unknown {
+  if (sourceValue === null || sourceValue === undefined) {
+    return sourceValue;
+  }
+
+  if (typeof sourceValue !== 'string') {
+    // Non-string values are passed through directly
+    return sourceValue;
+  }
+
+  // Convert legacy $.path syntax to expression syntax
+  let expression = sourceValue;
+  if (expression.startsWith('$.')) {
+    const path = expression.slice(2);
+    // In output mapping, $.path refers to action output (result)
+    // In input mapping, $.path refers to context root
+    expression = mode === 'output' ? `result.${path}` : path;
+  }
+
+  // Evaluate as expression
+  return evaluate(expression, expressionContext);
+}
+
+/**
  * Apply input mapping from context to action input
  *
- * Format: { "targetField": "$.source.path" | "literal" | "{{template}}" }
+ * Format: { "targetField": "expression" }
+ *
+ * Examples:
+ * - { "name": "input.userName" }           → context.input.userName
+ * - { "name": "'literal'" }                → string "literal"
+ * - { "total": "state.count * 2" }         → computed value
+ * - { "name": "$.input.userName" }         → legacy JSONPath (still supported)
  */
 export function applyInputMapping(
   mapping: Record<string, unknown> | null | undefined,
@@ -160,37 +207,16 @@ export function applyInputMapping(
 ): Record<string, unknown> {
   if (!mapping) return {};
 
+  const expressionContext = {
+    input: context.input,
+    state: context.state,
+    output: context.output,
+  };
+
   const result: Record<string, unknown> = {};
 
   for (const [targetField, sourceValue] of Object.entries(mapping)) {
-    if (sourceValue === null || sourceValue === undefined) {
-      result[targetField] = sourceValue;
-      continue;
-    }
-
-    if (typeof sourceValue !== 'string') {
-      // Non-string values are passed through directly
-      result[targetField] = sourceValue;
-      continue;
-    }
-
-    // Check for template interpolation: "Hello {{$.input.name}}"
-    if (sourceValue.includes('{{') && sourceValue.includes('}}')) {
-      result[targetField] = interpolateTemplate(
-        sourceValue,
-        context as unknown as Record<string, unknown>,
-      );
-      continue;
-    }
-
-    // Check for JSONPath expression: $.input.name
-    if (sourceValue.startsWith('$.')) {
-      result[targetField] = getValueByPath(context, sourceValue);
-      continue;
-    }
-
-    // Literal value
-    result[targetField] = sourceValue;
+    result[targetField] = evaluateMappingValue(sourceValue, expressionContext, 'input');
   }
 
   return result;
@@ -199,7 +225,16 @@ export function applyInputMapping(
 /**
  * Apply output mapping from action output to context
  *
- * Format: { "context.path": "$.output.path" | "literal" }
+ * Format: { "context.path": "expression" }
+ *
+ * The expression context includes:
+ * - input, state, output from task context
+ * - result: the action output (use result.field to access action output)
+ *
+ * Examples:
+ * - { "output.decision": "'approved'" }     → string literal
+ * - { "state.score": "result.score" }       → from action output
+ * - { "output.total": "result.a + result.b" } → computed from action output
  */
 export function applyOutputMapping(
   mapping: Record<string, unknown> | null | undefined,
@@ -218,6 +253,14 @@ export function applyOutputMapping(
     return;
   }
 
+  // Expression context includes task context + action output as 'result'
+  const expressionContext = {
+    input: context.input,
+    state: context.state,
+    output: context.output,
+    result: actionOutput,
+  };
+
   logger?.info({
     eventType: 'outputMapping_applying',
     message: 'Applying output mapping',
@@ -231,35 +274,18 @@ export function applyOutputMapping(
   for (const [targetPath, sourceValue] of Object.entries(mapping)) {
     if (sourceValue === null || sourceValue === undefined) continue;
 
-    let value: unknown;
+    const value = evaluateMappingValue(sourceValue, expressionContext, 'output');
 
-    if (typeof sourceValue === 'string') {
-      if (sourceValue.startsWith('$.')) {
-        // Get from action output directly
-        // $.response.greeting extracts actionOutput.response.greeting
-        value = getValueByPath(actionOutput, sourceValue);
-        logger?.info({
-          eventType: 'outputMapping_extract',
-          message: 'Extracted value from action output',
-          metadata: {
-            sourcePath: sourceValue,
-            targetPath: targetPath,
-            extractedValue: value,
-            extractedValueType: typeof value,
-            actionOutputKeys: Object.keys(actionOutput),
-          },
-        });
-      } else if (sourceValue.includes('{{') && sourceValue.includes('}}')) {
-        // Template with output context
-        value = interpolateTemplate(sourceValue, { ...context, _output: actionOutput });
-      } else {
-        // Literal
-        value = sourceValue;
-      }
-    } else {
-      // Non-string values are used directly
-      value = sourceValue;
-    }
+    logger?.info({
+      eventType: 'outputMapping_evaluated',
+      message: 'Evaluated mapping expression',
+      metadata: {
+        sourceValue,
+        targetPath,
+        evaluatedValue: value,
+        evaluatedValueType: typeof value,
+      },
+    });
 
     // Set in context
     setValueByPath(context as unknown as Record<string, unknown>, targetPath, value);

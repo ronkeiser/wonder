@@ -257,6 +257,105 @@ export function evaluate(
 }
 
 /**
+ * Parse an expression string into an AST
+ *
+ * Use this to validate expressions at creation time and store the AST.
+ * The AST can later be evaluated with evaluateAst() without re-parsing.
+ *
+ * @param expression - The expression string to parse
+ * @param options - Optional parsing options (for limits)
+ * @returns The parsed AST
+ * @throws {ExpressionSyntaxError} If the expression has invalid syntax
+ * @throws {ExpressionRangeError} If the expression exceeds limits
+ *
+ * @example
+ * ```ts
+ * const ast = parse('state.score >= 80');
+ * // Store ast as JSON in database
+ * // Later: evaluateAst(ast, context)
+ * ```
+ */
+export function parse(
+  expression: string,
+  options: EvaluateOptions = {}
+): Expression {
+  const limits = { ...DEFAULT_LIMITS, ...options.limits };
+
+  // Check expression length limit
+  if (expression.length > limits.maxExpressionLength) {
+    throw new ExpressionRangeError(
+      `Expression exceeds maximum length of ${limits.maxExpressionLength} characters`,
+      expression
+    );
+  }
+
+  const parser = new Parser();
+  let ast: Expression;
+
+  try {
+    ast = parser.parse(expression);
+  } catch (error) {
+    if (error instanceof LexerError) {
+      throw new ExpressionSyntaxError(error.message, expression, error.position);
+    }
+    if (error instanceof ParserError) {
+      throw new ExpressionSyntaxError(error.message, expression, error.position);
+    }
+    throw error;
+  }
+
+  // Validate AST limits
+  validateAstLimits(ast, expression, limits);
+
+  return ast;
+}
+
+/**
+ * Evaluate a pre-parsed AST against a context
+ *
+ * Use this when you have already parsed and stored the AST.
+ * Skips parsing for better performance and guaranteed no syntax errors.
+ *
+ * @param ast - The pre-parsed AST
+ * @param context - The context object containing variables
+ * @param options - Optional evaluation options
+ * @returns The result of evaluating the expression
+ * @throws {ExpressionReferenceError} If an unknown function is called
+ * @throws {ExpressionTypeError} If a type error occurs during evaluation
+ *
+ * @example
+ * ```ts
+ * const ast = parse('user.name');
+ * evaluateAst(ast, { user: { name: 'Alice' } }) // => 'Alice'
+ * ```
+ */
+export function evaluateAst(
+  ast: Expression,
+  context: Record<string, unknown> = {},
+  options: EvaluateOptions = {}
+): unknown {
+  const functions = createFullRegistry(context, options.functions);
+  const interpreter = new Interpreter(functions);
+
+  try {
+    return interpreter.evaluate(ast, context);
+  } catch (error) {
+    if (error instanceof Error) {
+      if (error.message.startsWith('Unknown function:')) {
+        throw new ExpressionReferenceError(error.message, '<ast>');
+      }
+      if (
+        error.message.includes('requires') ||
+        error.message.includes('must be')
+      ) {
+        throw new ExpressionTypeError(error.message, '<ast>');
+      }
+    }
+    throw error;
+  }
+}
+
+/**
  * Compile an expression for repeated evaluation
  *
  * @param expression - The expression string to compile

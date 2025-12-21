@@ -3,8 +3,10 @@
  *
  * Transforms ref-based input data into ID-based database data.
  * All refs are resolved to IDs at this boundary.
+ * Expression strings are parsed into ASTs at this boundary.
  */
 
+import { parse, type Expression } from '@wonder/expressions';
 import { ulid } from 'ulid';
 import type { NodeInput, TransitionInput, WorkflowDefInput } from './validator';
 
@@ -34,7 +36,7 @@ export type TransformedTransition = {
   fromNodeId: string;
   toNodeId: string;
   priority: number;
-  condition: object | null;
+  condition: Expression | null; // Parsed AST from expression string
   spawnCount: number | null;
   siblingGroup: string | null; // Named sibling group for fan-in coordination
   foreach: object | null;
@@ -116,6 +118,7 @@ function transformNodes(nodes: NodeInput[], nodeIds: Map<string, string>): Trans
 
 /**
  * Transforms transitions from input format to database format.
+ * Parses condition expression strings into ASTs.
  */
 function transformTransitions(
   transitions: TransitionInput[],
@@ -125,13 +128,16 @@ function transformTransitions(
     // Get or generate the transition ID
     const transitionId = transition.ref ? ids.transitionIds.get(transition.ref)! : ulid();
 
+    // Parse condition string into AST (throws on syntax error)
+    const condition = transition.condition ? parse(transition.condition) : null;
+
     return {
       id: transitionId,
       ref: transition.ref ?? null,
       fromNodeId: ids.nodeIds.get(transition.fromNodeRef)!,
       toNodeId: ids.nodeIds.get(transition.toNodeRef)!,
       priority: transition.priority,
-      condition: transition.condition ?? null,
+      condition,
       spawnCount: transition.spawnCount ?? null,
       siblingGroup: transition.siblingGroup ?? null,
       foreach: transition.foreach ?? null,

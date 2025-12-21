@@ -11,6 +11,7 @@
   },
   "dependencies": {
     "@wonder/events": "workspace:*",
+    "@wonder/expressions": "workspace:*",
     "@wonder/logs": "workspace:*",
     "@wonder/resources": "workspace:*",
     "@wonder/schemas": "workspace:*",

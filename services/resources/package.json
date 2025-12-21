@@ -27,6 +27,7 @@
   },
   "dependencies": {
     "@wonder/events": "workspace:*",
+    "@wonder/expressions": "workspace:*",
     "@wonder/logs": "workspace:*",
     "@wonder/schemas": "workspace:*",
     "drizzle-orm": "^0.44.7",

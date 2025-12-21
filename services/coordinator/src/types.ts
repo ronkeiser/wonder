@@ -162,27 +162,22 @@ export type TaskResult = {
 // ============================================================================
 
 /**
- * Condition for transition evaluation
- * Structured conditions support type-safe evaluation
+ * Condition for transition evaluation.
+ *
+ * Conditions are pre-parsed ASTs from @wonder/expressions.
+ * The expression is parsed at workflow creation time (in resources service)
+ * and evaluated at runtime using evaluateAst().
+ *
+ * The expression context includes: input, state, output.
+ *
+ * Examples (as expression strings before parsing):
+ * - "state.score >= 80"
+ * - "state.status == 'approved' && state.count > 0"
+ * - "len(state.items) > 0"
+ * - "exists(state.optional)"
  */
-export type Condition =
-  | {
-      type: 'comparison';
-      left: FieldRef | Literal;
-      operator: ComparisonOperator;
-      right: FieldRef | Literal;
-    }
-  | { type: 'exists'; field: FieldRef }
-  | { type: 'in_set'; field: FieldRef; values: unknown[] }
-  | { type: 'array_length'; field: FieldRef; operator: ComparisonOperator; value: number }
-  | { type: 'and'; conditions: Condition[] }
-  | { type: 'or'; conditions: Condition[] }
-  | { type: 'not'; condition: Condition }
-  | { type: 'cel'; expression: string }; // CEL fallback for complex logic
-
-export type FieldRef = { field: string }; // e.g., { field: 'state.score' }
-export type Literal = { literal: unknown }; // e.g., { literal: 80 }
-export type ComparisonOperator = '==' | '!=' | '>' | '>=' | '<' | '<=';
+import type { Expression } from '@wonder/expressions';
+export type Condition = Expression;
 
 /**
  * Foreach configuration for dynamic iteration

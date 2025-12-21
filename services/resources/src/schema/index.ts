@@ -200,7 +200,7 @@ export const transitions = sqliteTable(
     toNodeId: text().notNull(),
     priority: integer().notNull(),
 
-    condition: text({ mode: 'json' }).$type<object>(), // structured or expression
+    condition: text({ mode: 'json' }).$type<object>(), // parsed AST from @wonder/expressions
     spawnCount: integer(), // How many tokens to spawn (default: 1)
     siblingGroup: text(), // Sibling group identifier for fan-in coordination
     foreach: text({ mode: 'json' }).$type<object>(), // foreach config

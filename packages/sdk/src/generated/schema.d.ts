@@ -1920,9 +1920,7 @@ export interface components {
                 fromNodeRef: string;
                 toNodeRef: string;
                 priority: number;
-                condition?: {
-                    [key: string]: unknown;
-                };
+                condition?: string;
                 spawnCount?: number;
                 siblingGroup?: string;
                 foreach?: {
@@ -1972,6 +1970,7 @@ export interface components {
                 [key: string]: unknown;
             } | null;
             spawnCount: number | null;
+            siblingGroup: string | null;
             foreach: {
                 [key: string]: unknown;
             } | null;

@@ -52,7 +52,7 @@ export const CreateWorkflowDefSchema = z
           fromNodeRef: z.string().min(1),
           toNodeRef: z.string().min(1),
           priority: z.number().int(),
-          condition: z.record(z.string(), z.unknown()).optional(),
+          condition: z.string().optional(), // Expression string (e.g., "state.score >= 80")
           spawnCount: z.number().int().optional(),
           siblingGroup: z.string().optional(),
           foreach: z.record(z.string(), z.unknown()).optional(),
@@ -97,8 +97,9 @@ export const TransitionSchema = z
     fromNodeId: z.string(),
     toNodeId: z.string(),
     priority: z.number().int(),
-    condition: z.record(z.string(), z.unknown()).nullable(),
+    condition: z.record(z.string(), z.unknown()).nullable(), // Parsed AST from expression string
     spawnCount: z.number().int().nullable(),
+    siblingGroup: z.string().nullable(),
     foreach: z.record(z.string(), z.unknown()).nullable(),
     synchronization: z.record(z.string(), z.unknown()).nullable(),
     loopConfig: z.record(z.string(), z.unknown()).nullable(),

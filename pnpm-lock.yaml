@@ -246,6 +246,9 @@ importers:
       '@wonder/events':
         specifier: workspace:*
         version: link:../events
+      '@wonder/expressions':
+        specifier: workspace:*
+        version: link:../../packages/expressions
       '@wonder/logs':
         specifier: workspace:*
         version: link:../logs
@@ -314,6 +317,9 @@ importers:
       '@wonder/events':
         specifier: workspace:*
         version: link:../events
+      '@wonder/expressions':
+        specifier: workspace:*
+        version: link:../../packages/expressions
       '@wonder/logs':
         specifier: workspace:*
         version: link:../logs
@@ -401,6 +407,9 @@ importers:
       '@wonder/events':
         specifier: workspace:*
         version: link:../events
+      '@wonder/expressions':
+        specifier: workspace:*
+        version: link:../../packages/expressions
       '@wonder/logs':
         specifier: workspace:*
         version: link:../logs
