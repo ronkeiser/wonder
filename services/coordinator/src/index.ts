@@ -60,7 +60,7 @@ export class WorkflowCoordinator extends DurableObject {
           parentRunId: run.parentRunId,
         };
       },
-      { traceEnabled: this.env.TRACE_EVENTS_ENABLED === 'true' },
+      { traceEnabled: (this.env.TRACE_EVENTS_ENABLED as string) === 'true' },
     );
 
     this.context = new ContextManager(ctx.storage.sql, this.defs, this.emitter);
@@ -72,7 +72,10 @@ export class WorkflowCoordinator extends DurableObject {
    *
    * This bundles all dependencies needed by dispatch functions.
    */
-  private getDispatchContext(workflowRunId: string): DispatchContext {
+  private getDispatchContext(
+    workflowRunId: string,
+    options?: { enableTraceEvents?: boolean },
+  ): DispatchContext {
     return {
       tokens: this.tokens,
       context: this.context,
@@ -84,6 +87,7 @@ export class WorkflowCoordinator extends DurableObject {
       executor: this.env.EXECUTOR,
       waitUntil: (promise) => this.ctx.waitUntil(promise),
       scheduleTimeoutAlarm: (timeoutMs) => this.scheduleTimeoutAlarm(timeoutMs),
+      enableTraceEvents: options?.enableTraceEvents,
     };
   }
 
@@ -92,14 +96,26 @@ export class WorkflowCoordinator extends DurableObject {
    *
    * Note: workflowRunId must be passed because ctx.id.name is undefined inside DO
    * (see https://github.com/cloudflare/workerd/issues/2240)
+   *
+   * @param workflowRunId - The workflow run ID
+   * @param options - Optional execution options
+   * @param options.enableTraceEvents - Enable/disable trace events for this run (overrides env var)
    */
-  async start(workflowRunId: string): Promise<void> {
+  async start(
+    workflowRunId: string,
+    options?: { enableTraceEvents?: boolean },
+  ): Promise<void> {
     try {
+      // Override trace events setting if explicitly specified
+      if (options?.enableTraceEvents !== undefined) {
+        this.emitter.setTraceEnabled(options.enableTraceEvents);
+      }
+
       // Initialize definition manager (loads/fetches definitions)
       await this.defs.initialize(workflowRunId);
 
       // Delegate to lifecycle module
-      const ctx = this.getDispatchContext(workflowRunId);
+      const ctx = this.getDispatchContext(workflowRunId, options);
       await startWorkflow(ctx);
     } catch (error) {
       this.logger.error({

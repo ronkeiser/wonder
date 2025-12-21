@@ -33,6 +33,9 @@ export interface StreamOptions {
 
   /** Grace period in milliseconds to wait after terminal event before closing (to collect in-flight events) */
   gracePeriod?: number;
+
+  /** Enable trace event emission for this workflow run (overrides server default) */
+  enableTraceEvents?: boolean;
 }
 
 export interface StreamResult {
@@ -74,6 +77,7 @@ export function createWorkflowsClient(
       timeout = DEFAULT_TIMEOUT_MS,
       idleTimeout = DEFAULT_IDLE_TIMEOUT_MS,
       gracePeriod = DEFAULT_GRACE_PERIOD_MS,
+      enableTraceEvents,
     } = options;
 
     // Phase 1: Create the workflow run (doesn't start execution)
@@ -187,6 +191,7 @@ export function createWorkflowsClient(
             try {
               await sdk.POST('/workflows/{id}/runs/{runId}/start', {
                 params: { path: { id: workflowId, runId: workflowRunId } },
+                body: { enableTraceEvents },
               });
             } catch (error) {
               cleanup();

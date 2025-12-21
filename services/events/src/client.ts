@@ -18,6 +18,8 @@ type StreamerStub = ReturnType<DurableObjectNamespace<Streamer>['get']>;
 export interface Emitter {
   emit: (event: Omit<EventInput, 'sequence'>) => void;
   emitTrace: (event: TraceEventInput | TraceEventInput[]) => void;
+  /** Enable or disable trace event emission at runtime */
+  setTraceEnabled: (enabled: boolean) => void;
 }
 
 /**
@@ -36,6 +38,9 @@ export function createEmitter(
   context: EventContext | (() => EventContext),
   options: { traceEnabled: boolean },
 ): Emitter {
+  // Mutable trace flag - can be updated at runtime via setTraceEnabled()
+  let traceEnabled = options.traceEnabled;
+
   // Cached context and stub (lazy initialized on first emit)
   let cached: {
     context: EventContext;
@@ -65,13 +70,17 @@ export function createEmitter(
     },
 
     emitTrace: (event) => {
-      if (!options.traceEnabled) return;
+      if (!traceEnabled) return;
 
       const { traceContext, stub } = getCache();
       const events = Array.isArray(event) ? event : [event];
       for (const evt of events) {
         stub.emitTrace(traceContext, evt);
       }
+    },
+
+    setTraceEnabled: (enabled: boolean) => {
+      traceEnabled = enabled;
     },
   };
 }

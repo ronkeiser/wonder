@@ -117,6 +117,7 @@ export async function dispatchToken(ctx: DispatchContext, tokenId: string): Prom
       taskVersion: node.taskVersion ?? 1,
       input: taskInput,
       resources: resolvedResources,
+      traceEvents: ctx.enableTraceEvents,
     }),
   );
 }

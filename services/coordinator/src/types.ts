@@ -110,6 +110,8 @@ export type DispatchContext = {
   waitUntil: (promise: Promise<unknown>) => void;
   /** Schedule timeout alarm for sync points */
   scheduleTimeoutAlarm: (timeoutMs: number) => Promise<void>;
+  /** Whether trace events are enabled for this workflow run */
+  enableTraceEvents?: boolean;
 };
 
 /** Result of applying decisions */

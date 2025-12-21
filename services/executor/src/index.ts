@@ -28,6 +28,9 @@ export interface TaskPayload {
   // Execution config
   timeoutMs?: number;
   retryAttempt?: number; // Current retry count (for retry logic)
+
+  // Observability config
+  traceEvents?: boolean; // Enable/disable trace events for this task
 }
 
 /**
@@ -91,6 +94,14 @@ export default class ExecutorService extends WorkerEntrypoint<Env> {
    * @see docs/architecture/executor.md
    */
   async executeTask(payload: TaskPayload): Promise<void> {
+    // Determine if trace events are enabled:
+    // - If explicitly set in payload, use that value
+    // - Otherwise fall back to env var
+    const traceEnabled =
+      payload.traceEvents !== undefined
+        ? payload.traceEvents
+        : (this.env.TRACE_EVENTS_ENABLED as string) === 'true';
+
     // Create emitter for this task execution - uses Streamer DO for event writes
     const emitter = createEmitter(
       this.env.STREAMER,
@@ -100,7 +111,7 @@ export default class ExecutorService extends WorkerEntrypoint<Env> {
         workflowDefId: '',
         parentRunId: null,
       },
-      { traceEnabled: this.env.TRACE_EVENTS_ENABLED === 'true' },
+      { traceEnabled },
     );
 
     this.logger.info({

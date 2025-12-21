@@ -134,11 +134,14 @@ export async function executeWorkflow(
     idleTimeout?: number;
     /** Log events to console as they arrive */
     logEvents?: boolean;
+    /** Enable trace event emission for this workflow run */
+    enableTraceEvents?: boolean;
   },
 ) {
   const result = await wonder.workflows(workflowId).stream(inputData, {
     timeout: options?.timeout ?? 60000,
     idleTimeout: options?.idleTimeout ?? 10000,
+    enableTraceEvents: options?.enableTraceEvents,
     onEvent: options?.logEvents
       ? (event) => {
           if ('eventType' in event) {
@@ -203,6 +206,8 @@ export async function runTestWorkflow(
     idleTimeout?: number;
     /** Log events to console as they arrive */
     logEvents?: boolean;
+    /** Enable trace event emission for this workflow run */
+    enableTraceEvents?: boolean;
   },
 ): Promise<TestWorkflowResult> {
   // Setup infrastructure

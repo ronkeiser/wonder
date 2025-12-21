@@ -19,6 +19,15 @@ export const WorkflowRunCreateResponseSchema = z
   })
   .openapi('WorkflowRunCreateResponse');
 
+export const StartWorkflowRunSchema = z
+  .object({
+    enableTraceEvents: z.boolean().optional().openapi({
+      description: 'Enable trace event emission for this workflow run',
+      example: true,
+    }),
+  })
+  .openapi('StartWorkflowRun');
+
 export const WorkflowRunStartResponseSchema = z
   .object({
     durableObjectId: z.string(),

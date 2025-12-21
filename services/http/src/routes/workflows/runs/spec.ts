@@ -6,6 +6,7 @@ import { createRoute, z } from '@hono/zod-openapi';
 import { ulid } from '../../../validators';
 import {
   CreateWorkflowRunSchema,
+  StartWorkflowRunSchema,
   WorkflowRunCreateResponseSchema,
   WorkflowRunStartResponseSchema,
 } from './schema';
@@ -55,6 +56,14 @@ export const startWorkflowRunRoute = createRoute({
       id: ulid().openapi({ param: { name: 'id', in: 'path' } }),
       runId: ulid().openapi({ param: { name: 'runId', in: 'path' } }),
     }),
+    body: {
+      content: {
+        'application/json': {
+          schema: StartWorkflowRunSchema,
+        },
+      },
+      required: false,
+    },
   },
   responses: {
     200: {

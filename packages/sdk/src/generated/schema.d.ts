@@ -1052,7 +1052,11 @@ export interface paths {
                 };
                 cookie?: never;
             };
-            requestBody?: never;
+            requestBody?: {
+                content: {
+                    "application/json": components["schemas"]["StartWorkflowRun"];
+                };
+            };
             responses: {
                 /** @description Workflow run started successfully */
                 200: {
@@ -2052,6 +2056,13 @@ export interface components {
         };
         WorkflowRunStartError: {
             error: string;
+        };
+        StartWorkflowRun: {
+            /**
+             * @description Enable trace event emission for this workflow run
+             * @example true
+             */
+            enableTraceEvents?: boolean;
         };
         WorkflowRunSummary: {
             id: string;
