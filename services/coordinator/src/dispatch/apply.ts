@@ -27,7 +27,7 @@ import { batchDecisions } from './batch';
  * Decisions are first batched for optimization, then applied in order.
  * Returns a summary of what was applied.
  */
-export function applyDecisions(decisions: Decision[], ctx: DispatchContext): ApplyResult {
+export async function applyDecisions(decisions: Decision[], ctx: DispatchContext): Promise<ApplyResult> {
   const result: ApplyResult = {
     applied: 0,
     tokensCreated: [],
@@ -40,7 +40,7 @@ export function applyDecisions(decisions: Decision[], ctx: DispatchContext): App
 
   for (const decision of batched) {
     try {
-      const outcome = applyOne(decision, ctx);
+      const outcome = await applyOne(decision, ctx);
 
       result.applied++;
 
@@ -87,7 +87,10 @@ export function applyDecisions(decisions: Decision[], ctx: DispatchContext): App
  * Apply decisions with tracing metadata.
  * Wraps each decision with source and timestamp info.
  */
-export function applyTracedDecisions(traced: TracedDecision[], ctx: DispatchContext): ApplyResult {
+export async function applyTracedDecisions(
+  traced: TracedDecision[],
+  ctx: DispatchContext,
+): Promise<ApplyResult> {
   // Emit trace for each decision
   for (const t of traced) {
     ctx.emitter.emitTrace({
@@ -120,7 +123,7 @@ type ApplyOutcome = {
 /**
  * Apply a single decision to the appropriate manager.
  */
-function applyOne(decision: Decision, ctx: DispatchContext): ApplyOutcome {
+async function applyOne(decision: Decision, ctx: DispatchContext): Promise<ApplyOutcome> {
   switch (decision.type) {
     // Token operations
     case 'CREATE_TOKEN': {
@@ -350,9 +353,42 @@ function applyOne(decision: Decision, ctx: DispatchContext): ApplyOutcome {
     }
 
     case 'FAIL_WORKFLOW': {
-      // Note: This decision is a signal only. The actual workflow failure
-      // (event emission, token cancellation, status update) is handled by
-      // failWorkflow() in lifecycle.ts which is called after applyDecisions.
+      // Guard: Check if workflow is already in terminal state
+      if (ctx.status.isTerminal(ctx.workflowRunId)) {
+        ctx.logger.debug({
+          eventType: 'workflow.fail.skipped',
+          message: 'Workflow already in terminal state, skipping failure',
+          metadata: { workflowRunId: ctx.workflowRunId, error: decision.error },
+        });
+        return {};
+      }
+
+      // Mark workflow as failed in coordinator DO (returns false if already terminal)
+      const marked = ctx.status.markFailed(ctx.workflowRunId);
+      if (!marked) {
+        return {};
+      }
+
+      // Cancel all active tokens to prevent further processing
+      const activeTokens = ctx.tokens.getActiveTokens(ctx.workflowRunId);
+      if (activeTokens.length > 0) {
+        ctx.tokens.cancelMany(
+          activeTokens.map((t) => t.id),
+          `workflow failed: ${decision.error}`,
+        );
+      }
+
+      // Emit workflow.failed event
+      ctx.emitter.emit({
+        eventType: 'workflow.failed',
+        message: `Workflow failed: ${decision.error}`,
+        metadata: { error: decision.error },
+      });
+
+      // Update workflow run status in resources service
+      const workflowRunsResource = ctx.resources.workflowRuns();
+      await workflowRunsResource.updateStatus(ctx.workflowRunId, 'failed');
+
       return {};
     }
 

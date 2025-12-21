@@ -66,7 +66,7 @@ export async function startWorkflow(ctx: DispatchContext): Promise<void> {
   }
 
   // Apply planning decisions (creates token)
-  const applyResult = applyDecisions(startResult.decisions, ctx);
+  const applyResult = await applyDecisions(startResult.decisions, ctx);
 
   // Get the created token ID
   if (applyResult.tokensCreated.length === 0) {
@@ -87,6 +87,7 @@ export async function startWorkflow(ctx: DispatchContext): Promise<void> {
  * Handle task error from Executor
  *
  * Called when task execution fails. May trigger retry based on error type.
+ * Uses the decision pattern for workflow failure.
  */
 export async function processTaskError(
   ctx: DispatchContext,
@@ -94,7 +95,7 @@ export async function processTaskError(
   errorResult: TaskErrorResult,
 ): Promise<void> {
   const token = ctx.tokens.get(tokenId);
-  const _node = ctx.defs.getNode(token.nodeId);
+  const node = ctx.defs.getNode(token.nodeId);
 
   // TODO: Check retry policy and retry_attempt count
   // For now, just fail the workflow
@@ -106,68 +107,15 @@ export async function processTaskError(
     message: `Task failed: ${errorResult.error.message}`,
     metadata: {
       tokenId: tokenId,
-      taskId: _node.taskId ?? 'none',
+      taskId: node.taskId ?? 'none',
       nodeId: token.nodeId,
       error: errorResult.error,
       metrics: errorResult.metrics,
     },
   });
 
-  // Check if we should fail the workflow
-  // For now, any error fails the workflow
-  await failWorkflow(ctx, errorResult.error.message);
-}
-
-// ============================================================================
-// Workflow Failure
-// ============================================================================
-
-/**
- * Fail workflow due to unrecoverable error.
- *
- * This function:
- * 1. Checks if workflow is already in terminal state (guard)
- * 2. Marks workflow status as 'failed' in coordinator DO
- * 3. Cancels all active (non-terminal) tokens
- * 4. Emits workflow.failed event
- * 5. Updates status in resources service
- */
-export async function failWorkflow(ctx: DispatchContext, errorMessage: string): Promise<void> {
-  // Guard: Check if workflow is already in terminal state
-  if (ctx.status.isTerminal(ctx.workflowRunId)) {
-    ctx.logger.debug({
-      eventType: 'workflow.fail.skipped',
-      message: 'Workflow already in terminal state, skipping failure',
-      metadata: { workflowRunId: ctx.workflowRunId, error: errorMessage },
-    });
-    return;
-  }
-
-  // Mark workflow as failed in coordinator DO (returns false if already terminal)
-  const marked = ctx.status.markFailed(ctx.workflowRunId);
-  if (!marked) {
-    return;
-  }
-
-  // Cancel all active tokens to prevent further processing
-  const activeTokens = ctx.tokens.getActiveTokens(ctx.workflowRunId);
-  if (activeTokens.length > 0) {
-    ctx.tokens.cancelMany(
-      activeTokens.map((t) => t.id),
-      `workflow failed: ${errorMessage}`,
-    );
-  }
-
-  // Emit workflow.failed event
-  ctx.emitter.emit({
-    eventType: 'workflow.failed',
-    message: `Workflow failed: ${errorMessage}`,
-    metadata: { error: errorMessage },
-  });
-
-  // Update workflow run status in resources service
-  const workflowRunsResource = ctx.resources.workflowRuns();
-  await workflowRunsResource.updateStatus(ctx.workflowRunId, 'failed');
+  // Fail the workflow via decision pattern
+  await applyDecisions([{ type: 'FAIL_WORKFLOW', error: errorResult.error.message }], ctx);
 }
 
 // ============================================================================
@@ -235,14 +183,8 @@ export async function checkTimeouts(ctx: DispatchContext): Promise<void> {
         workflowRunId: workflowRun.id,
       });
 
-      // Apply decisions (marks waiting tokens as timed_out)
-      applyDecisions(decisions, ctx);
-
-      // If workflow should fail, use failWorkflow for proper status management
-      const failDecision = decisions.find((d) => d.type === 'FAIL_WORKFLOW');
-      if (failDecision && failDecision.type === 'FAIL_WORKFLOW') {
-        await failWorkflow(ctx, failDecision.error);
-      }
+      // Apply all decisions (including FAIL_WORKFLOW if present)
+      await applyDecisions(decisions, ctx);
     }
   }
 }

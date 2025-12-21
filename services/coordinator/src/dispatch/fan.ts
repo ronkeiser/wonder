@@ -164,7 +164,7 @@ export async function processSynchronization(
             continuationTokenIds.push(continuationTokenId);
           }
         } else {
-          applyDecisions([decision], ctx);
+          await applyDecisions([decision], ctx);
         }
       }
     } else {
@@ -269,7 +269,7 @@ export async function activateFanIn(
   const parentTokenId = completedSiblings[0].parentTokenId ?? '';
   const parentToken = parentTokenId ? ctx.tokens.get(parentTokenId) : null;
 
-  return createFanInContinuation(ctx, {
+  return await createFanInContinuation(ctx, {
     workflowRunId,
     nodeId,
     fanInPath,
@@ -419,7 +419,7 @@ function markSiblingsCompleted(
 /**
  * Create the continuation token after fan-in merge.
  */
-function createFanInContinuation(
+async function createFanInContinuation(
   ctx: DispatchContext,
   params: {
     workflowRunId: string;
@@ -428,7 +428,7 @@ function createFanInContinuation(
     parentTokenId: string;
     parentIterationCounts?: Record<string, number>;
   },
-): string | null {
+): Promise<string | null> {
   const continuationResult = decideFanInContinuation(params);
 
   // Emit trace events
@@ -437,7 +437,7 @@ function createFanInContinuation(
   }
 
   // Apply decisions (creates continuation token)
-  const applyResult = applyDecisions(continuationResult.decisions, ctx);
+  const applyResult = await applyDecisions(continuationResult.decisions, ctx);
 
   if (applyResult.tokensCreated.length === 0) {
     ctx.logger.debug({

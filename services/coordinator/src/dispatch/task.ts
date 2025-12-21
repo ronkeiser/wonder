@@ -222,7 +222,7 @@ export async function processTaskResult(
   }
 
   // Apply routing decisions (creates tokens)
-  const applyResult = applyDecisions(routingResult.decisions, ctx);
+  const applyResult = await applyDecisions(routingResult.decisions, ctx);
 
   // Handle synchronization for created tokens
   const syncTransitions = getTransitionsWithSynchronization(transitions, contextSnapshot);
