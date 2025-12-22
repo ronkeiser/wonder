@@ -13,16 +13,25 @@ export const CreateModelProfileSchema = z
       .openapi({ example: 'openai' }),
     modelId: z
       .enum([
+        // Cloudflare Workers AI models
         '@cf/meta/llama-4-scout-17b-16e-instruct',
         '@cf/meta/llama-3.3-70b-instruct-fp8-fast',
         '@cf/openai/gpt-oss-120b',
         '@cf/openai/gpt-oss-20b',
+        // Anthropic Claude models
+        'claude-opus-4-20250514',
+        'claude-sonnet-4-20250514',
+        'claude-3-5-sonnet-20241022',
+        'claude-3-5-haiku-20241022',
+        'claude-3-opus-20240229',
+        'claude-3-haiku-20240307',
+        // Dummy providers for testing
         'anthropic-dummy',
         'openai-dummy',
         'google-dummy',
         'local-dummy',
       ])
-      .openapi({ example: '@cf/meta/llama-4-scout-17b-16e-instruct' }),
+      .openapi({ example: 'claude-3-5-sonnet-20241022' }),
     parameters: z.record(z.string(), z.unknown()).openapi({ example: { temperature: 0.7 } }),
     executionConfig: z.record(z.string(), z.unknown()).optional(),
     costPer1kInputTokens: z.number().nonnegative().openapi({ example: 0.03 }),
@@ -36,10 +45,19 @@ export const ModelProfileSchema = z
     name: z.string(),
     provider: z.enum(['anthropic', 'openai', 'google', 'cloudflare', 'local']),
     modelId: z.enum([
+      // Cloudflare Workers AI models
       '@cf/meta/llama-4-scout-17b-16e-instruct',
       '@cf/meta/llama-3.3-70b-instruct-fp8-fast',
       '@cf/openai/gpt-oss-120b',
       '@cf/openai/gpt-oss-20b',
+      // Anthropic Claude models
+      'claude-opus-4-20250514',
+      'claude-sonnet-4-20250514',
+      'claude-3-5-sonnet-20241022',
+      'claude-3-5-haiku-20241022',
+      'claude-3-opus-20240229',
+      'claude-3-haiku-20240307',
+      // Dummy providers for testing
       'anthropic-dummy',
       'openai-dummy',
       'google-dummy',

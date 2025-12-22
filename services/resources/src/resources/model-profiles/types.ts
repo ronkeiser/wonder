@@ -77,6 +77,18 @@ export type GptOss20BParameters = {
 };
 
 /**
+ * Claude model parameters
+ * Docs: https://docs.anthropic.com/claude/reference/messages
+ */
+export type ClaudeParameters = {
+  temperature?: number; // Range: 0-1, default 1
+  max_tokens: number; // Required, maximum tokens to generate
+  top_p?: number; // Range: 0-1
+  top_k?: number; // Only sample from top K options
+  stop_sequences?: string[]; // Custom stop sequences
+};
+
+/**
  * Dummy Anthropic model parameters (for testing/future use)
  */
 export type AnthropicDummyParameters = {
@@ -113,6 +125,7 @@ export type LocalDummyParameters = {
  * Maps model_id to provider and parameter types
  */
 export const MODEL_CATALOG = {
+  // Cloudflare Workers AI models
   '@cf/meta/llama-4-scout-17b-16e-instruct': {
     provider: 'cloudflare' as const,
     parameters: {} as Llama4Scout17BParameters,
@@ -129,6 +142,34 @@ export const MODEL_CATALOG = {
     provider: 'cloudflare' as const,
     parameters: {} as GptOss20BParameters,
   },
+
+  // Anthropic Claude models
+  'claude-opus-4-20250514': {
+    provider: 'anthropic' as const,
+    parameters: {} as ClaudeParameters,
+  },
+  'claude-sonnet-4-20250514': {
+    provider: 'anthropic' as const,
+    parameters: {} as ClaudeParameters,
+  },
+  'claude-3-5-sonnet-20241022': {
+    provider: 'anthropic' as const,
+    parameters: {} as ClaudeParameters,
+  },
+  'claude-3-5-haiku-20241022': {
+    provider: 'anthropic' as const,
+    parameters: {} as ClaudeParameters,
+  },
+  'claude-3-opus-20240229': {
+    provider: 'anthropic' as const,
+    parameters: {} as ClaudeParameters,
+  },
+  'claude-3-haiku-20240307': {
+    provider: 'anthropic' as const,
+    parameters: {} as ClaudeParameters,
+  },
+
+  // Dummy providers for testing
   'anthropic-dummy': {
     provider: 'anthropic' as const,
     parameters: {} as AnthropicDummyParameters,

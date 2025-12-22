@@ -1,7 +1,8 @@
 /**
  * LLM Action Handler
  *
- * Executes LLM calls using Cloudflare Workers AI.
+ * Executes LLM calls using provider-specific implementations.
+ * Supports: Cloudflare Workers AI, Anthropic Claude
  *
  * Implementation schema for llm_call actions:
  * {
@@ -19,6 +20,7 @@
 
 import { render } from '@wonder/templates';
 import type { ActionDeps, ActionInput, ActionOutput } from './types';
+import { callAnthropic, isAnthropicRetryableError } from './providers/anthropic';
 
 /**
  * LLM implementation schema
@@ -137,16 +139,61 @@ export async function executeLLMAction(
       },
     });
 
-    // Call Workers AI
-    const response = (await env.AI.run(
-      modelProfile.modelId as Parameters<Ai['run']>[0],
-      aiOptions,
-    )) as {
-      response?: unknown;
-    };
+    // Route to provider-specific implementation
+    let rawResponse: unknown;
+    let tokenUsage: { input: number; output: number } | undefined;
+
+    if (modelProfile.provider === 'anthropic') {
+      // Anthropic Claude API
+      const apiKey = env.ANTHROPIC_API_KEY;
+      if (!apiKey) {
+        throw new Error('ANTHROPIC_API_KEY is not configured');
+      }
+
+      // Build Anthropic-specific request
+      const anthropicMessages = messages
+        .filter((m) => m.role !== 'system')
+        .map((m) => ({
+          role: m.role as 'user' | 'assistant',
+          content: m.content,
+        }));
+
+      const systemMessage = messages.find((m) => m.role === 'system');
+
+      const result = await callAnthropic(
+        apiKey,
+        {
+          model: modelProfile.modelId,
+          max_tokens: (modelProfile.parameters as { max_tokens?: number }).max_tokens ?? 4096,
+          messages: anthropicMessages,
+          system: systemMessage?.content,
+          temperature: (modelProfile.parameters as { temperature?: number }).temperature,
+          top_p: (modelProfile.parameters as { top_p?: number }).top_p,
+          top_k: (modelProfile.parameters as { top_k?: number }).top_k,
+          stop_sequences: (modelProfile.parameters as { stop_sequences?: string[] }).stop_sequences,
+        },
+        logger,
+        context.workflowRunId,
+      );
+
+      rawResponse = result.response;
+      tokenUsage = {
+        input: result.usage.input_tokens,
+        output: result.usage.output_tokens,
+      };
+    } else {
+      // Cloudflare Workers AI (default)
+      const response = (await env.AI.run(
+        modelProfile.modelId as Parameters<Ai['run']>[0],
+        aiOptions,
+      )) as {
+        response?: unknown;
+      };
+
+      rawResponse = response?.response ?? 'No response from LLM';
+    }
 
     const duration = Date.now() - startTime;
-    const rawResponse = response?.response ?? 'No response from LLM';
 
     // Log raw LLM response for debugging
     logger.info({
@@ -165,7 +212,7 @@ export async function executeLLMAction(
 
     if (jsonSchema) {
       if (typeof rawResponse === 'object') {
-        // Workers AI already parsed JSON
+        // Already parsed JSON
         processedResponse = rawResponse;
       } else if (typeof rawResponse === 'string') {
         // Try to parse string response
@@ -196,8 +243,17 @@ export async function executeLLMAction(
         actionId: action.id,
         durationMs: duration,
         responseType: typeof processedResponse,
+        tokenUsage,
       },
     });
+
+    // Calculate cost if we have token usage and cost info
+    let costUsd: number | undefined;
+    if (tokenUsage) {
+      costUsd =
+        (tokenUsage.input / 1000) * modelProfile.costPer1kInputTokens +
+        (tokenUsage.output / 1000) * modelProfile.costPer1kOutputTokens;
+    }
 
     return {
       success: true,
@@ -206,7 +262,13 @@ export async function executeLLMAction(
       },
       metrics: {
         durationMs: duration,
-        // TODO: Extract token counts from response if available
+        llmTokens: tokenUsage
+          ? {
+              input: tokenUsage.input,
+              output: tokenUsage.output,
+              costUsd: costUsd ?? 0,
+            }
+          : undefined,
       },
     };
   } catch (error) {
@@ -229,7 +291,7 @@ export async function executeLLMAction(
       output: {},
       error: {
         message: error instanceof Error ? error.message : String(error),
-        retryable: isRetryableError(error),
+        retryable: isRetryableError(error) || isAnthropicRetryableError(error),
       },
       metrics: {
         durationMs: duration,
