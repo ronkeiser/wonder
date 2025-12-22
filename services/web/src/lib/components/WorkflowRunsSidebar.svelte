@@ -140,21 +140,6 @@
     }
   }
 
-  function getStatusIcon(status: string): string {
-    switch (status) {
-      case 'running':
-        return '●';
-      case 'completed':
-        return '✓';
-      case 'failed':
-        return '✗';
-      case 'waiting':
-        return '○';
-      default:
-        return '?';
-    }
-  }
-
   /**
    * Starts an interval synced to second 0 of each minute.
    * First waits until the next minute boundary, then runs every 60 seconds.
@@ -217,7 +202,19 @@
         class:selected={run.id === selectedRunId}
         onclick={() => handleSelect(run.id)}
       >
-        <span class="status-icon status-{run.status}">{getStatusIcon(run.status)}</span>
+        <span class="status-icon status-{run.status}">
+          {#if run.status === 'running'}
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="7" /></svg>
+          {:else if run.status === 'completed'}
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M20 6 9 17l-5-5" /></svg>
+          {:else if run.status === 'failed'}
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M18 6 6 18M6 6l12 12" /></svg>
+          {:else if run.status === 'waiting'}
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="7" /><path d="M12 9v3l2.5 1.5" /></svg>
+          {:else}
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="7" /></svg>
+          {/if}
+        </span>
         <div class="run-info">
           <span class="workflow-name">{run.workflowName}</span>
           <span class="run-id">{run.id.slice(-6)}</span>
@@ -333,9 +330,17 @@
   }
 
   .status-icon {
-    font-size: 0.75rem;
     width: 1rem;
-    text-align: center;
+    height: 1rem;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    flex-shrink: 0;
+  }
+
+  .status-icon svg {
+    width: 14px;
+    height: 14px;
   }
 
   .status-running {
@@ -352,7 +357,7 @@
   }
 
   .status-waiting {
-    color: var(--yellow, #eab308);
+    color: #8b9eb3;
   }
 
   @keyframes pulse {
