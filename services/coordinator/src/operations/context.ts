@@ -49,9 +49,6 @@ export class ContextManager {
   private stateTable: SchemaTable | null = null;
   private outputTable: SchemaTable | null = null;
 
-  /** Track initialization */
-  private initialized = false;
-
   constructor(sql: SqlStorage, defs: DefinitionManager, emitter: Emitter) {
     this.sql = sql;
     this.defs = defs;
@@ -72,10 +69,8 @@ export class ContextManager {
     };
   }
 
-  /** Load schemas and bind tables (lazy initialization). */
-  private loadSchemas(): void {
-    if (this.initialized) return;
-
+  /** Initialize context tables and store input. */
+  initialize(input: Record<string, unknown>): void {
     const workflowDef = this.defs.getWorkflowDef();
 
     const inputSchema = new Schema(workflowDef.inputSchema as JSONSchema);
@@ -88,13 +83,6 @@ export class ContextManager {
       const stateSchema = new Schema(workflowDef.contextSchema as JSONSchema);
       this.stateTable = stateSchema.bind(this.sql, 'context_state', this.sqlHook);
     }
-
-    this.initialized = true;
-  }
-
-  /** Initialize context tables and store input. */
-  async initialize(input: Record<string, unknown>): Promise<void> {
-    this.loadSchemas();
 
     const tablesCreated: string[] = [];
 
@@ -154,24 +142,11 @@ export class ContextManager {
   }
 
   // ============================================================================
-  // Path Validation
-  // ============================================================================
-
-  /** Validate that a section is writable. */
-  private assertWritableSection(section: string): void {
-    if (section !== 'state' && section !== 'output') {
-      throw new Error(`Cannot write to '${section}' - only 'state' and 'output' are writable`);
-    }
-  }
-
-  // ============================================================================
   // Read Operations
   // ============================================================================
 
   /** Read entire section from context. */
   getSection(section: string): Record<string, unknown> {
-    this.loadSchemas();
-
     const table = this.getTable(section);
     const value = (table?.selectFirst() as Record<string, unknown>) ?? {};
 
@@ -204,9 +179,6 @@ export class ContextManager {
 
   /** Replace an entire section with new data. */
   replaceSection(section: string, data: Record<string, unknown>): void {
-    this.loadSchemas();
-    this.assertWritableSection(section);
-
     const table = this.getTable(section);
     if (!table) {
       throw new Error(`No table for section '${section}' - context_schema may be missing`);
@@ -225,11 +197,7 @@ export class ContextManager {
 
   /** Set a field within a section (read-modify-write). */
   setField(path: string, value: unknown): void {
-    this.loadSchemas();
-
     const { section, fieldParts } = parsePath(path);
-    this.assertWritableSection(section);
-
     const table = this.getTable(section);
     if (!table) {
       throw new Error(`No table for section '${section}' - context_schema may be missing`);
@@ -257,8 +225,6 @@ export class ContextManager {
    * via mergeBranches() at fan-in points.
    */
   getSnapshot(): ContextSnapshot {
-    this.loadSchemas();
-
     const snapshot = {
       input: this.getSection('input'),
       state: this.getSection('state'),
@@ -291,8 +257,6 @@ export class ContextManager {
     outputMapping: Record<string, string> | null,
     taskOutput: Record<string, unknown>,
   ): void {
-    this.loadSchemas();
-
     // Emit start event with input context
     this.emitter.emitTrace({
       type: 'operation.context.outputMapping.started',

@@ -453,7 +453,7 @@ async function applyOne(decision: Decision, ctx: DispatchContext): Promise<Apply
       ctx.status.initialize(ctx.workflowRunId);
 
       // Initialize context tables and store input
-      await ctx.context.initialize(decision.input);
+      ctx.context.initialize(decision.input);
 
       // Emit workflow started event
       ctx.emitter.emit({
