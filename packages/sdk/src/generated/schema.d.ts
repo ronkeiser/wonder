@@ -1610,7 +1610,7 @@ export interface components {
             /** @enum {string} */
             provider: "anthropic" | "openai" | "google" | "cloudflare" | "local";
             /** @enum {string} */
-            modelId: "@cf/meta/llama-4-scout-17b-16e-instruct" | "@cf/meta/llama-3.3-70b-instruct-fp8-fast" | "@cf/openai/gpt-oss-120b" | "@cf/openai/gpt-oss-20b" | "anthropic-dummy" | "openai-dummy" | "google-dummy" | "local-dummy";
+            modelId: "@cf/meta/llama-4-scout-17b-16e-instruct" | "@cf/meta/llama-3.3-70b-instruct-fp8-fast" | "@cf/openai/gpt-oss-120b" | "@cf/openai/gpt-oss-20b" | "claude-opus-4-20250514" | "claude-sonnet-4-20250514" | "claude-3-5-sonnet-20241022" | "claude-3-5-haiku-20241022" | "claude-3-opus-20240229" | "claude-3-haiku-20240307" | "anthropic-dummy" | "openai-dummy" | "google-dummy" | "local-dummy";
             parameters?: unknown;
             executionConfig?: unknown;
             costPer1kInputTokens: number;
@@ -1632,10 +1632,10 @@ export interface components {
              */
             provider: "anthropic" | "openai" | "google" | "cloudflare" | "local";
             /**
-             * @example @cf/meta/llama-4-scout-17b-16e-instruct
+             * @example claude-3-5-sonnet-20241022
              * @enum {string}
              */
-            modelId: "@cf/meta/llama-4-scout-17b-16e-instruct" | "@cf/meta/llama-3.3-70b-instruct-fp8-fast" | "@cf/openai/gpt-oss-120b" | "@cf/openai/gpt-oss-20b" | "anthropic-dummy" | "openai-dummy" | "google-dummy" | "local-dummy";
+            modelId: "@cf/meta/llama-4-scout-17b-16e-instruct" | "@cf/meta/llama-3.3-70b-instruct-fp8-fast" | "@cf/openai/gpt-oss-120b" | "@cf/openai/gpt-oss-20b" | "claude-opus-4-20250514" | "claude-sonnet-4-20250514" | "claude-3-5-sonnet-20241022" | "claude-3-5-haiku-20241022" | "claude-3-opus-20240229" | "claude-3-haiku-20240307" | "anthropic-dummy" | "openai-dummy" | "google-dummy" | "local-dummy";
             /**
              * @example {
              *       "temperature": 0.7

@@ -10,18 +10,6 @@ import { type EmbeddedModelProfile, MODEL_PROFILE } from './embedded';
 
 type CreateModelProfile = components['schemas']['CreateModelProfile'];
 
-type ModelProvider = 'anthropic' | 'openai' | 'google' | 'cloudflare' | 'local';
-
-type ModelId =
-  | '@cf/meta/llama-4-scout-17b-16e-instruct'
-  | '@cf/meta/llama-3.3-70b-instruct-fp8-fast'
-  | '@cf/openai/gpt-oss-120b'
-  | '@cf/openai/gpt-oss-20b'
-  | 'anthropic-dummy'
-  | 'openai-dummy'
-  | 'google-dummy'
-  | 'local-dummy';
-
 /**
  * Create a model profile
  *
@@ -43,13 +31,13 @@ type ModelId =
  * });
  */
 export function modelProfile(config: {
-  name: string;
-  provider: ModelProvider;
-  modelId: ModelId;
-  parameters: Record<string, unknown>;
-  executionConfig?: Record<string, unknown>;
-  costPer1kInputTokens?: number;
-  costPer1kOutputTokens?: number;
+  name: CreateModelProfile['name'];
+  provider: CreateModelProfile['provider'];
+  modelId: CreateModelProfile['modelId'];
+  parameters: CreateModelProfile['parameters'];
+  executionConfig?: CreateModelProfile['executionConfig'];
+  costPer1kInputTokens?: CreateModelProfile['costPer1kInputTokens'];
+  costPer1kOutputTokens?: CreateModelProfile['costPer1kOutputTokens'];
 }): EmbeddedModelProfile {
   return {
     [MODEL_PROFILE]: true,
