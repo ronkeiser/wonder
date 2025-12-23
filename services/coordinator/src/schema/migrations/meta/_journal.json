@@ -8,6 +8,13 @@
       "when": 1766260854049,
       "tag": "0000_organic_vengeance",
       "breakpoints": true
+    },
+    {
+      "idx": 1,
+      "version": "6",
+      "when": 1766510200753,
+      "tag": "0001_condemned_shinko_yamashiro",
+      "breakpoints": true
     }
   ]
 }

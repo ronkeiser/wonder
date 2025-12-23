@@ -26,7 +26,13 @@ export type TokenRow = typeof tokens.$inferSelect;
 const TERMINAL_STATES: TokenStatus[] = ['completed', 'failed', 'timed_out', 'cancelled'];
 
 /** Active states where token is still in flight (not terminal) */
-const ACTIVE_STATES: TokenStatus[] = ['pending', 'dispatched', 'executing', 'waiting_for_siblings'];
+const ACTIVE_STATES: TokenStatus[] = [
+  'pending',
+  'dispatched',
+  'executing',
+  'waiting_for_siblings',
+  'waiting_for_subworkflow',
+];
 
 /**
  * TokenManager manages token state for a workflow execution.
@@ -238,6 +244,45 @@ export class TokenManager {
       .select()
       .from(tokens)
       .where(eq(tokens.status, 'waiting_for_siblings'))
+      .all();
+  }
+
+  /**
+   * Mark token as waiting for a sub-workflow to complete
+   */
+  markWaitingForSubworkflow(tokenId: string, childRunId: string): void {
+    const token = this.get(tokenId);
+
+    this.db
+      .update(tokens)
+      .set({
+        status: 'waiting_for_subworkflow',
+        updatedAt: new Date(),
+      })
+      .where(eq(tokens.id, tokenId))
+      .run();
+
+    this.emitter.emitTrace({
+      type: 'operation.tokens.status_updated',
+      tokenId: tokenId,
+      nodeId: token.nodeId,
+      payload: {
+        from: token.status,
+        to: 'waiting_for_subworkflow',
+        childRunId,
+      },
+    });
+  }
+
+  /**
+   * Get all tokens waiting for sub-workflows.
+   * Used by timeout checking for sub-workflow timeouts.
+   */
+  getTokensWaitingForSubworkflow(): TokenRow[] {
+    return this.db
+      .select()
+      .from(tokens)
+      .where(eq(tokens.status, 'waiting_for_subworkflow'))
       .all();
   }
 

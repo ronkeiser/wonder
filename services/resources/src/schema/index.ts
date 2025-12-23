@@ -394,6 +394,7 @@ export const workflowRuns = sqliteTable(
 
     parentRunId: text(), // self-reference to workflow_runs.id (enforced at application level)
     parentNodeId: text(),
+    parentTokenId: text(), // which parent token to resume when sub-workflow completes
 
     createdAt: text().notNull(),
     updatedAt: text().notNull(),

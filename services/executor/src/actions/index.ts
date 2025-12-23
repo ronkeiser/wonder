@@ -12,6 +12,7 @@ import { executeLLMAction } from './llm';
 import { executeMockAction } from './mock';
 import type { ActionDeps, ActionInput, ActionOutput } from './types';
 import { executeUpdateContextAction } from './update-context';
+import { executeWorkflowAction } from './workflow';
 
 export interface DispatchActionParams {
   action: Action;
@@ -75,8 +76,7 @@ export async function dispatchAction(
       return notImplemented(action, context, logger);
 
     case 'workflow':
-      // TODO: Implement sub-workflow action handler
-      return notImplemented(action, context, logger);
+      return executeWorkflowAction(actionInput, deps);
 
     case 'vector':
       // TODO: Implement vector search action handler

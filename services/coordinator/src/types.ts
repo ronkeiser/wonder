@@ -29,7 +29,8 @@ export type TokenStatus =
   | 'failed'
   | 'timed_out'
   | 'cancelled'
-  | 'waiting_for_siblings';
+  | 'waiting_for_siblings'
+  | 'waiting_for_subworkflow';
 
 /**
  * Workflow Status
@@ -100,6 +101,7 @@ export type DispatchContext = {
   context: ContextManager;
   defs: DefinitionManager;
   status: StatusManager;
+  childWorkflows: ChildWorkflowManager;
   emitter: Emitter;
   logger: Logger;
   workflowRunId: string;
@@ -107,6 +109,8 @@ export type DispatchContext = {
   resources: Env['RESOURCES'];
   /** Executor service for dispatching tasks */
   executor: Env['EXECUTOR'];
+  /** Coordinator namespace for sub-workflow callbacks */
+  coordinator: Env['COORDINATOR'];
   /** Register background work (fire-and-forget) */
   waitUntil: (promise: Promise<unknown>) => void;
   /** Schedule alarm to fire after delayMs */
@@ -138,6 +142,7 @@ export type TaskErrorResult = {
 };
 
 // Forward declarations for manager types (to avoid circular imports)
+import type { ChildWorkflowManager } from './operations/child-workflows';
 import type { ContextManager } from './operations/context';
 import type { DefinitionManager } from './operations/defs';
 import type { StatusManager } from './operations/status';
@@ -239,6 +244,24 @@ export type Decision =
   | { type: 'INITIALIZE_WORKFLOW'; input: Record<string, unknown> }
   | { type: 'COMPLETE_WORKFLOW'; output: Record<string, unknown> }
   | { type: 'FAIL_WORKFLOW'; error: string }
+
+  // Sub-workflow operations
+  | {
+      type: 'MARK_WAITING_FOR_SUBWORKFLOW';
+      tokenId: string;
+      childRunId: string;
+      timeoutMs?: number;
+    }
+  | {
+      type: 'RESUME_FROM_SUBWORKFLOW';
+      tokenId: string;
+      output: Record<string, unknown>;
+    }
+  | {
+      type: 'FAIL_FROM_SUBWORKFLOW';
+      tokenId: string;
+      error: string;
+    }
 
   // Dispatch operations
   | { type: 'DISPATCH_TOKEN'; tokenId: string }

@@ -442,6 +442,26 @@ async function applyOne(decision: Decision, ctx: DispatchContext): Promise<Apply
       const workflowRunsResource = ctx.resources.workflowRuns();
       await workflowRunsResource.complete(ctx.workflowRunId, decision.output);
 
+      // If this is a sub-workflow, notify parent coordinator
+      const run = ctx.defs.getWorkflowRun();
+      if (run.parentRunId && run.parentTokenId) {
+        const parentCoordinatorId = ctx.coordinator.idFromName(run.parentRunId);
+        const parentCoordinator = ctx.coordinator.get(parentCoordinatorId);
+
+        ctx.waitUntil(
+          parentCoordinator.resumeFromSubworkflow(run.parentTokenId, decision.output),
+        );
+
+        ctx.emitter.emit({
+          eventType: 'subworkflow.notifying_parent',
+          message: 'Notifying parent workflow of completion',
+          metadata: {
+            parentRunId: run.parentRunId,
+            parentTokenId: run.parentTokenId,
+          },
+        });
+      }
+
       return {};
     }
 
@@ -471,6 +491,26 @@ async function applyOne(decision: Decision, ctx: DispatchContext): Promise<Apply
         );
       }
 
+      // Cascade cancellation: cancel all running child workflows
+      const runningChildren = ctx.childWorkflows.getRunning(ctx.workflowRunId);
+      for (const child of runningChildren) {
+        const childCoordinatorId = ctx.coordinator.idFromName(child.childRunId);
+        const childCoordinator = ctx.coordinator.get(childCoordinatorId);
+        ctx.waitUntil(childCoordinator.cancel('parent workflow failed'));
+        ctx.childWorkflows.updateStatus(child.childRunId, 'cancelled');
+      }
+
+      if (runningChildren.length > 0) {
+        ctx.emitter.emit({
+          eventType: 'subworkflows.cancelled',
+          message: 'Child workflows cancelled due to parent failure',
+          metadata: {
+            count: runningChildren.length,
+            childRunIds: runningChildren.map((c) => c.childRunId),
+          },
+        });
+      }
+
       // Emit workflow.failed event
       ctx.emitter.emit({
         eventType: 'workflow.failed',
@@ -482,6 +522,27 @@ async function applyOne(decision: Decision, ctx: DispatchContext): Promise<Apply
       const workflowRunsResource = ctx.resources.workflowRuns();
       await workflowRunsResource.updateStatus(ctx.workflowRunId, 'failed');
 
+      // If this is a sub-workflow, notify parent coordinator of failure
+      const run = ctx.defs.getWorkflowRun();
+      if (run.parentRunId && run.parentTokenId) {
+        const parentCoordinatorId = ctx.coordinator.idFromName(run.parentRunId);
+        const parentCoordinator = ctx.coordinator.get(parentCoordinatorId);
+
+        ctx.waitUntil(
+          parentCoordinator.handleSubworkflowError(run.parentTokenId, decision.error),
+        );
+
+        ctx.emitter.emit({
+          eventType: 'subworkflow.notifying_parent_failure',
+          message: 'Notifying parent workflow of failure',
+          metadata: {
+            parentRunId: run.parentRunId,
+            parentTokenId: run.parentTokenId,
+            error: decision.error,
+          },
+        });
+      }
+
       return {};
     }
 
@@ -492,6 +553,98 @@ async function applyOne(decision: Decision, ctx: DispatchContext): Promise<Apply
       // This decision just marks the token for dispatch
       ctx.tokens.updateStatus(decision.tokenId, 'dispatched');
       return { dispatchedTokens: [decision.tokenId] };
+    }
+
+    // Sub-workflow operations
+    case 'MARK_WAITING_FOR_SUBWORKFLOW': {
+      const token = ctx.tokens.get(decision.tokenId);
+      ctx.tokens.markWaitingForSubworkflow(decision.tokenId, decision.childRunId);
+
+      // Register child workflow for cascade cancellation
+      ctx.childWorkflows.register({
+        workflowRunId: ctx.workflowRunId,
+        parentTokenId: decision.tokenId,
+        childRunId: decision.childRunId,
+      });
+
+      // Emit event for sub-workflow start
+      ctx.emitter.emit({
+        eventType: 'subworkflow.started',
+        message: 'Waiting for sub-workflow',
+        metadata: {
+          tokenId: decision.tokenId,
+          nodeId: token.nodeId,
+          childRunId: decision.childRunId,
+        },
+      });
+
+      // Schedule timeout alarm if configured
+      if (decision.timeoutMs) {
+        ctx.waitUntil(ctx.scheduleAlarm(decision.timeoutMs));
+      }
+
+      return {};
+    }
+
+    case 'RESUME_FROM_SUBWORKFLOW': {
+      const token = ctx.tokens.get(decision.tokenId);
+
+      // Mark child as completed
+      const child = ctx.childWorkflows.getByParentTokenId(decision.tokenId);
+      if (child) {
+        ctx.childWorkflows.updateStatus(child.childRunId, 'completed');
+      }
+
+      // Emit sub-workflow completion event
+      ctx.emitter.emit({
+        eventType: 'subworkflow.completed',
+        message: 'Sub-workflow completed, resuming parent',
+        metadata: {
+          tokenId: decision.tokenId,
+          nodeId: token.nodeId,
+          outputKeys: Object.keys(decision.output),
+        },
+      });
+
+      // Process the result like a normal task result
+      // Import processTaskResult dynamically to avoid circular dependency
+      const { processTaskResult } = await import('./task');
+      await processTaskResult(ctx, decision.tokenId, { outputData: decision.output });
+
+      return {};
+    }
+
+    case 'FAIL_FROM_SUBWORKFLOW': {
+      const token = ctx.tokens.get(decision.tokenId);
+
+      // Mark child as failed
+      const child = ctx.childWorkflows.getByParentTokenId(decision.tokenId);
+      if (child) {
+        ctx.childWorkflows.updateStatus(child.childRunId, 'failed');
+      }
+
+      // Mark token as failed
+      ctx.tokens.updateStatus(decision.tokenId, 'failed');
+
+      // Emit sub-workflow failure event
+      ctx.emitter.emit({
+        eventType: 'subworkflow.failed',
+        message: `Sub-workflow failed: ${decision.error}`,
+        metadata: {
+          tokenId: decision.tokenId,
+          nodeId: token.nodeId,
+          error: decision.error,
+        },
+      });
+
+      // Check if this should fail the parent workflow
+      // For now, propagate the failure to the workflow level
+      await applyDecisions(
+        [{ type: 'FAIL_WORKFLOW', error: `Sub-workflow failed: ${decision.error}` }],
+        ctx,
+      );
+
+      return {};
     }
 
     default: {

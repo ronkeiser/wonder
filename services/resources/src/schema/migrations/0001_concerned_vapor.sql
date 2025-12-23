@@ -1,0 +1,1 @@
+ALTER TABLE `workflow_runs` ADD `parent_token_id` text;

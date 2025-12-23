@@ -12,6 +12,7 @@ import { createEmitter, type Emitter } from '@wonder/events';
 import { createLogger, type Logger } from '@wonder/logs';
 import { DurableObject } from 'cloudflare:workers';
 import {
+  applyDecisions,
   checkTimeouts,
   processTaskError,
   processTaskResult,
@@ -19,6 +20,7 @@ import {
   type DispatchContext,
   type TaskErrorResult,
 } from './dispatch';
+import { ChildWorkflowManager } from './operations/child-workflows';
 import { ContextManager } from './operations/context';
 import { createDb } from './operations/db';
 import { DefinitionManager } from './operations/defs';
@@ -38,6 +40,7 @@ export class WorkflowCoordinator extends DurableObject {
   private context: ContextManager;
   private tokens: TokenManager;
   private status: StatusManager;
+  private childWorkflows: ChildWorkflowManager;
 
   constructor(ctx: DurableObjectState, env: Env) {
     super(ctx, env);
@@ -73,6 +76,7 @@ export class WorkflowCoordinator extends DurableObject {
     this.context = new ContextManager(ctx.storage.sql, this.defs, this.emitter);
     this.tokens = new TokenManager(db, this.emitter);
     this.status = new StatusManager(db, this.emitter);
+    this.childWorkflows = new ChildWorkflowManager(db, this.emitter);
   }
 
   /**
@@ -89,11 +93,13 @@ export class WorkflowCoordinator extends DurableObject {
       context: this.context,
       defs: this.defs,
       status: this.status,
+      childWorkflows: this.childWorkflows,
       emitter: this.emitter,
       logger: this.logger,
       workflowRunId,
       resources: this.env.RESOURCES,
       executor: this.env.EXECUTOR,
+      coordinator: this.env.COORDINATOR,
       waitUntil: (promise) => this.ctx.waitUntil(promise),
       scheduleAlarm: (delayMs) => this.scheduleAlarm(delayMs),
       enableTraceEvents: options?.enableTraceEvents,
@@ -294,6 +300,149 @@ export class WorkflowCoordinator extends DurableObject {
         },
       });
       throw error; // Rethrow to trigger retry
+    }
+  }
+
+  /**
+   * Resume a token that was waiting for a sub-workflow to complete.
+   * Called by child coordinator when it completes successfully.
+   */
+  async resumeFromSubworkflow(
+    tokenId: string,
+    childOutput: Record<string, unknown>,
+  ): Promise<void> {
+    try {
+      const token = this.tokens.get(tokenId);
+
+      // State guard: only resume tokens waiting for sub-workflow
+      if (token.status !== 'waiting_for_subworkflow') {
+        this.logger.warn({
+          eventType: 'coordinator.resume_subworkflow.invalid_state',
+          message: `Token not waiting for subworkflow: ${token.status}`,
+          traceId: token.workflowRunId,
+          metadata: { tokenId, status: token.status },
+        });
+        return; // Idempotent: no-op if already resumed
+      }
+
+      this.logger.info({
+        eventType: 'coordinator.resume_subworkflow.started',
+        message: 'Resuming token from sub-workflow completion',
+        traceId: token.workflowRunId,
+        metadata: { tokenId, outputKeys: Object.keys(childOutput) },
+      });
+
+      const ctx = this.getDispatchContext(token.workflowRunId);
+      await applyDecisions(
+        [
+          {
+            type: 'RESUME_FROM_SUBWORKFLOW',
+            tokenId,
+            output: childOutput,
+          },
+        ],
+        ctx,
+      );
+    } catch (error) {
+      this.logger.error({
+        eventType: 'coordinator.resume_subworkflow.failed',
+        message: 'Failed to resume from sub-workflow',
+        metadata: {
+          tokenId,
+          error: error instanceof Error ? error.message : String(error),
+          stack: error instanceof Error ? error.stack : undefined,
+        },
+      });
+      throw error;
+    }
+  }
+
+  /**
+   * Handle sub-workflow failure.
+   * Called by child coordinator when it fails.
+   */
+  async handleSubworkflowError(tokenId: string, error: string): Promise<void> {
+    try {
+      const token = this.tokens.get(tokenId);
+
+      // State guard: only handle errors for tokens waiting for sub-workflow
+      if (token.status !== 'waiting_for_subworkflow') {
+        this.logger.warn({
+          eventType: 'coordinator.subworkflow_error.invalid_state',
+          message: `Token not waiting for subworkflow: ${token.status}`,
+          traceId: token.workflowRunId,
+          metadata: { tokenId, status: token.status },
+        });
+        return;
+      }
+
+      this.logger.info({
+        eventType: 'coordinator.subworkflow_error.started',
+        message: 'Handling sub-workflow failure',
+        traceId: token.workflowRunId,
+        metadata: { tokenId, error },
+      });
+
+      const ctx = this.getDispatchContext(token.workflowRunId);
+      await applyDecisions(
+        [
+          {
+            type: 'FAIL_FROM_SUBWORKFLOW',
+            tokenId,
+            error,
+          },
+        ],
+        ctx,
+      );
+    } catch (err) {
+      this.logger.error({
+        eventType: 'coordinator.subworkflow_error.failed',
+        message: 'Failed to handle sub-workflow error',
+        metadata: {
+          tokenId,
+          originalError: error,
+          handlerError: err instanceof Error ? err.message : String(err),
+        },
+      });
+      throw err;
+    }
+  }
+
+  /**
+   * Cancel this workflow run.
+   * Called by parent coordinator when it is cancelled/failed (cascade cancellation).
+   */
+  async cancel(reason: string): Promise<void> {
+    try {
+      const run = this.defs.getWorkflowRun();
+
+      this.logger.info({
+        eventType: 'coordinator.cancel.started',
+        message: 'Cancelling workflow',
+        traceId: run.id,
+        metadata: { reason },
+      });
+
+      const ctx = this.getDispatchContext(run.id);
+      await applyDecisions(
+        [
+          {
+            type: 'FAIL_WORKFLOW',
+            error: `Cancelled: ${reason}`,
+          },
+        ],
+        ctx,
+      );
+    } catch (error) {
+      this.logger.error({
+        eventType: 'coordinator.cancel.failed',
+        message: 'Failed to cancel workflow',
+        metadata: {
+          reason,
+          error: error instanceof Error ? error.message : String(error),
+        },
+      });
+      throw error;
     }
   }
 }

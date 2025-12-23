@@ -20,6 +20,10 @@ export class WorkflowRuns extends Resource {
   async create(
     workflowId: string,
     input: Record<string, unknown>,
+    options?: {
+      parentRunId?: string;
+      parentTokenId?: string;
+    },
   ): Promise<{
     workflowRunId: string;
     projectId: string;
@@ -89,6 +93,8 @@ export class WorkflowRuns extends Resource {
         context,
         activeTokens: activeTokens,
         durableObjectId: workflowRunId,
+        parentRunId: options?.parentRunId,
+        parentTokenId: options?.parentTokenId,
       });
 
       this.serviceCtx.logger.info({

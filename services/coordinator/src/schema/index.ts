@@ -106,5 +106,29 @@ export const workflowStatus = sqliteTable('workflow_status', {
   updatedAt: integer({ mode: 'timestamp_ms' }).notNull(),
 });
 
+/**
+ * Child Workflows Table
+ *
+ * Tracks active child workflows spawned by this workflow run.
+ * Used for cascade cancellation when parent workflow fails/cancels.
+ */
+export const childWorkflows = sqliteTable(
+  'child_workflows',
+  {
+    id: text().primaryKey(),
+    workflowRunId: text().notNull(), // Parent workflow run
+    parentTokenId: text().notNull(), // Token waiting for this child
+    childRunId: text().notNull(), // Child workflow run ID
+    status: text().$type<'running' | 'completed' | 'failed' | 'cancelled'>().notNull(),
+    createdAt: integer({ mode: 'timestamp_ms' }).notNull(),
+    updatedAt: integer({ mode: 'timestamp_ms' }).notNull(),
+  },
+  (table) => [
+    index('idx_child_workflows_workflow_run').on(table.workflowRunId),
+    index('idx_child_workflows_parent_token').on(table.parentTokenId),
+    index('idx_child_workflows_status').on(table.status),
+  ],
+);
+
 // Legacy snake_case exports for backward compatibility during migration
 export { fanIns as fan_ins, workflowStatus as workflow_status };

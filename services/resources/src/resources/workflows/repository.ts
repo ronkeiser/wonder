@@ -131,6 +131,7 @@ export async function createWorkflowRun(
     durableObjectId: string;
     parentRunId?: string | null;
     parentNodeId?: string | null;
+    parentTokenId?: string | null;
   },
 ): Promise<WorkflowRun> {
   const now = new Date().toISOString();
