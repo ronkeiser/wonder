@@ -64,9 +64,9 @@ export class WorkflowCoordinator extends DurableObject {
         const run = this.defs.getWorkflowRun();
         return {
           workflowRunId: run.id,
+          rootRunId: run.rootRunId,
           projectId: run.projectId,
           workflowDefId: run.workflowDefId,
-          parentRunId: run.parentRunId,
         };
       },
       { traceEnabled: (this.env.TRACE_EVENTS_ENABLED as string) === 'true' },
@@ -88,6 +88,7 @@ export class WorkflowCoordinator extends DurableObject {
     workflowRunId: string,
     options?: { enableTraceEvents?: boolean },
   ): DispatchContext {
+    const run = this.defs.getWorkflowRun();
     return {
       tokens: this.tokens,
       context: this.context,
@@ -97,6 +98,7 @@ export class WorkflowCoordinator extends DurableObject {
       emitter: this.emitter,
       logger: this.logger,
       workflowRunId,
+      rootRunId: run.rootRunId,
       resources: this.env.RESOURCES,
       executor: this.env.EXECUTOR,
       coordinator: this.env.COORDINATOR,

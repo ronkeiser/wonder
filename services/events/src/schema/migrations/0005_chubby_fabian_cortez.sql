@@ -1,1 +1,0 @@
-ALTER TABLE `trace_events` ADD `message` text;

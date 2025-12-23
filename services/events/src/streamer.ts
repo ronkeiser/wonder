@@ -111,7 +111,7 @@ export class Streamer extends DurableObject<Env> {
    * and broadcasts immediately to WebSocket subscribers.
    */
   emitTrace(
-    context: { workflowRunId: string; projectId: string },
+    context: { workflowRunId: string; rootRunId: string; projectId: string },
     input: TraceEventInput,
   ): void {
     this.traceSeq++;
@@ -370,7 +370,7 @@ function chunkArray<T>(array: T[], size: number): T[][] {
 
 function matchesEventFilter(event: BroadcastEventEntry, filter: SubscriptionFilter): boolean {
   if (filter.workflowRunId && event.workflowRunId !== filter.workflowRunId) return false;
-  if (filter.parentRunId && event.parentRunId !== filter.parentRunId) return false;
+  if (filter.rootRunId && event.rootRunId !== filter.rootRunId) return false;
   if (filter.projectId && event.projectId !== filter.projectId) return false;
   if (filter.nodeId && event.nodeId !== filter.nodeId) return false;
   if (filter.tokenId && event.tokenId !== filter.tokenId) return false;
@@ -382,6 +382,7 @@ function matchesEventFilter(event: BroadcastEventEntry, filter: SubscriptionFilt
 
 function matchesTraceFilter(event: BroadcastTraceEventEntry, filter: SubscriptionFilter): boolean {
   if (filter.workflowRunId && event.workflowRunId !== filter.workflowRunId) return false;
+  if (filter.rootRunId && event.rootRunId !== filter.rootRunId) return false;
   if (filter.projectId && event.projectId !== filter.projectId) return false;
   if (filter.tokenId && event.tokenId !== filter.tokenId) return false;
   if (filter.nodeId && event.nodeId !== filter.nodeId) return false;

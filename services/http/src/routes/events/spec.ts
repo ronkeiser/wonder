@@ -13,7 +13,7 @@ export const getEventsRoute = createRoute({
   request: {
     query: z.object({
       workflowRunId: z.string().optional(),
-      parentRunId: z.string().optional(),
+      rootRunId: z.string().optional().describe('Query all events in a workflow run tree'),
       projectId: z.string().optional(),
       eventType: z.string().optional(),
       nodeId: z.string().optional(),
@@ -42,6 +42,7 @@ export const getTraceEventsRoute = createRoute({
   request: {
     query: z.object({
       workflowRunId: z.string().optional(),
+      rootRunId: z.string().optional().describe('Query all trace events in a workflow run tree'),
       tokenId: z.string().optional(),
       nodeId: z.string().optional(),
       type: z.string().optional(),

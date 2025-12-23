@@ -392,6 +392,7 @@ export const workflowRuns = sqliteTable(
     durableObjectId: text().notNull(),
     latestSnapshot: text({ mode: 'json' }).$type<object>(), // Snapshot
 
+    rootRunId: text().notNull(), // top-level run ID (equals id for top-level runs)
     parentRunId: text(), // self-reference to workflow_runs.id (enforced at application level)
     parentNodeId: text(),
     parentTokenId: text(), // which parent token to resume when sub-workflow completes
@@ -408,6 +409,7 @@ export const workflowRuns = sqliteTable(
     index('idx_workflow_runs_project').on(table.projectId),
     index('idx_workflow_runs_workflow').on(table.workflowId),
     index('idx_workflow_runs_status').on(table.status),
+    index('idx_workflow_runs_root').on(table.rootRunId),
     index('idx_workflow_runs_parent').on(table.parentRunId),
     index('idx_workflow_runs_created_at').on(table.createdAt),
   ],

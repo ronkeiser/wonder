@@ -18,6 +18,7 @@ export interface StepExecutorDeps {
   emitter: Emitter;
   env: Env;
   workflowRunId: string;
+  rootRunId: string;
   tokenId: string;
 }
 
@@ -29,7 +30,7 @@ export async function executeStep(
   context: TaskContext,
   deps: StepExecutorDeps,
 ): Promise<StepResult> {
-  const { logger, emitter, workflowRunId, tokenId } = deps;
+  const { logger, emitter, workflowRunId, rootRunId, tokenId } = deps;
   const stepStartTime = Date.now();
 
   // Emit step started trace event
@@ -163,7 +164,7 @@ async function executeAction(
   input: Record<string, unknown>,
   deps: StepExecutorDeps,
 ): Promise<ActionResult> {
-  const { logger, emitter, env, workflowRunId, tokenId } = deps;
+  const { logger, emitter, env, workflowRunId, rootRunId, tokenId } = deps;
   const actionStartTime = Date.now();
 
   // Load ActionDef from Resources
@@ -202,6 +203,7 @@ async function executeAction(
       input,
       context: {
         workflowRunId,
+        rootRunId,
         tokenId,
         stepRef: step.ref,
       },

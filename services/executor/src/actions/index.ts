@@ -19,6 +19,7 @@ export interface DispatchActionParams {
   input: Record<string, unknown>;
   context: {
     workflowRunId: string;
+    rootRunId: string;
     tokenId: string;
     stepRef: string;
   };

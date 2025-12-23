@@ -112,6 +112,7 @@ export async function dispatchToken(ctx: DispatchContext, tokenId: string): Prom
     ctx.executor.executeTask({
       tokenId: tokenId,
       workflowRunId: token.workflowRunId,
+      rootRunId: ctx.rootRunId,
       projectId: ctx.defs.getWorkflowRun().projectId,
       taskId: node.taskId,
       taskVersion: node.taskVersion ?? 1,

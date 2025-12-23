@@ -21,6 +21,7 @@ export interface ActionInput {
   /** Execution context */
   context: {
     workflowRunId: string;
+    rootRunId: string;
     tokenId: string;
     stepRef: string;
   };

@@ -15,8 +15,8 @@
     {
       "binding": "DB",
       "database_name": "wonder-events",
-      "database_id": "6e452c1d-25f0-48c5-9f05-1d752896fada",
-      "migrations_dir": "./src/db/migrations",
+      "database_id": "31d45c6f-35c0-4eda-aa8b-215899236540",
+      "migrations_dir": "./src/schema/migrations",
     },
   ],
   "durable_objects": {

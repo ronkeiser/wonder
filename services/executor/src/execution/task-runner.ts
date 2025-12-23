@@ -99,6 +99,7 @@ export async function runTask(
         emitter,
         env: deps.env,
         workflowRunId: payload.workflowRunId,
+        rootRunId: payload.rootRunId,
         tokenId: payload.tokenId,
       });
 

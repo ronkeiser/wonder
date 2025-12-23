@@ -89,11 +89,13 @@ export async function executeWorkflowAction(
     });
 
     // 2. Create child workflow run via Resources service
+    // Pass rootRunId so the child inherits the top-level run ID for event scoping
     using workflowRunsResource = env.RESOURCES.workflowRuns();
     const { workflowRunId: childRunId } = await workflowRunsResource.create(
       workflowId,
       actionInput,
       {
+        rootRunId: context.rootRunId,
         parentRunId: context.workflowRunId,
         parentTokenId: context.tokenId,
       },

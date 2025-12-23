@@ -105,6 +105,7 @@ export type DispatchContext = {
   emitter: Emitter;
   logger: Logger;
   workflowRunId: string;
+  rootRunId: string;
   /** Resource service for fetching TaskDefs */
   resources: Env['RESOURCES'];
   /** Executor service for dispatching tasks */

@@ -21,6 +21,7 @@ export class WorkflowRuns extends Resource {
     workflowId: string,
     input: Record<string, unknown>,
     options?: {
+      rootRunId?: string; // For subworkflows - the top-level run ID
       parentRunId?: string;
       parentTokenId?: string;
     },
@@ -83,6 +84,8 @@ export class WorkflowRuns extends Resource {
       ];
 
       // Create workflow run record (status: waiting until start is called)
+      // For top-level runs, rootRunId equals the run's own ID
+      // For subworkflows, rootRunId is passed from the parent context
       await workflowRepo.createWorkflowRun(this.serviceCtx.db, {
         id: workflowRunId,
         projectId: workflow.projectId,
@@ -93,6 +96,7 @@ export class WorkflowRuns extends Resource {
         context,
         activeTokens: activeTokens,
         durableObjectId: workflowRunId,
+        rootRunId: options?.rootRunId ?? workflowRunId,
         parentRunId: options?.parentRunId,
         parentTokenId: options?.parentTokenId,
       });

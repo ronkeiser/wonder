@@ -129,6 +129,7 @@ export async function createWorkflowRun(
     context: object;
     activeTokens: object[];
     durableObjectId: string;
+    rootRunId: string;
     parentRunId?: string | null;
     parentNodeId?: string | null;
     parentTokenId?: string | null;

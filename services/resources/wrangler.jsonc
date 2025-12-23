@@ -9,7 +9,7 @@
     {
       "binding": "DB",
       "database_name": "wonder",
-      "database_id": "a670820b-6a86-441f-a2eb-9936908a9e92",
+      "database_id": "3f74eb31-7f06-4499-bd38-6b59400096f9",
       "migrations_dir": "src/schema/migrations",
       "remote": true,
     },

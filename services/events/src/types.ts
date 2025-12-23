@@ -49,9 +49,9 @@ export type EventType =
  */
 export interface EventContext {
   workflowRunId: string;
+  rootRunId: string; // Top-level run ID for unified timeline queries
   projectId: string;
   workflowDefId: string;
-  parentRunId?: string | null;
 }
 
 /**
@@ -91,7 +91,7 @@ export type BroadcastEventEntry = Omit<EventEntry, 'metadata'> & {
  */
 export interface GetEventsOptions {
   workflowRunId?: string;
-  parentRunId?: string;
+  rootRunId?: string; // Query all events in a workflow run tree
   projectId?: string;
   eventType?: string;
   nodeId?: string;
@@ -166,6 +166,7 @@ export function getEventCategory(type: string): TraceEventCategory {
  */
 export interface TraceEventContext {
   workflowRunId: string;
+  rootRunId: string;
   projectId: string;
 }
 
@@ -218,7 +219,7 @@ export interface TraceEventEmitter {
  */
 export interface SubscriptionFilter {
   workflowRunId?: string;
-  parentRunId?: string;
+  rootRunId?: string; // Subscribe to all events in a workflow run tree
   projectId?: string;
   eventType?: string;
   eventTypes?: string[];

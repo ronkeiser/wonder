@@ -17,6 +17,7 @@ import { runTask } from './execution/task-runner';
 export interface TaskPayload {
   tokenId: string; // For result correlation
   workflowRunId: string; // For sub-workflow context
+  rootRunId: string; // Top-level run ID for unified event timeline
   projectId: string; // For trace event context
   taskId: string; // TaskDef to execute
   taskVersion: number;
@@ -107,9 +108,9 @@ export default class ExecutorService extends WorkerEntrypoint<Env> {
       this.env.STREAMER,
       {
         workflowRunId: payload.workflowRunId,
+        rootRunId: payload.rootRunId,
         projectId: payload.projectId,
         workflowDefId: '',
-        parentRunId: null,
       },
       { traceEnabled },
     );

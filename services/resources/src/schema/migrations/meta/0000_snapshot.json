@@ -1,7 +1,7 @@
 {
   "version": "6",
   "dialect": "sqlite",
-  "id": "debed971-9576-4e41-95a0-bdfe61e935f2",
+  "id": "07630f12-cfab-42a4-8ff8-741827b4a49b",
   "prevId": "00000000-0000-0000-0000-000000000000",
   "tables": {
     "actions": {
@@ -2180,6 +2180,13 @@
           "notNull": false,
           "autoincrement": false
         },
+        "root_run_id": {
+          "name": "root_run_id",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false
+        },
         "parent_run_id": {
           "name": "parent_run_id",
           "type": "text",
@@ -2189,6 +2196,13 @@
         },
         "parent_node_id": {
           "name": "parent_node_id",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false,
+          "autoincrement": false
+        },
+        "parent_token_id": {
+          "name": "parent_token_id",
           "type": "text",
           "primaryKey": false,
           "notNull": false,
@@ -2235,6 +2249,13 @@
           "name": "idx_workflow_runs_status",
           "columns": [
             "status"
+          ],
+          "isUnique": false
+        },
+        "idx_workflow_runs_root": {
+          "name": "idx_workflow_runs_root",
+          "columns": [
+            "root_run_id"
           ],
           "isUnique": false
         },

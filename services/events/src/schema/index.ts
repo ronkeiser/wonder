@@ -23,7 +23,7 @@ export const workflowEvents = sqliteTable(
 
     // Execution context
     workflowRunId: text().notNull(),
-    parentRunId: text(), // For sub-workflows
+    rootRunId: text().notNull(), // Top-level run ID for unified timeline queries
     workflowDefId: text().notNull(),
     nodeId: text(),
     tokenId: text(),
@@ -44,7 +44,7 @@ export const workflowEvents = sqliteTable(
     index('idx_events_timestamp').on(table.timestamp),
     index('idx_events_event_type').on(table.eventType),
     index('idx_events_workflow_run_id').on(table.workflowRunId),
-    index('idx_events_parent_run_id').on(table.parentRunId),
+    index('idx_events_root_run_id').on(table.rootRunId),
     index('idx_events_project_id').on(table.projectId),
     index('idx_events_node_id').on(table.nodeId),
     index('idx_events_token_id').on(table.tokenId),
@@ -79,6 +79,7 @@ export const traceEvents = sqliteTable(
 
     // Execution context
     workflowRunId: text().notNull(),
+    rootRunId: text().notNull(), // Top-level run ID for unified timeline queries
     tokenId: text(), // Most events relate to specific token
     nodeId: text(), // Many events happen at specific node
 
@@ -96,6 +97,7 @@ export const traceEvents = sqliteTable(
   },
   (table) => [
     index('idx_trace_events_workflow_sequence').on(table.workflowRunId, table.sequence),
+    index('idx_trace_events_root_run_id').on(table.rootRunId),
     index('idx_trace_events_type').on(table.type),
     index('idx_trace_events_category').on(table.category),
     index('idx_trace_events_token').on(table.tokenId),
