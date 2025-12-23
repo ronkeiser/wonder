@@ -205,7 +205,11 @@ export class WorkflowCoordinator extends DurableObject {
     }
 
     try {
-      this.tokens.updateStatus(tokenId, 'executing');
+      const ctx = this.getDispatchContext(token.workflowRunId);
+      await applyDecisions(
+        [{ type: 'UPDATE_TOKEN_STATUS', tokenId, status: 'executing' }],
+        ctx,
+      );
     } catch (error) {
       this.logger.error({
         eventType: 'coordinator.mark_executing.failed',
