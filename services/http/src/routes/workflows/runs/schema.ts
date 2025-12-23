@@ -33,3 +33,19 @@ export const WorkflowRunStartResponseSchema = z
     durableObjectId: z.string(),
   })
   .openapi('WorkflowRunStartResponse');
+
+export const CancelWorkflowRunSchema = z
+  .object({
+    reason: z.string().optional().openapi({
+      description: 'Reason for cancellation',
+      example: 'User requested cancellation',
+    }),
+  })
+  .openapi('CancelWorkflowRun');
+
+export const WorkflowRunCancelResponseSchema = z
+  .object({
+    cancelled: z.boolean(),
+    workflowRunId: z.string(),
+  })
+  .openapi('WorkflowRunCancelResponse');

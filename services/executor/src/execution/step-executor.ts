@@ -120,6 +120,12 @@ export async function executeStep(
     logger,
   );
 
+  // Preserve _subworkflow signal for coordinator
+  // Workflow actions return this metadata to trigger parent token waiting
+  if (actionResult.output._subworkflow) {
+    context.output._subworkflow = actionResult.output._subworkflow;
+  }
+
   // Emit step completed trace event
   const stepDuration = Date.now() - stepStartTime;
   emitter.emitTrace({

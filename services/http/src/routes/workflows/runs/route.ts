@@ -4,7 +4,7 @@
 
 import { OpenAPIHono } from '@hono/zod-openapi';
 import type { HttpEnv } from '~/types';
-import { createWorkflowRunRoute, startWorkflowRunRoute } from './spec';
+import { cancelWorkflowRunRoute, createWorkflowRunRoute, startWorkflowRunRoute } from './spec';
 
 /** /{id}/runs */
 export const workflowRuns = new OpenAPIHono<HttpEnv>();
@@ -26,4 +26,15 @@ workflowRuns.openapi(startWorkflowRunRoute, async (c) => {
   const coordinator = c.env.COORDINATOR.get(coordinatorId);
   await coordinator.start(runId, { enableTraceEvents: body?.enableTraceEvents });
   return c.json({ durableObjectId: runId }, 200);
+});
+
+/** POST /{id}/runs/{runId}/cancel */
+workflowRuns.openapi(cancelWorkflowRunRoute, async (c) => {
+  const { runId } = c.req.valid('param');
+  const body = c.req.valid('json');
+  const reason = body?.reason ?? 'User requested cancellation';
+  const coordinatorId = c.env.COORDINATOR.idFromName(runId);
+  const coordinator = c.env.COORDINATOR.get(coordinatorId);
+  await coordinator.cancel(reason);
+  return c.json({ cancelled: true, workflowRunId: runId }, 200);
 });

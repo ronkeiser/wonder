@@ -104,3 +104,52 @@ export const deleteWorkflowRunRoute = createRoute({
     },
   },
 });
+
+export const cancelWorkflowRunRoute = createRoute({
+  method: 'post',
+  path: '/{id}/cancel',
+  tags: ['workflow-runs'],
+  request: {
+    params: z.object({
+      id: ulid().openapi({ param: { name: 'id', in: 'path' } }),
+    }),
+    body: {
+      content: {
+        'application/json': {
+          schema: z
+            .object({
+              reason: z.string().optional().openapi({
+                description: 'Reason for cancellation',
+                example: 'User requested cancellation',
+              }),
+            })
+            .openapi('CancelWorkflowRunRequest'),
+        },
+      },
+      required: false,
+    },
+  },
+  responses: {
+    200: {
+      content: {
+        'application/json': {
+          schema: z
+            .object({
+              cancelled: z.boolean(),
+              workflowRunId: z.string(),
+            })
+            .openapi('WorkflowRunCancelResponse'),
+        },
+      },
+      description: 'Workflow run cancelled successfully',
+    },
+    500: {
+      content: {
+        'application/json': {
+          schema: z.object({ error: z.string() }).openapi('WorkflowRunCancelError'),
+        },
+      },
+      description: 'Failed to cancel workflow run',
+    },
+  },
+});
