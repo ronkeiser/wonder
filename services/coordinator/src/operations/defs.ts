@@ -32,7 +32,6 @@ export class DefinitionManager {
   private readonly db: CoordinatorDb;
   private readonly env: Env;
   private readonly logger: Logger;
-  private initialized = false;
 
   constructor(db: CoordinatorDb, ctx: DurableObjectState, env: Env) {
     this.db = db;
@@ -69,7 +68,6 @@ export class DefinitionManager {
           message: 'DO SQLite already populated (wake-up)',
           traceId: workflowRunId,
         });
-        this.initialized = true;
         return;
       }
 
@@ -93,8 +91,6 @@ export class DefinitionManager {
           transitionCount: transitionCount,
         },
       });
-
-      this.initialized = true;
     } catch (error) {
       this.logger.error({
         eventType: 'defs.initialize.failed',
@@ -127,87 +123,19 @@ export class DefinitionManager {
     const transitionsList = defResponse.transitions;
 
     // 3. Insert workflow run
-    this.db
-      .insert(workflowRuns)
-      .values({
-        id: run.id,
-        projectId: run.projectId,
-        workflowId: run.workflowId,
-        workflowDefId: run.workflowDefId,
-        workflowVersion: run.workflowVersion,
-        status: run.status as 'running' | 'completed' | 'failed' | 'waiting',
-        context: run.context,
-        activeTokens: run.activeTokens,
-        durableObjectId: run.durableObjectId,
-        latestSnapshot: run.latestSnapshot,
-        parentRunId: run.parentRunId,
-        parentNodeId: run.parentNodeId,
-        createdAt: run.createdAt,
-        updatedAt: run.updatedAt,
-        completedAt: run.completedAt,
-      })
-      .run();
+    this.db.insert(workflowRuns).values(run).run();
 
     // 4. Insert workflow def
-    this.db
-      .insert(workflowDefs)
-      .values({
-        id: def.id,
-        version: def.version,
-        name: def.name,
-        description: def.description,
-        projectId: def.projectId,
-        libraryId: def.libraryId,
-        tags: def.tags,
-        inputSchema: def.inputSchema,
-        outputSchema: def.outputSchema,
-        outputMapping: def.outputMapping,
-        contextSchema: def.contextSchema,
-        initialNodeId: def.initialNodeId,
-        createdAt: def.createdAt,
-        updatedAt: def.updatedAt,
-      })
-      .run();
+    this.db.insert(workflowDefs).values(def).run();
 
     // 5. Insert nodes
     for (const node of nodesList) {
-      this.db
-        .insert(nodes)
-        .values({
-          id: node.id,
-          ref: node.ref,
-          workflowDefId: node.workflowDefId,
-          workflowDefVersion: node.workflowDefVersion,
-          name: node.name,
-          taskId: node.taskId,
-          taskVersion: node.taskVersion,
-          inputMapping: node.inputMapping,
-          outputMapping: node.outputMapping,
-          resourceBindings: node.resourceBindings,
-        })
-        .run();
+      this.db.insert(nodes).values(node).run();
     }
 
     // 6. Insert transitions
     for (const transition of transitionsList) {
-      this.db
-        .insert(transitions)
-        .values({
-          id: transition.id,
-          ref: transition.ref,
-          workflowDefId: transition.workflowDefId,
-          workflowDefVersion: transition.workflowDefVersion,
-          fromNodeId: transition.fromNodeId,
-          toNodeId: transition.toNodeId,
-          priority: transition.priority,
-          condition: transition.condition,
-          spawnCount: transition.spawnCount,
-          siblingGroup: transition.siblingGroup,
-          foreach: transition.foreach,
-          synchronization: transition.synchronization,
-          loopConfig: transition.loopConfig,
-        })
-        .run();
+      this.db.insert(transitions).values(transition).run();
     }
   }
 
@@ -215,17 +143,10 @@ export class DefinitionManager {
    * Accessors
    */
 
-  private ensureInitialized(): void {
-    if (!this.initialized) {
-      throw new Error('DefinitionManager not initialized - call initialize() first');
-    }
-  }
-
   /**
    * Get the workflow run
    */
   getWorkflowRun(): WorkflowRunRow {
-    this.ensureInitialized();
     const result = this.db.select().from(workflowRuns).limit(1).all();
     if (result.length === 0) {
       throw new Error('WorkflowRun not found');
@@ -237,7 +158,6 @@ export class DefinitionManager {
    * Get the workflow definition
    */
   getWorkflowDef(): WorkflowDefRow {
-    this.ensureInitialized();
     const result = this.db.select().from(workflowDefs).limit(1).all();
     if (result.length === 0) {
       throw new Error('WorkflowDef not found');
@@ -249,7 +169,6 @@ export class DefinitionManager {
    * Get a node by ID
    */
   getNode(nodeId: string): NodeRow {
-    this.ensureInitialized();
     const def = this.getWorkflowDef();
     const result = this.db
       .select()
@@ -274,7 +193,6 @@ export class DefinitionManager {
    * Get all nodes for this workflow
    */
   getNodes(): NodeRow[] {
-    this.ensureInitialized();
     const def = this.getWorkflowDef();
     return this.db
       .select()
@@ -287,7 +205,6 @@ export class DefinitionManager {
    * Get transitions from a specific node (for routing)
    */
   getTransitionsFrom(nodeId: string): TransitionRow[] {
-    this.ensureInitialized();
     const def = this.getWorkflowDef();
     return this.db
       .select()
@@ -306,7 +223,6 @@ export class DefinitionManager {
    * Get all transitions for this workflow
    */
   getTransitions(): TransitionRow[] {
-    this.ensureInitialized();
     const def = this.getWorkflowDef();
     return this.db
       .select()
@@ -324,7 +240,6 @@ export class DefinitionManager {
    * Get a transition by ID
    */
   getTransition(transitionId: string): TransitionRow {
-    this.ensureInitialized();
     const def = this.getWorkflowDef();
     const result = this.db
       .select()
