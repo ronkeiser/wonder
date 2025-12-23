@@ -232,7 +232,7 @@ async function applyOne(decision: Decision, ctx: DispatchContext): Promise<Apply
         );
         if (syncTransition?.synchronization?.timeoutMs) {
           // Fire-and-forget the alarm scheduling
-          ctx.waitUntil(ctx.scheduleTimeoutAlarm(syncTransition.synchronization.timeoutMs));
+          ctx.waitUntil(ctx.scheduleAlarm(syncTransition.synchronization.timeoutMs));
         }
       }
 

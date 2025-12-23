@@ -303,6 +303,27 @@ export function hasTimedOut(
   return elapsedMs >= transition.synchronization.timeoutMs;
 }
 
+/**
+ * Get the earliest (shortest) timeout configured across transitions.
+ *
+ * Used to determine the next alarm scheduling interval.
+ * Returns null if no transitions have timeout configurations.
+ */
+export function getEarliestTimeoutMs(transitions: Transition[]): number | null {
+  let earliest: number | null = null;
+
+  for (const t of transitions) {
+    const timeoutMs = t.synchronization?.timeoutMs;
+    if (timeoutMs !== undefined) {
+      if (earliest === null || timeoutMs < earliest) {
+        earliest = timeoutMs;
+      }
+    }
+  }
+
+  return earliest;
+}
+
 // ============================================================================
 // Fan-In Continuation
 // ============================================================================

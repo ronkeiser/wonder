@@ -10,7 +10,7 @@
  */
 
 import { decideWorkflowStart } from '../planning/index';
-import { decideOnTimeout, hasTimedOut } from '../planning/synchronization';
+import { decideOnTimeout, getEarliestTimeoutMs, hasTimedOut } from '../planning/synchronization';
 import type { DispatchContext, TaskErrorResult } from '../types';
 import { applyDecisions } from './apply';
 import { dispatchToken } from './task';
@@ -121,6 +121,8 @@ export async function processTaskError(
  * Called by the alarm handler when it fires.
  * Groups waiting tokens by their sibling group, checks each group's
  * transition for timeout, and applies timeout decisions.
+ *
+ * Automatically schedules the next alarm if there are remaining waiting tokens.
  */
 export async function checkTimeouts(ctx: DispatchContext): Promise<void> {
   const waitingTokens = ctx.tokens.getAllWaitingTokens();
@@ -178,6 +180,15 @@ export async function checkTimeouts(ctx: DispatchContext): Promise<void> {
 
       // Apply all decisions (including FAIL_WORKFLOW if present)
       await applyDecisions(decisions, ctx);
+    }
+  }
+
+  // Schedule next alarm if there are still waiting tokens with timeouts
+  const stillWaiting = ctx.tokens.getOldestWaitingTimestamp();
+  if (stillWaiting) {
+    const nextAlarmMs = getEarliestTimeoutMs(transitions);
+    if (nextAlarmMs) {
+      await ctx.scheduleAlarm(nextAlarmMs);
     }
   }
 }

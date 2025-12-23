@@ -95,7 +95,7 @@ export class WorkflowCoordinator extends DurableObject {
       resources: this.env.RESOURCES,
       executor: this.env.EXECUTOR,
       waitUntil: (promise) => this.ctx.waitUntil(promise),
-      scheduleTimeoutAlarm: (timeoutMs) => this.scheduleTimeoutAlarm(timeoutMs),
+      scheduleAlarm: (delayMs) => this.scheduleAlarm(delayMs),
       enableTraceEvents: options?.enableTraceEvents,
     };
   }
@@ -247,14 +247,13 @@ export class WorkflowCoordinator extends DurableObject {
   }
 
   /**
-   * Schedule an alarm to check for timeouts.
+   * Schedule an alarm to fire after delayMs.
    *
-   * Called when a token starts waiting. Sets an alarm for when the
-   * earliest timeout might fire.
+   * Only schedules if no alarm exists or the new alarm is earlier.
    */
-  async scheduleTimeoutAlarm(timeoutMs: number): Promise<void> {
+  async scheduleAlarm(delayMs: number): Promise<void> {
     const existingAlarm = await this.ctx.storage.getAlarm();
-    const newAlarmTime = Date.now() + timeoutMs;
+    const newAlarmTime = Date.now() + delayMs;
 
     // Only schedule if no alarm exists or new alarm is earlier
     if (!existingAlarm || newAlarmTime < existingAlarm) {
@@ -262,8 +261,8 @@ export class WorkflowCoordinator extends DurableObject {
 
       this.logger.info({
         eventType: 'coordinator.alarm.scheduled',
-        message: `Timeout alarm scheduled for ${timeoutMs}ms from now`,
-        metadata: { timeoutMs, alarmTime: new Date(newAlarmTime).toISOString() },
+        message: `Alarm scheduled for ${delayMs}ms from now`,
+        metadata: { delayMs, alarmTime: new Date(newAlarmTime).toISOString() },
       });
     }
   }
@@ -284,18 +283,7 @@ export class WorkflowCoordinator extends DurableObject {
         traceId: run.id,
       });
 
-      // Check for timed out tokens and handle them
       await checkTimeouts(ctx);
-
-      // Schedule next alarm if there are still waiting tokens
-      const oldestWaiting = this.tokens.getOldestWaitingTimestamp();
-      if (oldestWaiting) {
-        // Find the earliest configured timeout among waiting tokens' transitions
-        const nextTimeoutMs = this.getEarliestTimeout();
-        if (nextTimeoutMs) {
-          await this.scheduleTimeoutAlarm(nextTimeoutMs);
-        }
-      }
     } catch (error) {
       this.logger.error({
         eventType: 'coordinator.alarm.failed',
@@ -307,26 +295,6 @@ export class WorkflowCoordinator extends DurableObject {
       });
       throw error; // Rethrow to trigger retry
     }
-  }
-
-  /**
-   * Get the earliest timeout configuration among all transitions.
-   * Returns the shortest timeoutMs found, or null if none configured.
-   */
-  private getEarliestTimeout(): number | null {
-    const transitions = this.defs.getTransitions();
-    let earliest: number | null = null;
-
-    for (const t of transitions) {
-      const sync = t.synchronization as { timeoutMs?: number } | null;
-      if (sync?.timeoutMs) {
-        if (earliest === null || sync.timeoutMs < earliest) {
-          earliest = sync.timeoutMs;
-        }
-      }
-    }
-
-    return earliest;
   }
 }
 

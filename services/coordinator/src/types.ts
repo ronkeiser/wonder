@@ -109,8 +109,8 @@ export type DispatchContext = {
   executor: Env['EXECUTOR'];
   /** Register background work (fire-and-forget) */
   waitUntil: (promise: Promise<unknown>) => void;
-  /** Schedule timeout alarm for sync points */
-  scheduleTimeoutAlarm: (timeoutMs: number) => Promise<void>;
+  /** Schedule alarm to fire after delayMs */
+  scheduleAlarm: (delayMs: number) => Promise<void>;
   /** Whether trace events are enabled for this workflow run */
   enableTraceEvents?: boolean;
 };
