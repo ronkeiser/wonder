@@ -157,6 +157,28 @@ export async function processTaskResult(
     return;
   }
 
+  // Check for sub-workflow signal in output
+  // Executor returns { _subworkflow: { childRunId, timeoutMs } } when a workflow action starts a child
+  const subworkflow = result.outputData._subworkflow as
+    | { childRunId: string; timeoutMs?: number }
+    | undefined;
+
+  if (subworkflow) {
+    // Mark token as waiting for sub-workflow instead of completing
+    await applyDecisions(
+      [
+        {
+          type: 'MARK_WAITING_FOR_SUBWORKFLOW',
+          tokenId,
+          childRunId: subworkflow.childRunId,
+          timeoutMs: subworkflow.timeoutMs,
+        },
+      ],
+      ctx,
+    );
+    return;
+  }
+
   // Mark token as completed via decision
   await applyDecisions([{ type: 'COMPLETE_TOKEN', tokenId }], ctx);
 
@@ -172,9 +194,15 @@ export async function processTaskResult(
   } else {
     // Linear flow: Apply node's outputMapping to transform and store output
     // e.g., { "state.result": "$.greeting" } writes result.outputData.greeting to context.state.result
-    ctx.context.applyOutputMapping(
-      node.outputMapping as Record<string, string> | null,
-      result.outputData,
+    await applyDecisions(
+      [
+        {
+          type: 'APPLY_OUTPUT_MAPPING',
+          outputMapping: node.outputMapping as Record<string, string> | null,
+          outputData: result.outputData,
+        },
+      ],
+      ctx,
     );
   }
 

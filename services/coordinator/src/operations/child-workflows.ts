@@ -40,8 +40,9 @@ export class ChildWorkflowManager {
     workflowRunId: string;
     parentTokenId: string;
     childRunId: string;
+    timeoutMs?: number;
   }): string {
-    const { workflowRunId, parentTokenId, childRunId } = params;
+    const { workflowRunId, parentTokenId, childRunId, timeoutMs } = params;
     const id = ulid();
     const now = new Date();
 
@@ -53,6 +54,7 @@ export class ChildWorkflowManager {
         parentTokenId,
         childRunId,
         status: 'running',
+        timeoutMs: timeoutMs ?? null,
         createdAt: now,
         updatedAt: now,
       })
@@ -64,6 +66,7 @@ export class ChildWorkflowManager {
         id,
         parentTokenId,
         childRunId,
+        timeoutMs,
       },
     });
 

@@ -119,12 +119,22 @@ export async function processTaskError(
  * Check all waiting tokens for timeouts and handle them.
  *
  * Called by the alarm handler when it fires.
- * Groups waiting tokens by their sibling group, checks each group's
- * transition for timeout, and applies timeout decisions.
+ * Handles two types of timeouts:
+ * 1. Fan-in synchronization timeouts (waiting_for_siblings)
+ * 2. Sub-workflow timeouts (waiting_for_subworkflow)
  *
  * Automatically schedules the next alarm if there are remaining waiting tokens.
  */
 export async function checkTimeouts(ctx: DispatchContext): Promise<void> {
+  await checkSiblingTimeouts(ctx);
+  await checkSubworkflowTimeouts(ctx);
+  await scheduleNextAlarmIfNeeded(ctx);
+}
+
+/**
+ * Check fan-in synchronization timeouts for tokens waiting for siblings.
+ */
+async function checkSiblingTimeouts(ctx: DispatchContext): Promise<void> {
   const waitingTokens = ctx.tokens.getAllWaitingTokens();
   if (waitingTokens.length === 0) {
     return;
@@ -182,13 +192,70 @@ export async function checkTimeouts(ctx: DispatchContext): Promise<void> {
       await applyDecisions(decisions, ctx);
     }
   }
+}
 
-  // Schedule next alarm if there are still waiting tokens with timeouts
-  const stillWaiting = ctx.tokens.getOldestWaitingTimestamp();
-  if (stillWaiting) {
+/**
+ * Check sub-workflow timeouts for tokens waiting for child workflows.
+ */
+async function checkSubworkflowTimeouts(ctx: DispatchContext): Promise<void> {
+  const runningChildren = ctx.childWorkflows.getRunning(ctx.workflowRunId);
+
+  for (const child of runningChildren) {
+    // Skip if no timeout configured
+    if (!child.timeoutMs) continue;
+
+    // Check if timeout has elapsed since child was created
+    const elapsed = Date.now() - child.createdAt.getTime();
+    if (elapsed < child.timeoutMs) continue;
+
+    // Handle timeout via decision
+    await applyDecisions(
+      [
+        {
+          type: 'TIMEOUT_SUBWORKFLOW',
+          tokenId: child.parentTokenId,
+          childRunId: child.childRunId,
+          timeoutMs: child.timeoutMs,
+          elapsedMs: elapsed,
+        },
+      ],
+      ctx,
+    );
+  }
+}
+
+/**
+ * Schedule the next alarm if there are still waiting tokens with timeouts.
+ */
+async function scheduleNextAlarmIfNeeded(ctx: DispatchContext): Promise<void> {
+  const transitions = ctx.defs.getTransitions();
+
+  // Check for sibling waiting tokens
+  const stillWaitingForSiblings = ctx.tokens.getOldestWaitingTimestamp();
+  if (stillWaitingForSiblings) {
     const nextAlarmMs = getEarliestTimeoutMs(transitions);
     if (nextAlarmMs) {
       await ctx.scheduleAlarm(nextAlarmMs);
+      return;
     }
+  }
+
+  // Check for sub-workflow waiting tokens
+  const runningChildren = ctx.childWorkflows.getRunning(ctx.workflowRunId);
+  let earliestSubworkflowTimeout: number | null = null;
+
+  for (const child of runningChildren) {
+    if (!child.timeoutMs) continue;
+    const elapsed = Date.now() - child.createdAt.getTime();
+    const remaining = child.timeoutMs - elapsed;
+    if (remaining > 0) {
+      if (!earliestSubworkflowTimeout || remaining < earliestSubworkflowTimeout) {
+        earliestSubworkflowTimeout = remaining;
+      }
+    }
+  }
+
+  if (earliestSubworkflowTimeout) {
+    await ctx.scheduleAlarm(earliestSubworkflowTimeout);
   }
 }

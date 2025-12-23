@@ -125,6 +125,8 @@ export type ApplyResult = {
   tokensCreated: string[];
   tokensDispatched: string[];
   errors: Array<{ decision: Decision; error: Error }>;
+  /** Whether fan-in activation was won (only set by TRY_ACTIVATE_FAN_IN) */
+  fanInActivated?: boolean;
 };
 
 /** Task error result from executor */
@@ -217,6 +219,11 @@ export type Decision =
   // Context operations
   | { type: 'SET_CONTEXT'; path: string; value: unknown }
   | { type: 'APPLY_OUTPUT'; path: string; output: Record<string, unknown> }
+  | {
+      type: 'APPLY_OUTPUT_MAPPING';
+      outputMapping: Record<string, string> | null;
+      outputData: Record<string, unknown>;
+    }
 
   // Branch storage operations
   | { type: 'INIT_BRANCH_TABLE'; tokenId: string; outputSchema: object }
@@ -238,6 +245,14 @@ export type Decision =
       nodeId: string;
       fanInPath: string;
       mergedTokenIds: string[];
+    }
+  | {
+      type: 'TRY_ACTIVATE_FAN_IN';
+      workflowRunId: string;
+      nodeId: string;
+      fanInPath: string;
+      transitionId: string;
+      triggeringTokenId: string;
     }
 
   // Workflow lifecycle
@@ -261,6 +276,13 @@ export type Decision =
       type: 'FAIL_FROM_SUBWORKFLOW';
       tokenId: string;
       error: string;
+    }
+  | {
+      type: 'TIMEOUT_SUBWORKFLOW';
+      tokenId: string;
+      childRunId: string;
+      timeoutMs: number;
+      elapsedMs: number;
     }
 
   // Dispatch operations

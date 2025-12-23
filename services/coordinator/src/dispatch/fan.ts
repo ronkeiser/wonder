@@ -100,9 +100,18 @@ export async function handleBranchOutput(
       }
     }
 
-    // Apply state mappings if any exist
+    // Apply state mappings if any exist via decision
     if (Object.keys(stateMappings).length > 0) {
-      ctx.context.applyOutputMapping(stateMappings, output);
+      await applyDecisions(
+        [
+          {
+            type: 'APPLY_OUTPUT_MAPPING',
+            outputMapping: stateMappings,
+            outputData: output,
+          },
+        ],
+        ctx,
+      );
     }
   }
 }
@@ -196,16 +205,22 @@ export async function activateFanIn(
 ): Promise<string | null> {
   const { workflowRunId, nodeId, fanInPath } = decision;
 
-  // Step 1: Try to win the fan-in race
-  const raceWon = tryWinFanInRace(ctx, {
-    workflowRunId,
-    nodeId,
-    fanInPath,
-    transitionId: transition.id,
-    triggeringTokenId,
-  });
+  // Step 1: Try to win the fan-in race via decision
+  const raceResult = await applyDecisions(
+    [
+      {
+        type: 'TRY_ACTIVATE_FAN_IN',
+        workflowRunId,
+        nodeId,
+        fanInPath,
+        transitionId: transition.id,
+        triggeringTokenId,
+      },
+    ],
+    ctx,
+  );
 
-  if (!raceWon) {
+  if (!raceResult.fanInActivated) {
     // Lost the race - fan-in was already activated by another token.
     // Mark this arrival token as completed so it reaches a terminal state.
     await applyDecisions([{ type: 'COMPLETE_TOKEN', tokenId: triggeringTokenId }], ctx);
@@ -296,51 +311,6 @@ export async function activateFanIn(
 // ============================================================================
 // Fan-In Helper Functions
 // ============================================================================
-
-/**
- * Attempt to win the fan-in race using SQL constraints.
- * Returns true if this call won the race, false if another token already activated.
- */
-function tryWinFanInRace(
-  ctx: DispatchContext,
-  params: {
-    workflowRunId: string;
-    nodeId: string;
-    fanInPath: string;
-    transitionId: string;
-    triggeringTokenId: string;
-  },
-): boolean {
-  const { workflowRunId, nodeId, fanInPath, transitionId, triggeringTokenId } = params;
-
-  // Ensure fan-in record exists (handles race where all tokens arrive simultaneously)
-  ctx.tokens.tryCreateFanIn({
-    workflowRunId,
-    nodeId,
-    fanInPath,
-    transitionId,
-    tokenId: triggeringTokenId,
-  });
-
-  // Try to activate - first caller wins
-  const activated = ctx.tokens.tryActivateFanIn({
-    workflowRunId,
-    fanInPath,
-    activatedByTokenId: triggeringTokenId,
-  });
-
-  if (!activated) {
-    // Lost the race - this is just a debug log, the caller handles token completion
-    ctx.logger.debug({
-      eventType: 'fan_in.race.lost',
-      message: 'Another token already activated this fan-in',
-      metadata: { fanInPath: fanInPath },
-    });
-    return false;
-  }
-
-  return true;
-}
 
 /** Token shape for sibling operations */
 type SiblingToken = ReturnType<TokenManager['getSiblings']>[number];

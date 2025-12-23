@@ -115,29 +115,30 @@ export async function executeWorkflowAction(
     const childCoordinator = env.COORDINATOR.get(childCoordinatorId);
     await childCoordinator.start(childRunId);
 
+    const durationMs = Date.now() - startTime;
+
     logger.info({
       eventType: 'workflow_action.child_started',
-      message: 'Child workflow started, parent token will wait',
+      message: 'Child workflow started, returning subworkflow metadata',
       traceId: context.workflowRunId,
       metadata: {
         stepRef: context.stepRef,
         childRunId,
         parentTokenId: context.tokenId,
+        timeoutMs: impl.timeoutMs,
       },
     });
 
-    const durationMs = Date.now() - startTime;
-
-    // 4. Return waiting signal - parent token should wait for child completion
+    // Return subworkflow metadata - coordinator will detect this and mark token as waiting
     return {
       success: true,
-      output: {}, // Output will come from child workflow completion
-      metrics: { durationMs },
-      waiting: {
-        type: 'subworkflow',
-        childRunId,
-        timeoutMs: impl.timeoutMs,
+      output: {
+        _subworkflow: {
+          childRunId,
+          timeoutMs: impl.timeoutMs,
+        },
       },
+      metrics: { durationMs },
     };
   } catch (error) {
     const durationMs = Date.now() - startTime;

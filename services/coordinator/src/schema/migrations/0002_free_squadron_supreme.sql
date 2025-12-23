@@ -1,0 +1,1 @@
+ALTER TABLE `child_workflows` ADD `timeout_ms` integer;

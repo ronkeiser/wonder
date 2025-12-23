@@ -120,6 +120,7 @@ export const childWorkflows = sqliteTable(
     parentTokenId: text().notNull(), // Token waiting for this child
     childRunId: text().notNull(), // Child workflow run ID
     status: text().$type<'running' | 'completed' | 'failed' | 'cancelled'>().notNull(),
+    timeoutMs: integer(), // Optional timeout in milliseconds
     createdAt: integer({ mode: 'timestamp_ms' }).notNull(),
     updatedAt: integer({ mode: 'timestamp_ms' }).notNull(),
   },

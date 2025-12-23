@@ -50,6 +50,9 @@ export async function applyDecisions(decisions: Decision[], ctx: DispatchContext
       if (outcome.dispatchedTokens) {
         result.tokensDispatched.push(...outcome.dispatchedTokens);
       }
+      if (outcome.fanInActivated !== undefined) {
+        result.fanInActivated = outcome.fanInActivated;
+      }
     } catch (error) {
       result.errors.push({
         decision,
@@ -118,6 +121,7 @@ export async function applyTracedDecisions(
 type ApplyOutcome = {
   createdTokens?: string[];
   dispatchedTokens?: string[];
+  fanInActivated?: boolean;
 };
 
 /**
@@ -333,6 +337,25 @@ async function applyOne(decision: Decision, ctx: DispatchContext): Promise<Apply
       return {};
     }
 
+    case 'APPLY_OUTPUT_MAPPING': {
+      // Apply output mapping to transform task output and write to context
+      ctx.context.applyOutputMapping(decision.outputMapping, decision.outputData);
+
+      // Emit workflow event for output mapping application
+      if (decision.outputMapping) {
+        ctx.emitter.emit({
+          eventType: 'context.output_mapping_applied',
+          message: 'Output mapping applied to context',
+          metadata: {
+            mappingKeys: Object.keys(decision.outputMapping),
+            outputKeys: Object.keys(decision.outputData),
+          },
+        });
+      }
+
+      return {};
+    }
+
     // Branch storage operations
     case 'INIT_BRANCH_TABLE': {
       ctx.context.initializeBranchTable(decision.tokenId, decision.outputSchema as JSONSchema);
@@ -392,6 +415,36 @@ async function applyOne(decision: Decision, ctx: DispatchContext): Promise<Apply
         },
       });
       return {};
+    }
+
+    case 'TRY_ACTIVATE_FAN_IN': {
+      const { workflowRunId, nodeId, fanInPath, transitionId, triggeringTokenId } = decision;
+
+      // Ensure fan-in record exists (handles race where all tokens arrive simultaneously)
+      ctx.tokens.tryCreateFanIn({
+        workflowRunId,
+        nodeId,
+        fanInPath,
+        transitionId,
+        tokenId: triggeringTokenId,
+      });
+
+      // Try to activate - first caller wins
+      const activated = ctx.tokens.tryActivateFanIn({
+        workflowRunId,
+        fanInPath,
+        activatedByTokenId: triggeringTokenId,
+      });
+
+      if (!activated) {
+        ctx.logger.debug({
+          eventType: 'fan_in.race.lost',
+          message: 'Another token already activated this fan-in',
+          metadata: { fanInPath },
+        });
+      }
+
+      return { fanInActivated: activated };
     }
 
     // Workflow lifecycle
@@ -560,11 +613,12 @@ async function applyOne(decision: Decision, ctx: DispatchContext): Promise<Apply
       const token = ctx.tokens.get(decision.tokenId);
       ctx.tokens.markWaitingForSubworkflow(decision.tokenId, decision.childRunId);
 
-      // Register child workflow for cascade cancellation
+      // Register child workflow for cascade cancellation and timeout tracking
       ctx.childWorkflows.register({
         workflowRunId: ctx.workflowRunId,
         parentTokenId: decision.tokenId,
         childRunId: decision.childRunId,
+        timeoutMs: decision.timeoutMs,
       });
 
       // Emit event for sub-workflow start
@@ -575,6 +629,7 @@ async function applyOne(decision: Decision, ctx: DispatchContext): Promise<Apply
           tokenId: decision.tokenId,
           nodeId: token.nodeId,
           childRunId: decision.childRunId,
+          timeoutMs: decision.timeoutMs,
         },
       });
 
@@ -641,6 +696,47 @@ async function applyOne(decision: Decision, ctx: DispatchContext): Promise<Apply
       // For now, propagate the failure to the workflow level
       await applyDecisions(
         [{ type: 'FAIL_WORKFLOW', error: `Sub-workflow failed: ${decision.error}` }],
+        ctx,
+      );
+
+      return {};
+    }
+
+    case 'TIMEOUT_SUBWORKFLOW': {
+      const token = ctx.tokens.get(decision.tokenId);
+
+      // Emit timeout event
+      ctx.emitter.emit({
+        eventType: 'subworkflow.timeout',
+        message: `Sub-workflow timed out after ${decision.timeoutMs}ms`,
+        metadata: {
+          childRunId: decision.childRunId,
+          parentTokenId: decision.tokenId,
+          nodeId: token.nodeId,
+          timeoutMs: decision.timeoutMs,
+          elapsedMs: decision.elapsedMs,
+        },
+      });
+
+      // Cancel the child workflow
+      const childCoordinatorId = ctx.coordinator.idFromName(decision.childRunId);
+      const childCoordinator = ctx.coordinator.get(childCoordinatorId);
+      ctx.waitUntil(childCoordinator.cancel('sub-workflow timeout'));
+
+      // Mark the child as cancelled
+      ctx.childWorkflows.updateStatus(decision.childRunId, 'cancelled');
+
+      // Mark the parent token as timed out
+      ctx.tokens.updateStatus(decision.tokenId, 'timed_out');
+
+      // Fail the parent workflow
+      await applyDecisions(
+        [
+          {
+            type: 'FAIL_WORKFLOW',
+            error: `Sub-workflow '${decision.childRunId}' timed out after ${decision.timeoutMs}ms`,
+          },
+        ],
         ctx,
       );
 

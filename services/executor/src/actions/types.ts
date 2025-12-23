@@ -52,17 +52,6 @@ export interface ActionOutput {
       costUsd: number;
     };
   };
-
-  /**
-   * Signals that the action requires the token to wait for an external event
-   * (e.g., sub-workflow completion, human input).
-   * When true, the coordinator should not complete the token but mark it as waiting.
-   */
-  waiting?: {
-    type: 'subworkflow';
-    childRunId: string;
-    timeoutMs?: number;
-  };
 }
 
 /**
