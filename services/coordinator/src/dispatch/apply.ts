@@ -434,8 +434,7 @@ async function applyOne(decision: Decision, ctx: DispatchContext): Promise<Apply
         eventType: 'workflow.completed',
         message: 'Workflow completed successfully',
         metadata: {
-          hasOutput: Object.keys(decision.output).length > 0,
-          outputKeys: Object.keys(decision.output),
+          output: decision.output,
         },
       });
 
