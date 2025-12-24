@@ -75,24 +75,6 @@ export async function dispatchAction(
       // TODO: Implement artifact writing action handler
       return notImplemented(action, context, logger);
 
-    case 'workflow':
-      // Workflow actions are deprecated - subworkflows should use node-level subworkflowId
-      logger.error({
-        eventType: 'action_workflow_deprecated',
-        message: 'Workflow actions are deprecated. Use subworkflowId on the node instead.',
-        traceId: context.workflowRunId,
-        metadata: { stepRef: context.stepRef, actionId: action.id },
-      });
-      return {
-        success: false,
-        output: {},
-        error: {
-          message: 'Workflow actions are deprecated. Configure subworkflowId on the node instead.',
-          code: 'DEPRECATED',
-          retryable: false,
-        },
-      };
-
     case 'vector':
       // TODO: Implement vector search action handler
       return notImplemented(action, context, logger);

@@ -178,7 +178,6 @@ export type ActionKind =
   | 'http'
   | 'tool'
   | 'shell'
-  | 'workflow'
   | 'context'
   | 'vector'
   | 'metric'

@@ -204,7 +204,6 @@ function getActionKindCompletions(): CompletionItem[] {
     { label: 'http', kind: CompletionItemKind.EnumMember, detail: 'HTTP API call' },
     { label: 'tool', kind: CompletionItemKind.EnumMember, detail: 'Standard library tool' },
     { label: 'shell', kind: CompletionItemKind.EnumMember, detail: 'Shell command' },
-    { label: 'workflow', kind: CompletionItemKind.EnumMember, detail: 'Sub-workflow' },
     { label: 'context', kind: CompletionItemKind.EnumMember, detail: 'Context transformation' },
     { label: 'vector', kind: CompletionItemKind.EnumMember, detail: 'Vector search' },
     { label: 'metric', kind: CompletionItemKind.EnumMember, detail: 'Emit metric' },
@@ -292,9 +291,9 @@ function getWorkflowCompletions(
   if (!parsed) return [];
 
   // Extract valid paths from schemas
-  const inputPaths = extractPaths(parsed.inputSchema, 'input');
-  const contextPaths = extractPaths(parsed.contextSchema, 'state');
-  const outputPaths = extractPaths(parsed.outputSchema, 'output');
+  const inputPaths = extractPaths(parsed.input_schema, 'input');
+  const contextPaths = extractPaths(parsed.context_schema, 'state');
+  const outputPaths = extractPaths(parsed.output_schema, 'output');
   const nodeRefs = Object.keys(parsed.nodes || {});
   const transitionRefs = Object.keys(parsed.transitions || {});
 

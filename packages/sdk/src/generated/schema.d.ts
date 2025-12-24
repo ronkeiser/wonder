@@ -1581,7 +1581,7 @@ export interface components {
             description: string;
             version: number;
             /** @enum {string} */
-            kind: "llm" | "mcp" | "http" | "human" | "context" | "artifact" | "workflow" | "vector" | "metric" | "mock";
+            kind: "llm" | "mcp" | "http" | "human" | "context" | "artifact" | "vector" | "metric" | "mock";
             implementation: {
                 [key: string]: unknown;
             };
@@ -1621,7 +1621,7 @@ export interface components {
              * @example llm
              * @enum {string}
              */
-            kind: "llm" | "mcp" | "http" | "human" | "context" | "artifact" | "workflow" | "vector" | "metric" | "mock";
+            kind: "llm" | "mcp" | "http" | "human" | "context" | "artifact" | "vector" | "metric" | "mock";
             /**
              * @example {
              *       "model": "gpt-4"

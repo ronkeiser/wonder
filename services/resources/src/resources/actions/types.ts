@@ -13,7 +13,6 @@ export type ActionKind =
   | 'human'
   | 'context'
   | 'artifact'
-  | 'workflow'
   | 'vector'
   | 'metric'
   | 'mock';

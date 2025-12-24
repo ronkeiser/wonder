@@ -258,7 +258,7 @@ export const actions = sqliteTable(
     version: integer().notNull().default(1),
 
     kind: text({
-      enum: ['llm', 'mcp', 'http', 'human', 'context', 'artifact', 'workflow', 'vector', 'metric', 'mock'],
+      enum: ['llm', 'mcp', 'http', 'human', 'context', 'artifact', 'vector', 'metric', 'mock'],
     }).notNull(),
 
     implementation: text({ mode: 'json' }).$type<object>().notNull(), // discriminated by kind

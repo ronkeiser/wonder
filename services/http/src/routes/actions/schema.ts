@@ -10,7 +10,7 @@ export const CreateActionSchema = z
     description: z.string().min(1).openapi({ example: 'Generates a summary using LLM' }),
     version: z.number().int().positive().default(1).openapi({ example: 1 }),
     kind: z
-      .enum(['llm', 'mcp', 'http', 'human', 'context', 'artifact', 'workflow', 'vector', 'metric', 'mock'])
+      .enum(['llm', 'mcp', 'http', 'human', 'context', 'artifact', 'vector', 'metric', 'mock'])
       .openapi({ example: 'llm' }),
     implementation: z.record(z.string(), z.unknown()).openapi({ example: { model: 'gpt-4' } }),
     requires: z.record(z.string(), z.unknown()).optional(),
@@ -33,7 +33,7 @@ export const ActionSchema = z
     name: z.string(),
     description: z.string(),
     version: z.number().int(),
-    kind: z.enum(['llm', 'mcp', 'http', 'human', 'context', 'artifact', 'workflow', 'vector', 'metric', 'mock']),
+    kind: z.enum(['llm', 'mcp', 'http', 'human', 'context', 'artifact', 'vector', 'metric', 'mock']),
     implementation: z.record(z.string(), z.unknown()),
     requires: z.record(z.string(), z.unknown()).nullable(),
     produces: z.record(z.string(), z.unknown()).nullable(),
