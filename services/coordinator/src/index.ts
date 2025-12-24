@@ -212,6 +212,44 @@ export class WorkflowCoordinator extends DurableObject {
   }
 
   /**
+   * Cancel this workflow run.
+   * Called by parent coordinator when it is cancelled/failed (cascade cancellation).
+   */
+  async cancel(reason: string): Promise<void> {
+    try {
+      const run = this.defs.getWorkflowRun();
+
+      this.logger.info({
+        eventType: 'coordinator.cancel.started',
+        message: 'Cancelling workflow',
+        traceId: run.id,
+        metadata: { reason },
+      });
+
+      const ctx = this.getDispatchContext(run.id);
+      await applyDecisions(
+        [
+          {
+            type: 'FAIL_WORKFLOW',
+            error: `Cancelled: ${reason}`,
+          },
+        ],
+        ctx,
+      );
+    } catch (error) {
+      this.logger.error({
+        eventType: 'coordinator.cancel.failed',
+        message: 'Failed to cancel workflow',
+        metadata: {
+          reason,
+          ...errorDetails(error),
+        },
+      });
+      throw error;
+    }
+  }
+
+  /**
    * Handle task result from Executor
    *
    * Called when executor completes a task successfully.
@@ -317,6 +355,110 @@ export class WorkflowCoordinator extends DurableObject {
   }
 
   /**
+   * Handle successful subworkflow completion.
+   * Called by subworkflow coordinator when it completes successfully.
+   */
+  async handleSubworkflowResult(
+    tokenId: string,
+    subworkflowOutput: Record<string, unknown>,
+  ): Promise<void> {
+    try {
+      const token = this.tokens.get(tokenId);
+
+      // State guard: only handle results for tokens waiting for subworkflow
+      if (token.status !== 'waiting_for_subworkflow') {
+        this.logger.warn({
+          eventType: 'coordinator.subworkflow_result.invalid_state',
+          message: `Token not waiting for subworkflow: ${token.status}`,
+          traceId: token.workflowRunId,
+          metadata: { tokenId, status: token.status },
+        });
+        return; // Idempotent: no-op if already resumed
+      }
+
+      this.logger.info({
+        eventType: 'coordinator.subworkflow_result.started',
+        message: 'Handling subworkflow result',
+        traceId: token.workflowRunId,
+        metadata: { tokenId, outputKeys: Object.keys(subworkflowOutput) },
+      });
+
+      const ctx = this.getDispatchContext(token.workflowRunId);
+      await applyDecisions(
+        [
+          {
+            type: 'RESUME_FROM_SUBWORKFLOW',
+            tokenId,
+            output: subworkflowOutput,
+          },
+        ],
+        ctx,
+      );
+    } catch (error) {
+      this.logger.error({
+        eventType: 'coordinator.subworkflow_result.failed',
+        message: 'Failed to handle subworkflow result',
+        metadata: {
+          tokenId,
+          ...errorDetails(error),
+        },
+      });
+      throw error;
+    }
+  }
+
+  /**
+   * Handle subworkflow failure.
+   * Called by subworkflow coordinator when it fails.
+   */
+  async handleSubworkflowError(tokenId: string, error: string): Promise<void> {
+    try {
+      const token = this.tokens.get(tokenId);
+
+      // State guard: only handle errors for tokens waiting for subworkflow
+      if (token.status !== 'waiting_for_subworkflow') {
+        this.logger.warn({
+          eventType: 'coordinator.subworkflow_error.invalid_state',
+          message: `Token not waiting for subworkflow: ${token.status}`,
+          traceId: token.workflowRunId,
+          metadata: { tokenId, status: token.status },
+        });
+        return;
+      }
+
+      this.logger.info({
+        eventType: 'coordinator.subworkflow_error.started',
+        message: 'Handling subworkflow failure',
+        traceId: token.workflowRunId,
+        metadata: { tokenId, error },
+      });
+
+      const ctx = this.getDispatchContext(token.workflowRunId);
+      await applyDecisions(
+        [
+          {
+            type: 'FAIL_FROM_SUBWORKFLOW',
+            tokenId,
+            error,
+          },
+        ],
+        ctx,
+      );
+    } catch (err) {
+      this.logger.error({
+        eventType: 'coordinator.subworkflow_error.failed',
+        message: 'Failed to handle subworkflow error',
+        metadata: {
+          tokenId,
+          originalError: error,
+          handlerError: err instanceof Error ? err.message : String(err),
+        },
+      });
+      throw err;
+    }
+  }
+
+  /**
    * Schedule an alarm to fire after delayMs.
    *
    * Only schedules if no alarm exists or the new alarm is earlier.
@@ -361,148 +503,6 @@ export class WorkflowCoordinator extends DurableObject {
         metadata: errorDetails(error),
       });
       throw error; // Rethrow to trigger retry
-    }
-  }
-
-  /**
-   * Handle successful subworkflow completion.
-   * Called by child coordinator when it completes successfully.
-   */
-  async handleSubworkflowResult(
-    tokenId: string,
-    childOutput: Record<string, unknown>,
-  ): Promise<void> {
-    try {
-      const token = this.tokens.get(tokenId);
-
-      // State guard: only handle results for tokens waiting for sub-workflow
-      if (token.status !== 'waiting_for_subworkflow') {
-        this.logger.warn({
-          eventType: 'coordinator.subworkflow_result.invalid_state',
-          message: `Token not waiting for subworkflow: ${token.status}`,
-          traceId: token.workflowRunId,
-          metadata: { tokenId, status: token.status },
-        });
-        return; // Idempotent: no-op if already resumed
-      }
-
-      this.logger.info({
-        eventType: 'coordinator.subworkflow_result.started',
-        message: 'Handling sub-workflow result',
-        traceId: token.workflowRunId,
-        metadata: { tokenId, outputKeys: Object.keys(childOutput) },
-      });
-
-      const ctx = this.getDispatchContext(token.workflowRunId);
-      await applyDecisions(
-        [
-          {
-            type: 'RESUME_FROM_SUBWORKFLOW',
-            tokenId,
-            output: childOutput,
-          },
-        ],
-        ctx,
-      );
-    } catch (error) {
-      this.logger.error({
-        eventType: 'coordinator.subworkflow_result.failed',
-        message: 'Failed to handle sub-workflow result',
-        metadata: {
-          tokenId,
-          ...errorDetails(error),
-        },
-      });
-      throw error;
-    }
-  }
-
-  /**
-   * Handle sub-workflow failure.
-   * Called by child coordinator when it fails.
-   */
-  async handleSubworkflowError(tokenId: string, error: string): Promise<void> {
-    try {
-      const token = this.tokens.get(tokenId);
-
-      // State guard: only handle errors for tokens waiting for sub-workflow
-      if (token.status !== 'waiting_for_subworkflow') {
-        this.logger.warn({
-          eventType: 'coordinator.subworkflow_error.invalid_state',
-          message: `Token not waiting for subworkflow: ${token.status}`,
-          traceId: token.workflowRunId,
-          metadata: { tokenId, status: token.status },
-        });
-        return;
-      }
-
-      this.logger.info({
-        eventType: 'coordinator.subworkflow_error.started',
-        message: 'Handling sub-workflow failure',
-        traceId: token.workflowRunId,
-        metadata: { tokenId, error },
-      });
-
-      const ctx = this.getDispatchContext(token.workflowRunId);
-      await applyDecisions(
-        [
-          {
-            type: 'FAIL_FROM_SUBWORKFLOW',
-            tokenId,
-            error,
-          },
-        ],
-        ctx,
-      );
-    } catch (err) {
-      this.logger.error({
-        eventType: 'coordinator.subworkflow_error.failed',
-        message: 'Failed to handle sub-workflow error',
-        metadata: {
-          tokenId,
-          originalError: error,
-          handlerError: err instanceof Error ? err.message : String(err),
-        },
-      });
-      throw err;
-    }
-  }
-
-  /**
-   * Cancel this workflow run.
-   * Called by parent coordinator when it is cancelled/failed (cascade cancellation).
-   */
-  async cancel(reason: string): Promise<void> {
-    try {
-      const run = this.defs.getWorkflowRun();
-
-      this.logger.info({
-        eventType: 'coordinator.cancel.started',
-        message: 'Cancelling workflow',
-        traceId: run.id,
-        metadata: { reason },
-      });
-
-      const ctx = this.getDispatchContext(run.id);
-      await applyDecisions(
-        [
-          {
-            type: 'FAIL_WORKFLOW',
-            error: `Cancelled: ${reason}`,
-          },
-        ],
-        ctx,
-      );
-    } catch (error) {
-      this.logger.error({
-        eventType: 'coordinator.cancel.failed',
-        message: 'Failed to cancel workflow',
-        metadata: {
-          reason,
-          ...errorDetails(error),
-        },
-      });
-      throw error;
     }
   }
 }

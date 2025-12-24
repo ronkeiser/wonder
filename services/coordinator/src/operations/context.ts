@@ -511,10 +511,6 @@ export class ContextManager {
       if (table) {
         // Drop all tables (including array tables) in dependency order
         table.dropAll();
-      } else {
-        // Fallback for tables not in cache (shouldn't happen normally)
-        const tableName = `branch_output_${tokenId}`;
-        this.sql.exec(`DROP TABLE IF EXISTS ${tableName};`);
       }
 
       // Remove from cache
