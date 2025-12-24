@@ -58,7 +58,7 @@ export function createEmitter(
           rootRunId: ctx.rootRunId,
           projectId: ctx.projectId,
         },
-        stub: streamer.get(streamer.idFromName(ctx.workflowRunId)),
+        stub: streamer.get(streamer.idFromName(ctx.rootRunId)),
       };
     }
     return cached;

@@ -27,7 +27,10 @@ import { batchDecisions } from './batch';
  * Decisions are first batched for optimization, then applied in order.
  * Returns a summary of what was applied.
  */
-export async function applyDecisions(decisions: Decision[], ctx: DispatchContext): Promise<ApplyResult> {
+export async function applyDecisions(
+  decisions: Decision[],
+  ctx: DispatchContext,
+): Promise<ApplyResult> {
   const result: ApplyResult = {
     applied: 0,
     tokensCreated: [],
@@ -491,18 +494,20 @@ async function applyOne(decision: Decision, ctx: DispatchContext): Promise<Apply
         },
       });
 
-      // Update workflow run status in resources service
-      const workflowRunsResource = ctx.resources.workflowRuns();
-      await workflowRunsResource.complete(ctx.workflowRunId, decision.output);
-
       // If this is a sub-workflow, notify parent coordinator
       const run = ctx.defs.getWorkflowRun();
+
+      // Update workflow run status in resources service (skip for ephemeral subworkflows)
+      if (!run.parentRunId) {
+        const workflowRunsResource = ctx.resources.workflowRuns();
+        await workflowRunsResource.complete(ctx.workflowRunId, decision.output);
+      }
       if (run.parentRunId && run.parentTokenId) {
         const parentCoordinatorId = ctx.coordinator.idFromName(run.parentRunId);
         const parentCoordinator = ctx.coordinator.get(parentCoordinatorId);
 
         ctx.waitUntil(
-          parentCoordinator.resumeFromSubworkflow(run.parentTokenId, decision.output),
+          parentCoordinator.handleSubworkflowResult(run.parentTokenId, decision.output),
         );
 
         ctx.emitter.emit({
@@ -571,19 +576,19 @@ async function applyOne(decision: Decision, ctx: DispatchContext): Promise<Apply
         metadata: { error: decision.error },
       });
 
-      // Update workflow run status in resources service
-      const workflowRunsResource = ctx.resources.workflowRuns();
-      await workflowRunsResource.updateStatus(ctx.workflowRunId, 'failed');
-
       // If this is a sub-workflow, notify parent coordinator of failure
       const run = ctx.defs.getWorkflowRun();
+
+      // Update workflow run status in resources service (skip for ephemeral subworkflows)
+      if (!run.parentRunId) {
+        const workflowRunsResource = ctx.resources.workflowRuns();
+        await workflowRunsResource.updateStatus(ctx.workflowRunId, 'failed');
+      }
       if (run.parentRunId && run.parentTokenId) {
         const parentCoordinatorId = ctx.coordinator.idFromName(run.parentRunId);
         const parentCoordinator = ctx.coordinator.get(parentCoordinatorId);
 
-        ctx.waitUntil(
-          parentCoordinator.handleSubworkflowError(run.parentTokenId, decision.error),
-        );
+        ctx.waitUntil(parentCoordinator.handleSubworkflowError(run.parentTokenId, decision.error));
 
         ctx.emitter.emit({
           eventType: 'subworkflow.notifying_parent_failure',

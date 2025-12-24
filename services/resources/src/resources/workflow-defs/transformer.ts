@@ -10,7 +10,7 @@ import { parse } from '@wonder/expressions';
 import { ulid } from 'ulid';
 import { nodes, transitions } from '../../schema';
 import type { SynchronizationConfig } from '../../schema/types';
-import type { NodeInput, TransitionInput, WorkflowDefInput } from './types';
+import type { TransitionInput, WorkflowDefInput } from './types';
 
 // ============================================================================
 // Types (inferred from schema)
@@ -46,16 +46,16 @@ export type TransformResult = {
 export function transformWorkflowDef(data: WorkflowDefInput): TransformResult {
   const workflowDefId = ulid();
 
-  // Transform nodes with inline ID generation
-  const transformedNodes = data.nodes.map((node) => transformNode(node));
+  // Add IDs to nodes
+  const transformedNodes = data.nodes.map((node) => ({ id: ulid(), ...node }));
 
-  // Build ref→id map from transformed nodes (guaranteed complete since we just built it)
+  // Build ref→id map
   const nodeIdByRef: Record<string, string> = {};
   for (const node of transformedNodes) {
     nodeIdByRef[node.ref] = node.id;
   }
 
-  // Transform transitions using the map
+  // Transform transitions (resolve refs to IDs, parse conditions)
   const transformedTransitions = (data.transitions ?? []).map((transition) =>
     transformTransition(transition, nodeIdByRef),
   );
@@ -69,41 +69,21 @@ export function transformWorkflowDef(data: WorkflowDefInput): TransformResult {
 }
 
 /**
- * Transforms a single node from input format to database format.
- */
-function transformNode(node: NodeInput): TransformedNode {
-  return {
-    id: ulid(),
-    ref: node.ref,
-    name: node.name,
-    taskId: node.taskId,
-    taskVersion: node.taskVersion,
-    inputMapping: node.inputMapping,
-    outputMapping: node.outputMapping,
-    resourceBindings: node.resourceBindings,
-  };
-}
-
-/**
  * Transforms a single transition from input format to database format.
- * Parses condition expression strings into ASTs.
+ * Resolves refs to IDs, parses condition strings into ASTs.
  */
 function transformTransition(
   transition: TransitionInput,
   nodeIdByRef: Record<string, string>,
 ): TransformedTransition {
+  const { fromNodeRef, toNodeRef, condition, synchronization, ...rest } = transition;
   return {
     id: ulid(),
-    ref: transition.ref,
-    fromNodeId: nodeIdByRef[transition.fromNodeRef],
-    toNodeId: nodeIdByRef[transition.toNodeRef],
-    priority: transition.priority,
-    condition: transition.condition ? parse(transition.condition) : undefined,
-    spawnCount: transition.spawnCount,
-    siblingGroup: transition.siblingGroup,
-    foreach: transition.foreach,
-    synchronization: transformSynchronization(transition.synchronization),
-    loopConfig: transition.loopConfig,
+    ...rest,
+    fromNodeId: nodeIdByRef[fromNodeRef],
+    toNodeId: nodeIdByRef[toNodeRef],
+    condition: condition ? parse(condition) : undefined,
+    synchronization: transformSynchronization(synchronization),
   };
 }
 

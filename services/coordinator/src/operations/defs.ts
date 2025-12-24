@@ -21,12 +21,33 @@ export type NodeRow = typeof nodes.$inferSelect;
 export type TransitionRow = typeof transitions.$inferSelect;
 
 /**
+ * Parameters for initializing an ephemeral subworkflow
+ */
+export interface SubworkflowParams {
+  /** The subworkflow's own run ID (ephemeral, not in D1) */
+  runId: string;
+  /** The workflow definition ID to load */
+  workflowId: string;
+  /** Optional version (null = latest) */
+  version?: number;
+  /** Input to the subworkflow */
+  input: Record<string, unknown>;
+  /** Root run ID for event scoping (inherited from parent) */
+  rootRunId: string;
+  /** Parent workflow run ID (for callbacks) */
+  parentRunId: string;
+  /** Parent token ID (for callbacks) */
+  parentTokenId: string;
+  /** Project ID (inherited from parent) */
+  projectId: string;
+}
+
+/**
  * DefinitionManager provides access to workflow definitions stored in DO SQLite.
  *
- * On first initialize():
- * 1. Runs migrations (creates tables)
- * 2. Checks if already populated (DO wake-up case)
- * 3. If not, fetches from RESOURCES and inserts all tables
+ * Two initialization paths:
+ * - initializeWorkflow: For root workflows with D1 records
+ * - initializeSubworkflow: For ephemeral subworkflows (no D1 record)
  */
 export class DefinitionManager {
   private readonly db: CoordinatorDb;
@@ -43,14 +64,14 @@ export class DefinitionManager {
   }
 
   /**
-   * Initialize definitions for a workflow run.
+   * Initialize definitions for a root workflow run (has D1 record).
    *
    * - Runs migrations (idempotent)
    * - Checks if already populated (DO wake-up)
    * - If not, fetches from RESOURCES and inserts
-   * - Updates workflow run status to 'running'
+   * - Updates workflow run status to 'running' in D1
    */
-  async initialize(workflowRunId: string): Promise<void> {
+  async initializeWorkflow(workflowRunId: string): Promise<void> {
     try {
       // Run migrations (idempotent - creates tables if not exist)
       migrate(this.db, migrations);
@@ -136,6 +157,110 @@ export class DefinitionManager {
     // 6. Insert transitions
     for (const transition of transitionsList) {
       this.db.insert(transitions).values(transition).run();
+    }
+  }
+
+  /**
+   * Initialize definitions for an ephemeral subworkflow (no D1 record).
+   *
+   * - Runs migrations (idempotent)
+   * - Checks if already populated (DO wake-up)
+   * - If not, fetches WorkflowDef directly and creates synthetic run record
+   * - Does NOT update D1 (subworkflows are ephemeral)
+   */
+  async initializeSubworkflow(params: SubworkflowParams): Promise<void> {
+    try {
+      // Run migrations (idempotent - creates tables if not exist)
+      migrate(this.db, migrations);
+      this.logger.info({
+        eventType: 'defs.migrations.complete',
+        message: 'DO SQLite migrations applied (subworkflow)',
+        traceId: params.runId,
+      });
+
+      // Check if already populated (DO wake-up case)
+      const existing = this.db.select({ id: workflowRuns.id }).from(workflowRuns).limit(1).all();
+      if (existing.length > 0) {
+        this.logger.info({
+          eventType: 'defs.already_populated',
+          message: 'DO SQLite already populated (subworkflow wake-up)',
+          traceId: params.runId,
+        });
+        return;
+      }
+
+      // Fetch workflow def directly (not via workflowRun)
+      const workflowDefsResource = this.env.RESOURCES.workflowDefs();
+      const defResponse = await workflowDefsResource.get(params.workflowId, params.version);
+      const def = defResponse.workflowDef;
+      const nodesList = defResponse.nodes;
+      const transitionsList = defResponse.transitions;
+
+      // Create synthetic workflow run record (local to DO, not in D1)
+      const now = new Date().toISOString();
+      const syntheticRun: WorkflowRunRow = {
+        id: params.runId,
+        projectId: params.projectId,
+        workflowId: params.workflowId,
+        workflowDefId: def.id,
+        workflowVersion: def.version,
+        status: 'running',
+        context: { input: params.input, state: {}, output: {} },
+        activeTokens: [],
+        durableObjectId: params.runId,
+        latestSnapshot: null,
+        rootRunId: params.rootRunId,
+        parentRunId: params.parentRunId,
+        parentNodeId: null,
+        parentTokenId: params.parentTokenId,
+        createdAt: now,
+        updatedAt: now,
+        completedAt: null,
+      };
+      this.db.insert(workflowRuns).values(syntheticRun).run();
+
+      // Insert workflow def
+      this.db.insert(workflowDefs).values(def).run();
+
+      // Insert nodes
+      for (const node of nodesList) {
+        this.db.insert(nodes).values(node).run();
+      }
+
+      // Insert transitions
+      for (const transition of transitionsList) {
+        this.db.insert(transitions).values(transition).run();
+      }
+
+      // Log table counts
+      const nodeCount = this.db.select({ id: nodes.id }).from(nodes).all().length;
+      const transitionCount = this.db.select({ id: transitions.id }).from(transitions).all().length;
+      this.logger.info({
+        eventType: 'defs.subworkflow.populated',
+        message: 'DO SQLite populated for subworkflow',
+        traceId: params.runId,
+        metadata: {
+          runId: params.runId,
+          workflowId: params.workflowId,
+          rootRunId: params.rootRunId,
+          parentRunId: params.parentRunId,
+          nodeCount,
+          transitionCount,
+        },
+      });
+    } catch (error) {
+      this.logger.error({
+        eventType: 'defs.subworkflow.initialize.failed',
+        message: 'Failed to initialize subworkflow DefinitionManager',
+        traceId: params.runId,
+        metadata: {
+          runId: params.runId,
+          workflowId: params.workflowId,
+          error: error instanceof Error ? error.message : String(error),
+          stack: error instanceof Error ? error.stack : undefined,
+        },
+      });
+      throw error;
     }
   }
 

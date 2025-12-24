@@ -12,7 +12,6 @@ import { executeLLMAction } from './llm';
 import { executeMockAction } from './mock';
 import type { ActionDeps, ActionInput, ActionOutput } from './types';
 import { executeUpdateContextAction } from './update-context';
-import { executeWorkflowAction } from './workflow';
 
 export interface DispatchActionParams {
   action: Action;
@@ -77,7 +76,22 @@ export async function dispatchAction(
       return notImplemented(action, context, logger);
 
     case 'workflow':
-      return executeWorkflowAction(actionInput, deps);
+      // Workflow actions are deprecated - subworkflows should use node-level subworkflowId
+      logger.error({
+        eventType: 'action_workflow_deprecated',
+        message: 'Workflow actions are deprecated. Use subworkflowId on the node instead.',
+        traceId: context.workflowRunId,
+        metadata: { stepRef: context.stepRef, actionId: action.id },
+      });
+      return {
+        success: false,
+        output: {},
+        error: {
+          message: 'Workflow actions are deprecated. Configure subworkflowId on the node instead.',
+          code: 'DEPRECATED',
+          retryable: false,
+        },
+      };
 
     case 'vector':
       // TODO: Implement vector search action handler

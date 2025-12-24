@@ -57,6 +57,8 @@ export const CreateWorkflowDefSchema = z
         name: z.string().min(1),
         taskId: z.string().min(1).optional().openapi({ example: 'my-task' }),
         taskVersion: z.number().int().positive().optional().openapi({ example: 1 }),
+        subworkflowId: z.string().min(1).optional().openapi({ example: 'child-workflow-id' }),
+        subworkflowVersion: z.number().int().positive().optional().openapi({ example: 1 }),
         inputMapping: z.record(z.string(), z.unknown()).optional(),
         outputMapping: z.record(z.string(), z.unknown()).optional(),
         resourceBindings: z
@@ -107,6 +109,8 @@ export const NodeSchema = z
     name: z.string(),
     taskId: z.string().nullable(),
     taskVersion: z.number().int().nullable(),
+    subworkflowId: z.string().nullable(),
+    subworkflowVersion: z.number().int().nullable(),
     inputMapping: z.record(z.string(), z.unknown()).nullable(),
     outputMapping: z.record(z.string(), z.unknown()).nullable(),
     resourceBindings: z.record(z.string(), z.string()).nullable(),

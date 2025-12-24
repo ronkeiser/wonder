@@ -177,8 +177,14 @@ export const nodes = sqliteTable(
     name: text().notNull(),
 
     // Task execution (5-layer model: WorkflowDef → Node → TaskDef → Step → ActionDef)
+    // Mutually exclusive with subworkflowId
     taskId: text(),
     taskVersion: integer(),
+
+    // Subworkflow execution (node dispatches to child coordinator)
+    // Mutually exclusive with taskId
+    subworkflowId: text(),
+    subworkflowVersion: integer(),
 
     inputMapping: text({ mode: 'json' }).$type<object>(),
     outputMapping: text({ mode: 'json' }).$type<object>(),

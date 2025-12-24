@@ -1084,6 +1084,57 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/workflows/{id}/runs/{runId}/cancel": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post: {
+            parameters: {
+                query?: never;
+                header?: never;
+                path: {
+                    id: string;
+                    runId: string;
+                };
+                cookie?: never;
+            };
+            requestBody?: {
+                content: {
+                    "application/json": components["schemas"]["CancelWorkflowRun"];
+                };
+            };
+            responses: {
+                /** @description Workflow run cancelled successfully */
+                200: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["WorkflowRunCancelResponse"];
+                    };
+                };
+                /** @description Failed to cancel workflow run */
+                500: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["WorkflowRunCancelError"];
+                    };
+                };
+            };
+        };
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/workflow-runs": {
         parameters: {
             query?: never;
@@ -1212,6 +1263,56 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/workflow-runs/{id}/cancel": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post: {
+            parameters: {
+                query?: never;
+                header?: never;
+                path: {
+                    id: string;
+                };
+                cookie?: never;
+            };
+            requestBody?: {
+                content: {
+                    "application/json": components["schemas"]["CancelWorkflowRunRequest"];
+                };
+            };
+            responses: {
+                /** @description Workflow run cancelled successfully */
+                200: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["WorkflowRunCancelResponse"];
+                    };
+                };
+                /** @description Failed to cancel workflow run */
+                500: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["WorkflowRunCancelError"];
+                    };
+                };
+            };
+        };
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/events": {
         parameters: {
             query?: never;
@@ -1224,7 +1325,8 @@ export interface paths {
             parameters: {
                 query?: {
                     workflowRunId?: string;
-                    parentRunId?: string;
+                    /** @description Query all events in a workflow run tree */
+                    rootRunId?: string;
                     projectId?: string;
                     eventType?: string;
                     nodeId?: string;
@@ -1269,6 +1371,8 @@ export interface paths {
             parameters: {
                 query?: {
                     workflowRunId?: string;
+                    /** @description Query all trace events in a workflow run tree */
+                    rootRunId?: string;
                     tokenId?: string;
                     nodeId?: string;
                     type?: string;
@@ -1904,6 +2008,10 @@ export interface components {
                 taskId?: string;
                 /** @example 1 */
                 taskVersion?: number;
+                /** @example child-workflow-id */
+                subworkflowId?: string;
+                /** @example 1 */
+                subworkflowVersion?: number;
                 inputMapping?: {
                     [key: string]: unknown;
                 };
@@ -1959,6 +2067,8 @@ export interface components {
             name: string;
             taskId: string | null;
             taskVersion: number | null;
+            subworkflowId: string | null;
+            subworkflowVersion: number | null;
             inputMapping: {
                 [key: string]: unknown;
             } | null;
@@ -2064,6 +2174,20 @@ export interface components {
              */
             enableTraceEvents?: boolean;
         };
+        WorkflowRunCancelResponse: {
+            cancelled: boolean;
+            workflowRunId: string;
+        };
+        WorkflowRunCancelError: {
+            error: string;
+        };
+        CancelWorkflowRun: {
+            /**
+             * @description Reason for cancellation
+             * @example User requested cancellation
+             */
+            reason?: string;
+        };
         WorkflowRunSummary: {
             id: string;
             projectId: string;
@@ -2087,13 +2211,20 @@ export interface components {
         WorkflowRunDeleteResponse: {
             success: boolean;
         };
+        CancelWorkflowRunRequest: {
+            /**
+             * @description Reason for cancellation
+             * @example User requested cancellation
+             */
+            reason?: string;
+        };
         EventEntry: {
             id: string;
             timestamp: number;
             sequence: number;
             eventType: string;
             workflowRunId: string;
-            parentRunId?: string | null;
+            rootRunId: string;
             workflowDefId: string;
             nodeId?: string | null;
             tokenId?: string | null;
@@ -2119,6 +2250,7 @@ export interface components {
             /** @enum {string} */
             category: "decision" | "operation" | "dispatch" | "sql" | "debug";
             workflowRunId: string;
+            rootRunId: string;
             tokenId: string | null;
             nodeId: string | null;
             projectId: string;

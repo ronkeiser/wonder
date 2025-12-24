@@ -14,14 +14,14 @@ import { assertInvariants, createWorkflow, setupTestContext, verify } from '~/ki
  *
  * Data flow:
  *   1. Parent receives input.message
- *   2. Parent invokes child workflow, passing input.message
+ *   2. Parent invokes child workflow via subworkflowId on node, passing input.message
  *   3. Child generates a code using the message
  *   4. Child completes, returns { code: ... }
  *   5. Parent resumes with child's output
  *   6. Parent outputs the received code
  *
  * This proves:
- * 1. Workflow action creates a child workflow run
+ * 1. Subworkflow node dispatches to child coordinator
  * 2. Parent token enters waiting_for_subworkflow state
  * 3. Child workflow executes independently
  * 4. Child completion triggers parent resumption
@@ -119,37 +119,13 @@ describe('Foundation: 13 - Basic Sub-Workflow', () => {
     // Parent Workflow Definition
     // =========================================================================
 
-    // The parent uses a 'workflow' action to invoke the child
-    const invokeChildAction = action({
-      name: 'Invoke Child Workflow',
-      description: 'Invokes the child workflow and waits for completion',
-      kind: 'workflow',
-      implementation: {
-        workflowId: childSetup.workflowId,
-      },
-    });
-
-    const invokeChildStep = step({
-      ref: 'invoke_step',
-      ordinal: 0,
-      action: invokeChildAction,
-      inputMapping: { message: 'input.message' },
-      outputMapping: { 'output.code': 'result.code' },
-    });
-
-    const invokeChildTask = task({
-      name: 'Invoke Child Task',
-      description: 'Task that invokes child workflow',
-      inputSchema: parentInputSchema,
-      outputSchema: childOutputSchema,
-      steps: [invokeChildStep],
-    });
-
+    // The parent uses a subworkflow node to invoke the child
+    // No task/action needed - the coordinator dispatches directly to child coordinator
     const invokeNode = node({
       ref: 'invoke_child',
       name: 'Invoke Child',
-      task: invokeChildTask,
-      taskVersion: 1,
+      subworkflowId: childSetup.workflowDefId,
+      subworkflowVersion: 1,
       inputMapping: { message: 'input.message' },
       outputMapping: { 'output.childCode': 'result.code' },
     });
@@ -216,7 +192,7 @@ describe('Foundation: 13 - Basic Sub-Workflow', () => {
     const rootTokenId = tokenCreations[0].tokenId!;
     const statuses = trace.tokens.statusTransitions(rootTokenId);
 
-    // Token should have: pending → dispatched → executing → waiting_for_subworkflow → completed
+    // Token should have: pending → dispatched → waiting_for_subworkflow → completed
     expect(statuses).toContain('waiting_for_subworkflow');
     expect(statuses[statuses.length - 1]).toBe('completed');
 

@@ -237,6 +237,11 @@ export function createClient(baseClient: any) {
             if (error) throw new ApiError(`DELETE /workflow-runs/${id} failed`, error);
             return data;
           },
+          cancel: async (body: NonNullable<paths['/workflow-runs/{id}/cancel']['post']['requestBody']>['content']['application/json'], options?: any): Promise<paths['/workflow-runs/{id}/cancel']['post']['responses']['200']['content']['application/json']> => {
+            const { data, error } = await baseClient.POST(`/workflow-runs/${id}/cancel`, { body });
+            if (error) throw new ApiError(`POST /workflow-runs/${id}/cancel failed`, error);
+            return data;
+          },
           stream: {
           }
         }),

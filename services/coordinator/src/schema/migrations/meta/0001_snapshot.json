@@ -1,0 +1,1090 @@
+{
+  "version": "6",
+  "dialect": "sqlite",
+  "id": "561175af-c0f9-4e7d-a839-af8f775f4ec3",
+  "prevId": "7fa5d83c-488c-4584-8711-b7afec97e25c",
+  "tables": {
+    "child_workflows": {
+      "name": "child_workflows",
+      "columns": {
+        "id": {
+          "name": "id",
+          "type": "text",
+          "primaryKey": true,
+          "notNull": true,
+          "autoincrement": false
+        },
+        "workflow_run_id": {
+          "name": "workflow_run_id",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false
+        },
+        "parent_token_id": {
+          "name": "parent_token_id",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false
+        },
+        "child_run_id": {
+          "name": "child_run_id",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false
+        },
+        "status": {
+          "name": "status",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false
+        },
+        "timeout_ms": {
+          "name": "timeout_ms",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": false,
+          "autoincrement": false
+        },
+        "created_at": {
+          "name": "created_at",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false
+        },
+        "updated_at": {
+          "name": "updated_at",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false
+        }
+      },
+      "indexes": {
+        "idx_child_workflows_workflow_run": {
+          "name": "idx_child_workflows_workflow_run",
+          "columns": [
+            "workflow_run_id"
+          ],
+          "isUnique": false
+        },
+        "idx_child_workflows_parent_token": {
+          "name": "idx_child_workflows_parent_token",
+          "columns": [
+            "parent_token_id"
+          ],
+          "isUnique": false
+        },
+        "idx_child_workflows_status": {
+          "name": "idx_child_workflows_status",
+          "columns": [
+            "status"
+          ],
+          "isUnique": false
+        }
+      },
+      "foreignKeys": {},
+      "compositePrimaryKeys": {},
+      "uniqueConstraints": {},
+      "checkConstraints": {}
+    },
+    "fan_ins": {
+      "name": "fan_ins",
+      "columns": {
+        "id": {
+          "name": "id",
+          "type": "text",
+          "primaryKey": true,
+          "notNull": true,
+          "autoincrement": false
+        },
+        "workflow_run_id": {
+          "name": "workflow_run_id",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false
+        },
+        "node_id": {
+          "name": "node_id",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false
+        },
+        "fan_in_path": {
+          "name": "fan_in_path",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false
+        },
+        "status": {
+          "name": "status",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false
+        },
+        "transition_id": {
+          "name": "transition_id",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false
+        },
+        "first_arrival_at": {
+          "name": "first_arrival_at",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false
+        },
+        "activated_at": {
+          "name": "activated_at",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": false,
+          "autoincrement": false
+        },
+        "activated_by_token_id": {
+          "name": "activated_by_token_id",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false,
+          "autoincrement": false
+        }
+      },
+      "indexes": {
+        "idx_fan_ins_workflow_run": {
+          "name": "idx_fan_ins_workflow_run",
+          "columns": [
+            "workflow_run_id"
+          ],
+          "isUnique": false
+        },
+        "idx_fan_ins_path": {
+          "name": "idx_fan_ins_path",
+          "columns": [
+            "fan_in_path"
+          ],
+          "isUnique": false
+        },
+        "idx_fan_ins_unique_path": {
+          "name": "idx_fan_ins_unique_path",
+          "columns": [
+            "workflow_run_id",
+            "fan_in_path"
+          ],
+          "isUnique": false
+        }
+      },
+      "foreignKeys": {},
+      "compositePrimaryKeys": {},
+      "uniqueConstraints": {},
+      "checkConstraints": {}
+    },
+    "nodes": {
+      "name": "nodes",
+      "columns": {
+        "id": {
+          "name": "id",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false
+        },
+        "ref": {
+          "name": "ref",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false
+        },
+        "workflow_def_id": {
+          "name": "workflow_def_id",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false
+        },
+        "workflow_def_version": {
+          "name": "workflow_def_version",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false
+        },
+        "name": {
+          "name": "name",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false
+        },
+        "task_id": {
+          "name": "task_id",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false,
+          "autoincrement": false
+        },
+        "task_version": {
+          "name": "task_version",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": false,
+          "autoincrement": false
+        },
+        "subworkflow_id": {
+          "name": "subworkflow_id",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false,
+          "autoincrement": false
+        },
+        "subworkflow_version": {
+          "name": "subworkflow_version",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": false,
+          "autoincrement": false
+        },
+        "input_mapping": {
+          "name": "input_mapping",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false,
+          "autoincrement": false
+        },
+        "output_mapping": {
+          "name": "output_mapping",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false,
+          "autoincrement": false
+        },
+        "resource_bindings": {
+          "name": "resource_bindings",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false,
+          "autoincrement": false
+        }
+      },
+      "indexes": {
+        "idx_nodes_workflow_def": {
+          "name": "idx_nodes_workflow_def",
+          "columns": [
+            "workflow_def_id",
+            "workflow_def_version"
+          ],
+          "isUnique": false
+        },
+        "idx_nodes_task": {
+          "name": "idx_nodes_task",
+          "columns": [
+            "task_id",
+            "task_version"
+          ],
+          "isUnique": false
+        },
+        "idx_nodes_ref": {
+          "name": "idx_nodes_ref",
+          "columns": [
+            "workflow_def_id",
+            "workflow_def_version",
+            "ref"
+          ],
+          "isUnique": false
+        }
+      },
+      "foreignKeys": {
+        "nodes_workflow_def_id_workflow_def_version_workflow_defs_id_version_fk": {
+          "name": "nodes_workflow_def_id_workflow_def_version_workflow_defs_id_version_fk",
+          "tableFrom": "nodes",
+          "tableTo": "workflow_defs",
+          "columnsFrom": [
+            "workflow_def_id",
+            "workflow_def_version"
+          ],
+          "columnsTo": [
+            "id",
+            "version"
+          ],
+          "onDelete": "no action",
+          "onUpdate": "no action"
+        }
+      },
+      "compositePrimaryKeys": {
+        "nodes_workflow_def_id_workflow_def_version_id_pk": {
+          "columns": [
+            "workflow_def_id",
+            "workflow_def_version",
+            "id"
+          ],
+          "name": "nodes_workflow_def_id_workflow_def_version_id_pk"
+        }
+      },
+      "uniqueConstraints": {},
+      "checkConstraints": {}
+    },
+    "tokens": {
+      "name": "tokens",
+      "columns": {
+        "id": {
+          "name": "id",
+          "type": "text",
+          "primaryKey": true,
+          "notNull": true,
+          "autoincrement": false
+        },
+        "workflow_run_id": {
+          "name": "workflow_run_id",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false
+        },
+        "node_id": {
+          "name": "node_id",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false
+        },
+        "status": {
+          "name": "status",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false
+        },
+        "parent_token_id": {
+          "name": "parent_token_id",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false,
+          "autoincrement": false
+        },
+        "path_id": {
+          "name": "path_id",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false
+        },
+        "sibling_group": {
+          "name": "sibling_group",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false,
+          "autoincrement": false
+        },
+        "branch_index": {
+          "name": "branch_index",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false
+        },
+        "branch_total": {
+          "name": "branch_total",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false
+        },
+        "iteration_counts": {
+          "name": "iteration_counts",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false,
+          "autoincrement": false
+        },
+        "created_at": {
+          "name": "created_at",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false
+        },
+        "updated_at": {
+          "name": "updated_at",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false
+        },
+        "arrived_at": {
+          "name": "arrived_at",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": false,
+          "autoincrement": false
+        }
+      },
+      "indexes": {
+        "idx_tokens_workflow_run": {
+          "name": "idx_tokens_workflow_run",
+          "columns": [
+            "workflow_run_id"
+          ],
+          "isUnique": false
+        },
+        "idx_tokens_status": {
+          "name": "idx_tokens_status",
+          "columns": [
+            "status"
+          ],
+          "isUnique": false
+        },
+        "idx_tokens_siblingGroup": {
+          "name": "idx_tokens_siblingGroup",
+          "columns": [
+            "sibling_group"
+          ],
+          "isUnique": false
+        },
+        "idx_tokens_path": {
+          "name": "idx_tokens_path",
+          "columns": [
+            "path_id"
+          ],
+          "isUnique": false
+        }
+      },
+      "foreignKeys": {},
+      "compositePrimaryKeys": {},
+      "uniqueConstraints": {},
+      "checkConstraints": {}
+    },
+    "transitions": {
+      "name": "transitions",
+      "columns": {
+        "id": {
+          "name": "id",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false
+        },
+        "ref": {
+          "name": "ref",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false,
+          "autoincrement": false
+        },
+        "workflow_def_id": {
+          "name": "workflow_def_id",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false
+        },
+        "workflow_def_version": {
+          "name": "workflow_def_version",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false
+        },
+        "from_node_id": {
+          "name": "from_node_id",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false
+        },
+        "to_node_id": {
+          "name": "to_node_id",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false
+        },
+        "priority": {
+          "name": "priority",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false
+        },
+        "condition": {
+          "name": "condition",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false,
+          "autoincrement": false
+        },
+        "spawn_count": {
+          "name": "spawn_count",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": false,
+          "autoincrement": false
+        },
+        "sibling_group": {
+          "name": "sibling_group",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false,
+          "autoincrement": false
+        },
+        "foreach": {
+          "name": "foreach",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false,
+          "autoincrement": false
+        },
+        "synchronization": {
+          "name": "synchronization",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false,
+          "autoincrement": false
+        },
+        "loop_config": {
+          "name": "loop_config",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false,
+          "autoincrement": false
+        }
+      },
+      "indexes": {
+        "idx_transitions_workflow_def": {
+          "name": "idx_transitions_workflow_def",
+          "columns": [
+            "workflow_def_id",
+            "workflow_def_version"
+          ],
+          "isUnique": false
+        },
+        "idx_transitions_from_node": {
+          "name": "idx_transitions_from_node",
+          "columns": [
+            "from_node_id"
+          ],
+          "isUnique": false
+        },
+        "idx_transitions_to_node": {
+          "name": "idx_transitions_to_node",
+          "columns": [
+            "to_node_id"
+          ],
+          "isUnique": false
+        },
+        "idx_transitions_ref": {
+          "name": "idx_transitions_ref",
+          "columns": [
+            "workflow_def_id",
+            "workflow_def_version",
+            "ref"
+          ],
+          "isUnique": false
+        }
+      },
+      "foreignKeys": {
+        "transitions_workflow_def_id_workflow_def_version_workflow_defs_id_version_fk": {
+          "name": "transitions_workflow_def_id_workflow_def_version_workflow_defs_id_version_fk",
+          "tableFrom": "transitions",
+          "tableTo": "workflow_defs",
+          "columnsFrom": [
+            "workflow_def_id",
+            "workflow_def_version"
+          ],
+          "columnsTo": [
+            "id",
+            "version"
+          ],
+          "onDelete": "no action",
+          "onUpdate": "no action"
+        },
+        "transitions_workflow_def_id_workflow_def_version_from_node_id_nodes_workflow_def_id_workflow_def_version_id_fk": {
+          "name": "transitions_workflow_def_id_workflow_def_version_from_node_id_nodes_workflow_def_id_workflow_def_version_id_fk",
+          "tableFrom": "transitions",
+          "tableTo": "nodes",
+          "columnsFrom": [
+            "workflow_def_id",
+            "workflow_def_version",
+            "from_node_id"
+          ],
+          "columnsTo": [
+            "workflow_def_id",
+            "workflow_def_version",
+            "id"
+          ],
+          "onDelete": "cascade",
+          "onUpdate": "no action"
+        },
+        "transitions_workflow_def_id_workflow_def_version_to_node_id_nodes_workflow_def_id_workflow_def_version_id_fk": {
+          "name": "transitions_workflow_def_id_workflow_def_version_to_node_id_nodes_workflow_def_id_workflow_def_version_id_fk",
+          "tableFrom": "transitions",
+          "tableTo": "nodes",
+          "columnsFrom": [
+            "workflow_def_id",
+            "workflow_def_version",
+            "to_node_id"
+          ],
+          "columnsTo": [
+            "workflow_def_id",
+            "workflow_def_version",
+            "id"
+          ],
+          "onDelete": "cascade",
+          "onUpdate": "no action"
+        }
+      },
+      "compositePrimaryKeys": {
+        "transitions_workflow_def_id_workflow_def_version_id_pk": {
+          "columns": [
+            "workflow_def_id",
+            "workflow_def_version",
+            "id"
+          ],
+          "name": "transitions_workflow_def_id_workflow_def_version_id_pk"
+        }
+      },
+      "uniqueConstraints": {},
+      "checkConstraints": {}
+    },
+    "workflow_defs": {
+      "name": "workflow_defs",
+      "columns": {
+        "id": {
+          "name": "id",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false
+        },
+        "name": {
+          "name": "name",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false
+        },
+        "description": {
+          "name": "description",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false,
+          "default": "''"
+        },
+        "version": {
+          "name": "version",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false,
+          "default": 1
+        },
+        "project_id": {
+          "name": "project_id",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false,
+          "autoincrement": false
+        },
+        "library_id": {
+          "name": "library_id",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false,
+          "autoincrement": false
+        },
+        "tags": {
+          "name": "tags",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false,
+          "autoincrement": false
+        },
+        "input_schema": {
+          "name": "input_schema",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false
+        },
+        "output_schema": {
+          "name": "output_schema",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false
+        },
+        "output_mapping": {
+          "name": "output_mapping",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false,
+          "autoincrement": false
+        },
+        "context_schema": {
+          "name": "context_schema",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false,
+          "autoincrement": false
+        },
+        "initial_node_id": {
+          "name": "initial_node_id",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false,
+          "autoincrement": false
+        },
+        "content_hash": {
+          "name": "content_hash",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false,
+          "autoincrement": false
+        },
+        "created_at": {
+          "name": "created_at",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false
+        },
+        "updated_at": {
+          "name": "updated_at",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false
+        }
+      },
+      "indexes": {
+        "idx_workflow_defs_project": {
+          "name": "idx_workflow_defs_project",
+          "columns": [
+            "project_id"
+          ],
+          "isUnique": false
+        },
+        "idx_workflow_defs_library": {
+          "name": "idx_workflow_defs_library",
+          "columns": [
+            "library_id"
+          ],
+          "isUnique": false
+        },
+        "idx_workflow_defs_name_version": {
+          "name": "idx_workflow_defs_name_version",
+          "columns": [
+            "name",
+            "project_id",
+            "library_id",
+            "version"
+          ],
+          "isUnique": false
+        },
+        "idx_workflow_defs_content_hash": {
+          "name": "idx_workflow_defs_content_hash",
+          "columns": [
+            "name",
+            "project_id",
+            "library_id",
+            "content_hash"
+          ],
+          "isUnique": false
+        }
+      },
+      "foreignKeys": {
+        "workflow_defs_project_id_projects_id_fk": {
+          "name": "workflow_defs_project_id_projects_id_fk",
+          "tableFrom": "workflow_defs",
+          "tableTo": "projects",
+          "columnsFrom": [
+            "project_id"
+          ],
+          "columnsTo": [
+            "id"
+          ],
+          "onDelete": "no action",
+          "onUpdate": "no action"
+        }
+      },
+      "compositePrimaryKeys": {
+        "workflow_defs_id_version_pk": {
+          "columns": [
+            "id",
+            "version"
+          ],
+          "name": "workflow_defs_id_version_pk"
+        }
+      },
+      "uniqueConstraints": {},
+      "checkConstraints": {}
+    },
+    "workflow_runs": {
+      "name": "workflow_runs",
+      "columns": {
+        "id": {
+          "name": "id",
+          "type": "text",
+          "primaryKey": true,
+          "notNull": true,
+          "autoincrement": false
+        },
+        "project_id": {
+          "name": "project_id",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false
+        },
+        "workflow_id": {
+          "name": "workflow_id",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false
+        },
+        "workflow_def_id": {
+          "name": "workflow_def_id",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false
+        },
+        "workflow_version": {
+          "name": "workflow_version",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false
+        },
+        "status": {
+          "name": "status",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false
+        },
+        "context": {
+          "name": "context",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false
+        },
+        "active_tokens": {
+          "name": "active_tokens",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false
+        },
+        "durable_object_id": {
+          "name": "durable_object_id",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false
+        },
+        "latest_snapshot": {
+          "name": "latest_snapshot",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false,
+          "autoincrement": false
+        },
+        "root_run_id": {
+          "name": "root_run_id",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false
+        },
+        "parent_run_id": {
+          "name": "parent_run_id",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false,
+          "autoincrement": false
+        },
+        "parent_node_id": {
+          "name": "parent_node_id",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false,
+          "autoincrement": false
+        },
+        "parent_token_id": {
+          "name": "parent_token_id",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false,
+          "autoincrement": false
+        },
+        "created_at": {
+          "name": "created_at",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false
+        },
+        "updated_at": {
+          "name": "updated_at",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false
+        },
+        "completed_at": {
+          "name": "completed_at",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false,
+          "autoincrement": false
+        }
+      },
+      "indexes": {
+        "idx_workflow_runs_project": {
+          "name": "idx_workflow_runs_project",
+          "columns": [
+            "project_id"
+          ],
+          "isUnique": false
+        },
+        "idx_workflow_runs_workflow": {
+          "name": "idx_workflow_runs_workflow",
+          "columns": [
+            "workflow_id"
+          ],
+          "isUnique": false
+        },
+        "idx_workflow_runs_status": {
+          "name": "idx_workflow_runs_status",
+          "columns": [
+            "status"
+          ],
+          "isUnique": false
+        },
+        "idx_workflow_runs_root": {
+          "name": "idx_workflow_runs_root",
+          "columns": [
+            "root_run_id"
+          ],
+          "isUnique": false
+        },
+        "idx_workflow_runs_parent": {
+          "name": "idx_workflow_runs_parent",
+          "columns": [
+            "parent_run_id"
+          ],
+          "isUnique": false
+        },
+        "idx_workflow_runs_created_at": {
+          "name": "idx_workflow_runs_created_at",
+          "columns": [
+            "created_at"
+          ],
+          "isUnique": false
+        }
+      },
+      "foreignKeys": {
+        "workflow_runs_project_id_projects_id_fk": {
+          "name": "workflow_runs_project_id_projects_id_fk",
+          "tableFrom": "workflow_runs",
+          "tableTo": "projects",
+          "columnsFrom": [
+            "project_id"
+          ],
+          "columnsTo": [
+            "id"
+          ],
+          "onDelete": "no action",
+          "onUpdate": "no action"
+        },
+        "workflow_runs_workflow_id_workflows_id_fk": {
+          "name": "workflow_runs_workflow_id_workflows_id_fk",
+          "tableFrom": "workflow_runs",
+          "tableTo": "workflows",
+          "columnsFrom": [
+            "workflow_id"
+          ],
+          "columnsTo": [
+            "id"
+          ],
+          "onDelete": "no action",
+          "onUpdate": "no action"
+        },
+        "workflow_runs_workflow_def_id_workflow_version_parent_node_id_nodes_workflow_def_id_workflow_def_version_id_fk": {
+          "name": "workflow_runs_workflow_def_id_workflow_version_parent_node_id_nodes_workflow_def_id_workflow_def_version_id_fk",
+          "tableFrom": "workflow_runs",
+          "tableTo": "nodes",
+          "columnsFrom": [
+            "workflow_def_id",
+            "workflow_version",
+            "parent_node_id"
+          ],
+          "columnsTo": [
+            "workflow_def_id",
+            "workflow_def_version",
+            "id"
+          ],
+          "onDelete": "no action",
+          "onUpdate": "no action"
+        }
+      },
+      "compositePrimaryKeys": {},
+      "uniqueConstraints": {},
+      "checkConstraints": {}
+    },
+    "workflow_status": {
+      "name": "workflow_status",
+      "columns": {
+        "workflow_run_id": {
+          "name": "workflow_run_id",
+          "type": "text",
+          "primaryKey": true,
+          "notNull": true,
+          "autoincrement": false
+        },
+        "status": {
+          "name": "status",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false
+        },
+        "updated_at": {
+          "name": "updated_at",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false
+        }
+      },
+      "indexes": {},
+      "foreignKeys": {},
+      "compositePrimaryKeys": {},
+      "uniqueConstraints": {},
+      "checkConstraints": {}
+    }
+  },
+  "views": {},
+  "enums": {},
+  "_meta": {
+    "schemas": {},
+    "tables": {},
+    "columns": {}
+  },
+  "internal": {
+    "indexes": {}
+  }
+}

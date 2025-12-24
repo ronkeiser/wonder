@@ -23,7 +23,7 @@ import {
 import { ChildWorkflowManager } from './operations/child-workflows';
 import { ContextManager } from './operations/context';
 import { createDb } from './operations/db';
-import { DefinitionManager } from './operations/defs';
+import { DefinitionManager, type SubworkflowParams } from './operations/defs';
 import { StatusManager } from './operations/status';
 import { TokenManager } from './operations/tokens';
 import type { TaskResult } from './types';
@@ -102,9 +102,9 @@ export class WorkflowCoordinator extends DurableObject {
       resources: this.env.RESOURCES,
       executor: this.env.EXECUTOR,
       coordinator: this.env.COORDINATOR,
+      enableTraceEvents: options?.enableTraceEvents,
       waitUntil: (promise) => this.ctx.waitUntil(promise),
       scheduleAlarm: (delayMs) => this.scheduleAlarm(delayMs),
-      enableTraceEvents: options?.enableTraceEvents,
     };
   }
 
@@ -118,18 +118,15 @@ export class WorkflowCoordinator extends DurableObject {
    * @param options - Optional execution options
    * @param options.enableTraceEvents - Enable/disable trace events for this run (overrides env var)
    */
-  async start(
-    workflowRunId: string,
-    options?: { enableTraceEvents?: boolean },
-  ): Promise<void> {
+  async start(workflowRunId: string, options?: { enableTraceEvents?: boolean }): Promise<void> {
     try {
       // Override trace events setting if explicitly specified
       if (options?.enableTraceEvents !== undefined) {
         this.emitter.setTraceEnabled(options.enableTraceEvents);
       }
 
-      // Initialize definition manager (loads/fetches definitions)
-      await this.defs.initialize(workflowRunId);
+      // Initialize definition manager (loads/fetches definitions from D1)
+      await this.defs.initializeWorkflow(workflowRunId);
 
       // Delegate to lifecycle module
       const ctx = this.getDispatchContext(workflowRunId, options);
@@ -144,6 +141,78 @@ export class WorkflowCoordinator extends DurableObject {
           stack: error instanceof Error ? error.stack : undefined,
         },
       });
+      throw error;
+    }
+  }
+
+  /**
+   * Start an ephemeral subworkflow (no D1 record).
+   *
+   * Called by parent coordinator when dispatching a subworkflow node.
+   * The subworkflow runs to completion and calls back to parent via
+   * handleSubworkflowResult() or handleSubworkflowError().
+   *
+   * Note: The runId is passed from the parent (dispatchSubworkflow) and must
+   * match the DO ID used to create this coordinator instance. This ensures
+   * the executor can callback to the correct coordinator using workflowRunId.
+   */
+  async startSubworkflow(params: SubworkflowParams): Promise<void> {
+    const { runId } = params;
+
+    try {
+      this.logger.info({
+        eventType: 'coordinator.subworkflow.starting',
+        message: 'Starting ephemeral subworkflow',
+        traceId: runId,
+        metadata: {
+          workflowId: params.workflowId,
+          rootRunId: params.rootRunId,
+          parentRunId: params.parentRunId,
+          parentTokenId: params.parentTokenId,
+        },
+      });
+
+      // Initialize definitions (loads workflow def, creates synthetic run record)
+      await this.defs.initializeSubworkflow({ ...params, runId });
+
+      // Delegate to lifecycle module (same as root workflow)
+      const ctx = this.getDispatchContext(runId);
+      await startWorkflow(ctx);
+    } catch (error) {
+      this.logger.error({
+        eventType: 'coordinator.subworkflow.start_failed',
+        message: 'Failed to start subworkflow',
+        traceId: runId,
+        metadata: {
+          workflowId: params.workflowId,
+          parentRunId: params.parentRunId,
+          parentTokenId: params.parentTokenId,
+          error: error instanceof Error ? error.message : String(error),
+          stack: error instanceof Error ? error.stack : undefined,
+        },
+      });
+
+      // Notify parent of failure
+      try {
+        const parentCoordinatorId = this.env.COORDINATOR.idFromName(params.parentRunId);
+        const parentCoordinator = this.env.COORDINATOR.get(parentCoordinatorId);
+        await parentCoordinator.handleSubworkflowError(
+          params.parentTokenId,
+          error instanceof Error ? error.message : String(error),
+        );
+      } catch (callbackError) {
+        this.logger.error({
+          eventType: 'coordinator.subworkflow.callback_failed',
+          message: 'Failed to notify parent of subworkflow failure',
+          traceId: runId,
+          metadata: {
+            parentRunId: params.parentRunId,
+            parentTokenId: params.parentTokenId,
+            error: callbackError instanceof Error ? callbackError.message : String(callbackError),
+          },
+        });
+      }
+
       throw error;
     }
   }
@@ -208,10 +277,7 @@ export class WorkflowCoordinator extends DurableObject {
 
     try {
       const ctx = this.getDispatchContext(token.workflowRunId);
-      await applyDecisions(
-        [{ type: 'UPDATE_TOKEN_STATUS', tokenId, status: 'executing' }],
-        ctx,
-      );
+      await applyDecisions([{ type: 'UPDATE_TOKEN_STATUS', tokenId, status: 'executing' }], ctx);
     } catch (error) {
       this.logger.error({
         eventType: 'coordinator.mark_executing.failed',
@@ -310,20 +376,20 @@ export class WorkflowCoordinator extends DurableObject {
   }
 
   /**
-   * Resume a token that was waiting for a sub-workflow to complete.
+   * Handle successful subworkflow completion.
    * Called by child coordinator when it completes successfully.
    */
-  async resumeFromSubworkflow(
+  async handleSubworkflowResult(
     tokenId: string,
     childOutput: Record<string, unknown>,
   ): Promise<void> {
     try {
       const token = this.tokens.get(tokenId);
 
-      // State guard: only resume tokens waiting for sub-workflow
+      // State guard: only handle results for tokens waiting for sub-workflow
       if (token.status !== 'waiting_for_subworkflow') {
         this.logger.warn({
-          eventType: 'coordinator.resume_subworkflow.invalid_state',
+          eventType: 'coordinator.subworkflow_result.invalid_state',
           message: `Token not waiting for subworkflow: ${token.status}`,
           traceId: token.workflowRunId,
           metadata: { tokenId, status: token.status },
@@ -332,8 +398,8 @@ export class WorkflowCoordinator extends DurableObject {
       }
 
       this.logger.info({
-        eventType: 'coordinator.resume_subworkflow.started',
-        message: 'Resuming token from sub-workflow completion',
+        eventType: 'coordinator.subworkflow_result.started',
+        message: 'Handling sub-workflow result',
         traceId: token.workflowRunId,
         metadata: { tokenId, outputKeys: Object.keys(childOutput) },
       });
@@ -351,8 +417,8 @@ export class WorkflowCoordinator extends DurableObject {
       );
     } catch (error) {
       this.logger.error({
-        eventType: 'coordinator.resume_subworkflow.failed',
-        message: 'Failed to resume from sub-workflow',
+        eventType: 'coordinator.subworkflow_result.failed',
+        message: 'Failed to handle sub-workflow result',
         metadata: {
           tokenId,
           error: error instanceof Error ? error.message : String(error),

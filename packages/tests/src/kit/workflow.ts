@@ -51,40 +51,25 @@ export async function createWorkflow(
     taskIds: [],
   };
 
-  // Process nodes to resolve embedded resources
-  const resolvedNodes: Array<{
-    ref: string;
-    name: string;
-    taskId: string;
-    taskVersion?: number;
-    inputMapping?: Record<string, unknown>;
-    outputMapping?: Record<string, unknown>;
-    resourceBindings?: Record<string, unknown>;
-  }> = [];
+  // Process nodes - resolve embedded task defs to IDs, pass everything else through
+  const resolvedNodes = await Promise.all(
+    (workflow.nodes as EmbeddedNode[]).map(async (n) => {
+      const { task, ...rest } = n;
 
-  for (const n of workflow.nodes as EmbeddedNode[]) {
-    let taskId: string;
+      // Subworkflow node or node with existing taskId - pass through
+      if (n.subworkflowId || n.taskId) {
+        return rest;
+      }
 
-    if (n.taskId) {
-      // Already has an ID
-      taskId = n.taskId;
-    } else if (n.task && isEmbeddedTaskDef(n.task)) {
-      // Embedded task def - need to create it and its dependencies
-      taskId = await createEmbeddedTaskDef(ctx, n.task, createdResources);
-    } else {
-      throw new Error(`Node ${n.ref} must have either taskId or task`);
-    }
+      // Embedded task def - create it and get the ID
+      if (task && isEmbeddedTaskDef(task)) {
+        const taskId = await createEmbeddedTaskDef(ctx, task, createdResources);
+        return { ...rest, taskId };
+      }
 
-    resolvedNodes.push({
-      ref: n.ref,
-      name: n.name,
-      taskId: taskId,
-      taskVersion: n.taskVersion,
-      inputMapping: n.inputMapping,
-      outputMapping: n.outputMapping,
-      resourceBindings: n.resourceBindings as Record<string, string> | undefined,
-    });
-  }
+      throw new Error(`Node ${n.ref} must have either taskId/task or subworkflowId`);
+    }),
+  );
 
   // Create workflow def with resolved nodes
   const resolvedWorkflow = {

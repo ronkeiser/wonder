@@ -82,13 +82,19 @@ export interface EmbeddedModelProfile extends CreateModelProfile {
   [MODEL_PROFILE]: true;
 }
 
-/** Embedded node that can reference embedded task def */
+/** Embedded node that can reference embedded task def or subworkflow */
 export interface EmbeddedNode {
   ref: string;
   name: string;
+  // Task execution (mutually exclusive with subworkflowId)
   taskId?: string;
   task?: EmbeddedTaskDef;
   taskVersion?: number;
+  // Subworkflow execution (mutually exclusive with taskId/task)
+  subworkflowId?: string;
+  subworkflow?: EmbeddedWorkflowDef;
+  subworkflowVersion?: number;
+  // Common
   inputMapping?: Record<string, unknown>;
   outputMapping?: Record<string, unknown>;
   resourceBindings?: Record<string, unknown>;

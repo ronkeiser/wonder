@@ -9,6 +9,8 @@
  * - Handle pass-through nodes (no task)
  */
 
+import { ulid } from 'ulid';
+
 import {
   applyInputMapping,
   decideRouting,
@@ -70,7 +72,14 @@ export async function dispatchToken(ctx: DispatchContext, tokenId: string): Prom
     },
   });
 
-  // If node has no task, complete immediately (e.g., pass-through nodes)
+  // Route based on node type
+  if (node.subworkflowId) {
+    // Subworkflow node: dispatch to child coordinator
+    await dispatchSubworkflow(ctx, tokenId, token, node);
+    return;
+  }
+
+  // If node has no task (and no subworkflow), complete immediately (e.g., pass-through nodes)
   if (!node.taskId) {
     await processTaskResult(ctx, tokenId, { outputData: {} });
     return;
@@ -124,6 +133,97 @@ export async function dispatchToken(ctx: DispatchContext, tokenId: string): Prom
 }
 
 // ============================================================================
+// Subworkflow Dispatch
+// ============================================================================
+
+/**
+ * Dispatch token to child coordinator for subworkflow execution.
+ *
+ * Unlike task dispatch, subworkflow dispatch:
+ * - Creates a child coordinator DO
+ * - Passes input mapped from context
+ * - Marks token as waiting_for_subworkflow
+ * - Child coordinator calls back via handleSubworkflowResult when done
+ */
+async function dispatchSubworkflow(
+  ctx: DispatchContext,
+  tokenId: string,
+  token: { workflowRunId: string; nodeId: string },
+  node: { subworkflowId: string | null; subworkflowVersion: number | null; inputMapping: object | null },
+): Promise<void> {
+  if (!node.subworkflowId) {
+    throw new Error('dispatchSubworkflow called on node without subworkflowId');
+  }
+
+  const run = ctx.defs.getWorkflowRun();
+
+  // Apply input mapping to get subworkflow input
+  const context = ctx.context.getSnapshot();
+  const subworkflowInput = applyInputMapping(
+    node.inputMapping as Record<string, string> | null,
+    context,
+  );
+
+  ctx.emitter.emitTrace({
+    type: 'dispatch.subworkflow.inputMapping.applied',
+    tokenId: tokenId,
+    nodeId: node.subworkflowId,
+    payload: {
+      inputMapping: node.inputMapping,
+      subworkflowInput: subworkflowInput,
+    },
+  });
+
+  // Generate child run ID for the ephemeral subworkflow (ULID for sortability)
+  const childRunId = ulid();
+
+  // Get child coordinator DO
+  const childCoordinatorId = ctx.coordinator.idFromName(childRunId);
+  const childCoordinator = ctx.coordinator.get(childCoordinatorId);
+
+  // Emit workflow event for subworkflow dispatch
+  ctx.emitter.emit({
+    eventType: 'subworkflow.dispatched',
+    message: 'Subworkflow dispatched to child coordinator',
+    metadata: {
+      tokenId: tokenId,
+      nodeId: token.nodeId,
+      subworkflowId: node.subworkflowId,
+      childRunId: childRunId,
+    },
+  });
+
+  // Mark token as waiting for subworkflow
+  await applyDecisions(
+    [
+      {
+        type: 'MARK_WAITING_FOR_SUBWORKFLOW',
+        tokenId,
+        childRunId,
+        timeoutMs: undefined, // TODO: Support timeout on subworkflow nodes
+      },
+    ],
+    ctx,
+  );
+
+  // Fire and forget - child coordinator will call back via handleSubworkflowResult when done
+  // IMPORTANT: Pass childRunId so the child uses the same ID as its DO address.
+  // This ensures executor callbacks (which use workflowRunId) reach the correct coordinator.
+  ctx.waitUntil(
+    childCoordinator.startSubworkflow({
+      runId: childRunId,
+      workflowId: node.subworkflowId,
+      version: node.subworkflowVersion ?? undefined,
+      input: subworkflowInput,
+      rootRunId: ctx.rootRunId,
+      parentRunId: token.workflowRunId,
+      parentTokenId: tokenId,
+      projectId: run.projectId,
+    }),
+  );
+}
+
+// ============================================================================
 // Task Result Processing
 // ============================================================================
 
@@ -155,28 +255,6 @@ export async function processTaskResult(
       message: `Ignoring task result for token in terminal state: ${token.status}`,
       metadata: { tokenId, status: token.status },
     });
-    return;
-  }
-
-  // Check for sub-workflow signal in output
-  // Executor returns { _subworkflow: { childRunId, timeoutMs } } when a workflow action starts a child
-  const subworkflow = result.outputData._subworkflow as
-    | { childRunId: string; timeoutMs?: number }
-    | undefined;
-
-  if (subworkflow) {
-    // Mark token as waiting for sub-workflow instead of completing
-    await applyDecisions(
-      [
-        {
-          type: 'MARK_WAITING_FOR_SUBWORKFLOW',
-          tokenId,
-          childRunId: subworkflow.childRunId,
-          timeoutMs: subworkflow.timeoutMs,
-        },
-      ],
-      ctx,
-    );
     return;
   }
 
