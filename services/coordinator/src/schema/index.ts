@@ -107,27 +107,27 @@ export const workflowStatus = sqliteTable('workflow_status', {
 });
 
 /**
- * Child Workflows Table
+ * Subworkflows Table
  *
- * Tracks active child workflows spawned by this workflow run.
+ * Tracks active subworkflows spawned by this workflow run.
  * Used for cascade cancellation when parent workflow fails/cancels.
  */
-export const childWorkflows = sqliteTable(
-  'child_workflows',
+export const subworkflows = sqliteTable(
+  'subworkflows',
   {
     id: text().primaryKey(),
     workflowRunId: text().notNull(), // Parent workflow run
-    parentTokenId: text().notNull(), // Token waiting for this child
-    childRunId: text().notNull(), // Child workflow run ID
+    parentTokenId: text().notNull(), // Token waiting for this subworkflow
+    subworkflowRunId: text().notNull(), // Subworkflow run ID
     status: text().$type<'running' | 'completed' | 'failed' | 'cancelled'>().notNull(),
     timeoutMs: integer(), // Optional timeout in milliseconds
     createdAt: integer({ mode: 'timestamp_ms' }).notNull(),
     updatedAt: integer({ mode: 'timestamp_ms' }).notNull(),
   },
   (table) => [
-    index('idx_child_workflows_workflow_run').on(table.workflowRunId),
-    index('idx_child_workflows_parent_token').on(table.parentTokenId),
-    index('idx_child_workflows_status').on(table.status),
+    index('idx_subworkflows_workflow_run').on(table.workflowRunId),
+    index('idx_subworkflows_parent_token').on(table.parentTokenId),
+    index('idx_subworkflows_status').on(table.status),
   ],
 );
 

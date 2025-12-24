@@ -195,27 +195,27 @@ async function checkSiblingTimeouts(ctx: DispatchContext): Promise<void> {
 }
 
 /**
- * Check sub-workflow timeouts for tokens waiting for child workflows.
+ * Check subworkflow timeouts for tokens waiting for subworkflows.
  */
 async function checkSubworkflowTimeouts(ctx: DispatchContext): Promise<void> {
-  const runningChildren = ctx.childWorkflows.getRunning(ctx.workflowRunId);
+  const runningSubworkflows = ctx.subworkflows.getRunning(ctx.workflowRunId);
 
-  for (const child of runningChildren) {
+  for (const subworkflow of runningSubworkflows) {
     // Skip if no timeout configured
-    if (!child.timeoutMs) continue;
+    if (!subworkflow.timeoutMs) continue;
 
-    // Check if timeout has elapsed since child was created
-    const elapsed = Date.now() - child.createdAt.getTime();
-    if (elapsed < child.timeoutMs) continue;
+    // Check if timeout has elapsed since subworkflow was created
+    const elapsed = Date.now() - subworkflow.createdAt.getTime();
+    if (elapsed < subworkflow.timeoutMs) continue;
 
     // Handle timeout via decision
     await applyDecisions(
       [
         {
           type: 'TIMEOUT_SUBWORKFLOW',
-          tokenId: child.parentTokenId,
-          childRunId: child.childRunId,
-          timeoutMs: child.timeoutMs,
+          tokenId: subworkflow.parentTokenId,
+          subworkflowRunId: subworkflow.subworkflowRunId,
+          timeoutMs: subworkflow.timeoutMs,
           elapsedMs: elapsed,
         },
       ],
@@ -240,14 +240,14 @@ async function scheduleNextAlarmIfNeeded(ctx: DispatchContext): Promise<void> {
     }
   }
 
-  // Check for sub-workflow waiting tokens
-  const runningChildren = ctx.childWorkflows.getRunning(ctx.workflowRunId);
+  // Check for subworkflow waiting tokens
+  const runningSubworkflows = ctx.subworkflows.getRunning(ctx.workflowRunId);
   let earliestSubworkflowTimeout: number | null = null;
 
-  for (const child of runningChildren) {
-    if (!child.timeoutMs) continue;
-    const elapsed = Date.now() - child.createdAt.getTime();
-    const remaining = child.timeoutMs - elapsed;
+  for (const subworkflow of runningSubworkflows) {
+    if (!subworkflow.timeoutMs) continue;
+    const elapsed = Date.now() - subworkflow.createdAt.getTime();
+    const remaining = subworkflow.timeoutMs - elapsed;
     if (remaining > 0) {
       if (!earliestSubworkflowTimeout || remaining < earliestSubworkflowTimeout) {
         earliestSubworkflowTimeout = remaining;

@@ -9,6 +9,7 @@
 
 import m0000 from './0000_fuzzy_northstar.sql';
 import m0001 from './0001_right_namora.sql';
+import m0002 from './0002_flashy_white_tiger.sql';
 import journal from './meta/_journal.json';
 
 export default {
@@ -16,5 +17,6 @@ export default {
   migrations: {
     m0000,
     m0001,
+    m0002,
   },
 };

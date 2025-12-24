@@ -20,7 +20,7 @@ import {
   type DispatchContext,
   type TaskErrorResult,
 } from './dispatch';
-import { ChildWorkflowManager } from './operations/child-workflows';
+import { SubworkflowManager } from './operations/subworkflows';
 import { ContextManager } from './operations/context';
 import { createDb } from './operations/db';
 import { DefinitionManager, type SubworkflowParams } from './operations/defs';
@@ -41,7 +41,7 @@ export class WorkflowCoordinator extends DurableObject {
   private context: ContextManager;
   private tokens: TokenManager;
   private status: StatusManager;
-  private childWorkflows: ChildWorkflowManager;
+  private subworkflows: SubworkflowManager;
 
   constructor(ctx: DurableObjectState, env: Env) {
     super(ctx, env);
@@ -77,7 +77,7 @@ export class WorkflowCoordinator extends DurableObject {
     this.context = new ContextManager(ctx.storage.sql, this.defs, this.emitter);
     this.tokens = new TokenManager(db, this.emitter);
     this.status = new StatusManager(db, this.emitter);
-    this.childWorkflows = new ChildWorkflowManager(db, this.emitter);
+    this.subworkflows = new SubworkflowManager(db, this.emitter);
   }
 
   /**
@@ -95,7 +95,7 @@ export class WorkflowCoordinator extends DurableObject {
       context: this.context,
       defs: this.defs,
       status: this.status,
-      childWorkflows: this.childWorkflows,
+      subworkflows: this.subworkflows,
       emitter: this.emitter,
       logger: this.logger,
       workflowRunId,

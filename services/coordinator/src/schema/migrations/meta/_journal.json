@@ -15,6 +15,13 @@
       "when": 1766548091886,
       "tag": "0001_right_namora",
       "breakpoints": true
+    },
+    {
+      "idx": 2,
+      "version": "6",
+      "when": 1766560016778,
+      "tag": "0002_flashy_white_tiger",
+      "breakpoints": true
     }
   ]
 }

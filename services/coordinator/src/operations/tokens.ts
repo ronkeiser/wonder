@@ -248,9 +248,9 @@ export class TokenManager {
   }
 
   /**
-   * Mark token as waiting for a sub-workflow to complete
+   * Mark token as waiting for a subworkflow to complete
    */
-  markWaitingForSubworkflow(tokenId: string, childRunId: string): void {
+  markWaitingForSubworkflow(tokenId: string, subworkflowRunId: string): void {
     const token = this.get(tokenId);
 
     this.db
@@ -269,14 +269,14 @@ export class TokenManager {
       payload: {
         from: token.status,
         to: 'waiting_for_subworkflow',
-        childRunId,
+        subworkflowRunId,
       },
     });
   }
 
   /**
-   * Get all tokens waiting for sub-workflows.
-   * Used by timeout checking for sub-workflow timeouts.
+   * Get all tokens waiting for subworkflows.
+   * Used by timeout checking for subworkflow timeouts.
    */
   getTokensWaitingForSubworkflow(): TokenRow[] {
     return this.db

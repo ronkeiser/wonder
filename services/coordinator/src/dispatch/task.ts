@@ -138,13 +138,13 @@ export async function dispatchToken(ctx: DispatchContext, tokenId: string): Prom
 // ============================================================================
 
 /**
- * Dispatch token to child coordinator for subworkflow execution.
+ * Dispatch token to subworkflow coordinator for subworkflow execution.
  *
  * Unlike task dispatch, subworkflow dispatch:
- * - Creates a child coordinator DO
+ * - Creates a subworkflow coordinator DO
  * - Passes input mapped from context
  * - Marks token as waiting_for_subworkflow
- * - Child coordinator calls back via handleSubworkflowResult when done
+ * - Subworkflow coordinator calls back via handleSubworkflowResult when done
  */
 async function dispatchSubworkflow(
   ctx: DispatchContext,
@@ -175,22 +175,22 @@ async function dispatchSubworkflow(
     },
   });
 
-  // Generate child run ID for the ephemeral subworkflow (ULID for sortability)
-  const childRunId = ulid();
+  // Generate run ID for the ephemeral subworkflow (ULID for sortability)
+  const subworkflowRunId = ulid();
 
-  // Get child coordinator DO
-  const childCoordinatorId = ctx.coordinator.idFromName(childRunId);
-  const childCoordinator = ctx.coordinator.get(childCoordinatorId);
+  // Get subworkflow coordinator DO
+  const subworkflowCoordinatorId = ctx.coordinator.idFromName(subworkflowRunId);
+  const subworkflowCoordinator = ctx.coordinator.get(subworkflowCoordinatorId);
 
   // Emit workflow event for subworkflow dispatch
   ctx.emitter.emit({
     eventType: 'subworkflow.dispatched',
-    message: 'Subworkflow dispatched to child coordinator',
+    message: 'Subworkflow dispatched to coordinator',
     metadata: {
       tokenId: tokenId,
       nodeId: token.nodeId,
       subworkflowId: node.subworkflowId,
-      childRunId: childRunId,
+      subworkflowRunId: subworkflowRunId,
     },
   });
 
@@ -200,19 +200,19 @@ async function dispatchSubworkflow(
       {
         type: 'MARK_WAITING_FOR_SUBWORKFLOW',
         tokenId,
-        childRunId,
+        subworkflowRunId,
         timeoutMs: undefined, // TODO: Support timeout on subworkflow nodes
       },
     ],
     ctx,
   );
 
-  // Fire and forget - child coordinator will call back via handleSubworkflowResult when done
-  // IMPORTANT: Pass childRunId so the child uses the same ID as its DO address.
+  // Fire and forget - subworkflow coordinator will call back via handleSubworkflowResult when done
+  // IMPORTANT: Pass subworkflowRunId so the subworkflow uses the same ID as its DO address.
   // This ensures executor callbacks (which use workflowRunId) reach the correct coordinator.
   ctx.waitUntil(
-    childCoordinator.startSubworkflow({
-      runId: childRunId,
+    subworkflowCoordinator.startSubworkflow({
+      runId: subworkflowRunId,
       workflowId: node.subworkflowId,
       version: node.subworkflowVersion ?? undefined,
       input: subworkflowInput,

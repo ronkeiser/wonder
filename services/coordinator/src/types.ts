@@ -101,7 +101,7 @@ export type DispatchContext = {
   context: ContextManager;
   defs: DefinitionManager;
   status: StatusManager;
-  childWorkflows: ChildWorkflowManager;
+  subworkflows: SubworkflowManager;
   emitter: Emitter;
   logger: Logger;
   workflowRunId: string;
@@ -145,10 +145,10 @@ export type TaskErrorResult = {
 };
 
 // Forward declarations for manager types (to avoid circular imports)
-import type { ChildWorkflowManager } from './operations/child-workflows';
 import type { ContextManager } from './operations/context';
 import type { DefinitionManager } from './operations/defs';
 import type { StatusManager } from './operations/status';
+import type { SubworkflowManager } from './operations/subworkflows';
 import type { TokenManager } from './operations/tokens';
 
 // ============================================================================
@@ -261,11 +261,11 @@ export type Decision =
   | { type: 'COMPLETE_WORKFLOW'; output: Record<string, unknown> }
   | { type: 'FAIL_WORKFLOW'; error: string }
 
-  // Sub-workflow operations
+  // Subworkflow operations
   | {
       type: 'MARK_WAITING_FOR_SUBWORKFLOW';
       tokenId: string;
-      childRunId: string;
+      subworkflowRunId: string;
       timeoutMs?: number;
     }
   | {
@@ -281,7 +281,7 @@ export type Decision =
   | {
       type: 'TIMEOUT_SUBWORKFLOW';
       tokenId: string;
-      childRunId: string;
+      subworkflowRunId: string;
       timeoutMs: number;
       elapsedMs: number;
     }
