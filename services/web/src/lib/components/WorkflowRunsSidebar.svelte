@@ -203,7 +203,7 @@
   <div class="flex-1 overflow-y-auto p-2 scrollbar-thin">
     {#each runs as run (run.id)}
       <button
-        class="w-full p-2 bg-transparent border-none rounded text-foreground cursor-pointer flex items-center gap-2 text-[0.8rem] text-left transition-colors duration-100 hover:bg-surface-hover {run.id === selectedRunId ? 'bg-accent! text-white' : ''}"
+        class="w-full p-2 border-none rounded cursor-pointer flex items-center gap-2 text-[0.8rem] text-left transition-colors duration-100 {run.id === selectedRunId ? 'bg-accent text-white' : 'bg-transparent text-foreground hover:bg-surface-hover'}"
         onclick={() => handleSelect(run.id)}
       >
         <span

@@ -405,7 +405,7 @@
         <div class="flex gap-2">
           {#each [1, 5, 15, 60, 1440] as minutes}
             <button
-              class="py-1.5 px-3 bg-surface-overlay border-none rounded-md text-foreground cursor-pointer text-sm transition-colors duration-100 hover:bg-surface-hover focus:outline-none focus-visible:ring-2 focus-visible:ring-accent-muted {timeFilterMinutes === minutes ? 'bg-accent! text-white' : ''}"
+              class="py-1.5 px-3 border-none rounded-md cursor-pointer text-sm transition-colors duration-100 focus:outline-none focus-visible:ring-2 focus-visible:ring-accent-muted {timeFilterMinutes === minutes ? 'bg-accent text-white' : 'bg-surface-overlay text-foreground hover:bg-surface-hover'}"
               onclick={() => handleTimeFilterChange(minutes)}
             >
               {minutes < 60 ? `${minutes}m` : minutes === 60 ? '1h' : '24h'}
@@ -414,7 +414,7 @@
         </div>
 
         <button
-          class="py-1.5 px-3 bg-surface-overlay border-none rounded-md text-foreground cursor-pointer text-sm transition-colors duration-100 flex items-center gap-1.5 hover:bg-surface-hover focus:outline-none focus-visible:ring-2 focus-visible:ring-accent-muted {prettyPrintEnabled ? 'bg-accent! text-white' : ''}"
+          class="py-1.5 px-3 border-none rounded-md cursor-pointer text-sm transition-colors duration-100 flex items-center gap-1.5 focus:outline-none focus-visible:ring-2 focus-visible:ring-accent-muted {prettyPrintEnabled ? 'bg-accent text-white' : 'bg-surface-overlay text-foreground hover:bg-surface-hover'}"
           onclick={togglePrettyPrint}
         >
           <svg viewBox="0 0 16 16" fill="currentColor" class="w-3.5 h-3.5">
