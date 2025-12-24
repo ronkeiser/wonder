@@ -97,13 +97,13 @@
 </script>
 
 <div
-  class="py-3 px-2 mb-2 border-l-[3px] text-sm leading-relaxed relative group hover:bg-surface-raised"
+  class="p-2 mb-1 border-l-[3px] text-sm leading-relaxed relative group hover:bg-surface-raised"
   style="border-left-color: {getColor()}"
 >
   <div class="flex gap-2 items-baseline flex-wrap pr-14">
     <span class="text-foreground-muted font-medium">{header.time}</span>
     <span
-      class="inline-block py-0.5 px-1.5 rounded text-xs font-semibold text-black"
+      class="inline-block py-0.5 px-1.5 rounded text-xs font-semibold text-black leading-normal"
       style="background-color: {header.badge.color}"
     >
       {header.badge.text}
@@ -124,13 +124,13 @@
     <!-- svelte-ignore a11y_no_noninteractive_element_interactions -->
     <!-- svelte-ignore a11y_click_events_have_key_events -->
     <pre
-      class="mt-1 p-2 bg-surface-raised rounded text-foreground-muted text-xs overflow-x-auto whitespace-pre-wrap wrap-break-word cursor-pointer transition-colors duration-100 hover:bg-surface-overlay"
+      class="mt-1.5 p-2 bg-surface-raised rounded text-foreground-muted text-xs overflow-x-auto whitespace-pre-wrap wrap-break-word cursor-pointer transition-colors duration-100 hover:bg-surface-overlay"
       onclick={toggleLocalPrettyPrint}>{formattedFullItem}</pre>
   {:else if formattedMetadata}
     <!-- svelte-ignore a11y_no_noninteractive_element_interactions -->
     <!-- svelte-ignore a11y_click_events_have_key_events -->
     <pre
-      class="mt-1 p-2 bg-surface-raised rounded text-foreground-muted text-xs overflow-x-auto whitespace-pre-wrap wrap-break-word cursor-pointer transition-colors duration-100 hover:bg-surface-overlay"
+      class="mt-1.5 p-2 bg-surface-raised rounded text-foreground-muted text-xs overflow-x-auto whitespace-pre-wrap wrap-break-word cursor-pointer transition-colors duration-100 hover:bg-surface-overlay"
       onclick={toggleLocalPrettyPrint}>{formattedMetadata}</pre>
   {/if}
   <div class="opacity-0 absolute top-2 right-2 flex gap-1 transition-opacity duration-200 group-hover:opacity-100">

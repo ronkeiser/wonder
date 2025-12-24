@@ -398,14 +398,14 @@
           {/each}
         </select>
         {#if subscribeMessage && workflowRunId}
-          <span class="inline-block py-1 px-2 rounded text-xs font-medium {status === 'connected' ? 'bg-success text-white' : ''} {status === 'disconnected' ? 'bg-error text-white' : ''} {status === 'connecting' ? 'bg-warning text-white' : ''}">{status}</span>
+          <span class="inline-block py-1 px-2 rounded text-xs font-medium leading-normal {status === 'connected' ? 'bg-success text-white' : ''} {status === 'disconnected' ? 'bg-error text-white' : ''} {status === 'connecting' ? 'bg-warning text-white' : ''}">{status}</span>
         {/if}
       </div>
       <div class="flex gap-4 items-center flex-wrap">
         <div class="flex gap-2">
           {#each [1, 5, 15, 60, 1440] as minutes}
             <button
-              class="py-1.5 px-3 bg-surface-overlay border-none rounded-md text-foreground cursor-pointer text-sm transition-colors duration-100 hover:bg-surface-hover focus:outline-none focus-visible:ring-2 focus-visible:ring-accent-muted {timeFilterMinutes === minutes ? 'bg-accent text-white' : ''}"
+              class="py-1.5 px-3 bg-surface-overlay border-none rounded-md text-foreground cursor-pointer text-sm transition-colors duration-100 hover:bg-surface-hover focus:outline-none focus-visible:ring-2 focus-visible:ring-accent-muted {timeFilterMinutes === minutes ? 'bg-accent! text-white' : ''}"
               onclick={() => handleTimeFilterChange(minutes)}
             >
               {minutes < 60 ? `${minutes}m` : minutes === 60 ? '1h' : '24h'}
@@ -414,7 +414,7 @@
         </div>
 
         <button
-          class="py-1.5 px-3 bg-surface-overlay border-none rounded-md text-foreground cursor-pointer text-sm transition-colors duration-100 flex items-center gap-1.5 hover:bg-surface-hover focus:outline-none focus-visible:ring-2 focus-visible:ring-accent-muted {prettyPrintEnabled ? 'bg-accent text-white' : ''}"
+          class="py-1.5 px-3 bg-surface-overlay border-none rounded-md text-foreground cursor-pointer text-sm transition-colors duration-100 flex items-center gap-1.5 hover:bg-surface-hover focus:outline-none focus-visible:ring-2 focus-visible:ring-accent-muted {prettyPrintEnabled ? 'bg-accent! text-white' : ''}"
           onclick={togglePrettyPrint}
         >
           <svg viewBox="0 0 16 16" fill="currentColor" class="w-3.5 h-3.5">

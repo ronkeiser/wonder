@@ -20,7 +20,7 @@
       {#each tabs as tab}
         <a
           href={tab.href}
-          class="flex items-end px-4 pb-4 bg-transparent border-b-2 text-foreground-muted cursor-pointer text-base font-medium no-underline transition-colors duration-200 hover:text-foreground {tab.id === activeTabId ? 'text-foreground border-accent' : 'border-transparent'}"
+          class="flex items-end px-4 pb-4 bg-transparent border-b-2 cursor-pointer text-base font-medium no-underline transition-colors duration-200 {tab.id === activeTabId ? 'text-white border-accent' : 'text-foreground-muted hover:text-foreground border-transparent'}"
         >
           {tab.label}
         </a>
