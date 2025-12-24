@@ -5,6 +5,7 @@
  */
 
 export { evaluateCondition } from './conditions';
+export { errorDetails, errorMessage } from './errors';
 export {
   extractFromContext,
   extractFromTaskOutput,

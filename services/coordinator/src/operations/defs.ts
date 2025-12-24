@@ -11,6 +11,7 @@ import { and, eq } from 'drizzle-orm';
 import { migrate } from 'drizzle-orm/durable-sqlite/migrator';
 
 import { nodes, transitions, workflowDefs, workflowRuns } from '../schema';
+import { errorDetails } from '../shared';
 import migrations from '../schema/migrations';
 import type { CoordinatorDb } from './db';
 
@@ -119,8 +120,7 @@ export class DefinitionManager {
         traceId: workflowRunId,
         metadata: {
           workflowRunId: workflowRunId,
-          error: error instanceof Error ? error.message : String(error),
-          stack: error instanceof Error ? error.stack : undefined,
+          ...errorDetails(error),
         },
       });
       throw error;
@@ -256,8 +256,7 @@ export class DefinitionManager {
         metadata: {
           runId: params.runId,
           workflowId: params.workflowId,
-          error: error instanceof Error ? error.message : String(error),
-          stack: error instanceof Error ? error.stack : undefined,
+          ...errorDetails(error),
         },
       });
       throw error;

@@ -17,6 +17,7 @@ import {
   extractFinalOutput,
   getTransitionsWithSynchronization,
 } from '../planning/index';
+import { errorDetails } from '../shared';
 import type { DispatchContext, TaskResult } from '../types';
 import { applyDecisions } from './apply';
 import { handleBranchOutput, processSynchronization } from './fan';
@@ -407,8 +408,7 @@ async function finalizeWorkflow(ctx: DispatchContext): Promise<void> {
       message: 'Critical error in finalizeWorkflow()',
       traceId: ctx.workflowRunId,
       metadata: {
-        error: error instanceof Error ? error.message : String(error),
-        stack: error instanceof Error ? error.stack : undefined,
+        ...errorDetails(error),
         workflowRunId: ctx.workflowRunId,
       },
     });

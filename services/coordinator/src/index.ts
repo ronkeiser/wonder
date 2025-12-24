@@ -26,6 +26,7 @@ import { createDb } from './operations/db';
 import { DefinitionManager, type SubworkflowParams } from './operations/defs';
 import { StatusManager } from './operations/status';
 import { TokenManager } from './operations/tokens';
+import { errorDetails, errorMessage } from './shared';
 import type { TaskResult } from './types';
 
 /**
@@ -136,10 +137,7 @@ export class WorkflowCoordinator extends DurableObject {
         eventType: 'coordinator.start.failed',
         message: 'Critical error in start()',
         traceId: workflowRunId,
-        metadata: {
-          error: error instanceof Error ? error.message : String(error),
-          stack: error instanceof Error ? error.stack : undefined,
-        },
+        metadata: errorDetails(error),
       });
       throw error;
     }
@@ -187,8 +185,7 @@ export class WorkflowCoordinator extends DurableObject {
           workflowId: params.workflowId,
           parentRunId: params.parentRunId,
           parentTokenId: params.parentTokenId,
-          error: error instanceof Error ? error.message : String(error),
-          stack: error instanceof Error ? error.stack : undefined,
+          ...errorDetails(error),
         },
       });
 
@@ -196,10 +193,7 @@ export class WorkflowCoordinator extends DurableObject {
       try {
         const parentCoordinatorId = this.env.COORDINATOR.idFromName(params.parentRunId);
         const parentCoordinator = this.env.COORDINATOR.get(parentCoordinatorId);
-        await parentCoordinator.handleSubworkflowError(
-          params.parentTokenId,
-          error instanceof Error ? error.message : String(error),
-        );
+        await parentCoordinator.handleSubworkflowError(params.parentTokenId, errorMessage(error));
       } catch (callbackError) {
         this.logger.error({
           eventType: 'coordinator.subworkflow.callback_failed',
@@ -208,7 +202,7 @@ export class WorkflowCoordinator extends DurableObject {
           metadata: {
             parentRunId: params.parentRunId,
             parentTokenId: params.parentTokenId,
-            error: callbackError instanceof Error ? callbackError.message : String(callbackError),
+            ...errorDetails(callbackError),
           },
         });
       }
@@ -240,8 +234,7 @@ export class WorkflowCoordinator extends DurableObject {
         message: 'Critical error in handleTaskResult()',
         traceId: workflowRunId,
         metadata: {
-          error: error instanceof Error ? error.message : String(error),
-          stack: error instanceof Error ? error.stack : undefined,
+          ...errorDetails(error),
           tokenId,
           result,
         },
@@ -284,7 +277,7 @@ export class WorkflowCoordinator extends DurableObject {
         message: 'Failed to mark token as executing',
         traceId: token.workflowRunId,
         metadata: {
-          error: error instanceof Error ? error.message : String(error),
+          ...errorDetails(error),
           tokenId,
         },
       });
@@ -314,8 +307,7 @@ export class WorkflowCoordinator extends DurableObject {
         message: 'Critical error in handleTaskError()',
         traceId: workflowRunId,
         metadata: {
-          error: error instanceof Error ? error.message : String(error),
-          stack: error instanceof Error ? error.stack : undefined,
+          ...errorDetails(error),
           tokenId,
           errorResult,
         },
@@ -366,10 +358,7 @@ export class WorkflowCoordinator extends DurableObject {
       this.logger.error({
         eventType: 'coordinator.alarm.failed',
         message: 'Error in alarm handler',
-        metadata: {
-          error: error instanceof Error ? error.message : String(error),
-          stack: error instanceof Error ? error.stack : undefined,
-        },
+        metadata: errorDetails(error),
       });
       throw error; // Rethrow to trigger retry
     }
@@ -421,8 +410,7 @@ export class WorkflowCoordinator extends DurableObject {
         message: 'Failed to handle sub-workflow result',
         metadata: {
           tokenId,
-          error: error instanceof Error ? error.message : String(error),
-          stack: error instanceof Error ? error.stack : undefined,
+          ...errorDetails(error),
         },
       });
       throw error;
@@ -511,7 +499,7 @@ export class WorkflowCoordinator extends DurableObject {
         message: 'Failed to cancel workflow',
         metadata: {
           reason,
-          error: error instanceof Error ? error.message : String(error),
+          ...errorDetails(error),
         },
       });
       throw error;

@@ -13,6 +13,7 @@
 
 import type { JSONSchema } from '@wonder/schemas';
 
+import { errorMessage } from '../shared';
 import type { ApplyResult, Decision, DispatchContext, TracedDecision } from '../types';
 
 import { batchDecisions } from './batch';
@@ -67,7 +68,7 @@ export async function applyDecisions(
         type: 'dispatch.error',
         payload: {
           decisionType: decision.type,
-          error: error instanceof Error ? error.message : String(error),
+          error: errorMessage(error),
         },
       });
     }
