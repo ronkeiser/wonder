@@ -70,7 +70,8 @@
         url.searchParams.set(filterParam, currentFilter);
       }
       if (workflowRunId) {
-        url.searchParams.set('workflowRunId', workflowRunId);
+        // Use rootRunId to include subworkflow events in the stream
+        url.searchParams.set('rootRunId', workflowRunId);
       }
 
       const response = await fetch(url);
@@ -197,9 +198,9 @@
       console.log('WebSocket connected to', targetRunId);
 
       if (subscribeMessage) {
-        // Build subscription message with workflowRunId filter
+        // Build subscription message with rootRunId filter to include subworkflow events
         const message = { ...subscribeMessage } as any;
-        message.filters = { ...message.filters, workflowRunId: targetRunId };
+        message.filters = { ...message.filters, rootRunId: targetRunId };
         socket.send(JSON.stringify(message));
       }
     };

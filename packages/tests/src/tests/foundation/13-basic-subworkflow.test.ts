@@ -170,11 +170,14 @@ describe('Foundation: 13 - Basic Sub-Workflow', () => {
     // =========================================================================
     // VERIFICATION
     // =========================================================================
+    // Note: With subworkflows, we see tokens from both parent and child workflows
+    // since they share the same rootRunId for unified event streaming.
+    // Parent: 1 root token, Child: 1 root token = 2 total
     verify(trace, { input: workflowInput, definition: parentWorkflowDef })
       .completed()
       .withTokens({
-        root: 1,
-        total: 1,
+        root: 2, // Parent root + child root
+        total: 2,
       })
       .withOutput({
         childCode: { type: 'string', defined: true },
@@ -185,9 +188,9 @@ describe('Foundation: 13 - Basic Sub-Workflow', () => {
     // SUB-WORKFLOW SPECIFIC ASSERTIONS
     // =========================================================================
 
-    // Verify parent token went through waiting_for_subworkflow state
+    // Verify we have 2 token creations (parent + child)
     const tokenCreations = trace.tokens.creations();
-    expect(tokenCreations).toHaveLength(1);
+    expect(tokenCreations).toHaveLength(2);
 
     const rootTokenId = tokenCreations[0].tokenId!;
     const statuses = trace.tokens.statusTransitions(rootTokenId);

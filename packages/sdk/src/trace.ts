@@ -303,6 +303,24 @@ export class TraceEventCollection {
   }
 
   /**
+   * Filter events to only include root workflow events (excludes subworkflow events).
+   * Root events have workflowRunId === rootRunId.
+   */
+  rootOnly(): TypedTraceEvent[] {
+    return this.events.filter((e) => {
+      const entry = e as TraceEventEntry;
+      return entry.workflowRunId === entry.rootRunId;
+    });
+  }
+
+  /**
+   * Find first root workflow event matching type (excludes subworkflow events)
+   */
+  findRoot<T = any>(type: string): TypedTraceEvent<T> | undefined {
+    return this.rootOnly().find((e) => e.type === type) as TypedTraceEvent<T> | undefined;
+  }
+
+  /**
    * Get event count by type
    */
   count(type?: string): number {
@@ -596,19 +614,21 @@ export class TraceEventCollection {
   }
 
   /**
-   * Completion/finalization operations
+   * Completion/finalization operations.
+   * Note: These methods filter to root workflow only to exclude subworkflow completion events.
    */
   get completion() {
     const self = this;
     return {
       start(): TypedTraceEvent<TracePayloads.CompletionStart> | undefined {
-        return self.find<TracePayloads.CompletionStart>('decision.completion.start');
+        return self.findRoot<TracePayloads.CompletionStart>('decision.completion.start');
       },
       extracts(): TypedTraceEvent<TracePayloads.CompletionExtract>[] {
         return self.filter<TracePayloads.CompletionExtract>('decision.completion.extract');
       },
       complete(): TypedTraceEvent<TracePayloads.CompletionComplete> | undefined {
-        return self.find<TracePayloads.CompletionComplete>('decision.completion.complete');
+        // Use findRoot to get the root workflow's completion, not a subworkflow's
+        return self.findRoot<TracePayloads.CompletionComplete>('decision.completion.complete');
       },
       noMapping(): boolean {
         return self.has('decision.completion.no_mapping');

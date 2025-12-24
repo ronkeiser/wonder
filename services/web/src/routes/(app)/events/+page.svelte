@@ -73,6 +73,15 @@
     { value: 'fan_out.started', label: 'fan_out.started' },
     { value: 'fan_in.completed', label: 'fan_in.completed' },
     { value: 'branches.merged', label: 'branches.merged' },
+
+    // Subworkflow lifecycle
+    { value: 'subworkflow.dispatched', label: 'subworkflow.dispatched' },
+    { value: 'subworkflow.waiting', label: 'subworkflow.waiting' },
+    { value: 'subworkflow.started', label: 'subworkflow.started' },
+    { value: 'subworkflow.completed', label: 'subworkflow.completed' },
+    { value: 'subworkflow.result_received', label: 'subworkflow.result_received' },
+    { value: 'subworkflow.failed', label: 'subworkflow.failed' },
+    { value: 'subworkflow.timeout', label: 'subworkflow.timeout' },
   ];
 
   const colorMap: Record<string, string> = {
@@ -100,6 +109,15 @@
     'fan_out.started': 'var(--lime)',
     'fan_in.completed': 'var(--emerald)',
     'branches.merged': 'var(--emerald-light)',
+
+    // Subworkflow lifecycle - indigo/violet family
+    'subworkflow.dispatched': 'var(--indigo)',
+    'subworkflow.waiting': 'var(--indigo-light)',
+    'subworkflow.started': 'var(--violet)',
+    'subworkflow.completed': 'var(--violet)',
+    'subworkflow.result_received': 'var(--purple)',
+    'subworkflow.failed': 'var(--red)',
+    'subworkflow.timeout': 'var(--orange)',
   };
 
   function getEventColor(item: any): string {
@@ -148,7 +166,7 @@
 <div class="page-with-sidebar" class:resizing={isResizing}>
   <WorkflowRunsSidebar
     width={sidebarWidth}
-    selectedRunId={selectedRunId}
+    {selectedRunId}
     onSelect={(id) => (selectedRunId = id)}
   />
   <!-- svelte-ignore a11y_no_static_element_interactions -->

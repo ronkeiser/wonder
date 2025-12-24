@@ -172,10 +172,14 @@ export function createWorkflowsClient(
       };
 
       // Subscribe to both events and trace events
+      // Use rootRunId filter to capture both parent and child workflow events.
+      // For root workflows: rootRunId === workflowRunId
+      // For subworkflows: rootRunId === parent's workflowRunId
+      // This allows seeing the entire workflow tree's events in one stream.
       const subscriptions = (['events', 'trace'] as const).map((stream) => ({
         id: stream,
         stream,
-        filters: { workflowRunId, ...subscribe },
+        filters: { rootRunId: workflowRunId, ...subscribe },
         callback: eventCallback,
       }));
 

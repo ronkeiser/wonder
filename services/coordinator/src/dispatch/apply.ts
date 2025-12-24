@@ -458,10 +458,11 @@ async function applyOne(decision: Decision, ctx: DispatchContext): Promise<Apply
       // Initialize context tables and store input
       ctx.context.initialize(decision.input);
 
-      // Emit workflow started event
+      // Emit appropriate started event based on whether this is root or subworkflow
+      const isSubworkflow = ctx.workflowRunId !== ctx.rootRunId;
       ctx.emitter.emit({
-        eventType: 'workflow.started',
-        message: 'Workflow started',
+        eventType: isSubworkflow ? 'subworkflow.started' : 'workflow.started',
+        message: isSubworkflow ? 'Subworkflow started' : 'Workflow started',
         metadata: { input: decision.input },
       });
 
@@ -485,10 +486,11 @@ async function applyOne(decision: Decision, ctx: DispatchContext): Promise<Apply
         return {};
       }
 
-      // Emit workflow.completed event
+      // Emit appropriate completed event based on whether this is root or subworkflow
+      const isSubworkflow = ctx.workflowRunId !== ctx.rootRunId;
       ctx.emitter.emit({
-        eventType: 'workflow.completed',
-        message: 'Workflow completed successfully',
+        eventType: isSubworkflow ? 'subworkflow.completed' : 'workflow.completed',
+        message: isSubworkflow ? 'Subworkflow completed successfully' : 'Workflow completed successfully',
         metadata: {
           output: decision.output,
         },
@@ -626,9 +628,9 @@ async function applyOne(decision: Decision, ctx: DispatchContext): Promise<Apply
         timeoutMs: decision.timeoutMs,
       });
 
-      // Emit event for sub-workflow start
+      // Emit event for parent entering waiting state
       ctx.emitter.emit({
-        eventType: 'subworkflow.started',
+        eventType: 'subworkflow.waiting',
         message: 'Waiting for sub-workflow',
         metadata: {
           tokenId: decision.tokenId,
@@ -655,10 +657,10 @@ async function applyOne(decision: Decision, ctx: DispatchContext): Promise<Apply
         ctx.childWorkflows.updateStatus(child.childRunId, 'completed');
       }
 
-      // Emit sub-workflow completion event
+      // Emit event for parent receiving subworkflow result
       ctx.emitter.emit({
-        eventType: 'subworkflow.completed',
-        message: 'Sub-workflow completed, resuming parent',
+        eventType: 'subworkflow.result_received',
+        message: 'Sub-workflow result received',
         metadata: {
           tokenId: decision.tokenId,
           nodeId: token.nodeId,
