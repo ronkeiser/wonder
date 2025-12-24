@@ -2,16 +2,24 @@
   import { onMount, onDestroy } from 'svelte';
   import StreamItem from './StreamItem.svelte';
 
+  interface FilterConfig {
+    label: string;
+    param: string;
+    options: Array<{ value: string; label: string }>;
+  }
+
   interface Props {
     title: string;
     apiPath: string;
     filterLabel: string;
     filterParam: string;
     filterOptions: Array<{ value: string; label: string }>;
+    secondaryFilter?: FilterConfig; // Optional second filter (e.g., log level)
     itemsKey: string; // e.g., 'events' or 'logs'
     itemKey: string; // e.g., 'event' or 'log'
+    streamPath?: string; // For global streams (e.g., '/logs/stream') - connects immediately
     subscribeMessage?: object; // Optional WebSocket subscription message
-    workflowRunId?: string | null; // Required for WebSocket streaming
+    workflowRunId?: string | null; // For per-resource streams - requires selection first
     getItemColor?: (item: any) => string;
     getMetadata?: (item: any) => any;
     renderItemHeader: (item: any) => {
@@ -28,8 +36,10 @@
     filterLabel,
     filterParam,
     filterOptions,
+    secondaryFilter,
     itemsKey,
     itemKey,
+    streamPath,
     subscribeMessage,
     workflowRunId = null,
     getItemColor,
@@ -37,9 +47,13 @@
     renderItemHeader,
   }: Props = $props();
 
+  // Global stream mode: streamPath is provided, connect immediately without needing workflowRunId
+  const isGlobalStream = $derived(!!streamPath);
+
   let items = $state<any[]>([]);
   let status = $state<'connected' | 'disconnected' | 'connecting'>('disconnected');
   let currentFilter = $state('');
+  let secondaryFilterValue = $state('');
   let timeFilterMinutes = $state<number | null>(null);
   let prettyPrintEnabled = $state(false);
   let identifierFilters = $state<string[]>([]);
@@ -68,6 +82,9 @@
       url.searchParams.set('limit', '1000');
       if (currentFilter) {
         url.searchParams.set(filterParam, currentFilter);
+      }
+      if (secondaryFilter && secondaryFilterValue) {
+        url.searchParams.set(secondaryFilter.param, secondaryFilterValue);
       }
       if (workflowRunId) {
         // Use rootRunId to include subworkflow events in the stream
@@ -107,6 +124,12 @@
     if (currentFilter) {
       const itemFilterValue = item[filterParam];
       if (itemFilterValue !== currentFilter) return;
+    }
+
+    // Check if item matches secondary filter
+    if (secondaryFilter && secondaryFilterValue) {
+      const itemSecondaryValue = item[secondaryFilter.param];
+      if (itemSecondaryValue !== secondaryFilterValue) return;
     }
 
     // Insert in sorted order (newest first - descending)
@@ -159,8 +182,20 @@
   }
 
   function connect() {
-    // Require workflowRunId to connect
-    if (!workflowRunId) {
+    // Determine WebSocket URL based on streaming mode
+    let wsUrl: string;
+    let connectionId: string;
+
+    if (streamPath) {
+      // Global stream mode: connect directly to the stream path
+      wsUrl = `wss://api.wflow.app${streamPath}`;
+      connectionId = 'global';
+    } else if (workflowRunId) {
+      // Per-resource stream mode: connect to workflow-specific stream
+      wsUrl = `wss://api.wflow.app/workflow-runs/${workflowRunId}/stream`;
+      connectionId = workflowRunId;
+    } else {
+      // No stream path and no workflow run selected - can't connect
       status = 'disconnected';
       return;
     }
@@ -182,11 +217,6 @@
     intentionalClose = false;
     status = 'connecting';
 
-    // Capture the workflowRunId for this connection's closure
-    const targetRunId = workflowRunId;
-
-    // WebSocket connections go directly to the API service (can't proxy WS through SvelteKit)
-    const wsUrl = `wss://api.wflow.app/workflow-runs/${targetRunId}/stream`;
     const socket = new WebSocket(wsUrl);
     ws = socket;
 
@@ -195,12 +225,12 @@
       if (ws !== socket) return;
 
       status = 'connected';
-      console.log('WebSocket connected to', targetRunId);
+      console.log('WebSocket connected to', connectionId);
 
-      if (subscribeMessage) {
+      if (subscribeMessage && workflowRunId) {
         // Build subscription message with rootRunId filter to include subworkflow events
         const message = { ...subscribeMessage } as any;
-        message.filters = { ...message.filters, rootRunId: targetRunId };
+        message.filters = { ...message.filters, rootRunId: workflowRunId };
         socket.send(JSON.stringify(message));
       }
     };
@@ -239,8 +269,9 @@
       if (!intentionalClose) {
         console.log('WebSocket closed unexpectedly, reconnecting in 3s...');
         reconnectTimeout = setTimeout(() => {
-          // Double-check we should still reconnect to this run
-          if (workflowRunId === targetRunId) {
+          // For global streams, always reconnect
+          // For per-resource streams, only if still viewing same resource
+          if (streamPath || workflowRunId === connectionId) {
             connect();
           }
         }, 3000);
@@ -306,10 +337,12 @@
     const urlParams = new URLSearchParams(window.location.search);
     const savedMinutes = urlParams.get('m');
     const savedFilter = urlParams.get(filterParam);
+    const savedSecondaryFilter = secondaryFilter ? urlParams.get(secondaryFilter.param) : null;
     const savedPretty = urlParams.get('pretty');
 
     if (savedMinutes) timeFilterMinutes = parseInt(savedMinutes);
     if (savedFilter) currentFilter = savedFilter;
+    if (savedSecondaryFilter) secondaryFilterValue = savedSecondaryFilter;
     if (savedPretty === '1') prettyPrintEnabled = true;
 
     // Default to no time filter (show all events for the run)
@@ -329,6 +362,22 @@
       url.searchParams.set(filterParam, value);
     } else {
       url.searchParams.delete(filterParam);
+    }
+    window.history.pushState({}, '', url);
+
+    filterItemsByTime(timeFilterMinutes);
+  }
+
+  function handleSecondaryFilterChange(value: string) {
+    if (!secondaryFilter) return;
+
+    secondaryFilterValue = value;
+
+    const url = new URL(window.location.href);
+    if (value) {
+      url.searchParams.set(secondaryFilter.param, value);
+    } else {
+      url.searchParams.delete(secondaryFilter.param);
     }
     window.history.pushState({}, '', url);
 
@@ -383,7 +432,7 @@
 </script>
 
 <div class="stream-viewer flex flex-col h-full bg-surface text-foreground">
-  {#if workflowRunId || !subscribeMessage}
+  {#if isGlobalStream || workflowRunId || !subscribeMessage}
     <header class="h-16 bg-surface-raised px-4 pl-2.5 border-b border-border flex justify-between items-center gap-4 box-border">
       <div class="flex gap-4 items-center">
         <select
@@ -397,7 +446,20 @@
             <option value={option.value}>{option.label}</option>
           {/each}
         </select>
-        {#if subscribeMessage && workflowRunId}
+        {#if secondaryFilter}
+          <select
+            class="py-1.5 px-3 pr-8 bg-surface-overlay bg-no-repeat bg-position-[right_0.5rem_center] bg-size-[16px] appearance-none border-none rounded-md text-foreground cursor-pointer text-sm transition-colors duration-100 hover:bg-surface-hover focus:outline-none focus-visible:ring-2 focus-visible:ring-accent-muted"
+            style="background-image: url(&quot;data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 16 16' fill='%23c9d1d9'%3E%3Cpath d='M4.427 7.427l3.396 3.396a.25.25 0 00.354 0l3.396-3.396A.25.25 0 0011.396 7H4.604a.25.25 0 00-.177.427z'/%3E%3C/svg%3E&quot;)"
+            bind:value={secondaryFilterValue}
+            onchange={(e) => handleSecondaryFilterChange(e.currentTarget.value)}
+          >
+            <option value="">All {secondaryFilter.label}</option>
+            {#each secondaryFilter.options as option}
+              <option value={option.value}>{option.label}</option>
+            {/each}
+          </select>
+        {/if}
+        {#if isGlobalStream || (subscribeMessage && workflowRunId)}
           <span class="inline-block py-1 px-2 rounded text-xs font-medium leading-normal {status === 'connected' ? 'bg-success text-white' : ''} {status === 'disconnected' ? 'bg-error text-white' : ''} {status === 'connecting' ? 'bg-warning text-white' : ''}">{status}</span>
         {/if}
       </div>

@@ -10,11 +10,20 @@
     { value: 'http', label: 'http' },
   ];
 
+  const levelOptions = [
+    { value: 'fatal', label: 'fatal' },
+    { value: 'error', label: 'error' },
+    { value: 'warn', label: 'warn' },
+    { value: 'info', label: 'info' },
+    { value: 'debug', label: 'debug' },
+  ];
+
   const levelColorMap: Record<string, string> = {
-    error: 'var(--color-red)',
+    fatal: 'var(--color-red)',
+    error: 'var(--color-orange)',
     warn: 'var(--color-yellow)',
     info: 'var(--color-blue)',
-    debug: 'var(--color-gray)',
+    debug: 'var(--color-gray-lighter)',
   };
 
   function getLogColor(item: any): string {
@@ -56,10 +65,11 @@
 <StreamViewer
   title="Logs"
   apiPath="/api/logs"
-  streamPath="/api/logs/stream"
+  streamPath="/logs/stream"
   filterLabel="Services"
   filterParam="service"
   filterOptions={serviceOptions}
+  secondaryFilter={{ label: 'Levels', param: 'level', options: levelOptions }}
   itemsKey="logs"
   itemKey="log"
   getItemColor={getLogColor}
