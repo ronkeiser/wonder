@@ -189,175 +189,77 @@
   });
 </script>
 
-<aside class="workflow-runs-sidebar" style:width={width ? `${width}px` : undefined}>
-  <header>
-    <h3>Workflow Runs</h3>
-    <span class="ws-status {status}">{status === 'connected' ? '●' : '○'}</span>
+<aside
+  class="w-[220px] min-w-40 max-w-[400px] bg-surface-raised border-r border-border flex flex-col overflow-hidden shrink-0 group/sidebar"
+  style:width={width ? `${width}px` : undefined}
+>
+  <header class="h-16 px-4 border-b border-border flex justify-between items-center box-border">
+    <h3 class="m-0 py-1.5 text-sm font-semibold text-foreground">Workflow Runs</h3>
+    <span class="text-xs {status === 'connected' ? 'text-success' : 'text-foreground-muted'}">
+      {status === 'connected' ? '●' : '○'}
+    </span>
   </header>
 
-  <div class="runs-list">
+  <div class="flex-1 overflow-y-auto p-2 scrollbar-thin">
     {#each runs as run (run.id)}
       <button
-        class="run-item"
-        class:selected={run.id === selectedRunId}
+        class="w-full p-2 bg-transparent border-none rounded text-foreground cursor-pointer flex items-center gap-2 text-[0.8rem] text-left transition-colors duration-100 hover:bg-surface-hover {run.id === selectedRunId ? 'bg-accent text-white' : ''}"
         onclick={() => handleSelect(run.id)}
       >
-        <span class="status-icon status-{run.status}">
-          {#if run.status === 'running'}
-            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="7" /></svg>
-          {:else if run.status === 'completed'}
-            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M20 6 9 17l-5-5" /></svg>
-          {:else if run.status === 'failed'}
-            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M18 6 6 18M6 6l12 12" /></svg>
-          {:else if run.status === 'waiting'}
-            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="7" /><path d="M12 9v3l2.5 1.5" /></svg>
-          {:else}
-            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="7" /></svg>
-          {/if}
+        <span
+          class="w-4 h-4 flex items-center justify-center shrink-0 {run.status === 'running' ? 'text-purple animate-pulse' : ''} {run.status === 'completed' ? 'text-success' : ''} {run.status === 'failed' ? 'text-error' : ''} {run.status === 'waiting' ? 'text-[#8b9eb3]' : ''} {run.id === selectedRunId ? 'text-inherit!' : ''}"
+        >
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" class="w-3.5 h-3.5">
+            {#if run.status === 'running'}
+              <circle cx="12" cy="12" r="7" />
+            {:else if run.status === 'completed'}
+              <path d="M20 6 9 17l-5-5" />
+            {:else if run.status === 'failed'}
+              <path d="M18 6 6 18M6 6l12 12" />
+            {:else if run.status === 'waiting'}
+              <circle cx="12" cy="12" r="7" /><path d="M12 9v3l2.5 1.5" />
+            {:else}
+              <circle cx="12" cy="12" r="7" />
+            {/if}
+          </svg>
         </span>
-        <div class="run-info">
-          <span class="workflow-name">{run.workflowName}</span>
-          <span class="run-id">{run.id.slice(-6)}</span>
+        <div class="flex-1 min-w-0 flex flex-col gap-0.5">
+          <span class="font-medium whitespace-nowrap overflow-hidden text-ellipsis">{run.workflowName}</span>
+          <span class="text-[0.7rem] font-mono {run.id === selectedRunId ? 'text-white/70' : 'text-foreground-muted'}">{run.id.slice(-6)}</span>
         </div>
-        <span class="run-time">{getRelativeTime(run.createdAt)}</span>
+        <span class="text-[0.7rem] {run.id === selectedRunId ? 'text-white/70' : 'text-foreground-muted'}">{getRelativeTime(run.createdAt)}</span>
       </button>
     {/each}
 
     {#if runs.length === 0}
-      <div class="empty-state">No workflow runs</div>
+      <div class="p-4 text-center text-foreground-muted text-[0.8rem]">No workflow runs</div>
     {/if}
   </div>
 </aside>
 
 <style>
-  .workflow-runs-sidebar {
-    width: 220px;
-    min-width: 160px;
-    max-width: 400px;
-    background: var(--bg-secondary);
-    border-right: 1px solid var(--border);
-    display: flex;
-    flex-direction: column;
-    overflow: hidden;
-    flex-shrink: 0;
-  }
-
-  header {
-    height: 64px;
-    padding: 0 1rem;
-    border-bottom: 1px solid var(--border);
-    display: flex;
-    justify-content: space-between;
-    align-items: center;
-    box-sizing: border-box;
-  }
-
-  h3 {
-    margin: 0;
-    padding: 0.375rem 0;
-    font-size: 0.875rem;
-    font-weight: 600;
-    color: var(--text-primary);
-  }
-
-  .ws-status {
-    font-size: 0.75rem;
-  }
-
-  .ws-status.connected {
-    color: var(--green);
-  }
-
-  .ws-status.disconnected,
-  .ws-status.connecting {
-    color: var(--text-secondary);
-  }
-
-  .runs-list {
-    flex: 1;
-    overflow-y: auto;
-    padding: 0.5rem;
-  }
-
   /* Scrollbar styles - thumb visible on sidebar hover, hidden otherwise */
-  .runs-list::-webkit-scrollbar {
+  .scrollbar-thin::-webkit-scrollbar {
     width: 12px;
   }
 
-  .runs-list::-webkit-scrollbar-track {
+  .scrollbar-thin::-webkit-scrollbar-track {
     background: transparent;
   }
 
-  .runs-list::-webkit-scrollbar-thumb {
+  .scrollbar-thin::-webkit-scrollbar-thumb {
     background-color: transparent;
     background-clip: padding-box;
     border: 3px solid transparent;
     border-radius: 6px;
   }
 
-  .workflow-runs-sidebar:hover .runs-list::-webkit-scrollbar-thumb {
-    background-color: var(--border);
+  .group\/sidebar:hover .scrollbar-thin::-webkit-scrollbar-thumb {
+    background-color: var(--color-border);
   }
 
-  .workflow-runs-sidebar:hover .runs-list::-webkit-scrollbar-thumb:hover {
+  .group\/sidebar:hover .scrollbar-thin::-webkit-scrollbar-thumb:hover {
     background-color: #484f58;
-  }
-
-  .run-item {
-    width: 100%;
-    padding: 0.5rem;
-    background: transparent;
-    border: none;
-    border-radius: 4px;
-    color: var(--text-primary);
-    cursor: pointer;
-    display: flex;
-    align-items: center;
-    gap: 0.5rem;
-    font-family: inherit;
-    font-size: 0.8rem;
-    text-align: left;
-    transition: background 0.1s;
-  }
-
-  .run-item:hover {
-    background: var(--bg-hover);
-  }
-
-  .run-item.selected {
-    background: var(--accent);
-    color: #fff;
-  }
-
-  .status-icon {
-    width: 1rem;
-    height: 1rem;
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    flex-shrink: 0;
-  }
-
-  .status-icon svg {
-    width: 14px;
-    height: 14px;
-  }
-
-  .status-running {
-    color: var(--purple, #a855f7);
-    animation: pulse 1.5s ease-in-out infinite;
-  }
-
-  .status-completed {
-    color: var(--green);
-  }
-
-  .status-failed {
-    color: var(--red);
-  }
-
-  .status-waiting {
-    color: #8b9eb3;
   }
 
   @keyframes pulse {
@@ -370,48 +272,7 @@
     }
   }
 
-  .run-item.selected .status-icon {
-    color: inherit;
-  }
-
-  .run-info {
-    flex: 1;
-    min-width: 0;
-    display: flex;
-    flex-direction: column;
-    gap: 0.125rem;
-  }
-
-  .workflow-name {
-    font-weight: 500;
-    white-space: nowrap;
-    overflow: hidden;
-    text-overflow: ellipsis;
-  }
-
-  .run-id {
-    font-size: 0.7rem;
-    color: var(--text-secondary);
-    font-family: monospace;
-  }
-
-  .run-item.selected .run-id {
-    color: rgba(255, 255, 255, 0.7);
-  }
-
-  .run-time {
-    font-size: 0.7rem;
-    color: var(--text-secondary);
-  }
-
-  .run-item.selected .run-time {
-    color: rgba(255, 255, 255, 0.7);
-  }
-
-  .empty-state {
-    padding: 1rem;
-    text-align: center;
-    color: var(--text-secondary);
-    font-size: 0.8rem;
+  .animate-pulse {
+    animation: pulse 1.5s ease-in-out infinite;
   }
 </style>

@@ -56,14 +56,14 @@
   ];
 
   const categoryColorMap: Record<string, string> = {
-    decision: 'var(--green)',
-    operation: 'var(--gray-light)',
-    dispatch: 'var(--pink)',
-    sql: 'var(--violet)',
+    decision: 'var(--color-green)',
+    operation: 'var(--color-gray-light)',
+    dispatch: 'var(--color-pink)',
+    sql: 'var(--color-violet)',
   };
 
   function getTraceColor(item: any): string {
-    return categoryColorMap[item.category] || 'var(--gray)';
+    return categoryColorMap[item.category] || 'var(--color-gray)';
   }
 
   function formatTime(timestamp: number): string {
@@ -107,7 +107,7 @@
       time: formatTime(item.timestamp),
       badge: {
         text: item.category,
-        color: categoryColorMap[item.category] || 'var(--gray)',
+        color: categoryColorMap[item.category] || 'var(--color-gray)',
       },
       identifier: `${item.workflowRunId.slice(-8)}-${item.sequence}`,
       message,
@@ -130,15 +130,24 @@
   <title>Trace Events</title>
 </svelte:head>
 
-<div class="page-with-sidebar" class:resizing={isResizing}>
+<div
+  class="flex h-full overflow-hidden {isResizing ? 'cursor-col-resize select-none' : ''}"
+  class:resizing={isResizing}
+>
   <WorkflowRunsSidebar
     width={sidebarWidth}
     selectedRunId={selectedRunId}
     onSelect={(id) => (selectedRunId = id)}
   />
   <!-- svelte-ignore a11y_no_static_element_interactions -->
-  <div class="resize-handle" onmousedown={handleResizeStart}>
-    <div class="resize-handle-header"></div>
+  <div
+    class="w-1.5 cursor-col-resize bg-surface shrink-0 flex flex-col group"
+    class:bg-accent={isResizing}
+    onmousedown={handleResizeStart}
+  >
+    <div
+      class="h-16 bg-surface-raised border-b border-border box-border group-hover:bg-accent group-hover:border-accent {isResizing ? 'bg-accent border-accent' : ''}"
+    ></div>
   </div>
   <StreamViewer
     title="Trace Events"
@@ -157,46 +166,17 @@
 </div>
 
 <style>
-  .page-with-sidebar {
-    display: flex;
-    height: 100%;
-    overflow: hidden;
-  }
-
-  .page-with-sidebar.resizing {
-    cursor: col-resize;
-    user-select: none;
-  }
-
-  .resize-handle {
-    width: 6px;
-    cursor: col-resize;
-    background: var(--bg-primary);
-    flex-shrink: 0;
-    display: flex;
-    flex-direction: column;
-  }
-
-  .resize-handle-header {
-    height: 64px;
-    background: var(--bg-secondary);
-    border-bottom: 1px solid var(--border);
-    box-sizing: border-box;
-  }
-
-  .resize-handle:hover,
-  .resizing .resize-handle {
-    background: var(--accent);
-  }
-
-  .resize-handle:hover .resize-handle-header,
-  .resizing .resize-handle .resize-handle-header {
-    background: var(--accent);
-    border-bottom-color: var(--accent);
-  }
-
-  .page-with-sidebar :global(.stream-viewer) {
+  .resizing :global(.stream-viewer) {
     flex: 1;
     min-width: 0;
+  }
+
+  div:not(.resizing) :global(.stream-viewer) {
+    flex: 1;
+    min-width: 0;
+  }
+
+  .group:hover {
+    background: var(--color-accent);
   }
 </style>

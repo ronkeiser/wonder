@@ -52,7 +52,7 @@
     if (getItemColor) {
       return getItemColor(item);
     }
-    return 'var(--gray)';
+    return 'var(--color-gray)';
   }
 
   async function filterItemsByTime(minutes: number | null) {
@@ -382,12 +382,13 @@
   });
 </script>
 
-<div class="stream-viewer">
+<div class="stream-viewer flex flex-col h-full bg-surface text-foreground">
   {#if workflowRunId || !subscribeMessage}
-    <header>
-      <div class="left-controls">
+    <header class="h-16 bg-surface-raised px-4 pl-2.5 border-b border-border flex justify-between items-center gap-4 box-border">
+      <div class="flex gap-4 items-center">
         <select
-          class="filter-select"
+          class="py-1.5 px-3 pr-8 bg-surface-overlay bg-no-repeat bg-position-[right_0.5rem_center] bg-size-[16px] appearance-none border-none rounded-md text-foreground cursor-pointer text-sm transition-colors duration-100 hover:bg-surface-hover focus:outline-none focus-visible:ring-2 focus-visible:ring-accent-muted"
+          style="background-image: url(&quot;data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 16 16' fill='%23c9d1d9'%3E%3Cpath d='M4.427 7.427l3.396 3.396a.25.25 0 00.354 0l3.396-3.396A.25.25 0 0011.396 7H4.604a.25.25 0 00-.177.427z'/%3E%3C/svg%3E&quot;)"
           bind:value={currentFilter}
           onchange={(e) => handleFilterChange(e.currentTarget.value)}
         >
@@ -397,15 +398,14 @@
           {/each}
         </select>
         {#if subscribeMessage && workflowRunId}
-          <span class="status {status}">{status}</span>
+          <span class="inline-block py-1 px-2 rounded text-xs font-medium {status === 'connected' ? 'bg-success text-white' : ''} {status === 'disconnected' ? 'bg-error text-white' : ''} {status === 'connecting' ? 'bg-warning text-white' : ''}">{status}</span>
         {/if}
       </div>
-      <div class="right-controls">
-        <div class="time-filters">
+      <div class="flex gap-4 items-center flex-wrap">
+        <div class="flex gap-2">
           {#each [1, 5, 15, 60, 1440] as minutes}
             <button
-              class="time-filter-btn"
-              class:active={timeFilterMinutes === minutes}
+              class="py-1.5 px-3 bg-surface-overlay border-none rounded-md text-foreground cursor-pointer text-sm transition-colors duration-100 hover:bg-surface-hover focus:outline-none focus-visible:ring-2 focus-visible:ring-accent-muted {timeFilterMinutes === minutes ? 'bg-accent text-white' : ''}"
               onclick={() => handleTimeFilterChange(minutes)}
             >
               {minutes < 60 ? `${minutes}m` : minutes === 60 ? '1h' : '24h'}
@@ -414,11 +414,10 @@
         </div>
 
         <button
-          class="pretty-print-toggle"
-          class:active={prettyPrintEnabled}
+          class="py-1.5 px-3 bg-surface-overlay border-none rounded-md text-foreground cursor-pointer text-sm transition-colors duration-100 flex items-center gap-1.5 hover:bg-surface-hover focus:outline-none focus-visible:ring-2 focus-visible:ring-accent-muted {prettyPrintEnabled ? 'bg-accent text-white' : ''}"
           onclick={togglePrettyPrint}
         >
-          <svg viewBox="0 0 16 16" fill="currentColor">
+          <svg viewBox="0 0 16 16" fill="currentColor" class="w-3.5 h-3.5">
             <path
               d="M0 3.75C0 2.784.784 2 1.75 2h12.5c.966 0 1.75.784 1.75 1.75v8.5A1.75 1.75 0 0 1 14.25 14H1.75A1.75 1.75 0 0 1 0 12.25Zm1.75-.25a.25.25 0 0 0-.25.25v8.5c0 .138.112.25.25.25h12.5a.25.25 0 0 0 .25-.25v-8.5a.25.25 0 0 0-.25-.25ZM3.5 6.25a.75.75 0 0 1 .75-.75h7a.75.75 0 0 1 0 1.5h-7a.75.75 0 0 1-.75-.75Zm.75 2.25h4a.75.75 0 0 1 0 1.5h-4a.75.75 0 0 1 0-1.5Z"
             ></path>
@@ -427,20 +426,19 @@
         </button>
 
         <button
-          class="copy-all-btn"
-          class:copied={copyAllStatus === 'copied'}
+          class="py-1.5 px-3 bg-surface-overlay border-none rounded-md text-foreground cursor-pointer text-sm flex items-center gap-1.5 transition-all duration-100 hover:enabled:bg-surface-hover focus:outline-none focus-visible:ring-2 focus-visible:ring-accent-muted active:enabled:scale-95 disabled:opacity-50 disabled:cursor-not-allowed {copyAllStatus === 'copied' ? 'bg-success text-white' : ''}"
           onclick={copyAllToClipboard}
           disabled={filteredItems.length === 0}
         >
           {#if copyAllStatus === 'copied'}
-            <svg viewBox="0 0 16 16" fill="currentColor">
+            <svg viewBox="0 0 16 16" fill="currentColor" class="w-3.5 h-3.5">
               <path
                 d="M13.78 4.22a.75.75 0 0 1 0 1.06l-7.25 7.25a.75.75 0 0 1-1.06 0L2.22 9.28a.75.75 0 0 1 1.06-1.06L6 10.94l6.72-6.72a.75.75 0 0 1 1.06 0Z"
               ></path>
             </svg>
             Copied!
           {:else}
-            <svg viewBox="0 0 16 16" fill="currentColor">
+            <svg viewBox="0 0 16 16" fill="currentColor" class="w-3.5 h-3.5">
               <path
                 d="M0 6.75C0 5.784.784 5 1.75 5h1.5a.75.75 0 0 1 0 1.5h-1.5a.25.25 0 0 0-.25.25v7.5c0 .138.112.25.25.25h7.5a.25.25 0 0 0 .25-.25v-1.5a.75.75 0 0 1 1.5 0v1.5A1.75 1.75 0 0 1 9.25 16h-7.5A1.75 1.75 0 0 1 0 14.25Z"
               ></path>
@@ -452,8 +450,11 @@
           {/if}
         </button>
 
-        <button class="refresh-btn" onclick={() => filterItemsByTime(timeFilterMinutes)}>
-          <svg viewBox="0 0 16 16" fill="currentColor">
+        <button
+          class="py-1.5 px-3 bg-surface-overlay border-none rounded-md text-foreground cursor-pointer text-sm flex items-center gap-1.5 transition-all duration-100 hover:bg-surface-hover focus:outline-none focus-visible:ring-2 focus-visible:ring-accent-muted active:scale-95"
+          onclick={() => filterItemsByTime(timeFilterMinutes)}
+        >
+          <svg viewBox="0 0 16 16" fill="currentColor" class="w-3.5 h-3.5">
             <path
               fill-rule="evenodd"
               d="M8 2.5a5.487 5.487 0 00-4.131 1.869l1.204 1.204A.25.25 0 014.896 6H1.25A.25.25 0 011 5.75V2.104a.25.25 0 01.427-.177l1.38 1.38A7.001 7.001 0 0114.95 7.16a.75.75 0 11-1.49.178A5.501 5.501 0 008 2.5zM1.705 8.005a.75.75 0 01.834.656 5.501 5.501 0 009.592 2.97l-1.204-1.204a.25.25 0 01.177-.427h3.646a.25.25 0 01.25.25v3.646a.25.25 0 01-.427.177l-1.38-1.38A7.001 7.001 0 011.05 8.84a.75.75 0 01.656-.834z"
@@ -465,11 +466,14 @@
     </header>
 
     {#if identifierFilters.length > 0}
-      <div class="filter-chips">
+      <div class="flex flex-wrap gap-2 py-3 px-4 bg-surface-raised border-b border-border">
         {#each identifierFilters as filter}
-          <button class="filter-chip" onclick={() => removeIdentifierFilter(filter)}>
-            <span class="chip-label">ID:</span>{filter}
-            <svg class="chip-x" viewBox="0 0 16 16" fill="currentColor">
+          <button
+            class="inline-flex items-center gap-1.5 py-1 px-2 bg-indigo text-white border-none rounded text-[0.8rem] font-medium cursor-pointer transition-colors duration-100 hover:bg-indigo-light"
+            onclick={() => removeIdentifierFilter(filter)}
+          >
+            <span class="mr-1">ID:</span>{filter}
+            <svg class="w-3.5 h-3.5" viewBox="0 0 16 16" fill="currentColor">
               <path d="M3.72 3.72a.75.75 0 0 1 1.06 0L8 6.94l3.22-3.22a.749.749 0 0 1 1.275.326.749.749 0 0 1-.215.734L9.06 8l3.22 3.22a.749.749 0 0 1-.326 1.275.749.749 0 0 1-.734-.215L8 9.06l-3.22 3.22a.751.751 0 0 1-1.042-.018.751.751 0 0 1-.018-1.042L6.94 8 3.72 4.78a.75.75 0 0 1 0-1.06Z"></path>
             </svg>
           </button>
@@ -477,7 +481,7 @@
       </div>
     {/if}
 
-    <div class="items" id="items-container">
+    <div class="flex-1 overflow-y-auto p-4 pl-2.5" id="items-container">
       {#each filteredItems as item (item.id)}
         <StreamItem
           {item}
@@ -491,329 +495,28 @@
       {/each}
     </div>
   {:else}
-    <header class="empty-header"></header>
-    <div class="empty-state">
-      <p>Select a workflow run to view events</p>
+    <header class="h-16 bg-surface-raised border-b border-border"></header>
+    <div class="flex items-center justify-center flex-1 text-foreground-muted text-sm">
+      <p class="m-0">Select a workflow run to view events</p>
     </div>
   {/if}
 </div>
 
 <style>
-  .stream-viewer {
-    display: flex;
-    flex-direction: column;
-    height: 100%;
-    background: var(--bg-primary);
-    color: var(--text-primary);
-  }
-
-  header {
-    height: 64px;
-    background: var(--bg-secondary);
-    padding: 0 1rem 0 calc(1rem - 6px);
-    border-bottom: 1px solid var(--border);
-    display: flex;
-    justify-content: space-between;
-    align-items: center;
-    gap: 1rem;
-    box-sizing: border-box;
-  }
-
-  .left-controls {
-    display: flex;
-    gap: 1rem;
-    align-items: center;
-  }
-
-  .right-controls {
-    display: flex;
-    gap: 1rem;
-    align-items: center;
-    flex-wrap: wrap;
-  }
-
-  .filter-select {
-    padding: 0.375rem 0.75rem;
-    padding-right: 2rem;
-    background: var(--bg-tertiary);
-    background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 16 16' fill='%23c9d1d9'%3E%3Cpath d='M4.427 7.427l3.396 3.396a.25.25 0 00.354 0l3.396-3.396A.25.25 0 0011.396 7H4.604a.25.25 0 00-.177.427z'/%3E%3C/svg%3E");
-    background-repeat: no-repeat;
-    background-position: right 0.5rem center;
-    background-size: 16px;
-    appearance: none;
-    border: none;
-    border-radius: 6px;
-    color: var(--text-primary);
-    cursor: pointer;
-    font-size: 0.875rem;
-    font-family: inherit;
-    transition: background 0.1s;
-  }
-
-  .filter-select:hover {
-    background-color: var(--bg-hover);
-    background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 16 16' fill='%23c9d1d9'%3E%3Cpath d='M4.427 7.427l3.396 3.396a.25.25 0 00.354 0l3.396-3.396A.25.25 0 0011.396 7H4.604a.25.25 0 00-.177.427z'/%3E%3C/svg%3E");
-  }
-
-  .filter-select:focus {
-    outline: none;
-  }
-
-  .filter-select:focus-visible {
-    box-shadow: 0 0 0 2px var(--accent-emphasis);
-  }
-
-  .time-filters {
-    display: flex;
-    gap: 0.5rem;
-  }
-
-  .time-filter-btn {
-    padding: 0.375rem 0.75rem;
-    background: var(--bg-tertiary);
-    border: none;
-    border-radius: 6px;
-    color: var(--text-primary);
-    cursor: pointer;
-    font-size: 0.875rem;
-    font-family: inherit;
-    transition: background 0.1s;
-  }
-
-  .time-filter-btn:hover {
-    background: var(--bg-hover);
-  }
-
-  .time-filter-btn:focus {
-    outline: none;
-  }
-
-  .time-filter-btn:focus-visible {
-    box-shadow: 0 0 0 2px var(--accent-emphasis);
-  }
-
-  .time-filter-btn.active {
-    background: var(--accent);
-    color: #fff;
-  }
-
-  .pretty-print-toggle {
-    padding: 0.375rem 0.75rem;
-    background: var(--bg-tertiary);
-    border: none;
-    border-radius: 6px;
-    color: var(--text-primary);
-    cursor: pointer;
-    font-size: 0.875rem;
-    font-family: inherit;
-    transition: background 0.1s;
-    display: flex;
-    align-items: center;
-    gap: 0.375rem;
-  }
-
-  .pretty-print-toggle svg {
-    width: 14px;
-    height: 14px;
-  }
-
-  .pretty-print-toggle:hover {
-    background: var(--bg-hover);
-  }
-
-  .pretty-print-toggle:focus {
-    outline: none;
-  }
-
-  .pretty-print-toggle:focus-visible {
-    box-shadow: 0 0 0 2px var(--accent-emphasis);
-  }
-
-  .pretty-print-toggle.active {
-    background: var(--accent);
-    color: #fff;
-  }
-
-  .copy-all-btn {
-    padding: 0.375rem 0.75rem;
-    background: var(--bg-tertiary);
-    border: none;
-    border-radius: 6px;
-    color: var(--text-primary);
-    cursor: pointer;
-    font-size: 0.875rem;
-    font-family: inherit;
-    display: flex;
-    align-items: center;
-    gap: 0.375rem;
-    transition:
-      background 0.1s,
-      transform 0.1s;
-  }
-
-  .copy-all-btn svg {
-    width: 14px;
-    height: 14px;
-  }
-
-  .copy-all-btn:hover:not(:disabled) {
-    background: var(--bg-hover);
-  }
-
-  .copy-all-btn:focus {
-    outline: none;
-  }
-
-  .copy-all-btn:focus-visible {
-    box-shadow: 0 0 0 2px var(--accent-emphasis);
-  }
-
-  .copy-all-btn:active:not(:disabled) {
-    transform: scale(0.95);
-  }
-
-  .copy-all-btn:disabled {
-    opacity: 0.5;
-    cursor: not-allowed;
-  }
-
-  .copy-all-btn.copied {
-    background: var(--green);
-    color: #fff;
-  }
-
-  .refresh-btn {
-    padding: 0.375rem 0.75rem;
-    background: var(--bg-tertiary);
-    border: none;
-    border-radius: 6px;
-    color: var(--text-primary);
-    cursor: pointer;
-    font-size: 0.875rem;
-    font-family: inherit;
-    display: flex;
-    align-items: center;
-    gap: 0.375rem;
-    transition:
-      background 0.1s,
-      transform 0.1s;
-  }
-
-  .refresh-btn:hover {
-    background: var(--bg-hover);
-  }
-
-  .refresh-btn:focus {
-    outline: none;
-  }
-
-  .refresh-btn:focus-visible {
-    box-shadow: 0 0 0 2px var(--accent-emphasis);
-  }
-
-  .refresh-btn:active {
-    transform: scale(0.95);
-  }
-
-  .refresh-btn svg {
-    width: 14px;
-    height: 14px;
-  }
-
-  .status {
-    display: inline-block;
-    padding: 0.25rem 0.5rem;
-    border-radius: 4px;
-    font-size: 0.75rem;
-    font-weight: 500;
-  }
-
-  .status.connected {
-    background: var(--green);
-    color: #fff;
-  }
-
-  .status.disconnected {
-    background: var(--red);
-    color: #fff;
-  }
-
-  .status.connecting {
-    background: var(--orange);
-    color: #fff;
-  }
-
-  .items {
-    flex: 1;
-    overflow-y: auto;
-    padding: 1rem 1rem 1rem calc(1rem - 6px);
-  }
-
   ::-webkit-scrollbar {
     width: 12px;
   }
 
   ::-webkit-scrollbar-track {
-    background: var(--bg-primary);
+    background: var(--color-surface);
   }
 
   ::-webkit-scrollbar-thumb {
-    background: var(--border);
+    background: var(--color-border);
     border-radius: 6px;
   }
 
   ::-webkit-scrollbar-thumb:hover {
     background: #484f58;
-  }
-
-  .filter-chips {
-    display: flex;
-    flex-wrap: wrap;
-    gap: 0.5rem;
-    padding: 0.75rem 1rem;
-    background: var(--bg-secondary);
-    border-bottom: 1px solid var(--border);
-  }
-
-  .filter-chip {
-    display: inline-flex;
-    align-items: center;
-    gap: 0.375rem;
-    padding: 0.25rem 0.5rem;
-    background: var(--indigo);
-    color: #fff;
-    border: none;
-    border-radius: 4px;
-    font-size: 0.8rem;
-    font-weight: 500;
-    font-family: inherit;
-    cursor: pointer;
-    transition: background 0.1s;
-  }
-
-  .filter-chip:hover {
-    background: var(--indigo-light);
-  }
-
-  .chip-label {
-    margin-right: 0.25rem;
-  }
-
-  .chip-x {
-    width: 14px;
-    height: 14px;
-  }
-
-  .empty-state {
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    flex: 1;
-    color: var(--text-secondary);
-    font-size: 0.875rem;
-  }
-
-  .empty-state p {
-    margin: 0;
   }
 </style>

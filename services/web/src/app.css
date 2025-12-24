@@ -86,55 +86,10 @@
   box-sizing: border-box;
 }
 
-/* Legacy CSS variable aliases for existing component styles */
-:root {
-  --red: var(--color-red);
-  --orange: var(--color-orange);
-  --yellow: var(--color-yellow);
-  --green: var(--color-green);
-  --teal: var(--color-teal);
-  --cyan: var(--color-cyan);
-  --blue: var(--color-blue);
-  --indigo: var(--color-indigo);
-  --indigo-light: var(--color-indigo-light);
-  --violet: var(--color-violet);
-  --purple: var(--color-purple);
-  --purple-light: var(--color-purple-light);
-  --pink: var(--color-pink);
-  --lime: var(--color-lime);
-  --emerald: var(--color-emerald);
-  --emerald-light: var(--color-emerald-light);
-
-  --gray-darkest: var(--color-gray-darkest);
-  --gray-darker: var(--color-gray-darker);
-  --gray-dark: var(--color-gray-dark);
-  --gray: var(--color-gray);
-  --gray-light: var(--color-gray-light);
-  --gray-lighter: var(--color-gray-lighter);
-  --gray-lightest: var(--color-gray-lightest);
-  --blue-light: var(--color-blue-light);
-  --blue-lighter: var(--color-blue-lighter);
-
-  --bg-primary: var(--color-surface);
-  --bg-secondary: var(--color-surface-raised);
-  --bg-tertiary: var(--color-surface-overlay);
-  --bg-hover: var(--color-surface-hover);
-  --text-primary: var(--color-foreground);
-  --text-secondary: var(--color-foreground-muted);
-  --text-link: var(--color-link);
-  --border: var(--color-border);
-  --accent: var(--color-accent);
-  --accent-hover: var(--color-accent-hover);
-  --accent-emphasis: var(--color-accent-muted);
-  --error-bg: var(--color-error-surface);
-  --error-text: var(--color-error);
-}
-
 body {
-  font-family:
-    ui-monospace, 'Cascadia Code', 'Source Code Pro', Menlo, Consolas, 'DejaVu Sans Mono', monospace;
-  background: #0d1117;
-  color: #c9d1d9;
+  font-family: var(--font-mono);
+  background: var(--color-surface);
+  color: var(--color-foreground);
   -webkit-font-smoothing: antialiased;
   -moz-osx-font-smoothing: grayscale;
 }

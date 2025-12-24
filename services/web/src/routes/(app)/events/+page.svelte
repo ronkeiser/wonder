@@ -86,42 +86,42 @@
 
   const colorMap: Record<string, string> = {
     // Workflow lifecycle - pink/green/red family
-    'workflow.started': 'var(--pink)',
-    'workflow.completed': 'var(--green)',
-    'workflow.failed': 'var(--red)',
+    'workflow.started': 'var(--color-pink)',
+    'workflow.completed': 'var(--color-green)',
+    'workflow.failed': 'var(--color-red)',
 
     // Task execution - blue/indigo/violet family
-    'task.dispatched': 'var(--blue)',
-    'task.completed': 'var(--purple-light)',
-    'task.failed': 'var(--violet)',
+    'task.dispatched': 'var(--color-blue)',
+    'task.completed': 'var(--color-purple-light)',
+    'task.failed': 'var(--color-violet)',
 
     // Token lifecycle - teal/cyan/orange family
-    'token.created': 'var(--teal)',
-    'token.completed': 'var(--cyan)',
-    'token.failed': 'var(--orange)',
-    'token.waiting': 'var(--yellow)',
+    'token.created': 'var(--color-teal)',
+    'token.completed': 'var(--color-cyan)',
+    'token.failed': 'var(--color-orange)',
+    'token.waiting': 'var(--color-yellow)',
 
     // Context updates - purple family
-    'context.updated': 'var(--purple)',
-    'context.output_applied': 'var(--purple-light)',
+    'context.updated': 'var(--color-purple)',
+    'context.output_applied': 'var(--color-purple-light)',
 
     // Fan-out/Fan-in - lime/emerald family (parallel execution)
-    'fan_out.started': 'var(--lime)',
-    'fan_in.completed': 'var(--emerald)',
-    'branches.merged': 'var(--emerald-light)',
+    'fan_out.started': 'var(--color-lime)',
+    'fan_in.completed': 'var(--color-emerald)',
+    'branches.merged': 'var(--color-emerald-light)',
 
     // Subworkflow lifecycle - indigo/violet family
-    'subworkflow.dispatched': 'var(--indigo)',
-    'subworkflow.waiting': 'var(--indigo-light)',
-    'subworkflow.started': 'var(--violet)',
-    'subworkflow.completed': 'var(--violet)',
-    'subworkflow.result_received': 'var(--purple)',
-    'subworkflow.failed': 'var(--red)',
-    'subworkflow.timeout': 'var(--orange)',
+    'subworkflow.dispatched': 'var(--color-indigo)',
+    'subworkflow.waiting': 'var(--color-indigo-light)',
+    'subworkflow.started': 'var(--color-violet)',
+    'subworkflow.completed': 'var(--color-violet)',
+    'subworkflow.result_received': 'var(--color-purple)',
+    'subworkflow.failed': 'var(--color-red)',
+    'subworkflow.timeout': 'var(--color-orange)',
   };
 
   function getEventColor(item: any): string {
-    return colorMap[item.eventType] || 'var(--gray)';
+    return colorMap[item.eventType] || 'var(--color-gray)';
   }
 
   function formatTime(timestamp: number): string {
@@ -140,7 +140,7 @@
       time: formatTime(item.timestamp),
       badge: {
         text: item.eventType,
-        color: colorMap[item.eventType] || 'var(--gray-lighter)',
+        color: colorMap[item.eventType] || 'var(--color-gray-lighter)',
       },
       identifier: item.workflowRunId ? item.workflowRunId.slice(-8) : undefined,
       message: item.message,
@@ -163,15 +163,24 @@
   <title>Events</title>
 </svelte:head>
 
-<div class="page-with-sidebar" class:resizing={isResizing}>
+<div
+  class="flex h-full overflow-hidden {isResizing ? 'cursor-col-resize select-none' : ''}"
+  class:resizing={isResizing}
+>
   <WorkflowRunsSidebar
     width={sidebarWidth}
     {selectedRunId}
     onSelect={(id) => (selectedRunId = id)}
   />
   <!-- svelte-ignore a11y_no_static_element_interactions -->
-  <div class="resize-handle" onmousedown={handleResizeStart}>
-    <div class="resize-handle-header"></div>
+  <div
+    class="w-1.5 cursor-col-resize bg-surface shrink-0 flex flex-col group"
+    class:bg-accent={isResizing}
+    onmousedown={handleResizeStart}
+  >
+    <div
+      class="h-16 bg-surface-raised border-b border-border box-border group-hover:bg-accent group-hover:border-accent {isResizing ? 'bg-accent border-accent' : ''}"
+    ></div>
   </div>
   <StreamViewer
     title="Events"
@@ -190,46 +199,17 @@
 </div>
 
 <style>
-  .page-with-sidebar {
-    display: flex;
-    height: 100%;
-    overflow: hidden;
-  }
-
-  .page-with-sidebar.resizing {
-    cursor: col-resize;
-    user-select: none;
-  }
-
-  .resize-handle {
-    width: 6px;
-    cursor: col-resize;
-    background: var(--bg-primary);
-    flex-shrink: 0;
-    display: flex;
-    flex-direction: column;
-  }
-
-  .resize-handle-header {
-    height: 64px;
-    background: var(--bg-secondary);
-    border-bottom: 1px solid var(--border);
-    box-sizing: border-box;
-  }
-
-  .resize-handle:hover,
-  .resizing .resize-handle {
-    background: var(--accent);
-  }
-
-  .resize-handle:hover .resize-handle-header,
-  .resizing .resize-handle .resize-handle-header {
-    background: var(--accent);
-    border-bottom-color: var(--accent);
-  }
-
-  .page-with-sidebar :global(.stream-viewer) {
+  .resizing :global(.stream-viewer) {
     flex: 1;
     min-width: 0;
+  }
+
+  div:not(.resizing) :global(.stream-viewer) {
+    flex: 1;
+    min-width: 0;
+  }
+
+  .group:hover {
+    background: var(--color-accent);
   }
 </style>

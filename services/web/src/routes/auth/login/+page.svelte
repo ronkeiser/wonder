@@ -4,13 +4,20 @@
   let loading = false;
 </script>
 
-<div class="login-container">
-  <div class="login-card">
-    <h1>Wonder</h1>
+<div class="min-h-screen flex items-center justify-center bg-gray-darkest">
+  <div class="bg-transparent p-6 w-full max-w-[280px]">
+    <h1 class="m-0 mb-6 text-center text-gray-lightest font-normal text-sm tracking-widest uppercase">
+      Wonder
+    </h1>
 
     <form method="POST">
-      <div class="form-group">
-        <label for="username">Username</label>
+      <div class="mb-3.5">
+        <label
+          for="username"
+          class="block mb-1 text-gray-lighter font-normal text-[0.625rem] uppercase tracking-wide"
+        >
+          Username
+        </label>
         <input
           id="username"
           name="username"
@@ -18,11 +25,17 @@
           required
           autocomplete="username"
           disabled={loading}
+          class="w-full py-2 px-2.5 bg-transparent border-0 border-b border-gray-dark rounded-none text-xs text-gray-lightest box-border transition-colors duration-200 focus:outline-none focus:border-accent disabled:opacity-50 disabled:cursor-not-allowed"
         />
       </div>
 
-      <div class="form-group">
-        <label for="password">Password</label>
+      <div class="mb-3.5">
+        <label
+          for="password"
+          class="block mb-1 text-gray-lighter font-normal text-[0.625rem] uppercase tracking-wide"
+        >
+          Password
+        </label>
         <input
           id="password"
           name="password"
@@ -30,120 +43,25 @@
           required
           autocomplete="current-password"
           disabled={loading}
+          class="w-full py-2 px-2.5 bg-transparent border-0 border-b border-gray-dark rounded-none text-xs text-gray-lightest box-border transition-colors duration-200 focus:outline-none focus:border-accent disabled:opacity-50 disabled:cursor-not-allowed"
         />
       </div>
 
       {#if form?.error}
-        <div class="error">{form.error}</div>
+        <div
+          class="py-2 px-2 bg-transparent text-error border-0 border-l-2 border-error rounded-none mb-3 text-left text-[0.625rem]"
+        >
+          {form.error}
+        </div>
       {/if}
 
-      <button type="submit" disabled={loading}>
+      <button
+        type="submit"
+        disabled={loading}
+        class="w-full py-2 bg-transparent text-gray-lightest border border-gray-dark rounded-none text-[0.625rem] font-normal cursor-pointer mt-4 uppercase tracking-widest transition-all duration-200 hover:enabled:border-accent hover:enabled:text-accent disabled:opacity-50 disabled:cursor-not-allowed"
+      >
         {loading ? 'Logging in...' : 'Login'}
       </button>
     </form>
   </div>
 </div>
-
-<style>
-  .login-container {
-    min-height: 100vh;
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    background: var(--gray-darkest);
-  }
-
-  .login-card {
-    background: transparent;
-    padding: 1.5rem;
-    width: 100%;
-    max-width: 280px;
-  }
-
-  h1 {
-    margin: 0 0 1.5rem 0;
-    text-align: center;
-    color: var(--gray-lightest);
-    font-weight: 400;
-    font-size: 0.875rem;
-    letter-spacing: 0.1em;
-    text-transform: uppercase;
-  }
-
-  .form-group {
-    margin-bottom: 0.875rem;
-  }
-
-  label {
-    display: block;
-    margin-bottom: 0.25rem;
-    color: var(--gray-lighter);
-    font-weight: 400;
-    font-size: 0.625rem;
-    text-transform: uppercase;
-    letter-spacing: 0.05em;
-  }
-
-  input {
-    width: 100%;
-    padding: 0.5rem 0.625rem;
-    background: transparent;
-    border: none;
-    border-bottom: 1px solid var(--gray-dark);
-    border-radius: 0;
-    font-size: 0.75rem;
-    color: var(--gray-lightest);
-    box-sizing: border-box;
-    font-family: inherit;
-    transition: border-color 0.2s;
-  }
-
-  input:focus {
-    outline: none;
-    border-bottom-color: var(--accent);
-  }
-
-  input:disabled {
-    opacity: 0.5;
-    cursor: not-allowed;
-  }
-
-  button {
-    width: 100%;
-    padding: 0.5rem;
-    background: transparent;
-    color: var(--gray-lightest);
-    border: 1px solid var(--gray-dark);
-    border-radius: 0;
-    font-size: 0.625rem;
-    font-weight: 400;
-    cursor: pointer;
-    margin-top: 1rem;
-    font-family: inherit;
-    text-transform: uppercase;
-    letter-spacing: 0.1em;
-    transition: all 0.2s;
-  }
-
-  button:hover:not(:disabled) {
-    border-color: var(--accent);
-    color: var(--accent);
-  }
-
-  button:disabled {
-    opacity: 0.5;
-    cursor: not-allowed;
-  }
-
-  .error {
-    padding: 0.5rem;
-    background: transparent;
-    color: var(--error-text);
-    border: none;
-    border-left: 2px solid var(--error-text);
-    border-radius: 0;
-    margin-bottom: 0.75rem;
-    text-align: left;
-    font-size: 0.625rem;
-  }
-</style>

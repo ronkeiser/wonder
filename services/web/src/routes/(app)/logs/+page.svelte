@@ -11,14 +11,14 @@
   ];
 
   const levelColorMap: Record<string, string> = {
-    error: 'var(--red)',
-    warn: 'var(--yellow)',
-    info: 'var(--blue)',
-    debug: 'var(--gray)',
+    error: 'var(--color-red)',
+    warn: 'var(--color-yellow)',
+    info: 'var(--color-blue)',
+    debug: 'var(--color-gray)',
   };
 
   function getLogColor(item: any): string {
-    return levelColorMap[item.level] || 'var(--gray)';
+    return levelColorMap[item.level] || 'var(--color-gray)';
   }
 
   function formatTime(timestamp: number): string {
@@ -37,7 +37,7 @@
       time: formatTime(item.timestamp),
       badge: {
         text: item.level.toUpperCase(),
-        color: levelColorMap[item.level] || 'var(--gray)',
+        color: levelColorMap[item.level] || 'var(--color-gray)',
       },
       identifier: item.service,
       message: item.message,
