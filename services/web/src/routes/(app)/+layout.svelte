@@ -1,12 +1,16 @@
 <script lang="ts">
   import { Sidebar, createPersisted } from '@wonder/components';
-  import { Icon } from '@wonder/icons';
+  import { Icon, type IconName } from '@wonder/icons';
   import TabbedLayout from '$lib/components/TabbedLayout.svelte';
   import { page } from '$app/stores';
 
   let { children } = $props();
 
   const sidebarCollapsed = createPersisted('sidebar-collapsed', false, { cookie: true });
+
+  const navItems: { href: string; label: string; icon: IconName }[] = [
+    { href: '/admin', label: 'Admin', icon: 'clipboard' },
+  ];
 
   const tabs = [
     { id: 'events', label: 'Events', href: '/events' },
@@ -24,12 +28,12 @@
 </script>
 
 <div class="flex h-screen">
-  <Sidebar bind:collapsed={sidebarCollapsed.value} class="sidebar">
+  <Sidebar
+    bind:collapsed={sidebarCollapsed.value}
+    class="group flex flex-col w-52 data-collapsed:w-15 h-full p-3 bg-surface-raised border-r border-border transition-[width] duration-200"
+  >
     {#snippet trigger(props, collapsed)}
-      <button
-        {...props}
-        class="p-2 hover:bg-surface-hover rounded transition-colors"
-      >
+      <button {...props} class="flex items-center justify-center size-9 hover:bg-surface-hover rounded transition-colors">
         {#if collapsed}
           <Icon name="list" size={20} class="text-foreground-muted" />
         {:else}
@@ -40,13 +44,15 @@
 
     {#snippet children(collapsed)}
       <nav class="flex flex-col gap-1 mt-4">
-        <a
-          href="/events"
-          class="flex items-center gap-3 px-2 py-2 rounded hover:bg-surface-hover transition-colors text-foreground-muted hover:text-foreground"
-        >
-          <Icon name="clipboard" size={20} class="shrink-0" />
-          {#if !collapsed}<span>Admin</span>{/if}
-        </a>
+        {#each navItems as item}
+          <a
+            href={item.href}
+            class="flex items-center gap-3 px-2 h-9 rounded hover:bg-surface-hover transition-colors text-foreground-muted hover:text-foreground"
+          >
+            <Icon name={item.icon} size={20} class="shrink-0" />
+            <span class="group-data-collapsed:hidden">{item.label}</span>
+          </a>
+        {/each}
       </nav>
     {/snippet}
   </Sidebar>
@@ -57,20 +63,3 @@
     </TabbedLayout>
   </div>
 </div>
-
-<style>
-  :global(.sidebar) {
-    display: flex;
-    flex-direction: column;
-    width: var(--sidebar-width, 200px);
-    height: 100%;
-    padding: 0.75rem;
-    background: var(--color-surface-raised);
-    border-right: 1px solid var(--color-border);
-    transition: width 200ms ease;
-  }
-
-  :global(.sidebar[data-collapsed]) {
-    width: var(--sidebar-collapsed-width, 56px);
-  }
-</style>
