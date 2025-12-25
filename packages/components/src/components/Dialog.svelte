@@ -6,6 +6,8 @@
 	import { portal } from '../actions/portal.js';
 	import { escapeKeydown } from '../actions/escapeKeydown.js';
 
+	type DialogState = 'open' | 'closed';
+
 	interface TriggerProps {
 		id: string;
 		'aria-haspopup': 'dialog';
@@ -13,13 +15,15 @@
 		'aria-controls': string;
 		onclick: () => void;
 		onkeydown: (event: KeyboardEvent) => void;
-		'data-state': 'open' | 'closed';
+		'data-state': DialogState;
 	}
 
 	interface OverlayProps {
 		'aria-hidden': 'true';
 		onclick: () => void;
-		'data-state': 'open';
+		onanimationend: () => void;
+		ontransitionend: () => void;
+		'data-state': DialogState;
 	}
 
 	interface ContentProps {
@@ -28,7 +32,7 @@
 		'aria-modal': 'true' | undefined;
 		'aria-labelledby': string | undefined;
 		'aria-describedby': string | undefined;
-		'data-state': 'open';
+		'data-state': DialogState;
 	}
 
 	let {
@@ -58,6 +62,36 @@
 		trigger: generateId('dialog-trigger'),
 		content: generateId('dialog-content'),
 	};
+
+	// Track mounted state separately to allow exit animations
+	// mounted = element exists in DOM
+	// visible = element should appear open (delayed by a frame for enter transition)
+	let mounted = $state(false);
+	let visible = $state(false);
+
+	// Sync mounted/visible state with open prop
+	$effect(() => {
+		if (open) {
+			// Mount first, then set visible after a frame to trigger enter transition
+			mounted = true;
+			requestAnimationFrame(() => {
+				visible = true;
+			});
+		} else {
+			// Set invisible immediately to trigger exit transition
+			visible = false;
+		}
+	});
+
+	// Derived state for data attributes
+	const dataState = $derived<DialogState>(visible ? 'open' : 'closed');
+
+	// Handle animation/transition end to unmount after closing
+	function handleAnimationEnd() {
+		if (!visible) {
+			mounted = false;
+		}
+	}
 
 	// Handle scroll lock
 	$effect(() => {
@@ -108,7 +142,7 @@
 			'aria-controls': ids.content,
 			onclick: handleTriggerClick,
 			onkeydown: handleTriggerKeydown,
-			'data-state': open ? 'open' : 'closed',
+			'data-state': dataState,
 		};
 	}
 
@@ -116,7 +150,9 @@
 		return {
 			'aria-hidden': 'true',
 			onclick: handleOverlayClick,
-			'data-state': 'open',
+			onanimationend: handleAnimationEnd,
+			ontransitionend: handleAnimationEnd,
+			'data-state': dataState,
 		};
 	}
 
@@ -127,7 +163,7 @@
 			'aria-modal': modal ? 'true' : undefined,
 			'aria-labelledby': labelledby,
 			'aria-describedby': describedby,
-			'data-state': 'open',
+			'data-state': dataState,
 		};
 	}
 </script>
@@ -136,17 +172,17 @@
 	{@render trigger(getTriggerProps())}
 {/if}
 
-{#if open}
+{#if mounted}
 	<div
 		use:portal
-		use:escapeKeydown={{ handler: handleEscape }}
+		use:escapeKeydown={{ handler: handleEscape, enabled: open }}
 	>
 		{#if overlay}
 			{@render overlay(getOverlayProps())}
 		{/if}
 
 		<div
-			use:focusTrap={{ enabled: modal, modal, returnFocus: true }}
+			use:focusTrap={{ enabled: open && modal, modal, returnFocus: true }}
 		>
 			{@render content(getContentProps())}
 		</div>

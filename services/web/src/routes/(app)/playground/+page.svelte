@@ -25,21 +25,21 @@
       {/snippet}
 
       {#snippet overlay(props)}
-        <div
-          {...props}
-          class="fixed inset-0 bg-black/50 z-40"
-        />
+        <div {...props} class="dialog-overlay fixed inset-0 bg-black/50 z-40"></div>
       {/snippet}
 
       {#snippet content(props)}
         <div
           {...props}
-          class="fixed inset-0 z-50 flex items-center justify-center pointer-events-none"
+          class="dialog-content fixed inset-0 z-50 flex items-center justify-center pointer-events-none"
         >
-          <div class="bg-surface border border-border rounded-lg shadow-lg p-6 w-full max-w-md pointer-events-auto">
+          <div
+            class="dialog-panel bg-surface border border-border rounded-lg shadow-lg p-6 w-full max-w-md pointer-events-auto"
+          >
             <h2 id="dialog-title" class="text-lg font-semibold mb-2">Dialog Title</h2>
             <p id="dialog-description" class="text-foreground-muted mb-4">
-              This is a headless dialog component with focus trapping, scroll lock, and escape key handling.
+              This is a headless dialog component with focus trapping, scroll lock, and escape key
+              handling.
             </p>
             <div class="flex justify-end gap-2">
               <button
@@ -61,3 +61,32 @@
     </Dialog>
   </section>
 </div>
+
+<style>
+  /* Overlay transitions */
+  .dialog-overlay {
+    opacity: 0;
+    transition: opacity 1000ms ease-out;
+  }
+  .dialog-overlay[data-state='open'] {
+    opacity: 1;
+  }
+
+  /* Content wrapper transitions */
+  .dialog-content {
+    opacity: 0;
+    transition: opacity 200ms ease-out;
+  }
+  .dialog-content[data-state='open'] {
+    opacity: 1;
+  }
+
+  /* Panel transitions */
+  .dialog-panel {
+    transform: scale(0.95);
+    transition: transform 200ms ease-out;
+  }
+  .dialog-content[data-state='open'] .dialog-panel {
+    transform: scale(1);
+  }
+</style>
