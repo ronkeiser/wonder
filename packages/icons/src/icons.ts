@@ -10,6 +10,7 @@ import arrowsOutLineVertical from '@phosphor-icons/core/assets/regular/arrows-ou
 import list from '@phosphor-icons/core/assets/regular/list.svg?raw';
 import clipboard from '@phosphor-icons/core/assets/regular/clipboard.svg?raw';
 import sidebarSimple from '@phosphor-icons/core/assets/regular/sidebar-simple.svg?raw';
+import folderSimple from '@phosphor-icons/core/assets/regular/folder-simple.svg?raw';
 
 export const icons = {
 	copy,
@@ -24,6 +25,7 @@ export const icons = {
 	list,
 	clipboard,
 	sidebar: sidebarSimple,
+	folder: folderSimple,
 } as const;
 
 export type IconName = keyof typeof icons;
