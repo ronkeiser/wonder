@@ -137,15 +137,19 @@ export function focusTrap(
 		node.insertBefore(startGuard, node.firstChild);
 		node.appendChild(endGuard);
 
-		// Handle focus on guards
+		// Handle focus on guards (filter out guards themselves to prevent infinite loops)
 		startGuard.addEventListener('focus', () => {
-			const tabbables = getTabbableElements(node);
+			const tabbables = getTabbableElements(node).filter(
+				(el) => !el.hasAttribute('data-focus-guard')
+			);
 			const lastTabbable = tabbables[tabbables.length - 1];
 			lastTabbable?.focus();
 		});
 
 		endGuard.addEventListener('focus', () => {
-			const tabbables = getTabbableElements(node);
+			const tabbables = getTabbableElements(node).filter(
+				(el) => !el.hasAttribute('data-focus-guard')
+			);
 			const firstTabbable = tabbables[0];
 			firstTabbable?.focus();
 		});
@@ -160,8 +164,10 @@ export function focusTrap(
 		if (focusTarget) {
 			enqueueFocus(focusTarget);
 		} else {
-			// Focus first tabbable element
-			const tabbables = getTabbableElements(node);
+			// Focus first tabbable element (excluding guards)
+			const tabbables = getTabbableElements(node).filter(
+				(el) => !el.hasAttribute('data-focus-guard')
+			);
 			if (tabbables.length > 0) {
 				enqueueFocus(tabbables[0]);
 			} else {
@@ -195,7 +201,9 @@ export function focusTrap(
 		if (!enabled) return;
 		if (event.key !== 'Tab') return;
 
-		const tabbables = getTabbableElements(node);
+		const tabbables = getTabbableElements(node).filter(
+			(el) => !el.hasAttribute('data-focus-guard')
+		);
 		if (tabbables.length === 0) {
 			event.preventDefault();
 			return;
