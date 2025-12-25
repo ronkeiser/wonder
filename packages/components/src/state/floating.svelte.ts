@@ -44,6 +44,8 @@ export interface FloatingState {
 	y: number;
 	/** Final computed placement (may differ from requested if flipped) */
 	placement: Placement;
+	/** Width of the reference element in pixels */
+	referenceWidth: number;
 	/** Arrow X offset if arrow middleware used */
 	arrowX: number | undefined;
 	/** Arrow Y offset if arrow middleware used */
@@ -100,6 +102,7 @@ export function createFloating(
 		x: 0,
 		y: 0,
 		placement: options.placement ?? 'bottom',
+		referenceWidth: reference.offsetWidth,
 		arrowX: undefined,
 		arrowY: undefined,
 		middlewareData: {},
@@ -142,6 +145,7 @@ export function createFloating(
 			x: result.x,
 			y: result.y,
 			placement: result.placement,
+			referenceWidth: reference.offsetWidth,
 			arrowX: result.middlewareData.arrow?.x,
 			arrowY: result.middlewareData.arrow?.y,
 			middlewareData: result.middlewareData,
