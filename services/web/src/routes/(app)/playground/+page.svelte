@@ -1,5 +1,5 @@
 <script lang="ts">
-  import { Dialog } from '@wonder/components';
+  import { Dialog, Tooltip } from '@wonder/components';
 
   let dialogOpen = $state(false);
 </script>
@@ -25,16 +25,19 @@
       {/snippet}
 
       {#snippet overlay(props)}
-        <div {...props} class="dialog-overlay fixed inset-0 bg-black/50 z-40"></div>
+        <div
+          {...props}
+          class="fixed inset-0 bg-black/50 z-40 opacity-0 transition-opacity duration-300 ease-out data-[state=open]:opacity-100"
+        ></div>
       {/snippet}
 
       {#snippet content(props)}
         <div
           {...props}
-          class="dialog-content fixed inset-0 z-50 flex items-center justify-center pointer-events-none"
+          class="group fixed inset-0 z-50 flex items-center justify-center pointer-events-none opacity-0 transition-opacity duration-200 ease-out data-[state=open]:opacity-100"
         >
           <div
-            class="dialog-panel bg-surface border border-border rounded-lg shadow-lg p-6 w-full max-w-md pointer-events-auto"
+            class="bg-surface border border-border rounded-lg shadow-lg p-6 w-full max-w-md pointer-events-auto scale-95 transition-transform duration-200 ease-out group-data-[state=open]:scale-100"
           >
             <h2 id="dialog-title" class="text-lg font-semibold mb-2">Dialog Title</h2>
             <p id="dialog-description" class="text-foreground-muted mb-4">
@@ -60,33 +63,66 @@
       {/snippet}
     </Dialog>
   </section>
+
+  <section class="mb-8">
+    <h2 class="text-lg font-medium mb-4">Tooltip</h2>
+
+    <div class="flex gap-4">
+      <Tooltip
+        placement="top"
+        class="bg-surface-raised border border-border text-sm px-3 py-2 rounded shadow-lg opacity-0 transition-opacity duration-150 ease-out data-[state=open]:opacity-100"
+      >
+        {#snippet trigger(props)}
+          <button
+            {...props}
+            class="px-4 py-2 border border-border rounded hover:bg-surface-hover transition-colors"
+          >
+            Hover me (top)
+          </button>
+        {/snippet}
+
+        {#snippet content()}
+          Tooltip on top
+        {/snippet}
+      </Tooltip>
+
+      <Tooltip
+        placement="bottom"
+        class="bg-surface-raised border border-border text-sm px-3 py-2 rounded shadow-lg opacity-0 transition-opacity duration-150 ease-out data-[state=open]:opacity-100"
+      >
+        {#snippet trigger(props)}
+          <button
+            {...props}
+            class="px-4 py-2 border border-border rounded hover:bg-surface-hover transition-colors"
+          >
+            Hover me (bottom)
+          </button>
+        {/snippet}
+
+        {#snippet content()}
+          Tooltip on bottom
+        {/snippet}
+      </Tooltip>
+
+      <Tooltip
+        placement="right"
+        delay={0}
+        class="bg-surface-raised border border-border text-sm px-3 py-2 rounded shadow-lg opacity-0 transition-opacity duration-150 ease-out data-[state=open]:opacity-100"
+      >
+        {#snippet trigger(props)}
+          <button
+            {...props}
+            class="px-4 py-2 border border-border rounded hover:bg-surface-hover transition-colors"
+          >
+            Instant (right)
+          </button>
+        {/snippet}
+
+        {#snippet content()}
+          No delay tooltip
+        {/snippet}
+      </Tooltip>
+    </div>
+  </section>
 </div>
 
-<style>
-  /* Overlay transitions */
-  .dialog-overlay {
-    opacity: 0;
-    transition: opacity 1000ms ease-out;
-  }
-  .dialog-overlay[data-state='open'] {
-    opacity: 1;
-  }
-
-  /* Content wrapper transitions */
-  .dialog-content {
-    opacity: 0;
-    transition: opacity 200ms ease-out;
-  }
-  .dialog-content[data-state='open'] {
-    opacity: 1;
-  }
-
-  /* Panel transitions */
-  .dialog-panel {
-    transform: scale(0.95);
-    transition: transform 200ms ease-out;
-  }
-  .dialog-content[data-state='open'] .dialog-panel {
-    transform: scale(1);
-  }
-</style>
