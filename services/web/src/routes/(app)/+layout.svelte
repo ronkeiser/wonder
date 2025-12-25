@@ -4,9 +4,9 @@
   import TabbedLayout from '$lib/components/TabbedLayout.svelte';
   import { page } from '$app/state';
 
-  let { children } = $props();
+  let { children, data } = $props();
 
-  const sidebarCollapsed = createPersisted('sidebar-collapsed', false, { cookie: true });
+  const sidebarCollapsed = createPersisted('sidebar-collapsed', data.sidebarCollapsed);
 
   const navItems: { href: string; label: string; icon: IconName }[] = [
     { href: '/admin', label: 'Admin', icon: 'clipboard' },
@@ -41,7 +41,9 @@
             class="flex items-center gap-3 px-2 h-9 rounded hover:bg-surface-hover transition-colors text-foreground-muted hover:text-foreground text-sm"
           >
             <Icon name={item.icon} size={20} class="shrink-0" />
-            <span class="opacity-100 group-data-collapsed:opacity-0 transition-opacity duration-200">{item.label}</span>
+            <span class="opacity-100 group-data-collapsed:opacity-0 transition-opacity duration-200"
+              >{item.label}</span
+            >
           </a>
         {/each}
       </nav>
