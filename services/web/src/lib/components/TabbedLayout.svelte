@@ -1,17 +1,16 @@
 <script lang="ts">
   interface Tab {
-    id: string;
     label: string;
     href: string;
   }
 
   interface Props {
     tabs: Tab[];
-    activeTabId: string;
+    activeHref: string;
     children: any;
   }
 
-  let { tabs, activeTabId, children }: Props = $props();
+  let { tabs, activeHref, children }: Props = $props();
 </script>
 
 <div class="flex flex-col h-screen bg-surface text-foreground">
@@ -20,7 +19,7 @@
       {#each tabs as tab}
         <a
           href={tab.href}
-          class="flex items-end px-4 pb-4 bg-transparent border-b-2 cursor-pointer text-base font-medium no-underline transition-colors duration-200 {tab.id === activeTabId ? 'text-white border-accent' : 'text-foreground-muted hover:text-foreground border-transparent'}"
+          class="flex items-end px-4 pb-4 bg-transparent border-b-2 cursor-pointer text-base font-medium no-underline transition-colors duration-200 {activeHref.startsWith(tab.href) ? 'text-white border-accent' : 'text-foreground-muted hover:text-foreground border-transparent'}"
         >
           {tab.label}
         </a>

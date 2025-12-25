@@ -2,7 +2,7 @@
   import { Sidebar, createPersisted } from '@wonder/components';
   import { Icon, type IconName } from '@wonder/icons';
   import TabbedLayout from '$lib/components/TabbedLayout.svelte';
-  import { page } from '$app/stores';
+  import { page } from '$app/state';
 
   let { children } = $props();
 
@@ -13,18 +13,10 @@
   ];
 
   const tabs = [
-    { id: 'events', label: 'Events', href: '/events' },
-    { id: 'trace', label: 'Trace', href: '/trace' },
-    { id: 'logs', label: 'Logs', href: '/logs' },
+    { label: 'Events', href: '/events' },
+    { label: 'Trace', href: '/trace' },
+    { label: 'Logs', href: '/logs' },
   ];
-
-  const activeTabId = $derived.by(() => {
-    const path = $page.url.pathname;
-    if (path.startsWith('/events')) return 'events';
-    if (path.startsWith('/trace')) return 'trace';
-    if (path.startsWith('/logs')) return 'logs';
-    return 'events';
-  });
 </script>
 
 <div class="flex h-screen">
@@ -49,7 +41,7 @@
             class="flex items-center gap-3 px-2 h-9 rounded hover:bg-surface-hover transition-colors text-foreground-muted hover:text-foreground text-sm"
           >
             <Icon name={item.icon} size={20} class="shrink-0" />
-            <span class="group-data-collapsed:hidden">{item.label}</span>
+            <span class="opacity-100 group-data-collapsed:opacity-0 transition-opacity duration-200">{item.label}</span>
           </a>
         {/each}
       </nav>
@@ -57,7 +49,7 @@
   </Sidebar>
 
   <div class="flex-1 overflow-hidden">
-    <TabbedLayout {tabs} {activeTabId}>
+    <TabbedLayout {tabs} activeHref={page.url.pathname}>
       {@render children()}
     </TabbedLayout>
   </div>
