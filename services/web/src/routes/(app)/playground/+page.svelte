@@ -1,5 +1,5 @@
 <script lang="ts">
-  import { Dialog, Tooltip } from '@wonder/components';
+  import { Dialog, Tooltip, Popover } from '@wonder/components';
 
   let dialogOpen = $state(false);
 </script>
@@ -122,6 +122,61 @@
           No delay tooltip
         {/snippet}
       </Tooltip>
+    </div>
+  </section>
+
+  <section class="mb-8">
+    <h2 class="text-lg font-medium mb-4">Popover</h2>
+
+    <div class="flex gap-4">
+      <Popover
+        placement="bottom-start"
+        class="bg-surface-raised border border-border rounded-lg shadow-lg p-4 w-64 opacity-0 transition-opacity duration-150 ease-out data-[state=open]:opacity-100"
+      >
+        {#snippet trigger(props)}
+          <button
+            {...props}
+            class="px-4 py-2 bg-accent text-white rounded hover:bg-accent/90 transition-colors"
+          >
+            Open Popover
+          </button>
+        {/snippet}
+
+        {#snippet content(props)}
+          <h3 class="font-medium mb-2">Popover Title</h3>
+          <p class="text-foreground-muted text-sm mb-3">
+            This is interactive content. You can click inside without closing.
+          </p>
+          <button
+            class="px-3 py-1.5 bg-accent text-white text-sm rounded hover:bg-accent/90 transition-colors"
+          >
+            Action
+          </button>
+        {/snippet}
+      </Popover>
+
+      <Popover
+        placement="right"
+        class="bg-surface-raised border border-border rounded-lg shadow-lg p-4 w-48 opacity-0 transition-opacity duration-150 ease-out data-[state=open]:opacity-100"
+      >
+        {#snippet trigger(props)}
+          <button
+            {...props}
+            class="px-4 py-2 border border-border rounded hover:bg-surface-hover transition-colors"
+          >
+            Right Popover
+          </button>
+        {/snippet}
+
+        {#snippet content(props)}
+          <p class="text-sm mb-2">Positioned to the right of the trigger.</p>
+          <input
+            type="text"
+            placeholder="Type here..."
+            class="w-full px-2 py-1 text-sm border border-border rounded bg-surface focus:outline-none focus:ring-1 focus:ring-accent"
+          />
+        {/snippet}
+      </Popover>
     </div>
   </section>
 </div>

@@ -4,6 +4,7 @@ export { default as Select, type SelectOption } from './components/Select.svelte
 export { default as DropdownMenu, type MenuItem } from './components/DropdownMenu.svelte';
 export { default as Dialog } from './components/Dialog.svelte';
 export { default as Tooltip } from './components/Tooltip.svelte';
+export { default as Popover } from './components/Popover.svelte';
 
 // State (reactive utilities using runes)
 export { createPersisted, type Persisted } from './state/persisted.svelte';
