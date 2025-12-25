@@ -358,10 +358,20 @@ async function typeCheckServices(services: Map<string, ServiceInfo>): Promise<bo
 // ============================================================================
 
 async function typeCheckPackages(packages: Map<string, PackageInfo>): Promise<boolean> {
-  console.log('🔍 Step 5: Type checking packages (tsc --noEmit)...\n');
+  console.log('🔍 Step 5: Type checking packages...\n');
 
   const tasks = Array.from(packages.values()).map(async (pkg) => {
-    const cmd = `tsc --noEmit`;
+    // Check if package has a custom check script (e.g., svelte-check for Svelte packages)
+    const pkgJsonPath = join(pkg.path, 'package.json');
+    let cmd = 'tsc --noEmit';
+
+    if (existsSync(pkgJsonPath)) {
+      const pkgJson = JSON.parse(readFileSync(pkgJsonPath, 'utf-8'));
+      if (pkgJson.scripts?.check) {
+        cmd = 'pnpm run check';
+      }
+    }
+
     console.log(`  [${pkg.dirName}] ${cmd}`);
 
     try {
