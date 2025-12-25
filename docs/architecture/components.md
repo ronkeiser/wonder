@@ -454,8 +454,10 @@ actions/
 
 utils/
 ├── floating.ts        # Floating UI wrapper with standard middleware
+├── floatingTree.ts    # Track parent/child relationships between nested floating elements, coordinate dismiss bubbling
 ├── focus.ts           # Focus management (save/restore, custom targets)
-├── keyboard.ts        # Direction-aware key handling, roving focus, typeahead
+├── keyboard.ts        # Direction-aware key handling, roving focus
+├── typeahead.ts       # Character buffer with timeout for jumping to matching items
 ├── id.ts              # Unique ID generation for ARIA relationships
 └── scrollLock.ts      # Body scroll prevention with platform quirks handled
 ```
