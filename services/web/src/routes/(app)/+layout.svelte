@@ -33,12 +33,11 @@
     class="group flex flex-col w-52 data-collapsed:w-15 h-full p-3 bg-surface-raised border-r border-border transition-[width] duration-200"
   >
     {#snippet trigger(props, collapsed)}
-      <button {...props} class="flex items-center justify-center size-9 hover:bg-surface-hover rounded transition-colors">
-        {#if collapsed}
-          <Icon name="list" size={20} class="text-foreground-muted" />
-        {:else}
-          <Icon name="x" size={20} class="text-foreground-muted" />
-        {/if}
+      <button
+        {...props}
+        class="flex items-center justify-center size-9 hover:bg-surface-hover rounded transition-colors cursor-pointer"
+      >
+        <Icon name="sidebar" size={20} class="text-foreground-muted" />
       </button>
     {/snippet}
 
@@ -47,7 +46,7 @@
         {#each navItems as item}
           <a
             href={item.href}
-            class="flex items-center gap-3 px-2 h-9 rounded hover:bg-surface-hover transition-colors text-foreground-muted hover:text-foreground"
+            class="flex items-center gap-3 px-2 h-9 rounded hover:bg-surface-hover transition-colors text-foreground-muted hover:text-foreground text-sm"
           >
             <Icon name={item.icon} size={20} class="shrink-0" />
             <span class="group-data-collapsed:hidden">{item.label}</span>
