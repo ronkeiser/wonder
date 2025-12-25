@@ -1,5 +1,6 @@
 <script lang="ts">
   import { Sidebar, createPersisted } from '@wonder/components';
+  import { Icon } from '@wonder/icons';
   import TabbedLayout from '$lib/components/TabbedLayout.svelte';
   import { page } from '$app/stores';
 
@@ -29,18 +30,11 @@
         {...props}
         class="p-2 hover:bg-surface-hover rounded transition-colors"
       >
-        <svg
-          class="w-5 h-5 text-foreground-muted"
-          fill="none"
-          stroke="currentColor"
-          viewBox="0 0 24 24"
-        >
-          {#if collapsed}
-            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 6h16M4 12h16M4 18h16" />
-          {:else}
-            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12" />
-          {/if}
-        </svg>
+        {#if collapsed}
+          <Icon name="list" size={20} class="text-foreground-muted" />
+        {:else}
+          <Icon name="x" size={20} class="text-foreground-muted" />
+        {/if}
       </button>
     {/snippet}
 
@@ -50,9 +44,7 @@
           href="/events"
           class="flex items-center gap-3 px-2 py-2 rounded hover:bg-surface-hover transition-colors text-foreground-muted hover:text-foreground"
         >
-          <svg class="w-5 h-5 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2" />
-          </svg>
+          <Icon name="clipboard" size={20} class="shrink-0" />
           {#if !collapsed}<span>Admin</span>{/if}
         </a>
       </nav>

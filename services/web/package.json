@@ -4,7 +4,8 @@
   "version": "0.0.1",
   "type": "module",
   "dependencies": {
-    "@wonder/components": "workspace:*"
+    "@wonder/components": "workspace:*",
+    "@wonder/icons": "workspace:*"
   },
   "scripts": {
     "dev": "vite dev",

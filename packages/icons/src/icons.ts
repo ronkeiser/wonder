@@ -7,6 +7,8 @@ import code from '@phosphor-icons/core/assets/regular/code.svg?raw';
 import arrowsClockwise from '@phosphor-icons/core/assets/regular/arrows-clockwise.svg?raw';
 import arrowsInLineVertical from '@phosphor-icons/core/assets/regular/arrows-in-line-vertical.svg?raw';
 import arrowsOutLineVertical from '@phosphor-icons/core/assets/regular/arrows-out-line-vertical.svg?raw';
+import list from '@phosphor-icons/core/assets/regular/list.svg?raw';
+import clipboard from '@phosphor-icons/core/assets/regular/clipboard.svg?raw';
 
 export const icons = {
 	copy,
@@ -18,6 +20,8 @@ export const icons = {
 	refresh: arrowsClockwise,
 	fold: arrowsInLineVertical,
 	unfold: arrowsOutLineVertical,
+	list,
+	clipboard,
 } as const;
 
 export type IconName = keyof typeof icons;

@@ -465,6 +465,9 @@ importers:
       '@wonder/components':
         specifier: workspace:*
         version: link:../../packages/components
+      '@wonder/icons':
+        specifier: workspace:*
+        version: link:../../packages/icons
     devDependencies:
       '@sveltejs/adapter-cloudflare':
         specifier: ^7.2.4
