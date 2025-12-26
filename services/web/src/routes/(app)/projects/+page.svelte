@@ -1,5 +1,6 @@
 <script lang="ts">
   import type { PageData } from './$types';
+  import Button from '$lib/components/Button.svelte';
 
   let { data }: { data: PageData } = $props();
 </script>
@@ -9,7 +10,10 @@
 </svelte:head>
 
 <div class="p-6">
-  <h1 class="text-xl font-semibold mb-6">Projects</h1>
+  <div class="flex items-center justify-between mb-6">
+    <h1 class="text-xl font-semibold">Projects</h1>
+    <Button href="/projects/new">New Project</Button>
+  </div>
 
   {#if data.projects.length === 0}
     <p class="text-foreground-muted text-sm">No projects in this workspace</p>

@@ -1,4 +1,5 @@
 // Components
+export { default as Button, type Props as ButtonProps } from './components/Button.svelte';
 export { default as Sidebar } from './components/Sidebar.svelte';
 export { default as Select, type SelectOption } from './components/Select.svelte';
 export { default as DropdownMenu, type MenuItem } from './components/DropdownMenu.svelte';
