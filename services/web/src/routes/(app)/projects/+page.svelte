@@ -21,8 +21,10 @@
     <div class="grid gap-4">
       {#each data.projects as project}
         <div class="p-4 border border-border rounded bg-surface-raised">
-          <h2 class="text-sm font-medium">{project.name}</h2>
-          <p class="text-xs text-foreground-muted mt-1 font-mono">{project.id}</p>
+          <a href="/projects/{project.id}" class="text-sm font-medium text-link hover:underline">{project.name}</a>
+          {#if project.description}
+            <p class="text-xs text-foreground-muted mt-1">{project.description}</p>
+          {/if}
         </div>
       {/each}
     </div>

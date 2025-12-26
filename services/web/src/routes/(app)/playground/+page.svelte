@@ -45,6 +45,10 @@
 <div class="p-6">
   <h1 class="text-xl font-semibold mb-6">Component Playground</h1>
 
+  <nav class="mb-8">
+    <a href="/playground/workflows" class="text-accent hover:underline">Workflows Demo</a>
+  </nav>
+
   <section class="mb-8">
     <h2 class="text-lg font-medium mb-4">Dialog</h2>
 
