@@ -5,6 +5,7 @@ declare global {
     // interface Error {}
     interface Locals {
       authenticated?: boolean;
+      workspaceId?: string;
     }
     // interface PageData {}
     // interface PageState {}
