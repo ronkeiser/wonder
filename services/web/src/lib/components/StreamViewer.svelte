@@ -326,7 +326,7 @@
       // Reset time filter when switching workflow runs
       timeFilterMinutes = null;
 
-      // Fetch data and connect to new run
+      // Fetch and connect
       filterItemsByTime(null);
       connect();
     }
@@ -345,9 +345,12 @@
     if (savedSecondaryFilter) secondaryFilterValue = savedSecondaryFilter;
     if (savedPretty === '1') prettyPrintEnabled = true;
 
-    // Default to no time filter (show all events for the run)
-    filterItemsByTime(timeFilterMinutes);
-    connect();
+    // Only fetch on mount if we have a workflowRunId or it's a global stream
+    // Otherwise wait for a workflow to be selected
+    if (workflowRunId || isGlobalStream) {
+      filterItemsByTime(timeFilterMinutes);
+      connect();
+    }
   });
 
   onDestroy(() => {

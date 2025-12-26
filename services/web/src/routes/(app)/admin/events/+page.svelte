@@ -124,15 +124,16 @@
     return colorMap[item.eventType] || 'var(--color-gray)';
   }
 
+  const timeFormatter = new Intl.DateTimeFormat('en-US', {
+    hour12: false,
+    hour: '2-digit',
+    minute: '2-digit',
+    second: '2-digit',
+    fractionalSecondDigits: 3,
+  });
+
   function formatTime(timestamp: number): string {
-    const date = new Date(timestamp);
-    return date.toLocaleTimeString('en-US', {
-      hour12: false,
-      hour: '2-digit',
-      minute: '2-digit',
-      second: '2-digit',
-      fractionalSecondDigits: 3,
-    });
+    return timeFormatter.format(new Date(timestamp));
   }
 
   function renderEventHeader(item: any) {
