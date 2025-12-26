@@ -192,6 +192,7 @@ export type BroadcastTraceEventEntry = Omit<TraceEventEntry, 'payload'> & {
  */
 export interface GetTraceEventsOptions {
   workflowRunId?: string;
+  rootRunId?: string; // Query all trace events in a workflow run tree
   tokenId?: string;
   nodeId?: string;
   type?: string;

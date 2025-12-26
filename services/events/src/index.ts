@@ -74,6 +74,7 @@ export class EventsService extends WorkerEntrypoint<Env> {
           options.workflowRunId
             ? eq(traceEvents.workflowRunId, options.workflowRunId)
             : undefined,
+          options.rootRunId ? eq(traceEvents.rootRunId, options.rootRunId) : undefined,
           options.tokenId ? eq(traceEvents.tokenId, options.tokenId) : undefined,
           options.nodeId ? eq(traceEvents.nodeId, options.nodeId) : undefined,
           options.type ? eq(traceEvents.type, options.type) : undefined,
