@@ -8,8 +8,6 @@
     type MenuItem,
   } from '@wonder/components';
   import { Icon, type IconName } from '@wonder/icons';
-  import TabbedLayout from '$lib/components/TabbedLayout.svelte';
-  import { page } from '$app/state';
 
   let { children, data } = $props();
 
@@ -19,12 +17,6 @@
     { href: '/projects', label: 'Projects', icon: 'folder' },
     { href: '/playground', label: 'Playground', icon: 'code' },
     { href: '/admin', label: 'Admin', icon: 'clipboard' },
-  ];
-
-  const tabs = [
-    { label: 'Events', href: '/events' },
-    { label: 'Trace', href: '/trace' },
-    { label: 'Logs', href: '/logs' },
   ];
 
   // Demo select
@@ -148,8 +140,6 @@
   </Sidebar>
 
   <div class="flex-1 overflow-hidden">
-    <TabbedLayout {tabs} activeHref={page.url.pathname}>
-      {@render children()}
-    </TabbedLayout>
+    {@render children()}
   </div>
 </div>
