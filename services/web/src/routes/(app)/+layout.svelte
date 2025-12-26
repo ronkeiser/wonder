@@ -1,12 +1,5 @@
 <script lang="ts">
-  import {
-    Sidebar,
-    Select,
-    DropdownMenu,
-    createPersisted,
-    type SelectOption,
-    type MenuItem,
-  } from '@wonder/components';
+  import { Sidebar, createPersisted } from '@wonder/components';
   import { Icon, type IconName } from '@wonder/icons';
 
   let { children, data } = $props();
@@ -17,31 +10,6 @@
     { href: '/projects', label: 'Projects', icon: 'folder' },
     { href: '/playground', label: 'Playground', icon: 'code' },
     { href: '/admin', label: 'Admin', icon: 'clipboard' },
-  ];
-
-  // Demo select
-  const demoOptions: SelectOption[] = [
-    { value: 'dev', label: 'Development' },
-    { value: 'staging', label: 'Staging' },
-    { value: 'prod', label: 'Production' },
-  ];
-  let demoValue = $state<string | undefined>('dev');
-
-  // Demo dropdown menu
-  const menuItems: MenuItem[] = [
-    { id: 'new', label: 'New File', onSelect: () => console.log('New File') },
-    { id: 'open', label: 'Open...', onSelect: () => console.log('Open') },
-    {
-      id: 'recent',
-      label: 'Open Recent',
-      children: [
-        { id: 'file1', label: 'project.ts', onSelect: () => console.log('file1') },
-        { id: 'file2', label: 'config.json', onSelect: () => console.log('file2') },
-        { id: 'file3', label: 'README.md', onSelect: () => console.log('file3') },
-      ],
-    },
-    { id: 'save', label: 'Save', onSelect: () => console.log('Save') },
-    { id: 'export', label: 'Export', disabled: true },
   ];
 </script>
 
@@ -60,69 +28,6 @@
     {/snippet}
 
     {#snippet children(collapsed)}
-      {#if !collapsed}
-        <div class="mt-4 px-1">
-          <Select options={demoOptions} bind:value={demoValue}>
-            {#snippet trigger(props, selected)}
-              <button
-                {...props}
-                class="flex items-center justify-between w-full px-3 h-9 text-sm rounded border border-border bg-surface hover:bg-surface-hover transition-colors text-left data-[state=open]:ring-2 data-[state=open]:ring-ring"
-              >
-                <span class="truncate">{selected?.label ?? 'Select environment...'}</span>
-                <Icon name="list" size={16} class="shrink-0 text-foreground-muted" />
-              </button>
-            {/snippet}
-
-            {#snippet listbox(props, children)}
-              <div {...props} class="bg-surface border border-border rounded shadow-lg py-1">
-                {@render children()}
-              </div>
-            {/snippet}
-
-            {#snippet option(props, opt, isSelected)}
-              <div
-                {...props}
-                class="px-3 py-2 text-sm cursor-pointer data-highlighted:bg-surface-hover data-selected:font-medium"
-              >
-                {opt.label}
-              </div>
-            {/snippet}
-          </Select>
-        </div>
-
-        <div class="mt-2 px-1">
-          <DropdownMenu items={menuItems}>
-            {#snippet trigger(props)}
-              <button
-                {...props}
-                class="flex items-center justify-between w-full px-3 h-9 text-sm rounded border border-border bg-surface hover:bg-surface-hover transition-colors text-left data-[state=open]:ring-2 data-[state=open]:ring-ring"
-              >
-                <span>Actions</span>
-                <Icon name="list" size={16} class="shrink-0 text-foreground-muted" />
-              </button>
-            {/snippet}
-
-            {#snippet content(props, children)}
-              <div {...props} class="bg-surface border border-border rounded shadow-lg py-1 z-50">
-                {@render children()}
-              </div>
-            {/snippet}
-
-            {#snippet item(props, menuItem)}
-              <div
-                {...props}
-                class="flex items-center justify-between px-3 py-2 text-sm cursor-pointer data-highlighted:bg-surface-hover data-disabled:opacity-50 data-disabled:cursor-not-allowed"
-              >
-                <span>{menuItem.label}</span>
-                {#if props['data-has-submenu']}
-                  <span class="text-foreground-muted">→</span>
-                {/if}
-              </div>
-            {/snippet}
-          </DropdownMenu>
-        </div>
-      {/if}
-
       <nav class="flex flex-col gap-1 mt-4">
         {#each navItems as item}
           <a
