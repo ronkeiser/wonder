@@ -1,5 +1,6 @@
 <script lang="ts">
   import { onMount, onDestroy } from 'svelte';
+  import { pushState } from '$app/navigation';
   import StreamItem from './StreamItem.svelte';
 
   interface FilterConfig {
@@ -20,6 +21,7 @@
     streamPath?: string; // For global streams (e.g., '/logs/stream') - connects immediately
     subscribeMessage?: object; // Optional WebSocket subscription message
     workflowRunId?: string | null; // For per-resource streams - requires selection first
+    defaultTimeFilter?: number | null; // Default time filter in minutes (used when no URL param)
     getItemColor?: (item: any) => string;
     getMetadata?: (item: any) => any;
     renderItemHeader: (item: any) => {
@@ -42,6 +44,7 @@
     streamPath,
     subscribeMessage,
     workflowRunId = null,
+    defaultTimeFilter = null,
     getItemColor,
     getMetadata,
     renderItemHeader,
@@ -340,7 +343,8 @@
     const savedSecondaryFilter = secondaryFilter ? urlParams.get(secondaryFilter.param) : null;
     const savedPretty = urlParams.get('pretty');
 
-    if (savedMinutes) timeFilterMinutes = parseInt(savedMinutes);
+    // Use saved value from URL, or fall back to default
+    timeFilterMinutes = savedMinutes ? parseInt(savedMinutes) : defaultTimeFilter;
     if (savedFilter) currentFilter = savedFilter;
     if (savedSecondaryFilter) secondaryFilterValue = savedSecondaryFilter;
     if (savedPretty === '1') prettyPrintEnabled = true;
@@ -366,7 +370,7 @@
     } else {
       url.searchParams.delete(filterParam);
     }
-    window.history.pushState({}, '', url);
+    pushState(url, {});
 
     filterItemsByTime(timeFilterMinutes);
   }
@@ -382,7 +386,7 @@
     } else {
       url.searchParams.delete(secondaryFilter.param);
     }
-    window.history.pushState({}, '', url);
+    pushState(url, {});
 
     filterItemsByTime(timeFilterMinutes);
   }
@@ -397,7 +401,7 @@
     } else {
       url.searchParams.delete('m');
     }
-    window.history.pushState({}, '', url);
+    pushState(url, {});
 
     filterItemsByTime(newValue);
   }
@@ -411,7 +415,7 @@
     } else {
       url.searchParams.delete('pretty');
     }
-    window.history.pushState({}, '', url);
+    pushState(url, {});
   }
 
   function addIdentifierFilter(identifier: string) {

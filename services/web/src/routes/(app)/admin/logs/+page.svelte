@@ -73,6 +73,7 @@
   secondaryFilter={{ label: 'Levels', param: 'level', options: levelOptions }}
   itemsKey="logs"
   itemKey="log"
+  defaultTimeFilter={5}
   getItemColor={getLogColor}
   getMetadata={getLogMetadata}
   renderItemHeader={renderLogHeader}
