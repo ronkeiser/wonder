@@ -2,7 +2,7 @@
 
 ## Overview
 
-`@wonder/ui` provides styled components built on `@wonder/components`, `@wonder/forms`, and `@wonder/icons`. Theming is configured via a JSON file, processed by a Vite plugin that generates:
+`@wonder/ui` provides styled components built on `@wonder/components`, `@wonder/forms`, and `@wonder/icons`. Theming is configured via TypeScript files, processed by a Vite plugin that generates:
 
 1. Tailwind `@theme` CSS for primitives (colors, spacing, radius, fonts)
 2. A virtual module with component class strings for runtime merging
@@ -11,11 +11,12 @@
 
 ```
 ┌─────────────────────────────────────────────────────────────┐
-│  Default Config (shipped with @wonder/ui)                   │
-│  + Consumer Config (wonder.config.json)                     │
+│  Default Theme (shipped with @wonder/ui)                    │
+│  + Consumer Theme (src/theme.ts)                            │
 ├─────────────────────────────────────────────────────────────┤
 │  Vite Plugin                                                │
-│  ├─ Deep-merges consumer config over defaults               │
+│  ├─ Reads ui.config.ts to find theme file location          │
+│  ├─ Deep-merges consumer theme over defaults                │
 │  ├─ Generates @theme CSS (primitives)                       │
 │  └─ Generates virtual:wonder-theme module (merged config)   │
 ├─────────────────────────────────────────────────────────────┤
@@ -24,54 +25,58 @@
 └─────────────────────────────────────────────────────────────┘
 ```
 
-## Configuration Schema
+## Theme Schema
 
-```json
-{
-  "theme": {
-    "colors": {
-      "accent": "#7964ff",
-      "accent-hover": "#8885ff",
-      "error": "#f85149",
-      "surface": "#0d0e15",
-      "foreground": "#ced0dc"
+The theme file uses `createTheme` for type safety:
+
+```ts
+import { createTheme } from '@wonder/ui';
+
+export default createTheme({
+  theme: {
+    colors: {
+      accent: '#7964ff',
+      'accent-hover': '#8885ff',
+      error: '#f85149',
+      surface: '#0d0e15',
+      foreground: '#ced0dc'
     },
-    "spacing": {
-      "1": "0.25rem",
-      "2": "0.5rem",
-      "4": "1rem",
-      "6": "1.5rem"
+    spacing: {
+      '1': '0.25rem',
+      '2': '0.5rem',
+      '4': '1rem',
+      '6': '1.5rem'
     },
-    "radius": {
-      "sm": "0.25rem",
-      "md": "0.375rem",
-      "lg": "0.5rem"
+    radius: {
+      sm: '0.25rem',
+      md: '0.375rem',
+      lg: '0.5rem'
     }
   },
-  "components": {
-    "button": {
-      "base": "font-medium transition-colors rounded-md",
-      "size": {
-        "sm": "px-3 py-1 text-sm",
-        "md": "px-4 py-2",
-        "lg": "px-6 py-3 text-lg"
+  components: {
+    button: {
+      base: 'font-medium transition-colors rounded-md',
+      size: {
+        sm: 'px-3 py-1 text-sm',
+        md: 'px-4 py-2',
+        lg: 'px-6 py-3 text-lg'
       },
-      "variant": {
-        "primary": "bg-accent text-white hover:bg-accent-hover",
-        "secondary": "bg-surface text-foreground hover:bg-surface-hover",
-        "danger": "bg-error text-white hover:bg-red-600",
-        "ghost": "bg-transparent text-foreground hover:bg-surface-hover"
+      variant: {
+        primary: 'bg-accent text-white hover:bg-accent-hover',
+        secondary: 'bg-surface text-foreground hover:bg-surface-hover',
+        danger: 'bg-error text-white hover:bg-red-600',
+        ghost: 'bg-transparent text-foreground hover:bg-surface-hover'
       }
     },
-    "input": {
-      "base": "rounded-md border bg-surface text-foreground",
-      "state": {
-        "default": "border-border focus:border-accent",
-        "error": "border-error focus:border-error"
+    input: {
+      base: 'rounded-md border bg-surface text-foreground',
+      state: {
+        default: 'border-border focus:border-accent',
+        error: 'border-error focus:border-error'
       }
     }
   }
-}
+});
 ```
 
 ## Vite Plugin Output
@@ -218,28 +223,51 @@ Components import the merged config from the virtual module:
 
 ## Consumer Usage
 
-### 1. Add config file
+### 1. Add root config (optional)
 
-Create `wonder.config.json` at project root:
+Create `ui.config.ts` at project root to specify the theme file location:
 
-```json
-{
-  "theme": {
-    "colors": {
-      "accent": "#8b5cf6"
+```ts
+// ui.config.ts
+import { createConfig } from '@wonder/ui';
+
+export default createConfig({
+  theme: './src/theme.ts',
+  strict: true,
+  extend: true
+});
+```
+
+Options:
+- **`theme`** — path to the theme file (default: `./src/theme.ts`)
+- **`strict`** — error on unknown keys in the theme (default: `false`)
+- **`extend`** — merge consumer theme over defaults; if `false`, replaces defaults entirely (default: `true`)
+
+### 2. Add theme file
+
+Create the theme file with your overrides:
+
+```ts
+// src/theme.ts
+import { createTheme } from '@wonder/ui';
+
+export default createTheme({
+  theme: {
+    colors: {
+      accent: '#8b5cf6'
     }
   },
-  "components": {
-    "button": {
-      "size": {
-        "md": "px-6 py-3"
+  components: {
+    button: {
+      size: {
+        md: 'px-6 py-3'
       }
     }
   }
-}
+});
 ```
 
-### 2. Add Vite plugin
+### 3. Add Vite plugin
 
 ```ts
 // vite.config.ts
@@ -250,7 +278,7 @@ export default defineConfig({
 });
 ```
 
-### 3. Import generated CSS
+### 4. Import generated CSS
 
 ```css
 /* app.css */
@@ -258,7 +286,7 @@ export default defineConfig({
 @import 'virtual:wonder-theme/css';
 ```
 
-### 4. Use components
+### 5. Use components
 
 ```svelte
 <script>
