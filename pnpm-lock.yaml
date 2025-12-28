@@ -194,6 +194,28 @@ importers:
         specifier: ^3.2.4
         version: 3.2.4(@types/node@24.10.1)(@vitest/ui@3.2.4)(jiti@2.6.1)(lightningcss@1.30.2)(tsx@4.21.0)(yaml@2.8.1)
 
+  packages/ui:
+    dependencies:
+      '@wonder/components':
+        specifier: workspace:*
+        version: link:../components
+      '@wonder/forms':
+        specifier: workspace:*
+        version: link:../forms
+      '@wonder/icons':
+        specifier: workspace:*
+        version: link:../icons
+    devDependencies:
+      svelte:
+        specifier: ^5.43.8
+        version: 5.45.2
+      svelte-check:
+        specifier: ^4.3.4
+        version: 4.3.4(picomatch@4.0.3)(svelte@5.45.2)(typescript@5.9.3)
+      typescript:
+        specifier: ^5.9.3
+        version: 5.9.3
+
   packages/wflow/cli:
     dependencies:
       '@wonder/sdk':
@@ -3281,7 +3303,7 @@ snapshots:
       devalue: 5.5.0
       miniflare: 4.20251125.0
       semver: 7.7.3
-      vitest: 3.2.4(@types/node@24.10.1)(@vitest/ui@3.2.4)(jiti@2.6.1)(lightningcss@1.30.2)(tsx@4.21.0)(yaml@2.8.1)
+      vitest: 3.2.4(@types/node@22.19.3)(@vitest/ui@3.2.4)(jiti@2.6.1)(lightningcss@1.30.2)(tsx@4.21.0)(yaml@2.8.1)
       wrangler: 4.51.0(@cloudflare/workers-types@4.20251127.0)
       zod: 3.25.76
     transitivePeerDependencies:
