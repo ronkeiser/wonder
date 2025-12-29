@@ -1,22 +1,20 @@
 # Wonder
 
-Wonder is a workflow orchestration platform for AI-powered software development. It executes long-running, massively parallel workflows where reasoning strategies, consensus mechanisms, and research pipelines are all composable graphs.
+Wonder is an AI orchestration platform that supports two execution models: **deterministic workflows** for structured pipelines, and **conversational agents** for open-ended interaction. Both share the same infrastructure—Durable Objects for coordination, event sourcing for observability, and a unified dispatch layer for execution.
 
 ## Why Wonder Exists
 
-AI-assisted development involves complex, multi-step processes: researching a problem, generating candidate solutions, evaluating them with multiple judges, synthesizing results, and waiting for human approval. These processes:
+AI-assisted development takes two forms:
 
-- Run for hours to days
-- Involve hundreds of LLM calls
-- Require true parallelism (100 judges evaluating simultaneously)
-- Need human checkpoints and approvals
-- Must be observable, debuggable, and replayable
+**Structured pipelines**: Research a problem, generate candidate solutions, evaluate them with multiple judges, synthesize results, wait for human approval. These processes run for hours to days, involve hundreds of LLM calls, require true parallelism, need human checkpoints, and must be observable and replayable.
 
-Wonder provides the orchestration layer that makes this possible.
+**Open-ended interaction**: A user converses with an agent that has access to tools, workflows, and memory. The agent decides what to do next based on conversation history and extracted context. Sessions span multiple turns over days or weeks.
+
+Wonder provides the orchestration layer for both.
 
 ## Structure
 
-### Workspace → Project → Workflow
+### Workspace → Project → Workflows & Agents
 
 ```
 Workspace (Acme Corp)
@@ -27,6 +25,9 @@ Workspace (Acme Corp)
 │   ├── Workflows
 │   │   ├── implement_feature
 │   │   └── code_review
+│   ├── Agents
+│   │   ├── code_assistant
+│   │   └── reviewer
 │   └── Settings
 ├── Project (ML Platform)
 │   └── ...
@@ -35,9 +36,11 @@ Workspace (Acme Corp)
 
 **Workspace** is the top-level container. It defines allowed model providers, MCP servers, and budget limits that apply to all projects within it.
 
-**Project** is an isolated workspace containing repos, artifacts, workflows, and runs. Projects have their own settings for rate limits, default models, and budgets.
+**Project** is an isolated workspace containing repos, artifacts, workflows, agents, and runs. Projects have their own settings for rate limits, default models, and budgets.
 
 **Workflow** binds a graph definition to a project, adding triggers (webhook, schedule, event) and enabling runs.
+
+**Agent** binds a persona to a project, enabling conversations. Agents can invoke workflows as capabilities and access project resources.
 
 ### Library
 
@@ -53,15 +56,20 @@ Library (wonder-patterns)
 │   ├── write_file_verified
 │   ├── run_tests
 │   └── str_replace
+├── Personas
+│   ├── code_assistant
+│   └── reviewer
 └── Actions
     └── ...
 ```
 
 Libraries can be global (shared across all workspaces) or workspace-private. Projects reference library definitions by ID, optionally pinning to a specific version.
 
-## Execution Model
+## Execution Models
 
-Wonder has a layered execution model:
+Wonder supports two parallel execution models that share the same infrastructure but differ in what drives decisions.
+
+### Workflows: Graph-Driven Execution
 
 ```
 WorkflowDef
@@ -75,7 +83,7 @@ WorkflowDef
   Action
 ```
 
-**WorkflowDef**: Graphs of nodes and transitions. Supports parallelism, fan-out/fan-in, human gates, sub-workflows. State is durable (DO SQLite). Coordinated by a Durable Object.
+**WorkflowDef**: Graphs of nodes and transitions. Supports parallelism, fan-out/fan-in, human gates, sub-workflows. State is durable (DO SQLite). Coordinated by CoordinatorDO.
 
 **Node**: A point in the workflow graph. Each node executes exactly one task.
 
@@ -86,6 +94,44 @@ WorkflowDef
 **Action**: Atomic operations—LLM calls, MCP tools, HTTP requests, context updates.
 
 Every execution path traverses all five layers. Simple cases are trivial at each layer.
+
+### Agents: LLM-Driven Execution
+
+```
+Persona
+    ↓ instantiated as
+  Agent
+    ↓ holds
+  Conversation
+    ↓ contains
+  Turn
+    ↓ contains
+  Message
+```
+
+**Persona**: Reusable definition specifying system prompt, available tools, workflow capabilities, and memory configuration. Versioned and stored in libraries.
+
+**Agent**: A persona bound to a project. Has access to project resources and can invoke workflows as capabilities.
+
+**Conversation**: A session with an agent. Durable state in AgentDO. Contains turns and accumulated memories.
+
+**Turn**: A request-response cycle within a conversation. User submits a message, agent reasons and acts, then responds.
+
+**Message**: Individual messages within a turn—user input, assistant responses, tool calls, tool results.
+
+### The Same Pattern
+
+Both execution models follow the same coordination pattern:
+
+```
+receive → decide → dispatch → wait → resume
+```
+
+The difference is what drives "decide":
+- **CoordinatorDO**: Graph traversal determines next node based on transitions and conditions
+- **AgentDO**: LLM reasoning determines next action based on conversation and context
+
+Both dispatch to the same targets: Executor (for tasks), CoordinatorDO (for sub-workflows), or AgentDO (for agent invocation).
 
 ### Why Tasks?
 
@@ -224,7 +270,11 @@ The platform doesn't know what `pnpm` is. A library encodes that `pnpm test` run
 
 See [Agent Environment](./agent-environment.md) for details.
 
-## Sub-Workflow Invocation
+## Sub-Workflow and Agent Invocation
+
+Workflows, agents, and tasks can invoke each other, creating a unified dispatch layer.
+
+### Workflow → Workflow
 
 Sub-workflow nodes enable composition. A research pipeline invokes a reasoning routine:
 
@@ -245,43 +295,82 @@ Node: investigate
 
 **Dynamic dispatch.** Select workflow at runtime via `from_context` references.
 
+### Agent → Workflow
+
+Agents invoke workflows as capabilities. A code assistant agent uses an `implement_feature` workflow:
+
+```
+Agent decides: invoke workflow
+  workflowId: implement_feature
+  input: { feature: "add dark mode toggle", branch: "feature/dark-mode" }
+
+Agent waits for workflow completion
+Agent receives: { branch: "feature/dark-mode", commit: "abc123" }
+Agent responds to user with results
+```
+
+Agents don't need to know how to implement features—they delegate to workflows that encode the expertise.
+
+### Workflow → Agent
+
+Workflows can invoke agents for open-ended subtasks. A code review workflow uses a reviewer agent:
+
+```
+Node: get_review_feedback
+  agentId: reviewer
+  inputMapping:
+    context: state.code_diff
+  outputMapping:
+    state.feedback: $.response
+```
+
+The agent receives context, reasons about it, and returns a response. Useful when the task requires judgment rather than a fixed procedure.
+
 ## Execution Infrastructure
 
 ### Durable Object Coordination
 
-Every workflow run gets its own Coordinator DO implementing the Actor Model:
+Every execution gets its own Durable Object implementing the Actor Model:
 
+**CoordinatorDO** (one per workflow run):
 - Maintains authoritative state (context, tokens)
 - Tracks fan-in synchronization
-- Emits events for observability
-- Dispatches tasks to workers
+- Evaluates transitions to determine next nodes
+- Dispatches tasks to Executor
 
-The coordinator is lightweight—decision logic only. Actual work happens in workers.
+**AgentDO** (one per conversation):
+- Maintains conversation state (turns, messages, memories)
+- Assembles context for LLM calls
+- Reasons via LLM to decide next action
+- Dispatches tools, workflows, or agent invocations
 
-### Worker Execution
+Both are lightweight—decision logic only. Actual work happens in Executor or nested DOs.
 
-Workers execute tasks:
+### Executor
 
-1. Receive task definition and inputs
+The Executor service executes tasks:
+
+1. Receive task definition and inputs from CoordinatorDO or AgentDO
 2. Execute steps sequentially
 3. Handle retries and conditionals
-4. Return result to coordinator
+4. Return result to calling DO
 
-Workers are stateless. Task state is in-memory for the task's duration.
+Executor is stateless. Task state is in-memory for the task's duration.
 
 ### Container Execution
 
 Shell commands route through ContainerDO:
 
-1. Worker calls `containerStub.exec(run_id, command, timeout)`
+1. Executor calls `containerStub.exec(run_id, command, timeout)`
 2. ContainerDO validates ownership
 3. ContainerDO forwards to container's shell server
-4. Result returns to worker
+4. Result returns to Executor
 
 ## Event Sourcing
 
-Every state change emits an event (dot notation: `category.action`):
+Every state change emits an event (dot notation: `category.action`). Events are tagged with `executionType` ('workflow' | 'conversation') for unified storage and filtering.
 
+**Workflow events:**
 - `workflow.started`, `workflow.completed`, `workflow.failed`
 - `task.dispatched`, `task.completed`, `task.failed`
 - `token.created`, `token.completed`, `token.failed`, `token.waiting`
@@ -289,28 +378,38 @@ Every state change emits an event (dot notation: `category.action`):
 - `subworkflow.started`, `subworkflow.completed`, `subworkflow.failed`
 - `context.updated`, `context.output_applied`
 
-This enables full replay, live UI updates, audit trails, and time-travel debugging.
+**Conversation events:**
+- `conversation.started`, `conversation.completed`
+- `turn.started`, `turn.completed`
+- `message.user`, `message.assistant`, `message.tool_call`, `message.tool_result`
+- `tool.invoked`, `tool.completed`, `tool.failed`
+- `memory.extracted`, `memory.recalled`
+
+This enables full replay, live UI updates, audit trails, and time-travel debugging across both execution models.
 
 ## Platform: Cloudflare
 
-| Service          | Role                                        |
-| ---------------- | ------------------------------------------- |
-| Durable Objects  | Workflow coordination, container lifecycle  |
-| Workers          | Task execution                              |
-| D1               | Definitions, refs, metadata, completed runs |
-| R2               | Git objects, pnpm store, large artifacts    |
-| Vectorize        | Semantic search over artifacts              |
-| Analytics Engine | Time-series metrics                         |
-| Containers       | Agent execution environment                 |
+| Service          | Role                                                              |
+| ---------------- | ----------------------------------------------------------------- |
+| Durable Objects  | CoordinatorDO (workflows), AgentDO (conversations), ContainerDO   |
+| Workers          | Executor service, API routes                                      |
+| D1               | Definitions, refs, metadata, completed runs, conversation history |
+| R2               | Git objects, pnpm store, large artifacts                          |
+| Vectorize        | Semantic search over artifacts and memories                       |
+| Analytics Engine | Time-series metrics                                               |
+| Containers       | Agent execution environment                                       |
 
 ## What Wonder Enables
 
-- **Composition**: Build complex pipelines from reusable workflows, tasks, and actions
+- **Dual execution**: Deterministic workflows for structured pipelines, LLM-driven agents for open-ended interaction
+- **Composition**: Build complex pipelines from reusable workflows, tasks, personas, and actions
+- **Interoperability**: Agents invoke workflows as capabilities; workflows invoke agents for judgment
 - **Reliability**: Tasks bundle operations with verification and atomic retries
+- **Memory**: Agents accumulate memories across turns and conversations via semantic extraction
 - **Experimentation**: Compare strategies by querying results across runs
-- **Observability**: See exactly what happened, replay any execution
+- **Observability**: See exactly what happened, replay any execution (workflows or conversations)
 - **Scale**: 100+ parallel judges, multi-day research pipelines, thousands of LLM calls
-- **Human-in-the-loop**: Gates pause execution for review, approval, or input
+- **Human-in-the-loop**: Gates pause workflows; agents naturally support multi-turn conversation
 - **Versioning**: Pin versions, upgrade without breaking dependents
-- **Isolation**: Projects are fully isolated; sub-workflows get fresh context
-- **Native development**: Code, artifacts, and workflows in one Cloudflare-native system
+- **Isolation**: Projects are fully isolated; sub-workflows and agents get fresh context
+- **Native development**: Code, artifacts, workflows, and agents in one Cloudflare-native system

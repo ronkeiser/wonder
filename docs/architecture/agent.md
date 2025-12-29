@@ -527,3 +527,23 @@ What action types do memory workflows need?
 - `vector_search` already exists
 - `vector_write` / `embed` for semantic store
 - Consolidation actions?
+
+### State Storage Model
+
+Should AgentDO use the same schema-driven SQL approach as CoordinatorDO (via `@wonder/schemas`), or is conversation state simpler—fixed tables for turns/messages/memory rather than dynamic schemas?
+
+### Memory Extraction Mechanism
+
+Memory extraction is described as LLM-driven. Is this a dedicated workflow that runs after each turn? Does it use Vectorize for semantic storage? What's the extraction prompt/strategy?
+
+### Tool Execution Path
+
+When an agent calls a tool, does it always go through Executor with Tasks, or is there a lighter-weight path for simple tool calls (direct MCP invocation without Task wrapping)?
+
+### Persona Schema Details
+
+What does the full Persona schema look like? The doc shows `availableTaskIds`, `availableWorkflowIds`, `availableAgentIds`—but how are tools defined? MCP-style? Inline schemas? Are they referenced by ID from a library?
+
+### Conversation Lifecycle
+
+What triggers conversation end? Explicit user action, timeout, or do conversations stay open indefinitely? Is there a `conversation.completed` status, and what sets it?
