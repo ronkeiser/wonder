@@ -64,10 +64,10 @@ export class WorkflowCoordinator extends DurableObject {
       () => {
         const run = this.defs.getWorkflowRun();
         return {
-          workflowRunId: run.id,
-          rootRunId: run.rootRunId,
+          streamId: run.rootRunId, // Workflows use rootRunId as the outer boundary
+          executionId: run.id, // The specific workflow run
+          executionType: 'workflow' as const,
           projectId: run.projectId,
-          workflowDefId: run.workflowDefId,
         };
       },
       { traceEnabled: (this.env.TRACE_EVENTS_ENABLED as string) === 'true' },

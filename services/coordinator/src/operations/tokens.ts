@@ -69,9 +69,9 @@ export class TokenManager {
 
     this.emitter.emitTrace({
       type: 'operation.tokens.created',
-      tokenId: tokenId,
-      nodeId: params.nodeId,
       payload: {
+        tokenId: tokenId,
+        nodeId: params.nodeId,
         taskId: params.nodeId,
         parentTokenId: params.parentTokenId,
         pathId: params.pathId,
@@ -114,9 +114,9 @@ export class TokenManager {
 
     this.emitter.emitTrace({
       type: 'operation.tokens.status_updated',
-      tokenId: tokenId,
-      nodeId: token.nodeId,
       payload: {
+        tokenId: tokenId,
+        nodeId: token.nodeId,
         from: token.status,
         to: status,
       },
@@ -209,9 +209,9 @@ export class TokenManager {
 
     this.emitter.emitTrace({
       type: 'operation.tokens.status_updated',
-      tokenId: tokenId,
-      nodeId: token.nodeId,
       payload: {
+        tokenId: tokenId,
+        nodeId: token.nodeId,
         from: token.status,
         to: 'waiting_for_siblings',
       },
@@ -264,9 +264,9 @@ export class TokenManager {
 
     this.emitter.emitTrace({
       type: 'operation.tokens.status_updated',
-      tokenId: tokenId,
-      nodeId: token.nodeId,
       payload: {
+        tokenId: tokenId,
+        nodeId: token.nodeId,
         from: token.status,
         to: 'waiting_for_subworkflow',
         subworkflowRunId,
@@ -389,9 +389,9 @@ export class TokenManager {
       const token = tokenMap.get(tokenId);
       this.emitter.emitTrace({
         type: 'operation.tokens.status_updated',
-        tokenId: tokenId,
-        nodeId: token?.nodeId ?? 'unknown',
         payload: {
+          tokenId: tokenId,
+          nodeId: token?.nodeId ?? 'unknown',
           from: 'waiting_for_siblings',
           to: 'completed',
         },
@@ -424,9 +424,9 @@ export class TokenManager {
       const token = tokenMap.get(tokenId);
       this.emitter.emitTrace({
         type: 'operation.tokens.status_updated',
-        tokenId: tokenId,
-        nodeId: token?.nodeId ?? 'unknown',
         payload: {
+          tokenId: tokenId,
+          nodeId: token?.nodeId ?? 'unknown',
           from: token?.status ?? 'unknown',
           to: 'cancelled',
         },

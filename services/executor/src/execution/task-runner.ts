@@ -71,8 +71,8 @@ export async function runTask(
     // Emit trace event for task started
     emitter.emitTrace({
       type: 'executor.task.started',
-      tokenId: payload.tokenId,
       payload: {
+        tokenId: payload.tokenId,
         taskId: task.id,
         taskVersion: task.version,
         stepCount: sortedSteps.length,
@@ -135,9 +135,9 @@ export async function runTask(
     // Emit trace event for task completed
     emitter.emitTrace({
       type: 'executor.task.completed',
-      tokenId: payload.tokenId,
       durationMs: metrics.durationMs,
       payload: {
+        tokenId: payload.tokenId,
         taskId: task.id,
         taskVersion: task.version,
         stepsExecuted: metrics.stepsExecuted,

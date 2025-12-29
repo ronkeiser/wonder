@@ -49,8 +49,7 @@ export function decideSynchronization(params: {
   // Emit sync start event
   events.push({
     type: 'decision.sync.start',
-    tokenId: token.id,
-    payload: { siblingCount: siblingCounts.total },
+    payload: { tokenId: token.id, siblingCount: siblingCounts.total },
   });
 
   // No synchronization config → pass through
@@ -344,8 +343,8 @@ export function decideFanInContinuation(params: {
   // Emit fan-in continuation planning event
   events.push({
     type: 'decision.sync.continuation',
-    nodeId: nodeId,
     payload: {
+      nodeId: nodeId,
       workflowRunId: workflowRunId,
       fanInPath: fanInPath,
     },

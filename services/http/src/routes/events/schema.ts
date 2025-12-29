@@ -9,18 +9,13 @@ export const EventEntrySchema = z
     id: z.string(),
     timestamp: z.number(),
     sequence: z.number(),
+    streamId: z.string().describe('Outer execution boundary (conversationId or rootRunId)'),
+    executionId: z.string().describe('Specific execution (workflowRunId, turnId, etc.)'),
+    executionType: z.string().describe('Execution type: workflow, conversation, etc.'),
     eventType: z.string(),
-    workflowRunId: z.string(),
-    rootRunId: z.string(),
-    workflowDefId: z.string(),
-    nodeId: z.string().nullable().optional(),
-    tokenId: z.string().nullable().optional(),
-    pathId: z.string().nullable().optional(),
     projectId: z.string(),
-    tokens: z.number().nullable().optional(),
-    costUsd: z.number().nullable().optional(),
     message: z.string().nullable().optional(),
-    metadata: z.string(),
+    metadata: z.string().describe('JSON blob with all domain-specific fields'),
   })
   .openapi('EventEntry');
 
@@ -45,14 +40,13 @@ export const TraceEventEntrySchema = z
     sequence: z.number(),
     timestamp: z.number(),
     type: z.string().describe('Event type following {category}.{domain}.{action} convention'),
-    category: z.enum(['decision', 'operation', 'dispatch', 'sql', 'debug']),
-    workflowRunId: z.string(),
-    rootRunId: z.string(),
-    tokenId: z.string().nullable(),
-    nodeId: z.string().nullable(),
+    category: z.string().describe('Event category extracted from type prefix'),
+    streamId: z.string().describe('Outer execution boundary (conversationId or rootRunId)'),
+    executionId: z.string().describe('Specific execution (workflowRunId, turnId, etc.)'),
+    executionType: z.string().describe('Execution type: workflow, conversation, etc.'),
     projectId: z.string(),
     durationMs: z.number().nullable(),
-    payload: TraceEventPayloadSchema,
+    payload: TraceEventPayloadSchema.describe('Contains domain-specific fields including tokenId, nodeId'),
   })
   .openapi('TraceEventEntry');
 

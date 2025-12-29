@@ -376,7 +376,7 @@ describe('Foundation: 07 - Conditional Routing', () => {
     // Find the routing from evaluate node
     const evaluateRouting = routingStarts.find((r) => {
       // The routing should be for the evaluate token
-      const token = trace.tokens.creations().find((t) => t.tokenId === r.tokenId);
+      const token = trace.tokens.creations().find((t) => t.payload.tokenId === r.payload.tokenId);
       return token !== undefined;
     });
     expect(evaluateRouting, 'Routing from evaluate node should exist').toBeDefined();

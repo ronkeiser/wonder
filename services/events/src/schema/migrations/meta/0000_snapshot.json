@@ -1,164 +1,11 @@
 {
   "version": "6",
   "dialect": "sqlite",
-  "id": "ffb83e67-caec-401e-8bdb-ea5313f4cf1e",
+  "id": "b4011534-cf87-4018-b718-4972314a11bc",
   "prevId": "00000000-0000-0000-0000-000000000000",
   "tables": {
-    "trace_events": {
-      "name": "trace_events",
-      "columns": {
-        "id": {
-          "name": "id",
-          "type": "text",
-          "primaryKey": true,
-          "notNull": true,
-          "autoincrement": false
-        },
-        "sequence": {
-          "name": "sequence",
-          "type": "integer",
-          "primaryKey": false,
-          "notNull": true,
-          "autoincrement": false
-        },
-        "timestamp": {
-          "name": "timestamp",
-          "type": "integer",
-          "primaryKey": false,
-          "notNull": true,
-          "autoincrement": false
-        },
-        "type": {
-          "name": "type",
-          "type": "text",
-          "primaryKey": false,
-          "notNull": true,
-          "autoincrement": false
-        },
-        "category": {
-          "name": "category",
-          "type": "text",
-          "primaryKey": false,
-          "notNull": true,
-          "autoincrement": false
-        },
-        "workflow_run_id": {
-          "name": "workflow_run_id",
-          "type": "text",
-          "primaryKey": false,
-          "notNull": true,
-          "autoincrement": false
-        },
-        "root_run_id": {
-          "name": "root_run_id",
-          "type": "text",
-          "primaryKey": false,
-          "notNull": true,
-          "autoincrement": false
-        },
-        "token_id": {
-          "name": "token_id",
-          "type": "text",
-          "primaryKey": false,
-          "notNull": false,
-          "autoincrement": false
-        },
-        "node_id": {
-          "name": "node_id",
-          "type": "text",
-          "primaryKey": false,
-          "notNull": false,
-          "autoincrement": false
-        },
-        "project_id": {
-          "name": "project_id",
-          "type": "text",
-          "primaryKey": false,
-          "notNull": true,
-          "autoincrement": false
-        },
-        "duration_ms": {
-          "name": "duration_ms",
-          "type": "real",
-          "primaryKey": false,
-          "notNull": false,
-          "autoincrement": false
-        },
-        "payload": {
-          "name": "payload",
-          "type": "text",
-          "primaryKey": false,
-          "notNull": true,
-          "autoincrement": false
-        },
-        "message": {
-          "name": "message",
-          "type": "text",
-          "primaryKey": false,
-          "notNull": false,
-          "autoincrement": false
-        }
-      },
-      "indexes": {
-        "idx_trace_events_workflow_sequence": {
-          "name": "idx_trace_events_workflow_sequence",
-          "columns": [
-            "workflow_run_id",
-            "sequence"
-          ],
-          "isUnique": false
-        },
-        "idx_trace_events_root_run_id": {
-          "name": "idx_trace_events_root_run_id",
-          "columns": [
-            "root_run_id"
-          ],
-          "isUnique": false
-        },
-        "idx_trace_events_type": {
-          "name": "idx_trace_events_type",
-          "columns": [
-            "type"
-          ],
-          "isUnique": false
-        },
-        "idx_trace_events_category": {
-          "name": "idx_trace_events_category",
-          "columns": [
-            "category"
-          ],
-          "isUnique": false
-        },
-        "idx_trace_events_token": {
-          "name": "idx_trace_events_token",
-          "columns": [
-            "token_id"
-          ],
-          "isUnique": false
-        },
-        "idx_trace_events_project": {
-          "name": "idx_trace_events_project",
-          "columns": [
-            "project_id",
-            "timestamp"
-          ],
-          "isUnique": false
-        },
-        "idx_trace_events_duration": {
-          "name": "idx_trace_events_duration",
-          "columns": [
-            "duration_ms"
-          ],
-          "isUnique": false
-        }
-      },
-      "foreignKeys": {},
-      "compositePrimaryKeys": {},
-      "uniqueConstraints": {},
-      "checkConstraints": {}
-    },
-    "workflow_events": {
-      "name": "workflow_events",
+    "events": {
+      "name": "events",
       "columns": {
         "id": {
           "name": "id",
@@ -177,6 +24,27 @@
         "sequence": {
           "name": "sequence",
           "type": "integer",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false
+        },
+        "stream_id": {
+          "name": "stream_id",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false
+        },
+        "execution_id": {
+          "name": "execution_id",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false
+        },
+        "execution_type": {
+          "name": "execution_type",
+          "type": "text",
           "primaryKey": false,
           "notNull": true,
           "autoincrement": false
@@ -188,67 +56,11 @@
           "notNull": true,
           "autoincrement": false
         },
-        "workflow_run_id": {
-          "name": "workflow_run_id",
-          "type": "text",
-          "primaryKey": false,
-          "notNull": true,
-          "autoincrement": false
-        },
-        "root_run_id": {
-          "name": "root_run_id",
-          "type": "text",
-          "primaryKey": false,
-          "notNull": true,
-          "autoincrement": false
-        },
-        "workflow_def_id": {
-          "name": "workflow_def_id",
-          "type": "text",
-          "primaryKey": false,
-          "notNull": true,
-          "autoincrement": false
-        },
-        "node_id": {
-          "name": "node_id",
-          "type": "text",
-          "primaryKey": false,
-          "notNull": false,
-          "autoincrement": false
-        },
-        "token_id": {
-          "name": "token_id",
-          "type": "text",
-          "primaryKey": false,
-          "notNull": false,
-          "autoincrement": false
-        },
-        "path_id": {
-          "name": "path_id",
-          "type": "text",
-          "primaryKey": false,
-          "notNull": false,
-          "autoincrement": false
-        },
         "project_id": {
           "name": "project_id",
           "type": "text",
           "primaryKey": false,
           "notNull": true,
-          "autoincrement": false
-        },
-        "tokens": {
-          "name": "tokens",
-          "type": "integer",
-          "primaryKey": false,
-          "notNull": false,
-          "autoincrement": false
-        },
-        "cost_usd": {
-          "name": "cost_usd",
-          "type": "real",
-          "primaryKey": false,
-          "notNull": false,
           "autoincrement": false
         },
         "message": {
@@ -281,17 +93,24 @@
           ],
           "isUnique": false
         },
-        "idx_events_workflow_run_id": {
-          "name": "idx_events_workflow_run_id",
+        "idx_events_stream_id": {
+          "name": "idx_events_stream_id",
           "columns": [
-            "workflow_run_id"
+            "stream_id"
           ],
           "isUnique": false
         },
-        "idx_events_root_run_id": {
-          "name": "idx_events_root_run_id",
+        "idx_events_execution_id": {
+          "name": "idx_events_execution_id",
           "columns": [
-            "root_run_id"
+            "execution_id"
+          ],
+          "isUnique": false
+        },
+        "idx_events_execution_type": {
+          "name": "idx_events_execution_type",
+          "columns": [
+            "execution_type"
           ],
           "isUnique": false
         },
@@ -302,25 +121,157 @@
           ],
           "isUnique": false
         },
-        "idx_events_node_id": {
-          "name": "idx_events_node_id",
-          "columns": [
-            "node_id"
-          ],
-          "isUnique": false
-        },
-        "idx_events_token_id": {
-          "name": "idx_events_token_id",
-          "columns": [
-            "token_id"
-          ],
-          "isUnique": false
-        },
         "idx_events_sequence": {
           "name": "idx_events_sequence",
           "columns": [
-            "workflow_run_id",
+            "stream_id",
             "sequence"
+          ],
+          "isUnique": false
+        }
+      },
+      "foreignKeys": {},
+      "compositePrimaryKeys": {},
+      "uniqueConstraints": {},
+      "checkConstraints": {}
+    },
+    "trace_events": {
+      "name": "trace_events",
+      "columns": {
+        "id": {
+          "name": "id",
+          "type": "text",
+          "primaryKey": true,
+          "notNull": true,
+          "autoincrement": false
+        },
+        "sequence": {
+          "name": "sequence",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false
+        },
+        "timestamp": {
+          "name": "timestamp",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false
+        },
+        "stream_id": {
+          "name": "stream_id",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false
+        },
+        "execution_id": {
+          "name": "execution_id",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false
+        },
+        "execution_type": {
+          "name": "execution_type",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false
+        },
+        "type": {
+          "name": "type",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false
+        },
+        "category": {
+          "name": "category",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false
+        },
+        "project_id": {
+          "name": "project_id",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false
+        },
+        "duration_ms": {
+          "name": "duration_ms",
+          "type": "real",
+          "primaryKey": false,
+          "notNull": false,
+          "autoincrement": false
+        },
+        "payload": {
+          "name": "payload",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false
+        },
+        "message": {
+          "name": "message",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false,
+          "autoincrement": false
+        }
+      },
+      "indexes": {
+        "idx_trace_events_stream_sequence": {
+          "name": "idx_trace_events_stream_sequence",
+          "columns": [
+            "stream_id",
+            "sequence"
+          ],
+          "isUnique": false
+        },
+        "idx_trace_events_execution_id": {
+          "name": "idx_trace_events_execution_id",
+          "columns": [
+            "execution_id"
+          ],
+          "isUnique": false
+        },
+        "idx_trace_events_execution_type": {
+          "name": "idx_trace_events_execution_type",
+          "columns": [
+            "execution_type"
+          ],
+          "isUnique": false
+        },
+        "idx_trace_events_type": {
+          "name": "idx_trace_events_type",
+          "columns": [
+            "type"
+          ],
+          "isUnique": false
+        },
+        "idx_trace_events_category": {
+          "name": "idx_trace_events_category",
+          "columns": [
+            "category"
+          ],
+          "isUnique": false
+        },
+        "idx_trace_events_project": {
+          "name": "idx_trace_events_project",
+          "columns": [
+            "project_id",
+            "timestamp"
+          ],
+          "isUnique": false
+        },
+        "idx_trace_events_duration": {
+          "name": "idx_trace_events_duration",
+          "columns": [
+            "duration_ms"
           ],
           "isUnique": false
         }

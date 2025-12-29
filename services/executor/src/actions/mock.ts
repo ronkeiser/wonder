@@ -71,9 +71,9 @@ export async function executeMockAction(
     // Emit trace event for mock data generation
     emitter.emitTrace({
       type: 'executor.mock.generated',
-      tokenId: context.tokenId,
       durationMs: duration,
       payload: {
+        tokenId: context.tokenId,
         stepRef: context.stepRef,
         actionId: action.id,
         schemaType: implementation.schema.type,

@@ -57,8 +57,10 @@ export function decideRouting(params: {
   // Emit routing start event
   events.push({
     type: 'decision.routing.start',
-    tokenId: completedTokenId,
-    nodeId: nodeId,
+    payload: {
+      tokenId: completedTokenId,
+      nodeId: nodeId,
+    },
   });
 
   // Group by priority tier

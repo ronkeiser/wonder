@@ -102,8 +102,8 @@ export async function applyTracedDecisions(
   for (const t of traced) {
     ctx.emitter.emitTrace({
       type: 'dispatch.decision.planned',
-      tokenId: t.tokenId ?? undefined,
       payload: {
+        tokenId: t.tokenId ?? undefined,
         decisionType: t.decision.type,
         source: t.source,
         timestamp: t.timestamp,

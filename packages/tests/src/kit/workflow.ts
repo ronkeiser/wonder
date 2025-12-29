@@ -4,14 +4,40 @@
  * Functions for creating, configuring, and executing test workflows.
  */
 
-import { isEmbeddedTask, type EmbeddedNode, type EmbeddedWorkflowDef } from '@wonder/sdk';
+import {
+  isEmbeddedTask,
+  type EmbeddedNode,
+  type EmbeddedWorkflowDef,
+  type EventEntry,
+  type StreamEvent,
+  type Subscription,
+  type TraceEventEntry,
+} from '@wonder/sdk';
+import { TraceEventCollection } from './trace';
 import { wonder } from '~/client';
 import { cleanupWorkflowTest } from './cleanup';
 import { setupTestContext } from './context';
 import { createEmbeddedTask } from './resources';
-import type { CreatedResources, TestContext, TestWorkflowResult, WorkflowTestSetup } from './types';
+import type {
+  CreatedResources,
+  ExecuteWorkflowResult,
+  TestContext,
+  TestWorkflowResult,
+  WorkflowTestSetup,
+} from './types';
 
-export type { TestWorkflowResult, WorkflowTestSetup } from './types';
+export type { ExecuteWorkflowResult, TestWorkflowResult, WorkflowTestSetup } from './types';
+
+const DEFAULT_TIMEOUT_MS = 300000; // 5 minutes
+const DEFAULT_IDLE_TIMEOUT_MS = 30000; // 30 seconds
+const DEFAULT_GRACE_PERIOD_MS = 100; // Grace period after terminal event
+const WEBSOCKET_HANDSHAKE_DELAY_MS = 100;
+
+type InternalEvent = StreamEvent & { stream?: 'events' | 'trace' };
+
+interface StreamSubscription {
+  close: () => void;
+}
 
 /**
  * Creates all embedded resources and the workflow.
@@ -109,7 +135,10 @@ export async function createWorkflow(
 }
 
 /**
- * Executes a workflow and returns all events.
+ * Executes a workflow using two-phase execution to avoid missing early events:
+ * 1. Create the workflow run (doesn't start execution)
+ * 2. Subscribe to events via WebSocket
+ * 3. Start execution after subscription is established
  */
 export async function executeWorkflow(
   workflowId: string,
@@ -122,28 +151,132 @@ export async function executeWorkflow(
     /** Enable trace event emission for this workflow run */
     enableTraceEvents?: boolean;
   },
-) {
-  const result = await wonder.workflows(workflowId).stream(inputData, {
-    timeout: options?.timeout ?? 60000,
-    idleTimeout: options?.idleTimeout ?? 10000,
-    enableTraceEvents: options?.enableTraceEvents,
-    onEvent: options?.logEvents
-      ? (event) => {
-          if ('eventType' in event) {
-            console.log(`📨 ${event.eventType}`, JSON.stringify(event.metadata ?? {}, null, 2));
-          } else if ('type' in event) {
-            console.log(`🔍 ${event.type}`, JSON.stringify(event.payload ?? {}, null, 2));
-          }
-        }
-      : undefined,
+): Promise<ExecuteWorkflowResult> {
+  const timeout = options?.timeout ?? DEFAULT_TIMEOUT_MS;
+  const idleTimeout = options?.idleTimeout ?? DEFAULT_IDLE_TIMEOUT_MS;
+  const gracePeriod = DEFAULT_GRACE_PERIOD_MS;
+  const enableTraceEvents = options?.enableTraceEvents;
+
+  // Phase 1: Create the workflow run (doesn't start execution)
+  const createResponse = await wonder.POST('/workflows/{id}/runs', {
+    params: { path: { id: workflowId } },
+    body: { input: inputData as Record<string, unknown> },
   });
 
-  return {
-    workflowRunId: result.workflowRunId,
-    status: result.status,
-    events: result.events,
-    trace: result.trace,
-  };
+  if (!createResponse.data?.workflowRunId) {
+    throw new Error(`Failed to create workflow run`);
+  }
+
+  const { workflowRunId } = createResponse.data;
+
+  // Phase 2: Subscribe to events BEFORE starting execution
+  return new Promise<ExecuteWorkflowResult>((resolve, reject) => {
+    const events: EventEntry[] = [];
+    const traceEvents: TraceEventEntry[] = [];
+    let totalTimer: NodeJS.Timeout | null = null;
+    let idleTimer: NodeJS.Timeout | null = null;
+    let subscription: StreamSubscription | null = null;
+
+    const cleanup = () => {
+      if (totalTimer) clearTimeout(totalTimer);
+      if (idleTimer) clearTimeout(idleTimer);
+      if (subscription) subscription.close();
+    };
+
+    const resolveWithCleanup = (
+      status: ExecuteWorkflowResult['status'],
+      finalEvents = events,
+      finalTraceEvents = traceEvents,
+    ) => {
+      cleanup();
+      resolve({
+        workflowRunId,
+        status,
+        events: finalEvents,
+        traceEvents: finalTraceEvents,
+        trace: new TraceEventCollection(finalTraceEvents),
+      });
+    };
+
+    // Set up total timeout
+    if (timeout) {
+      totalTimer = setTimeout(() => resolveWithCleanup('timeout'), timeout);
+    }
+
+    const resetIdleTimer = () => {
+      if (idleTimer) clearTimeout(idleTimer);
+      if (idleTimeout) {
+        idleTimer = setTimeout(() => resolveWithCleanup('idle_timeout'), idleTimeout);
+      }
+    };
+
+    const eventCallback = (event: InternalEvent) => {
+      resetIdleTimer();
+
+      // Log events if requested
+      if (options?.logEvents) {
+        if ('eventType' in event) {
+          console.log(`📨 ${event.eventType}`, JSON.stringify(event.metadata ?? {}, null, 2));
+        } else if ('type' in event) {
+          console.log(`🔍 ${event.type}`, JSON.stringify(event.payload ?? {}, null, 2));
+        }
+      }
+
+      // Collect events by stream type
+      if (event.stream === 'trace') {
+        traceEvents.push(event as TraceEventEntry);
+      } else {
+        events.push(event as EventEntry);
+      }
+
+      // Check for terminal conditions (only applies to EventEntry, not TraceEventEntry)
+      if ('eventType' in event && event.eventType === 'workflow.completed') {
+        // Wait for grace period to collect any in-flight events before closing
+        setTimeout(() => resolveWithCleanup('completed'), gracePeriod);
+        return;
+      }
+
+      if ('eventType' in event && event.eventType === 'workflow.failed') {
+        // Wait for grace period to collect any in-flight events before closing
+        setTimeout(() => resolveWithCleanup('failed'), gracePeriod);
+        return;
+      }
+    };
+
+    // Subscribe to both events and trace events
+    // Use streamId filter to capture both parent and child workflow events.
+    const subscriptions: Subscription[] = (['events', 'trace'] as const).map((stream) => ({
+      id: stream,
+      stream,
+      filters: { streamId: workflowRunId },
+      callback: eventCallback,
+    }));
+
+    wonder.streams
+      .subscribe(subscriptions, workflowRunId)
+      .then((sub) => {
+        subscription = sub;
+        resetIdleTimer();
+
+        // Phase 3: Start execution (after subscription is established)
+        // Small delay to ensure WebSocket handshake completes
+        setTimeout(async () => {
+          try {
+            await wonder.POST('/workflows/{id}/runs/{runId}/start', {
+              params: { path: { id: workflowId, runId: workflowRunId } },
+              body: { enableTraceEvents },
+            });
+          } catch (error) {
+            cleanup();
+            reject(error);
+          }
+        }, WEBSOCKET_HANDSHAKE_DELAY_MS);
+      })
+      .catch((error) => {
+        cleanup();
+        reject(error);
+      });
+  });
 }
 
 /**
@@ -214,11 +347,11 @@ export async function runTestWorkflow(
   console.log('\n🔍 Debug Query Examples:');
   console.log('   # Events (workflow/task/token lifecycle, LLM calls):');
   console.log(
-    `   curl -H "X-API-Key: ${apiKey}" "https://api.wflow.app/events?workflowRunId=${result.workflowRunId}"`,
+    `   curl -H "X-API-Key: ${apiKey}" "https://api.wflow.app/events?streamId=${result.workflowRunId}"`,
   );
   console.log('   # Trace events (coordinator decisions, routing, sync):');
   console.log(
-    `   curl -H "X-API-Key: ${apiKey}" "https://api.wflow.app/events/trace?workflowRunId=${result.workflowRunId}"`,
+    `   curl -H "X-API-Key: ${apiKey}" "https://api.wflow.app/events/trace?streamId=${result.workflowRunId}"`,
   );
   console.log('\n🎁  Response is wrapped: { "events": [...] }');
   console.log("   Use jq to unwrap: curl ... | jq '.events'");

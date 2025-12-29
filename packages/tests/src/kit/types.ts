@@ -4,7 +4,8 @@
  * All type definitions for the test kit.
  */
 
-import type { executeWorkflow } from './workflow';
+import type { EventEntry, TraceEventEntry } from '@wonder/sdk';
+import type { TraceEventCollection } from './trace';
 
 // =============================================================================
 // Context Types
@@ -49,11 +50,22 @@ export interface WorkflowTestSetup extends TestContext {
 }
 
 /**
+ * Result from executing a workflow
+ */
+export interface ExecuteWorkflowResult {
+  workflowRunId: string;
+  status: 'completed' | 'failed' | 'timeout' | 'idle_timeout';
+  events: EventEntry[];
+  traceEvents: TraceEventEntry[];
+  trace: TraceEventCollection;
+}
+
+/**
  * Result from runTestWorkflow
  */
 export interface TestWorkflowResult {
   /** Results from executing the workflow */
-  result: Awaited<ReturnType<typeof executeWorkflow>>;
+  result: ExecuteWorkflowResult;
   /** The setup object with IDs of created resources */
   setup: WorkflowTestSetup;
   /** Cleanup function - call this when done */

@@ -324,8 +324,8 @@ export class ContextManager {
 
     this.emitter.emitTrace({
       type: 'operation.context.branch_table.created',
-      tokenId: tokenId,
       payload: {
+        tokenId: tokenId,
         tableName: tableName,
         schemaType: outputSchema.type as string,
       },
@@ -344,8 +344,8 @@ export class ContextManager {
 
     this.emitter.emitTrace({
       type: 'operation.context.branch.validate',
-      tokenId: tokenId,
       payload: {
+        tokenId: tokenId,
         valid: result.valid,
         errorCount: result.errors.length,
         errors: result.errors.slice(0, 5).map((e) => e.message),
@@ -362,8 +362,7 @@ export class ContextManager {
 
     this.emitter.emitTrace({
       type: 'operation.context.branch.written',
-      tokenId: tokenId,
-      payload: { output },
+      payload: { tokenId: tokenId, output },
     });
   }
 
@@ -392,8 +391,8 @@ export class ContextManager {
 
       this.emitter.emitTrace({
         type: 'operation.context.branch.read',
-        tokenId: tokenId,
         payload: {
+          tokenId: tokenId,
           branchIndex: branchIndex,
           output,
           fromCache: this.branchTables.has(tokenId),

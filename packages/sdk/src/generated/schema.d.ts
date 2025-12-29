@@ -1320,17 +1320,18 @@ export interface paths {
             path?: never;
             cookie?: never;
         };
-        /** Get workflow events */
+        /** Get execution events */
         get: {
             parameters: {
                 query?: {
-                    workflowRunId?: string;
-                    /** @description Query all events in a workflow run tree */
-                    rootRunId?: string;
+                    /** @description Outer execution boundary (conversationId or rootRunId) */
+                    streamId?: string;
+                    /** @description Specific execution (workflowRunId, turnId, etc.) */
+                    executionId?: string;
+                    /** @description Execution type */
+                    executionType?: "workflow" | "conversation";
                     projectId?: string;
                     eventType?: string;
-                    nodeId?: string;
-                    tokenId?: string;
                     limit?: number;
                     afterSequence?: number | null;
                 };
@@ -1340,7 +1341,7 @@ export interface paths {
             };
             requestBody?: never;
             responses: {
-                /** @description Workflow events retrieved successfully */
+                /** @description Execution events retrieved successfully */
                 200: {
                     headers: {
                         [name: string]: unknown;
@@ -1370,11 +1371,12 @@ export interface paths {
         get: {
             parameters: {
                 query?: {
-                    workflowRunId?: string;
-                    /** @description Query all trace events in a workflow run tree */
-                    rootRunId?: string;
-                    tokenId?: string;
-                    nodeId?: string;
+                    /** @description Outer execution boundary (conversationId or rootRunId) */
+                    streamId?: string;
+                    /** @description Specific execution (workflowRunId, turnId, etc.) */
+                    executionId?: string;
+                    /** @description Execution type */
+                    executionType?: "workflow" | "conversation";
                     type?: string;
                     category?: "decision" | "operation" | "dispatch" | "sql";
                     projectId?: string;
@@ -2222,22 +2224,22 @@ export interface components {
             id: string;
             timestamp: number;
             sequence: number;
+            /** @description Outer execution boundary (conversationId or rootRunId) */
+            streamId: string;
+            /** @description Specific execution (workflowRunId, turnId, etc.) */
+            executionId: string;
+            /** @description Execution type: workflow, conversation, etc. */
+            executionType: string;
             eventType: string;
-            workflowRunId: string;
-            rootRunId: string;
-            workflowDefId: string;
-            nodeId?: string | null;
-            tokenId?: string | null;
-            pathId?: string | null;
             projectId: string;
-            tokens?: number | null;
-            costUsd?: number | null;
             message?: string | null;
+            /** @description JSON blob with all domain-specific fields */
             metadata: string;
         };
         EventsResponse: {
             events: components["schemas"]["EventEntry"][];
         };
+        /** @description Contains domain-specific fields including tokenId, nodeId */
         TraceEventPayload: {
             [key: string]: unknown;
         };
@@ -2249,10 +2251,12 @@ export interface components {
             type: string;
             /** @enum {string} */
             category: "decision" | "operation" | "dispatch" | "sql" | "debug";
-            workflowRunId: string;
-            rootRunId: string;
-            tokenId: string | null;
-            nodeId: string | null;
+            /** @description Outer execution boundary (conversationId or rootRunId) */
+            streamId: string;
+            /** @description Specific execution (workflowRunId, turnId, etc.) */
+            executionId: string;
+            /** @description Execution type: workflow, conversation, etc. */
+            executionType: string;
             projectId: string;
             durationMs: number | null;
             payload: components["schemas"]["TraceEventPayload"];

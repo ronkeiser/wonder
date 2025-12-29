@@ -1,23 +1,23 @@
 import { createLogger, type Logger } from '@wonder/logs';
 import { DurableObject } from 'cloudflare:workers';
 import type {
+  ExecutionStatusChange,
   HubSubscription,
   HubSubscriptionFilter,
   HubSubscriptionMessage,
-  WorkflowStatusChange,
 } from './types';
 
-export type { WorkflowRunStatus, WorkflowStatusChange } from './types';
+export type { ExecutionStatus, ExecutionStatusChange } from './types';
 
 /**
- * EventHub Durable Object - singleton for workflow lifecycle events
+ * EventHub Durable Object - singleton for execution lifecycle events
  *
  * Responsibilities:
- * - Broadcast workflow lifecycle events (started, completed, failed)
- * - Allow clients to discover active workflows
+ * - Broadcast execution lifecycle events (started, completed, failed)
+ * - Allow clients to discover active executions (workflows, conversations)
  * - Lightweight - only lifecycle transitions, not detailed events
  *
- * Detailed events (token.*, task.*, context.*, trace.*) go to per-workflow Streamer DOs.
+ * Detailed events go to per-execution Streamer DOs.
  */
 export class EventHub extends DurableObject<Env> {
   private logger: Logger;
@@ -35,12 +35,12 @@ export class EventHub extends DurableObject<Env> {
   // ============================================================================
 
   /**
-   * Notify about a workflow run status change
+   * Notify about an execution status change
    *
-   * Called by resources service when workflow run status changes.
+   * Called by resources service when execution status changes.
    * Broadcasts to all connected WebSocket clients.
    */
-  notifyStatusChange(change: WorkflowStatusChange): void {
+  notifyStatusChange(change: ExecutionStatusChange): void {
     this.broadcastStatusChange(change);
   }
 
@@ -111,7 +111,7 @@ export class EventHub extends DurableObject<Env> {
   // Broadcasting
   // ============================================================================
 
-  private broadcastStatusChange(change: WorkflowStatusChange): void {
+  private broadcastStatusChange(change: ExecutionStatusChange): void {
     this.ctx.getWebSockets().forEach((ws) => {
       const subsObj = (ws.deserializeAttachment() as Record<string, HubSubscription>) || {};
 
@@ -140,9 +140,10 @@ export class EventHub extends DurableObject<Env> {
   // Filtering
   // ============================================================================
 
-  private matchesFilter(change: WorkflowStatusChange, filter: HubSubscriptionFilter): boolean {
+  private matchesFilter(change: ExecutionStatusChange, filter: HubSubscriptionFilter): boolean {
+    if (filter.executionType && change.executionType !== filter.executionType) return false;
     if (filter.projectId && change.projectId !== filter.projectId) return false;
-    if (filter.workflowDefId && change.workflowDefId !== filter.workflowDefId) return false;
+    if (filter.definitionId && change.definitionId !== filter.definitionId) return false;
     if (filter.status && change.status !== filter.status) return false;
     return true;
   }

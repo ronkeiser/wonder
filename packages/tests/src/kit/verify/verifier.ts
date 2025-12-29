@@ -5,7 +5,8 @@
  * Provides self-diagnosing test assertions with full context on failure.
  */
 
-import type { EmbeddedWorkflowDef, EventEntry, TraceEventCollection } from '@wonder/sdk';
+import type { EmbeddedWorkflowDef, EventEntry } from '@wonder/sdk';
+import type { TraceEventCollection } from '../trace';
 import { WorkflowVerificationError } from './error';
 import type {
   BranchWriteSpec,
@@ -428,7 +429,7 @@ export class WorkflowVerifier {
               expected: spec.branchTotal,
               siblingGroup: group.siblingGroup,
               mismatches: wrongTotals.map((s) => ({
-                tokenId: s.tokenId,
+                tokenId: s.payload.tokenId,
                 branchTotal: s.payload.branchTotal,
               })),
             },
@@ -454,7 +455,7 @@ export class WorkflowVerifier {
         if (spec.outputFields) {
           const { branchOutputs } = ctx.collected;
           for (const sibling of group.siblings) {
-            const tokenId = sibling.tokenId!;
+            const tokenId = sibling.payload.tokenId!;
 
             // Check if token was cancelled (skip output verification for cancelled tokens)
             const statuses = this.trace.tokens.statusTransitions(tokenId);
@@ -846,7 +847,7 @@ export class WorkflowVerifier {
     // The key insight: true fan-out siblings are the FIRST tokens in their branch path,
     // meaning their parent doesn't have the same siblingGroup.
     // Fan-in arrivals (child of a sibling going into sync) inherit siblingGroup but are NOT siblings.
-    const tokenMap = new Map(tokenCreations.map((tc) => [tc.tokenId, tc]));
+    const tokenMap = new Map(tokenCreations.map((tc) => [tc.payload.tokenId, tc]));
 
     const fanOutSiblings = tokenCreations.filter((tc) => {
       if (tc.payload.siblingGroup === null) return false;
@@ -859,7 +860,7 @@ export class WorkflowVerifier {
       }
       return true;
     });
-    const siblingIds = new Set(fanOutSiblings.map((s) => s.tokenId));
+    const siblingIds = new Set(fanOutSiblings.map((s) => s.payload.tokenId));
 
     // Group siblings by siblingGroup (preserving order of first occurrence)
     const fanOutGroupMap = new Map<string, typeof fanOutSiblings>();
@@ -897,8 +898,9 @@ export class WorkflowVerifier {
     const branchOutputs = new Map<string, Record<string, unknown>>();
     const branchWrites = this.trace.branches.writes();
     for (const bw of branchWrites) {
-      if (bw.tokenId && siblingIds.has(bw.tokenId)) {
-        branchOutputs.set(bw.tokenId, bw.payload.output as Record<string, unknown>);
+      const tokenId = bw.payload.tokenId;
+      if (tokenId && siblingIds.has(tokenId)) {
+        branchOutputs.set(tokenId, bw.payload.output as Record<string, unknown>);
       }
     }
 
@@ -956,7 +958,7 @@ export class WorkflowVerifier {
     this._diagnostics = {
       input: this.input,
       tokenCreations: tokenCreations.map((tc) => ({
-        tokenId: tc.tokenId,
+        tokenId: tc.payload.tokenId ?? null,
         pathId: tc.payload.pathId,
         parentId: tc.payload.parentTokenId,
         siblingGroup: tc.payload.siblingGroup,
@@ -975,7 +977,7 @@ export class WorkflowVerifier {
         .map(([path, { value, sequence }]) => ({ path, value, sequence }))
         .sort((a, b) => a.sequence - b.sequence),
       branchWrites: this.trace.branches.writes().map((bw) => ({
-        tokenId: bw.tokenId,
+        tokenId: bw.payload.tokenId ?? null,
         output: bw.payload.output,
       })),
       finalOutput: ctx.collected.finalOutput,

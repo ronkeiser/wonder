@@ -1,70 +1,54 @@
 // services/events/src/types.ts
 
 import type { InferInsertModel, InferSelectModel } from 'drizzle-orm';
-import type { traceEvents, workflowEvents } from './schema';
+import type { events, traceEvents } from './schema';
 
 /**
- * Workflow event types for execution tracking
+ * Execution type discriminator
+ */
+export type ExecutionType = 'workflow' | 'conversation';
+
+/**
+ * Event types - domain-specific, not restricted at the infrastructure level
  *
  * Naming convention: category.action (dot notation)
+ *
+ * Workflow events:
  * - workflow.* - Workflow lifecycle events
  * - task.* - Task execution events
  * - token.* - Token lifecycle events
  * - context.* - Context state changes
  * - fan_out.* / fan_in.* - Parallel execution events
- * - branches.* - Branch merge events
+ *
+ * Conversation events:
+ * - conversation.* - Conversation lifecycle
+ * - turn.* - Turn lifecycle
+ * - message.* - Message events
+ * - tool.* - Tool execution
+ * - memory.* - Memory extraction
  */
-export type EventType =
-  // Workflow lifecycle
-  | 'workflow.started'
-  | 'workflow.completed'
-  | 'workflow.failed'
-  // Task execution
-  | 'task.dispatched'
-  | 'task.completed'
-  | 'task.failed'
-  // Token lifecycle
-  | 'token.created'
-  | 'token.completed'
-  | 'token.failed'
-  | 'token.waiting'
-  // Context updates
-  | 'context.updated'
-  | 'context.output_applied'
-  // Fan-out/Fan-in
-  | 'fan_out.started'
-  | 'fan_in.completed'
-  | 'branches.merged'
-  // Sub-workflows
-  | 'subworkflow.started'
-  | 'subworkflow.completed'
-  | 'subworkflow.failed'
-  // Actions (LLM calls)
-  | 'llm.started'
-  | 'llm.completed'
-  | 'llm.failed';
+export type EventType = string;
 
 /**
- * Context required for emitting events - provided by coordinator
+ * Context required for emitting events
+ *
+ * Generic execution context - domain-specific fields go in metadata.
  */
 export interface EventContext {
-  workflowRunId: string;
-  rootRunId: string; // Top-level run ID for unified timeline queries
+  streamId: string; // Outer boundary (conversationId or rootRunId)
+  executionId: string; // Specific execution (workflowRunId, turnId, etc.)
+  executionType: ExecutionType;
   projectId: string;
-  workflowDefId: string;
 }
 
 /**
  * Input for emitting an event - caller provides event data
+ *
+ * All domain-specific fields (nodeId, tokenId, costUsd, etc.) go in metadata.
  */
 export interface EventInput {
-  eventType: EventType | string; // Allow custom event types
+  eventType: EventType;
   sequence?: number;
-  nodeId?: string | null;
-  tokenId?: string | null;
-  pathId?: string | null;
-  tokens?: number | null; // For LLM calls
-  costUsd?: number | null; // For LLM calls
   message?: string | null;
   metadata?: Record<string, unknown>;
 }
@@ -72,12 +56,12 @@ export interface EventInput {
 /**
  * Event entry for inserting into D1
  */
-export type EventEntry = InferInsertModel<typeof workflowEvents>;
+export type EventEntry = InferInsertModel<typeof events>;
 
 /**
  * Event entry as selected from D1
  */
-export type EventRow = InferSelectModel<typeof workflowEvents>;
+export type EventRow = InferSelectModel<typeof events>;
 
 /**
  * Event entry with parsed metadata for WebSocket broadcasting
@@ -90,12 +74,11 @@ export type BroadcastEventEntry = Omit<EventEntry, 'metadata'> & {
  * Options for querying events
  */
 export interface GetEventsOptions {
-  workflowRunId?: string;
-  rootRunId?: string; // Query all events in a workflow run tree
+  streamId?: string; // Outer boundary (conversationId or rootRunId)
+  executionId?: string; // Specific execution (workflowRunId, turnId, etc.)
+  executionType?: ExecutionType;
   projectId?: string;
   eventType?: string;
-  nodeId?: string;
-  tokenId?: string;
   limit?: number;
   afterSequence?: number; // For replay from checkpoint
 }
@@ -109,15 +92,13 @@ export interface Emitter {
 }
 
 /**
- * Trace event categories - extracted from type prefix for fast filtering
+ * Trace event category - extracted from type prefix for fast filtering
+ *
+ * Free-form string. Conventions by execution type:
+ * - Workflows: 'decision', 'operation', 'dispatch', 'sql', 'debug', 'executor'
+ * - Conversations: 'turn', 'tool', 'memory', 'llm', etc.
  */
-export type TraceEventCategory =
-  | 'decision'
-  | 'operation'
-  | 'dispatch'
-  | 'sql'
-  | 'debug'
-  | 'executor';
+export type TraceEventCategory = string;
 
 /**
  * Generic trace event input
@@ -125,48 +106,39 @@ export type TraceEventCategory =
  * Convention: type = `{category}.{domain}.{action}`
  * Examples: 'decision.routing.start', 'operation.tokens.created', 'sql.query'
  *
- * Indexed fields (promoted to DB columns): tokenId, nodeId, durationMs
- * Payload: Event-specific data, stored as JSON blob
+ * All domain-specific data (tokenId, nodeId, etc.) goes in payload.
+ * Only durationMs is promoted to a DB column for performance filtering.
  */
 export interface TraceEventInput {
   /** Event type following {category}.{domain}.{action} convention */
-  type: `${TraceEventCategory}.${string}`;
-
-  /** Execution context (promoted to indexed DB columns) */
-  tokenId?: string;
-  nodeId?: string;
+  type: string;
 
   /** Performance tracking (promoted to indexed DB column) */
   durationMs?: number;
 
-  /** Event-specific data (stored as JSON blob) */
+  /** Event-specific data including domain context (tokenId, nodeId, etc.) */
   payload?: Record<string, unknown>;
 }
 
 /**
  * Extract category from event type string
+ *
+ * Convention: type = '{category}.{domain}.{action}'
+ * Returns the first segment before the first dot.
  */
-export function getEventCategory(type: string): TraceEventCategory {
-  const category = type.split('.')[0];
-  if (
-    category === 'decision' ||
-    category === 'operation' ||
-    category === 'dispatch' ||
-    category === 'sql' ||
-    category === 'debug' ||
-    category === 'executor'
-  ) {
-    return category;
-  }
-  return 'operation'; // Default fallback
+export function getEventCategory(type: string): string {
+  return type.split('.')[0] || 'unknown';
 }
 
 /**
  * Context required for emitting trace events
+ *
+ * Same as EventContext - generic execution context.
  */
 export interface TraceEventContext {
-  workflowRunId: string;
-  rootRunId: string;
+  streamId: string;
+  executionId: string;
+  executionType: ExecutionType;
   projectId: string;
 }
 
@@ -191,10 +163,9 @@ export type BroadcastTraceEventEntry = Omit<TraceEventEntry, 'payload'> & {
  * Options for querying trace events
  */
 export interface GetTraceEventsOptions {
-  workflowRunId?: string;
-  rootRunId?: string; // Query all trace events in a workflow run tree
-  tokenId?: string;
-  nodeId?: string;
+  streamId?: string; // Outer boundary (conversationId or rootRunId)
+  executionId?: string; // Specific execution (workflowRunId, turnId, etc.)
+  executionType?: ExecutionType;
   type?: string;
   category?: TraceEventCategory;
   projectId?: string;
@@ -219,14 +190,12 @@ export interface TraceEventEmitter {
  * Filter for server-side event filtering on WebSocket subscriptions
  */
 export interface SubscriptionFilter {
-  workflowRunId?: string;
-  rootRunId?: string; // Subscribe to all events in a workflow run tree
+  streamId?: string; // Outer boundary (conversationId or rootRunId)
+  executionId?: string; // Specific execution (workflowRunId, turnId, etc.)
+  executionType?: ExecutionType;
   projectId?: string;
   eventType?: string;
   eventTypes?: string[];
-  nodeId?: string;
-  tokenId?: string;
-  pathId?: string;
   category?: TraceEventCategory;
   type?: string;
   minDurationMs?: number;
@@ -252,23 +221,44 @@ export interface Subscription {
 }
 
 // ============================================================================
-// EventHub Types (Workflow Lifecycle)
+// EventHub Types (Execution Lifecycle)
 // ============================================================================
 
 /**
- * Workflow run status values
+ * Execution status values (generic for workflows and conversations)
  */
-export type WorkflowRunStatus = 'running' | 'completed' | 'failed' | 'waiting';
+export type ExecutionStatus = 'running' | 'completed' | 'failed' | 'waiting';
 
 /**
  * Status change notification payload
+ *
+ * Generic execution context. Domain-specific IDs:
+ * - Workflows: definitionId = workflowDefId
+ * - Conversations: definitionId = agentId
  */
-export interface WorkflowStatusChange {
-  workflowRunId: string;
-  workflowDefId: string;
+export interface ExecutionStatusChange {
+  /** Execution type discriminator */
+  executionType: ExecutionType;
+
+  /** Outer boundary (conversationId or rootRunId) */
+  streamId: string;
+
+  /** Specific execution (workflowRunId, turnId, etc.) */
+  executionId: string;
+
+  /** Definition ID (workflowDefId for workflows, agentId for conversations) */
+  definitionId: string;
+
+  /** Project ID */
   projectId: string;
-  parentRunId: string | null;
-  status: WorkflowRunStatus;
+
+  /** Parent execution ID (for subworkflows) */
+  parentExecutionId: string | null;
+
+  /** Current status */
+  status: ExecutionStatus;
+
+  /** Timestamp of status change */
   timestamp: number;
 }
 
@@ -276,9 +266,10 @@ export interface WorkflowStatusChange {
  * Subscription filter for hub events
  */
 export interface HubSubscriptionFilter {
+  executionType?: ExecutionType;
   projectId?: string;
-  workflowDefId?: string;
-  status?: WorkflowRunStatus;
+  definitionId?: string;
+  status?: ExecutionStatus;
 }
 
 /**

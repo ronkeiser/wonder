@@ -5,29 +5,31 @@
  * Types match exactly what the coordinator emits - no remapping.
  *
  * Event structure:
- * - Top-level: type, token_id, node_id, durationMs, sequence, timestamp, category
- * - payload: Event-specific data (varies by event type)
+ * - Top-level: type, streamId, executionId, executionType, durationMs, sequence, timestamp, category
+ * - payload: Event-specific data (varies by event type), includes tokenId and nodeId for workflow events
  */
 
-import type { components } from './generated/schema';
+import type { TraceEventEntry } from '@wonder/sdk';
 
-export type TraceEventEntry = components['schemas']['TraceEventEntry'];
+export type { TraceEventEntry };
 
 /**
  * Typed trace event with known payload structure.
- * Top-level fields (token_id, node_id) come from TraceEventEntry.
- * Payload contains event-specific data.
+ * Payload contains event-specific data plus tokenId/nodeId for filtering.
  */
 export interface TypedTraceEvent<TPayload = Record<string, unknown>> extends Omit<
   TraceEventEntry,
   'payload'
 > {
-  payload: TPayload;
+  payload: TPayload & {
+    tokenId?: string;
+    nodeId?: string;
+  };
 }
 
 /**
  * Trace event payload types - matches exactly what coordinator emits in payload.
- * Top-level fields (token_id, node_id) are NOT duplicated here.
+ * tokenId and nodeId are now included in payload for workflow events.
  */
 export namespace TracePayloads {
   // Context operations
@@ -70,7 +72,6 @@ export namespace TracePayloads {
   }
 
   // Branch operations
-  // Note: token_id is a TOP-LEVEL field on these events, not in the payload
   export interface BranchTableCreate {
     tableName: string;
     schemaType: string;
@@ -101,7 +102,7 @@ export namespace TracePayloads {
     branchCount: number;
   }
 
-  // Token operations - token_id and node_id are TOP LEVEL, not in payload
+  // Token operations
   export interface TokenCreatedPayload {
     taskId: string;
     parentTokenId: string | null;
@@ -284,7 +285,7 @@ export class TraceEventCollection {
   /**
    * Filter events by category
    */
-  byCategory(category: 'decision' | 'operation' | 'dispatch' | 'sql'): TypedTraceEvent[] {
+  byCategory(category: string): TypedTraceEvent[] {
     return this.events.filter((e) => e.category === category);
   }
 
@@ -292,24 +293,24 @@ export class TraceEventCollection {
    * Filter events by token
    */
   byToken(tokenId: string): TypedTraceEvent[] {
-    return this.events.filter((e) => e.tokenId === tokenId);
+    return this.events.filter((e) => e.payload.tokenId === tokenId);
   }
 
   /**
    * Filter events by node
    */
   byNode(nodeId: string): TypedTraceEvent[] {
-    return this.events.filter((e) => e.nodeId === nodeId);
+    return this.events.filter((e) => e.payload.nodeId === nodeId);
   }
 
   /**
    * Filter events to only include root workflow events (excludes subworkflow events).
-   * Root events have workflowRunId === rootRunId.
+   * Root events have executionId === streamId (no outer context).
    */
   rootOnly(): TypedTraceEvent[] {
     return this.events.filter((e) => {
       const entry = e as TraceEventEntry;
-      return entry.workflowRunId === entry.rootRunId;
+      return entry.executionId === entry.streamId;
     });
   }
 
@@ -459,8 +460,8 @@ export class TraceEventCollection {
   /**
    * Token operations
    *
-   * Note: token_id and node_id are TOP-LEVEL fields on the event,
-   * not inside payload. Access via event.tokenId, event.nodeId.
+   * Note: tokenId and nodeId are in the payload.
+   * Access via event.payload.tokenId, event.payload.nodeId.
    */
   get tokens() {
     const self = this;
@@ -473,9 +474,8 @@ export class TraceEventCollection {
         return this.creates();
       },
       created(tokenId: string): TypedTraceEvent<TracePayloads.TokenCreatedPayload> | undefined {
-        // token_id is top-level, not in payload
         return self.findWhere(
-          (e) => e.type === 'operation.tokens.created' && e.tokenId === tokenId,
+          (e) => e.type === 'operation.tokens.created' && e.payload.tokenId === tokenId,
         ) as TypedTraceEvent<TracePayloads.TokenCreatedPayload> | undefined;
       },
       statusUpdates(): TypedTraceEvent<TracePayloads.TokenStatusUpdatedPayload>[] {
@@ -484,10 +484,9 @@ export class TraceEventCollection {
         );
       },
       statusTransitions(tokenId: string): string[] {
-        // token_id is top-level, not in payload
         const updates = self
           .filter<TracePayloads.TokenStatusUpdatedPayload>('operation.tokens.status_updated')
-          .filter((e) => e.tokenId === tokenId)
+          .filter((e) => e.payload.tokenId === tokenId)
           .sort((a, b) => a.sequence - b.sequence);
         if (updates.length === 0) return [];
         // Return list of status names in order
@@ -504,7 +503,7 @@ export class TraceEventCollection {
       ): TypedTraceEvent<TracePayloads.TokenStatusUpdatedPayload> | undefined {
         return self
           .filter<TracePayloads.TokenStatusUpdatedPayload>('operation.tokens.status_updated')
-          .find((e) => e.tokenId === tokenId && e.payload.to === toStatus);
+          .find((e) => e.payload.tokenId === tokenId && e.payload.to === toStatus);
       },
     };
   }
@@ -671,7 +670,7 @@ export class TraceEventCollection {
       },
       taskDispatch(tokenId: string): TypedTraceEvent | undefined {
         return self.findWhere(
-          (e) => e.type === 'dispatch.task.inputMapping.applied' && e.tokenId === tokenId,
+          (e) => e.type === 'dispatch.task.inputMapping.applied' && e.payload.tokenId === tokenId,
         );
       },
       /** Get all dispatch.task.sent events (task dispatched to executor) */
@@ -680,7 +679,7 @@ export class TraceEventCollection {
       },
       /** Get dispatch.task.sent event for a specific token */
       send(tokenId: string): TypedTraceEvent<TracePayloads.TaskSent> | undefined {
-        return self.findWhere((e) => e.type === 'dispatch.task.sent' && e.tokenId === tokenId) as
+        return self.findWhere((e) => e.type === 'dispatch.task.sent' && e.payload.tokenId === tokenId) as
           | TypedTraceEvent<TracePayloads.TaskSent>
           | undefined;
       },
@@ -706,7 +705,7 @@ export class TraceEventCollection {
       /** Get executor.task.started event for a specific token */
       taskStart(tokenId: string): TypedTraceEvent<TracePayloads.ExecutorTaskStarted> | undefined {
         return self.findWhere(
-          (e) => e.type === 'executor.task.started' && e.tokenId === tokenId,
+          (e) => e.type === 'executor.task.started' && e.payload.tokenId === tokenId,
         ) as TypedTraceEvent<TracePayloads.ExecutorTaskStarted> | undefined;
       },
       /** Get all executor.task.completed events */
@@ -718,7 +717,7 @@ export class TraceEventCollection {
         tokenId: string,
       ): TypedTraceEvent<TracePayloads.ExecutorTaskCompleted> | undefined {
         return self.findWhere(
-          (e) => e.type === 'executor.task.completed' && e.tokenId === tokenId,
+          (e) => e.type === 'executor.task.completed' && e.payload.tokenId === tokenId,
         ) as TypedTraceEvent<TracePayloads.ExecutorTaskCompleted> | undefined;
       },
       /** Get all executor.step.started events */
@@ -729,7 +728,7 @@ export class TraceEventCollection {
       stepStartsFor(tokenId: string): TypedTraceEvent<TracePayloads.ExecutorStepStarted>[] {
         return self
           .filter<TracePayloads.ExecutorStepStarted>('executor.step.started')
-          .filter((e) => e.tokenId === tokenId);
+          .filter((e) => e.payload.tokenId === tokenId);
       },
       /** Get all executor.step.completed events */
       stepCompletions(): TypedTraceEvent<TracePayloads.ExecutorStepCompleted>[] {
@@ -739,7 +738,7 @@ export class TraceEventCollection {
       stepCompletionsFor(tokenId: string): TypedTraceEvent<TracePayloads.ExecutorStepCompleted>[] {
         return self
           .filter<TracePayloads.ExecutorStepCompleted>('executor.step.completed')
-          .filter((e) => e.tokenId === tokenId);
+          .filter((e) => e.payload.tokenId === tokenId);
       },
       /** Get all executor.action.started events */
       actionStarts(): TypedTraceEvent<TracePayloads.ExecutorActionStarted>[] {
@@ -749,7 +748,7 @@ export class TraceEventCollection {
       actionStartsFor(tokenId: string): TypedTraceEvent<TracePayloads.ExecutorActionStarted>[] {
         return self
           .filter<TracePayloads.ExecutorActionStarted>('executor.action.started')
-          .filter((e) => e.tokenId === tokenId);
+          .filter((e) => e.payload.tokenId === tokenId);
       },
       /** Get all executor.action.completed events */
       actionCompletions(): TypedTraceEvent<TracePayloads.ExecutorActionCompleted>[] {
@@ -761,7 +760,7 @@ export class TraceEventCollection {
       ): TypedTraceEvent<TracePayloads.ExecutorActionCompleted>[] {
         return self
           .filter<TracePayloads.ExecutorActionCompleted>('executor.action.completed')
-          .filter((e) => e.tokenId === tokenId);
+          .filter((e) => e.payload.tokenId === tokenId);
       },
       /** Get all executor.action.failed events */
       actionFailures(): TypedTraceEvent<TracePayloads.ExecutorActionFailed>[] {
@@ -776,7 +775,7 @@ export class TraceEventCollection {
         tokenId: string,
       ): TypedTraceEvent<TracePayloads.ExecutorMockGenerated> | undefined {
         return self.findWhere(
-          (e) => e.type === 'executor.mock.generated' && e.tokenId === tokenId,
+          (e) => e.type === 'executor.mock.generated' && e.payload.tokenId === tokenId,
         ) as TypedTraceEvent<TracePayloads.ExecutorMockGenerated> | undefined;
       },
     };

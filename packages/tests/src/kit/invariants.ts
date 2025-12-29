@@ -4,7 +4,7 @@
  * Universal assertions that must hold for every workflow run.
  */
 
-import { TraceEventCollection } from '@wonder/sdk';
+import { TraceEventCollection } from './trace';
 import { expect } from 'vitest';
 
 interface InvariantOptions {
@@ -27,7 +27,7 @@ export function assertInvariants(
   if (!options.allowNonTerminalTokens) {
     const terminalStates = ['completed', 'failed', 'cancelled', 'timed_out'];
     for (const creation of trace.tokens.creations()) {
-      const tokenId = creation.tokenId;
+      const tokenId = creation.payload.tokenId;
       expect(tokenId, 'Token creation must have tokenId').toBeDefined();
       const statuses = trace.tokens.statusTransitions(tokenId!);
       const finalStatus = statuses.at(-1);
@@ -46,13 +46,13 @@ export function assertInvariants(
   ).toBe(true);
 
   // 3. Every non-root token has a parent that was created
-  const createdIds = new Set(trace.tokens.creations().map((c) => c.tokenId));
+  const createdIds = new Set(trace.tokens.creations().map((c) => c.payload.tokenId));
   for (const creation of trace.tokens.creations()) {
     const parentId = creation.payload.parentTokenId;
     if (parentId) {
       expect(
         createdIds,
-        `Token ${creation.tokenId} references parent ${parentId} that was never created`,
+        `Token ${creation.payload.tokenId} references parent ${parentId} that was never created`,
       ).toContain(parentId);
     }
   }

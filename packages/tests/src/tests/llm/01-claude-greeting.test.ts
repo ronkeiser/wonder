@@ -149,7 +149,7 @@ describe('LLM: 01 - Claude Greeting', () => {
     expect(tokenCreations, 'Exactly one token should be created').toHaveLength(1);
 
     const rootToken = tokenCreations[0];
-    const tokenId = rootToken.tokenId!;
+    const tokenId = rootToken.payload.tokenId!;
 
     const statuses = trace.tokens.statusTransitions(tokenId);
     expect(statuses).toEqual(['pending', 'dispatched', 'executing', 'completed']);

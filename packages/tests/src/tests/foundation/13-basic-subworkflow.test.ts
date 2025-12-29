@@ -192,7 +192,7 @@ describe('Foundation: 13 - Basic Sub-Workflow', () => {
     const tokenCreations = trace.tokens.creations();
     expect(tokenCreations).toHaveLength(2);
 
-    const rootTokenId = tokenCreations[0].tokenId!;
+    const rootTokenId = tokenCreations[0].payload.tokenId!;
     const statuses = trace.tokens.statusTransitions(rootTokenId);
 
     // Token should have: pending → dispatched → waiting_for_subworkflow → completed

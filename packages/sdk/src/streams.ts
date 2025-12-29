@@ -1,9 +1,8 @@
 /**
- * WebSocket client for streaming workflow and trace events
+ * WebSocket client for real-time event streaming
  */
 
-import type { Client } from 'openapi-fetch';
-import type { components, paths } from './generated/schema';
+import type { components } from './generated/schema';
 
 const WS_MESSAGE_TYPE = {
   SUBSCRIBE: 'subscribe',
@@ -13,30 +12,25 @@ const WS_MESSAGE_TYPE = {
 } as const;
 
 export interface SubscriptionFilter {
-  // Workflow execution context
-  workflowRunId?: string;
-  parentRunId?: string;
-  workspaceId?: string;
+  // Generic execution context
+  streamId?: string; // Outer boundary (conversationId or rootRunId)
+  executionId?: string; // Specific execution (workflowRunId, turnId, etc.)
+  executionType?: 'workflow' | 'conversation';
   projectId?: string;
 
   // Event classification
   eventType?: string;
   eventTypes?: string[];
 
-  // Execution elements
-  nodeId?: string;
-  tokenId?: string;
-  pathId?: string;
-
   // Trace event specific
-  category?: 'decision' | 'operation' | 'dispatch' | 'sql';
+  category?: string;
   type?: string;
   minDurationMs?: number;
 }
 
-export interface EventStreamSubscription {
+export interface StreamSubscription {
   close(): void;
-  onEvent(callback: (event: WorkflowEvent) => void): void;
+  onEvent(callback: (event: StreamEvent) => void): void;
   onError(callback: (error: Error) => void): void;
 }
 
@@ -44,10 +38,10 @@ export interface Subscription {
   id: string;
   stream: 'events' | 'trace';
   filters: SubscriptionFilter;
-  callback: (event: WorkflowEvent) => void;
+  callback: (event: StreamEvent) => void;
 }
 
-export type WorkflowEvent =
+export type StreamEvent =
   | components['schemas']['EventEntry']
   | components['schemas']['TraceEventEntry'];
 
@@ -55,7 +49,7 @@ interface WebSocketMessage {
   type: string;
   stream?: 'events' | 'trace';
   subscriptionId?: string;
-  event?: WorkflowEvent;
+  event?: StreamEvent;
   message?: string;
 }
 
@@ -67,29 +61,16 @@ interface SubscriptionMessage {
 }
 
 /**
- * Events client for HTTP queries and WebSocket subscriptions
+ * WebSocket client for real-time event streaming
  *
- * Provides both snapshot queries (HTTP) and real-time streaming (WebSocket)
- * for workflow events and trace events.
+ * Connects to per-stream Streamer DOs for live event delivery.
+ * For HTTP queries, use the generated client directly (sdk.events.list()).
  */
-export class EventsClient {
+export class StreamsClient {
   private wsUrl: string;
-  private sdk: Client<paths>;
 
-  // HTTP query method from generated client
-  list: (
-    options?: paths['/events']['get']['parameters']['query'],
-  ) => Promise<paths['/events']['get']['responses']['200']['content']['application/json']>;
-
-  constructor(baseUrl: string, sdk: Client<paths>) {
+  constructor(baseUrl: string) {
     this.wsUrl = this.convertToWebSocketUrl(baseUrl);
-    this.sdk = sdk;
-
-    // Bind the HTTP list method
-    this.list = async (options?) => {
-      const response = await this.sdk.GET('/events', { params: { query: options || {} } });
-      return response.data!;
-    };
   }
 
   private convertToWebSocketUrl(httpUrl: string): string {
@@ -99,22 +80,22 @@ export class EventsClient {
   private sendSubscriptionMessage(ws: WebSocket, message: SubscriptionMessage): void {
     try {
       ws.send(JSON.stringify(message));
-    } catch (error) {
+    } catch {
       // Ignore errors during message send (WebSocket may be closing)
     }
   }
 
   private handleWebSocketMessage(
     data: WebSocketMessage,
-    callbacks: Map<string, (event: WorkflowEvent) => void>,
-    eventCallbacks: Array<(event: WorkflowEvent) => void>,
+    callbacks: Map<string, (event: StreamEvent) => void>,
+    eventCallbacks: Array<(event: StreamEvent) => void>,
     errorCallbacks: Array<(error: Error) => void>,
   ): void {
     if (data.type === WS_MESSAGE_TYPE.EVENT) {
       if (!data.event) return;
 
-      // Attach stream property to event for routing in workflows.ts
-      const eventWithStream = { ...data.event, stream: data.stream } as WorkflowEvent & {
+      // Attach stream property to event for routing
+      const eventWithStream = { ...data.event, stream: data.stream } as StreamEvent & {
         stream?: 'events' | 'trace';
       };
 
@@ -138,18 +119,15 @@ export class EventsClient {
    * Subscribe to event/trace stream via WebSocket with server-side filtering
    *
    * @param subscriptions - Array of subscriptions to create
-   * @param workflowRunId - Required workflow run ID to connect to the per-run Streamer DO
+   * @param streamId - Required stream ID to connect to the per-stream Streamer DO
    */
-  async subscribe(
-    subscriptions: Subscription[],
-    workflowRunId: string,
-  ): Promise<EventStreamSubscription> {
-    const url = `${this.wsUrl}/workflow-runs/${workflowRunId}/stream`;
+  async subscribe(subscriptions: Subscription[], streamId: string): Promise<StreamSubscription> {
+    const url = `${this.wsUrl}/streams/${streamId}`;
     const ws = new WebSocket(url);
 
     const callbacks = new Map(subscriptions.map((s) => [s.id, s.callback]));
     const errorCallbacks: Array<(error: Error) => void> = [];
-    const eventCallbacks: Array<(event: WorkflowEvent) => void> = [];
+    const eventCallbacks: Array<(event: StreamEvent) => void> = [];
 
     // Wait for connection to open
     await new Promise<void>((resolve, reject) => {
@@ -176,8 +154,8 @@ export class EventsClient {
       try {
         const data: WebSocketMessage = JSON.parse(event.data);
         this.handleWebSocketMessage(data, callbacks, eventCallbacks, errorCallbacks);
-      } catch (error) {
-        console.error('Error parsing WebSocket message:', error);
+      } catch {
+        // Ignore parse errors
       }
     });
 
@@ -201,11 +179,4 @@ export class EventsClient {
       onError: (callback) => errorCallbacks.push(callback),
     };
   }
-}
-
-/**
- * Create events client
- */
-export function createEventsClient(baseUrl: string, sdk: Client<paths>): EventsClient {
-  return new EventsClient(baseUrl, sdk);
 }

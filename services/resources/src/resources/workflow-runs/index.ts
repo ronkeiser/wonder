@@ -160,10 +160,12 @@ export class WorkflowRuns extends Resource {
         const hubId = eventHub.idFromName('global');
         const hubStub = eventHub.get(hubId);
         hubStub.notifyStatusChange({
-          workflowRunId: workflowRunId,
-          workflowDefId: workflowRun.workflowDefId,
+          executionType: 'workflow',
+          streamId: workflowRun.rootRunId,
+          executionId: workflowRunId,
+          definitionId: workflowRun.workflowDefId,
           projectId: workflowRun.projectId,
-          parentRunId: workflowRun.parentRunId,
+          parentExecutionId: workflowRun.parentRunId,
           status,
           timestamp: Date.now(),
         });
@@ -214,10 +216,12 @@ export class WorkflowRuns extends Resource {
         const hubId = eventHub.idFromName('global');
         const hubStub = eventHub.get(hubId);
         hubStub.notifyStatusChange({
-          workflowRunId: id,
-          workflowDefId: workflowRun.workflowDefId,
+          executionType: 'workflow',
+          streamId: workflowRun.rootRunId,
+          executionId: id,
+          definitionId: workflowRun.workflowDefId,
           projectId: workflowRun.projectId,
-          parentRunId: workflowRun.parentRunId,
+          parentExecutionId: workflowRun.parentRunId,
           status: 'completed',
           timestamp: Date.now(),
         });

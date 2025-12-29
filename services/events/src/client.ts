@@ -23,10 +23,13 @@ export interface Emitter {
 }
 
 /**
- * Create an emitter bound to a specific workflow context
+ * Create an emitter bound to a specific execution context
  *
  * Context can be provided directly or as a function for lazy evaluation.
  * Use a function when context isn't available at creation time (e.g., coordinator DO).
+ *
+ * The Streamer DO is keyed by streamId, which is the outer execution boundary
+ * (conversationId for conversations, rootRunId for standalone workflows).
  *
  * @param streamer - DurableObjectNamespace for Streamer DO
  * @param context - Event context or function returning context (lazy)
@@ -44,7 +47,6 @@ export function createEmitter(
   // Cached context and stub (lazy initialized on first emit)
   let cached: {
     context: EventContext;
-    traceContext: { workflowRunId: string; rootRunId: string; projectId: string };
     stub: StreamerStub;
   } | null = null;
 
@@ -53,12 +55,8 @@ export function createEmitter(
       const ctx = typeof context === 'function' ? context() : context;
       cached = {
         context: ctx,
-        traceContext: {
-          workflowRunId: ctx.workflowRunId,
-          rootRunId: ctx.rootRunId,
-          projectId: ctx.projectId,
-        },
-        stub: streamer.get(streamer.idFromName(ctx.rootRunId)),
+        // Key the Streamer DO by streamId (outer execution boundary)
+        stub: streamer.get(streamer.idFromName(ctx.streamId)),
       };
     }
     return cached;
@@ -73,10 +71,10 @@ export function createEmitter(
     emitTrace: (event) => {
       if (!traceEnabled) return;
 
-      const { traceContext, stub } = getCache();
+      const { context: ctx, stub } = getCache();
       const events = Array.isArray(event) ? event : [event];
       for (const evt of events) {
-        stub.emitTrace(traceContext, evt);
+        stub.emitTrace(ctx, evt);
       }
     },
 

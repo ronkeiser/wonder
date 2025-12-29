@@ -15,6 +15,10 @@
  * await cleanup();
  */
 
+// Trace event utilities (moved from SDK - test-specific)
+export { parseTraceEvents, TraceEventCollection } from './trace';
+export type { TraceEventEntry, TracePayloads, TypedTraceEvent } from './trace';
+
 // All types from root types.ts
 export type {
   CreatedResources,

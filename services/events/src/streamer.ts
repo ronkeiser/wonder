@@ -2,7 +2,7 @@ import { createLogger, type Logger } from '@wonder/logs';
 import { DurableObject } from 'cloudflare:workers';
 import { drizzle } from 'drizzle-orm/d1';
 import { ulid } from 'ulid';
-import { traceEvents, workflowEvents } from './schema';
+import { events, traceEvents } from './schema';
 import type {
   BroadcastEventEntry,
   BroadcastTraceEventEntry,
@@ -27,10 +27,10 @@ const ROWS_PER_INSERT = 7;
 const MAX_RETRY_ATTEMPTS = 3;
 
 /**
- * Streamer Durable Object - one instance per workflow_run_id
+ * Streamer Durable Object - one instance per streamId (conversationId or rootRunId)
  *
  * Responsibilities:
- * - Assigns sequences atomically (single-threaded per workflow)
+ * - Assigns sequences atomically (single-threaded per stream)
  * - Buffers and batches events for efficient D1 writes
  * - Broadcasts events to WebSocket subscribers immediately
  * - Manages WebSocket connections for real-time streaming
@@ -110,21 +110,24 @@ export class Streamer extends DurableObject<Env> {
    * Called by coordinator/executor via RPC. Assigns sequence, buffers for D1,
    * and broadcasts immediately to WebSocket subscribers.
    */
-  emitTrace(
-    context: { workflowRunId: string; rootRunId: string; projectId: string },
-    input: TraceEventInput,
-  ): void {
+  emitTrace(context: EventContext, input: TraceEventInput): void {
     this.traceSeq++;
     this.ctx.storage.put('traceSeq', this.traceSeq);
+
+    const payload = input.payload ?? {};
 
     const entry: TraceEventEntry = {
       id: ulid(),
       timestamp: Date.now(),
       sequence: this.traceSeq,
+      streamId: context.streamId,
+      executionId: context.executionId,
+      executionType: context.executionType,
+      projectId: context.projectId,
+      type: input.type,
       category: getEventCategory(input.type),
-      ...context,
-      ...input,
-      payload: JSON.stringify(input.payload ?? {}),
+      durationMs: input.durationMs,
+      payload: JSON.stringify(payload),
     };
 
     // Buffer for batched D1 write (persisted to survive hibernation)
@@ -135,7 +138,7 @@ export class Streamer extends DurableObject<Env> {
     // Broadcast immediately to WebSocket subscribers
     this.broadcastTraceEvent({
       ...entry,
-      payload: input.payload ?? {},
+      payload,
     });
   }
 
@@ -186,7 +189,7 @@ export class Streamer extends DurableObject<Env> {
 
       // Build insert statements for events and traces (chunked for efficiency)
       const eventStatements = chunkArray(eventBatch, ROWS_PER_INSERT).map((chunk) =>
-        db.insert(workflowEvents).values(chunk),
+        db.insert(events).values(chunk),
       );
       const traceStatements = chunkArray(traceBatch, ROWS_PER_INSERT).map((chunk) =>
         db.insert(traceEvents).values(chunk),
@@ -369,23 +372,20 @@ function chunkArray<T>(array: T[], size: number): T[][] {
 }
 
 function matchesEventFilter(event: BroadcastEventEntry, filter: SubscriptionFilter): boolean {
-  if (filter.workflowRunId && event.workflowRunId !== filter.workflowRunId) return false;
-  if (filter.rootRunId && event.rootRunId !== filter.rootRunId) return false;
+  if (filter.streamId && event.streamId !== filter.streamId) return false;
+  if (filter.executionId && event.executionId !== filter.executionId) return false;
+  if (filter.executionType && event.executionType !== filter.executionType) return false;
   if (filter.projectId && event.projectId !== filter.projectId) return false;
-  if (filter.nodeId && event.nodeId !== filter.nodeId) return false;
-  if (filter.tokenId && event.tokenId !== filter.tokenId) return false;
-  if (filter.pathId && event.pathId !== filter.pathId) return false;
   if (filter.eventType && event.eventType !== filter.eventType) return false;
   if (filter.eventTypes && !filter.eventTypes.includes(event.eventType)) return false;
   return true;
 }
 
 function matchesTraceFilter(event: BroadcastTraceEventEntry, filter: SubscriptionFilter): boolean {
-  if (filter.workflowRunId && event.workflowRunId !== filter.workflowRunId) return false;
-  if (filter.rootRunId && event.rootRunId !== filter.rootRunId) return false;
+  if (filter.streamId && event.streamId !== filter.streamId) return false;
+  if (filter.executionId && event.executionId !== filter.executionId) return false;
+  if (filter.executionType && event.executionType !== filter.executionType) return false;
   if (filter.projectId && event.projectId !== filter.projectId) return false;
-  if (filter.tokenId && event.tokenId !== filter.tokenId) return false;
-  if (filter.nodeId && event.nodeId !== filter.nodeId) return false;
   if (filter.category && event.category !== filter.category) return false;
   if (filter.type && event.type !== filter.type) return false;
   if (

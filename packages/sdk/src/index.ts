@@ -4,10 +4,13 @@
 
 import type { Client } from 'openapi-fetch';
 import createOpenAPIClient from 'openapi-fetch';
-import { EventsClient } from './events';
 import { createClient as createGeneratedClient } from './generated/client';
-import type { paths } from './generated/schema';
-import { createWorkflowsClient } from './workflows';
+import type { components, paths } from './generated/schema';
+import { StreamsClient } from './streams';
+
+// Re-export common schema types for convenience
+export type EventEntry = components['schemas']['EventEntry'];
+export type TraceEventEntry = components['schemas']['TraceEventEntry'];
 
 export {
   action,
@@ -36,16 +39,11 @@ export {
 
 export { ApiError } from './generated/client';
 
-export { TraceEventCollection } from './trace';
+export type { StreamEvent, StreamSubscription, Subscription, SubscriptionFilter } from './streams';
 
-export type { EventEntry } from './workflows';
-
-export interface WonderClient extends Omit<ReturnType<typeof createGeneratedClient>, 'workflows'> {
-  // Events client extends generated events with WebSocket capabilities
-  events: EventsClient;
-
-  // Workflows extends generated workflows with streaming capabilities
-  workflows: ReturnType<typeof createWorkflowsClient>;
+export interface WonderClient extends ReturnType<typeof createGeneratedClient> {
+  // WebSocket streaming client
+  streams: StreamsClient;
 
   // Raw HTTP methods
   GET: Client<paths>['GET'];
@@ -56,7 +54,7 @@ export interface WonderClient extends Omit<ReturnType<typeof createGeneratedClie
 }
 
 /**
- * Create a unified Wonder API client with SDK methods, WebSocket events, and raw HTTP access
+ * Create a unified Wonder API client with SDK methods, WebSocket streaming, and raw HTTP access
  * @param baseUrl - The base URL for the API
  * @param apiKey - The API key for authentication
  */
@@ -69,18 +67,11 @@ export function createClient(
     headers: apiKey ? { 'X-API-Key': apiKey } : {},
   });
   const sdkClient = createGeneratedClient(baseClient);
-  const eventsClient = new EventsClient(baseUrl, baseClient);
-  const workflowsClient = createWorkflowsClient(
-    sdkClient.workflows,
-    baseUrl,
-    baseClient,
-    eventsClient,
-  );
+  const streamsClient = new StreamsClient(baseUrl);
 
   return {
     ...sdkClient,
-    events: eventsClient,
-    workflows: workflowsClient,
+    streams: streamsClient,
     GET: baseClient.GET.bind(baseClient),
     POST: baseClient.POST.bind(baseClient),
     PUT: baseClient.PUT.bind(baseClient),

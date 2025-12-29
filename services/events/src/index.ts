@@ -1,7 +1,7 @@
 import { WorkerEntrypoint } from 'cloudflare:workers';
 import { and, desc, eq, gte } from 'drizzle-orm';
 import { drizzle } from 'drizzle-orm/d1';
-import { traceEvents, workflowEvents } from './schema';
+import { events, traceEvents } from './schema';
 import type {
   EventRow,
   GetEventsOptions,
@@ -14,14 +14,14 @@ import type {
 export { EventHub } from './hub';
 export { Streamer } from './streamer';
 export { createEmitter, type Emitter } from './client';
-export type { EventContext, EventInput, TraceEventInput } from './types';
-export type { WorkflowStatusChange, WorkflowRunStatus } from './hub';
+export type { EventContext, EventInput, TraceEventInput, ExecutionType } from './types';
+export type { ExecutionStatus, ExecutionStatusChange } from './hub';
 
 /**
  * Events Query Service
  *
  * Provides read-only access to historical events stored in D1.
- * All event writes go through the Streamer DO (one per workflow_run_id).
+ * All event writes go through the Streamer DO (one per streamId).
  */
 export class EventsService extends WorkerEntrypoint<Env> {
   private db = drizzle(this.env.DB, { casing: 'snake_case' });
@@ -34,30 +34,25 @@ export class EventsService extends WorkerEntrypoint<Env> {
   }
 
   /**
-   * RPC method - retrieves workflow events from D1
+   * RPC method - retrieves events from D1
    */
   async getEvents(options: GetEventsOptions = {}): Promise<{ events: EventRow[] }> {
-    const events = await this.db
+    const results = await this.db
       .select()
-      .from(workflowEvents)
+      .from(events)
       .where(
         and(
-          options.workflowRunId
-            ? eq(workflowEvents.workflowRunId, options.workflowRunId)
-            : undefined,
-          options.rootRunId
-            ? eq(workflowEvents.rootRunId, options.rootRunId)
-            : undefined,
-          options.projectId ? eq(workflowEvents.projectId, options.projectId) : undefined,
-          options.eventType ? eq(workflowEvents.eventType, options.eventType) : undefined,
-          options.nodeId ? eq(workflowEvents.nodeId, options.nodeId) : undefined,
-          options.tokenId ? eq(workflowEvents.tokenId, options.tokenId) : undefined,
+          options.streamId ? eq(events.streamId, options.streamId) : undefined,
+          options.executionId ? eq(events.executionId, options.executionId) : undefined,
+          options.executionType ? eq(events.executionType, options.executionType) : undefined,
+          options.projectId ? eq(events.projectId, options.projectId) : undefined,
+          options.eventType ? eq(events.eventType, options.eventType) : undefined,
         ),
       )
-      .orderBy(desc(workflowEvents.timestamp))
+      .orderBy(desc(events.timestamp))
       .limit(options.limit || 100);
 
-    return { events };
+    return { events: results };
   }
 
   /**
@@ -71,12 +66,11 @@ export class EventsService extends WorkerEntrypoint<Env> {
       .from(traceEvents)
       .where(
         and(
-          options.workflowRunId
-            ? eq(traceEvents.workflowRunId, options.workflowRunId)
+          options.streamId ? eq(traceEvents.streamId, options.streamId) : undefined,
+          options.executionId ? eq(traceEvents.executionId, options.executionId) : undefined,
+          options.executionType
+            ? eq(traceEvents.executionType, options.executionType)
             : undefined,
-          options.rootRunId ? eq(traceEvents.rootRunId, options.rootRunId) : undefined,
-          options.tokenId ? eq(traceEvents.tokenId, options.tokenId) : undefined,
-          options.nodeId ? eq(traceEvents.nodeId, options.nodeId) : undefined,
           options.type ? eq(traceEvents.type, options.type) : undefined,
           options.category ? eq(traceEvents.category, options.category) : undefined,
           options.projectId ? eq(traceEvents.projectId, options.projectId) : undefined,
@@ -89,13 +83,13 @@ export class EventsService extends WorkerEntrypoint<Env> {
       .limit(options.limit || 1000);
 
     // Parse JSON payloads
-    const events = results.map((row) => ({
+    const parsedEvents = results.map((row) => ({
       ...row,
       category: row.category as TraceEventCategory,
       payload: typeof row.payload === 'string' ? JSON.parse(row.payload) : row.payload,
     }));
 
-    return { events };
+    return { events: parsedEvents };
   }
 }
 

@@ -131,8 +131,8 @@ describe('Foundation: 01 - Single Node Mock', () => {
       expect(tokenCreations, 'Exactly one token should be created').toHaveLength(1);
 
       const rootToken = tokenCreations[0];
-      expect(rootToken.tokenId, 'Root token must have tokenId').toBeDefined();
-      const tokenId = rootToken.tokenId!;
+      expect(rootToken.payload.tokenId, 'Root token must have tokenId').toBeDefined();
+      const tokenId = rootToken.payload.tokenId!;
 
       // Root token lineage
       expect(rootToken.payload.parentTokenId).toBeNull();
@@ -140,7 +140,7 @@ describe('Foundation: 01 - Single Node Mock', () => {
       expect(rootToken.payload.branchIndex).toBe(0);
       expect(rootToken.payload.branchTotal).toBe(1);
       expect(rootToken.payload.siblingGroup).toBeNull();
-      expect(rootToken.nodeId).toBeDefined();
+      expect(rootToken.payload.nodeId).toBeDefined();
 
       // Token state transitions
       const statuses = trace.tokens.statusTransitions(tokenId);
@@ -314,8 +314,8 @@ describe('Foundation: 01 - Single Node Mock', () => {
       // ROUTING PLANNING
       const routingPlanningStarts = trace.routing.starts();
       expect(routingPlanningStarts, 'Routing planning invoked').toHaveLength(1);
-      expect(routingPlanningStarts[0].tokenId, 'Planning for completed token').toBe(tokenId);
-      expect(routingPlanningStarts[0].nodeId, 'Planning has node context').toBeDefined();
+      expect(routingPlanningStarts[0].payload.tokenId, 'Planning for completed token').toBe(tokenId);
+      expect(routingPlanningStarts[0].payload.nodeId, 'Planning has node context').toBeDefined();
 
       // No transitions should be evaluated (workflow has no outgoing transitions)
       const transitionEvaluations = trace.routing.evaluations();

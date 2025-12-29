@@ -62,9 +62,9 @@ export async function dispatchToken(ctx: DispatchContext, tokenId: string): Prom
 
   ctx.emitter.emitTrace({
     type: 'dispatch.task.inputMapping.context',
-    tokenId: tokenId,
-    nodeId: node.id,
     payload: {
+      tokenId: tokenId,
+      nodeId: node.id,
       contextKeys: {
         input: Object.keys(context.input),
         state: Object.keys(context.state),
@@ -91,9 +91,9 @@ export async function dispatchToken(ctx: DispatchContext, tokenId: string): Prom
 
   ctx.emitter.emitTrace({
     type: 'dispatch.task.inputMapping.applied',
-    tokenId: tokenId,
-    nodeId: node.id,
     payload: {
+      tokenId: tokenId,
+      nodeId: node.id,
       inputMapping: node.inputMapping,
       taskInput: taskInput,
     },
@@ -108,9 +108,9 @@ export async function dispatchToken(ctx: DispatchContext, tokenId: string): Prom
   // Emit trace event for what we're sending to executor
   ctx.emitter.emitTrace({
     type: 'dispatch.task.sent',
-    tokenId: tokenId,
-    nodeId: node.id,
     payload: {
+      tokenId: tokenId,
+      nodeId: node.id,
       taskId: node.taskId,
       taskVersion: node.taskVersion ?? 1,
       resources: resolvedResources,
@@ -171,9 +171,9 @@ async function dispatchSubworkflow(
 
   ctx.emitter.emitTrace({
     type: 'dispatch.subworkflow.inputMapping.applied',
-    tokenId: tokenId,
-    nodeId: node.subworkflowId,
     payload: {
+      tokenId: tokenId,
+      nodeId: node.subworkflowId,
       inputMapping: node.inputMapping,
       subworkflowInput: subworkflowInput,
     },

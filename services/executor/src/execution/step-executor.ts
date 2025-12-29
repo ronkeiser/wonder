@@ -36,8 +36,8 @@ export async function executeStep(
   // Emit step started trace event
   emitter.emitTrace({
     type: 'executor.step.started',
-    tokenId: tokenId,
     payload: {
+      tokenId: tokenId,
       stepRef: step.ref,
       stepOrdinal: step.ordinal,
       actionId: step.actionId,
@@ -131,9 +131,9 @@ export async function executeStep(
   const stepDuration = Date.now() - stepStartTime;
   emitter.emitTrace({
     type: 'executor.step.completed',
-    tokenId: tokenId,
     durationMs: stepDuration,
     payload: {
+      tokenId: tokenId,
       stepRef: step.ref,
       actionId: step.actionId,
       success: true,
@@ -174,8 +174,8 @@ async function executeAction(
   // Emit action started trace event
   emitter.emitTrace({
     type: 'executor.action.started',
-    tokenId: tokenId,
     payload: {
+      tokenId: tokenId,
       stepRef: step.ref,
       actionId: action.id,
       actionKind: action.kind,
@@ -215,8 +215,8 @@ async function executeAction(
     // Emit action failed trace event
     emitter.emitTrace({
       type: 'executor.action.failed',
-      tokenId: tokenId,
       payload: {
+        tokenId: tokenId,
         stepRef: step.ref,
         actionId: action.id,
         actionKind: action.kind,
@@ -239,9 +239,9 @@ async function executeAction(
     // Emit action completed trace event
     emitter.emitTrace({
       type: 'executor.action.completed',
-      tokenId: tokenId,
       durationMs: result.metrics?.durationMs,
       payload: {
+        tokenId: tokenId,
         stepRef: step.ref,
         actionId: action.id,
         actionKind: action.kind,

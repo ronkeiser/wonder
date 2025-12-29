@@ -47,10 +47,10 @@ export default class ExecutorService extends WorkerEntrypoint<Env> {
     const emitter = createEmitter(
       this.env.STREAMER,
       {
-        workflowRunId: payload.workflowRunId,
-        rootRunId: payload.rootRunId,
+        streamId: payload.rootRunId, // Workflows use rootRunId as the outer boundary
+        executionId: payload.workflowRunId,
+        executionType: 'workflow',
         projectId: payload.projectId,
-        workflowDefId: '',
       },
       { traceEnabled },
     );

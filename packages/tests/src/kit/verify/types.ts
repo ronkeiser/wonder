@@ -4,7 +4,8 @@
  * Types for declarative workflow execution verification.
  */
 
-import type { EmbeddedWorkflowDef, TraceEventCollection } from '@wonder/sdk';
+import type { EmbeddedWorkflowDef } from '@wonder/sdk';
+import type { TraceEventCollection } from '../trace';
 
 /**
  * Token creation payload type (mirrors SDK's TracePayloads.TokenCreatedPayload)
@@ -20,16 +21,18 @@ export interface TokenCreatedPayload {
 
 /**
  * Typed trace event (mirrors SDK's TypedTraceEvent)
+ * tokenId and nodeId are in the payload, not top-level fields
  */
 export interface TypedTraceEvent<TPayload = Record<string, unknown>> {
   type: string;
-  tokenId: string | null;
-  nodeId: string | null;
   durationMs: number | null;
   sequence: number;
   timestamp: number;
   category: string;
-  payload: TPayload;
+  payload: TPayload & {
+    tokenId?: string;
+    nodeId?: string;
+  };
 }
 
 // =============================================================================

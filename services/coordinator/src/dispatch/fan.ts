@@ -83,8 +83,7 @@ export async function handleBranchOutput(
 
   ctx.emitter.emitTrace({
     type: 'operation.context.branch.written',
-    tokenId: token.id,
-    payload: { output },
+    payload: { tokenId: token.id, output },
   });
 
   // Apply state.* mappings from node's outputMapping to shared context
@@ -226,9 +225,7 @@ export async function activateFanIn(
     await applyDecisions([{ type: 'COMPLETE_TOKEN', tokenId: triggeringTokenId }], ctx);
     ctx.emitter.emitTrace({
       type: 'dispatch.sync.fan_in_race_lost',
-      tokenId: triggeringTokenId,
-      nodeId: nodeId,
-      payload: { fanInPath },
+      payload: { tokenId: triggeringTokenId, nodeId: nodeId, fanInPath },
     });
     return null;
   }
@@ -249,8 +246,8 @@ export async function activateFanIn(
   // Emit trace event
   ctx.emitter.emitTrace({
     type: 'dispatch.sync.fan_in_activated',
-    nodeId: nodeId,
     payload: {
+      nodeId: nodeId,
       fanInPath: fanInPath,
       mergedCount: completedSiblings.length,
       waitingCount: waitingSiblings.length,
