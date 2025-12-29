@@ -37,8 +37,8 @@
         "script_name": "wonder-events",
       },
       {
-        "name": "EVENT_HUB",
-        "class_name": "EventHub",
+        "name": "BROADCASTER",
+        "class_name": "Broadcaster",
         "script_name": "wonder-events",
       },
       {

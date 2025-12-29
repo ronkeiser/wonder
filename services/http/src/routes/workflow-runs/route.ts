@@ -31,7 +31,7 @@ workflowRuns.openapi(listWorkflowRunsRoute, async (c) => {
   return c.json(result);
 });
 
-/** GET /stream - EventHub for workflow run status changes (sidebar) */
+/** GET /stream - Broadcaster for workflow run status changes (sidebar) */
 workflowRuns.get('/stream', async (c) => {
   const upgradeHeader = c.req.header('Upgrade');
 
@@ -45,11 +45,11 @@ workflowRuns.get('/stream', async (c) => {
     );
   }
 
-  // Route to EventHub singleton for status change broadcasts
-  const hubId = c.env.EVENT_HUB.idFromName('global');
-  const stub = c.env.EVENT_HUB.get(hubId);
+  // Route to Broadcaster singleton for status change broadcasts
+  const broadcasterId = c.env.BROADCASTER.idFromName('global');
+  const stub = c.env.BROADCASTER.get(broadcasterId);
 
-  // Rewrite the URL to /stream (what EventHub expects)
+  // Rewrite the URL to /stream (what Broadcaster expects)
   const url = new URL(c.req.url);
   url.pathname = '/stream';
   const request = new Request(url, c.req.raw);

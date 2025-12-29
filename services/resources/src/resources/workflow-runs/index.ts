@@ -1,6 +1,6 @@
 /** Workflow Runs RPC resource */
 
-import type { EventHub } from '@wonder/events';
+import type { Broadcaster } from '@wonder/events';
 import { eq } from 'drizzle-orm';
 import { ulid } from 'ulid';
 import { NotFoundError } from '~/shared/errors';
@@ -132,7 +132,7 @@ export class WorkflowRuns extends Resource {
       'updateStatus',
       { workflowRunId: workflowRunId, metadata: { workflowRunId: workflowRunId, status } },
       async () => {
-        // Fetch workflow run first to get details for EventHub notification
+        // Fetch workflow run first to get details for Broadcaster notification
         const workflowRun = await repo.getWorkflowRun(this.serviceCtx.db, workflowRunId);
         if (!workflowRun) {
           throw new NotFoundError(
@@ -154,12 +154,13 @@ export class WorkflowRuns extends Resource {
           );
         }
 
-        // Notify EventHub about the status change
-        const eventHub = (this.env as unknown as { EVENT_HUB: DurableObjectNamespace<EventHub> })
-          .EVENT_HUB;
-        const hubId = eventHub.idFromName('global');
-        const hubStub = eventHub.get(hubId);
-        hubStub.notifyStatusChange({
+        // Notify Broadcaster about the status change
+        const broadcaster = (
+          this.env as unknown as { BROADCASTER: DurableObjectNamespace<Broadcaster> }
+        ).BROADCASTER;
+        const broadcasterId = broadcaster.idFromName('global');
+        const broadcasterStub = broadcaster.get(broadcasterId);
+        broadcasterStub.notifyStatusChange({
           executionType: 'workflow',
           streamId: workflowRun.rootRunId,
           executionId: workflowRunId,
@@ -194,7 +195,7 @@ export class WorkflowRuns extends Resource {
       'complete',
       { traceId: id, workflowRunId: id, metadata: { workflowRunId: id, finalOutput } },
       async () => {
-        // Fetch workflow run first to get details for EventHub notification
+        // Fetch workflow run first to get details for Broadcaster notification
         const workflowRun = await repo.getWorkflowRun(this.serviceCtx.db, id);
         if (!workflowRun) {
           throw new NotFoundError(`Workflow run not found: ${id}`, 'workflow_run', id);
@@ -210,12 +211,13 @@ export class WorkflowRuns extends Resource {
           throw new NotFoundError(`Workflow run not found: ${id}`, 'workflow_run', id);
         }
 
-        // Notify EventHub about the status change
-        const eventHub = (this.env as unknown as { EVENT_HUB: DurableObjectNamespace<EventHub> })
-          .EVENT_HUB;
-        const hubId = eventHub.idFromName('global');
-        const hubStub = eventHub.get(hubId);
-        hubStub.notifyStatusChange({
+        // Notify Broadcaster about the status change
+        const broadcaster = (
+          this.env as unknown as { BROADCASTER: DurableObjectNamespace<Broadcaster> }
+        ).BROADCASTER;
+        const broadcasterId = broadcaster.idFromName('global');
+        const broadcasterStub = broadcaster.get(broadcasterId);
+        broadcasterStub.notifyStatusChange({
           executionType: 'workflow',
           streamId: workflowRun.rootRunId,
           executionId: id,

@@ -221,7 +221,7 @@ export interface Subscription {
 }
 
 // ============================================================================
-// EventHub Types (Execution Lifecycle)
+// Broadcaster Types (Execution Lifecycle)
 // ============================================================================
 
 /**

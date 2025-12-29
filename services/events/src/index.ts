@@ -11,11 +11,11 @@ import type {
 } from './types';
 
 // Re-export DOs and types for consumer convenience
-export { EventHub } from './hub';
+export { Broadcaster } from './broadcaster';
 export { Streamer } from './streamer';
 export { createEmitter, type Emitter } from './client';
 export type { EventContext, EventInput, TraceEventInput, ExecutionType } from './types';
-export type { ExecutionStatus, ExecutionStatusChange } from './hub';
+export type { ExecutionStatus, ExecutionStatusChange } from './broadcaster';
 
 /**
  * Events Query Service

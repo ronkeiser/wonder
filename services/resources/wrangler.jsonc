@@ -17,8 +17,8 @@
   "durable_objects": {
     "bindings": [
       {
-        "name": "EVENT_HUB",
-        "class_name": "EventHub",
+        "name": "BROADCASTER",
+        "class_name": "Broadcaster",
         "script_name": "wonder-events",
       },
     ],

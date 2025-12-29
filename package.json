@@ -12,6 +12,7 @@
     "test:foundation:latest": "vitest run --config packages/tests/vitest.config.ts $(ls packages/tests/src/tests/foundation/*.test.ts | sort | tail -1)",
     "gen:sdk": "pnpm --filter @wonder/sdk run generate",
     "deploy:all": "pnpm -r --filter './services/*' --workspace-concurrency 1 deploy",
+    "deploy:agent": "wrangler deploy --config services/agent/wrangler.jsonc",
     "deploy:coordinator": "wrangler deploy --config services/coordinator/wrangler.jsonc",
     "deploy:events": "wrangler deploy --config services/events/wrangler.jsonc",
     "deploy:executor": "wrangler deploy --config services/executor/wrangler.jsonc",

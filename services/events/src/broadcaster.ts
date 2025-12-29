@@ -10,7 +10,7 @@ import type {
 export type { ExecutionStatus, ExecutionStatusChange } from './types';
 
 /**
- * EventHub Durable Object - singleton for execution lifecycle events
+ * Broadcaster Durable Object - singleton for execution lifecycle status broadcasts
  *
  * Responsibilities:
  * - Broadcast execution lifecycle events (started, completed, failed)
@@ -19,13 +19,13 @@ export type { ExecutionStatus, ExecutionStatusChange } from './types';
  *
  * Detailed events go to per-execution Streamer DOs.
  */
-export class EventHub extends DurableObject<Env> {
+export class Broadcaster extends DurableObject<Env> {
   private logger: Logger;
 
   constructor(ctx: DurableObjectState, env: Env) {
     super(ctx, env);
     this.logger = createLogger(ctx, env.LOGS, {
-      service: `${env.SERVICE}-hub`,
+      service: `${env.SERVICE}-broadcaster`,
       environment: env.ENVIRONMENT,
     });
   }

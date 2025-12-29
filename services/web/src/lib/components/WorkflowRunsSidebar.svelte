@@ -68,7 +68,7 @@
     status = 'disconnected';
   }
 
-  function connectToEventHub() {
+  function connectToBroadcaster() {
     // Cancel any pending reconnect
     if (reconnectTimeout) {
       clearTimeout(reconnectTimeout);
@@ -98,7 +98,7 @@
           updateRunStatus(msg.change);
         }
       } catch (e) {
-        console.error('Failed to parse EventHub message:', e);
+        console.error('Failed to parse Broadcaster message:', e);
       }
     };
 
@@ -112,8 +112,8 @@
       status = 'disconnected';
 
       if (!intentionalClose) {
-        console.log('EventHub WebSocket closed, reconnecting in 3s...');
-        reconnectTimeout = setTimeout(connectToEventHub, 3000);
+        console.log('Broadcaster WebSocket closed, reconnecting in 3s...');
+        reconnectTimeout = setTimeout(connectToBroadcaster, 3000);
       }
     };
   }
@@ -179,7 +179,7 @@
 
   onMount(() => {
     fetchRuns();
-    connectToEventHub();
+    connectToBroadcaster();
     startClockInterval();
   });
 
