@@ -12,7 +12,7 @@ import {
   type EmbeddedAction,
   type EmbeddedPromptSpec,
   type EmbeddedStep,
-  type EmbeddedTaskDef,
+  type EmbeddedTask,
 } from '@wonder/sdk';
 import { wonder } from '~/client';
 import type { CreatedResources, TestContext } from './types';
@@ -23,9 +23,9 @@ export type { CreatedResources } from './types';
  * Creates an embedded task def and all its dependencies (actions, prompt specs).
  * @internal
  */
-export async function createEmbeddedTaskDef(
+export async function createEmbeddedTask(
   ctx: TestContext,
-  taskDef: EmbeddedTaskDef,
+  taskDef: EmbeddedTask,
   createdResources: CreatedResources,
 ): Promise<string> {
   // Process steps to resolve embedded actions

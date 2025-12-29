@@ -6,7 +6,7 @@ Fan-out: multiple sibling branch*output*\* tables
 Node output_mapping writes to token's output storage
 
 Task result → mapped fields → token's output table
-Schema comes from TaskDef.output_schema (already exists)
+Schema comes from Task.output_schema (already exists)
 Workflow completion extracts final output
 
 Applies workflow.output_mapping to last token's output (or merged outputs)
@@ -18,7 +18,7 @@ Reads from token output storage (not the final output table)
 Enables routing based on node results
 Why This Is Sound
 Consistent model - fan-out and linear use same storage mechanism
-Schema-driven - TaskDef.output_schema validates token outputs
+Schema-driven - Task.output_schema validates token outputs
 Clean separation - intermediate results ≠ final output
 Existing infrastructure - leverages branch storage already built
 No JSON blobs - still normalized SQL tables
@@ -33,7 +33,7 @@ Workflow finalization applies output_mapping and writes validated output
 ---
 
 Every token gets a branch table (branch*output*{tokenId})
-Schema comes from TaskDef.output_schema
+Schema comes from Task.output_schema
 Branch tables are created when token is dispatched
 Node output writes to token's branch table
 At fan-in, merge strategies combine sibling outputs into context.state

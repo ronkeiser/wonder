@@ -1,10 +1,10 @@
 /**
- * TaskDef Zod Schemas
+ * Task Zod Schemas
  */
 
 import { z } from '@hono/zod-openapi';
 
-/** Step schema (embedded in TaskDef) */
+/** Step schema (embedded in Task) */
 export const StepSchema = z
   .object({
     id: z.string().openapi({ example: '01ARZ3NDEKTSV4RRFFQ69G5FAV' }),
@@ -85,7 +85,7 @@ export const CreateStepSchema = z
   })
   .openapi('CreateStep');
 
-export const CreateTaskDefSchema = z
+export const CreateTaskSchema = z
   .object({
     name: z.string().min(1).max(255).openapi({ example: 'Write File Verified' }),
     description: z
@@ -121,20 +121,14 @@ export const CreateTaskDefSchema = z
       }),
     retry: RetryConfigSchema.optional(),
     timeoutMs: z.number().int().positive().optional().openapi({ example: 30000 }),
-    autoversion: z
-      .boolean()
-      .optional()
-      .openapi({
-        description:
-          'When true, compute content hash for deduplication. If existing task with same name/owner and content exists, return it. Otherwise auto-increment version.',
-      }),
+    autoversion: z.boolean().optional().openapi({
+      description:
+        'When true, compute content hash for deduplication. If existing task with same name/owner and content exists, return it. Otherwise auto-increment version.',
+    }),
   })
-  .openapi('CreateTaskDef');
+  .openapi('CreateTask');
 
-/** Alias for CreateTaskDefSchema for consistency with renamed entity */
-export const CreateTaskSchema = CreateTaskDefSchema;
-
-export const TaskDefSchema = z
+export const TaskSchema = z
   .object({
     id: z.string().openapi({ example: '01ARZ3NDEKTSV4RRFFQ69G5FAV' }),
     version: z.number().int(),
@@ -152,10 +146,7 @@ export const TaskDefSchema = z
     createdAt: z.string(),
     updatedAt: z.string(),
   })
-  .openapi('TaskDef');
-
-/** Alias for TaskDefSchema for consistency with renamed entity */
-export const TaskSchema = TaskDefSchema;
+  .openapi('Task');
 
 export const TaskCreateResponseSchema = z
   .object({

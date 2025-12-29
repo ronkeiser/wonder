@@ -251,7 +251,7 @@ Every component in Wonder is either a **package** or a **service**:
 
 - Workspace, project management
 - Workflow definition CRUD (WorkflowDef, Node, Transition)
-- Task definition CRUD (TaskDef, Step)
+- Task definition CRUD (Task, Step)
 - Action, prompt spec, model profile management
 - Repo metadata (name, project_id, default_branch)
 - D1 storage for all resource metadata
@@ -371,22 +371,22 @@ git push wonder main
 
 ## Summary
 
-| Component         | Type    | Deploy Target      | Storage          | Communication                                 |
-| ----------------- | ------- | ------------------ | ---------------- | --------------------------------------------- |
-| @wonder/tests     | Package | npm (internal)     | None             | Import                                        |
-| @wonder/schemas   | Package | npm (internal)     | None             | Import                                        |
-| @wonder/sdk       | Package | npm (public)       | None             | Import                                        |
-| @wonder/templates | Package | npm (internal)     | None             | Import                                        |
-| @wonder/expressions | Package | npm (internal)   | None             | Import                                        |
-| cache             | Service | Cloudflare Workers | R2               | Workers RPC                                   |
-| containers        | Service | Cloudflare Workers | DO SQLite        | Workers RPC                                   |
-| coordinator       | Service | Cloudflare Workers | DO SQLite, D1    | Workers RPC                                   |
-| events            | Service | Cloudflare Workers | D1               | Workers RPC                                   |
-| executor          | Service | Cloudflare Workers | None (stateless) | Workers RPC                                   |
-| http              | Service | Cloudflare Workers | None (gateway)   | Workers RPC                                   |
-| logs              | Service | Cloudflare Workers | D1               | Workers RPC                                   |
-| resources         | Service | Cloudflare Workers | D1               | Workers RPC                                   |
-| source            | Service | Cloudflare Workers | R2, D1           | Workers RPC                                   |
-| web               | Service | Cloudflare Workers | None             | Workers RPC (server), HTTP/WebSocket (client) |
+| Component           | Type    | Deploy Target      | Storage          | Communication                                 |
+| ------------------- | ------- | ------------------ | ---------------- | --------------------------------------------- |
+| @wonder/tests       | Package | npm (internal)     | None             | Import                                        |
+| @wonder/schemas     | Package | npm (internal)     | None             | Import                                        |
+| @wonder/sdk         | Package | npm (public)       | None             | Import                                        |
+| @wonder/templates   | Package | npm (internal)     | None             | Import                                        |
+| @wonder/expressions | Package | npm (internal)     | None             | Import                                        |
+| cache               | Service | Cloudflare Workers | R2               | Workers RPC                                   |
+| containers          | Service | Cloudflare Workers | DO SQLite        | Workers RPC                                   |
+| coordinator         | Service | Cloudflare Workers | DO SQLite, D1    | Workers RPC                                   |
+| events              | Service | Cloudflare Workers | D1               | Workers RPC                                   |
+| executor            | Service | Cloudflare Workers | None (stateless) | Workers RPC                                   |
+| http                | Service | Cloudflare Workers | None (gateway)   | Workers RPC                                   |
+| logs                | Service | Cloudflare Workers | D1               | Workers RPC                                   |
+| resources           | Service | Cloudflare Workers | D1               | Workers RPC                                   |
+| source              | Service | Cloudflare Workers | R2, D1           | Workers RPC                                   |
+| web                 | Service | Cloudflare Workers | None             | Workers RPC (server), HTTP/WebSocket (client) |
 
 Packages are libraries. Services are deployed workers. Services talk via RPC, never direct imports.

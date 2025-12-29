@@ -42,7 +42,7 @@ executor/src/
 │   ├── manager.ts              # Task context lifecycle
 │   └── mapping.ts              # Input/output mapping (JSONPath)
 └── integration/
-    ├── resources.ts            # Load TaskDef/ActionDef from Resources
+    ├── resources.ts            # Load Task/ActionDef from Resources
     ├── coordinator.ts          # RPC to coordinator for sub-workflows
     ├── llm-providers.ts        # LLM API adapters
     └── mcp-client.ts           # MCP protocol client
@@ -56,7 +56,7 @@ executor/src/
 interface TaskPayload {
   token_id: string; // For result correlation
   workflow_run_id: string; // For sub-workflow context
-  task_id: string; // TaskDef to execute
+  task_id: string; // Task to execute
   task_version: number;
   input: Record<string, unknown>; // Mapped from workflow context
 
@@ -107,7 +107,7 @@ async function executeTask(payload: TaskPayload): Promise<TaskResult> {
 
   try {
     // 1. Load task definition
-    const taskDef = await resources.getTaskDef(payload.task_id, payload.task_version);
+    const taskDef = await resources.getTask(payload.task_id, payload.task_version);
     const steps = await resources.getSteps(taskDef.id, taskDef.version);
 
     // 2. Validate input against schema
@@ -840,7 +840,7 @@ return {
 
 1. Worker detects step failure with `on_failure: 'retry'`
 2. Worker aborts task execution, returns `retryable: true`
-3. Coordinator checks TaskDef retry policy
+3. Coordinator checks Task retry policy
 4. If retry budget remaining, coordinator dispatches new task with incremented `retry_attempt`
 5. Worker receives fresh payload, resets context, starts from step 0
 
@@ -984,7 +984,7 @@ Metrics are included in TaskResult for coordinator to aggregate and emit.
 
 ```typescript
 // Load task and action definitions
-const taskDef = await env.RESOURCES.getTaskDef(task_id, version);
+const taskDef = await env.RESOURCES.getTask(task_id, version);
 const steps = await env.RESOURCES.getSteps(task_id, version);
 const actionDef = await env.RESOURCES.getActionDef(action_id, version);
 

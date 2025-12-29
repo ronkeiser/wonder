@@ -10,7 +10,7 @@ export type { LLMCallParams, LLMCallResult, TaskPayload, TaskResult } from './ty
  * Wonder Executor Service
  *
  * RPC-based task execution service.
- * Implements the 5-layer execution model: loads TaskDef, iterates Steps, executes Actions.
+ * Implements the 5-layer execution model: loads Task, iterates Steps, executes Actions.
  */
 
 /**
@@ -30,7 +30,7 @@ export default class ExecutorService extends WorkerEntrypoint<Env> {
    * RPC method - Execute a task (fire-and-forget, calls back to coordinator)
    *
    * This is the main entry point for task execution per the 5-layer model.
-   * Loads TaskDef, iterates Steps, executes Actions, and returns result.
+   * Loads Task, iterates Steps, executes Actions, and returns result.
    *
    * @see docs/architecture/executor.md
    */

@@ -43,7 +43,7 @@ context_schema: {
 **Task output schema (each judge task):**
 
 ```typescript
-// TaskDef.output_schema (referenced by Node via task_id)
+// Task.output_schema (referenced by Node via task_id)
 output_schema: {
   type: 'object',
   properties: {
@@ -146,9 +146,9 @@ When a token is created during fan-out:
 const token = operations.tokens.create(sql, params);
 
 // Create isolated branch output table
-// Get output schema from the node's TaskDef
+// Get output schema from the node's Task
 const node = workflow.nodes.find((n) => n.id === params.node_id);
-const taskDef = await resources.getTaskDef(node.task_id, node.task_version);
+const taskDef = await resources.getTask(node.task_id, node.task_version);
 const taskOutputSchema = taskDef.output_schema;
 
 if (taskOutputSchema) {
@@ -175,8 +175,8 @@ When executor returns a result:
 
 ```typescript
 // In coordinator handleTaskResult()
-// Output schema comes from TaskDef, not Node
-const taskDef = await resources.getTaskDef(node.task_id, node.task_version);
+// Output schema comes from Task, not Node
+const taskDef = await resources.getTask(node.task_id, node.task_version);
 operations.context.applyNodeOutput(sql, tokenId, result.output_data, taskDef.output_schema);
 ```
 
@@ -209,9 +209,9 @@ When synchronization condition is met:
 ```typescript
 // In decisions/synchronization.ts
 if (syncConditionMet) {
-  // Get TaskDef output schema for merge validation
+  // Get Task output schema for merge validation
   const node = workflow.nodes.find((n) => n.id === token.node_id);
-  const taskDef = await resources.getTaskDef(node.task_id, node.task_version);
+  const taskDef = await resources.getTask(node.task_id, node.task_version);
 
   return [
     {
@@ -309,11 +309,11 @@ function mergeBranches(
 
 Task output schemas come from:
 
-1. **TaskDef.output_schema** - Primary source, defines what the task produces
-2. **Derived from Actions** - If TaskDef doesn't specify, can be inferred from final step's ActionDef.produces
+1. **Task.output_schema** - Primary source, defines what the task produces
+2. **Derived from Actions** - If Task doesn't specify, can be inferred from final step's ActionDef.produces
 3. **Structured LLM output** - For LLM actions with JSON schema output validation
 
-Note: Nodes reference TaskDefs via `node.task_id` and `node.task_version`. The Node itself only defines data mapping (`input_mapping`, `output_mapping`), not schemas.
+Note: Nodes reference Tasks via `node.task_id` and `node.task_version`. The Node itself only defines data mapping (`input_mapping`, `output_mapping`), not schemas.
 
 ### Merge Target Validation
 
@@ -337,10 +337,10 @@ validateSchema(merged, targetSchema);  // Must be array of vote objects
 
 ### Nested Objects in Branch Output
 
-If a TaskDef output schema defines nested objects:
+If a Task output schema defines nested objects:
 
 ```typescript
-// TaskDef.output_schema
+// Task.output_schema
 output_schema: {
   type: 'object',
   properties: {

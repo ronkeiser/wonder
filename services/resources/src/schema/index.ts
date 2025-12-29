@@ -14,14 +14,10 @@ import {
 
 import type { ModelId, ModelProfile } from '../resources/model-profiles/types';
 import type { RetryConfig, Step } from '../resources/tasks/types';
-import type {
-  Condition,
-  ForeachConfig,
-  LoopConfig,
-  SynchronizationConfig,
-} from './types';
+import type { Condition, ForeachConfig, LoopConfig, SynchronizationConfig } from './types';
 
 // Re-export schema types for consumers
+export type { RetryConfig, Step } from '../resources/tasks/types';
 export type {
   Condition,
   ForeachConfig,
@@ -29,7 +25,6 @@ export type {
   MergeConfig,
   SynchronizationConfig,
 } from './types';
-export type { RetryConfig, Step } from '../resources/tasks/types';
 
 /** Workspace & Project */
 
@@ -176,7 +171,7 @@ export const nodes = sqliteTable(
     workflowDefVersion: integer().notNull(),
     name: text().notNull(),
 
-    // Task execution (5-layer model: WorkflowDef → Node → TaskDef → Step → ActionDef)
+    // Task execution (5-layer model: WorkflowDef → Node → Task → Step → ActionDef)
     // Mutually exclusive with subworkflowId
     taskId: text(),
     taskVersion: integer(),
@@ -313,12 +308,7 @@ export const tasks = sqliteTable(
     primaryKey({ columns: [table.id, table.version] }),
     index('idx_tasks_project').on(table.projectId),
     index('idx_tasks_library').on(table.libraryId),
-    index('idx_tasks_name_version').on(
-      table.name,
-      table.projectId,
-      table.libraryId,
-      table.version,
-    ),
+    index('idx_tasks_name_version').on(table.name, table.projectId, table.libraryId, table.version),
     index('idx_tasks_content_hash').on(
       table.name,
       table.projectId,
@@ -650,14 +640,14 @@ export const secrets = sqliteTable(
 // Legacy snake_case exports for backward compatibility during migration
 // TODO: Remove these after all consumers are updated
 export {
-  workspaceSettings as workspace_settings,
-  projectSettings as project_settings,
-  workflowDefs as workflow_defs,
-  promptSpecs as prompt_specs,
-  modelProfiles as model_profiles,
-  workflowRuns as workflow_runs,
   artifactTypes as artifact_types,
-  mcpServers as mcp_servers,
   eventSources as event_sources,
+  mcpServers as mcp_servers,
+  modelProfiles as model_profiles,
+  projectSettings as project_settings,
+  promptSpecs as prompt_specs,
   vectorIndexes as vector_indexes,
+  workflowDefs as workflow_defs,
+  workflowRuns as workflow_runs,
+  workspaceSettings as workspace_settings,
 };

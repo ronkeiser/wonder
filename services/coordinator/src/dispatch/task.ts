@@ -29,9 +29,9 @@ import { handleBranchOutput, processSynchronization } from './fan';
 /**
  * Dispatch token to Executor
  *
- * Per the 5-layer execution model (WorkflowDef → Node → TaskDef → Step → ActionDef):
+ * Per the 5-layer execution model (WorkflowDef → Node → Task → Step → ActionDef):
  * - Coordinator just sends { taskId, taskVersion, input, resources } to Executor
- * - Executor handles everything: loading TaskDef, iterating Steps, executing Actions
+ * - Executor handles everything: loading Task, iterating Steps, executing Actions
  */
 export async function dispatchToken(ctx: DispatchContext, tokenId: string): Promise<void> {
   const token = ctx.tokens.get(tokenId);
@@ -150,7 +150,11 @@ async function dispatchSubworkflow(
   ctx: DispatchContext,
   tokenId: string,
   token: { workflowRunId: string; nodeId: string },
-  node: { subworkflowId: string | null; subworkflowVersion: number | null; inputMapping: object | null },
+  node: {
+    subworkflowId: string | null;
+    subworkflowVersion: number | null;
+    inputMapping: object | null;
+  },
 ): Promise<void> {
   if (!node.subworkflowId) {
     throw new Error('dispatchSubworkflow called on node without subworkflowId');
@@ -398,10 +402,7 @@ async function finalizeWorkflow(ctx: DispatchContext): Promise<void> {
     }
 
     // Apply COMPLETE_WORKFLOW decision (handles guards, status, event, RESOURCES)
-    await applyDecisions(
-      [{ type: 'COMPLETE_WORKFLOW', output: completionResult.output }],
-      ctx,
-    );
+    await applyDecisions([{ type: 'COMPLETE_WORKFLOW', output: completionResult.output }], ctx);
   } catch (error) {
     ctx.logger.error({
       eventType: 'coordinator.finalize.failed',

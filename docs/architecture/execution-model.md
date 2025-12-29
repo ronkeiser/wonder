@@ -9,7 +9,7 @@ WorkflowDef
     ↓ contains
   Node
     ↓ executes
-  TaskDef
+  Task
     ↓ contains
   Step
     ↓ executes
@@ -30,7 +30,7 @@ Workflows are for orchestration: branching logic, parallel exploration, human ch
 
 A point in the workflow graph. Each node executes exactly one task. Nodes don't contain logic—they specify what task to run and how to map data in and out of workflow context.
 
-### TaskDef
+### Task
 
 Linear sequences of steps executed by a single worker. State is in-memory—ephemeral, fast, no coordination overhead. Supports retries at the task level and simple conditional logic (if/else, on_failure).
 
@@ -122,13 +122,13 @@ Retries operate at two distinct levels with sharp boundaries:
 
 **Non-retryable:** Business errors (400, 401, 403, 404), validation failures, schema mismatches.
 
-### Business Retry (TaskDef)
+### Business Retry (Task)
 
 **Purpose:** Handle wrong outputs—invalid JSON, failed assertions, schema violations, business logic failures.
 
 **Behavior:** Explicit and visible. The entire task restarts from step 0 with fresh context. All steps re-execute.
 
-**Configuration:** `TaskDef.retry`
+**Configuration:** `Task.retry`
 
 **Triggered by:** `Step.on_failure = 'retry'` when a step fails.
 
@@ -139,7 +139,7 @@ Retries operate at two distinct levels with sharp boundaries:
 `Step.on_failure` is **not a retry mechanism**. It's a routing decision:
 
 - **`abort`**: Task fails, no retry
-- **`retry`**: Signal coordinator to retry entire task (if `TaskDef.retry` allows)
+- **`retry`**: Signal coordinator to retry entire task (if `Task.retry` allows)
 - **`continue`**: Log error, proceed to next step
 
 The step itself never retries in isolation. Retry is always at the task level (full reset) or action level (infrastructure only).
@@ -180,7 +180,7 @@ The Executor wraps action execution with `AbortController` and enforces the time
 ### 2. Task-Level Timeout
 
 **Enforced by:** Cloudflare Workers platform  
-**Configured in:** `TaskDef.timeout_ms`  
+**Configured in:** `Task.timeout_ms`  
 **Purpose:** Limit entire task execution (all steps sequentially)
 
 Platform terminates the worker if task exceeds limit. No graceful shutdown—execution simply stops. Coordinator detects missing response and handles as task failure.
@@ -266,7 +266,7 @@ Coordinator (DO)
 ▼
 Worker
 │
-├─ Loads TaskDef + Steps (ordered by ordinal)
+├─ Loads Task + Steps (ordered by ordinal)
 ├─ Initializes in-memory context: { input, state: {}, output: {} }
 ├─ For each step:
 │   ├─ Evaluate condition (skip if needed)
@@ -291,7 +291,7 @@ Coordinator (DO)
 | ----------- | ------------------ | ----------------------------------------- |
 | WorkflowDef | Nodes, Transitions | Orchestration, parallelism, durability    |
 | Node        | —                  | Maps context to/from task                 |
-| TaskDef     | Steps              | Reliable sequences, retries, verification |
+| Task        | Steps              | Reliable sequences, retries, verification |
 | Step        | —                  | Maps context to/from action               |
 | ActionDef   | —                  | Atomic operations                         |
 

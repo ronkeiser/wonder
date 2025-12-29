@@ -1,6 +1,6 @@
 # Executor Implementation Plan
 
-Implementing the 5-layer execution model: WorkflowDef → Node → TaskDef → Step → ActionDef
+Implementing the 5-layer execution model: WorkflowDef → Node → Task → Step → ActionDef
 
 ## Step 3 Breakdown
 
@@ -69,7 +69,7 @@ Implementing the 5-layer execution model: WorkflowDef → Node → TaskDef → S
 
 Handle task retries when steps throw `TaskRetryError`:
 
-- Check `TaskDef.retry` config (max_attempts, backoff strategy)
+- Check `Task.retry` config (max_attempts, backoff strategy)
 - Track retry_attempt in TaskPayload
 - Calculate backoff delay (none/linear/exponential)
 - Emit retry events to coordinator

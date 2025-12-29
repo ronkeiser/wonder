@@ -21,7 +21,7 @@ import {
   type EmbeddedNode,
   type EmbeddedPromptSpec,
   type EmbeddedStep,
-  type EmbeddedTaskDef,
+  type EmbeddedTask,
   type EmbeddedWorkflowDef,
   type WonderClient,
 } from '@wonder/sdk';
@@ -314,9 +314,9 @@ function transformAction(actionDoc: ActionDocument, _testContext: TestContext): 
 }
 
 /**
- * Transform TaskDocument to EmbeddedTaskDef
+ * Transform TaskDocument to EmbeddedTask
  */
-function transformTask(taskDoc: TaskDocument, testContext: TestContext): EmbeddedTaskDef {
+function transformTask(taskDoc: TaskDocument, testContext: TestContext): EmbeddedTask {
   const embeddedSteps: EmbeddedStep[] = [];
 
   if (taskDoc.steps) {
@@ -716,7 +716,7 @@ async function createWorkflowViaApi(
     if (n.taskId) {
       taskId = n.taskId;
     } else if (n.task) {
-      taskId = await createEmbeddedTaskDef(client, apiCtx, n.task as EmbeddedTaskDef, resources);
+      taskId = await createEmbeddedTask(client, apiCtx, n.task as EmbeddedTask, resources);
     } else {
       throw new Error(`Node ${n.ref} must have either taskId or task`);
     }
@@ -749,10 +749,10 @@ async function createWorkflowViaApi(
 /**
  * Create embedded task def and its dependencies
  */
-async function createEmbeddedTaskDef(
+async function createEmbeddedTask(
   client: WonderClient,
   apiCtx: ApiTestContext,
-  taskDef: EmbeddedTaskDef,
+  taskDef: EmbeddedTask,
   resources: CreatedResources,
 ): Promise<string> {
   const resolvedSteps: Array<{
@@ -781,7 +781,12 @@ async function createEmbeddedTaskDef(
       actionVersion = actionResponse.action.version;
     } else if (s.action) {
       // Create embedded action and use returned version
-      const result = await createEmbeddedAction(client, apiCtx, s.action as EmbeddedAction, resources);
+      const result = await createEmbeddedAction(
+        client,
+        apiCtx,
+        s.action as EmbeddedAction,
+        resources,
+      );
       actionId = result.id;
       actionVersion = result.version;
     } else {

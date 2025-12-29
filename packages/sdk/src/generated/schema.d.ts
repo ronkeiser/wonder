@@ -648,7 +648,7 @@ export interface paths {
             };
             requestBody?: {
                 content: {
-                    "application/json": components["schemas"]["CreateTaskDef"];
+                    "application/json": components["schemas"]["CreateTask"];
                 };
             };
             responses: {
@@ -1810,7 +1810,7 @@ export interface components {
             /** @example 30000 */
             maxDelayMs: number | null;
         } | null;
-        TaskDef: {
+        Task: {
             /** @example 01ARZ3NDEKTSV4RRFFQ69G5FAV */
             id: string;
             version: number;
@@ -1834,7 +1834,7 @@ export interface components {
         };
         TaskCreateResponse: {
             taskId: string;
-            task: components["schemas"]["TaskDef"];
+            task: components["schemas"]["Task"];
             /** @description True if an existing task was reused (autoversion matched) */
             reused: boolean;
         };
@@ -1880,7 +1880,7 @@ export interface components {
                 else: "continue" | "skip" | "succeed" | "fail";
             } | null;
         };
-        CreateTaskDef: {
+        CreateTask: {
             /** @example Write File Verified */
             name: string;
             /** @example Write file with read-back verification */
@@ -1942,10 +1942,10 @@ export interface components {
             autoversion?: boolean;
         };
         TaskListResponse: {
-            tasks: components["schemas"]["TaskDef"][];
+            tasks: components["schemas"]["Task"][];
         };
         TaskGetResponse: {
-            task: components["schemas"]["TaskDef"];
+            task: components["schemas"]["Task"];
         };
         WorkflowDef: {
             id: string;

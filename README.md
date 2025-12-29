@@ -68,7 +68,7 @@ WorkflowDef
     ↓ contains
   Node
     ↓ executes
-  TaskDef
+  Task
     ↓ contains
   Step
     ↓ executes
@@ -79,7 +79,7 @@ WorkflowDef
 
 **Node**: A point in the workflow graph. Each node executes exactly one task.
 
-**TaskDef**: Linear sequences of steps executed by a single worker. State is in-memory. Supports retries and simple conditionals. Tasks bundle operations with verification.
+**Task**: Linear sequences of steps executed by a single worker. State is in-memory. Supports retries and simple conditionals. Tasks bundle operations with verification.
 
 **Step**: A point in a task sequence. Each step executes exactly one action.
 

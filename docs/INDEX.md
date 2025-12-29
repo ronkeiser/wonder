@@ -2,7 +2,7 @@
 
 ## Core Concepts
 
-- **[execution-model.md](execution-model.md)** - Five-layer execution model (WorkflowDef→Node→TaskDef→Step→ActionDef) with durable workflows and in-memory tasks for performance optimization.
+- **[execution-model.md](execution-model.md)** - Five-layer execution model (WorkflowDef→Node→Task→Step→ActionDef) with durable workflows and in-memory tasks for performance optimization.
 - **[packages-services.md](packages-services.md)** - Service architecture defining RPC-based communication between Cloudflare Workers services and shared library packages.
 - **[primitives.md](primitives.md)** - Core data types organized by storage layer (D1, DO SQLite, R2, Vectorize) and managing service.
 

@@ -26,7 +26,7 @@ import type { components } from '../generated/schema';
 
 type CreatePromptSpec = components['schemas']['CreatePromptSpec'];
 type CreateAction = components['schemas']['CreateAction'];
-type CreateTaskDef = components['schemas']['CreateTaskDef'];
+type CreateTask = components['schemas']['CreateTask'];
 type CreateModelProfile = components['schemas']['CreateModelProfile'];
 
 /** Embedded prompt spec with type marker */
@@ -56,7 +56,7 @@ export interface EmbeddedAction extends Omit<CreateAction, 'implementation'> {
 }
 
 /** Embedded task def with type marker */
-export interface EmbeddedTaskDef extends Omit<CreateTaskDef, 'steps'> {
+export interface EmbeddedTask extends Omit<CreateTask, 'steps'> {
   [TASK_DEF]: true;
   steps: EmbeddedStep[];
 }
@@ -88,7 +88,7 @@ export interface EmbeddedNode {
   name: string;
   // Task execution (mutually exclusive with subworkflowId)
   taskId?: string;
-  task?: EmbeddedTaskDef;
+  task?: EmbeddedTask;
   taskVersion?: number;
   // Subworkflow execution (mutually exclusive with taskId/task)
   subworkflowId?: string;
@@ -120,7 +120,7 @@ export function isEmbeddedAction(obj: unknown): obj is EmbeddedAction {
   return typeof obj === 'object' && obj !== null && ACTION in obj;
 }
 
-export function isEmbeddedTaskDef(obj: unknown): obj is EmbeddedTaskDef {
+export function isEmbeddedTask(obj: unknown): obj is EmbeddedTask {
   return typeof obj === 'object' && obj !== null && TASK_DEF in obj;
 }
 

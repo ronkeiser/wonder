@@ -8,7 +8,7 @@ export interface TaskPayload {
   workflowRunId: string; // For sub-workflow context
   rootRunId: string; // Top-level run ID for unified event timeline
   projectId: string; // For trace event context
-  taskId: string; // TaskDef to execute
+  taskId: string; // Task to execute
   taskVersion: number;
   input: Record<string, unknown>; // Mapped from workflow context
 

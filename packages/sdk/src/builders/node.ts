@@ -6,7 +6,7 @@
  */
 
 import type { components } from '../generated/schema';
-import { type EmbeddedNode, type EmbeddedTaskDef, type EmbeddedWorkflowDef } from './embedded';
+import { type EmbeddedNode, type EmbeddedTask, type EmbeddedWorkflowDef } from './embedded';
 
 type NodeConfig = components['schemas']['CreateWorkflowDef']['nodes'][number];
 
@@ -48,7 +48,7 @@ export function node(config: {
   name: string;
   // Task execution (mutually exclusive with subworkflowId)
   taskId?: string;
-  task?: EmbeddedTaskDef;
+  task?: EmbeddedTask;
   taskVersion?: number;
   // Subworkflow execution (mutually exclusive with taskId/task)
   subworkflowId?: string;
@@ -79,7 +79,9 @@ export function node(config: {
     // Subworkflow fields
     ...(config.subworkflowId !== undefined && { subworkflowId: config.subworkflowId }),
     ...(config.subworkflow !== undefined && { subworkflow: config.subworkflow }),
-    ...(config.subworkflowVersion !== undefined && { subworkflowVersion: config.subworkflowVersion }),
+    ...(config.subworkflowVersion !== undefined && {
+      subworkflowVersion: config.subworkflowVersion,
+    }),
     // Common fields
     ...(config.inputMapping !== undefined && { inputMapping: config.inputMapping }),
     ...(config.outputMapping !== undefined && { outputMapping: config.outputMapping }),

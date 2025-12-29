@@ -379,12 +379,12 @@ expect(decisions).toEqual([
 ]);
 ```
 
-**Worker contract:** Given `TaskDef` + input → produces output | error
+**Worker contract:** Given `Task` + input → produces output | error
 
 ```typescript
 // Unit test
 const result = await executeTask({
-  task: mockTaskDef,
+  task: mockTask,
   input: { value: 'test' },
 });
 expect(result).toEqual({ success: true, output: { processed: 'test' } });

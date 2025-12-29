@@ -1,11 +1,11 @@
 /**
  * Task definition builder - Ergonomic helper for creating task definitions
  *
- * Returns a plain typed object that matches CreateTaskDef.
+ * Returns a plain typed object that matches CreateTask.
  * Steps can embed actions for automatic creation by createWorkflow.
  */
 
-import { type EmbeddedAction, type EmbeddedStep, type EmbeddedTaskDef, TASK_DEF } from './embedded';
+import { type EmbeddedAction, type EmbeddedStep, type EmbeddedTask, TASK_DEF } from './embedded';
 
 /**
  * Create a step for a task definition
@@ -106,7 +106,7 @@ export function task(config: {
     maxDelayMs?: number | null;
   };
   timeoutMs?: number;
-}): EmbeddedTaskDef {
+}): EmbeddedTask {
   // Validate step ordinals are sequential starting from 0
   const ordinals = config.steps.map((s) => s.ordinal).sort((a, b) => a - b);
   for (let i = 0; i < ordinals.length; i++) {

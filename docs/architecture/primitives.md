@@ -301,7 +301,7 @@ Version pinning enables stability (pin to v3) or live updates (null = latest).
   workflow_def_version: number;
   name: string;
 
-  task_id: string; // References TaskDef
+  task_id: string; // References Task
   task_version: number; // Task version to execute
 
   input_mapping: object | null; // Map workflow context → task input
@@ -415,7 +415,7 @@ When `on_timeout: "proceed_with_available"`, merge whatever siblings completed a
 
 ## Execution
 
-### TaskDef
+### Task
 
 **Storage:** D1 (Resources)  
 **Schema:**
@@ -473,7 +473,7 @@ See [Execution Model](./execution-model.md) for design rationale.
 
 ### Step
 
-**Storage:** Embedded in TaskDef (not a separate table)  
+**Storage:** Embedded in Task (not a separate table)  
 **Schema:**
 
 ```typescript
@@ -582,7 +582,7 @@ condition: {
 
 Versioned, reusable action implementation. Atomic operations executed by workers.
 
-**Retry semantics:** `execution.retry_policy` handles **infrastructure failures only**—network errors, rate limits, provider 5xx errors. This retry is automatic and invisible to the task. Business-level retry (wrong outputs, validation failures) is handled by TaskDef retry, which restarts from step 0.
+**Retry semantics:** `execution.retry_policy` handles **infrastructure failures only**—network errors, rate limits, provider 5xx errors. This retry is automatic and invisible to the task. Business-level retry (wrong outputs, validation failures) is handled by Task retry, which restarts from step 0.
 
 **ActionKind:**
 
@@ -1349,7 +1349,7 @@ Enables **testable coordination logic** without spinning up actors.
 | **Workflow**      | Resources      | D1                    | Persistent            |
 | **Node**          | Resources      | D1                    | Immutable (versioned) |
 | **Transition**    | Resources      | D1                    | Immutable (versioned) |
-| **TaskDef**       | Resources      | D1                    | Immutable (versioned) |
+| **Task**          | Resources      | D1                    | Immutable (versioned) |
 | **ActionDef**     | Resources      | D1                    | Immutable (versioned) |
 | **PromptSpec**    | Resources      | D1                    | Immutable (versioned) |
 | **ModelProfile**  | Resources      | D1                    | Persistent            |

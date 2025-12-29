@@ -90,7 +90,7 @@ nodes:
 **Note:** Tasks contain steps with actions. This example shows Node-level configuration. The actual task definitions would have steps like:
 
 ```yaml
-# TaskDef: run_tool_task
+# Task: run_tool_task
 steps:
   - action:
       kind: tool

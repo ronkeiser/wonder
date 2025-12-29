@@ -36,7 +36,7 @@ type Node = ReturnType<DefinitionManager['getNode']>;
 /**
  * Handle branch output for fan-out tokens
  *
- * 1. Fetch TaskDef to get output_schema
+ * 1. Fetch Task to get output_schema
  * 2. Initialize branch table (lazy - creates if not exists)
  * 3. Write task output to branch table
  * 4. Apply any state.* mappings from node's outputMapping to shared context
@@ -50,7 +50,7 @@ export async function handleBranchOutput(
   node: Node,
   output: Record<string, unknown>,
 ): Promise<void> {
-  // Fetch TaskDef to get output schema
+  // Fetch Task to get output schema
   if (!node.taskId) {
     ctx.logger.debug({
       eventType: 'branch.output.skip',
@@ -368,10 +368,7 @@ async function mergeBranchOutputs(
   if (!sourceNode.taskId) return;
 
   const tasksResource = ctx.resources.tasks();
-  const { task } = await tasksResource.get(
-    sourceNode.taskId,
-    sourceNode.taskVersion ?? 1,
-  );
+  const { task } = await tasksResource.get(sourceNode.taskId, sourceNode.taskVersion ?? 1);
 
   if (task.outputSchema) {
     // Merge branches and clean up via decisions

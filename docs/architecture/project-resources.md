@@ -321,7 +321,7 @@ This section shows how all the pieces—coordinator, executor, containers, and s
       - resources: { "container": "do-abc123..." }  # resolved container DO ID
       - input: { file: "src/auth.ts", changes: "..." }
 
-2. Executor loads TaskDef and executes steps
+2. Executor loads Task and executes steps
    → Step 1: action_id: shell, action_version: 1
    → ActionDef.implementation:
       - command_template: "cat > {{file}} << 'EOF'\n{{changes}}\nEOF"
@@ -453,7 +453,7 @@ User → HTTP service → Coordinator DO
                     Coordinator dispatches tokens
                        ↓
                     Executor receives task (via queue)
-                      → Loads TaskDef, ActionDef (from Resources)
+                      → Loads Task, ActionDef (from Resources)
                       → Executes shell action
                         → containerStub.exec(command)
                           → ContainerDO validates ownership
@@ -551,7 +551,7 @@ nodes:
       files: ['.']
 ```
 
-Each node references a TaskDef (e.g., `llm_research_task`, `write_file_task`, `git_commit_task`). The TaskDef contains steps that reference ActionDefs. The node handles resource bindings and data mapping between workflow context and task I/O.
+Each node references a Task (e.g., `llm_research_task`, `write_file_task`, `git_commit_task`). The Task contains steps that reference ActionDefs. The node handles resource bindings and data mapping between workflow context and task I/O.
 
 The artifact is now versioned, diffable, searchable.
 

@@ -14,14 +14,14 @@ export {
   isEmbeddedModelProfile,
   isEmbeddedNode,
   isEmbeddedPromptSpec,
-  isEmbeddedTaskDef,
+  isEmbeddedTask,
   isEmbeddedWorkflowDef,
   type EmbeddedAction,
   type EmbeddedModelProfile,
   type EmbeddedNode,
   type EmbeddedPromptSpec,
   type EmbeddedStep,
-  type EmbeddedTaskDef,
+  type EmbeddedTask,
   type EmbeddedWorkflowDef,
 } from './embedded';
 export { modelProfile } from './model-profile';

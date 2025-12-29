@@ -15,7 +15,7 @@ export {
   isEmbeddedModelProfile,
   isEmbeddedNode,
   isEmbeddedPromptSpec,
-  isEmbeddedTaskDef,
+  isEmbeddedTask,
   isEmbeddedWorkflowDef,
   modelProfile,
   node,
@@ -30,7 +30,7 @@ export {
   type EmbeddedNode,
   type EmbeddedPromptSpec,
   type EmbeddedStep,
-  type EmbeddedTaskDef,
+  type EmbeddedTask,
   type EmbeddedWorkflowDef,
 } from './builders';
 

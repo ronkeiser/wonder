@@ -22,7 +22,7 @@
 
 ## Execution Model
 
-- Five layers: WorkflowDef → Node → TaskDef → Step → ActionDef
+- Five layers: WorkflowDef → Node → Task → Step → ActionDef
 - Every node executes exactly one task; every step executes exactly one action
 - Workflows: graphs, parallelism, durable state (DO SQLite), coordinated by Durable Object
 - Tasks: linear sequences, in-memory state, single worker execution, atomic retries

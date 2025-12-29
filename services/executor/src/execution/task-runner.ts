@@ -1,7 +1,7 @@
 /**
  * Task Runner - Main task execution loop
  *
- * Loads TaskDef, executes all steps in sequence, returns result.
+ * Loads Task, executes all steps in sequence, returns result.
  *
  * @see docs/architecture/executor.md
  */

@@ -19,7 +19,7 @@ When users author a WorkflowDef (via SDK or UI), they define schemas as JSONSche
 - `state_schema` - Defines mutable state structure (auto-inferred from graph or user-defined)
 - `output_schema` - Validates final workflow outputs
 
-These schemas are **stored as JSON** in D1 as part of the `WorkflowDef` record. TaskDefs (referenced by Nodes) can define `output_schema` for their results, enabling structured outputs and downstream validation.
+These schemas are **stored as JSON** in D1 as part of the `WorkflowDef` record. Tasks (referenced by Nodes) can define `output_schema` for their results, enabling structured outputs and downstream validation.
 
 ```typescript
 WorkflowDef {
@@ -31,7 +31,7 @@ WorkflowDef {
   output_schema: JSONSchema;     // JSON blob in D1
 }
 
-TaskDef {
+Task {
   id: string;
   version: number;
   // ...
@@ -41,11 +41,11 @@ TaskDef {
 
 Node {
   id: string;
-  task_id: string;               // References TaskDef
+  task_id: string;               // References Task
   task_version: number;
   input_mapping: object | null;  // Map context → task input
   output_mapping: object | null; // Map task output → context
-  // Nodes don't have output_schema - they reference TaskDefs that do
+  // Nodes don't have output_schema - they reference Tasks that do
 }
 ```
 
@@ -157,7 +157,7 @@ Each workflow run gets its own isolated context in a dedicated DO instance. Sche
 
 During fan-out, each token writes to isolated branch storage. See `branch-storage.md` for complete design.
 
-**Storage approach:** Each branch gets separate SQL tables (e.g., `branch_output_tok_abc123`) generated from the TaskDef's `output_schema` (referenced via `node.task_id`). This provides:
+**Storage approach:** Each branch gets separate SQL tables (e.g., `branch_output_tok_abc123`) generated from the Task's `output_schema` (referenced via `node.task_id`). This provides:
 
 - True isolation (no shared state)
 - Schema validation via `@wonder/schemas`
@@ -187,14 +187,14 @@ Merged data is written to `context.state` via `SET_CONTEXT` decision → `dispat
 ## Lifecycle
 
 1. **Authoring**: User defines `input_schema`, `context_schema`, `output_schema` as JSONSchema (via SDK/UI)
-2. **Storage**: Schemas stored as JSON in D1 with `WorkflowDef`; TaskDefs store their own `output_schema`
+2. **Storage**: Schemas stored as JSON in D1 with `WorkflowDef`; Tasks store their own `output_schema`
 3. **Initialization**:
    - Coordinator loads `WorkflowDef` from RESOURCES (cached)
    - `@wonder/schemas` generates DDL from schemas
    - Coordinator executes CREATE TABLE in DO SQLite
    - Input data validated and inserted
 4. **Execution**:
-   - Task outputs validated against `TaskDef.output_schema` (referenced via `node.task_id`)
+   - Task outputs validated against `Task.output_schema` (referenced via `node.task_id`)
    - Node's `output_mapping` maps task output to context paths
    - Context operations use generated DML to read/write normalized tables
    - Decision logic reads via `getSnapshot()` (read-only)

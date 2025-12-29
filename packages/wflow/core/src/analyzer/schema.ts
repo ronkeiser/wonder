@@ -65,7 +65,7 @@ export const RESOURCE_ALLOWED_PROPS = new Set([
   'merge_strategy',
 ]);
 
-// TaskDef allowed properties
+// Task allowed properties
 export const TASK_ALLOWED_PROPS = new Set([
   'imports',
   'task',

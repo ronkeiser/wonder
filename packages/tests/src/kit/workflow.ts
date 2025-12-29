@@ -4,11 +4,11 @@
  * Functions for creating, configuring, and executing test workflows.
  */
 
-import { isEmbeddedTaskDef, type EmbeddedNode, type EmbeddedWorkflowDef } from '@wonder/sdk';
+import { isEmbeddedTask, type EmbeddedNode, type EmbeddedWorkflowDef } from '@wonder/sdk';
 import { wonder } from '~/client';
 import { cleanupWorkflowTest } from './cleanup';
 import { setupTestContext } from './context';
-import { createEmbeddedTaskDef } from './resources';
+import { createEmbeddedTask } from './resources';
 import type { CreatedResources, TestContext, TestWorkflowResult, WorkflowTestSetup } from './types';
 
 export type { TestWorkflowResult, WorkflowTestSetup } from './types';
@@ -62,8 +62,8 @@ export async function createWorkflow(
       }
 
       // Embedded task def - create it and get the ID
-      if (task && isEmbeddedTaskDef(task)) {
-        const taskId = await createEmbeddedTaskDef(ctx, task, createdResources);
+      if (task && isEmbeddedTask(task)) {
+        const taskId = await createEmbeddedTask(ctx, task, createdResources);
         return { ...rest, taskId };
       }
 

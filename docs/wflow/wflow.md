@@ -625,7 +625,7 @@ For conditional branches and fan-in, the analysis must compute **intersection** 
      │
      ▼
 ┌──────────┐
-│ Transform│ → WorkflowDef, Node[], Transition[], TaskDef[]
+│ Transform│ → WorkflowDef, Node[], Transition[], Task[]
 └────┬─────┘
      │
      ▼
@@ -637,7 +637,7 @@ The transform phase:
 1. Generates ULIDs for all entities
 2. Resolves `@library/...` references to actual IDs
 3. Converts `reads`/`writes` to `input_mapping`/`output_mapping` JSONPath expressions
-4. Separates embedded task definitions into standalone TaskDefs
+4. Separates embedded task definitions into standalone Tasks
 
 ---
 
