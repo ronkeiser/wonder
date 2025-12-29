@@ -56,6 +56,12 @@
   --color-accent-hover: #8885ff;
   --color-accent-muted: #7269ff80;
 
+  /* Semantic: status */
+  --color-success: #10aa67;
+  --color-warning: #ffb640;
+  --color-error: #f85149;
+  --color-info: #5ec9e0;
+
   /* Semantic: status backgrounds */
   --color-error-surface: #2d1515;
   --color-success-surface: #0d2818;
