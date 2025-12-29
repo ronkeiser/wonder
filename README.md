@@ -72,7 +72,7 @@ WorkflowDef
     ↓ contains
   Step
     ↓ executes
-  ActionDef
+  Action
 ```
 
 **WorkflowDef**: Graphs of nodes and transitions. Supports parallelism, fan-out/fan-in, human gates, sub-workflows. State is durable (DO SQLite). Coordinated by a Durable Object.
@@ -83,7 +83,7 @@ WorkflowDef
 
 **Step**: A point in a task sequence. Each step executes exactly one action.
 
-**ActionDef**: Atomic operations—LLM calls, shell commands, HTTP requests, context updates.
+**Action**: Atomic operations—LLM calls, MCP tools, HTTP requests, context updates.
 
 Every execution path traverses all five layers. Simple cases are trivial at each layer.
 
@@ -101,9 +101,9 @@ A workflow is a directed graph of nodes connected by transitions. Nodes execute 
 
 ```
 Node: generate_candidates
-  → Transition (fan_out, spawn_count: 5)
+  → Transition (siblingGroup: "judges", spawn_count: 5)
   → Node: judge_candidate
-  → Transition (fan_in, wait_for: all, merge: append)
+  → Transition (synchronization: { strategy: all, siblingGroup: "judges" }, merge: append)
   → Node: select_winner
 ```
 
@@ -113,9 +113,9 @@ Transitions handle all routing logic:
 
 - **Conditions**: Route based on context state
 - **Priority tiers**: Same priority = parallel, different = sequential fallback
-- **Fan-out**: `spawn_count` (static) or `foreach` (dynamic over collection)
-- **Fan-in**: `wait_for` (any | all | m_of_n) with merge strategies
-- **Loops**: Back-edges with iteration limits
+- **Fan-out**: `siblingGroup` + `spawn_count` (static) or `foreach` (dynamic over collection)
+- **Fan-in**: `synchronization` with strategy (any | all | m_of_n) and merge config
+- **Loops**: Back-edges with iteration limits via `loopConfig`
 
 Nodes are simple—they just execute tasks and map data.
 
@@ -130,7 +130,7 @@ Start: 1 token
   → End
 ```
 
-Each token tracks its lineage: parent token, fan-out transition, branch index, branch total.
+Each token tracks its lineage: parent token, path ID, sibling group, branch index, branch total.
 
 ### Context Carries State
 
@@ -143,21 +143,23 @@ Every workflow run has a context:
 
 Context is stored as SQL tables in the coordinator's SQLite database, driven by JSONSchema. During fan-out, each token writes to isolated branch tables. At fan-in, merge strategies combine results.
 
-## Action Types
+## Action Kinds
 
 Actions are the atomic operations that steps execute:
 
-| Action           | Purpose                                |
-| ---------------- | -------------------------------------- |
-| `llm_call`       | Call an LLM with a prompt spec         |
-| `shell_exec`     | Execute a command in a container       |
-| `mcp_tool`       | Invoke an MCP server tool              |
-| `http_request`   | Make HTTP requests to external APIs    |
-| `human_input`    | Wait for human or agent input          |
-| `update_context` | Transform data (pure functions)        |
-| `write_artifact` | Persist typed output                   |
-| `workflow_call`  | Invoke another workflow (sub-workflow) |
-| `vector_search`  | Semantic search over artifacts         |
+| Kind       | Purpose                                         |
+| ---------- | ----------------------------------------------- |
+| `llm`      | Call an LLM with a prompt spec                  |
+| `mcp`      | Invoke an MCP server tool (including shell)     |
+| `http`     | Make HTTP requests to external APIs             |
+| `human`    | Wait for human or agent input                   |
+| `context`  | Transform data (pure functions)                 |
+| `artifact` | Persist typed output                            |
+| `vector`   | Semantic search over artifacts                  |
+| `metric`   | Record metrics to Analytics Engine              |
+| `mock`     | Test stub with predefined responses             |
+
+Note: Sub-workflows are invoked via Node's `subworkflowId`, not an action.
 
 ## Containers
 
@@ -224,18 +226,17 @@ See [Agent Environment](./agent-environment.md) for details.
 
 ## Sub-Workflow Invocation
 
-The `workflow_call` action enables composition. A research pipeline invokes a reasoning routine:
+Sub-workflow nodes enable composition. A research pipeline invokes a reasoning routine:
 
 ```
 Node: investigate
-  action: workflow_call
-  implementation:
-    workflow_def_id: react_reasoning_v2
-    pass_resources: [dev_env]
-  input_mapping:
+  subworkflowId: react_reasoning_v2
+  resourceBindings:
+    dev_env: dev_env
+  inputMapping:
     task: state.research_question
-  output_mapping:
-    state.findings: output.findings
+  outputMapping:
+    state.findings: $.findings
 ```
 
 **Context isolation.** Sub-workflows execute with fresh context. Input is mapped from parent. Output is mapped back.
@@ -279,13 +280,14 @@ Shell commands route through ContainerDO:
 
 ## Event Sourcing
 
-Every state change emits an event:
+Every state change emits an event (dot notation: `category.action`):
 
-- `workflow_started`, `workflow_completed`, `workflow_failed`
-- `node_started`, `node_completed`, `node_failed`
-- `token_spawned`, `token_merged`, `token_cancelled`
-- `subworkflow_started`, `subworkflow_completed`
-- `artifact_created`, `context_updated`
+- `workflow.started`, `workflow.completed`, `workflow.failed`
+- `task.dispatched`, `task.completed`, `task.failed`
+- `token.created`, `token.completed`, `token.failed`, `token.waiting`
+- `fan_out.started`, `fan_in.completed`, `branches.merged`
+- `subworkflow.started`, `subworkflow.completed`, `subworkflow.failed`
+- `context.updated`, `context.output_applied`
 
 This enables full replay, live UI updates, audit trails, and time-travel debugging.
 

@@ -22,8 +22,8 @@ Branch isolation is achieved through table namespacing—each token gets its own
 **Workflow context schema:**
 
 ```typescript
-// WorkflowDef.context_schema
-context_schema: {
+// WorkflowDef.contextSchema
+contextSchema: {
   type: 'object',
   properties: {
     votes: {
@@ -43,8 +43,8 @@ context_schema: {
 **Task output schema (each judge task):**
 
 ```typescript
-// Task.output_schema (referenced by Node via task_id)
-output_schema: {
+// Task.outputSchema (referenced by Node via taskId)
+outputSchema: {
   type: 'object',
   properties: {
     choice: { type: 'string', enum: ['A', 'B'] },
@@ -93,46 +93,50 @@ CREATE TABLE branch_output_tok_abc124 (
 ### `operations/context.ts`
 
 ```typescript
-interface ContextOperations {
-  // Initialize main context tables from workflow schemas
-  initializeTable(sql: SqlStorage, schema: JSONSchema): void;
+class ContextManager {
+  constructor(sql: SqlStorage, defs: DefinitionManager, emitter: Emitter);
 
-  // Initialize branch output table for a token
-  initializeBranchTable(sql: SqlStorage, tokenId: string, schema: JSONSchema): void;
+  // Initialize context tables from workflow schemas and store input
+  initialize(input: Record<string, unknown>): void;
 
-  // Read from main context (for decision logic)
-  get(sql: SqlStorage, path: string): unknown;
-  getSnapshot(sql: SqlStorage): ContextSnapshot;
+  // Read from main context
+  getSection(section: string): Record<string, unknown>;
+  get(path: string): unknown;
+  getSnapshot(): ContextSnapshot;
 
-  // Write to main context (SET_CONTEXT decision)
-  set(sql: SqlStorage, path: string, value: unknown): void;
+  // Write to main context
+  setField(path: string, value: unknown): void;
+  replaceSection(section: string, data: Record<string, unknown>): void;
 
-  // Write node output to branch-isolated table
-  applyNodeOutput(
-    sql: SqlStorage,
-    tokenId: string,
-    output: Record<string, unknown>,
-    outputSchema: JSONSchema,
+  // Apply node's outputMapping to write task output to context (linear flows)
+  applyOutputMapping(
+    outputMapping: Record<string, string> | null,
+    taskOutput: Record<string, unknown>,
   ): void;
 
-  // Read all branch outputs from sibling tokens (for merge)
+  // Branch storage operations (parallel flows)
+  initializeBranchTable(tokenId: string, outputSchema: JSONSchema): void;
+  applyBranchOutput(tokenId: string, output: Record<string, unknown>): void;
   getBranchOutputs(
-    sql: SqlStorage,
     tokenIds: string[],
+    branchIndices: number[],
     outputSchema: JSONSchema,
-  ): Array<{ tokenId: string; output: Record<string, unknown> }>;
-
-  // Merge branch outputs into main context (at fan-in)
-  mergeBranches(
-    sql: SqlStorage,
-    siblings: TokenRow[],
-    merge: { source: string; target: string; strategy: string },
-    outputSchema: JSONSchema,
-  ): void;
-
-  // Cleanup: drop branch tables after merge
-  dropBranchTables(sql: SqlStorage, tokenIds: string[]): void;
+  ): BranchOutput[];
+  mergeBranches(branchOutputs: BranchOutput[], merge: MergeConfig): void;
+  dropBranchTables(tokenIds: string[]): void;
 }
+
+type BranchOutput = {
+  tokenId: string;
+  branchIndex: number;
+  output: unknown;
+};
+
+type MergeConfig = {
+  source: string;  // Path in branch output (e.g., '_branch.output')
+  target: string;  // Where to write merged result (e.g., 'state.votes')
+  strategy: 'append' | 'collect' | 'merge_object' | 'keyed_by_branch' | 'last_wins';
+};
 ```
 
 ## Lifecycle
@@ -143,29 +147,26 @@ When a token is created during fan-out:
 
 ```typescript
 // In dispatch/apply.ts handling CREATE_TOKEN decision
-const token = operations.tokens.create(sql, params);
+const token = operations.tokens.create(decision);
 
-// Create isolated branch output table
-// Get output schema from the node's Task
-const node = workflow.nodes.find((n) => n.id === params.node_id);
-const taskDef = await resources.getTask(node.task_id, node.task_version);
-const taskOutputSchema = taskDef.output_schema;
-
-if (taskOutputSchema) {
-  operations.context.initializeBranchTable(sql, token.id, taskOutputSchema);
+// Create isolated branch output table if node has outputSchema
+const outputSchema = defs.getNode(decision.nodeId).outputSchema;
+if (outputSchema) {
+  context.initializeBranchTable(token.id, outputSchema);
 }
 
 dispatch(token.id);
 ```
 
-Implementation:
+Implementation uses `@wonder/schemas` Schema class:
 
 ```typescript
-function initializeBranchTable(sql: SqlStorage, tokenId: string, schema: JSONSchema): void {
+initializeBranchTable(tokenId: string, outputSchema: JSONSchema): void {
   const tableName = `branch_output_${tokenId}`;
-  const ddlGen = new DDLGenerator(schema, registry);
-  const ddl = ddlGen.generateDDL(tableName);
-  sql.exec(ddl); // Creates branch_output_tok_xxx table(s)
+  const schema = new Schema(outputSchema);
+  const table = schema.bind(this.sql, tableName, this.sqlHook);
+  table.create();
+  this.branchTables.set(tokenId, table);  // Cache for later use
 }
 ```
 
@@ -174,51 +175,50 @@ function initializeBranchTable(sql: SqlStorage, tokenId: string, schema: JSONSch
 When executor returns a result:
 
 ```typescript
-// In coordinator handleTaskResult()
-// Output schema comes from Task, not Node
-const taskDef = await resources.getTask(node.task_id, node.task_version);
-operations.context.applyNodeOutput(sql, tokenId, result.output_data, taskDef.output_schema);
+// In dispatch/apply.ts handling COMPLETE_TOKEN decision for branch tokens
+// Output is written to branch table for later merge
+context.applyBranchOutput(tokenId, result.output);
 ```
 
-Implementation:
+Implementation uses cached SchemaTable:
 
 ```typescript
-function applyNodeOutput(
-  sql: SqlStorage,
-  tokenId: string,
-  output: Record<string, unknown>,
-  outputSchema: JSONSchema,
-): void {
-  const tableName = `branch_output_${tokenId}`;
-  const dmlGen = new DMLGenerator(outputSchema, registry);
-
-  // Generate INSERT statements
-  const { statements, values } = dmlGen.generateInsert(tableName, output);
-
-  // Execute parameterized inserts
-  for (let i = 0; i < statements.length; i++) {
-    sql.exec(statements[i], values[i]);
+applyBranchOutput(tokenId: string, output: Record<string, unknown>): void {
+  const table = this.branchTables.get(tokenId);
+  if (!table) {
+    throw new Error(`Branch table not found for token ${tokenId}`);
   }
+
+  // Validate output against schema
+  const result = table.validate(output);
+  if (!result.valid) {
+    throw new Error(`Branch output validation failed: ${result.errors.map((e) => e.message).join(', ')}`);
+  }
+
+  table.insert(output);
 }
 ```
 
 ### 3. Fan-in: Merge Branch Tables
 
-When synchronization condition is met:
+When synchronization condition is met, planning emits decisions:
 
 ```typescript
-// In decisions/synchronization.ts
+// In planning/synchronization.ts
 if (syncConditionMet) {
-  // Get Task output schema for merge validation
-  const node = workflow.nodes.find((n) => n.id === token.node_id);
-  const taskDef = await resources.getTask(node.task_id, node.task_version);
+  const merge = transition.synchronization!.merge!;
 
   return [
     {
       type: 'MERGE_BRANCHES',
-      siblings: siblingTokens,
-      merge: transition.synchronization.merge,
-      outputSchema: taskDef.output_schema,
+      tokenIds: siblingTokenIds,
+      branchIndices: siblingBranchIndices,
+      outputSchema: nodeOutputSchema,
+      merge,
+    },
+    {
+      type: 'DROP_BRANCH_TABLES',
+      tokenIds: siblingTokenIds,
     },
     {
       type: 'ACTIVATE_FAN_IN_TOKEN',
@@ -232,16 +232,17 @@ Implementation in dispatch/apply.ts:
 
 ```typescript
 case 'MERGE_BRANCHES': {
-  operations.context.mergeBranches(
-    sql,
-    decision.siblings,
-    decision.merge,
-    decision.outputSchema
+  const branchOutputs = context.getBranchOutputs(
+    decision.tokenIds,
+    decision.branchIndices,
+    decision.outputSchema,
   );
+  context.mergeBranches(branchOutputs, decision.merge);
+  break;
+}
 
-  // Cleanup branch tables
-  const tokenIds = decision.siblings.map(s => s.id);
-  operations.context.dropBranchTables(sql, tokenIds);
+case 'DROP_BRANCH_TABLES': {
+  context.dropBranchTables(decision.tokenIds);
   break;
 }
 ```
@@ -249,57 +250,70 @@ case 'MERGE_BRANCHES': {
 ### 4. Merge Strategies
 
 ```typescript
-function mergeBranches(
-  sql: SqlStorage,
-  siblings: TokenRow[],
-  merge: { source: string; target: string; strategy: string },
-  outputSchema: JSONSchema,
-): void {
-  // Read all branch outputs
-  const branchData = siblings.map((sibling) => {
-    const tableName = `branch_output_${sibling.id}`;
-    // Read using schema-driven query
-    return {
-      tokenId: sibling.id,
-      branchIndex: sibling.branch_index,
-      output: readBranchTable(sql, tableName, outputSchema),
-    };
+mergeBranches(branchOutputs: BranchOutput[], merge: MergeConfig): void {
+  // Extract outputs based on source path
+  const extractedOutputs = branchOutputs.map((b) => {
+    if (merge.source === '_branch.output') {
+      return b;
+    }
+    // Extract nested path from output (e.g., '_branch.output.ideas')
+    const path = merge.source.replace('_branch.output.', '');
+    return { ...b, output: getNestedValue(b.output, path) };
   });
 
   // Apply merge strategy
-  const merged = applyMergeStrategy(branchData, merge.strategy);
+  let merged: unknown;
+  switch (merge.strategy) {
+    case 'append': /* ... */ break;
+    case 'collect': /* ... */ break;
+    case 'merge_object': /* ... */ break;
+    case 'keyed_by_branch': /* ... */ break;
+    case 'last_wins': /* ... */ break;
+  }
 
-  // Write to main context
-  operations.context.set(sql, merge.target, merged);
+  // Write to target path in context
+  this.setField(merge.target, merged);
 }
 ```
 
 **Merge strategies:**
 
-- **append** - Collect all outputs into array
+- **append** - Collect all outputs into array, ordered by branch index. If all outputs are arrays, flattens them.
 
   ```typescript
-  merged = branchData.map((b) => b.output);
+  const sorted = extractedOutputs.sort((a, b) => a.branchIndex - b.branchIndex);
+  const outputs = sorted.map((b) => b.output);
+  merged = outputs.every((o) => Array.isArray(o)) ? outputs.flat() : outputs;
   // Result: [{ choice: 'A', rationale: '...' }, { choice: 'B', ... }, ...]
+  // Or if outputs are arrays: [item1, item2, item3, item4, ...]
+  ```
+
+- **collect** - Collect all outputs into array, preserving structure (no flattening)
+
+  ```typescript
+  const sorted = extractedOutputs.sort((a, b) => a.branchIndex - b.branchIndex);
+  merged = sorted.map((b) => b.output);
+  // Result: [[a,b], [c,d]] instead of [a,b,c,d]
   ```
 
 - **merge_object** - Shallow merge all outputs
 
   ```typescript
-  merged = Object.assign({}, ...branchData.map((b) => b.output));
+  merged = Object.assign({}, ...extractedOutputs.map((b) => b.output));
   // Result: { choice: 'B', rationale: '...' } (last wins for conflicts)
   ```
 
 - **keyed_by_branch** - Object keyed by branch index
 
   ```typescript
-  merged = Object.fromEntries(branchData.map((b) => [b.branchIndex.toString(), b.output]));
+  merged = Object.fromEntries(extractedOutputs.map((b) => [b.branchIndex.toString(), b.output]));
   // Result: { '0': {...}, '1': {...}, '2': {...} }
   ```
 
-- **last_wins** - Take last completed branch
+- **last_wins** - Take highest branch index
   ```typescript
-  merged = branchData[branchData.length - 1].output;
+  const sorted = extractedOutputs.sort((a, b) => b.branchIndex - a.branchIndex);
+  merged = sorted[0]?.output ?? {};
   // Result: { choice: 'A', rationale: '...' }
   ```
 
@@ -307,13 +321,12 @@ function mergeBranches(
 
 ### Branch Output Schema Sources
 
-Task output schemas come from:
+Output schemas come from:
 
-1. **Task.output_schema** - Primary source, defines what the task produces
-2. **Derived from Actions** - If Task doesn't specify, can be inferred from final step's ActionDef.produces
-3. **Structured LLM output** - For LLM actions with JSON schema output validation
+1. **Task.outputSchema** - Primary source, defines what the task produces (used for branch table DDL)
+2. **Structured LLM output** - For LLM actions with JSON schema output validation
 
-Note: Nodes reference Tasks via `node.task_id` and `node.task_version`. The Node itself only defines data mapping (`input_mapping`, `output_mapping`), not schemas.
+Note: Nodes don't have outputSchema - they reference Tasks via `taskId` and `taskVersion`. The node's `outputMapping` maps task output to context paths.
 
 ### Merge Target Validation
 
@@ -323,12 +336,12 @@ The merged result must match the target path's schema:
 // Merge config
 merge: {
   source: '_branch.output',  // All of branch output
-  target: 'state.votes',  // Array in state schema
+  target: 'state.votes',     // Array in state schema
   strategy: 'append'
 }
 
 // Validation
-const targetSchema = getSchemaAtPath(workflow.state_schema, 'state.votes');
+const targetSchema = getSchemaAtPath(workflow.contextSchema, 'state.votes');
 // targetSchema = { type: 'array', items: { ... } }
 
 const merged = applyMergeStrategy(branchData, 'append');
@@ -337,11 +350,11 @@ validateSchema(merged, targetSchema);  // Must be array of vote objects
 
 ### Nested Objects in Branch Output
 
-If a Task output schema defines nested objects:
+If a node's output schema defines nested objects:
 
 ```typescript
-// Task.output_schema
-output_schema: {
+// Node.outputSchema
+outputSchema: {
   type: 'object',
   properties: {
     decision: { type: 'string' },
@@ -395,19 +408,24 @@ Outer fan-in (tok_1, tok_2, tok_3) merges into main `context_state`.
 
 Each level of fan-in reads from its sibling branch tables and writes to its parent's context (which might itself be a branch table).
 
-## Decision Type Addition
+## Decision Types
 
-Add new decision type for merge:
+Branch storage uses these decision types:
 
 ```typescript
 type Decision =
   // ... existing decisions
-  {
-    type: 'MERGE_BRANCHES';
-    siblings: TokenRow[];
-    merge: { source: string; target: string; strategy: string };
-    outputSchema: JSONSchema;
-  };
+  | {
+      type: 'MERGE_BRANCHES';
+      tokenIds: string[];
+      branchIndices: number[];
+      outputSchema: JSONSchema;
+      merge: MergeConfig;
+    }
+  | {
+      type: 'DROP_BRANCH_TABLES';
+      tokenIds: string[];
+    };
 ```
 
 ## Path Syntax Clarification
@@ -441,7 +459,7 @@ Target paths are standard JSONPath into main context:
 **Branch isolation via table namespacing:**
 
 - Each token gets `branch_output_{tokenId}` table(s) during fan-out
-- Node outputs write to isolated branch tables via `@wonder/schemas` DML
+- Task outputs write to isolated branch tables via `@wonder/schemas` DML
 - Fan-in reads all sibling branch tables, merges, writes to main context
 - Branch tables dropped after merge (cleanup)
 
@@ -449,14 +467,15 @@ Target paths are standard JSONPath into main context:
 
 **Key operations:**
 
-- `initializeBranchTable(tokenId, schema)` - CREATE TABLE
-- `applyNodeOutput(tokenId, output, schema)` - INSERT into branch table
-- `mergeBranches(siblings, merge, schema)` - Read branches, merge, write to context
+- `initializeBranchTable(tokenId, outputSchema)` - CREATE TABLE using @wonder/schemas
+- `applyBranchOutput(tokenId, output)` - INSERT into branch table with validation
+- `getBranchOutputs(tokenIds, branchIndices, outputSchema)` - Read from branch tables
+- `mergeBranches(branchOutputs, merge)` - Apply merge strategy, write to context
 - `dropBranchTables(tokenIds)` - DROP TABLE cleanup
 
 **Schema-driven throughout:**
 
-- Branch table DDL from node.output_schema
-- Branch inserts via DML generator
+- Branch table DDL from Task.outputSchema via @wonder/schemas
+- Branch inserts via SchemaTable.insert() with validation
 - Merge validation against target path schema
 - Type safety end-to-end

@@ -17,26 +17,35 @@ Wonder's branching model is based on **transition-centric control flow**, inspir
 ```typescript
 Transition {
   id: string,                 // Unique transition identifier
-  from_node_id: string,
-  to_node_id: string,
+  fromNodeId: string,
+  toNodeId: string,
   priority: number,           // Lower = higher priority (1 = first)
   condition?: Condition,      // Structured or CEL expression
-  spawn_count?: number,       // How many tokens for this path (default: 1)
-  foreach?: {                 // Dynamic iteration over collection
-    collection: string,
-    item_var: string
-  },
+  spawnCount?: number,        // How many tokens for this path (default: 1)
+  siblingGroup?: string,      // Named group identifier for fan-out tokens
+  foreach?: ForeachConfig,    // Dynamic iteration over collection
   synchronization?: {         // Fan-in behavior for tokens arriving via this transition
-    strategy: 'any' | 'all' | { m_of_n: number },
-    sibling_group: string,  // Which fan_out_transition_id to synchronize on
-    timeout_ms?: number,    // Max wait time for siblings (null = no timeout)
-    on_timeout?: 'proceed_with_available' | 'fail',  // Default: 'fail'
-    merge?: {
-      source: string,         // Path in branch output (e.g., '_branch.output', '_branch.output.choice')
-      target: string,         // Where to write merged result (e.g., 'state.votes')
-      strategy: 'append' | 'merge_object' | 'keyed_by_branch' | 'last_wins'
-    }
-  }
+    strategy: 'any' | 'all' | { mOfN: number },
+    siblingGroup: string,     // Which sibling group to synchronize on
+    timeoutMs?: number,       // Max wait time for siblings (undefined = no timeout)
+    onTimeout?: 'proceed_with_available' | 'fail',  // Default: 'fail'
+    merge?: MergeConfig
+  },
+  loopConfig?: LoopConfig     // For back-edges with iteration limits
+}
+
+MergeConfig {
+  target: string,             // Where to write merged result (e.g., 'output.votes')
+  strategy: 'append' | 'collect' | 'merge_object' | 'keyed_by_branch' | 'last_wins'
+}
+
+ForeachConfig {
+  collection: string,         // Path to array in context (e.g., 'input.items')
+  itemVar: string             // Variable name for current item
+}
+
+LoopConfig {
+  maxIterations: number       // Maximum loop iterations before stopping
 }
 ```
 
@@ -88,14 +97,15 @@ Multiple tokens execute the same path.
 // Node A completes
 Transition:
   id: 'trans_a_to_b',
-  from_node_id: 'A',
-  to_node_id: 'B',
-  spawn_count: 5
+  fromNodeId: 'A',
+  toNodeId: 'B',
+  siblingGroup: 'judges',
+  spawnCount: 5
 
 // → 5 tokens spawned to Node B
-// → All have fan_out_transition_id = 'trans_a_to_b'
-// → branch_index: 0,1,2,3,4
-// → branch_total: 5
+// → All have siblingGroup = 'judges'
+// → branchIndex: 0,1,2,3,4
+// → branchTotal: 5
 ```
 
 **Use case:** Parallel LLM judges, multiple attempts, Monte Carlo sampling.
@@ -107,19 +117,19 @@ Combine parallel dispatch with per-transition replication.
 ```typescript
 // Node A completes
 Transitions (same priority = parallel dispatch):
-  id: 'trans_research', priority: 1, condition: { mode == 'research' }, spawn_count: 3 → Node B
-  id: 'trans_validate', priority: 1, condition: { mode == 'validate' }, spawn_count: 5 → Node C
+  id: 'trans_research', priority: 1, condition: { mode == 'research' }, siblingGroup: 'research', spawnCount: 3 → Node B
+  id: 'trans_validate', priority: 1, condition: { mode == 'validate' }, siblingGroup: 'validate', spawnCount: 5 → Node C
 
 // If mode='research' and mode='validate' both true
 // → 8 tokens total (3 to B, 5 to C)
-// → 3 tokens have fan_out_transition_id = 'trans_research' (siblings with each other)
-// → 5 tokens have fan_out_transition_id = 'trans_validate' (siblings with each other)
-// → NOT siblings across transitions
+// → 3 tokens have siblingGroup = 'research' (siblings with each other)
+// → 5 tokens have siblingGroup = 'validate' (siblings with each other)
+// → NOT siblings across groups
 ```
 
 **Use case:** Different strategies with different parallelism levels, evaluated in parallel.
 
-**Important:** Each transition creates its own sibling group. The 3 tokens to B are siblings with each other, and the 5 tokens to C are siblings with each other, but they are NOT siblings across transitions.
+**Important:** Each sibling group is independent. The 3 tokens to B are siblings with each other, and the 5 tokens to C are siblings with each other, but they are NOT siblings across groups.
 
 ### Pattern 5: Dynamic Iteration (foreach)
 
@@ -147,37 +157,33 @@ Tokens track execution history and current execution state:
 
 ```typescript
 Token {
-  id: 'tok_abc123',
-  workflow_run_id: string,
-  node_id: string,
-  path_id: 'root.A.0.B.2',  // Root → Node A branch 0 → Node B branch 2
-  parent_token_id: 'tok_parent',
-  fan_out_transition_id: 'trans_b_spawn',  // Transition that spawned this token
-  branch_index: 2,          // Position in sibling group
-  branch_total: 5,          // Total siblings from this transition
+  id: string,               // ULID
+  workflowRunId: string,
+  nodeId: string,
+  pathId: string,           // 'root.A.0.B.2' - hierarchical execution path
+  parentTokenId: string | null,
+  siblingGroup: string | null,  // Named group identifier (from transition.siblingGroup)
+  branchIndex: number,      // Position in sibling group (0-indexed)
+  branchTotal: number,      // Total siblings in group
+  iterationCounts: Record<string, number> | null,  // Loop iteration tracking
 
-  // State machine
-  state: TokenState,
-  state_data?: StateSpecificData,
-  state_updated_at: timestamp
+  // State
+  status: TokenStatus,
+  arrivedAt: Date | null,   // When token arrived at fan-in (for timeout calculation)
+  createdAt: Date,
+  updatedAt: Date
 }
 
-enum TokenState {
-  'pending',              // Created, not dispatched yet
-  'dispatched',           // Sent to Executor
-  'executing',            // Executor acknowledged, running task
-  'waiting_for_siblings', // At fan-in, waiting for synchronization
-  'completed',            // Successfully finished (terminal)
-  'failed',               // Execution error (terminal)
-  'timed_out',            // Exceeded timeout (terminal)
-  'cancelled'             // Explicitly cancelled (terminal)
-}
-
-type StateSpecificData =
-  | { state: 'waiting_for_siblings', arrived_at: timestamp, awaiting_count: number }
-  | { state: 'timed_out', timeout_at: timestamp }
-  | { state: 'cancelled', cancelled_by: token_id, reason?: string }
-  | { state: 'failed', error: Error, retry_count: number }
+type TokenStatus =
+  | 'pending'               // Created, not dispatched yet
+  | 'dispatched'            // Sent to Executor
+  | 'executing'             // Executor acknowledged, running task
+  | 'waiting_for_siblings'  // At fan-in, waiting for synchronization
+  | 'waiting_for_subworkflow' // Waiting for child workflow to complete
+  | 'completed'             // Successfully finished (terminal)
+  | 'failed'                // Execution error (terminal)
+  | 'timed_out'             // Exceeded timeout (terminal)
+  | 'cancelled'             // Explicitly cancelled (terminal)
 ```
 
 **State Transitions:**
@@ -187,24 +193,28 @@ pending → dispatched → executing → completed
                            ↓
                          failed
 
-pending → dispatched → executing → waiting_for_siblings → dispatched
+pending → dispatched → executing → waiting_for_siblings → completed (fan-in activated)
                                               ↓
-                                          completed
+                                          timed_out (if timeout configured)
 
-Any state → timed_out (via timeout mechanism)
-Any non-terminal → cancelled (via explicit cancellation)
+pending → dispatched → waiting_for_subworkflow → completed (subworkflow done)
+                                    ↓
+                                  failed (subworkflow failed)
+
+Any non-terminal → cancelled (via explicit cancellation or fan-in race)
 ```
 
-**State Semantics:**
+**Status Semantics:**
 
-- `pending`: Token created, waiting to be dispatched (may be in queue)
-- `dispatched`: Sent to Executor, awaiting acknowledgment
+- `pending`: Token created, not yet dispatched
+- `dispatched`: Sent to Executor, awaiting execution
 - `executing`: Executor running the node's task
-- `waiting_for_siblings`: Token arrived at fan-in, waiting for other siblings
-- `completed`: Terminal state - task execution succeeded
-- `failed`: Terminal state - task execution failed
+- `waiting_for_siblings`: Token arrived at fan-in, waiting for sync condition
+- `waiting_for_subworkflow`: Token dispatched subworkflow, waiting for completion
+- `completed`: Terminal state - task/subworkflow succeeded
+- `failed`: Terminal state - execution error
 - `timed_out`: Terminal state - exceeded timeout deadline
-- `cancelled`: Terminal state - cancelled by user or early completion policy
+- `cancelled`: Terminal state - cancelled by fan-in race or explicit cancellation
 
 **Path Format:** `root[.nodeId.branchIndex]*`
 
@@ -220,46 +230,50 @@ Transitions can specify synchronization requirements for tokens arriving via tha
 
 ```typescript
 Transition {
-  from_node_id: 'B',
-  to_node_id: 'C',
+  fromNodeId: 'B',
+  toNodeId: 'C',
   synchronization: {
     strategy: 'all',                    // Wait for all siblings
-    sibling_group: 'trans_a',           // Which fan_out_transition_id to synchronize on
-    timeout_ms: null,                   // No timeout
-    on_timeout: 'fail',                 // Fail if timeout occurs
+    siblingGroup: 'judges',             // Which sibling group to synchronize on
+    timeoutMs: 30000,                   // 30 second timeout (optional)
+    onTimeout: 'fail',                  // Fail if timeout occurs
     merge: {
-      source: '_branch.output',         // All fields from branch output
-      target: 'state.votes',            // Where to write merged result
+      target: 'output.votes',           // Where to write merged result
       strategy: 'append'                // How to combine
     }
   }
 }
 ```
 
-**Storage:** Each sibling writes to `branch_output_{tokenId}` table. At fan-in, all sibling tables are read, merged per strategy, and written to `context_state.votes`. See `branch-storage.md` for details.
+**Storage:** Each sibling writes to `branch_output_{tokenId}` table. At fan-in, all sibling tables are read, merged per strategy, and written to context. See `branch-storage.md` for details.
 
 **Sibling Identification:**
 
-Tokens are siblings if they share a common `fan_out_transition_id` (the transition specified in `sibling_group`).
+Tokens are siblings if they share a common `siblingGroup` value (from the fan-out transition's `siblingGroup` field).
 
 ```sql
--- Find all siblings from transition 'trans_a'
+-- Find all siblings in group 'judges'
 SELECT * FROM tokens
 WHERE workflow_run_id = ?
-AND fan_out_transition_id = 'trans_a'
+AND sibling_group = 'judges'
 ```
 
 **Synchronization Implementation:**
 
-When a token arrives at a node via a transition with synchronization:
+When routing creates a token at a node via a transition with synchronization:
 
-1. Check if token belongs to the specified sibling group (`fan_out_transition_id` matches `sibling_group`)
-2. If yes: query all siblings and check their states
-3. Count siblings in terminal states (`completed`, `failed`, `timed_out`, `cancelled`)
-4. Determine if synchronization condition is met based on `strategy` mode
-5. If condition met: merge outputs and create new token in `pending` state
-6. If not met: transition current token to `waiting_for_siblings` state
-7. If token doesn't belong to sibling group: pass through as `dispatched`
+1. Get sibling counts from TokenManager (`getSiblingCounts`)
+2. Call `decideSynchronization()` planning function with token, transition, and counts
+3. Based on strategy:
+   - `'any'`: First arrival wins - activate immediately
+   - `'all'`: Check if `terminal_count >= branchTotal`
+   - `{ mOfN: M }`: Check if `completed_count >= M`
+4. If condition met: `ACTIVATE_FAN_IN` decision
+   - Race-safe via `TRY_ACTIVATE_FAN_IN` (SQL unique constraint)
+   - Merge branch outputs
+   - Create continuation token
+   - Mark waiting/in-flight siblings as completed/cancelled
+5. If not met: `MARK_WAITING` decision - token enters `waiting_for_siblings` state
 
 **Synchronization Strategies:**
 
@@ -282,21 +296,21 @@ When a token arrives at a node via a transition with synchronization:
 **Example: Multiple fan-out groups converging**
 
 ```typescript
-// Node A spawns via two transitions
-Transition: id: 'trans_a1', A → B, spawn_count: 3
-Transition: id: 'trans_a2', A → C, spawn_count: 5
+// Node A spawns via two transitions with different sibling groups
+Transition: id: 'trans_a1', A → B, siblingGroup: 'group_a', spawnCount: 3
+Transition: id: 'trans_a2', A → C, siblingGroup: 'group_b', spawnCount: 5
 
 // Node D receives from both paths with separate synchronization
 Transition: B → D, synchronization: {
-  sibling_group: 'trans_a1',
+  siblingGroup: 'group_a',
   strategy: 'all',
-  merge: { source: '_branch.output', target: 'state.group_a', strategy: 'append' }
+  merge: { target: 'output.group_a_results', strategy: 'append' }
 }
 
 Transition: C → D, synchronization: {
-  sibling_group: 'trans_a2',
+  siblingGroup: 'group_b',
   strategy: 'all',
-  merge: { source: '_branch.output', target: 'state.group_b', strategy: 'append' }
+  merge: { target: 'output.group_b_results', strategy: 'append' }
 }
 ```
 
@@ -308,131 +322,96 @@ Failed nodes produce error objects in their branch output tables. These flow thr
 
 ## Routing Algorithm
 
+The coordinator uses a planning/dispatch separation. Planning functions are pure (return Decision[]), dispatch executes them.
+
 ```typescript
-async function handleTaskResult(token, result) {
-  // 1. Get completed node
-  const node = getNode(token.node_id);
+// dispatch/task.ts - processTaskResult()
+async function processTaskResult(ctx, tokenId, result) {
+  // 1. Mark token completed
+  await applyDecisions([{ type: 'COMPLETE_TOKEN', tokenId }], ctx);
 
-  // 2. Apply task output to workflow context via node's output_mapping
-  applyOutputMapping(node, result);
+  // 2. Handle output by flow type
+  const token = ctx.tokens.get(tokenId);
+  const node = ctx.defs.getNode(token.nodeId);
 
-  // 3. Get outgoing transitions grouped by priority
-  const transitions = getTransitions(node.id);
-  const grouped = groupBy(transitions, (t) => t.priority);
-  const sortedPriorities = Object.keys(grouped)
-    .map(Number)
-    .sort((a, b) => a - b);
+  if (token.siblingGroup) {
+    // Fan-out: write to branch table
+    await handleBranchOutput(ctx, token, node, result.outputData);
+  } else {
+    // Linear: apply outputMapping to context
+    await applyDecisions([{
+      type: 'APPLY_OUTPUT_MAPPING',
+      outputMapping: node.outputMapping,
+      outputData: result.outputData
+    }], ctx);
+  }
 
-  // 4. Evaluate by priority tier (stop at first non-empty tier)
+  // 3. Plan routing (pure function)
+  const transitions = ctx.defs.getTransitionsFrom(token.nodeId);
+  const context = ctx.context.getSnapshot();
+  const routingResult = decideRouting({ completedToken: token, transitions, context });
+
+  // 4. Apply routing decisions (creates tokens)
+  const applyResult = await applyDecisions(routingResult.decisions, ctx);
+
+  // 5. Process synchronization for created tokens
+  const syncTransitions = getTransitionsWithSynchronization(transitions, context);
+  const continuationTokenIds = await processSynchronization(
+    ctx,
+    applyResult.tokensCreated,
+    syncTransitions
+  );
+
+  // 6. Dispatch tokens
+  const dispatchedTokens = applyResult.tokensCreated.filter(
+    id => ctx.tokens.get(id).status === 'dispatched'
+  );
+  await Promise.all(dispatchedTokens.map(id => dispatchToken(ctx, id)));
+  await Promise.all(continuationTokenIds.map(id => dispatchToken(ctx, id)));
+
+  // 7. Check completion
+  if (ctx.tokens.getActiveCount(ctx.workflowRunId) === 0) {
+    await finalizeWorkflow(ctx);
+  }
+}
+
+// planning/routing.ts - decideRouting()
+function decideRouting({ completedToken, transitions, context }): PlanningResult {
+  // Group by priority, evaluate tiers in order
+  const grouped = groupBy(transitions, t => t.priority);
+  const sortedPriorities = Object.keys(grouped).map(Number).sort((a, b) => a - b);
+
   let transitionsToFollow = [];
   for (const priority of sortedPriorities) {
-    const transitionsAtThisPriority = grouped[priority];
-    const matches = transitionsAtThisPriority.filter((t) =>
-      evaluateCondition(t.condition, context),
-    );
-
+    const matches = grouped[priority].filter(t => evaluateCondition(t.condition, context));
     if (matches.length > 0) {
-      // Found matches at this priority tier - follow all and stop
       transitionsToFollow = matches;
-      break;
+      break;  // First tier with matches wins
     }
-    // No matches at this tier, try next priority
   }
 
-  if (transitionsToFollow.length === 0) {
-    throw new Error('No matching transitions');
-  }
-
-  // 5. Spawn tokens
-
+  // Generate CREATE_TOKEN decisions
+  const decisions = [];
   for (const transition of transitionsToFollow) {
     const spawnCount = determineSpawnCount(transition, context);
-    const fanOutTransitionId = spawnCount > 1 ? transition.id : null;
-
     for (let i = 0; i < spawnCount; i++) {
-      const pathId = buildPathId(token.path_id, node.id, i, spawnCount);
-
-      const newToken = createToken({
-        workflow_run_id: token.workflow_run_id,
-        node_id: transition.to_node_id,
-        parent_token_id: token.id,
-        path_id: pathId,
-        fan_out_transition_id: fanOutTransitionId,
-        branch_index: i,
-        branch_total: spawnCount,
-        state: 'pending',
-        state_updated_at: now(),
-      });
-
-      // Check if this transition requires synchronization
-      if (transition.synchronization) {
-        const siblingGroupId = transition.synchronization.sibling_group;
-
-        // Verify this token belongs to the specified sibling group
-        if (newToken.fan_out_transition_id === siblingGroupId) {
-          // Token is part of this sibling group - apply synchronization
-          if (transition.synchronization.strategy !== 'any') {
-            // Check if synchronization condition is met
-            const siblings = getSiblings(newToken.workflow_run_id, siblingGroupId);
-            const terminalStates = ['completed', 'failed', 'timed_out', 'cancelled'];
-            const finishedCount =
-              siblings.filter((s) => terminalStates.includes(s.state)).length + 1; // +1 for current token
-
-            if (
-              shouldProceedWithFanIn(finishedCount, spawnCount, transition.synchronization.strategy)
-            ) {
-              // Condition met: merge and dispatch
-              mergeAndDispatch(siblings, newToken, transition);
-            } else {
-              // Condition not met: wait
-              newToken.state = 'waiting_for_siblings';
-              newToken.state_data = {
-                state: 'waiting_for_siblings',
-                arrived_at: now(),
-                awaiting_count: spawnCount - finishedCount,
-              };
-              saveToken(newToken);
-            }
-          } else {
-            // 'any' mode: proceed immediately
-            newToken.state = 'dispatched';
-            dispatchToken(newToken);
-          }
-        } else {
-          // Token is not part of this sibling group - pass through
-          newToken.state = 'dispatched';
-          dispatchToken(newToken);
+      decisions.push({
+        type: 'CREATE_TOKEN',
+        params: {
+          workflowRunId: completedToken.workflowRunId,
+          nodeId: transition.toNodeId,
+          parentTokenId: completedToken.id,
+          pathId: buildPathId(completedToken.pathId, completedToken.nodeId, i, spawnCount),
+          siblingGroup: transition.siblingGroup ?? null,
+          branchIndex: i,
+          branchTotal: spawnCount,
+          iterationCounts: completedToken.iterationCounts
         }
-      } else {
-        // No synchronization: dispatch immediately
-        newToken.state = 'dispatched';
-        dispatchToken(newToken);
-      }
+      });
     }
   }
 
-  // 7. Check workflow completion
-  if (getActiveTokenCount() === 0) {
-    completeWorkflow();
-  }
-}
-
-function determineSpawnCount(transition, context) {
-  if (transition.foreach) {
-    // Dynamic: count items in collection
-    const collection = getFromContext(context, transition.foreach.collection);
-    return Array.isArray(collection) ? collection.length : 1;
-  }
-  // Static: use spawn_count or default to 1
-  return transition.spawn_count ?? 1;
-}
-
-function buildPathId(parentPath, nodeId, branchIndex, branchTotal) {
-  if (branchTotal > 1) {
-    return `${parentPath}.${nodeId}.${branchIndex}`;
-  }
-  // No fan-out: don't add to path
-  return parentPath;
+  return { decisions, events: [] };
 }
 ```
 
@@ -481,7 +460,7 @@ priority: 3 → D  // default fallback
 
 ### No matching transitions at any priority tier
 
-Workflow error. Best practice: include an unconditional transition at lowest priority as a fallback.
+If no transitions match, the token has no next step. If no other active tokens remain, the workflow completes. Best practice: include an unconditional transition at lowest priority as a fallback.
 
 ```typescript
 priority: 1, condition: {normal_path} → B
@@ -490,26 +469,30 @@ priority: 999, (no condition) → ErrorHandler  // Catch-all
 
 ### Synchronization without siblings
 
-If `joins_transition` references a transition that didn't fan out (spawn_count=1), synchronization degenerates to simple pass-through.
+If `siblingGroup` references a group with only one token (spawnCount=1), synchronization condition is immediately met - the single token proceeds.
 
 ### Nested fan-out lineage
 
-Tokens preserve full ancestry in `path_id`. Synchronization at any level references the specific `joins_transition` that created the sibling group.
+Tokens preserve full ancestry in `pathId`. Synchronization at any level references the named `siblingGroup` that created the sibling group.
 
-### Multiple transitions converging
+### Multiple sibling groups converging
 
-Each transition creates its own sibling group via `fan_out_transition_id`. Synchronization is per-transition, not per-node, allowing fine-grained control over which tokens must synchronize.
+Each fan-out transition declares its own `siblingGroup` name. Synchronization is per-group, not per-node, allowing fine-grained control over which tokens must synchronize.
+
+### Fan-in race conditions
+
+When multiple siblings complete simultaneously, the `TRY_ACTIVATE_FAN_IN` decision uses a SQL unique constraint to ensure only one activates the fan-in. Losers have their arrival tokens marked completed.
+
+## Implemented Features
+
+- **Synchronization timeouts**: `timeoutMs` and `onTimeout: 'proceed_with_available' | 'fail'` on transitions
+- **Early completion (race patterns)**: `strategy: 'any'` proceeds on first arrival; `{ mOfN: M }` for quorum
+- **Sibling cancellation**: When fan-in activates, in-flight siblings are cancelled automatically
+- **Subworkflow timeouts**: `timeoutMs` on MARK_WAITING_FOR_SUBWORKFLOW decision
+- **Loop iteration limits**: `loopConfig.maxIterations` prevents infinite loops
 
 ## Future Enhancements
 
-- **Timeouts**: Token-level, synchronization-level, and workflow-level timeout policies
-  - Leverage token state machine: background job transitions `executing` or `waiting_for_siblings` → `timed_out`
-  - Synchronization timeout: `timeout: '5m', on_timeout: 'proceed_with_available' | 'fail'`
-- **Early completion (race patterns)**: `wait_for: { first_n: 3 }, on_completion: 'cancel_remaining'`
-  - Transition remaining siblings from `executing` → `cancelled`
-  - Requires cancellation protocol with Executor
-- **Explicit cancellation**: Task to cancel sibling groups on demand
-  - Query siblings by `fan_out_transition_id`, transition to `cancelled` state
-- **Retry on failure**: Leverage `failed` state with retry_count to automatically retry failed tokens
-- **Conditional spawn_count**: `spawn_count: { from_context: 'input.num_judges' }`
+- **Conditional spawnCount**: `spawnCount: { fromContext: 'input.num_judges' }`
 - **Streaming merge**: Process results as they arrive (trigger on each sibling reaching terminal state)
+- **Task-level retry**: Leverage `failed` status with retry count to automatically retry failed tokens

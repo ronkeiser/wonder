@@ -15,37 +15,38 @@ Context has four components:
 
 When users author a WorkflowDef (via SDK or UI), they define schemas as JSONSchema:
 
-- `input_schema` - Validates workflow inputs (immutable after start)
-- `state_schema` - Defines mutable state structure (auto-inferred from graph or user-defined)
-- `output_schema` - Validates final workflow outputs
+- `inputSchema` - Validates workflow inputs (immutable after start)
+- `contextSchema` - Defines mutable state structure (auto-inferred from graph or user-defined)
+- `outputSchema` - Validates final workflow outputs
 
-These schemas are **stored as JSON** in D1 as part of the `WorkflowDef` record. Tasks (referenced by Nodes) can define `output_schema` for their results, enabling structured outputs and downstream validation.
+These schemas are **stored as JSON** in D1 as part of the `WorkflowDef` record. Tasks (referenced by Nodes) define `outputSchema` for their results, enabling structured outputs and downstream validation.
 
 ```typescript
 WorkflowDef {
   id: string;
   version: number;
   // ...
-  input_schema: JSONSchema;      // JSON blob in D1
-  context_schema: JSONSchema;    // JSON blob in D1 (defines state structure)
-  output_schema: JSONSchema;     // JSON blob in D1
+  inputSchema: JSONSchema;       // JSON blob in D1
+  contextSchema: JSONSchema;     // JSON blob in D1 (defines state structure)
+  outputSchema: JSONSchema;      // JSON blob in D1
 }
 
 Task {
   id: string;
   version: number;
   // ...
-  output_schema?: JSONSchema;    // Optional schema for task output
+  inputSchema: JSONSchema;       // Task input schema
+  outputSchema: JSONSchema;      // Task output schema (used for branch storage)
   // Steps execute actions, final step output becomes task output
 }
 
 Node {
   id: string;
-  task_id: string;               // References Task
-  task_version: number;
-  input_mapping: object | null;  // Map context → task input
-  output_mapping: object | null; // Map task output → context
-  // Nodes don't have output_schema - they reference Tasks that do
+  taskId: string;                // References Task
+  taskVersion: number;
+  inputMapping: object | null;   // Map context → task input
+  outputMapping: object | null;  // Map task output → context
+  // Nodes don't have outputSchema - they reference Tasks that do
 }
 ```
 
@@ -54,13 +55,13 @@ Node {
 When a workflow run starts, the Coordinator:
 
 1. Loads the `WorkflowDef` from RESOURCES (including schema JSON, cached in DO)
-2. Passes `input_schema` and `context_schema` to `@wonder/schemas`
+2. Passes `inputSchema` and `contextSchema` to `@wonder/schemas`
 3. `@wonder/schemas` generates DDL (CREATE TABLE statements)
-4. Coordinator executes DDL in DO SQLite via `operations.context.initializeTable()`
+4. Coordinator calls `ContextManager.initialize(input)` which creates tables and inserts input
 5. Tables are created in the isolated DO instance for this workflow run
-6. Input data is validated against `input_schema` and inserted into context
+6. Input data is validated against `inputSchema` and inserted into context
 
-**Example context_schema:**
+**Example contextSchema:**
 
 ```typescript
 {
@@ -108,19 +109,35 @@ CREATE TABLE context_state_votes (
 
 ## Data Operations
 
-During workflow execution, the coordinator performs context operations via `operations/context.ts`:
+During workflow execution, the coordinator performs context operations via `ContextManager`:
 
 ```typescript
-initializeTable(sql) → void              // Create tables from schema DDL
-initializeWithInput(sql, input) → void   // Validate and insert input data
-get(sql, path) → unknown                 // Read context value (e.g., 'state.votes')
-set(sql, path, value) → void             // Write context value with validation
-applyNodeOutput(sql, nodeRef, output, tokenId?) → void  // Apply node output mapping
-getSnapshot(sql) → ContextSnapshot       // Read-only view for decision logic
-getBranchOutputs(sql, tokenIds, outputSchema) → Array<{ tokenId: string; output: Record<string, unknown> }>
-initializeBranchTable(sql, tokenId, schema) → void  // Create branch output table for token
-mergeBranches(sql, siblings, merge, outputSchema) → void  // Merge branch outputs at fan-in
-dropBranchTables(sql, tokenIds) → void   // Cleanup branch tables after merge
+class ContextManager {
+  // Initialization
+  initialize(input: Record<string, unknown>): void;  // Create tables, validate & insert input
+
+  // Read operations
+  getSection(section: string): Record<string, unknown>;  // Read entire section
+  get(path: string): unknown;                            // Read context value (e.g., 'state.votes')
+  getSnapshot(): ContextSnapshot;                        // Read-only view for decision logic
+
+  // Write operations
+  setField(path: string, value: unknown): void;          // Set nested field value
+  replaceSection(section: string, data: Record<string, unknown>): void;
+
+  // Output mapping (linear flows)
+  applyOutputMapping(
+    outputMapping: Record<string, string> | null,
+    taskOutput: Record<string, unknown>,
+  ): void;
+
+  // Branch storage (parallel flows)
+  initializeBranchTable(tokenId: string, outputSchema: JSONSchema): void;
+  applyBranchOutput(tokenId: string, output: Record<string, unknown>): void;
+  getBranchOutputs(tokenIds: string[], branchIndices: number[], outputSchema: JSONSchema): BranchOutput[];
+  mergeBranches(branchOutputs: BranchOutput[], merge: MergeConfig): void;
+  dropBranchTables(tokenIds: string[]): void;
+}
 ```
 
 `@wonder/schemas` generates parameterized SQL:
@@ -157,7 +174,7 @@ Each workflow run gets its own isolated context in a dedicated DO instance. Sche
 
 During fan-out, each token writes to isolated branch storage. See `branch-storage.md` for complete design.
 
-**Storage approach:** Each branch gets separate SQL tables (e.g., `branch_output_tok_abc123`) generated from the Task's `output_schema` (referenced via `node.task_id`). This provides:
+**Storage approach:** Each branch gets separate SQL tables (e.g., `branch_output_tok_abc123`) generated from the Task's `outputSchema` (referenced via `node.taskId`). This provides:
 
 - True isolation (no shared state)
 - Schema validation via `@wonder/schemas`
@@ -168,39 +185,40 @@ During fan-out, each token writes to isolated branch storage. See `branch-storag
 ```typescript
 Token {
   id: string,              // Token ID
-  branch_index: number,    // 0-indexed position in sibling group
-  branch_total: number,    // Total siblings
-  fan_out_transition_id: string, // Transition that spawned this group
-  parent_token_id?: string // For nested fan-outs
+  branchIndex: number,     // 0-indexed position in sibling group
+  branchTotal: number,     // Total siblings
+  siblingGroup: string,    // Named group identifier from fan-out transition
+  parentTokenId?: string   // For nested fan-outs
 }
 ```
 
-At fan-in, `decisions/synchronization.ts` evaluates merge strategies:
+At fan-in, `planning/synchronization.ts` evaluates merge strategies:
 
-- **append** - Collect all `_branch.output` into an array
+- **append** - Collect all outputs into an array, ordered by branch index (flattens arrays)
+- **collect** - Collect all outputs into array, preserving structure (no flattening)
 - **merge_object** - Shallow merge all outputs into one object
 - **keyed_by_branch** - Merge into object keyed by branch index
-- **last_wins** - Take the last completed branch's output
+- **last_wins** - Take the highest branch index's output
 
-Merged data is written to `context.state` via `SET_CONTEXT` decision → `dispatch/apply.ts` → `operations.context.set()`.
+Merged data is written to context via `MERGE_BRANCHES` decision → `dispatch/apply.ts` → `context.mergeBranches()`.
 
 ## Lifecycle
 
-1. **Authoring**: User defines `input_schema`, `context_schema`, `output_schema` as JSONSchema (via SDK/UI)
-2. **Storage**: Schemas stored as JSON in D1 with `WorkflowDef`; Tasks store their own `output_schema`
+1. **Authoring**: User defines `inputSchema`, `contextSchema`, `outputSchema` as JSONSchema (via SDK/UI)
+2. **Storage**: Schemas stored as JSON in D1 with `WorkflowDef`; Tasks store their own `outputSchema`
 3. **Initialization**:
-   - Coordinator loads `WorkflowDef` from RESOURCES (cached)
+   - Coordinator loads `WorkflowDef` from RESOURCES (cached in DefinitionManager)
    - `@wonder/schemas` generates DDL from schemas
-   - Coordinator executes CREATE TABLE in DO SQLite
+   - `ContextManager.initialize()` creates tables and inserts input
    - Input data validated and inserted
 4. **Execution**:
-   - Task outputs validated against `Task.output_schema` (referenced via `node.task_id`)
-   - Node's `output_mapping` maps task output to context paths
-   - Context operations use generated DML to read/write normalized tables
+   - Task outputs validated against `Task.outputSchema` (referenced via `node.taskId`)
+   - For linear flows: `applyOutputMapping()` maps task output to context paths
+   - For parallel flows: `applyBranchOutput()` writes to branch tables, `mergeBranches()` combines at fan-in
    - Decision logic reads via `getSnapshot()` (read-only)
-   - Dispatch layer writes via `set()` and `applyNodeOutput()`
+   - Dispatch layer writes via `setField()` and output mapping operations
 5. **Completion**:
-   - `decisions/completion.ts` extracts final output via `output_schema` mapping
+   - `planning/lifecycle.ts` checks completion conditions
    - Artifacts committed to RESOURCES
    - DO state persists until explicit cleanup
 
@@ -208,20 +226,23 @@ Each workflow run has isolated context in its own DO instance. Schema changes be
 
 ## Integration with Coordinator
 
-Context operations are called by the dispatch layer after decision logic:
+Context operations are called by the dispatch layer after planning decisions:
 
 ```typescript
-// Decision logic (pure)
-const decisions = decisions.routing.decide(token, workflow, contextSnapshot);
+// Planning (pure functions)
+const decisions = decideRouting({ completedToken, transitions, context });
 
-// Dispatch converts decisions to operations
-await dispatch.applyDecisions(decisions, sql, env, logger);
-// → SET_CONTEXT decision → operations.context.set(sql, path, value)
-// → APPLY_NODE_OUTPUT decision → operations.context.applyNodeOutput(sql, nodeRef, output)
+// Dispatch applies decisions via ContextManager
+await applyDecisions(decisions, ctx);
+// → APPLY_OUTPUT_MAPPING decision → context.applyOutputMapping(mapping, output)
+// → INIT_BRANCH_TABLE decision → context.initializeBranchTable(tokenId, schema)
+// → APPLY_BRANCH_OUTPUT decision → context.applyBranchOutput(tokenId, output)
+// → MERGE_BRANCHES decision → context.mergeBranches(branchOutputs, mergeConfig)
+// → SET_CONTEXT decision → context.setField(path, value)
 ```
 
 Separation of concerns:
 
-- **decisions/** - Pure logic, reads context via snapshots
-- **dispatch/** - Converts decisions to operations
-- **operations/context.ts** - SQL operations via `@wonder/schemas`
+- **planning/** - Pure logic, reads context via snapshots, returns Decision[]
+- **dispatch/** - Applies decisions via operations managers
+- **operations/context.ts** - ContextManager with SQL operations via `@wonder/schemas`
