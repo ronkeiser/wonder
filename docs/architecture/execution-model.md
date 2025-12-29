@@ -2,7 +2,16 @@
 
 ## Overview
 
-Wonder has a layered execution model. Each layer has distinct responsibilities, constraints, and runtime characteristics.
+Wonder supports two execution models that share infrastructure but differ in what drives decisions:
+
+- **Workflows**: Graph-driven execution coordinated by CoordinatorDO
+- **Agents**: LLM-driven execution coordinated by AgentDO
+
+Both follow the same pattern: receive → decide → dispatch → wait → resume. The difference is what drives "decide" — graph traversal for workflows, LLM reasoning for agents.
+
+## Workflow Execution
+
+Workflows have a layered execution model. Each layer has distinct responsibilities, constraints, and runtime characteristics.
 
 ```
 WorkflowDef
@@ -18,33 +27,19 @@ WorkflowDef
 
 Every execution path traverses all five layers. Simple cases are just trivial at each layer—a workflow with one node, a task with one step.
 
-## The Layers
+### The Layers
 
-### WorkflowDef
+**WorkflowDef**: Graphs of nodes connected by transitions. Supports parallelism, fan-out/fan-in, human gates, sub-workflow invocation. State is durable—stored in DO SQLite, survives crashes, enables replay. Coordinated by CoordinatorDO.
 
-Graphs of nodes connected by transitions. Supports parallelism, fan-out/fan-in, human gates, sub-workflow invocation. State is durable—stored in DO SQLite, survives crashes, enables replay. Coordinated by a Durable Object.
+**Node**: A point in the workflow graph. Each node executes exactly one task. Nodes don't contain logic—they specify what task to run and how to map data in and out of workflow context.
 
-Workflows are for orchestration: branching logic, parallel exploration, human checkpoints, long-running processes.
+**Task**: Linear sequences of steps executed by a single worker. State is in-memory—ephemeral, fast, no coordination overhead. Supports retries at the task level and simple conditional logic (if/else, on_failure).
 
-### Node
+**Step**: A point in a task sequence. Each step executes exactly one action. Steps specify what action to run, how to map data, and what to do on failure (abort, retry task, continue).
 
-A point in the workflow graph. Each node executes exactly one task. Nodes don't contain logic—they specify what task to run and how to map data in and out of workflow context.
+**ActionDef**: Atomic operations: LLM calls, shell commands, HTTP requests, context updates. Actions have no internal structure. They execute and return a result.
 
-### Task
-
-Linear sequences of steps executed by a single worker. State is in-memory—ephemeral, fast, no coordination overhead. Supports retries at the task level and simple conditional logic (if/else, on_failure).
-
-Tasks are for reliable operations: bundling an action with its verification, retrying a sequence atomically, keeping tight loops out of the coordinator.
-
-### Step
-
-A point in a task sequence. Each step executes exactly one action. Steps specify what action to run, how to map data, and what to do on failure (abort, retry task, continue).
-
-### ActionDef
-
-Atomic operations: LLM calls, shell commands, HTTP requests, context updates. Actions have no internal structure. They execute and return a result.
-
-## Why Tasks Exist
+### Why Tasks Exist
 
 The original model was Node → Action. Every action required a coordinator round-trip:
 
@@ -71,7 +66,90 @@ Coordinator dispatches → Worker executes entire task → Coordinator receives
 
 The worker runs all three steps in memory. Same result, one-third the overhead.
 
-## Comparison
+## Agent Execution
+
+Agents have a simpler execution model. The agent loop is built into AgentDO, not expressed as a workflow graph.
+
+```
+Persona
+    ↓ instantiated as
+  Agent
+    ↓ holds
+  Conversation
+    ↓ contains
+  Turn
+    ↓ contains
+  Message
+```
+
+**Persona**: Reusable configuration — system prompt, tools, memory configuration. Lives in libraries.
+
+**Agent**: Living instance — persona plus accumulated memory, scoped to projects.
+
+**Conversation**: Session with an agent. Contains turns and accumulated context.
+
+**Turn**: One cycle of the agent loop — user input through agent response.
+
+**Message**: User or agent utterance within a turn.
+
+### The Agent Loop
+
+AgentDO executes a fixed loop:
+
+```
+receive → assemble context → LLM decides → execute → extract memories → respond → wait
+```
+
+The agent loop is **not a workflow**. It's built into AgentDO as a first-class execution model. Agents *invoke* workflows as tools, but the agent loop itself is not expressed as a graph.
+
+### How Agents Use Workflows
+
+Context assembly and memory extraction are workflows — but they're **hooks called by the agent loop**, not the agent loop itself:
+
+```
+AgentDO receives user message
+  │
+  ├─ Calls contextAssemblyWorkflowId → workflow runs, returns assembled context
+  │
+  ├─ LLM call with context + tools + history
+  │   │
+  │   └─ If tool_use → dispatch to tool's target
+  │       ├─ tool.taskId → Executor
+  │       ├─ tool.workflowId → CoordinatorDO
+  │       └─ tool.agentId → another AgentDO
+  │
+  ├─ Calls memoryExtractionWorkflowId → workflow runs, returns facts to store
+  │
+  └─ Respond to user
+```
+
+The platform provides the agent loop structure. Libraries provide the workflows that plug into it.
+
+## Comparison: Workflows vs Agents
+
+| Aspect           | Workflow (CoordinatorDO)           | Agent (AgentDO)                          |
+| ---------------- | ---------------------------------- | ---------------------------------------- |
+| Decision driver  | Graph traversal (deterministic)    | LLM reasoning (non-deterministic)        |
+| State            | Fixed tables (tokens) + schema-driven context | Fixed tables (turns, messages) + schema-driven memory |
+| Instance scope   | One workflow run                   | One agent (many conversations)           |
+| Parallelism      | Fan-out/fan-in                     | None (sequential turns)                  |
+| Human gates      | Yes (token pauses)                 | Natural (multi-turn conversation)        |
+| Duration         | Seconds to days                    | Sessions span days to weeks              |
+| Dispatches to    | Executor, CoordinatorDO, AgentDO   | Executor, CoordinatorDO, AgentDO         |
+
+## Unified Dispatch
+
+Both CoordinatorDO and AgentDO dispatch to the same targets:
+
+- **Executor** — for tasks (stateless worker execution)
+- **CoordinatorDO** — for sub-workflows (nested graph execution)
+- **AgentDO** — for agent invocation (LLM-driven subtasks)
+
+This creates a unified dispatch layer where workflows can invoke agents and agents can invoke workflows.
+
+## Workflow Execution Details
+
+### Comparison: Workflow vs Task
 
 | Aspect        | Workflow                         | Task                             |
 | ------------- | -------------------------------- | -------------------------------- |
@@ -85,7 +163,7 @@ The worker runs all three steps in memory. Same result, one-third the overhead.
 | Retry scope   | Per-node                         | Whole task                       |
 | Duration      | Seconds to days                  | Milliseconds to minutes          |
 
-## When to Use Each
+### When to Use Each
 
 **Workflows** for:
 
@@ -102,128 +180,32 @@ The worker runs all three steps in memory. Same result, one-third the overhead.
 - Retry loops that should restart from the beginning
 - Tight sequences where coordinator overhead matters
 
-## Retry Model
+### Retry Model
 
 Retries operate at two distinct levels with sharp boundaries:
 
-### Infrastructure Retry (ActionDef)
+**Infrastructure Retry (ActionDef)**: Handle transient failures—network errors, rate limits, provider 5xx errors. Automatic and invisible to task logic. The action handler retries the operation within the same step execution.
 
-**Purpose:** Handle transient failures—network errors, rate limits, provider 5xx errors.
+**Business Retry (Task)**: Handle wrong outputs—invalid JSON, failed assertions, schema violations. Explicit and visible. The entire task restarts from step 0 with fresh context.
 
-**Behavior:** Automatic and invisible to task logic. The action handler retries the operation within the same step execution. From the task's perspective, the action just took longer.
+**Step-Level on_failure**: Routing only, not retry. Options:
+- `abort`: Task fails, no retry
+- `retry`: Signal coordinator to retry entire task (if `Task.retry` allows)
+- `continue`: Log error, proceed to next step
 
-**Configuration:** `ActionDef.execution.retry_policy`
+### Timeout Model
 
-**Error classification:**
+Timeouts are enforced at multiple layers:
 
-- Network timeouts, connection failures
-- HTTP 429 (rate limit), 500-599 (server errors)
-- Provider-specific transient errors
+**Action-Level**: Executor enforces via AbortController. Prevents individual actions from hanging.
 
-**Non-retryable:** Business errors (400, 401, 403, 404), validation failures, schema mismatches.
+**Task-Level**: Platform terminates worker if exceeded. No graceful shutdown.
 
-### Business Retry (Task)
+**Workflow-Level**: Coordinator enforces via DO alarms. Catches graph-level bugs (infinite loops, exponential fan-out).
 
-**Purpose:** Handle wrong outputs—invalid JSON, failed assertions, schema violations, business logic failures.
+**Synchronization Timeout**: Controls wait time for siblings at fan-in merge points.
 
-**Behavior:** Explicit and visible. The entire task restarts from step 0 with fresh context. All steps re-execute.
-
-**Configuration:** `Task.retry`
-
-**Triggered by:** `Step.on_failure = 'retry'` when a step fails.
-
-**Key characteristic:** Fresh attempt. Previous attempt's state is discarded. If you need to preserve state between retry attempts or implement conditional retry logic, use workflow nodes with durable state.
-
-### Step-Level on_failure: Routing Only
-
-`Step.on_failure` is **not a retry mechanism**. It's a routing decision:
-
-- **`abort`**: Task fails, no retry
-- **`retry`**: Signal coordinator to retry entire task (if `Task.retry` allows)
-- **`continue`**: Log error, proceed to next step
-
-The step itself never retries in isolation. Retry is always at the task level (full reset) or action level (infrastructure only).
-
-### Conditional Execution
-
-Steps support conditional execution based on task context:
-
-```typescript
-condition: {
-  if: "input.auto_format == true",
-  then: "continue" | "skip" | "succeed" | "fail",
-  else: "continue" | "skip" | "succeed" | "fail"
-}
-```
-
-**Conditional outcomes:**
-
-- **`continue`**: Execute this step normally
-- **`skip`**: Skip this step, proceed to next step
-- **`succeed`**: Skip this step, mark task as successful, return current output
-- **`fail`**: Skip this step, mark task as failed
-
-This enables simple branching without workflow-level complexity. For example, "skip formatting if auto_format is false" or "fail fast if required input is missing."
-
-## Timeout Model
-
-Timeouts are enforced at three layers, each serving a distinct purpose:
-
-### 1. Action-Level Timeout
-
-**Enforced by:** Executor (AbortController)  
-**Configured in:** `ActionDef.execution.timeout_ms`  
-**Purpose:** Prevent individual actions from hanging (LLM calls, HTTP requests, shell commands)
-
-The Executor wraps action execution with `AbortController` and enforces the timeout inline. If exceeded, the action fails and step-level `on_failure` determines whether the task aborts, retries, or continues.
-
-### 2. Task-Level Timeout
-
-**Enforced by:** Cloudflare Workers platform  
-**Configured in:** `Task.timeout_ms`  
-**Purpose:** Limit entire task execution (all steps sequentially)
-
-Platform terminates the worker if task exceeds limit. No graceful shutdown—execution simply stops. Coordinator detects missing response and handles as task failure.
-
-### 3. Workflow-Level Timeout
-
-**Enforced by:** Coordinator (DO alarms)  
-**Configured in:** `WorkflowDef.timeout_ms` and `on_timeout`  
-**Purpose:** Catch graph-level bugs that action/task timeouts cannot detect
-
-Detects problems like:
-
-- **Infinite loops**: A→B→C→A cycle where each node succeeds but workflow never terminates
-- **Exponential fan-out**: Bug causes unbounded token spawning
-- **Routing errors**: Correct execution but logic errors prevent completion
-
-**Default behavior:** `on_timeout: 'human_gate'` pauses workflow for review rather than killing it. Humans can inspect state, extend timeout, or abort. This turns timeouts into supervision checkpoints, not catastrophic failures.
-
-### 4. Synchronization Timeout
-
-**Enforced by:** Coordinator (DO alarms)  
-**Configured in:** `Transition.synchronization.timeout_ms` and `on_timeout`  
-**Purpose:** Control wait time for siblings at fan-in merge points
-
-Measures time from first sibling arrival (not from fan-out), avoiding double-counting execution time. Policies:
-
-- `fail`: All waiting siblings fail, workflow fails
-- `proceed_with_available`: Merge completed siblings, mark stragglers as timed out
-
-**Timeout Hierarchy:** Action < Task < Workflow (and synchronization is independent per fan-in)
-
-### When Retry Logic Needs Branching
-
-If you need:
-
-- Different retry strategies per attempt ("first try model A, then try model B")
-- State preservation between attempts
-- Conditional branching based on failure type
-- Parallel retry attempts
-
-You've outgrown tasks. Use workflow nodes and transitions, where you get full graph routing and durable state.
-
-## Uniform Structure
+### Uniform Structure
 
 The layering is uniform. A node always executes a task. A step always executes an action. This eliminates special cases:
 
@@ -234,7 +216,7 @@ The layering is uniform. A node always executes a task. A step always executes a
 
 A one-step task is not overhead—it's consistency.
 
-## Example: File Edit
+### Example: File Edit
 
 Without tasks (3 coordinator round-trips):
 
@@ -253,10 +235,10 @@ Node: write_file_verified
 
 The task bundles the operation with its verification. If assertion fails, the entire task retries. The workflow sees one node that either succeeds or fails.
 
-## Execution Flow
+### Workflow Execution Flow
 
 ```
-Coordinator (DO)
+CoordinatorDO
 │
 ├─ Evaluates transitions, selects node
 ├─ Reads workflow context
@@ -264,7 +246,7 @@ Coordinator (DO)
 ├─ Dispatches: { task_id, task_version, input }
 │
 ▼
-Worker
+Executor (Worker)
 │
 ├─ Loads Task + Steps (ordered by ordinal)
 ├─ Initializes in-memory context: { input, state: {}, output: {} }
@@ -278,7 +260,7 @@ Worker
 ├─ On success: return context.output
 │
 ▼
-Coordinator (DO)
+CoordinatorDO
 │
 ├─ Receives task result
 ├─ Applies node.output_mapping → workflow context
@@ -286,6 +268,11 @@ Coordinator (DO)
 ```
 
 ## Summary
+
+| Coordinator   | Decision Driver                   | State                              | Dispatches to                    |
+| ------------- | --------------------------------- | ---------------------------------- | -------------------------------- |
+| CoordinatorDO | Graph traversal (deterministic)   | Fixed (tokens) + schema-driven context | Executor, CoordinatorDO, AgentDO |
+| AgentDO       | LLM reasoning (non-deterministic) | Fixed (turns, messages) + schema-driven memory | Executor, CoordinatorDO, AgentDO |
 
 | Layer       | Contains           | Responsibility                            |
 | ----------- | ------------------ | ----------------------------------------- |
@@ -295,4 +282,4 @@ Coordinator (DO)
 | Step        | —                  | Maps context to/from action               |
 | ActionDef   | —                  | Atomic operations                         |
 
-Workflows handle complexity. Tasks handle reliability. Actions handle execution.
+Workflows handle orchestration. Agents handle conversation. Tasks handle reliability. Actions handle execution.

@@ -4,7 +4,7 @@
 
 Wonder has primitives for user-facing interaction:
 
-- **Persona** — Shareable identity, behavior, and capability configuration
+- **Persona** — Shareable identity, behavior, and tool configuration
 - **Agent** — Instance with persona + memory, scoped to one or more projects
 - **Conversation** — A session with an agent
 - **Turn** — One cycle of the agent loop
@@ -28,14 +28,12 @@ A persona is **identity and behavior** — the shareable, versionable configurat
 - Memory extraction workflow (what to remember, how to structure)
 - Store schema
 
-**Capabilities:**
+**Tools:**
 
-- Available tasks (quick operations, retrieval)
-- Available workflows (orchestrated work)
-- Available agents (delegation to other agents)
+- Tool IDs referencing library definitions
 - Constraints (budgets, allowed actions)
 
-These capabilities become LLM tools. When the LLM invokes a capability, the AgentDO dispatches accordingly.
+Tools are the LLM-facing interface. Each tool binds to an execution target (Task, Workflow, or Agent). When the LLM invokes a tool, the AgentDO dispatches to the appropriate target.
 
 ```typescript
 interface Persona {
@@ -45,16 +43,81 @@ interface Persona {
     memoryExtractionWorkflowId: string;
     storeSchema: MemoryStoreSchema;
   }
-  capabilities: {
-    availableTaskIds: string[];
-    availableWorkflowIds: string[];
-    availableAgentIds: string[];
+  tools: {
+    toolIds: string[];           // References to Tool definitions in libraries
     constraints: AgentConstraints;
   }
 }
 ```
 
 Personas live in libraries and can be shared across projects. When you create an agent, you either reference a persona from a library or define one inline.
+
+## Tool
+
+A tool is the **LLM-facing interface** to Wonder's execution primitives. Tools live in libraries alongside Workflows, Tasks, and Personas.
+
+```typescript
+interface Tool {
+  id: string;
+  name: string;                // What the LLM sees
+  description: string;         // How the LLM understands when to use it
+  inputSchema: JSONSchema;     // What the LLM provides
+
+  // Execution target (exactly one)
+  taskId?: string;
+  workflowId?: string;
+  agentId?: string;
+
+  // Optional input transformation
+  inputMapping?: Record<string, string>;
+}
+```
+
+**Why tools exist:** The LLM shouldn't think in terms of internal primitives (Task, Workflow, Agent). It thinks in terms of actions it can take: "search the codebase", "implement a feature", "ask the reviewer". Tools provide this abstraction layer.
+
+**Tool → Target binding:**
+
+- `taskId` — Quick operations (search, retrieval, simple transformations)
+- `workflowId` — Orchestrated work (feature implementation, research pipelines)
+- `agentId` — Delegation to another agent (get a second opinion, specialized expertise)
+
+**Input mapping:** Transforms LLM-provided input to match the target's inputSchema. If omitted, input passes through directly.
+
+**Example:**
+
+```typescript
+// Tool definition in library
+{
+  id: 'tool_implement_feature',
+  name: 'implement_feature',
+  description: 'Implement a new feature in the codebase. Use when the user asks for new functionality.',
+  inputSchema: {
+    type: 'object',
+    properties: {
+      feature: { type: 'string', description: 'What to implement' },
+      branch: { type: 'string', description: 'Branch name for the work' }
+    },
+    required: ['feature']
+  },
+  workflowId: 'workflow_implement_feature_v2'
+}
+
+// Persona references tools by ID
+{
+  tools: {
+    toolIds: ['tool_implement_feature', 'tool_search_code', 'tool_run_tests'],
+    constraints: { ... }
+  }
+}
+```
+
+When the LLM invokes `implement_feature`, the AgentDO:
+
+1. Resolves `tool_implement_feature` from the library
+2. Validates input against `inputSchema`
+3. Applies `inputMapping` (if any)
+4. Dispatches to `workflow_implement_feature_v2`
+5. Returns the workflow result to the LLM
 
 ## Agent
 
@@ -122,7 +185,7 @@ AgentDO is the **actor that coordinates the agent loop**. It follows the same pa
 
 - Runs the agent loop (context assembly → LLM → execute → memory extraction)
 - Manages memory (structured in DO SQLite, semantic via Vectorize)
-- Dispatches capabilities to Executor (tasks), CoordinatorDO (workflows), or other AgentDOs (agent calls)
+- Dispatches tools to Executor (tasks), CoordinatorDO (workflows), or other AgentDOs (agent calls)
 - Handles async workflow completions and triggers new turns
 - Manages multiple concurrent conversations (keyed by conversation_id)
 
@@ -296,7 +359,7 @@ The manager is an agent with a workflow that dispatches to other agents with cur
 
 ## Reasoning Strategies
 
-Advanced reasoning patterns—tree-of-thought, debate, chain-of-verification—are workflows in the persona's capabilities.
+Advanced reasoning patterns—tree-of-thought, debate, chain-of-verification—are workflows exposed as tools.
 
 The LLM sees these as tools it can invoke. When a problem warrants deeper reasoning, the agent decides to invoke the appropriate strategy workflow. This keeps the agent loop simple while enabling sophisticated reasoning when needed.
 
@@ -308,7 +371,7 @@ The LLM sees these as tools it can invoke. When a problem warrants deeper reason
 
 - **User instruction (heavy):** Direct user guidance overrides defaults. "Think through this step by step" or "Use tree-of-thought for this problem."
 
-The LLM ultimately decides, but that decision is shaped by these influences. No special primitive needed—reasoning strategies are workflows, and the agent invokes them like any other capability.
+The LLM ultimately decides, but that decision is shaped by these influences. No special primitive needed—reasoning strategies are workflows, and the agent invokes them like any other tool.
 
 ## Observability
 
@@ -324,7 +387,8 @@ Workflow invocations don't have D1 records. Observability comes from events:
 
 | Entity          | Purpose                                                                             |
 | --------------- | ----------------------------------------------------------------------------------- |
-| `personas`      | Shareable config — identity, behavior, capabilities (versioned, lives in libraries) |
+| `personas`      | Shareable config — identity, behavior, tools (versioned, lives in libraries)        |
+| `tools`         | LLM-facing interface — binds name/description/schema to execution target            |
 | `agents`        | Instance — persona ref + memory, scoped to projects                                 |
 | `conversations` | Session — status, accumulated context                                               |
 | `turns`         | Execution record — links messages to workflow runs                                  |
@@ -359,16 +423,17 @@ Memory lives on the **Agent**, not the Persona. This is what makes agents "livin
 
 ### Storage
 
-Two stores, different access patterns:
+Three stores, different access patterns:
 
 | Store      | Technology | Purpose                                              |
 | ---------- | ---------- | ---------------------------------------------------- |
 | Structured | D1         | Facts, decisions, relationships. Queryable by field. |
 | Semantic   | Vectorize  | Episodic memories, summaries. Similarity search.     |
+| Archive    | R2         | Raw episodes, large documents. Cold storage.         |
 
 The Persona defines the schema (what fields, what types). The Agent owns the data.
 
-Memory workflows (`context_assembly`, `memory_extraction`) have actions to read/write both stores. The platform provides the primitives; workflows define the strategies.
+Memory workflows (`context_assembly`, `memory_extraction`) have actions to read/write all three stores. The platform provides the primitives; workflows define the strategies.
 
 ### Lifecycle
 
@@ -378,6 +443,29 @@ Per-agent retention policies with consolidation:
 - **Episodic memories** consolidate into summaries over time
 - Raw episodes archived to R2, summaries remain active
 - Different agents can have different retention policies (configured in Persona)
+
+## Platform vs Library Boundary
+
+The platform provides **dispatch plumbing**. Libraries provide **intelligence**.
+
+**Platform responsibilities:**
+
+- AgentDO coordinates the agent loop (receive → decide → dispatch → wait → resume)
+- Dispatch to execution targets (Executor for tasks, CoordinatorDO for workflows, AgentDO for agents)
+- Storage primitives (D1 for structured, Vectorize for semantic, R2 for archive)
+- Event emission and observability
+
+**Library responsibilities:**
+
+- Context assembly workflows (what to retrieve, how to score, how to filter)
+- Memory extraction workflows (what to remember, how to structure, when to consolidate)
+- Tool definitions (LLM-facing interface to execution targets)
+- Reasoning strategy workflows (tree-of-thought, debate, chain-of-verification)
+- Persona definitions (system prompts, tool sets, memory configuration)
+
+The platform doesn't know *how* to assemble context or *what* to remember—it just calls the workflows the persona specifies. This keeps the platform simple and lets libraries encode domain-specific intelligence.
+
+**Example:** The platform's AgentDO calls `contextAssemblyWorkflowId` before every LLM call. A library provides `context_assembly_code_assistant_v2` that knows to retrieve recent code changes, relevant design decisions, and similar past conversations. The platform provides the hook; the library provides the strategy.
 
 ## Implementation Structure
 
@@ -403,7 +491,7 @@ services/agent/
 │   │
 │   └── planning/             # Decision logic (pure functions)
 │       ├── context.ts        # Plan context assembly decisions
-│       ├── tools.ts          # Convert capabilities → LLM tools
+│       ├── tools.ts          # Resolve tool definitions → LLM tool specs
 │       ├── llm.ts            # Interpret LLM output → decisions
 │       └── memory.ts         # Plan memory extraction decisions
 ```
@@ -416,7 +504,7 @@ export class AgentDO extends DurableObject<Env> {
   async startTurn(params: StartTurnParams): Promise<void>; // User/API initiated
   async startAgentCall(params: AgentCallParams): Promise<void>; // Workflow node initiated
 
-  // Callbacks (from dispatched capabilities)
+  // Callbacks (from dispatched tools)
   async handleTaskResult(turnId: string, result: TaskResult): Promise<void>;
   async handleTaskError(turnId: string, error: unknown): Promise<void>;
   async handleWorkflowResult(turnId: string, output: unknown): Promise<void>;
@@ -465,7 +553,7 @@ type AgentDecision =
   | { type: 'MARK_WAITING_FOR_TASK'; turnId: string }
   | { type: 'MARK_WAITING_FOR_WORKFLOW'; turnId: string }
   | { type: 'MARK_WAITING_FOR_AGENT'; turnId: string }
-  | { type: 'RESUME_FROM_CAPABILITY'; turnId: string; result: unknown }
+  | { type: 'RESUME_FROM_TOOL'; turnId: string; result: unknown }
 
   // Memory
   | { type: 'WRITE_MEMORY'; key: string; value: unknown }
@@ -482,19 +570,19 @@ startTurn(conversationId, userMessage)
   │
   ├─ Run context assembly workflow → assembled context
   │
-  ├─ Generate tools from persona capabilities
+  ├─ Resolve tools from persona.tools.toolIds
   │
   ├─ LLM call with context + tools + history
   │   │
-  │   ├─ If tool_use → dispatch capability
-  │   │   ├─ Task → DISPATCH_TASK, MARK_WAITING_FOR_TASK
-  │   │   ├─ Workflow → DISPATCH_WORKFLOW, MARK_WAITING_FOR_WORKFLOW
-  │   │   └─ Agent → DISPATCH_AGENT, MARK_WAITING_FOR_AGENT
+  │   ├─ If tool_use → dispatch to tool's target
+  │   │   ├─ tool.taskId → DISPATCH_TASK, MARK_WAITING_FOR_TASK
+  │   │   ├─ tool.workflowId → DISPATCH_WORKFLOW, MARK_WAITING_FOR_WORKFLOW
+  │   │   └─ tool.agentId → DISPATCH_AGENT, MARK_WAITING_FOR_AGENT
   │   │
   │   └─ If text response → continue
   │
-  ├─ (capability result arrives via callback)
-  ├─ RESUME_FROM_CAPABILITY
+  ├─ (tool result arrives via callback)
+  ├─ RESUME_FROM_TOOL
   ├─ Continue LLM loop until text response
   │
   ├─ Run memory extraction workflow
@@ -530,7 +618,9 @@ What action types do memory workflows need?
 
 ### State Storage Model
 
-Should AgentDO use the same schema-driven SQL approach as CoordinatorDO (via `@wonder/schemas`), or is conversation state simpler—fixed tables for turns/messages/memory rather than dynamic schemas?
+**Decided:** Fixed tables for conversation primitives (turns, messages, conversations), schema-driven storage for memory.
+
+Conversation primitives have a known, stable structure—no need for dynamic schema generation. Memory storage uses schema-driven tables because the memory structure varies by persona (different agents remember different things in different formats).
 
 ### Memory Extraction Mechanism
 
@@ -539,10 +629,6 @@ Memory extraction is described as LLM-driven. Is this a dedicated workflow that 
 ### Tool Execution Path
 
 When an agent calls a tool, does it always go through Executor with Tasks, or is there a lighter-weight path for simple tool calls (direct MCP invocation without Task wrapping)?
-
-### Persona Schema Details
-
-What does the full Persona schema look like? The doc shows `availableTaskIds`, `availableWorkflowIds`, `availableAgentIds`—but how are tools defined? MCP-style? Inline schemas? Are they referenced by ID from a library?
 
 ### Conversation Lifecycle
 

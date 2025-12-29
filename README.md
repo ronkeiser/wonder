@@ -56,6 +56,10 @@ Library (wonder-patterns)
 │   ├── write_file_verified
 │   ├── run_tests
 │   └── str_replace
+├── Tools
+│   ├── implement_feature
+│   ├── search_code
+│   └── run_tests
 ├── Personas
 │   ├── code_assistant
 │   └── reviewer
