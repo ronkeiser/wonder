@@ -25,30 +25,34 @@ coordinator/src/
 ├── types.ts                    # Decision type definitions
 ├── schema/                     # Drizzle table schemas
 │   ├── index.ts                # Schema exports
-│   └── migrations/             # DO SQLite migrations (drizzle-kit generated)
-│       ├── 0000_*.sql          # Initial schema (FK constraints stripped)
-│       └── meta/               # Drizzle migration metadata
-├── helpers/                    # Pure utility functions
-│   ├── index.ts                # Helper exports
-│   └── sql.ts                  # SQL tracing utilities
-├── planning/                   # Pure logic - returns Decision[]
+│   └── migrations/             # DO SQLite migrations
+│       └── index.ts            # Migration runner
+├── shared/                     # Pure utility functions
+│   ├── index.ts                # Exports
+│   ├── conditions.ts           # Condition evaluation
+│   ├── errors.ts               # Error utilities
+│   └── path.ts                 # Path computation utilities
+├── planning/                   # Pure logic - returns { decisions, events }
 │   ├── index.ts                # Planning exports
 │   ├── routing.ts              # Transition evaluation
 │   ├── synchronization.ts      # Fan-in logic
-│   ├── completion.ts           # Workflow finalization
-│   ├── branching.ts            # Branch control logic (TODO)
-│   └── conditions.ts           # Condition evaluation (CEL future, TODO)
-├── operations/                 # Actor operations - SQL and RPC
+│   ├── completion.ts           # Workflow finalization (output mapping)
+│   ├── lifecycle.ts            # Workflow start decisions
+│   └── merge.ts                # Branch merge strategies
+├── operations/                 # Data managers - SQL and state
+│   ├── db.ts                   # Shared Drizzle DB instance
 │   ├── tokens.ts               # Token CRUD + queries
-│   ├── context.ts              # Context CRUD + snapshots
-│   ├── defs.ts                 # Workflow definitions - copies from RESOURCES on init
-│   ├── events.ts               # Event emission coordination
-│   └── artifacts.ts            # Artifact staging (TODO)
-└── dispatch/                   # Decision dispatch (convert to operations)
+│   ├── context.ts              # Context CRUD + snapshots + branch tables
+│   ├── defs.ts                 # Workflow definitions from RESOURCES
+│   ├── status.ts               # Workflow status management
+│   └── subworkflows.ts         # Subworkflow tracking for cascade cancellation
+└── dispatch/                   # Decision execution (convert to operations)
     ├── index.ts                # Dispatch exports
     ├── apply.ts                # Main decision dispatcher
     ├── batch.ts                # Decision batching optimization
-    └── cache.ts                # DO-level caching (TODO)
+    ├── lifecycle.ts            # Workflow start/completion execution
+    ├── task.ts                 # Token dispatch to executor
+    └── fan.ts                  # Fan-out/fan-in execution (branch tables, synchronization)
 ```
 
 ## Decision Types (types.ts)
@@ -59,135 +63,202 @@ Decisions are pure data describing state changes to make (converted to operation
 type Decision =
   // Token operations
   | { type: 'CREATE_TOKEN'; params: CreateTokenParams }
-  | { type: 'CREATE_FAN_IN_TOKEN'; params: CreateFanInParams }
   | { type: 'UPDATE_TOKEN_STATUS'; tokenId: string; status: TokenStatus }
-  | {
-      type: 'ACTIVATE_FAN_IN_TOKEN';
-      workflow_run_id: string;
-      node_id: string;
-      fanInPath: string;
-    }
+  | { type: 'MARK_WAITING'; tokenId: string; arrivedAt: Date }
   | { type: 'MARK_FOR_DISPATCH'; tokenId: string }
+  | { type: 'COMPLETE_TOKEN'; tokenId: string }
+  | { type: 'COMPLETE_TOKENS'; tokenIds: string[] }
+  | { type: 'CANCEL_TOKENS'; tokenIds: string[]; reason: string }
 
   // Context operations
   | { type: 'SET_CONTEXT'; path: string; value: unknown }
-  | {
-      type: 'APPLY_NODE_OUTPUT';
-      nodeRef: string;
-      output: Record<string, unknown>;
-      tokenId?: string;
-    }
+  | { type: 'APPLY_OUTPUT'; path: string; output: Record<string, unknown> }
+  | { type: 'APPLY_OUTPUT_MAPPING'; outputMapping: Record<string, string> | null; outputData: Record<string, unknown> }
 
-  // Synchronization (triggers recursive decision generation)
-  | {
-      type: 'CHECK_SYNCHRONIZATION';
-      tokenId: string;
-      transition: TransitionDef;
-    }
+  // Branch storage operations
+  | { type: 'INIT_BRANCH_TABLE'; tokenId: string; outputSchema: object }
+  | { type: 'APPLY_BRANCH_OUTPUT'; tokenId: string; output: Record<string, unknown> }
+  | { type: 'MERGE_BRANCHES'; tokenIds: string[]; branchIndices: number[]; outputSchema: object; merge: MergeConfig }
+  | { type: 'DROP_BRANCH_TABLES'; tokenIds: string[] }
+
+  // Synchronization
+  | { type: 'CHECK_SYNCHRONIZATION'; tokenId: string; transition: Transition }
+  | { type: 'ACTIVATE_FAN_IN'; workflowRunId: string; nodeId: string; fanInPath: string; mergedTokenIds: string[] }
+  | { type: 'TRY_ACTIVATE_FAN_IN'; workflowRunId: string; nodeId: string; fanInPath: string; transitionId: string; triggeringTokenId: string }
+
+  // Workflow lifecycle
+  | { type: 'INITIALIZE_WORKFLOW'; input: Record<string, unknown> }
+  | { type: 'COMPLETE_WORKFLOW'; output: Record<string, unknown> }
+  | { type: 'FAIL_WORKFLOW'; error: string }
+
+  // Subworkflow operations
+  | { type: 'MARK_WAITING_FOR_SUBWORKFLOW'; tokenId: string; subworkflowRunId: string; timeoutMs?: number }
+  | { type: 'RESUME_FROM_SUBWORKFLOW'; tokenId: string; output: Record<string, unknown> }
+  | { type: 'FAIL_FROM_SUBWORKFLOW'; tokenId: string; error: string }
+  | { type: 'TIMEOUT_SUBWORKFLOW'; tokenId: string; subworkflowRunId: string; timeoutMs: number; elapsedMs: number }
+
+  // Dispatch operations
+  | { type: 'DISPATCH_TOKEN'; tokenId: string }
 
   // Batched operations (optimization)
   | { type: 'BATCH_CREATE_TOKENS'; allParams: CreateTokenParams[] }
-  | {
-      type: 'BATCH_UPDATE_STATUS';
-      updates: Array<{ tokenId: string; status: TokenStatus }>;
-    };
+  | { type: 'BATCH_UPDATE_STATUS'; updates: Array<{ tokenId: string; status: TokenStatus }> };
 ```
 
 ## Planning Modules (Pure)
 
+All planning modules are pure functions that return `PlanningResult = { decisions: Decision[], events: TraceEventInput[] }`. No side effects, SQL, or RPC.
+
 ### planning/routing.ts
 
-Evaluates transitions and determines next tokens.
-
-**Signature:**
+Evaluates transitions and determines next tokens after task completion.
 
 ```typescript
-function decide(
-  completedToken: TokenRow,
-  workflow: WorkflowDef,
-  contextData: ContextSnapshot,
-): Decision[];
+function decideRouting(params: {
+  completedToken: TokenRow;
+  workflowRunId: string;
+  nodeId: string;
+  transitions: TransitionRow[];
+  context: ContextSnapshot;
+}): PlanningResult;
+
+function getTransitionsWithSynchronization(
+  transitions: TransitionRow[],
+  context: ContextSnapshot,
+): Transition[];
 ```
 
-**Does:**
+**Algorithm:**
 
-1. Gets outgoing transitions from completed node
-2. Evaluates conditions against context (CEL in future)
-3. Groups by priority tier (sequential evaluation in future)
-4. For each matching transition:
-   - Determines spawn count (static or foreach)
-   - Generates CREATE_TOKEN decisions with proper lineage
-   - Generates CHECK_SYNCHRONIZATION or MARK_FOR_DISPATCH decisions
-
-**Returns:** Array of decisions describing token creation and dispatch (pure data, no execution).
+1. Group transitions by priority tier
+2. Evaluate tiers in order (lower number = higher priority)
+3. First tier with ANY matches wins; follow ALL matches in that tier
+4. Check loopConfig.maxIterations before evaluating conditions
+5. For each matched transition, determine spawn count (static or foreach)
+6. Generate CREATE_TOKEN decisions with:
+   - pathId for lineage tracking
+   - siblingGroup for fan-in coordination
+   - branchIndex/branchTotal for parallel branches
+   - iterationCounts for loop tracking
 
 ### planning/synchronization.ts
 
-Handles fan-in logic and merge strategies.
-
-**Signature:**
+Handles fan-in synchronization when tokens arrive at merge points.
 
 ```typescript
-function decide(
-  token: TokenRow,
-  transition: TransitionDef,
-  siblings: TokenRow[],
-  workflow: WorkflowDef,
-): Decision[];
+function decideSynchronization(params: {
+  token: TokenRow;
+  transition: Transition;
+  siblingCounts: SiblingCounts;
+  workflowRunId: string;
+}): PlanningResult;
+
+function decideOnTimeout(params: {
+  waitingTokens: TokenRow[];
+  transition: Transition;
+  workflowRunId: string;
+}): Decision[];
+
+function decideFanInContinuation(params: {
+  workflowRunId: string;
+  nodeId: string;
+  fanInPath: string;
+  parentTokenId: string;
+  parentIterationCounts?: Record<string, number>;
+}): PlanningResult;
 ```
 
-**Does:**
+**Strategies:**
 
-1. Resolves sibling_group ref to fan_out_transition_id
-2. Checks if token is in sibling group
-3. Evaluates synchronization condition (strategy: any/all/m_of_n)
-4. If not met: returns CREATE_FAN_IN_TOKEN decision (waiting)
-5. If met: returns SET_CONTEXT (merge) + ACTIVATE_FAN_IN_TOKEN decisions
+- `'any'` - First arrival activates fan-in immediately
+- `'all'` - Wait for all siblings (branchTotal)
+- `{ mOfN: n }` - Wait for n completions (quorum)
 
-**Returns:** Array of decisions describing synchronization behavior (pure data, no execution).
+**Timeout policies:**
 
-**Pure helpers:**
+- `'fail'` - Fail workflow on timeout
+- `'proceed_with_available'` - Merge available and continue
 
-- `evaluateSyncCondition(siblings, strategy)` - Check if condition met (any/all/m_of_n)
-- `mergeOutputs(siblings, merge)` - Apply merge strategy (append, merge_object, keyed_by_branch, last_wins)
-- `buildFanInPath(tokenPath)` - Compute stable fan-in path
+**Helpers:**
+
+- `needsMerge(transition)` - Check if branch merge configured
+- `getMergeConfig(transition)` - Get merge configuration
+- `hasTimedOut(transition, oldestWaitingTimestamp)` - Check timeout
+- `getEarliestTimeoutMs(transitions)` - For alarm scheduling
 
 ### planning/completion.ts
 
-Determines workflow completion and extracts final output.
-
-**Signature:**
+Extracts final workflow output by applying outputMapping.
 
 ```typescript
 function extractFinalOutput(
-  workflow: WorkflowDef,
-  contextData: ContextSnapshot,
+  outputMapping: Record<string, string> | null,
+  context: ContextSnapshot,
+): CompletionResult;  // { output, events }
+
+function applyInputMapping(
+  mapping: Record<string, string> | null,
+  context: ContextSnapshot,
 ): Record<string, unknown>;
 ```
 
-**Does:**
+### planning/lifecycle.ts
 
-1. Evaluates output_mapping against context
-2. Returns final output object
+Workflow start decisions.
 
-**Returns:** Final output for workflow run.
+```typescript
+function decideWorkflowStart(params: {
+  workflowRunId: string;
+  initialNodeId: string;
+  input: Record<string, unknown>;
+}): PlanningResult;
+```
 
-## Operations (Imperative)
+### planning/merge.ts
+
+Branch merge strategy implementations (used by ContextManager.mergeBranches).
+
+Strategies: `append`, `collect`, `merge_object`, `keyed_by_branch`, `last_wins`
+
+## Operations (Data Managers)
 
 ### operations/tokens.ts
 
-Token state management via TokenManager class.
+Token state management via TokenManager class (Drizzle ORM).
 
 ```typescript
 class TokenManager {
-  constructor(sql, defs, emitter)
+  constructor(db, emitter)
 
-  initialize() → void                                      // Create tokens table
-  create(params) → tokenId                                 // Create new token
-  get(tokenId) → TokenRow                                  // Get token by ID
-  updateStatus(tokenId, status) → void                     // Update token status
-  getActiveCount(workflowRunId) → number                   // Count active tokens
-  // Future: tryCreateFanIn, tryActivate, getSiblings for fan-out/fan-in
+  // Core CRUD
+  create(params: CreateTokenParams): string              // Create token, returns ID
+  get(tokenId: string): TokenRow                         // Get token by ID
+  updateStatus(tokenId: string, status: TokenStatus): void
+
+  // Queries
+  getActiveCount(workflowRunId: string): number          // Count non-terminal tokens
+  getActiveTokens(workflowRunId: string): TokenRow[]     // Get all active tokens
+  getRootToken(workflowRunId: string): TokenRow | null
+
+  // Sibling queries (for fan-in)
+  getSiblings(workflowRunId: string, siblingGroup: string): TokenRow[]
+  getSiblingCounts(workflowRunId: string, siblingGroup: string): SiblingCounts
+
+  // Waiting state management
+  markWaitingForSiblings(tokenId: string, arrivedAt: Date): void
+  markWaitingForSubworkflow(tokenId: string, subworkflowRunId: string): void
+  getAllWaitingTokens(): TokenRow[]
+  getTokensWaitingForSubworkflow(): TokenRow[]
+
+  // Bulk operations
+  getMany(tokenIds: string[]): TokenRow[]
+  completeMany(tokenIds: string[]): void
+  cancelMany(tokenIds: string[], reason?: string): void
+
+  // Fan-in operations (race-safe)
+  tryCreateFanIn(params): boolean                        // INSERT OR IGNORE (race-safe)
+  tryActivateFanIn(params): boolean                      // UPDATE WHERE status='waiting' (race-safe)
+  getFanIn(workflowRunId: string, fanInPath: string): FanInRow | null
 }
 ```
 
@@ -199,128 +270,230 @@ Schema-driven SQL operations for workflow context and branch storage.
 class ContextManager {
   constructor(sql, defs, emitter)
 
-  initialize() → Promise<void>                             // Create tables from schema DDL
-  initializeWithInput(input) → Promise<void>               // Validate and insert input
-  get(path) → unknown                                      // Read context value
-  set(path, value) → void                                  // Write context value
-  getSnapshot() → ContextSnapshot                          // Read-only view for decision logic
-  // Future: initializeBranchTable, applyNodeOutput, mergeBranches, dropBranchTables
+  // Initialization
+  initialize(input: Record<string, unknown>): void       // Create tables + validate/store input
+
+  // Read operations
+  get(path: string): unknown                             // Read value (supports nested paths)
+  getSection(section: string): Record<string, unknown>   // Read entire section
+  getSnapshot(): ContextSnapshot                         // Read-only view for planning
+
+  // Write operations
+  setField(path: string, value: unknown): void           // Set field (read-modify-write)
+  replaceSection(section: string, data: Record<string, unknown>): void
+  applyOutputMapping(outputMapping, taskOutput): void    // Apply node's output mapping
+
+  // Branch storage (for parallel execution)
+  initializeBranchTable(tokenId: string, outputSchema: JSONSchema): void
+  applyBranchOutput(tokenId: string, output: Record<string, unknown>): void
+  getBranchOutputs(tokenIds: string[], branchIndices: number[], outputSchema): BranchOutput[]
+  mergeBranches(branchOutputs: BranchOutput[], merge: MergeConfig): void
+  dropBranchTables(tokenIds: string[]): void
 }
 ```
 
 See `branch-storage.md` for branch isolation design.
 
-### operations/artifacts.ts
-
-Artifact staging in DO SQLite.
-
-```typescript
-initializeTable(sql) → void
-stage(sql, artifact) → void
-getStaged(sql) → Artifact[]
-commitAll(env, sql) → void  // writes to RESOURCES
-```
-
 ### operations/defs.ts
 
-Workflow definition management with multi-level caching.
+Workflow definition management via DefinitionManager.
 
 ```typescript
 class DefinitionManager {
-  constructor(ctx, sql, env)
+  constructor(db, ctx, env)
 
-  initialize(workflow_run_id) → Promise<void>        // Load definitions on first access
-  getWorkflowRun() → Promise<WorkflowRun>            // Memory → SQL → RESOURCES
-  getWorkflowDef() → Promise<WorkflowDef>            // Memory → SQL (fetched with Run)
+  // Initialization (two paths)
+  initializeWorkflow(workflowRunId: string): Promise<void>    // Root workflow (has D1 record)
+  initializeSubworkflow(params: SubworkflowParams): Promise<void>  // Ephemeral (no D1 record)
+
+  // Accessors (sync - data in DO SQLite after init)
+  getWorkflowRun(): WorkflowRunRow
+  getWorkflowDef(): WorkflowDefRow
+  getNode(nodeId: string): NodeRow
+  getNodes(): NodeRow[]
+  getTransitionsFrom(nodeId: string): TransitionRow[]
+  getTransitions(): TransitionRow[]
+  getTransition(transitionId: string): TransitionRow
 }
 ```
 
-**Caching strategy:**
+**Initialization flow:**
 
-- Memory cache (fastest) - cleared on DO eviction
-- SQL cache (durable) - persists across DO wake-ups
-- RESOURCES RPC (slowest) - only on first access
+1. Run drizzle migrations (idempotent)
+2. Check if already populated (DO wake-up case)
+3. If not, fetch from RESOURCES and insert into DO SQLite
+4. For root workflows: update D1 status to 'running'
+5. For subworkflows: create synthetic run record (local only)
 
-Both `WorkflowRun` and `WorkflowDef` are fetched together and cached together. Used by ContextManager (for schemas), CoordinatorEmitter (for IDs), and decision logic (for graph structure).
+### operations/status.ts
+
+Workflow lifecycle status management.
+
+```typescript
+class StatusManager {
+  constructor(db, emitter)
+
+  initialize(workflowRunId: string): void                // Set initial 'running' status
+  get(workflowRunId: string): WorkflowStatus | null
+  isTerminal(workflowRunId: string): boolean             // completed/failed/timed_out/cancelled
+  update(workflowRunId: string, newStatus: WorkflowStatus): boolean  // Returns false if already terminal
+  markCompleted(workflowRunId: string): boolean
+  markFailed(workflowRunId: string): boolean
+  markTimedOut(workflowRunId: string): boolean
+}
+```
+
+Guards against double finalization - cannot transition from terminal state.
+
+### operations/subworkflows.ts
+
+Subworkflow tracking for cascade operations.
+
+```typescript
+class SubworkflowManager {
+  constructor(db, emitter)
+
+  register(params): string                               // Register new subworkflow
+  updateStatus(subworkflowRunId: string, status: SubworkflowStatus): void
+  getRunning(workflowRunId: string): SubworkflowRow[]    // Get all running subworkflows
+  getBySubworkflowRunId(subworkflowRunId: string): SubworkflowRow | null
+  getByParentTokenId(parentTokenId: string): SubworkflowRow | null
+  cancelAll(workflowRunId: string): string[]             // Cancel all running, return IDs
+}
+```
+
+Used for cascade cancellation when parent workflow fails/cancels.
 
 ## Dispatch Layer
 
+The dispatch layer converts Decision[] to actual operations. This is the "act" phase.
+
 ### dispatch/apply.ts
 
-Dispatches decisions by converting them to operations (SQL mutations, RPC calls).
+Main decision dispatcher - routes decisions to appropriate managers.
 
 ```typescript
-async applyDecisions(
+async function applyDecisions(
   decisions: Decision[],
-  sql: SqlStorage,
-  env: Env,
-  logger: Logger,
-): Promise<string[]>  // returns tokensToDispatch
+  ctx: DispatchContext,
+): Promise<ApplyResult>;
+
+type ApplyResult = {
+  applied: number;
+  tokensCreated: string[];
+  tokensDispatched: string[];
+  errors: Array<{ decision: Decision; error: Error }>;
+  fanInActivated?: boolean;
+};
 ```
 
-**Does:**
+**Flow:**
 
-1. Batches decisions (multiple CREATE_TOKEN → BATCH_CREATE_TOKENS)
-2. Handles race conditions (tryCreateFanIn, tryActivate)
-3. Handles CHECK_SYNCHRONIZATION recursively (loads state, calls decision function, applies sub-decisions)
-4. Collects MARK_FOR_DISPATCH decisions into return value
-5. Emits events after successful execution
-6. Logs errors if execution fails
+1. Batch compatible decisions (optimization)
+2. Apply each decision to appropriate manager
+3. Emit workflow events for milestones (token.created, task.completed, etc.)
+4. Handle recursive decisions (COMPLETE_WORKFLOW cascades to subworkflows)
+5. Return summary with created/dispatched token IDs
+
+### dispatch/task.ts
+
+Token dispatch to executor and result processing.
+
+```typescript
+async function dispatchToken(ctx: DispatchContext, tokenId: string): Promise<void>;
+async function processTaskResult(ctx: DispatchContext, tokenId: string, result: TaskResult): Promise<void>;
+```
+
+**dispatchToken:**
+
+1. Get node definition
+2. Route based on node type (task vs subworkflow)
+3. Apply input mapping from context
+4. Send to EXECUTOR (fire-and-forget)
+
+**processTaskResult:**
+
+1. Mark token completed
+2. Handle output based on flow type:
+   - Linear flow: Apply outputMapping to context
+   - Fan-out flow: Write to branch table
+3. Plan routing decisions
+4. Process synchronization for created tokens
+5. Dispatch non-waiting tokens
+
+### dispatch/fan.ts
+
+Fan-out/fan-in execution.
+
+```typescript
+async function handleBranchOutput(ctx, token, node, output): Promise<void>;
+async function processSynchronization(ctx, createdTokenIds, syncTransitions): Promise<string[]>;
+async function activateFanIn(ctx, decision, transition, triggeringTokenId): Promise<string | null>;
+```
+
+**handleBranchOutput:** Write task output to isolated branch table (for later merge).
+
+**processSynchronization:** Check sync conditions for created tokens, return continuation token IDs.
+
+**activateFanIn:**
+
+1. Try to win fan-in race (race-safe via SQL constraint)
+2. Get completed siblings for merge
+3. Merge branch outputs if configured
+4. Mark waiting/in-flight siblings as completed/cancelled
+5. Create continuation token
+
+### dispatch/lifecycle.ts
+
+Workflow start and timeout handling.
+
+```typescript
+async function startWorkflow(ctx: DispatchContext): Promise<void>;
+async function processTaskError(ctx, tokenId, errorResult): Promise<void>;
+async function checkTimeouts(ctx: DispatchContext): Promise<void>;
+```
+
+**startWorkflow:**
+
+1. Get workflow run and definition
+2. Initialize workflow (INITIALIZE_WORKFLOW decision)
+3. Plan initial token creation
+4. Dispatch first token
+
+**checkTimeouts:**
+
+1. Check sibling timeouts (waiting_for_siblings tokens)
+2. Check subworkflow timeouts (waiting_for_subworkflow tokens)
+3. Apply timeout decisions (fail or proceed_with_available)
+4. Schedule next alarm if still waiting
 
 ### dispatch/batch.ts
 
-Decision batching optimizations.
+Decision batching optimizations - groups consecutive CREATE_TOKEN into BATCH_CREATE_TOKENS.
 
-```typescript
-batchDecisions(decisions: Decision[]) → Decision[]
-```
+## Event Emission
 
-Groups consecutive CREATE_TOKEN decisions into BATCH_CREATE_TOKENS for single SQL transaction.
-
-### dispatch/cache.ts
-
-Actor-level caching utilities.
-
-```typescript
-// Workflow definitions cached per workflow_run_id (actor instance cache)
-// Context snapshots cached and invalidated on SET_CONTEXT
-// Avoids repeated SQL reads during decision execution
-```
-
-## Event Emission & Introspection
-
-### events.ts
-
-Handles event emission for observability and debugging. Emits two types of events:
+Events are emitted via the `Emitter` from `@wonder/events`:
 
 **Workflow events** (always on):
 
-- Business-level events: `workflow_started`, `node_completed`, `token_spawned`, etc.
-- Used for audit trails, replay, and user-facing observability
-- Written to Events Service (D1) for all workflow runs
+- `workflow.started`, `workflow.completed`, `workflow.failed`
+- `task.dispatched`, `task.completed`, `task.failed`
+- `token.created`, `token.completed`, `token.waiting`
+- `fan_out.started`, `fan_in.completed`, `branches.merged`
+- `subworkflow.dispatched`, `subworkflow.completed`
 
-**Introspection events** (opt-in):
+**Trace events** (opt-in via `enableTraceEvents`):
 
-- Debug-level events: `decision.routing.start`, `operation.sql.query`, `operation.context.read`, etc.
-- High-volume, detailed execution traces for debugging coordinator internals
-- Enabled via `X-Introspection-Enabled` header or env var
-- Written to separate `introspection_events` table in Events Service
-- **Replaces logging for normal operations** - only critical failures logged
+- `decision.routing.start`, `decision.sync.check_condition`
+- `operation.context.field_set`, `operation.tokens.status_updated`
+- `dispatch.batch.complete`, `sql.query`
 
-**Emitter lifecycle:**
-
-1. Created in `index.ts` during DO initialization
-2. Passed to `operations` and `dispatch` layers
-3. Batches events in memory (flush every 100 events or 30 seconds)
-4. Writes to Events Service via RPC
-
-**Event types imported from `@wonder/events` package** (Events Service owns the schema).
-
-See `docs/architecture/introspection.md` for detailed design.
+Events are streamed to STREAMER service for persistence and observability.
 
 ## Coordinator (Entry Point)
 
-The DO class (Actor). Thin orchestration layer that coordinates decision logic and execution.
+The DO class (Actor). Thin orchestration layer that delegates to dispatch functions.
 
 ```typescript
 class WorkflowCoordinator extends DurableObject {
@@ -328,105 +501,115 @@ class WorkflowCoordinator extends DurableObject {
   private emitter: Emitter;
   private context: ContextManager;
   private tokens: TokenManager;
+  private status: StatusManager;
+  private subworkflows: SubworkflowManager;
 
-  async start(workflowRunId: string): Promise<void>;
+  // Root workflow entry
+  async start(workflowRunId: string, options?: { enableTraceEvents?: boolean }): Promise<void>;
+
+  // Subworkflow entry (no D1 record - ephemeral)
+  async startSubworkflow(params: SubworkflowParams): Promise<void>;
+
+  // Task callbacks from Executor
   async handleTaskResult(tokenId: string, result: TaskResult): Promise<void>;
+  async handleTaskError(tokenId: string, errorResult: TaskErrorResult): Promise<void>;
+  async markTokenExecuting(tokenId: string): Promise<void>;
+
+  // Subworkflow callbacks
+  async handleSubworkflowResult(tokenId: string, output: Record<string, unknown>): Promise<void>;
+  async handleSubworkflowError(tokenId: string, error: string): Promise<void>;
+
+  // Lifecycle
+  async cancel(reason: string): Promise<void>;
+  async alarm(): Promise<void>;
 }
 ```
 
 ### RPC Methods (Actor Messages)
 
-Only two external entry points (messages this actor can receive):
+The coordinator receives these external messages:
 
-- `start(workflow_run_id, input)` - Initialize and begin workflow
-- `handleTaskResult(token_id, result)` - Process completed task
+**Workflow lifecycle:**
 
-### start(workflow_run_id, input)
+- `start(workflowRunId, options?)` - Initialize and begin root workflow
+- `startSubworkflow(params)` - Start ephemeral subworkflow (no D1 record)
+- `cancel(reason)` - Cancel workflow (cascades to subworkflows)
+
+**Task callbacks (from Executor):**
+
+- `handleTaskResult(tokenId, result)` - Task completed successfully
+- `handleTaskError(tokenId, errorResult)` - Task failed
+- `markTokenExecuting(tokenId)` - Task started executing (observability)
+
+**Subworkflow callbacks (from child coordinators):**
+
+- `handleSubworkflowResult(tokenId, output)` - Subworkflow completed
+- `handleSubworkflowError(tokenId, error)` - Subworkflow failed
+
+**Alarm:**
+
+- `alarm()` - Timeout check (scheduled via DO alarms)
+
+### start(workflowRunId, options?)
 
 ```typescript
-async start(workflowRunId: string) {
-  // Initialize definition manager (loads WorkflowRun + WorkflowDef)
-  await this.defs.initialize(workflowRunId);
+async start(workflowRunId: string, options?: { enableTraceEvents?: boolean }) {
+  // Initialize definition manager (loads WorkflowRun + WorkflowDef from D1)
+  await this.defs.initializeWorkflow(workflowRunId);
 
-  const workflowRun = await this.defs.getWorkflowRun();
-  const workflowDef = await this.defs.getWorkflowDef();
-  const input = workflowRun.context.input;
-
-  // Initialize storage
-  this.tokens.initialize();
-  await this.context.initialize();
-
-  // Store input
-  await this.context.initializeWithInput(input);
-
-  // Create initial token
-  const tokenId = this.tokens.create({
-    workflow_run_id: workflowRun.id,
-    node_id: workflowDef.initial_node_id,
-    parent_token_id: null,
-    path_id: 'root',
-    fan_out_transition_id: null,
-    branch_index: 0,
-    branch_total: 1,
-  });
-
-  // Dispatch
-  await this.dispatchToken(tokenId);
+  // Delegate to dispatch/lifecycle.ts
+  const ctx = this.getDispatchContext(workflowRunId, options);
+  await startWorkflow(ctx);
 }
 ```
 
-### handleTaskResult(token_id, result)
+### startSubworkflow(params)
+
+```typescript
+async startSubworkflow(params: SubworkflowParams) {
+  // Initialize definitions (creates synthetic run record in DO SQLite, no D1)
+  await this.defs.initializeSubworkflow(params);
+
+  // Same lifecycle as root workflow
+  const ctx = this.getDispatchContext(params.runId);
+  await startWorkflow(ctx);
+}
+```
+
+### handleTaskResult(tokenId, result)
 
 ```typescript
 async handleTaskResult(tokenId: string, result: TaskResult) {
-  // 1. Mark complete and apply result
-  this.tokens.updateStatus(tokenId, 'completed');
   const token = this.tokens.get(tokenId);
-  this.context.applyNodeOutput(token.node_id, result.output_data, tokenId);
+  const ctx = this.getDispatchContext(token.workflowRunId);
 
-  // 2. Load workflow and context (cached in definition manager)
-  const workflowDef = await this.defs.getWorkflowDef();
-  const contextData = this.context.getSnapshot();
-
-  // 3. Run decision logic (pure - returns data)
-  const routingDecisions = planning.routing.decide(token, workflowDef, contextData);
-
-  // 4. Dispatch decisions (converts to operations, handles synchronization recursively)
-  const tokensToDispatch = await dispatch.applyDecisions(
-    routingDecisions,
-    this.sql,
-    this.env,
-    this.logger,
-  );
-
-  // 5. Dispatch all
-  await Promise.all(tokensToDispatch.map(id => this.dispatchToken(id)));
-
-  // 6. Check completion
-  const activeCount = this.tokens.getActiveCount(token.workflow_run_id);
-  if (activeCount === 0) {
-    const finalOutput = planning.completion.extractFinalOutput(workflowDef, contextData);
-    await this.finalizeWorkflow(token.workflow_run_id, finalOutput);
-  }
+  // Delegate to dispatch/task.ts - handles output mapping, routing, fan-in
+  await processTaskResult(ctx, tokenId, result);
 }
 ```
 
-### dispatchToken(token_id) [private]
+### DispatchContext
+
+All dispatch functions receive a `DispatchContext` containing managers and services:
 
 ```typescript
-private async dispatchToken(tokenId: string) {
-  this.tokens.updateStatus(tokenId, 'executing');
-
-  const payload = await buildExecutorPayload(this.sql, this.env, tokenId);
-
-  if (payload.completedSynchronously) {
-    // Task has no steps - complete immediately
-    await this.handleTaskResult(tokenId, { output_data: {} });
-  } else {
-    // Fire-and-forget to Executor
-    this.env.EXECUTOR.executeTask(payload);
-  }
-}
+type DispatchContext = {
+  tokens: TokenManager;
+  context: ContextManager;
+  defs: DefinitionManager;
+  status: StatusManager;
+  subworkflows: SubworkflowManager;
+  emitter: Emitter;
+  logger: Logger;
+  workflowRunId: string;
+  rootRunId: string;
+  resources: Env['RESOURCES'];
+  executor: Env['EXECUTOR'];
+  coordinator: Env['COORDINATOR'];
+  waitUntil: (promise: Promise<unknown>) => void;
+  scheduleAlarm: (delayMs: number) => Promise<void>;
+  enableTraceEvents?: boolean;
+};
 ```
 
 ## Data Flow
@@ -434,41 +617,41 @@ private async dispatchToken(tokenId: string) {
 ```
 handleTaskResult(tokenId, result)  [Actor message received]
   │
-  ├─► operations.tokens.updateStatus(tokenId, 'completed')  [Actor state mutation]
-  ├─► operations.context.applyNodeOutput(result.output_data)  [Actor state mutation]
+  ├─► processTaskResult(ctx, tokenId, result)  [dispatch/task.ts]
+  │     │
+  │     ├─► Guard: ignore if token already terminal
+  │     │
+  │     ├─► applyDecisions([COMPLETE_TOKEN])
+  │     │
+  │     ├─► Handle output by flow type:
+  │     │   ├─► Linear: APPLY_OUTPUT_MAPPING → context.applyOutputMapping()
+  │     │   └─► Fan-out: handleBranchOutput() → branch table
+  │     │
+  │     ├─► planning.decideRouting() → { decisions, events }
+  │     │
+  │     ├─► applyDecisions(routingDecisions) → { tokensCreated }
+  │     │
+  │     ├─► processSynchronization(tokensCreated, syncTransitions)
+  │     │   ├─► For each created token:
+  │     │   │   ├─► Get siblingCounts
+  │     │   │   ├─► planning.decideSynchronization() → decisions
+  │     │   │   ├─► If ACTIVATE_FAN_IN:
+  │     │   │   │     ├─► TRY_ACTIVATE_FAN_IN (race-safe)
+  │     │   │   │     ├─► mergeBranchOutputs()
+  │     │   │   │     └─► createFanInContinuation() → continuationTokenId
+  │     │   │   └─► Else: MARK_WAITING or MARK_FOR_DISPATCH
+  │     │   └─► Return continuationTokenIds[]
+  │     │
+  │     ├─► dispatchToken() for each dispatched + continuation token
+  │     │
+  │     └─► If no routing → checkAndFinalizeWorkflow()
   │
-  ├─► Load state (read-only snapshot for decision logic)
-  │   ├─► token = this.tokens.get(tokenId)
-  │   ├─► workflowDef = await this.defs.getWorkflowDef()  [cached]
-  │   └─► contextData = this.context.getSnapshot()
-  │
-  ├─► Decision logic (pure, returns Decision[] data)
-  │   └─► decisions = planning.routing.decide(token, workflow, contextData)
-  │
-  ├─► Dispatch decisions (convert to operations)
-  │   └─► tokensToDispatch = dispatch.applyDecisions(decisions, ...)
-  │         │
-  │         ├─► Batch decisions (optimization)
-  │         │
-  │         ├─► For each decision:
-  │         │   ├─► CREATE_TOKEN → operations.tokens.create()  [SQL mutation]
-  │         │   ├─► CHECK_SYNCHRONIZATION → recursive:
-  │         │   │     ├─► Load siblings
-  │         │   │     ├─► planning.synchronization.decide() → subDecisions
-  │         │   │     └─► applyDecisions(subDecisions)
-  │         │   ├─► CREATE_FAN_IN_TOKEN → operations.tokens.tryCreateFanIn()  [SQL mutation]
-  │         │   ├─► ACTIVATE_FAN_IN_TOKEN → operations.tokens.tryActivate()  [SQL mutation]
-  │         │   └─► MARK_FOR_DISPATCH → add to return array
-  │         │
-  │         └─► Return tokensToDispatch[]
-  │
-  ├─► Dispatch all tokens
-  │   └─► Promise.all(tokensToDispatch.map(id => dispatchToken(id)))
-  │
-  └─► Check workflow completion
-      └─► if activeCount === 0:
-          ├─► finalOutput = planning.completion.extractFinalOutput()
-          └─► finalizeWorkflow()
+  └─► If activeCount === 0:
+      ├─► planning.extractFinalOutput() → { output, events }
+      └─► applyDecisions([COMPLETE_WORKFLOW])
+          ├─► Update status.completed
+          ├─► Emit workflow.completed
+          └─► Notify parent (if subworkflow) or RESOURCES (if root)
 ```
 
 ## Key Characteristics
@@ -503,35 +686,30 @@ The application layer optimizes decision execution:
 
 Single SQL transaction instead of three separate operations.
 
-### Recursive Synchronization
+### Synchronization Processing
 
-`CHECK_SYNCHRONIZATION` decisions trigger recursive decision generation during dispatch:
+Fan-in synchronization happens after routing decisions create tokens:
 
-1. Load siblings from SQL
-2. Call `planning.synchronization.decide()` → returns sub-decisions
-3. Apply sub-decisions (which may generate more decisions)
-4. Collect all `MARK_FOR_DISPATCH` results
+1. For each created token, check if it has a sync transition
+2. Get siblingCounts from TokenManager
+3. Call `planning.decideSynchronization()` → returns decisions
+4. Handle ACTIVATE_FAN_IN specially:
+   - Race-safe activation via TRY_ACTIVATE_FAN_IN
+   - Merge branch outputs
+   - Create continuation token
+5. Mark non-activating tokens as WAITING or dispatch them
 
-This keeps synchronization logic isolated, testable, and independent of actor mechanics.
+This ensures a single deterministic path for all sync logic.
 
-### Definition Caching
+### Definition Storage
 
-DefinitionManager provides multi-level caching:
+DefinitionManager stores workflow definitions in DO SQLite after initial fetch:
 
-```typescript
-class DefinitionManager {
-  // Memory cache (fastest)
-  private cachedRun: WorkflowRun | null = null;
-  private cachedDef: WorkflowDef | null = null;
+1. On workflow start: fetch from RESOURCES (D1), insert into DO SQLite
+2. On DO wake-up: already in DO SQLite (no RPC needed)
+3. Accessors are sync (getWorkflowDef, getNode, etc.) - data always local after init
 
-  // SQL cache (durable, persists across DO wake-ups)
-  // Stored in defs table
-
-  // RESOURCES RPC (slowest, only on cache miss)
-}
-```
-
-**Cache flow:** Memory → SQL → RESOURCES. Both `WorkflowRun` and `WorkflowDef` loaded together on first access, cached at all three levels. Memory cache invalidated on DO eviction (cold start penalty), but SQL cache persists.
+For subworkflows: synthetic run record created in DO SQLite only (no D1 record).
 
 ## Testing Strategy
 
@@ -577,92 +755,47 @@ Test decision functions with real workflow definitions and context from deployed
 
 ## Timeout Handling
 
-The coordinator enforces two types of timeouts to prevent runaway workflows and coordinate parallel work.
-
-### Workflow-Level Timeout
-
-Catches graph-level bugs that task/action timeouts cannot: infinite loops, exponential fan-out, incorrect routing logic.
-
-**Implementation via DO Alarms:**
-
-```typescript
-class WorkflowRunDO {
-  async alarm() {
-    await this.checkWorkflowTimeout();
-
-    // Schedule next check
-    const nextCheck = Date.now() + 30_000; // 30 seconds
-    await this.storage.setAlarm(nextCheck);
-  }
-
-  async checkWorkflowTimeout() {
-    const run = await this.getWorkflowRun();
-    const def = await this.getWorkflowDef();
-
-    if (!def.timeout_ms) return;
-
-    const timeoutAt = run.started_at + def.timeout_ms;
-    if (Date.now() < timeoutAt) return;
-
-    // Timeout triggered
-    if (def.on_timeout === 'human_gate') {
-      await this.transitionToHumanReview('workflow_timeout', {
-        duration_ms: Date.now() - run.started_at,
-        active_tokens: await this.getActiveTokens(),
-        message: 'Workflow exceeded expected duration. Review and decide to continue or abort.',
-      });
-    } else if (def.on_timeout === 'fail') {
-      await this.failWorkflow('Workflow timeout exceeded');
-    } else {
-      // cancel_all
-      await this.cancelAllTokens();
-      await this.markWorkflowTimedOut();
-    }
-  }
-}
-```
-
-**Default behavior:** `on_timeout: 'human_gate'` pauses the workflow for human review rather than killing it. This preserves state, enables debugging, and allows humans to decide whether to extend the timeout or abort.
-
-**Purpose:** A workflow hitting timeout isn't necessarily wrong—it might just need approval to continue. Human gates turn timeouts into supervision checkpoints rather than catastrophic failures.
+The coordinator handles two types of timeouts via DO alarms.
 
 ### Synchronization Timeout
 
-Controls how long to wait for siblings at fan-in merge points. Measured from first sibling arrival, not from fan-out dispatch (avoids double-counting execution time).
+Controls how long to wait for siblings at fan-in merge points. Measured from first sibling arrival (arrivedAt), not from fan-out dispatch.
 
-**Implementation:**
+**Implementation in dispatch/lifecycle.ts:**
 
 ```typescript
-async function checkSynchronizationTimeout(transition: TransitionDef) {
-  if (!transition.synchronization?.timeout_ms) return;
-
-  const siblings = await this.getSiblings(transition.synchronization.sibling_group);
-  const firstArrival = Math.min(...siblings.map((s) => s.arrived_at));
-  const waitTime = Date.now() - firstArrival;
-
-  if (waitTime < transition.synchronization.timeout_ms) return;
-
-  // Timeout triggered
-  if (transition.synchronization.on_timeout === 'proceed_with_available') {
-    const completed = siblings.filter((s) => s.status === 'completed');
-    if (completed.length > 0) {
-      await this.mergeSiblingsAndProceed(completed, transition);
-    } else {
-      await this.failSynchronization('No siblings completed before timeout');
-    }
-
-    // Mark waiting siblings as timed out
-    const waiting = siblings.filter((s) => s.status === 'waiting_for_siblings');
-    for (const token of waiting) {
-      await this.markTokenTimedOut(token.id);
-    }
-  } else {
-    // on_timeout: 'fail'
-    await this.failSynchronization('Synchronization timeout exceeded');
-  }
+async function checkTimeouts(ctx: DispatchContext): Promise<void> {
+  await checkSiblingTimeouts(ctx);
+  await checkSubworkflowTimeouts(ctx);
+  await scheduleNextAlarmIfNeeded(ctx);
 }
 ```
 
-**Purpose:** Parallel work may have stragglers. Synchronization timeout lets you decide: wait forever, fail if stragglers miss deadline, or proceed with partial results.
+**Policies** (configured in transition.synchronization):
 
-**Note:** Task and action timeouts are enforced by the Executor (platform limits and AbortController). Coordinator only handles workflow-level and synchronization timeouts—the orchestration layer concerns.
+- `onTimeout: 'fail'` - Fail the workflow
+- `onTimeout: 'proceed_with_available'` - Merge available siblings and continue
+
+### Subworkflow Timeout
+
+Controls how long to wait for subworkflow completion.
+
+**Implementation:**
+
+1. When MARK_WAITING_FOR_SUBWORKFLOW has timeoutMs, schedule alarm
+2. checkSubworkflowTimeouts() checks elapsed time vs configured timeout
+3. If timed out, apply TIMEOUT_SUBWORKFLOW decision:
+   - Cancel the subworkflow
+   - Mark parent token as timed_out
+   - Fail parent workflow
+
+### Alarm Scheduling
+
+Alarms are scheduled when:
+
+1. Token enters waiting_for_siblings state (if sync has timeoutMs)
+2. Token enters waiting_for_subworkflow state (if timeoutMs configured)
+
+`scheduleNextAlarmIfNeeded()` reschedules based on earliest remaining timeout.
+
+**Note:** Task and action timeouts are enforced by the Executor. Coordinator only handles orchestration-level timeouts.

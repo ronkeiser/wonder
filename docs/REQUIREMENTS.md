@@ -51,10 +51,10 @@
 ## Parallelism
 
 - Transitions specify spawn_count (static) or foreach (dynamic over collection)
-- Fan-out spawns sibling tokens with shared fan_out_transition_id
-- Tokens track lineage: parent_token_id, path_id, branch_index, branch_total
-- Synchronization on transitions: wait_for (any|all|m_of_n) + joins_transition ref
-- Merge strategies: append, merge, keyed, last_wins
+- Fan-out transitions declare siblingGroup; spawned tokens share that group identifier
+- Tokens track lineage: parent_token_id, path_id, branch_index, branch_total, siblingGroup
+- Synchronization on transitions: strategy (any|all|m_of_n) + siblingGroup ref + optional timeout
+- Merge strategies: append, collect, merge_object, keyed_by_branch, last_wins
 - Branch isolation: each token writes to separate SQL tables (branch*output*{token_id})
 - Deep nesting supported (5-6+ layers of fan-out/sub-workflows)
 
@@ -110,8 +110,8 @@
 
 ## Data
 
-- Task nodes define input/output mapping to workflow context
-- LLM nodes define output schema; enables structured output + autocomplete
+- Nodes define input/output mapping to workflow context (Tasks have input/output schemas only)
+- Tasks define output schema; enables structured output + autocomplete for LLM actions
 - State schema auto-inferred from graph; user can override/lock fields
 - Artifacts are files in artifacts repo with conventions and schemas
 - Artifact schemas validated on commit
