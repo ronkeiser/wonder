@@ -1,0 +1,28 @@
+{
+  "$schema": "node_modules/wrangler/config-schema.json",
+  "name": "wonder-agent",
+  "main": "src/index.ts",
+  "compatibility_date": "2025-12-01",
+  "compatibility_flags": ["nodejs_compat"],
+
+  "durable_objects": {
+    "bindings": [
+      { "name": "AGENT", "class_name": "AgentDO" },
+      { "name": "STREAMER", "class_name": "Streamer", "script_name": "wonder-events" }
+    ]
+  },
+
+  "services": [
+    { "binding": "LOGS", "service": "wonder-logs" },
+    { "binding": "EVENTS", "service": "wonder-events" },
+    { "binding": "RESOURCES", "service": "wonder-resources" },
+    { "binding": "COORDINATOR", "service": "wonder-coordinator" }
+  ],
+
+  "migrations": [{ "tag": "v1", "new_sqlite_classes": ["AgentDO"] }],
+
+  "vars": {
+    "SERVICE": "agent",
+    "ENVIRONMENT": "development"
+  }
+}
