@@ -203,8 +203,8 @@ export function validateTestDocument(doc: TestDocument, imports: ImportsMap): Di
     }
   }
 
-  // Validate test_suite is present
-  if (!doc.test_suite) {
+  // Validate testSuite is present
+  if (!doc.testSuite) {
     diagnostics.push({
       severity: DiagnosticSeverity.Error,
       range: {

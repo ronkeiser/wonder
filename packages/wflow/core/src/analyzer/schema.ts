@@ -12,12 +12,13 @@ export const WORKFLOW_ALLOWED_PROPS = new Set([
   'inputSchema',
   'contextSchema',
   'outputSchema',
+  'outputMapping',
   'resources',
   'nodes',
   'transitions',
-  'initial_node_ref',
+  'initialNodeRef',
   'timeoutMs',
-  'on_timeout',
+  'onTimeout',
 ]);
 
 export const NODE_ALLOWED_PROPS = new Set([
@@ -44,13 +45,13 @@ export const TRANSITION_ALLOWED_PROPS = new Set([
 
 export const CONDITION_ALLOWED_PROPS = new Set(['type', 'expr', 'definition', 'reads']);
 
-export const FOREACH_ALLOWED_PROPS = new Set(['collection', 'item_var']);
+export const FOREACH_ALLOWED_PROPS = new Set(['collection', 'itemVar']);
 
 export const SYNCHRONIZATION_ALLOWED_PROPS = new Set([
   'strategy',
   'siblingGroup',
   'timeoutMs',
-  'on_timeout',
+  'onTimeout',
   'merge',
 ]);
 
@@ -59,10 +60,10 @@ export const MERGE_ALLOWED_PROPS = new Set(['source', 'target', 'strategy']);
 export const RESOURCE_ALLOWED_PROPS = new Set([
   'type',
   'image',
-  'repo_id',
-  'base_branch',
-  'merge_on_success',
-  'merge_strategy',
+  'repoId',
+  'baseBranch',
+  'mergeOnSuccess',
+  'mergeStrategy',
 ]);
 
 // Task allowed properties
@@ -115,29 +116,29 @@ export const ACTION_ALLOWED_PROPS = new Set([
   'idempotency',
 ]);
 
-export const ACTION_EXECUTION_ALLOWED_PROPS = new Set(['timeoutMs', 'retry_policy']);
+export const ACTION_EXECUTION_ALLOWED_PROPS = new Set(['timeoutMs', 'retryPolicy']);
 
 export const ACTION_RETRY_POLICY_ALLOWED_PROPS = new Set([
   'maxAttempts',
   'backoff',
   'initialDelayMs',
   'maxDelayMs',
-  'retryable_errors',
+  'retryableErrors',
 ]);
 
-export const ACTION_IDEMPOTENCY_ALLOWED_PROPS = new Set(['key_template', 'ttl_seconds']);
+export const ACTION_IDEMPOTENCY_ALLOWED_PROPS = new Set(['keyTemplate', 'ttlSeconds']);
 
 // Kind-specific implementation properties
 export const IMPLEMENTATION_PROPS_BY_KIND: Record<string, Set<string>> = {
   llm: new Set(['promptSpecId', 'modelProfileId']),
-  mcp: new Set(['mcp_server_id', 'tool_name']),
-  http: new Set(['url_template', 'method', 'headers', 'body_template']),
-  tool: new Set(['tool_name', 'tool_version']),
-  shell: new Set(['command_template', 'working_dir', 'resource_name']),
+  mcp: new Set(['mcpServerId', 'toolName']),
+  http: new Set(['urlTemplate', 'method', 'headers', 'bodyTemplate']),
+  tool: new Set(['toolName', 'toolVersion']),
+  shell: new Set(['commandTemplate', 'workingDir', 'resourceName']),
   context: new Set(['updates']),
-  vector: new Set(['vector_index_id', 'top_k', 'similarity_threshold']),
-  metric: new Set(['metric_name', 'value', 'dimensions']),
-  human: new Set(['prompt', 'timeoutMs', 'on_timeout']),
+  vector: new Set(['vectorIndexId', 'topK', 'similarityThreshold']),
+  metric: new Set(['metricName', 'value', 'dimensions']),
+  human: new Set(['prompt', 'timeoutMs', 'onTimeout']),
 };
 
 // Valid action kinds

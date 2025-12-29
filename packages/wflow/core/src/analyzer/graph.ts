@@ -90,13 +90,13 @@ export function topologicalSort(doc: WflowDocument, graph: GraphAnalysis): strin
   }
 
   // Start with nodes that have no predecessors (in-degree 0)
-  // Prefer initial_node_ref if it exists
+  // Prefer initialNodeRef if it exists
   const queue: string[] = [];
-  if (doc.initial_node_ref && inDegree.get(doc.initial_node_ref) === 0) {
-    queue.push(doc.initial_node_ref);
+  if (doc.initialNodeRef && inDegree.get(doc.initialNodeRef) === 0) {
+    queue.push(doc.initialNodeRef);
   }
   for (const [nodeRef, degree] of inDegree) {
-    if (degree === 0 && nodeRef !== doc.initial_node_ref) {
+    if (degree === 0 && nodeRef !== doc.initialNodeRef) {
       queue.push(nodeRef);
     }
   }
@@ -143,12 +143,12 @@ export function findReachableNodes(graph: GraphAnalysis, startNode: string): Set
  * Find unreachable nodes from initial node
  */
 export function findUnreachableNodes(doc: WflowDocument, graph: GraphAnalysis): string[] {
-  if (!doc.initial_node_ref) return [];
+  if (!doc.initialNodeRef) return [];
 
   const nodeRefs = new Set(Object.keys(doc.nodes || {}));
-  if (!nodeRefs.has(doc.initial_node_ref)) return [];
+  if (!nodeRefs.has(doc.initialNodeRef)) return [];
 
-  const reachable = findReachableNodes(graph, doc.initial_node_ref);
+  const reachable = findReachableNodes(graph, doc.initialNodeRef);
 
   return [...nodeRefs].filter((nodeRef) => !reachable.has(nodeRef));
 }

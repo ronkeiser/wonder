@@ -386,11 +386,11 @@ function validateActionDocument(
       diagnostics,
     );
 
-    if (parsed.execution.retry_policy && typeof parsed.execution.retry_policy === 'object') {
+    if (parsed.execution.retryPolicy && typeof parsed.execution.retryPolicy === 'object') {
       validateUnknownProps(
-        parsed.execution.retry_policy as unknown as Record<string, unknown>,
+        parsed.execution.retryPolicy as unknown as Record<string, unknown>,
         ACTION_RETRY_POLICY_ALLOWED_PROPS,
-        'execution.retry_policy',
+        'execution.retryPolicy',
         lines,
         diagnostics,
       );
@@ -605,19 +605,19 @@ function validateWorkflowDocument(
   const nodeRefs = new Set(Object.keys(parsed.nodes || {}));
   const transitionRefs = new Set(Object.keys(parsed.transitions || {}));
 
-  // Validate initial_node_ref
-  if (parsed.initial_node_ref && !nodeRefs.has(parsed.initial_node_ref)) {
+  // Validate initialNodeRef
+  if (parsed.initialNodeRef && !nodeRefs.has(parsed.initialNodeRef)) {
     const lineIndex = lines.findIndex((line) => line.includes('initial_node_ref:'));
     if (lineIndex !== -1) {
       const line = lines[lineIndex];
-      const charIndex = line.indexOf(parsed.initial_node_ref);
+      const charIndex = line.indexOf(parsed.initialNodeRef);
       diagnostics.push({
         severity: LSPDiagnosticSeverity.Error,
         range: {
           start: { line: lineIndex, character: charIndex },
-          end: { line: lineIndex, character: charIndex + parsed.initial_node_ref.length },
+          end: { line: lineIndex, character: charIndex + parsed.initialNodeRef.length },
         },
-        message: `Node '${parsed.initial_node_ref}' does not exist. Available nodes: ${[...nodeRefs].join(', ')}`,
+        message: `Node '${parsed.initialNodeRef}' does not exist. Available nodes: ${[...nodeRefs].join(', ')}`,
         source: 'wflow',
       });
     }
@@ -811,7 +811,7 @@ function validateWorkflowDocument(
           start: { line: lineIndex, character: charIndex },
           end: { line: lineIndex, character: charIndex + nodeRef.length },
         },
-        message: `Node '${nodeRef}' is unreachable from initial node '${parsed.initial_node_ref}'`,
+        message: `Node '${nodeRef}' is unreachable from initial node '${parsed.initialNodeRef}'`,
         source: 'wflow',
       });
     }

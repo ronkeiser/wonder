@@ -64,7 +64,7 @@ export interface ConditionDecl {
 
 export interface ForeachConfig {
   collection: string;
-  item_var: string;
+  itemVar: string;
 }
 
 export interface MergeConfig {
@@ -101,10 +101,10 @@ export interface TransitionDecl {
 export interface ResourceDecl {
   type: 'container';
   image: string;
-  repo_id: string;
-  base_branch: string;
-  merge_on_success: boolean;
-  merge_strategy: 'rebase' | 'fail' | 'force';
+  repoId: string;
+  baseBranch: string;
+  mergeOnSuccess: boolean;
+  mergeStrategy: 'rebase' | 'fail' | 'force';
 }
 
 export interface WflowDocument {
@@ -115,12 +115,13 @@ export interface WflowDocument {
   inputSchema?: JSONSchemaProperty;
   contextSchema?: JSONSchemaProperty;
   outputSchema?: JSONSchemaProperty;
+  outputMapping?: Record<string, string>;
   resources?: Record<string, ResourceDecl>;
   nodes?: Record<string, NodeDecl>;
   transitions?: Record<string, TransitionDecl>;
-  initial_node_ref?: string;
+  initialNodeRef?: string;
   timeoutMs?: number;
-  on_timeout?: 'human_gate' | 'fail' | 'cancel_all';
+  onTimeout?: 'human_gate' | 'fail' | 'cancel_all';
   _loc?: SourceLocation;
 }
 
@@ -188,17 +189,17 @@ export interface ActionRetryPolicy {
   backoff: 'none' | 'linear' | 'exponential';
   initialDelayMs: number;
   maxDelayMs?: number;
-  retryable_errors?: string[];
+  retryableErrors?: string[];
 }
 
 export interface ActionExecution {
   timeoutMs?: number;
-  retry_policy?: ActionRetryPolicy;
+  retryPolicy?: ActionRetryPolicy;
 }
 
 export interface ActionIdempotency {
-  key_template: string;
-  ttl_seconds?: number;
+  keyTemplate: string;
+  ttlSeconds?: number;
 }
 
 export interface ActionDocument {
@@ -300,7 +301,7 @@ export interface MockResponseDecl {
     message: string;
   };
   /** Delay before responding (ms) */
-  delay_ms?: number;
+  delayMs?: number;
 }
 
 /**
@@ -312,7 +313,7 @@ export interface MockDecl {
   /** Mock response configuration */
   response?: MockResponseDecl;
   /** Track call count and arguments */
-  track_calls?: boolean;
+  trackCalls?: boolean;
   _loc?: SourceLocation;
 }
 
@@ -337,7 +338,7 @@ export interface TestCaseDecl {
   context?: Record<string, unknown>;
   /** Test-specific mock overrides */
   mocks?: Record<string, MockDecl | MockResponseDecl>;
-  /** Maximum execution time */
+  /** Maximum execution time (snake_case alias: timeout_ms) */
   timeoutMs?: number;
   /** Assertions to verify */
   assert?: AssertionsDecl;
@@ -366,19 +367,19 @@ export interface TestGroupDecl {
  * Lifecycle hooks
  */
 export interface TestHooksDecl {
-  before_all?: Array<{
+  beforeAll?: Array<{
     action: string;
     input?: Record<string, unknown>;
   }>;
-  after_all?: Array<{
+  afterAll?: Array<{
     action: string;
     input?: Record<string, unknown>;
   }>;
-  before_each?: Array<{
+  beforeEach?: Array<{
     action: string;
     input?: Record<string, unknown>;
   }>;
-  after_each?: Array<{
+  afterEach?: Array<{
     action: string;
     input?: Record<string, unknown>;
   }>;
@@ -389,9 +390,9 @@ export interface TestHooksDecl {
  */
 export interface TestConfigDecl {
   parallel?: boolean;
-  max_concurrent?: number;
+  maxConcurrent?: number;
   timeoutMs?: number;
-  fail_fast?: boolean;
+  failFast?: boolean;
 }
 
 /**
@@ -411,7 +412,7 @@ export interface TestCoverageDecl {
  */
 export interface TestDocument {
   imports?: Record<string, string>;
-  test_suite?: string;
+  testSuite?: string;
   description?: string;
   /** Mock definitions for actions */
   mocks?: Record<string, MockDecl | MockResponseDecl>;
@@ -460,7 +461,7 @@ export interface RunDocument {
   /** Input data */
   input?: Record<string, unknown>;
   /** Path to input file */
-  input_file?: string;
+  inputFile?: string;
   /** Initial context state */
   context?: Record<string, unknown>;
   /** Override resource bindings */
@@ -470,7 +471,7 @@ export interface RunDocument {
   /** Execution priority */
   priority?: 'low' | 'normal' | 'high';
   /** Idempotency key */
-  idempotency_key?: string;
+  idempotencyKey?: string;
   /** Tags for filtering */
   tags?: string[];
   /** Arbitrary metadata */

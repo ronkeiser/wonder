@@ -324,8 +324,8 @@ function transformTask(taskDoc: TaskDocument, testContext: TestContext): Embedde
       let embeddedAction: EmbeddedAction | undefined;
 
       // Resolve action reference
-      if (stepDoc.action_id) {
-        const actionDoc = testContext.resolvedImports.get(stepDoc.action_id);
+      if (stepDoc.actionId) {
+        const actionDoc = testContext.resolvedImports.get(stepDoc.actionId);
         if (actionDoc && 'action' in actionDoc) {
           embeddedAction = transformAction(actionDoc as ActionDocument, testContext);
         }
@@ -336,10 +336,9 @@ function transformTask(taskDoc: TaskDocument, testContext: TestContext): Embedde
           ref: stepDoc.ref || `step-${stepDoc.ordinal || 0}`,
           ordinal: stepDoc.ordinal || 0,
           action: embeddedAction,
-          // Support both input_mapping and input_map (parser may produce either)
-          inputMapping: stepDoc.input_mapping || (stepDoc as any).input_map || undefined,
-          outputMapping: stepDoc.output_mapping || (stepDoc as any).output_map || undefined,
-          onFailure: stepDoc.on_failure,
+          inputMapping: stepDoc.inputMapping,
+          outputMapping: stepDoc.outputMapping,
+          onFailure: stepDoc.onFailure,
           condition: stepDoc.condition,
         }),
       );
@@ -350,11 +349,11 @@ function transformTask(taskDoc: TaskDocument, testContext: TestContext): Embedde
     name: taskDoc.task || taskDoc.name || 'unnamed-task',
     description: taskDoc.description || '',
     version: taskDoc.version || 1,
-    inputSchema: transformSchema(taskDoc.input_schema) as any,
-    outputSchema: transformSchema(taskDoc.output_schema) as any,
+    inputSchema: transformSchema(taskDoc.inputSchema) as any,
+    outputSchema: transformSchema(taskDoc.outputSchema) as any,
     steps: embeddedSteps,
     retry: taskDoc.retry as any,
-    timeoutMs: taskDoc.timeout_ms,
+    timeoutMs: taskDoc.timeoutMs,
   });
 }
 
@@ -367,14 +366,14 @@ function transformWorkflow(wflowDoc: WflowDocument, testContext: TestContext): E
   if (wflowDoc.nodes) {
     for (const [nodeRef, nodeDoc] of Object.entries(wflowDoc.nodes)) {
       // Resolve task reference
-      if (!nodeDoc.task_id) {
-        throw new Error(`Node '${nodeRef}' must have a task_id`);
+      if (!nodeDoc.taskId) {
+        throw new Error(`Node '${nodeRef}' must have a taskId`);
       }
 
-      const taskDoc = testContext.resolvedImports.get(nodeDoc.task_id);
+      const taskDoc = testContext.resolvedImports.get(nodeDoc.taskId);
       if (!taskDoc || !('task' in taskDoc)) {
         throw new Error(
-          `Task '${nodeDoc.task_id}' not found for node '${nodeRef}'. Available imports: ${[...testContext.resolvedImports.keys()].join(', ')}`,
+          `Task '${nodeDoc.taskId}' not found for node '${nodeRef}'. Available imports: ${[...testContext.resolvedImports.keys()].join(', ')}`,
         );
       }
 
@@ -385,10 +384,10 @@ function transformWorkflow(wflowDoc: WflowDocument, testContext: TestContext): E
           ref: nodeDoc.ref || nodeRef,
           name: nodeDoc.name || nodeRef,
           task: embeddedTask,
-          taskVersion: nodeDoc.task_version || 1,
-          inputMapping: nodeDoc.input_mapping as Record<string, unknown> | undefined,
-          outputMapping: nodeDoc.output_mapping as Record<string, unknown> | undefined,
-          resourceBindings: nodeDoc.resource_bindings as Record<string, unknown> | undefined,
+          taskVersion: nodeDoc.taskVersion || 1,
+          inputMapping: nodeDoc.inputMapping as Record<string, unknown> | undefined,
+          outputMapping: nodeDoc.outputMapping as Record<string, unknown> | undefined,
+          resourceBindings: nodeDoc.resourceBindings as Record<string, unknown> | undefined,
         }),
       );
     }
@@ -397,22 +396,21 @@ function transformWorkflow(wflowDoc: WflowDocument, testContext: TestContext): E
   // Transform transitions
   const transitions = wflowDoc.transitions
     ? Object.values(wflowDoc.transitions).map((t) => ({
-        fromNodeRef: t.from_node_ref || '',
-        toNodeRef: t.to_node_ref || '',
+        fromNodeRef: t.fromNodeRef || '',
+        toNodeRef: t.toNodeRef || '',
         priority: t.priority || 1,
-        condition: t.condition as Record<string, unknown> | undefined,
+        condition: t.condition?.expr,
       }))
     : [];
 
   return workflow({
     name: wflowDoc.workflow || 'unnamed-workflow',
     description: wflowDoc.description || '',
-    inputSchema: transformSchema(wflowDoc.input_schema) as any,
-    outputSchema: transformSchema(wflowDoc.output_schema) as any,
-    contextSchema: transformSchema(wflowDoc.context_schema) as any,
-    // Note: output_mapping exists in parsed docs but not in type definition
-    outputMapping: (wflowDoc as any).output_mapping as Record<string, string> | undefined,
-    initialNodeRef: wflowDoc.initial_node_ref || '',
+    inputSchema: transformSchema(wflowDoc.inputSchema) as any,
+    outputSchema: transformSchema(wflowDoc.outputSchema) as any,
+    contextSchema: transformSchema(wflowDoc.contextSchema) as any,
+    outputMapping: wflowDoc.outputMapping,
+    initialNodeRef: wflowDoc.initialNodeRef || '',
     nodes: embeddedNodes,
     transitions,
   });
@@ -635,7 +633,7 @@ async function executeTestCase(
     const executionResult = await testContext.client
       .workflows(resources.workflowId)
       .stream(testCase.input || {}, {
-        timeout: testCase.timeout_ms || options.timeoutMs || 60000,
+        timeout: testCase.timeoutMs || options.timeoutMs || 60000,
         idleTimeout: 10000,
         onEvent: options.logEvents
           ? (event: Record<string, unknown>) => {
@@ -975,7 +973,7 @@ export async function runTestFile(
   }
 
   return {
-    suite: context.doc.test_suite || path.basename(filePath),
+    suite: context.doc.testSuite || path.basename(filePath),
     file: filePath,
     tests: results,
     durationMs: Date.now() - startTime,

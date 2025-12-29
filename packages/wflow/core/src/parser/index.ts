@@ -10,6 +10,34 @@ import type {
 } from '../types/ast.js';
 
 /**
+ * Convert snake_case string to camelCase
+ */
+function snakeToCamel(str: string): string {
+  return str.replace(/_([a-z])/g, (_, letter) => letter.toUpperCase());
+}
+
+/**
+ * Recursively convert all snake_case keys in an object to camelCase
+ * Preserves keys that are already camelCase or contain special characters
+ */
+function deepSnakeToCamel<T>(obj: T): T {
+  if (obj === null || obj === undefined) return obj;
+  if (Array.isArray(obj)) {
+    return obj.map(deepSnakeToCamel) as T;
+  }
+  if (typeof obj === 'object') {
+    const result: Record<string, unknown> = {};
+    for (const [key, value] of Object.entries(obj)) {
+      // Convert snake_case keys but preserve $ref and other special keys
+      const newKey = key.startsWith('$') || key.startsWith('_') ? key : snakeToCamel(key);
+      result[newKey] = deepSnakeToCamel(value);
+    }
+    return result as T;
+  }
+  return obj;
+}
+
+/**
  * Resolved import information
  */
 export interface ResolvedImport {
@@ -111,15 +139,18 @@ export function parseDocument<T extends AnyDocument>(
   const lines = text.split('\n');
 
   try {
-    const document = parseYaml(text) as T | null;
+    const rawDocument = parseYaml(text) as T | null;
 
-    if (!document) {
+    if (!rawDocument) {
       return {
         document: null,
         imports: { byAlias: new Map(), all: [] },
         fileType,
       };
     }
+
+    // Convert snake_case keys to camelCase for TypeScript consumption
+    const document = deepSnakeToCamel(rawDocument);
 
     const imports = parseImports(
       (document as { imports?: Record<string, string> }).imports,
