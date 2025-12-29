@@ -81,14 +81,14 @@
   function renderTraceHeader(item: any) {
     const parts: string[] = [];
 
-    // Add token context if present
-    if (item.tokenId) {
-      parts.push(`token:${item.tokenId.slice(-8)}`);
+    // Add token context if present (now in payload)
+    if (item.payload?.tokenId) {
+      parts.push(`token:${item.payload.tokenId.slice(-8)}`);
     }
 
-    // Add node context if present
-    if (item.nodeId) {
-      parts.push(`node:${item.nodeId.slice(-8)}`);
+    // Add node context if present (now in payload)
+    if (item.payload?.nodeId) {
+      parts.push(`node:${item.payload.nodeId.slice(-8)}`);
     }
 
     // Determine the message to display
@@ -110,7 +110,7 @@
         text: item.category,
         color: categoryColorMap[item.category] || 'var(--color-gray)',
       },
-      identifier: `${item.workflowRunId.slice(-8)}-${item.sequence}`,
+      identifier: `${item.executionId.slice(-8)}-${item.sequence}`,
       message,
     };
   }

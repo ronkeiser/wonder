@@ -90,8 +90,8 @@
         url.searchParams.set(secondaryFilter.param, secondaryFilterValue);
       }
       if (workflowRunId) {
-        // Use rootRunId to include subworkflow events in the stream
-        url.searchParams.set('rootRunId', workflowRunId);
+        // Use streamId to include subworkflow events in the stream
+        url.searchParams.set('streamId', workflowRunId);
       }
 
       const response = await fetch(url);
@@ -194,8 +194,8 @@
       wsUrl = `wss://api.wflow.app${streamPath}`;
       connectionId = 'global';
     } else if (workflowRunId) {
-      // Per-resource stream mode: connect to workflow-specific stream
-      wsUrl = `wss://api.wflow.app/workflow-runs/${workflowRunId}/stream`;
+      // Per-resource stream mode: connect to stream endpoint
+      wsUrl = `wss://api.wflow.app/streams/${workflowRunId}`;
       connectionId = workflowRunId;
     } else {
       // No stream path and no workflow run selected - can't connect
@@ -231,9 +231,9 @@
       console.log('WebSocket connected to', connectionId);
 
       if (subscribeMessage && workflowRunId) {
-        // Build subscription message with rootRunId filter to include subworkflow events
+        // Build subscription message with streamId filter to include subworkflow events
         const message = { ...subscribeMessage } as any;
-        message.filters = { ...message.filters, rootRunId: workflowRunId };
+        message.filters = { ...message.filters, streamId: workflowRunId };
         socket.send(JSON.stringify(message));
       }
     };

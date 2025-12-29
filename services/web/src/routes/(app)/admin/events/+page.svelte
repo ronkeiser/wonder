@@ -143,7 +143,7 @@
         text: item.eventType,
         color: colorMap[item.eventType] || 'var(--color-gray-lighter)',
       },
-      identifier: item.workflowRunId ? item.workflowRunId.slice(-8) : undefined,
+      identifier: item.executionId ? item.executionId.slice(-8) : undefined,
       message: item.message,
     };
   }
