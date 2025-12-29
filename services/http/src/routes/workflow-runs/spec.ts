@@ -57,33 +57,6 @@ export const listWorkflowRunsRoute = createRoute({
   },
 });
 
-export const streamWorkflowRunRoute = createRoute({
-  method: 'get',
-  path: '/{id}/stream',
-  tags: ['workflow-runs'],
-  request: {
-    params: z.object({
-      id: ulid().openapi({ param: { name: 'id', in: 'path' } }),
-    }),
-  },
-  responses: {
-    101: {
-      description: 'WebSocket connection established',
-    },
-    400: {
-      content: {
-        'application/json': {
-          schema: z.object({
-            error: z.string(),
-            receivedUpgrade: z.string().optional(),
-          }),
-        },
-      },
-      description: 'WebSocket upgrade required',
-    },
-  },
-});
-
 export const deleteWorkflowRunRoute = createRoute({
   method: 'delete',
   path: '/{id}',

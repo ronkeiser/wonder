@@ -22,14 +22,3 @@ events.openapi(getTraceEventsRoute, async (c) => {
   const result = await c.env.EVENTS.getTraceEvents(query);
   return c.json(result);
 });
-
-/** GET /stream - Reserved for future global streamer */
-events.get('/stream', async (c) => {
-  return c.json(
-    {
-      error: 'Not Implemented',
-      message: 'Global event streaming is not yet implemented. Use /workflow-runs/{id}/stream for per-run streaming.',
-    },
-    501,
-  );
-});

@@ -4,12 +4,7 @@
 
 import { OpenAPIHono } from '@hono/zod-openapi';
 import type { HttpEnv } from '~/types';
-import {
-  cancelWorkflowRunRoute,
-  deleteWorkflowRunRoute,
-  listWorkflowRunsRoute,
-  streamWorkflowRunRoute,
-} from './spec';
+import { cancelWorkflowRunRoute, deleteWorkflowRunRoute, listWorkflowRunsRoute } from './spec';
 
 /** /workflow-runs */
 export const workflowRuns = new OpenAPIHono<HttpEnv>();
@@ -29,59 +24,6 @@ workflowRuns.openapi(listWorkflowRunsRoute, async (c) => {
   });
 
   return c.json(result);
-});
-
-/** GET /stream - Broadcaster for workflow run status changes (sidebar) */
-workflowRuns.get('/stream', async (c) => {
-  const upgradeHeader = c.req.header('Upgrade');
-
-  if (upgradeHeader !== 'websocket') {
-    return c.json(
-      {
-        error: 'WebSocket upgrade required',
-        receivedUpgrade: upgradeHeader,
-      },
-      400,
-    );
-  }
-
-  // Route to Broadcaster singleton for status change broadcasts
-  const broadcasterId = c.env.BROADCASTER.idFromName('global');
-  const stub = c.env.BROADCASTER.get(broadcasterId);
-
-  // Rewrite the URL to /stream (what Broadcaster expects)
-  const url = new URL(c.req.url);
-  url.pathname = '/stream';
-  const request = new Request(url, c.req.raw);
-
-  return stub.fetch(request);
-});
-
-/** GET /{id}/stream - Per-run event streaming */
-workflowRuns.openapi(streamWorkflowRunRoute, async (c) => {
-  const { id } = c.req.valid('param');
-  const upgradeHeader = c.req.header('Upgrade');
-
-  if (upgradeHeader !== 'websocket') {
-    return c.json(
-      {
-        error: 'WebSocket upgrade required',
-        receivedUpgrade: upgradeHeader,
-      },
-      400,
-    );
-  }
-
-  // Route to per-run Streamer DO for detailed event streaming
-  const doId = c.env.EVENTS_STREAMER.idFromName(id);
-  const stub = c.env.EVENTS_STREAMER.get(doId);
-
-  // Rewrite the URL to /stream (what Streamer expects)
-  const url = new URL(c.req.url);
-  url.pathname = '/stream';
-  const request = new Request(url, c.req.raw);
-
-  return stub.fetch(request);
 });
 
 /** DELETE /{id} */
