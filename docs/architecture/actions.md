@@ -9,7 +9,7 @@ Actions are the atomic operations that steps execute. Each action has a **kind**
 Actions are identified by kind and operation:
 
 ```
-kind: 'shell' | 'llm' | 'mcp' | 'http' | 'context' | 'artifact' | 'memory' | 'metric' | 'human' | 'mock'
+kind: 'shell' | 'llm' | 'mcp' | 'http' | 'context' | 'artifact' | 'memory' | 'repo' | 'metric' | 'human' | 'mock'
 operation: string  // varies by kind
 ```
 
@@ -27,6 +27,7 @@ Some action kinds require specific context to execute:
 | Kind       | Required Context | How Provided                              |
 | ---------- | ---------------- | ----------------------------------------- |
 | `shell`    | Repo + Branch    | From workflow/agent context automatically |
+| `repo`     | Repo + Branch    | From workflow/agent context automatically |
 | `artifact` | Project          | From workflow/agent context automatically |
 | `memory`   | Agent            | From agent context automatically          |
 
@@ -104,6 +105,20 @@ Operates on agent memory. Requires agent context (provided automatically when wo
 
 Memory is private to the agent. Cross-agent memory access is not supported.
 
+### repo
+
+Operates on the code repository. Requires repo + branch context. Provides convenience operations for common code access patterns without shelling out.
+
+| Operation | Purpose                                         |
+| --------- | ----------------------------------------------- |
+| `tree`    | Directory structure with depth/filter options   |
+| `read`    | File contents with optional line range          |
+| `write`   | Write file contents                             |
+| `search`  | Text/regex search (wraps ripgrep)               |
+| `diff`    | Show changes (staged, unstaged, between refs)   |
+
+These are thin wrappers—no language semantics or AST parsing. For specialized tooling (tree-sitter, language servers), use `shell.exec`.
+
 ### metric
 
 Records metrics to Analytics Engine.
@@ -168,6 +183,17 @@ Note: `shell.exec` no longer specifies `resource_name`. Repo and branch come fro
     key: '{{state.memory_key}}',
     content: '{{state.extracted_fact}}',
     metadata: { category: 'fact', source_turn: '{{input.turn_id}}' }
+  }
+}
+
+// repo.search
+{
+  kind: 'repo',
+  operation: 'search',
+  implementation: {
+    pattern: '{{input.search_term}}',
+    glob: '*.ts',
+    max_results: 50
   }
 }
 

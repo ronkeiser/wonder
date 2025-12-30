@@ -26,12 +26,12 @@ A persona is **identity and behavior** — the shareable, versionable configurat
 
 - Context assembly workflow (what to retrieve, how to score/filter)
 - Memory extraction workflow (what to remember, how to structure)
-- Store schema
+- Recent turns limit (how many turns to keep locally for context)
 
 **Tools:**
 
 - Tool IDs referencing library definitions
-- Constraints (budgets, allowed actions)
+- Constraints (move budgets, allowed actions)
 
 Tools are the LLM-facing interface. Each tool binds to an execution target (Task, Workflow, or Agent). When the LLM invokes a tool, the AgentDO dispatches to the appropriate target.
 
@@ -41,12 +41,17 @@ interface Persona {
   memory: {
     contextAssemblyWorkflowId: string;
     memoryExtractionWorkflowId: string;
-    storeSchema: MemoryStoreSchema;
+    recentTurnsLimit?: number;   // How many turns to keep in DO SQLite (default: 20)
   }
   tools: {
     toolIds: string[];           // References to Tool definitions in libraries
     constraints: AgentConstraints;
   }
+}
+
+interface AgentConstraints {
+  maxMovesPerTurn?: number;      // Limits iterations before agent must respond
+  // ... other constraints (allowed actions, budgets)
 }
 ```
 
@@ -59,27 +64,36 @@ A tool is the **LLM-facing interface** to Wonder's execution primitives. Tools l
 ```typescript
 interface Tool {
   id: string;
-  name: string;                // What the LLM sees
-  description: string;         // How the LLM understands when to use it
-  inputSchema: JSONSchema;     // What the LLM provides
+  name: string; // What the LLM sees
+  description: string; // How the LLM understands when to use it
+  inputSchema: JSONSchema; // What the LLM provides
 
-  // Execution target (exactly one)
-  taskId?: string;
-  workflowId?: string;
-  agentId?: string;
+  // Execution target
+  targetType: 'task' | 'workflow' | 'agent';
+  targetId: string;
+
+  async?: boolean; // If true, dispatch and continue; results trigger new turn when ready
+
+  // Agent-specific options
+  invocationMode?: 'delegate' | 'loop_in'; // Only for agent targets. Default: 'delegate'
 
   // Optional input transformation
   inputMapping?: Record<string, string>;
 }
 ```
 
-**Why tools exist:** The LLM shouldn't think in terms of internal primitives (Task, Workflow, Agent). It thinks in terms of actions it can take: "search the codebase", "implement a feature", "ask the reviewer". Tools provide this abstraction layer.
+**Why tools exist:** Tools let the LLM think in terms of actions—"search the codebase", "implement a feature", "ask the reviewer"—rather than internal primitives (Task, Workflow, Agent).
 
 **Tool → Target binding:**
 
-- `taskId` — Quick operations (search, retrieval, simple transformations)
-- `workflowId` — Orchestrated work (feature implementation, research pipelines)
-- `agentId` — Delegation to another agent (get a second opinion, specialized expertise)
+- `task` — Quick operations (search, retrieval, simple transformations)
+- `workflow` — Orchestrated work (feature implementation, research pipelines)
+- `agent` — Invoke another agent. Use `invocationMode: 'delegate'` for directed tasks, `'loop_in'` to add them to the conversation.
+
+**Async execution:** When `async: true`, the agent dispatches to the target and immediately continues (or responds). The target runs in the background; when it completes, the result triggers a new turn. This works for any target type:
+- **Tasks:** Useful for slow external APIs or fire-and-forget operations
+- **Workflows:** Long-running pipelines like research or multi-step generation
+- **Agents:** For `delegate` mode—"I asked @architect about it, I'll let you know when he responds." (For `loop_in`, async doesn't apply—the agent joins the conversation immediately.)
 
 **Input mapping:** Transforms LLM-provided input to match the target's inputSchema. If omitted, input passes through directly.
 
@@ -99,7 +113,9 @@ interface Tool {
     },
     required: ['feature']
   },
-  workflowId: 'workflow_implement_feature_v2'
+  targetType: 'workflow',
+  targetId: 'workflow_implement_feature_v2',
+  async: true  // Long-running, agent responds immediately
 }
 
 // Persona references tools by ID
@@ -139,30 +155,35 @@ The agent executes a fixed loop:
 receive → assemble context → LLM decides → execute → extract memories → respond → wait → (loop)
 ```
 
-You don't author this control flow—it's the primitive's execution model. The persona configures what happens at each step.
+This loop is **not a workflow**—it's not authored or versioned, it's the primitive's built-in control flow. But structurally it's the same pattern: AgentDO dispatches tasks and workflows to Executor, waits for results, continues. The LLM call itself is dispatched as a task (the `llm` action), not called directly. The persona configures what happens at each step (which workflows to call for context assembly and memory extraction, which tools are available).
 
-### Async Workflow Execution
+### Async Tool Execution
 
-Some workflows take minutes or hours—research, multi-step code generation, complex analysis. The conversation shouldn't block.
+Some operations take minutes or hours—research pipelines, multi-step code generation, complex analysis, or waiting for another agent's response. When a tool has `async: true`, execution runs in the background so the conversation remains responsive.
 
-For async workflows:
+For async tools:
 
-- LLM decides to invoke a long-running workflow with `async: true`
-- Agent immediately responds: "I've started researching X, I'll let you know when it's done"
-- Workflow runs in the background, linked to the conversation
-- When complete, the workflow emits an event that triggers a new agent turn
-- The agent sees the result in context and decides how to respond
+- LLM decides to invoke a tool marked `async: true`
+- Agent immediately responds: "I've started working on X..." or "I asked @architect, I'll let you know when he responds"
+- Target executes in the background, linked to the turn
+- The turn stays `active` while async work is pending
+- When the async operation completes, the agent posts another message on the same turn
+- The turn closes when all async work is done
 
-**Turn triggers:**
+**Turn lifecycle with async:**
 
-- User message (normal)
-- Async workflow completion (agent-initiated)
+```
+User: "Research authentication patterns for our API"
+  └─ Turn A starts (active)
+     ├─ Agent: "I'll research that for you..." (immediate response)
+     ├─ [async research workflow running]
+     ├─ User: "Also, what's in the config file?" → Turn B starts
+     │   └─ Agent: "Here's the config..." → Turn B completes
+     ├─ [research workflow completes]
+     └─ Agent: "Here's what I found about auth patterns..." → Turn A completes
+```
 
-The agent loop stays the same regardless of trigger. The only difference is what initiates the turn.
-
-**In-flight awareness:** Context assembly includes pending async workflows. If the user messages while work is in progress, the agent knows: "You asked about X—I'm still working on that research" or "Here's what I have so far."
-
-**No special conversation state needed.** Async workflows are just workflow runs with a `conversation_id`. The AgentDO receives completion events and triggers new turns.
+**In-flight awareness:** Context assembly includes pending async operations across all active turns. If the user starts a new turn while work is in progress, the agent knows what's still running and can reference it.
 
 **Key distinction:**
 
@@ -184,7 +205,7 @@ AgentDO is the **actor that coordinates the agent loop**. It follows the same pa
 **AgentDO responsibilities:**
 
 - Runs the agent loop (context assembly → LLM → execute → memory extraction)
-- Manages memory (structured in DO SQLite, semantic via Vectorize)
+- Dispatches memory workflows to Executor (memory itself lives in D1/R2/Vectorize, not DO SQLite)
 - Dispatches tools to Executor (tasks), CoordinatorDO (workflows), or other AgentDOs (agent calls)
 - Handles async workflow completions and triggers new turns
 - Manages multiple concurrent conversations (keyed by conversation_id)
@@ -198,9 +219,8 @@ Context assembly is a **workflow hook** invoked before the LLM sees the user's m
 **What gets assembled:**
 
 1. Identity (system prompt) — static
-2. Retrieved memories — from long-term store
-3. Conversation history — from current session
-4. Current state — workflow results, etc.
+2. Retrieved memories — from agent memory store (includes turn references, facts, episodes)
+3. Current state — pending workflows, recent tool results, etc.
 
 How the workflow assembles context is a library design choice. Some personas might use cheap deterministic retrieval (vector search, D1 queries, pattern matching). Others might use LLM calls to reason about what context is relevant. The platform provides the hook; libraries provide the strategy.
 
@@ -221,11 +241,13 @@ The agent has access to multiple knowledge sources:
 
 **Agent memory vs code:** The agent doesn't store copies of code structure. It stores _understanding about_ code—patterns, conventions, relationships, context about why things are the way they are. The code is the source of truth; agent memory is learned experience working with it.
 
+**Accessing code:** The platform provides `repo.*` actions for common code operations (`tree`, `read`, `write`, `search`, `diff`). These are thin wrappers around standard tools, not language-aware. For specialized tooling (tree-sitter, language servers), use `shell.exec`.
+
 ### Indices
 
-Context assembly retrieves **pointers** to content, not content itself. The LLM sees structured indices: "Here are the design decisions on file, here are the artifacts in this project, here are the modules in the codebase."
+Context assembly retrieves **pointers**, not content itself. The LLM sees structured indices: "Here are the design decisions on file, here are the artifacts in this project, here are the modules in the codebase."
 
-The index is a menu of available knowledge. The LLM knows _what exists_ without having all of it in context. When it needs details, it fetches from the index.
+The index is a menu of available knowledge. The LLM knows _what exists_ and fetches details on demand.
 
 Benefits:
 
@@ -237,58 +259,85 @@ _Needs more exploration: Index structure, how indices are defined per persona, h
 
 ## Memory Extraction
 
-After turns complete, the agent updates memory:
+After turns complete, AgentDO invokes the memory extraction workflow specified by the persona. The workflow receives the turn transcript and can use `memory.*` actions to read existing memory and write updates.
 
-1. Analyze what happened
-2. Decide what's worth remembering
-3. Structure it (facts, decisions, summaries)
-4. Detect contradictions with existing memories
-5. Consolidate episodic memories into summaries when appropriate
-6. Return memory operations for AgentDO to apply
+What the workflow does is a library design choice. The platform provides the hook and the primitives; libraries provide the strategy.
 
-Unlike context assembly, memory extraction typically involves LLM calls—deciding what's worth remembering requires judgment.
-
-**Consolidation:** Memory extraction workflows handle consolidation as part of their normal operation. When the workflow receives current memory state and turn transcript, it can decide "these 5 recent episodic memories should consolidate into a summary" and return appropriate operations (`archive` for raw episodes, `write` for the new summary). No separate consolidation job needed.
-
-**Contradiction detection:** The workflow receives current memory state as input. When it extracts new facts, it can compare against existing facts and return `update` or `delete` operations to resolve contradictions. The "how much memory to pass in" question is a workflow design concern—the workflow specifies what it needs via its input schema.
-
-**Concurrency:** AgentDO is single-threaded (DO actor model). If two conversations trigger memory extraction simultaneously, one completes before the other starts. The second workflow sees memory state *after* the first's operations were applied. No special concurrency handling needed in workflows.
+**Concurrency:** AgentDO is single-threaded (DO actor model). If two conversations trigger memory extraction simultaneously, one completes before the other starts. The second workflow sees memory state _after_ the first's operations were applied. No special concurrency handling is needed in workflows.
 
 ## Conversation
 
-A conversation is a **session with an agent**. It groups messages and turns together, providing session context for the agent loop.
+A conversation is a **multi-party collaboration space**. It groups participants, messages, and turns together, providing shared context for all participants.
 
-| Field      | Purpose                                    |
-| ---------- | ------------------------------------------ |
-| `agent_id` | Which agent this session belongs to        |
-| `status`   | `active`, `waiting`, `completed`, `failed` |
+| Field          | Purpose                                    |
+| -------------- | ------------------------------------------ |
+| `participants` | Users and agents in this conversation      |
+| `status`       | `active`, `waiting`, `completed`, `failed` |
 
-**Relationship to AgentDO:** When a message arrives for a conversation, it routes to the AgentDO for that agent. The AgentDO runs a turn using the conversation_id to:
+```typescript
+interface Conversation {
+  id: string;
+  participants: Array<
+    | { type: 'user'; userId: string }
+    | { type: 'agent'; agentId: string }
+  >;
+  status: 'active' | 'waiting' | 'completed' | 'failed';
+}
+```
 
-- Fetch conversation history for context assembly
-- Store new turns and messages
+Conversations are not limited to user-agent pairs. Multiple agents can participate—a user might start a conversation with a manager agent, then the architect gets looped in, and now all three share context.
+
+**Relationship to AgentDO:** When a message arrives for a conversation, it routes to the AgentDO for each agent participant. The AgentDO runs a turn using the conversation_id to:
+
+- Store new turns and messages (D1, for observability and UI)
 - Track async workflows linked to this conversation
+- Access shared conversation history (when the agent is a participant)
 
-**Multiple conversations:** An agent can have many concurrent conversations. Memory is shared across all conversations (the agent's accumulated knowledge), but conversation history is per-session. Each turn includes the conversation_id so the AgentDO knows which session context to use.
+Note: The agent doesn't query the Messages table for context—it queries memory. See [Memory](#memory) for how conversation history relates to agent recall. However, conversation history *is* available to looped-in agents during context assembly.
 
-**Async workflow routing:** When an async workflow completes, it carries the agent_id and conversation_id. The completion routes to the AgentDO, which starts a new turn in that specific conversation.
+**Multiple conversations:** An agent can participate in many concurrent conversations. Memory is shared across all conversations (the agent's accumulated knowledge), but conversation history is per-session. Each turn includes the conversation_id so the AgentDO knows which session context to use.
 
-Conversations don't store messages directly—they're linked via Turn and Message entities.
+**Async completion routing:** When an async operation completes, it carries conversation_id and turn_id. The completion routes to the appropriate AgentDO, which continues the turn—the agent posts a new message with the results.
+
+Conversations link to messages via Turn and Message entities.
 
 ## Turn
 
-A turn is **one cycle of the agent loop**. It's the execution record for what happened between user input and agent response.
+A turn is **one unit of agent work**—an input, the agent's processing, and responses. Each turn has exactly one triggering input and zero or more agent responses.
 
-| Field                      | Purpose                                    |
-| -------------------------- | ------------------------------------------ |
-| `conversation_id`          | Parent conversation                        |
-| `user_message_id`          | The triggering user message                |
-| `agent_message_id`         | The resulting agent response               |
-| `context_assembly_run_id`  | Workflow run for context assembly          |
-| `action_workflow_run_id`   | Workflow run for delegated work (nullable) |
-| `memory_extraction_run_id` | Workflow run for memory extraction         |
-| `latency_ms`               | Total turn duration                        |
-| `created_at`               | Timestamp                                  |
+| Field                      | Purpose                                                       |
+| -------------------------- | ------------------------------------------------------------- |
+| `conversation_id`          | Parent conversation                                           |
+| `caller`                   | Who initiated this turn (see below)                           |
+| `input`                    | The triggering input (user message or caller's input)         |
+| `reply_to_message_id`      | Optional—if user replied to a specific agent message          |
+| `status`                   | `active`, `completed`, `failed`                               |
+| `context_assembly_run_id`  | Workflow run for context assembly                             |
+| `memory_extraction_run_id` | Workflow run for memory extraction                            |
+| `created_at`               | Timestamp                                                     |
+| `completed_at`             | When the turn closed (nullable while active)                  |
+
+**Caller:** A discriminated union identifying who initiated the turn:
+
+```typescript
+caller:
+  | { type: 'user'; userId: string }
+  | { type: 'workflow'; runId: string }
+  | { type: 'agent'; agentId: string; turnId: string }
+```
+
+Every turn has a caller—users are callers too, not a special absence-of-caller case. For agent callers, `turnId` identifies which turn the calling agent was on, enabling result threading.
+
+**Turn lifecycle:**
+- A turn starts when the agent receives input (user message, workflow dispatch, or agent call)
+- The turn stays `active` while the agent has pending async operations
+- Agent messages accumulate on the turn as work completes
+- The turn becomes `completed` when there's no pending work and the agent has responded
+- Memory extraction runs when the turn completes
+
+**Parallel turns:** Multiple turns can be active simultaneously. User asks for research (turn A), then asks an unrelated question (turn B) while research is running. Turn B completes quickly. Turn A stays active until its async work finishes. Each turn is a logically independent execution context.
+
+**Threading with `reply_to`:** Users can reply to a specific agent message. The new turn carries `reply_to_message_id`, giving the agent context about what the user is responding to. This enables natural threading without forcing it—a plain message starts a new thread, a reply continues one.
 
 Turns are the execution spine. They link the visible dialogue to the underlying workflow runs.
 
@@ -296,25 +345,27 @@ Turns are the execution spine. They link the visible dialogue to the underlying 
 
 A message is a **user or agent utterance**. It's what you'd export as a transcript.
 
-| Field             | Purpose             |
-| ----------------- | ------------------- |
-| `conversation_id` | Parent conversation |
-| `role`            | `user` or `agent`   |
-| `content`         | The message content |
-| `created_at`      | Timestamp           |
+| Field             | Purpose                                          |
+| ----------------- | ------------------------------------------------ |
+| `conversation_id` | Parent conversation                              |
+| `turn_id`         | Which turn this message belongs to               |
+| `role`            | `user` or `agent`                                |
+| `content`         | The message content                              |
+| `created_at`      | Timestamp                                        |
 
-Messages are the user-facing content. Turns are the execution record. A turn typically contains one user message and one agent message, plus metadata about what happened in between.
+Each turn has exactly one user message (the trigger) and zero or more agent messages (responses as work completes). The `turn_id` link enables threading—UI can show which agent messages relate to which user input.
 
 **Why separate entities?**
 
+- **Threading**: Group agent messages by the user input that triggered them
 - **Querying**: Find all turns where the agent invoked a workflow, or messages mentioning a topic
 - **Linking**: Join turns to workflow runs for observability
 - **Streaming/pagination**: Load messages incrementally for long conversations
-- **Observability**: Turns capture execution details (latency, workflow runs) that don't belong in message content
+- **Observability**: Turns capture execution details that don't belong in message content
 
 ## Context Isolation
 
-Each agent maintains **isolated context by default**.
+Each agent maintains **isolated context by default**. When invoked via `delegate` mode, an agent sees only what was explicitly passed—no conversation history, no implicit context from the caller.
 
 Consider a code development scenario:
 
@@ -324,9 +375,13 @@ Consider a code development scenario:
 
 Clean contexts mean each agent sees what's relevant to their role.
 
+**When isolation breaks (intentionally):** The `loop_in` invocation mode explicitly grants conversation access. A looped-in agent becomes a participant and sees shared history. This is a deliberate choice by the caller—isolation is the default, context sharing is opt-in per invocation.
+
+This keeps the common case simple (delegate with explicit input) while enabling richer collaboration when needed (loop in for discussion).
+
 ## Agent Invocation
 
-Workflow nodes can execute agents, just like they execute tasks or subworkflows. Agent invocation is a **node-level dispatch**, not an action within a task.
+Workflow nodes and other agents can invoke agents. Agent invocation is a **node-level dispatch**, not an action within a task.
 
 | Node executes | Dispatches to | Mechanism                      |
 | ------------- | ------------- | ------------------------------ |
@@ -334,14 +389,47 @@ Workflow nodes can execute agents, just like they execute tasks or subworkflows.
 | Subworkflow   | CoordinatorDO | DO-to-DO, waits for completion |
 | Agent         | AgentDO       | DO-to-DO, waits for response   |
 
-When a node dispatches to an agent:
+When dispatching to an agent:
 
-- Parent token enters `waiting_for_agent` state
+- Parent token (or calling agent's turn) enters waiting state
 - AgentDO runs a turn with the provided input
-- Response flows back to parent coordinator
-- Parent token resumes with agent output
+- Response flows back to parent coordinator or calling agent
+- Parent resumes with agent output
 
-**Context isolation:** The invoked agent runs with clean context — only what was explicitly passed via input mapping. Response is explicit output, not shared state.
+### Invocation Modes
+
+How an agent is invoked determines what context it sees and how it participates:
+
+**Delegate mode** (default): The invoked agent runs with clean context—only what was explicitly passed via input. It executes a single turn and returns results to the caller. The agent doesn't join the caller's conversation; it's a one-shot task.
+
+```typescript
+{
+  targetType: 'agent',
+  targetId: 'architect',
+  invocationMode: 'delegate',  // default
+  input: { question: "Does this violate our API patterns?" }
+}
+```
+
+**Loop-in mode**: The invoked agent joins the conversation as a participant. It sees the conversation history, can respond multiple times, and stays in the conversation until explicitly removed. Use this when you want collaborative discussion rather than a directed task.
+
+```typescript
+{
+  targetType: 'agent',
+  targetId: 'architect',
+  invocationMode: 'loop_in',
+  input: { context: "We're discussing the auth redesign" }
+}
+```
+
+The invocation mode can be set on the tool definition as a default, or overridden per-invocation. The calling agent (or workflow author) decides which mode fits the situation—are you giving orders to a subordinate, or bringing a peer into the room.
+
+**Context access by mode:**
+
+| Mode       | Sees conversation history | Becomes participant | Response destination     |
+| ---------- | ------------------------- | ------------------- | ------------------------ |
+| `delegate` | No (only explicit input)  | No                  | Caller only              |
+| `loop_in`  | Yes                       | Yes                 | Conversation (all see it)|
 
 ## The Manager Pattern
 
@@ -359,6 +447,14 @@ Manager Agent (synthesizes, responds to user)
 
 The manager is an agent with a workflow that dispatches to other agents with curated context.
 
+**Choosing invocation modes:** The manager decides per-invocation whether to delegate or loop in:
+
+- **Delegate** to the developer: "Implement this feature according to the spec." The developer works independently and returns results.
+- **Loop in** the architect: "We're discussing a significant API change—join us." The architect sees the conversation, participates in the discussion, and stays engaged.
+- **Delegate** to the reviewer: "Review this PR." The reviewer provides feedback without needing the full conversation history.
+
+The same specialist agent might be delegated to in one situation and looped in another, depending on what the collaboration requires.
+
 ## Reasoning Strategies
 
 Advanced reasoning patterns—tree-of-thought, debate, chain-of-verification—are workflows exposed as tools.
@@ -373,11 +469,11 @@ The LLM sees these as tools it can invoke. When a problem warrants deeper reason
 
 - **User instruction (heavy):** Direct user guidance overrides defaults. "Think through this step by step" or "Use tree-of-thought for this problem."
 
-The LLM ultimately decides, but that decision is shaped by these influences. No special primitive needed—reasoning strategies are workflows, and the agent invokes them like any other tool.
+The LLM ultimately decides, but that decision is shaped by these influences. No special primitive is needed—reasoning strategies are workflows, invoked like any other tool.
 
 ## Observability
 
-Workflow invocations don't have D1 records. Observability comes from events:
+Observability comes from events:
 
 - `conversation_started`, `conversation_turn`, `conversation_ended`
 - `workflow_started`, `workflow_completed`, `workflow_failed`
@@ -387,18 +483,18 @@ Workflow invocations don't have D1 records. Observability comes from events:
 
 ### D1 Entities
 
-| Entity          | Purpose                                                                             |
-| --------------- | ----------------------------------------------------------------------------------- |
-| `personas`      | Shareable config — identity, behavior, tools (versioned, lives in libraries)        |
-| `tools`         | LLM-facing interface — binds name/description/schema to execution target            |
-| `agents`        | Instance — persona ref + memory, scoped to projects                                 |
-| `conversations` | Session — status, accumulated context                                               |
-| `turns`         | Execution record — links messages to workflow runs                                  |
-| `messages`      | Dialogue content — user and agent utterances                                        |
-| `workflows`     | Definition — graph (versioned)                                                      |
-| `tasks`         | Definition — step sequences (versioned)                                             |
-| `actions`       | Definition — atomic operations (versioned)                                          |
-| `events`        | Execution log — full history                                                        |
+| Entity          | Purpose                                                                      |
+| --------------- | ---------------------------------------------------------------------------- |
+| `personas`      | Shareable config — identity, behavior, tools (versioned, lives in libraries) |
+| `tools`         | LLM-facing interface — binds name/description/schema to execution target     |
+| `agents`        | Instance — persona ref + memory, scoped to projects                          |
+| `conversations` | Session — status, accumulated context                                        |
+| `turns`         | Execution record — links messages to workflow runs                           |
+| `messages`      | Dialogue content — user and agent utterances                                 |
+| `workflows`     | Definition — graph (versioned)                                               |
+| `tasks`         | Definition — step sequences (versioned)                                      |
+| `actions`       | Definition — atomic operations (versioned)                                   |
+| `events`        | Execution log — full history                                                 |
 
 ### Durable Objects
 
@@ -416,19 +512,89 @@ Each agent references:
 - `context_assembly_workflow_id` — invoked at the start of each turn
 - `memory_extraction_workflow_id` — invoked at the end of each turn
 
-These workflows get the same observability, composition, and versioning as any other workflow. No special primitive needed.
+These workflows get the same observability, composition, and versioning as any other workflow.
 
 ## Memory
 
-Memory lives on the **Agent**, not the Persona. This is what makes agents "living instances"—they accumulate knowledge across conversations.
+Memory lives on the **Agent**. This is what makes agents "living instances"—they accumulate knowledge across conversations. The Persona defines the schema; the Agent owns the data.
+
+**Memory is the agent's recall abstraction.** During context assembly and reasoning, the agent queries memory—not the Messages table, not the code directly. Memory is what the agent "knows."
+
+### Memory vs Conversation History
+
+Messages and Turns persist to D1 for observability and UI—so users can see transcripts and developers can debug. But the agent doesn't read the Messages table.
+
+Instead, memory extraction decides what the agent remembers. This can include:
+
+- **Turn references** — Pointers to recent turns, queryable by conversation_id and recency
+- **Facts** — Distilled understanding extracted from turns
+- **Episodes** — Consolidated summaries of past interactions
+
+What counts as a memory is a library decision. The platform provides storage primitives; libraries define memory types and extraction strategies. A simple persona might store every turn as a memory. A sophisticated one might extract facts and discard raw turns after consolidation.
+
+### Significance
+
+Every memory has a `significance` score—an intrinsic measure of how important the memory is, independent of any particular query.
+
+- **Significance** is intrinsic: "How important is this fact, period?"
+- **Relevance** is contextual: "How related is this to the current query?"
+
+Both factor into retrieval. Context assembly and memory search combine significance with semantic relevance to rank results. A moderately relevant but high-significance memory may rank above a highly relevant but low-significance one.
+
+The platform provides `significance` as a first-class field in memory metadata. Memory extraction sets it when writing memories. Libraries decide how to weight significance against relevance in their retrieval logic.
+
+### Memory Structure
+
+The platform defines a fixed memory structure. Libraries decide _what_ to remember via extraction workflows and _how to query_ via assembly workflows, but they don't define the shape.
+
+```typescript
+interface Memory {
+  id: string;
+  agent_id: string;
+  type: string; // Library-defined taxonomy (e.g., 'fact', 'decision', 'pattern')
+  content: string; // Inline content (up to 4KB)
+  content_ref?: string; // R2 key for content exceeding 4KB
+  significance: number; // Intrinsic importance score
+  metadata: Record<string, unknown>; // Flexible structured data
+  created_at: string;
+  updated_at: string;
+}
+```
+
+When `content_ref` is set, `content` is empty and the actual content lives in R2. The `memory.read` action abstracts this—callers always get `content` populated, fetched from R2 transparently if needed.
+
+The `type` field is an unconstrained string—libraries define their own taxonomy. A coding assistant might use `pattern`, `decision`, `bug_context`. A research agent might use `source`, `claim`, `contradiction`. The platform indexes on type for efficient queries but doesn't interpret it.
+
+The `metadata` field provides flexibility for structured data without schema versioning. Libraries maintain their own conventions about what goes in metadata.
+
+**Size guidance:** Memories should target ~1KB or less. Well-distilled facts and decisions are typically a few sentences (100-500 bytes). Memories up to 4KB are stored inline in D1; larger content spills to R2. If you're regularly hitting 4KB, consider whether the content belongs in an artifact instead.
 
 ### Storage
 
-Memory uses the same storage model as artifacts: files in a git repo (R2 + D1 refs), with metadata indexed in D1 and content indexed in Vectorize for semantic search. The difference is ownership—memory belongs to the agent, artifacts belong to the project.
+Memory lives in shared infrastructure, not in AgentDO's SQLite. This is necessary because:
 
-The `memory` action kind handles storage atomically. A `memory.write` operation stores the file, updates the metadata index, and generates embeddings in a single action. Workflows don't need to coordinate these steps.
+1. **Executor writes memory** — Memory extraction runs as a workflow dispatched to Executor, which can't write to AgentDO's SQLite directly.
+2. **External queryability** — Memories may need to be queried across agents or from services outside AgentDO.
 
-The Persona defines the memory schema (what categories, what fields). The Agent owns the data.
+Storage model:
+
+- **D1** — Full memory records (all fields above). Content stored inline for memories under 4KB.
+- **Vectorize** — Semantic search over memory content (embeddings generated on write).
+- **R2** — Content overflow for memories exceeding 4KB.
+
+The `memory.*` actions abstract storage details. Callers write and read content directly; the platform handles the D1/R2 split transparently based on size.
+
+Memory doesn't use git semantics. Unlike artifacts (which are versioned documents with branching and merge), memories are written once, possibly updated or consolidated later, but not branched or versioned. Memory extraction is serialized through AgentDO (single-threaded actor), so there are no merge conflicts.
+
+**No pruning.** Storage is cheap—D1 rows accumulate indefinitely. Significance governs recall priority, not retention.
+
+The `memory` action kind handles operations atomically:
+
+- `memory.write` — Store content (D1 inline or R2 if large), index metadata in D1, generate embedding in Vectorize
+- `memory.search` — Query Vectorize, return matching memory refs
+- `memory.read` — Fetch from D1 (transparently fetching from R2 if content_ref is set)
+
+The agent_id is passed in execution context when AgentDO dispatches memory workflows, so actions know which agent's memories to access.
 
 ### Lifecycle
 
@@ -436,8 +602,7 @@ Per-agent retention policies with consolidation:
 
 - **Facts and decisions** persist until explicitly updated or contradicted
 - **Episodic memories** consolidate into summaries over time
-- Raw episodes archived to R2, summaries remain active
-- Different agents can have different retention policies (configured in Persona)
+- Consolidation strategies are library-defined via memory extraction workflows
 
 ## Platform vs Library Boundary
 
@@ -458,7 +623,7 @@ The platform provides **dispatch plumbing**. Libraries provide **intelligence**.
 - Reasoning strategy workflows (tree-of-thought, debate, chain-of-verification)
 - Persona definitions (system prompts, tool sets, memory configuration)
 
-The platform doesn't know *how* to assemble context or *what* to remember—it just calls the workflows the persona specifies. This keeps the platform simple and lets libraries encode domain-specific intelligence.
+The platform calls the workflows the persona specifies. This keeps the platform simple and lets libraries encode domain-specific intelligence.
 
 **Example:** The platform's AgentDO calls `contextAssemblyWorkflowId` before every LLM call. A library provides `context_assembly_code_assistant_v2` that knows to retrieve recent code changes, relevant design decisions, and similar past conversations. The platform provides the hook; the library provides the strategy.
 
@@ -514,41 +679,39 @@ export class AgentDO extends DurableObject<Env> {
 
 **Entry point differences:**
 
-|                        | `startTurn`                  | `startAgentCall`                   |
-| ---------------------- | ---------------------------- | ---------------------------------- |
-| **Caller**             | User via API                 | Parent coordinator                 |
-| **Context**            | Conversation + user message  | Explicit input from parent         |
-| **Result destination** | Streams to user / completes  | Callbacks to parent coordinator    |
-| **Conversation**       | Always within a conversation | One-shot (no conversation context) |
+|                        | `startTurn`                  | `startAgentCall`                            |
+| ---------------------- | ---------------------------- | ------------------------------------------- |
+| **Caller**             | User via API                 | Parent coordinator or another agent         |
+| **Context**            | Conversation + user message  | Depends on invocation mode                  |
+| **Result destination** | Streams to user / completes  | Callbacks to parent coordinator/agent       |
+| **Conversation**       | Always within a conversation | `delegate`: none. `loop_in`: joins existing |
+
+For `delegate` mode, the agent sees only explicit input—no conversation context. For `loop_in` mode, the agent joins the caller's conversation as a participant and sees shared history.
 
 ### Decision Types
 
 ```typescript
 type AgentDecision =
   // Turn lifecycle
-  | { type: 'START_TURN'; conversationId: string; trigger: 'user' | 'workflow' | 'agent' }
-  | { type: 'COMPLETE_TURN'; turnId: string; response: string }
+  | { type: 'START_TURN'; conversationId: string; replyToMessageId?: string }
+  | { type: 'COMPLETE_TURN'; turnId: string }
   | { type: 'FAIL_TURN'; turnId: string; error: unknown }
 
   // Message management
-  | { type: 'APPEND_MESSAGE'; conversationId: string; role: 'user' | 'agent'; content: string }
+  | { type: 'APPEND_MESSAGE'; turnId: string; role: 'user' | 'agent'; content: string }
 
-  // Capability dispatch
-  | { type: 'DISPATCH_TASK'; turnId: string; taskId: string; input: unknown }
-  | {
-      type: 'DISPATCH_WORKFLOW';
-      turnId: string;
-      workflowId: string;
-      input: unknown;
-      async: boolean;
-    }
-  | { type: 'DISPATCH_AGENT'; turnId: string; agentId: string; input: unknown }
+  // Capability dispatch (sync tools block, async tools don't)
+  | { type: 'DISPATCH_TASK'; turnId: string; taskId: string; input: unknown; async: boolean }
+  | { type: 'DISPATCH_WORKFLOW'; turnId: string; workflowId: string; input: unknown; async: boolean }
+  | { type: 'DISPATCH_AGENT'; turnId: string; agentId: string; input: unknown; mode: 'delegate' | 'loop_in'; async: boolean }
 
-  // Waiting states
-  | { type: 'MARK_WAITING_FOR_TASK'; turnId: string }
-  | { type: 'MARK_WAITING_FOR_WORKFLOW'; turnId: string }
-  | { type: 'MARK_WAITING_FOR_AGENT'; turnId: string }
-  | { type: 'RESUME_FROM_TOOL'; turnId: string; result: unknown }
+  // Async tracking
+  | { type: 'TRACK_ASYNC_OPERATION'; turnId: string; operationId: string }
+  | { type: 'ASYNC_OPERATION_COMPLETED'; turnId: string; operationId: string; result: unknown }
+
+  // Sync tool waiting
+  | { type: 'MARK_WAITING'; turnId: string; operationId: string }
+  | { type: 'RESUME_FROM_TOOL'; turnId: string; operationId: string; result: unknown }
 
   // Memory
   | { type: 'WRITE_MEMORY'; key: string; value: unknown }
@@ -558,47 +721,92 @@ type AgentDecision =
 ### Turn Execution Flow
 
 ```
-startTurn(conversationId, userMessage)
+startTurn(conversationId, userMessage, replyToMessageId?)
   │
-  ├─ START_TURN
+  ├─ START_TURN (status: active)
   ├─ APPEND_MESSAGE (user)
   │
   ├─ Run context assembly workflow → assembled context
+  │   (includes pending async operations from other active turns)
   │
   ├─ Resolve tools from persona.tools.toolIds
   │
   ├─ LLM call with context + tools + history
   │   │
-  │   ├─ If tool_use → dispatch to tool's target
-  │   │   ├─ tool.taskId → DISPATCH_TASK, MARK_WAITING_FOR_TASK
-  │   │   ├─ tool.workflowId → DISPATCH_WORKFLOW, MARK_WAITING_FOR_WORKFLOW
-  │   │   └─ tool.agentId → DISPATCH_AGENT, MARK_WAITING_FOR_AGENT
+  │   ├─ If sync tool_use → dispatch and wait
+  │   │   ├─ DISPATCH_*, MARK_WAITING
+  │   │   ├─ (result arrives via callback)
+  │   │   ├─ RESUME_FROM_TOOL
+  │   │   └─ Continue LLM loop
   │   │
-  │   └─ If text response → continue
+  │   ├─ If async tool_use → dispatch and continue
+  │   │   ├─ DISPATCH_* (async: true), TRACK_ASYNC_OPERATION
+  │   │   ├─ APPEND_MESSAGE (agent: "I'm working on X...")
+  │   │   └─ Continue LLM loop (or end if no more sync work)
+  │   │
+  │   └─ If text response with no tool calls → agent is done for now
   │
-  ├─ (tool result arrives via callback)
-  ├─ RESUME_FROM_TOOL
-  ├─ Continue LLM loop until text response
+  ├─ If pending async operations → turn stays active, wait for completions
   │
-  ├─ Run memory extraction workflow
-  ├─ WRITE_MEMORY (extracted facts)
-  │
-  ├─ APPEND_MESSAGE (agent)
-  └─ COMPLETE_TURN
+  └─ When async operation completes:
+      ├─ ASYNC_OPERATION_COMPLETED
+      ├─ LLM call with result in context
+      ├─ APPEND_MESSAGE (agent: "Here's what I found...")
+      ├─ If no more pending async → run memory extraction, COMPLETE_TURN
+      └─ Otherwise → wait for remaining operations
 ```
+
+**Parallel turns:** Multiple turns can be active simultaneously. Each turn tracks its own pending async operations. Context assembly sees all active turns so the agent has full awareness.
 
 ### Parallel to CoordinatorDO
 
-| Aspect               | CoordinatorDO                                  | AgentDO                                                         |
-| -------------------- | ---------------------------------------------- | --------------------------------------------------------------- |
-| **Instance scope**   | One workflow run                               | One agent                                                       |
-| **State management** | Tokens, context, transitions                   | Turns, messages, memory                                         |
-| **Decision driver**  | Graph traversal (deterministic)                | LLM reasoning (non-deterministic)                               |
-| **Dispatches to**    | Executor, CoordinatorDO, AgentDO               | Executor, CoordinatorDO, AgentDO                                |
-| **Callbacks from**   | Executor, child coordinators, agents           | Executor, coordinators, child agents                            |
-| **Waiting states**   | `waiting_for_subworkflow`, `waiting_for_agent` | `waiting_for_task`, `waiting_for_workflow`, `waiting_for_agent` |
+| Aspect               | CoordinatorDO                                  | AgentDO                                            |
+| -------------------- | ---------------------------------------------- | -------------------------------------------------- |
+| **Instance scope**   | One workflow run                               | One agent (multiple concurrent turns)              |
+| **State management** | Tokens, context, transitions                   | Turns, messages, memory, async operations          |
+| **Decision driver**  | Graph traversal (deterministic)                | LLM reasoning (non-deterministic)                  |
+| **Dispatches to**    | Executor, CoordinatorDO, AgentDO               | Executor, CoordinatorDO, AgentDO                   |
+| **Callbacks from**   | Executor, child coordinators, agents           | Executor, coordinators, child agents               |
+| **Concurrency**      | Single workflow execution                      | Parallel turns, each with sync/async operations    |
 
-The core pattern is identical: receive → decide → dispatch → wait → resume. The difference is what drives the "decide" step.
+The core pattern is identical: receive → decide → dispatch → wait → resume. The difference is what drives the "decide" step, and AgentDO manages multiple concurrent turns where CoordinatorDO manages a single workflow.
+
+### Turn Context and Moves
+
+During a turn, context accumulates with each iteration of the agent loop. Every tool call, result, and reasoning output is recorded. This context must persist across dispatch → wait → resume cycles, so it lives in DO SQLite.
+
+**Recent turns in DO SQLite:** AgentDO keeps the last N turns per conversation locally (per `recentTurnsLimit`). This enables fast context assembly—no D1 query needed for recent history. Turns are also written to D1 for observability and UI, but the hot path reads from DO SQLite. Older turns roll off locally but persist in D1; if the agent needs something older, it goes through memory or explicit history tools.
+
+The `moves` table records the sequence of events within a turn:
+
+```typescript
+interface Move {
+  id: string;
+  turn_id: string;
+  sequence: number; // Order within the turn
+
+  // What happened
+  reasoning?: string; // LLM text output (user-facing, streamable)
+  tool_call?: {
+    tool_id: string;
+    input: Record<string, unknown>;
+  };
+  tool_result?: Record<string, unknown>;
+
+  // For debugging
+  raw?: string; // Full LLM response
+
+  created_at: string;
+}
+```
+
+A move captures one iteration of the loop. The agent might emit reasoning ("Let me search for that..."), invoke a tool, and receive a result—all in one move. Or it might emit reasoning with no tool call, which means the turn is ending.
+
+When the turn completes:
+
+1. All moves become the input to memory extraction (the "turn transcript")
+2. The turn record links to these moves for observability
+3. The final move's reasoning becomes the agent response stored in the Messages table
 
 ## Conversation Lifecycle
 
@@ -606,7 +814,7 @@ Conversations stay open indefinitely by default. The `completed` status is trigg
 
 ## Shell Operations and Branch Context
 
-When agents invoke tools that execute shell commands, they need repo and branch context. This works the same way as workflows—the agent owns a branch, not a container.
+When agents invoke tools that execute shell commands, they need repo and branch context. This works the same way as workflows—the agent owns a branch.
 
 ### Conversation Branch
 
@@ -630,7 +838,7 @@ When a tool invokes a task with shell actions:
 4. Command executes on the conversation's branch
 5. Result returns to AgentDO
 
-The tool definition doesn't specify container or branch—that's implicit from the conversation context. The ContainerDO stays warm via `sleepAfter` between commands.
+Container and branch are implicit from conversation context. The ContainerDO stays warm via `sleepAfter` between commands.
 
 ### Multiple Conversations
 
@@ -643,7 +851,7 @@ Project: my-backend
 └── wonder/conv-01HGHI...   # Conversation C (fixing bugs)
 ```
 
-Each conversation has isolated work. Merging is a user decision, not automatic. The agent can commit to its branch, but merging to main requires explicit user action or workflow completion with merge configured.
+Each conversation has isolated work. The agent commits to its branch; merging to main requires explicit user action or workflow completion with merge configured.
 
 ### Workflow-Initiated Agent Calls
 
@@ -662,21 +870,27 @@ Memory workflows use `memory.*` actions directly. The `agent_id` is provided aut
 ### Context Assembly
 
 **Input:**
+
 - `conversation_id` — current conversation
 - `user_message` — the triggering message
-- `recent_turns` — last N turns of conversation history
+- `recent_turns` — last N turns from this conversation (from DO SQLite, per `recentTurnsLimit`)
 
 **Output:**
-- `context` — assembled context object to augment the LLM call
 
-The workflow uses `memory.search`, `memory.read`, `artifact.search`, etc. to retrieve relevant information and assemble it into context. The output is what gets added to the LLM's context window.
+- `context` — assembled context object containing:
+  - Pre-fetched content (high-confidence relevant items)
+  - Indices (pointers to available knowledge the LLM can fetch on demand)
+
+The `recent_turns` input provides raw conversational history without requiring the workflow to query for it. The workflow author decides how to use it—pass through directly, summarize, or ignore. Its presence makes conversational continuity visible as a concern.
+
+The workflow uses `memory.search`, `memory.read`, `artifact.search`, etc. to retrieve relevant information. The output includes both content and indices—enough for the LLM to understand what exists and where to find more. During reasoning, the LLM uses memory/artifact tools to fetch details based on the user's actual question.
 
 ### Memory Extraction
 
 **Input:**
+
 - `turn_transcript` — what happened (user message, agent response, tool calls, results)
 
 **Output:**
-- None — side effects (memory writes) happen via `memory.write`, `memory.delete` actions during execution
 
-The workflow analyzes the turn, decides what's worth remembering, and writes it directly using `memory.*` actions. No return value needed.
+Side effects only—memory updates happen via `memory.write`, `memory.delete` actions during execution.
