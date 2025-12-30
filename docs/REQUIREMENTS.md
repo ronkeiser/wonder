@@ -73,13 +73,12 @@
 
 ## Containers
 
-- One ContainerDO per resource declaration per run
-- Linear ownership: single owner, explicit transfer via pass_resources, no parallel access
-- Ownership tracked via owner_run_id; claim/release/transfer operations
-- Shell access: Workers call containerStub.exec(run_id, command, timeout)
-- ContainerDO validates ownership, forwards to container's shell server
-- Git-based hibernation: record SHA, destroy container, resume from SHA
-- Workflows must commit before human gates (enforced by design)
+- Containers are ephemeral compute; git branch is state
+- ContainerDO per caller: identity = run_id or conv_id (1:1 with Cloudflare model)
+- Shell access: executor calls containerDO.exec(command, timeout) on caller's DO
+- Idle timeout via Cloudflare `sleepAfter`; automatic cleanup
+- Sub-second provisioning via R2 cache and pnpm store
+- Branch isolation: each workflow run or agent conversation gets its own branch
 
 ## Source Hosting
 
@@ -186,4 +185,4 @@
 - Error propagation: failures bubbling through 5-6 nested layers
 - Synchronization: race-safe fan-in via SQL unique constraints (tryCreateFanIn, tryActivate)
 - Stuck workflow detection: human input timeouts surfaced and recoverable
-- ContainerDO: ownership enforcement, transfer, hibernation/resume cycles
+- ContainerDO: per-caller provisioning, idle timeout via sleepAfter

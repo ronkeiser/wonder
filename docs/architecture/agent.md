@@ -404,7 +404,6 @@ Workflow invocations don't have D1 records. Observability comes from events:
 | ------------- | ------------------------------------------------------------------------- |
 | CoordinatorDO | Workflow execution — graph traversal, token management, fan-in sync       |
 | AgentDO       | Agent coordination — agent loop, memory management, conversation handling |
-| ContainerDO   | Shell access — container lifecycle, ownership enforcement                 |
 
 ## Context Assembly and Memory Extraction
 
@@ -605,31 +604,99 @@ startTurn(conversationId, userMessage)
 
 The core pattern is identical: receive → decide → dispatch → wait → resume. The difference is what drives the "decide" step.
 
-## Open Questions
+## Conversation Lifecycle
 
-### Memory Actions
+Conversations stay open indefinitely by default. The `completed` status is triggered by explicit user action only—no timeouts. An idle conversation costs nothing (just D1 rows), and users may return after days or weeks to continue.
 
-What action types do memory workflows need?
+## Shell Operations and Branch Context
 
-- `memory_read` / `memory_write` for structured store
-- `vector_search` already exists
-- `vector_write` / `embed` for semantic store
-- Consolidation actions?
+When agents invoke tools that execute shell commands, they need repo and branch context. This works the same way as workflows—the agent owns a branch, not a container.
 
-### State Storage Model
+### Conversation Branch
 
-**Decided:** Fixed tables for conversation primitives (turns, messages, conversations), schema-driven storage for memory.
+At conversation start, a working branch is created:
 
-Conversation primitives have a known, stable structure—no need for dynamic schema generation. Memory storage uses schema-driven tables because the memory structure varies by persona (different agents remember different things in different formats).
+```
+Conversation created for agent scoped to project P
+  → Branch: wonder/conv-{conversation_id} from project's default branch
+  → Stored in conversation context
+```
 
-### Memory Extraction Mechanism
+All shell operations during the conversation use this branch. The conversation has its own ContainerDO (keyed by conv_id) for shell execution.
 
-Memory extraction is described as LLM-driven. Is this a dedicated workflow that runs after each turn? Does it use Vectorize for semantic storage? What's the extraction prompt/strategy?
+### Tool Execution Context
 
-### Tool Execution Path
+When a tool invokes a task with shell actions:
 
-When an agent calls a tool, does it always go through Executor with Tasks, or is there a lighter-weight path for simple tool calls (direct MCP invocation without Task wrapping)?
+1. AgentDO dispatches to Executor with conversation context (conv_id, repo_id, branch)
+2. Executor gets the conversation's ContainerDO (keyed by conv_id)
+3. Executor calls `containerDO.exec(command, timeout)`
+4. Command executes on the conversation's branch
+5. Result returns to AgentDO
 
-### Conversation Lifecycle
+The tool definition doesn't specify container or branch—that's implicit from the conversation context. The ContainerDO stays warm via `sleepAfter` between commands.
 
-What triggers conversation end? Explicit user action, timeout, or do conversations stay open indefinitely? Is there a `conversation.completed` status, and what sets it?
+### Multiple Conversations
+
+Multiple conversations can operate on the same project concurrently:
+
+```
+Project: my-backend
+├── wonder/conv-01HABC...   # Conversation A (refactoring auth)
+├── wonder/conv-01HDEF...   # Conversation B (adding logging)
+└── wonder/conv-01HGHI...   # Conversation C (fixing bugs)
+```
+
+Each conversation has isolated work. Merging is a user decision, not automatic. The agent can commit to its branch, but merging to main requires explicit user action or workflow completion with merge configured.
+
+### Workflow-Initiated Agent Calls
+
+When a workflow node invokes an agent (one-shot call, no conversation):
+
+- The agent receives the parent workflow's branch context in input
+- Shell operations use that branch
+- No new branch is created
+
+This allows agents to continue work in progress on a workflow's branch.
+
+## Memory Workflow Contracts
+
+Memory workflows are pure decision logic. They receive data and return decisions—AgentDO handles all actual storage operations.
+
+### Context Assembly
+
+**Input:**
+- Conversation history (recent turns)
+- User message
+- Pre-fetched memory samples (optional optimization)
+
+**Output:**
+- Assembled context to send to LLM
+
+The workflow decides what context is relevant. It doesn't read from storage directly—AgentDO provides the inputs and uses the output.
+
+### Memory Extraction
+
+**Input:**
+- Turn transcript (user message, agent response, tool calls)
+- Current memory state (relevant facts)
+
+**Output:**
+- List of memory operations to perform
+
+```typescript
+type MemoryOperation =
+  | { op: 'write'; store: 'structured' | 'semantic'; key: string; value: unknown }
+  | { op: 'update'; store: 'structured'; key: string; value: unknown }
+  | { op: 'delete'; store: 'structured' | 'semantic'; key: string }
+  | { op: 'archive'; key: string };
+```
+
+AgentDO invokes the workflow, receives the operations, and applies them to its own storage.
+
+### Why This Model
+
+- **No special action types needed** — memory workflows use standard actions (llm, context)
+- **Testable** — workflows are pure functions (input → output)
+- **AgentDO owns storage** — no workflows reaching into agent state
+- **Matches coordinator pattern** — planning returns decisions, dispatch applies them
