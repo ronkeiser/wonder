@@ -431,7 +431,9 @@ User → HTTP service → Coordinator DO
 
 ## Artifacts Workflow
 
-Artifacts are committed like code. A workflow that produces an artifact:
+The `artifact` action kind handles artifact operations atomically—file storage, git commit, metadata indexing, and semantic embedding in a single action.
+
+A workflow that produces an artifact:
 
 ```yaml
 # WorkflowDef nodes
@@ -445,34 +447,34 @@ nodes:
       recommendations: $.response.recommendations
 
   - ref: write_artifact
-    task_id: lib_write_file
-    input_mapping:
-      path: 'research/market-analysis.md'
-      content: |
-        ---
-        title: Market Analysis
-        date: 2024-01-15
-        workflow_run: ${run_id}
-        ---
+    action:
+      kind: artifact
+      operation: write
+      implementation:
+        path: 'research/market-analysis.md'
+        content: |
+          ---
+          title: Market Analysis
+          date: 2024-01-15
+          workflow_run: {{run_id}}
+          ---
 
-        ## Findings
-        ${context.findings}
+          ## Findings
+          {{state.findings}}
 
-        ## Recommendations
-        ${context.recommendations}
-    output_mapping:
-      file_written: $.success
-
-  - ref: commit
-    task_id: lib_git_commit
-    input_mapping:
-      message: 'research: market analysis'
-      files: ['.']
+          ## Recommendations
+          {{state.recommendations}}
+        metadata:
+          type: research
+          status: draft
 ```
 
-Each node references a Task (e.g., `lib_llm_research`, `lib_write_file`, `lib_git_commit`). The node handles data mapping between workflow context and task I/O. Repo and branch come from workflow context automatically.
+The `artifact.write` action handles:
+- Writing the file to the artifacts repo (R2 + git)
+- Extracting and indexing metadata to D1
+- Generating embeddings and storing in Vectorize
 
-The artifact is now versioned, diffable, searchable.
+No separate commit or indexing steps needed. The artifact is immediately versioned, queryable, and searchable.
 
 ### Artifact Schemas
 
@@ -496,25 +498,7 @@ Enforce structure via schemas:
 }
 ```
 
-Validation runs on commit. Invalid artifacts fail the commit.
-
-### Artifact Indexing
-
-Artifacts are indexed for discovery:
-
-| Index     | Purpose                                  |
-| --------- | ---------------------------------------- |
-| D1        | Metadata queries (by type, date, status) |
-| Vectorize | Semantic search over content             |
-
-Indexing happens post-commit via event handler:
-
-```
-Event: branch_push
-  → Filter: paths match artifacts/**
-  → Action: Extract metadata, update D1 index
-  → Action: Generate embeddings, update Vectorize
-```
+Validation runs during `artifact.write`. Invalid artifacts fail the action.
 
 ## Concurrent Workflows Example
 

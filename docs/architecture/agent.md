@@ -193,7 +193,7 @@ When a workflow node dispatches to an agent, the parent CoordinatorDO's token en
 
 ## Context Assembly
 
-Context assembly is a **deterministic pre-LLM optimization pass**. Before the LLM sees the user's message, the agent retrieves relevant context to inform reasoning.
+Context assembly is a **workflow hook** invoked before the LLM sees the user's message. It retrieves and structures relevant context to inform reasoning.
 
 **What gets assembled:**
 
@@ -202,14 +202,9 @@ Context assembly is a **deterministic pre-LLM optimization pass**. Before the LL
 3. Conversation history — from current session
 4. Current state — workflow results, etc.
 
-**Key principle:** Context assembly is fast and deterministic. It uses pattern matching, vector search, and structured queries—not LLM calls. This keeps it cheap and tunable.
+How the workflow assembles context is a library design choice. Some personas might use cheap deterministic retrieval (vector search, D1 queries, pattern matching). Others might use LLM calls to reason about what context is relevant. The platform provides the hook; libraries provide the strategy.
 
-| Layer            | When                    | What                       | Tuning                   |
-| ---------------- | ----------------------- | -------------------------- | ------------------------ |
-| Context assembly | Before LLM sees message | Deterministic retrieval    | Workflow experimentation |
-| LLM tool use     | During reasoning        | On-demand deeper retrieval | Prompt engineering       |
-
-The LLM also has memory tools available. When it recognizes it needs more context than was pre-fetched, it can search deeper. Two layers, clear responsibilities: baseline retrieval guarantees relevant context; tool-driven retrieval handles edge cases.
+The LLM also has memory tools available during reasoning. When it recognizes it needs more context than was pre-fetched, it can search deeper.
 
 ### Knowledge Sources
 
@@ -247,10 +242,17 @@ After turns complete, the agent updates memory:
 1. Analyze what happened
 2. Decide what's worth remembering
 3. Structure it (facts, decisions, summaries)
-4. Write to memory store
-5. Detect contradictions with existing memories
+4. Detect contradictions with existing memories
+5. Consolidate episodic memories into summaries when appropriate
+6. Return memory operations for AgentDO to apply
 
 Unlike context assembly, memory extraction typically involves LLM calls—deciding what's worth remembering requires judgment.
+
+**Consolidation:** Memory extraction workflows handle consolidation as part of their normal operation. When the workflow receives current memory state and turn transcript, it can decide "these 5 recent episodic memories should consolidate into a summary" and return appropriate operations (`archive` for raw episodes, `write` for the new summary). No separate consolidation job needed.
+
+**Contradiction detection:** The workflow receives current memory state as input. When it extracts new facts, it can compare against existing facts and return `update` or `delete` operations to resolve contradictions. The "how much memory to pass in" question is a workflow design concern—the workflow specifies what it needs via its input schema.
+
+**Concurrency:** AgentDO is single-threaded (DO actor model). If two conversations trigger memory extraction simultaneously, one completes before the other starts. The second workflow sees memory state *after* the first's operations were applied. No special concurrency handling needed in workflows.
 
 ## Conversation
 
@@ -422,17 +424,11 @@ Memory lives on the **Agent**, not the Persona. This is what makes agents "livin
 
 ### Storage
 
-Three stores, different access patterns:
+Memory uses the same storage model as artifacts: files in a git repo (R2 + D1 refs), with metadata indexed in D1 and content indexed in Vectorize for semantic search. The difference is ownership—memory belongs to the agent, artifacts belong to the project.
 
-| Store      | Technology | Purpose                                              |
-| ---------- | ---------- | ---------------------------------------------------- |
-| Structured | D1         | Facts, decisions, relationships. Queryable by field. |
-| Semantic   | Vectorize  | Episodic memories, summaries. Similarity search.     |
-| Archive    | R2         | Raw episodes, large documents. Cold storage.         |
+The `memory` action kind handles storage atomically. A `memory.write` operation stores the file, updates the metadata index, and generates embeddings in a single action. Workflows don't need to coordinate these steps.
 
-The Persona defines the schema (what fields, what types). The Agent owns the data.
-
-Memory workflows (`context_assembly`, `memory_extraction`) have actions to read/write all three stores. The platform provides the primitives; workflows define the strategies.
+The Persona defines the memory schema (what categories, what fields). The Agent owns the data.
 
 ### Lifecycle
 
@@ -661,42 +657,26 @@ This allows agents to continue work in progress on a workflow's branch.
 
 ## Memory Workflow Contracts
 
-Memory workflows are pure decision logic. They receive data and return decisions—AgentDO handles all actual storage operations.
+Memory workflows use `memory.*` actions directly. The `agent_id` is provided automatically from execution context when AgentDO dispatches these workflows.
 
 ### Context Assembly
 
 **Input:**
-- Conversation history (recent turns)
-- User message
-- Pre-fetched memory samples (optional optimization)
+- `conversation_id` — current conversation
+- `user_message` — the triggering message
+- `recent_turns` — last N turns of conversation history
 
 **Output:**
-- Assembled context to send to LLM
+- `context` — assembled context object to augment the LLM call
 
-The workflow decides what context is relevant. It doesn't read from storage directly—AgentDO provides the inputs and uses the output.
+The workflow uses `memory.search`, `memory.read`, `artifact.search`, etc. to retrieve relevant information and assemble it into context. The output is what gets added to the LLM's context window.
 
 ### Memory Extraction
 
 **Input:**
-- Turn transcript (user message, agent response, tool calls)
-- Current memory state (relevant facts)
+- `turn_transcript` — what happened (user message, agent response, tool calls, results)
 
 **Output:**
-- List of memory operations to perform
+- None — side effects (memory writes) happen via `memory.write`, `memory.delete` actions during execution
 
-```typescript
-type MemoryOperation =
-  | { op: 'write'; store: 'structured' | 'semantic'; key: string; value: unknown }
-  | { op: 'update'; store: 'structured'; key: string; value: unknown }
-  | { op: 'delete'; store: 'structured' | 'semantic'; key: string }
-  | { op: 'archive'; key: string };
-```
-
-AgentDO invokes the workflow, receives the operations, and applies them to its own storage.
-
-### Why This Model
-
-- **No special action types needed** — memory workflows use standard actions (llm, context)
-- **Testable** — workflows are pure functions (input → output)
-- **AgentDO owns storage** — no workflows reaching into agent state
-- **Matches coordinator pattern** — planning returns decisions, dispatch applies them
+The workflow analyzes the turn, decides what's worth remembering, and writes it directly using `memory.*` actions. No return value needed.

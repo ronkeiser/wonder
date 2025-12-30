@@ -9,7 +9,7 @@ Actions are the atomic operations that steps execute. Each action has a **kind**
 Actions are identified by kind and operation:
 
 ```
-kind: 'vector' | 'shell' | 'llm' | 'mcp' | 'http' | 'context' | 'artifact' | 'metric' | 'human' | 'mock'
+kind: 'shell' | 'llm' | 'mcp' | 'http' | 'context' | 'artifact' | 'memory' | 'metric' | 'human' | 'mock'
 operation: string  // varies by kind
 ```
 
@@ -24,28 +24,15 @@ The operation specifies the specific behavior within that kind.
 
 Some action kinds require specific context to execute:
 
-| Kind     | Required Context | How Provided                              |
-| -------- | ---------------- | ----------------------------------------- |
-| `shell`  | Repo + Branch    | From workflow/agent context automatically |
-| `vector` | Index            | Project index or explicit binding         |
+| Kind       | Required Context | How Provided                              |
+| ---------- | ---------------- | ----------------------------------------- |
+| `shell`    | Repo + Branch    | From workflow/agent context automatically |
+| `artifact` | Project          | From workflow/agent context automatically |
+| `memory`   | Agent            | From agent context automatically          |
 
 Actions without required context will fail at execution time.
 
-Note: Agent memory operations are not action types. Memory workflows return decisions that AgentDO applies. See [Agents - Memory Workflow Contracts](./agent.md#memory-workflow-contracts).
-
 ## Action Kinds
-
-### vector
-
-Operates on vector indices for semantic search and storage.
-
-| Operation | Purpose                              |
-| --------- | ------------------------------------ |
-| `search`  | Query by embedding, return top-k     |
-| `embed`   | Embed content and store in index     |
-| `delete`  | Remove vectors by ID                 |
-
-The index is determined by context: project artifacts, agent memory, or explicit binding.
 
 ### shell
 
@@ -93,12 +80,29 @@ Transforms workflow context data. Pure functions, no side effects.
 
 ### artifact
 
-Persists typed output to the artifacts repo.
+Operates on project artifacts. Requires project context. Handles file storage (R2 + git), metadata indexing (D1), and semantic search (Vectorize) atomically.
 
-| Operation | Purpose                     |
-| --------- | --------------------------- |
-| `write`   | Write artifact to repo      |
-| `read`    | Read artifact from repo     |
+| Operation | Purpose                                    |
+| --------- | ------------------------------------------ |
+| `read`    | Read artifact content by path              |
+| `write`   | Write artifact (file + index + embed)      |
+| `search`  | Semantic search over artifacts             |
+| `list`    | List artifacts by metadata query           |
+| `delete`  | Remove artifact                            |
+
+### memory
+
+Operates on agent memory. Requires agent context (provided automatically when workflows run on behalf of an agent). Handles file storage (R2 + git), metadata indexing (D1), and semantic search (Vectorize) atomically.
+
+| Operation | Purpose                                    |
+| --------- | ------------------------------------------ |
+| `read`    | Read memory content by key                 |
+| `write`   | Write memory (file + index + embed)        |
+| `search`  | Semantic search over memories              |
+| `list`    | List memories by metadata query            |
+| `delete`  | Remove memory                              |
+
+Memory is private to the agent. Cross-agent memory access is not supported.
 
 ### metric
 
@@ -145,14 +149,25 @@ The `implementation` field is validated based on kind + operation:
 Note: `shell.exec` no longer specifies `resource_name`. Repo and branch come from execution context (workflow or agent).
 
 ```typescript
-// vector.search
+// artifact.search
 {
-  kind: 'vector',
+  kind: 'artifact',
   operation: 'search',
   implementation: {
     query: '{{input.question}}',
     top_k: 10,
-    filters: { type: 'artifact' }
+    filters: { type: 'decision' }
+  }
+}
+
+// memory.write
+{
+  kind: 'memory',
+  operation: 'write',
+  implementation: {
+    key: '{{state.memory_key}}',
+    content: '{{state.extracted_fact}}',
+    metadata: { category: 'fact', source_turn: '{{input.turn_id}}' }
   }
 }
 

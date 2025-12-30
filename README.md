@@ -197,17 +197,18 @@ Context is stored as SQL tables in the coordinator's SQLite database, driven by 
 
 Actions are the atomic operations that steps execute:
 
-| Kind       | Purpose                                         |
-| ---------- | ----------------------------------------------- |
-| `llm`      | Call an LLM with a prompt spec                  |
-| `mcp`      | Invoke an MCP server tool (including shell)     |
-| `http`     | Make HTTP requests to external APIs             |
-| `human`    | Wait for human or agent input                   |
-| `context`  | Transform data (pure functions)                 |
-| `artifact` | Persist typed output                            |
-| `vector`   | Semantic search over artifacts                  |
-| `metric`   | Record metrics to Analytics Engine              |
-| `mock`     | Test stub with predefined responses             |
+| Kind       | Purpose                                              |
+| ---------- | ---------------------------------------------------- |
+| `llm`      | Call an LLM with a prompt spec                       |
+| `shell`    | Execute commands in a container                      |
+| `mcp`      | Invoke an MCP server tool                            |
+| `http`     | Make HTTP requests to external APIs                  |
+| `human`    | Wait for human or agent input                        |
+| `context`  | Transform data (pure functions)                      |
+| `artifact` | Read/write/search project artifacts                  |
+| `memory`   | Read/write/search agent memory                       |
+| `metric`   | Record metrics to Analytics Engine                   |
+| `mock`     | Test stub with predefined responses                  |
 
 Note: Sub-workflows are invoked via Node's `subworkflowId`, not an action.
 
