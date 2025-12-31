@@ -5,10 +5,13 @@
   "private": true,
   "bin": {
     "build-services": "./src/generate-types.ts",
-    "run-foundation-test": "./src/run-foundation-test.ts"
+    "run-test": "./src/run-test.ts"
   },
   "scripts": {
-    "build-services": "tsx src/generate-types.ts"
+    "gen:tasks": "tsx src/generate-tasks.ts",
+    "gen:types": "tsx src/generate-types.ts",
+    "test:models": "tsx src/run-test.ts models",
+    "test:workflows": "tsx src/run-test.ts workflows"
   },
   "dependencies": {
     "@wonder/sdk": "workspace:*",
