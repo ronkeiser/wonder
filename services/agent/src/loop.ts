@@ -161,7 +161,7 @@ export async function runLLMLoop(params: RunLLMLoopParams): Promise<RunLLMLoopRe
   });
 
   // Call LLM
-  const response = await callLLM(llmRequest, specs);
+  const response = await callLLM(llmRequest, specs, ctx.env.ANTHROPIC_API_KEY);
 
   ctx.emitter.emitTrace({
     type: 'loop.llm.response',

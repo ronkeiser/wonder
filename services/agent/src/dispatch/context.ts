@@ -36,6 +36,9 @@ export type DispatchContext = {
   agent: Env['AGENT'];
   resources: Env['RESOURCES'];
 
+  // Environment (for API keys, etc.)
+  env: Env;
+
   // Async primitives
   waitUntil: (promise: Promise<unknown>) => void;
 };

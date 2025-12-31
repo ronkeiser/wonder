@@ -16,6 +16,11 @@
         "class_name": "Streamer",
         "script_name": "wonder-events",
       },
+      {
+        "name": "AGENT",
+        "class_name": "Conversation",
+        "script_name": "wonder-agent",
+      },
     ],
   },
   "services": [

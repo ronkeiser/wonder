@@ -9,6 +9,7 @@
  * - Route decisions to appropriate managers
  * - Handle recursive decisions (CHECK_SYNCHRONIZATION → more decisions)
  * - Emit trace events for observability
+ * - Route callbacks to agents when workflows complete
  */
 
 import type { JSONSchema } from '@wonder/schemas';
@@ -17,6 +18,21 @@ import { errorMessage } from '../shared';
 import type { ApplyResult, Decision, DispatchContext, TracedDecision } from '../types';
 
 import { batchDecisions } from './batch';
+
+// ============================================================================
+// Agent Callback Types
+// ============================================================================
+
+/**
+ * Callback metadata embedded in workflow run input by the agent.
+ * Used to route workflow completion/failure back to the originating agent.
+ */
+type AgentCallback = {
+  conversationId: string;
+  turnId: string;
+  toolCallId?: string;
+  type: 'context_assembly' | 'memory_extraction' | 'workflow';
+};
 
 // ============================================================================
 // Main Dispatch Entry Point
@@ -523,6 +539,59 @@ async function applyOne(decision: Decision, ctx: DispatchContext): Promise<Apply
         });
       }
 
+      // Check for agent callback metadata in workflow run input
+      const runContext = run.context as { input?: { _callback?: AgentCallback } };
+      const callback = runContext.input?._callback;
+
+      if (callback?.conversationId) {
+        const agentId = ctx.agent.idFromName(callback.conversationId);
+        const agent = ctx.agent.get(agentId);
+
+        ctx.waitUntil(
+          (async () => {
+            switch (callback.type) {
+              case 'context_assembly':
+                // Workflow output contains llmRequest - pass as context
+                await agent.handleContextAssemblyResult(
+                  callback.turnId,
+                  ctx.workflowRunId,
+                  decision.output as { llmRequest: { messages: unknown[] } },
+                );
+                break;
+              case 'memory_extraction':
+                await agent.handleMemoryExtractionResult(callback.turnId, ctx.workflowRunId);
+                break;
+              case 'workflow':
+                await agent.handleWorkflowResult(
+                  callback.turnId,
+                  callback.toolCallId!,
+                  decision.output,
+                );
+                break;
+            }
+          })().catch((error) => {
+            ctx.emitter.emitTrace({
+              type: 'workflow.agent_callback.error',
+              payload: {
+                workflowRunId: ctx.workflowRunId,
+                callbackType: callback.type,
+                error: errorMessage(error),
+              },
+            });
+          }),
+        );
+
+        ctx.emitter.emit({
+          eventType: 'workflow.agent_callback.sent',
+          message: `Agent callback sent: ${callback.type}`,
+          metadata: {
+            conversationId: callback.conversationId,
+            turnId: callback.turnId,
+            callbackType: callback.type,
+          },
+        });
+      }
+
       return {};
     }
 
@@ -599,6 +668,43 @@ async function applyOne(decision: Decision, ctx: DispatchContext): Promise<Apply
           metadata: {
             parentRunId: run.parentRunId,
             parentTokenId: run.parentTokenId,
+            error: decision.error,
+          },
+        });
+      }
+
+      // Check for agent callback metadata in workflow run input
+      // Only route errors for workflow tool calls (context_assembly and memory_extraction
+      // don't need error callbacks - they're internal)
+      const runContext = run.context as { input?: { _callback?: AgentCallback } };
+      const callback = runContext.input?._callback;
+
+      if (callback?.conversationId && callback.type === 'workflow' && callback.toolCallId) {
+        const agentId = ctx.agent.idFromName(callback.conversationId);
+        const agent = ctx.agent.get(agentId);
+
+        ctx.waitUntil(
+          agent
+            .handleWorkflowError(callback.turnId, callback.toolCallId, decision.error)
+            .catch((error) => {
+              ctx.emitter.emitTrace({
+                type: 'workflow.agent_callback.error',
+                payload: {
+                  workflowRunId: ctx.workflowRunId,
+                  callbackType: 'workflow_error',
+                  error: errorMessage(error),
+                },
+              });
+            }),
+        );
+
+        ctx.emitter.emit({
+          eventType: 'workflow.agent_callback.sent',
+          message: 'Agent error callback sent',
+          metadata: {
+            conversationId: callback.conversationId,
+            turnId: callback.turnId,
+            toolCallId: callback.toolCallId,
             error: decision.error,
           },
         });

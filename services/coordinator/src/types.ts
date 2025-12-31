@@ -112,6 +112,8 @@ export type DispatchContext = {
   executor: Env['EXECUTOR'];
   /** Coordinator namespace for sub-workflow callbacks */
   coordinator: Env['COORDINATOR'];
+  /** Agent namespace for agent callbacks */
+  agent: Env['AGENT'];
   /** Register background work (fire-and-forget) */
   waitUntil: (promise: Promise<unknown>) => void;
   /** Schedule alarm to fire after delayMs */

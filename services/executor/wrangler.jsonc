@@ -27,7 +27,7 @@
       },
       {
         "name": "AGENT",
-        "class_name": "AgentDO",
+        "class_name": "Conversation",
         "script_name": "wonder-agent",
       },
     ],

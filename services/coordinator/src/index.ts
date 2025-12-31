@@ -103,6 +103,7 @@ export class WorkflowCoordinator extends DurableObject {
       resources: this.env.RESOURCES,
       executor: this.env.EXECUTOR,
       coordinator: this.env.COORDINATOR,
+      agent: this.env.AGENT,
       enableTraceEvents: options?.enableTraceEvents,
       waitUntil: (promise) => this.ctx.waitUntil(promise),
       scheduleAlarm: (delayMs) => this.scheduleAlarm(delayMs),

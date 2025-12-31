@@ -4,7 +4,7 @@
  * Durable Object-based conversation orchestration service.
  * Manages agent conversations and tool execution via RPC.
  *
- * Each ConversationDO instance manages a single conversation, following
+ * Each Conversation instance manages a single conversation, following
  * the same actor/decision pattern as WorkflowCoordinator:
  * receive → decide → dispatch → wait → resume
  */
@@ -27,11 +27,11 @@ import {
 import type { Caller, LLMRequest, ToolResult } from './types';
 
 /**
- * ConversationDO Durable Object
+ * Conversation Durable Object
  *
  * Each instance manages a single conversation.
  */
-export class ConversationDO extends DurableObject {
+export class Conversation extends DurableObject {
   private defs: DefinitionManager;
   private emitter: Emitter;
   private logger: Logger;
@@ -96,6 +96,7 @@ export class ConversationDO extends DurableObject {
       executor: this.env.EXECUTOR,
       agent: this.env.AGENT,
       resources: this.env.RESOURCES,
+      env: this.env,
       waitUntil: (promise) => this.ctx.waitUntil(promise),
     };
   }
@@ -684,7 +685,9 @@ export class ConversationDO extends DurableObject {
       // Link the workflow run to the turn
       this.turns.linkMemoryExtraction(turnId, runId);
 
-      // TODO: Check if turn can be completed (all async ops done)
+      // Memory extraction is fire-and-forget - turn was already completed
+      // in maybeCompleteTurn before dispatching extraction.
+      // This callback is just for bookkeeping/logging.
     } catch (error) {
       this.logger.error({
         eventType: 'conversation.memory_extraction.failed',
@@ -700,8 +703,6 @@ export class ConversationDO extends DurableObject {
   }
 }
 
-// Keep AgentDO as an alias for backwards compatibility with wrangler.jsonc
-export { ConversationDO as AgentDO };
 
 /**
  * Worker entrypoint

@@ -7,7 +7,7 @@
 
   "durable_objects": {
     "bindings": [
-      { "name": "AGENT", "class_name": "AgentDO" },
+      { "name": "AGENT", "class_name": "Conversation" },
       { "name": "STREAMER", "class_name": "Streamer", "script_name": "wonder-events" },
       { "name": "COORDINATOR", "class_name": "WorkflowCoordinator", "script_name": "wonder-coordinator" }
     ]
@@ -20,7 +20,7 @@
     { "binding": "EXECUTOR", "service": "wonder-executor" }
   ],
 
-  "migrations": [{ "tag": "v1", "new_sqlite_classes": ["AgentDO"] }],
+  "migrations": [{ "tag": "v1", "new_sqlite_classes": ["Conversation"] }],
 
   "vars": {
     "SERVICE": "agent",
