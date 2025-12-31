@@ -22,9 +22,18 @@ import {
   DefinitionManager,
   MessageManager,
   MoveManager,
+  ParticipantManager,
   TurnManager,
 } from './operations';
-import type { AgentCallback, Caller, LLMRequest, ToolResult } from './types';
+import type {
+  AgentCallback,
+  AgentCallParams,
+  Caller,
+  LLMRequest,
+  ToolResult,
+  TurnIssues,
+  WorkflowCallback,
+} from './types';
 
 /**
  * Conversation Durable Object
@@ -39,6 +48,7 @@ export class Conversation extends DurableObject {
   private messages: MessageManager;
   private moves: MoveManager;
   private asyncOps: AsyncOpManager;
+  private participants: ParticipantManager;
 
   /** Active WebSocket connection for streaming LLM tokens */
   private activeWebSocket: WebSocket | null = null;
@@ -79,6 +89,7 @@ export class Conversation extends DurableObject {
     this.messages = new MessageManager(db, this.emitter);
     this.moves = new MoveManager(db, this.emitter);
     this.asyncOps = new AsyncOpManager(db, this.emitter);
+    this.participants = new ParticipantManager(db, this.emitter);
   }
 
   /**
@@ -93,6 +104,7 @@ export class Conversation extends DurableObject {
       messages: this.messages,
       moves: this.moves,
       asyncOps: this.asyncOps,
+      participants: this.participants,
       emitter: this.emitter,
       conversationId: conversation.id,
       coordinator: this.env.COORDINATOR,
@@ -101,6 +113,13 @@ export class Conversation extends DurableObject {
       resources: this.env.RESOURCES,
       env: this.env,
       waitUntil: (promise) => this.ctx.waitUntil(promise),
+      scheduleAlarm: async (timeoutAt: number) => {
+        // Only schedule if this timeout is earlier than the current alarm
+        const currentAlarm = await this.ctx.storage.getAlarm();
+        if (currentAlarm === null || timeoutAt < currentAlarm) {
+          await this.ctx.storage.setAlarm(timeoutAt);
+        }
+      },
       streamToken: this.activeWebSocket
         ? (token: string) => this.activeWebSocket?.send(JSON.stringify({ type: 'token', token }))
         : undefined,
@@ -190,8 +209,9 @@ export class Conversation extends DurableObject {
     // All done - dispatch memory extraction
     const persona = this.defs.getPersona();
     const agent = this.defs.getAgent();
+    const moves = this.moves.getForTurn(turnId);
+
     if (persona?.memoryExtractionWorkflowId) {
-      const moves = this.moves.getForTurn(turnId);
       const extractionDecisions = decideMemoryExtraction({
         turnId,
         agentId: agent.id,
@@ -209,8 +229,17 @@ export class Conversation extends DurableObject {
       applyDecisions(extractionDecisions.decisions, ctx);
     }
 
-    // Mark turn complete
-    this.turns.complete(turnId);
+    // Count tool failures for turn issues tracking
+    const toolFailures = moves.filter((m) => {
+      const result = m.toolResult as { success?: boolean } | null;
+      return result !== null && result.success === false;
+    }).length;
+
+    // Build turn issues
+    const issues: TurnIssues | undefined = toolFailures > 0 ? { toolFailures } : undefined;
+
+    // Mark turn complete with issues
+    this.turns.complete(turnId, issues);
 
     this.logger.info({
       eventType: 'conversation.turn.completed',
@@ -219,19 +248,21 @@ export class Conversation extends DurableObject {
       metadata: { turnId },
     });
 
-    // Check for agent callback (delegate mode completion)
+    // Check for callbacks (agent delegation or workflow-initiated)
     const turn = this.turns.get(turnId);
-    const inputWithCallback = turn?.input as { _agentCallback?: AgentCallback } | null;
-    const callback = inputWithCallback?._agentCallback;
+    const inputWithCallbacks = turn?.input as {
+      _agentCallback?: AgentCallback;
+      _workflowCallback?: WorkflowCallback;
+    } | null;
 
-    if (callback) {
-      // Extract final response from moves (last reasoning text)
-      const moves = this.moves.getForTurn(turnId);
-      const lastMoveWithReasoning = [...moves].reverse().find((m) => m.reasoning);
-      const response = lastMoveWithReasoning?.reasoning ?? '';
+    // Extract final response from moves (last reasoning text)
+    const lastMoveWithReasoning = [...moves].reverse().find((m) => m.reasoning);
+    const response = lastMoveWithReasoning?.reasoning ?? '';
 
-      // Call back to parent agent
-      const parentAgentId = ctx.agent.idFromName(callback.conversationId);
+    // Handle agent callback (delegate mode completion)
+    const agentCallback = inputWithCallbacks?._agentCallback;
+    if (agentCallback) {
+      const parentAgentId = ctx.agent.idFromName(agentCallback.conversationId);
       const parentAgent = ctx.agent.get(parentAgentId);
 
       this.logger.info({
@@ -240,15 +271,15 @@ export class Conversation extends DurableObject {
         traceId: ctx.conversationId,
         metadata: {
           turnId,
-          parentConversationId: callback.conversationId,
-          parentTurnId: callback.turnId,
-          toolCallId: callback.toolCallId,
+          parentConversationId: agentCallback.conversationId,
+          parentTurnId: agentCallback.turnId,
+          toolCallId: agentCallback.toolCallId,
         },
       });
 
       ctx.waitUntil(
         parentAgent
-          .handleAgentResponse(callback.turnId, callback.toolCallId, response)
+          .handleAgentResponse(agentCallback.turnId, agentCallback.toolCallId, response)
           .catch((error: Error) => {
             this.logger.error({
               eventType: 'conversation.turn.agent_callback_failed',
@@ -256,7 +287,42 @@ export class Conversation extends DurableObject {
               traceId: ctx.conversationId,
               metadata: {
                 turnId,
-                parentConversationId: callback.conversationId,
+                parentConversationId: agentCallback.conversationId,
+                error: error.message,
+              },
+            });
+          }),
+      );
+    }
+
+    // Handle workflow callback (workflow-initiated agent call completion)
+    const workflowCallback = inputWithCallbacks?._workflowCallback;
+    if (workflowCallback?.type === 'workflow') {
+      const coordinatorId = ctx.coordinator.idFromName(workflowCallback.runId);
+      const coordinator = ctx.coordinator.get(coordinatorId);
+
+      this.logger.info({
+        eventType: 'conversation.turn.workflow_callback',
+        message: 'Calling back to parent coordinator',
+        traceId: ctx.conversationId,
+        metadata: {
+          turnId,
+          runId: workflowCallback.runId,
+          nodeId: workflowCallback.nodeId,
+        },
+      });
+
+      ctx.waitUntil(
+        coordinator
+          .handleAgentResult(workflowCallback.nodeId, { response })
+          .catch((error: Error) => {
+            this.logger.error({
+              eventType: 'conversation.turn.workflow_callback_failed',
+              message: 'Failed to call back to parent coordinator',
+              traceId: ctx.conversationId,
+              metadata: {
+                turnId,
+                runId: workflowCallback.runId,
                 error: error.message,
               },
             });
@@ -430,6 +496,89 @@ export class Conversation extends DurableObject {
   }
 
   /**
+   * Start an agent call from a workflow node or another agent.
+   *
+   * Unlike startTurn (user-initiated via WebSocket), this:
+   * - Doesn't stream to WebSocket
+   * - Callbacks to parent coordinator/agent when complete
+   * - May inherit branch context from parent workflow
+   *
+   * @param params - Agent call parameters including callback info
+   */
+  async startAgentCall(params: AgentCallParams): Promise<{ turnId: string }> {
+    try {
+      // Initialize definitions (loads from D1 on first call, cached thereafter)
+      await this.defs.initializeConversation(params.conversationId);
+
+      this.logger.info({
+        eventType: 'conversation.agent_call.starting',
+        message: 'Starting agent call',
+        traceId: params.conversationId,
+        metadata: {
+          callerType: params.caller.type,
+          hasCallback: !!params.callback,
+          hasBranchContext: !!params.branchContext,
+        },
+      });
+
+      // Embed callback metadata in input for later retrieval
+      const inputWithCallback = params.callback
+        ? { ...(params.input as object), _workflowCallback: params.callback }
+        : params.input;
+
+      // Create the turn
+      const turnId = this.turns.create({
+        conversationId: params.conversationId,
+        caller: params.caller,
+        input: inputWithCallback,
+      });
+
+      this.logger.info({
+        eventType: 'conversation.agent_call.turn_created',
+        message: 'Agent call turn created',
+        traceId: params.conversationId,
+        metadata: { turnId },
+      });
+
+      // Append input as message
+      const userMessage = typeof params.input === 'string'
+        ? params.input
+        : JSON.stringify(params.input);
+      this.messages.append({
+        conversationId: params.conversationId,
+        turnId,
+        role: 'user',
+        content: userMessage,
+      });
+
+      // Get dispatch context (no streaming for agent calls - activeWebSocket is null)
+      const ctx = this.getDispatchContext();
+
+      // Dispatch context assembly workflow
+      await dispatchContextAssembly(turnId, userMessage, this.defs, ctx);
+
+      this.logger.info({
+        eventType: 'conversation.agent_call.context_assembly_dispatched',
+        message: 'Context assembly dispatched for agent call',
+        traceId: params.conversationId,
+        metadata: { turnId },
+      });
+
+      return { turnId };
+    } catch (error) {
+      this.logger.error({
+        eventType: 'conversation.agent_call.failed',
+        message: 'Failed to start agent call',
+        traceId: params.conversationId,
+        metadata: {
+          error: error instanceof Error ? error.message : String(error),
+        },
+      });
+      throw error;
+    }
+  }
+
+  /**
    * Handle task result from Executor.
    *
    * Called when a task dispatched by a tool completes.
@@ -502,6 +651,86 @@ export class Conversation extends DurableObject {
         },
       });
       throw error;
+    }
+  }
+
+  /**
+   * Handle task error from Executor.
+   *
+   * Called when a task dispatched by a tool fails.
+   */
+  async handleTaskError(turnId: string, toolCallId: string, error: string): Promise<void> {
+    try {
+      const turn = this.turns.get(turnId);
+      if (!turn) {
+        this.logger.warn({
+          eventType: 'conversation.task_error.turn_not_found',
+          message: 'Turn not found for task error',
+          metadata: { turnId, toolCallId },
+        });
+        return;
+      }
+
+      this.logger.info({
+        eventType: 'conversation.task_error.received',
+        message: 'Received task error',
+        traceId: turn.conversationId,
+        metadata: { turnId, toolCallId, error },
+      });
+
+      // Record the tool result as failure
+      const result: ToolResult = {
+        toolCallId,
+        success: false,
+        error: {
+          code: 'EXECUTION_FAILED',
+          message: error,
+          retriable: false,
+        },
+      };
+      this.moves.recordResult(turnId, toolCallId, result);
+
+      // Mark async operation as failed
+      this.asyncOps.fail(toolCallId, result.error);
+
+      // Check if this was a sync tool we were waiting for
+      const wasWaiting = this.asyncOps.hasWaiting(turnId);
+
+      // Get dispatch context
+      const ctx = this.getDispatchContext();
+
+      if (wasWaiting) {
+        // Resume from sync tool - continue LLM loop with error result
+        const continuationRequest = this.buildContinuationRequest(turnId, toolCallId, result);
+
+        const loopResult = await runLLMLoop({
+          turnId,
+          llmRequest: continuationRequest,
+          defs: this.defs,
+          ctx,
+        });
+
+        await this.maybeCompleteTurn(turnId, loopResult, ctx);
+      } else {
+        // Async tool failed - check if turn can complete now
+        const loopResult: RunLLMLoopResult = {
+          waitingForSync: false,
+          pendingAsyncOps: this.asyncOps.getPendingCount(turnId),
+        };
+        await this.maybeCompleteTurn(turnId, loopResult, ctx);
+      }
+    } catch (err) {
+      this.logger.error({
+        eventType: 'conversation.task_error.failed',
+        message: 'Failed to handle task error',
+        metadata: {
+          turnId,
+          toolCallId,
+          originalError: error,
+          handlerError: err instanceof Error ? err.message : String(err),
+        },
+      });
+      throw err;
     }
   }
 
@@ -740,6 +969,86 @@ export class Conversation extends DurableObject {
   }
 
   /**
+   * Handle agent error from another ConversationDO.
+   *
+   * Called when an agent invoked by a tool fails (delegate mode).
+   */
+  async handleAgentError(turnId: string, toolCallId: string, error: string): Promise<void> {
+    try {
+      const turn = this.turns.get(turnId);
+      if (!turn) {
+        this.logger.warn({
+          eventType: 'conversation.agent_error.turn_not_found',
+          message: 'Turn not found for agent error',
+          metadata: { turnId, toolCallId },
+        });
+        return;
+      }
+
+      this.logger.info({
+        eventType: 'conversation.agent_error.received',
+        message: 'Received agent error',
+        traceId: turn.conversationId,
+        metadata: { turnId, toolCallId, error },
+      });
+
+      // Record the tool result as failure
+      const result: ToolResult = {
+        toolCallId,
+        success: false,
+        error: {
+          code: 'AGENT_DECLINED',
+          message: error,
+          retriable: false,
+        },
+      };
+      this.moves.recordResult(turnId, toolCallId, result);
+
+      // Mark async operation as failed
+      this.asyncOps.fail(toolCallId, result.error);
+
+      // Check if this was a sync tool we were waiting for
+      const wasWaiting = this.asyncOps.hasWaiting(turnId);
+
+      // Get dispatch context
+      const ctx = this.getDispatchContext();
+
+      if (wasWaiting) {
+        // Resume from sync tool - continue LLM loop with error result
+        const continuationRequest = this.buildContinuationRequest(turnId, toolCallId, result);
+
+        const loopResult = await runLLMLoop({
+          turnId,
+          llmRequest: continuationRequest,
+          defs: this.defs,
+          ctx,
+        });
+
+        await this.maybeCompleteTurn(turnId, loopResult, ctx);
+      } else {
+        // Async agent failed - check if turn can complete now
+        const loopResult: RunLLMLoopResult = {
+          waitingForSync: false,
+          pendingAsyncOps: this.asyncOps.getPendingCount(turnId),
+        };
+        await this.maybeCompleteTurn(turnId, loopResult, ctx);
+      }
+    } catch (err) {
+      this.logger.error({
+        eventType: 'conversation.agent_error.failed',
+        message: 'Failed to handle agent error',
+        metadata: {
+          turnId,
+          toolCallId,
+          originalError: error,
+          handlerError: err instanceof Error ? err.message : String(err),
+        },
+      });
+      throw err;
+    }
+  }
+
+  /**
    * Handle context assembly completion.
    *
    * Called when the context assembly workflow completes.
@@ -850,6 +1159,158 @@ export class Conversation extends DurableObject {
         },
       });
       throw error;
+    }
+  }
+
+  /**
+   * Handle memory extraction error.
+   *
+   * Called when the memory extraction workflow fails.
+   * The turn is already completed - this just marks the extraction failure.
+   */
+  async handleMemoryExtractionError(turnId: string, runId: string, error: string): Promise<void> {
+    try {
+      const turn = this.turns.get(turnId);
+      if (!turn) {
+        this.logger.warn({
+          eventType: 'conversation.memory_extraction_error.turn_not_found',
+          message: 'Turn not found for memory extraction error',
+          metadata: { turnId, runId },
+        });
+        return;
+      }
+
+      this.logger.warn({
+        eventType: 'conversation.memory_extraction_error.received',
+        message: 'Memory extraction failed',
+        traceId: turn.conversationId,
+        metadata: { turnId, runId, error },
+      });
+
+      // Mark the turn with memoryExtractionFailed flag
+      // The turn is already complete - this updates the issues metadata
+      this.turns.markMemoryExtractionFailed(turnId);
+    } catch (err) {
+      this.logger.error({
+        eventType: 'conversation.memory_extraction_error.failed',
+        message: 'Failed to handle memory extraction error',
+        metadata: {
+          turnId,
+          runId,
+          originalError: error,
+          handlerError: err instanceof Error ? err.message : String(err),
+        },
+      });
+      throw err;
+    }
+  }
+
+  /**
+   * Durable Object alarm handler for timeouts.
+   *
+   * Fires when the earliest pending async operation times out.
+   * Marks the operation as failed and either resumes the LLM loop
+   * (for sync operations) or checks turn completion (for async).
+   */
+  async alarm(): Promise<void> {
+    try {
+      const now = new Date();
+      const timedOutOps = this.asyncOps.getTimedOut(now);
+
+      this.logger.info({
+        eventType: 'conversation.alarm.triggered',
+        message: 'Alarm triggered for timeout check',
+        metadata: {
+          timedOutCount: timedOutOps.length,
+        },
+      });
+
+      for (const op of timedOutOps) {
+        this.logger.warn({
+          eventType: 'conversation.alarm.operation_timeout',
+          message: 'Async operation timed out',
+          traceId: op.turnId,
+          metadata: {
+            opId: op.id,
+            turnId: op.turnId,
+            targetType: op.targetType,
+            targetId: op.targetId,
+          },
+        });
+
+        // Record the timeout as a tool failure
+        const result: ToolResult = {
+          toolCallId: op.id,
+          success: false,
+          error: {
+            code: 'TIMEOUT',
+            message: `Operation timed out after waiting`,
+            retriable: true,
+          },
+        };
+        this.moves.recordResult(op.turnId, op.id, result);
+
+        // Mark async operation as failed
+        this.asyncOps.fail(op.id, result.error);
+
+        // Check if this was a waiting (sync) operation
+        const wasWaiting = op.status === 'waiting';
+
+        // Get dispatch context
+        const ctx = this.getDispatchContext();
+
+        if (wasWaiting) {
+          // Resume from sync tool - continue LLM loop with timeout error
+          const continuationRequest = this.buildContinuationRequest(op.turnId, op.id, result);
+
+          const loopResult = await runLLMLoop({
+            turnId: op.turnId,
+            llmRequest: continuationRequest,
+            defs: this.defs,
+            ctx,
+          });
+
+          await this.maybeCompleteTurn(op.turnId, loopResult, ctx);
+        } else {
+          // Async op timed out - check if turn can complete now
+          const loopResult: RunLLMLoopResult = {
+            waitingForSync: false,
+            pendingAsyncOps: this.asyncOps.getPendingCount(op.turnId),
+          };
+          await this.maybeCompleteTurn(op.turnId, loopResult, ctx);
+        }
+      }
+
+      // Schedule next alarm if there are more pending operations with timeouts
+      await this.scheduleNextAlarm();
+    } catch (error) {
+      this.logger.error({
+        eventType: 'conversation.alarm.failed',
+        message: 'Failed to handle alarm',
+        metadata: {
+          error: error instanceof Error ? error.message : String(error),
+        },
+      });
+      throw error;
+    }
+  }
+
+  /**
+   * Schedule the next alarm for the earliest pending timeout.
+   */
+  private async scheduleNextAlarm(): Promise<void> {
+    const earliestTimeout = this.asyncOps.getEarliestTimeout();
+
+    if (earliestTimeout) {
+      this.logger.info({
+        eventType: 'conversation.alarm.scheduled',
+        message: 'Scheduling next alarm',
+        metadata: {
+          timeoutAt: earliestTimeout.toISOString(),
+        },
+      });
+
+      await this.ctx.storage.setAlarm(earliestTimeout.getTime());
     }
   }
 }

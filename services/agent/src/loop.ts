@@ -20,7 +20,14 @@ import { callLLM, callLLMWithStreaming } from './llm';
 import type { DefinitionManager, ToolDefRow } from './operations/defs';
 import type { MoveRow } from './operations/moves';
 import { interpretResponse, resolveTools, type Tool } from './planning';
-import type { ContextAssemblyInput, LLMRequest, MoveSnapshot, TurnSnapshot } from './types';
+import type {
+  ActiveTurnInfo,
+  ContextAssemblyInput,
+  LLMRequest,
+  MoveSnapshot,
+  PendingOperationInfo,
+  TurnSnapshot,
+} from './types';
 
 // ============================================================================
 // Types
@@ -72,6 +79,23 @@ export async function dispatchContextAssembly(
   const recentTurnRows = ctx.turns.getRecent(ctx.conversationId, persona.recentTurnsLimit);
   const recentTurns = recentTurnRows.map((turn) => toTurnSnapshot(turn, ctx));
 
+  // Get active turns with pending operations (excluding current turn)
+  const activeTurnRows = ctx.turns.getActive(ctx.conversationId);
+  const activeTurns: ActiveTurnInfo[] = activeTurnRows
+    .filter((t) => t.id !== turnId) // Exclude current turn
+    .map((turn) => {
+      const pendingOps = ctx.asyncOps.getPending(turn.id);
+      return {
+        turnId: turn.id,
+        startedAt: turn.createdAt.toISOString(),
+        pendingOperations: pendingOps.map((op): PendingOperationInfo => ({
+          type: op.targetType,
+          targetId: op.targetId,
+          startedAt: op.createdAt.toISOString(),
+        })),
+      };
+    });
+
   // Build context assembly input
   const input: ContextAssemblyInput = {
     conversationId: ctx.conversationId,
@@ -79,6 +103,7 @@ export async function dispatchContextAssembly(
     recentTurns,
     modelProfileId: persona.modelProfileId,
     toolIds: persona.toolIds,
+    activeTurns: activeTurns.length > 0 ? activeTurns : undefined,
   };
 
   // Create workflow run in D1
@@ -124,6 +149,7 @@ export async function dispatchContextAssembly(
       workflowRunId,
       workflowId: persona.contextAssemblyWorkflowId,
       recentTurnsCount: recentTurns.length,
+      activeTurnsCount: activeTurns.length,
     },
   });
 }

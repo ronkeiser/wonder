@@ -147,6 +147,11 @@ function createDispatchDecision(
 ): AgentDecision {
   const input = applyInputMapping(toolCall.input, tool.inputMapping);
 
+  // Extract retry config if defined on tool
+  const retry = tool.retry
+    ? { maxAttempts: tool.retry.maxAttempts, backoffMs: tool.retry.backoffMs }
+    : undefined;
+
   switch (tool.targetType) {
     case 'task':
       return {
@@ -156,6 +161,7 @@ function createDispatchDecision(
         taskId: tool.targetId,
         input,
         rawContent,
+        retry,
       };
 
     case 'workflow':
@@ -167,6 +173,7 @@ function createDispatchDecision(
         input,
         async: tool.async ?? false,
         rawContent,
+        retry,
       };
 
     case 'agent':
@@ -179,6 +186,7 @@ function createDispatchDecision(
         mode: tool.invocationMode ?? 'delegate',
         async: tool.async ?? false,
         rawContent,
+        retry,
       };
   }
 }

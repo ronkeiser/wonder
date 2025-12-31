@@ -8,7 +8,7 @@
  */
 
 import type { Emitter } from '@wonder/events';
-import { and, count, eq } from 'drizzle-orm';
+import { and, count, eq, lt, isNotNull, asc } from 'drizzle-orm';
 import { ulid } from 'ulid';
 
 import { asyncOps } from '../schema';
@@ -18,11 +18,21 @@ import type { AgentDb } from './db';
 /** Async operation row type inferred from schema */
 export type AsyncOpRow = typeof asyncOps.$inferSelect;
 
+/** Retry configuration for async operations */
+export type RetryConfig = {
+  maxAttempts: number;
+  backoffMs: number;
+};
+
 /** Track async operation parameters */
 export type TrackAsyncOpParams = {
   turnId: string;
   targetType: AsyncOpTargetType;
   targetId: string;
+  /** Optional timeout timestamp (ms since epoch) */
+  timeoutAt?: number;
+  /** Optional retry configuration */
+  retry?: RetryConfig;
 };
 
 /**
@@ -56,6 +66,10 @@ export class AsyncOpManager {
         targetId: params.targetId,
         status: 'pending',
         createdAt: now,
+        timeoutAt: params.timeoutAt ? new Date(params.timeoutAt) : null,
+        attemptNumber: 1,
+        maxAttempts: params.retry?.maxAttempts ?? 1,
+        backoffMs: params.retry?.backoffMs ?? null,
       })
       .run();
 
@@ -66,6 +80,8 @@ export class AsyncOpManager {
         turnId: params.turnId,
         targetType: params.targetType,
         targetId: params.targetId,
+        timeoutAt: params.timeoutAt,
+        maxAttempts: params.retry?.maxAttempts ?? 1,
       },
     });
 
@@ -339,5 +355,130 @@ export class AsyncOpManager {
       .all();
 
     return (result[0]?.count ?? 0) > 0;
+  }
+
+  /**
+   * Get operations that have timed out.
+   *
+   * Returns pending/waiting operations where timeoutAt < now.
+   */
+  getTimedOut(now: Date): AsyncOpRow[] {
+    return this.db
+      .select()
+      .from(asyncOps)
+      .where(
+        and(
+          isNotNull(asyncOps.timeoutAt),
+          lt(asyncOps.timeoutAt, now),
+          // Only pending or waiting ops can timeout
+          // (completed/failed are already terminal)
+          eq(asyncOps.status, 'pending'),
+        ),
+      )
+      .all();
+  }
+
+  /**
+   * Get the earliest timeout timestamp across all pending operations.
+   *
+   * Used to schedule the next alarm.
+   * Returns null if no pending operations have timeouts.
+   */
+  getEarliestTimeout(): Date | null {
+    const result = this.db
+      .select({ timeoutAt: asyncOps.timeoutAt })
+      .from(asyncOps)
+      .where(
+        and(
+          isNotNull(asyncOps.timeoutAt),
+          eq(asyncOps.status, 'pending'),
+        ),
+      )
+      .orderBy(asc(asyncOps.timeoutAt))
+      .limit(1)
+      .all();
+
+    return result[0]?.timeoutAt ?? null;
+  }
+
+  /**
+   * Check if an operation can be retried.
+   *
+   * Returns true if:
+   * - Operation exists and is failed
+   * - attemptNumber < maxAttempts
+   * - Error was retriable (not a permanent failure)
+   */
+  canRetry(opId: string): boolean {
+    const op = this.get(opId);
+    if (!op) return false;
+    if (op.status !== 'failed') return false;
+
+    const attemptNumber = op.attemptNumber ?? 1;
+    const maxAttempts = op.maxAttempts ?? 1;
+
+    return attemptNumber < maxAttempts;
+  }
+
+  /**
+   * Prepare an operation for retry.
+   *
+   * - Increments attempt number
+   * - Resets status to pending
+   * - Calculates new timeout based on backoff
+   * - Stores last error for debugging
+   *
+   * Returns the new timeout timestamp for alarm scheduling,
+   * or null if the operation cannot be retried.
+   */
+  prepareRetry(opId: string, error: string): number | null {
+    const op = this.get(opId);
+    if (!op) return null;
+
+    const attemptNumber = op.attemptNumber ?? 1;
+    const maxAttempts = op.maxAttempts ?? 1;
+
+    if (attemptNumber >= maxAttempts) {
+      this.emitter.emitTrace({
+        type: 'operation.async.retry_exhausted',
+        payload: {
+          opId,
+          attemptNumber,
+          maxAttempts,
+        },
+      });
+      return null;
+    }
+
+    const newAttemptNumber = attemptNumber + 1;
+    const backoffMs = op.backoffMs ?? 1000;
+    const now = Date.now();
+    const newTimeoutAt = now + backoffMs;
+
+    this.db
+      .update(asyncOps)
+      .set({
+        status: 'pending',
+        attemptNumber: newAttemptNumber,
+        timeoutAt: new Date(newTimeoutAt),
+        lastError: error,
+        result: null,
+        completedAt: null,
+      })
+      .where(eq(asyncOps.id, opId))
+      .run();
+
+    this.emitter.emitTrace({
+      type: 'operation.async.retry_scheduled',
+      payload: {
+        opId,
+        turnId: op.turnId,
+        attemptNumber: newAttemptNumber,
+        maxAttempts,
+        retryAt: newTimeoutAt,
+      },
+    });
+
+    return newTimeoutAt;
   }
 }

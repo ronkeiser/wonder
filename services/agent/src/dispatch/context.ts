@@ -10,6 +10,7 @@ import type { Emitter } from '@wonder/events';
 import type { AsyncOpManager } from '../operations/async';
 import type { MessageManager } from '../operations/messages';
 import type { MoveManager } from '../operations/moves';
+import type { ParticipantManager } from '../operations/participants';
 import type { TurnManager } from '../operations/turns';
 
 /**
@@ -23,6 +24,7 @@ export type DispatchContext = {
   messages: MessageManager;
   moves: MoveManager;
   asyncOps: AsyncOpManager;
+  participants: ParticipantManager;
 
   // Event emission
   emitter: Emitter;
@@ -41,6 +43,9 @@ export type DispatchContext = {
 
   // Async primitives
   waitUntil: (promise: Promise<unknown>) => void;
+
+  // Alarm scheduling for timeouts
+  scheduleAlarm: (timeoutAt: number) => Promise<void>;
 
   // Streaming callback (set when WebSocket is connected)
   streamToken?: (token: string) => void;

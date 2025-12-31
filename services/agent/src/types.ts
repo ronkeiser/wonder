@@ -90,12 +90,28 @@ export type TurnError = {
 // Context Assembly Input
 // ============================================================================
 
+/** Information about a pending async operation */
+export type PendingOperationInfo = {
+  type: 'task' | 'workflow' | 'agent';
+  targetId: string;
+  startedAt: string;
+};
+
+/** Information about an active turn for context awareness */
+export type ActiveTurnInfo = {
+  turnId: string;
+  startedAt: string;
+  pendingOperations: PendingOperationInfo[];
+};
+
 export type ContextAssemblyInput = {
   conversationId: string;
   userMessage: string;
   recentTurns: TurnSnapshot[];
   modelProfileId: string;
   toolIds: string[];
+  /** Active turns with pending operations (for agent awareness of parallel work) */
+  activeTurns?: ActiveTurnInfo[];
 };
 
 export type TurnSnapshot = {
@@ -189,6 +205,8 @@ export type AgentDecision =
       input: unknown;
       /** Raw content blocks from LLM response (for tool continuation) */
       rawContent?: unknown[];
+      /** Retry configuration for infrastructure errors */
+      retry?: { maxAttempts: number; backoffMs: number };
     }
   | {
       type: 'DISPATCH_WORKFLOW';
@@ -199,6 +217,8 @@ export type AgentDecision =
       async: boolean;
       /** Raw content blocks from LLM response (for tool continuation) */
       rawContent?: unknown[];
+      /** Retry configuration for infrastructure errors */
+      retry?: { maxAttempts: number; backoffMs: number };
     }
   | {
       type: 'DISPATCH_AGENT';
@@ -210,6 +230,8 @@ export type AgentDecision =
       async: boolean;
       /** Raw content blocks from LLM response (for tool continuation) */
       rawContent?: unknown[];
+      /** Retry configuration for infrastructure errors */
+      retry?: { maxAttempts: number; backoffMs: number };
     }
 
   // Async tracking
@@ -259,4 +281,48 @@ export type AgentCallback = {
   turnId: string;
   /** The tool call ID to report result back to */
   toolCallId: string;
+};
+
+// ============================================================================
+// Workflow Callback Type (for workflow-initiated agent calls)
+// ============================================================================
+
+/**
+ * Callback metadata for workflow-initiated agent calls.
+ * Embedded in agent's input to enable callback to parent coordinator.
+ */
+export type WorkflowCallback = {
+  type: 'workflow';
+  /** The workflow run ID */
+  runId: string;
+  /** The node ID that invoked the agent */
+  nodeId: string;
+};
+
+// ============================================================================
+// Agent Call Params (for startAgentCall)
+// ============================================================================
+
+/**
+ * Parameters for workflow-initiated agent calls.
+ *
+ * Unlike startTurn (user-initiated via WebSocket), startAgentCall:
+ * - Doesn't stream to WebSocket
+ * - Callbacks to parent coordinator/agent when complete
+ * - May inherit branch context from parent workflow
+ */
+export type AgentCallParams = {
+  /** The conversation ID to use (or create) */
+  conversationId: string;
+  /** The input for this turn */
+  input: unknown;
+  /** Who initiated this call */
+  caller: Caller;
+  /** Optional callback for when turn completes */
+  callback?: WorkflowCallback | AgentCallback;
+  /** Optional branch context from parent workflow (for shell operations) */
+  branchContext?: {
+    repoId: string;
+    branch: string;
+  };
 };

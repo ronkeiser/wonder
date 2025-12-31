@@ -179,6 +179,28 @@ export const moves = sqliteTable(
 );
 
 /**
+ * Participants in a conversation.
+ *
+ * Tracks who has access to a conversation - users and agents.
+ * For loop-in mode, the target agent is added as a participant.
+ */
+export const participants = sqliteTable(
+  'participants',
+  {
+    id: text().primaryKey(),
+    conversationId: text().notNull(),
+    participantType: text().$type<'user' | 'agent'>().notNull(),
+    participantId: text().notNull(), // userId or agentId
+    addedAt: integer({ mode: 'timestamp_ms' }).notNull(),
+    addedByTurnId: text(), // Which turn added this participant (for loop-in tracking)
+  },
+  (table) => [
+    index('idx_participants_conversation').on(table.conversationId),
+    index('idx_participants_type').on(table.participantType),
+  ],
+);
+
+/**
  * Async operations pending on a turn.
  */
 export const asyncOps = sqliteTable(
@@ -192,9 +214,22 @@ export const asyncOps = sqliteTable(
     result: text({ mode: 'json' }),
     createdAt: integer({ mode: 'timestamp_ms' }).notNull(),
     completedAt: integer({ mode: 'timestamp_ms' }),
+    /** When this operation should timeout (for alarm scheduling) */
+    timeoutAt: integer({ mode: 'timestamp_ms' }),
+
+    // Retry tracking
+    /** Current attempt number (1-based) */
+    attemptNumber: integer().default(1),
+    /** Maximum attempts allowed */
+    maxAttempts: integer().default(1),
+    /** Backoff delay in ms between retries */
+    backoffMs: integer(),
+    /** Last error message (for retry debugging) */
+    lastError: text(),
   },
   (table) => [
     index('idx_async_ops_turn').on(table.turnId),
     index('idx_async_ops_status').on(table.status),
+    index('idx_async_ops_timeout').on(table.timeoutAt),
   ],
 );

@@ -12,6 +12,13 @@ import { ulid } from 'ulid';
 import type { AgentDecision } from '../types';
 import type { DispatchContext } from './context';
 
+// ============================================================================
+// Timeout Defaults (milliseconds)
+// ============================================================================
+
+/** Default timeout for tool dispatch (tasks, workflows, agents) */
+const DEFAULT_TOOL_TIMEOUT_MS = 120_000; // 2 minutes
+
 /**
  * Result of applying decisions.
  */
@@ -194,7 +201,7 @@ function dispatchTask(
   decision: Extract<AgentDecision, { type: 'DISPATCH_TASK' }>,
   ctx: DispatchContext,
 ): void {
-  const { turnId, toolCallId, taskId, input, rawContent } = decision;
+  const { turnId, toolCallId, taskId, input, rawContent, retry } = decision;
 
   // Record move for this tool call
   ctx.moves.record({
@@ -207,12 +214,18 @@ function dispatchTask(
     rawContent,
   });
 
-  // Track as async operation
+  // Track as async operation with timeout and retry config
+  const timeoutAt = Date.now() + DEFAULT_TOOL_TIMEOUT_MS;
   ctx.asyncOps.track({
     turnId,
     targetType: 'task',
     targetId: toolCallId,
+    timeoutAt,
+    retry,
   });
+
+  // Schedule alarm for timeout
+  ctx.waitUntil(ctx.scheduleAlarm(timeoutAt));
 
   ctx.emitter.emitTrace({
     type: 'dispatch.task.queued',
@@ -249,7 +262,7 @@ async function dispatchWorkflow(
   decision: Extract<AgentDecision, { type: 'DISPATCH_WORKFLOW' }>,
   ctx: DispatchContext,
 ): Promise<void> {
-  const { turnId, toolCallId, workflowId, input, async: isAsync, rawContent } = decision;
+  const { turnId, toolCallId, workflowId, input, async: isAsync, rawContent, retry } = decision;
 
   // Record move for this tool call
   ctx.moves.record({
@@ -262,12 +275,18 @@ async function dispatchWorkflow(
     rawContent,
   });
 
-  // Track as async operation
+  // Track as async operation with timeout and retry config
+  const timeoutAt = Date.now() + DEFAULT_TOOL_TIMEOUT_MS;
   ctx.asyncOps.track({
     turnId,
     targetType: 'workflow',
     targetId: toolCallId,
+    timeoutAt,
+    retry,
   });
+
+  // Schedule alarm for timeout
+  ctx.waitUntil(ctx.scheduleAlarm(timeoutAt));
 
   ctx.emitter.emitTrace({
     type: 'dispatch.workflow.queued',
@@ -311,7 +330,7 @@ function dispatchAgent(
   decision: Extract<AgentDecision, { type: 'DISPATCH_AGENT' }>,
   ctx: DispatchContext,
 ): void {
-  const { turnId, toolCallId, agentId, input, mode, async: isAsync, rawContent } = decision;
+  const { turnId, toolCallId, agentId, input, mode, async: isAsync, rawContent, retry } = decision;
 
   // Record move for this tool call
   ctx.moves.record({
@@ -324,51 +343,85 @@ function dispatchAgent(
     rawContent,
   });
 
-  // Track as async operation
+  // Track as async operation with timeout and retry config
+  const timeoutAt = Date.now() + DEFAULT_TOOL_TIMEOUT_MS;
   ctx.asyncOps.track({
     turnId,
     targetType: 'agent',
     targetId: toolCallId,
+    timeoutAt,
+    retry,
   });
+
+  // Schedule alarm for timeout
+  ctx.waitUntil(ctx.scheduleAlarm(timeoutAt));
 
   ctx.emitter.emitTrace({
     type: 'dispatch.agent.queued',
     payload: { turnId, toolCallId, agentId, mode, async: isAsync },
   });
 
-  // Get target agent's DO
-  // For delegate mode: use a new conversation ID
-  // For loop_in mode: use the same conversation ID (not supported yet)
-  const targetConversationId = mode === 'delegate' ? ulid() : ctx.conversationId;
-  const targetAgentId = ctx.agent.idFromName(targetConversationId);
-  const targetAgent = ctx.agent.get(targetAgentId);
+  if (mode === 'loop_in') {
+    // Loop-in mode: agent joins THIS conversation
+    // 1. Add agent as participant
+    ctx.participants.add({
+      conversationId: ctx.conversationId,
+      participant: { type: 'agent', agentId },
+      addedByTurnId: turnId,
+    });
 
-  // For delegate mode, embed callback metadata so target agent can report back
-  const targetInput = mode === 'delegate'
-    ? {
-        ...(input as Record<string, unknown>),
-        _agentCallback: {
-          conversationId: ctx.conversationId,
+    // 2. Use the SAME conversation ID - agent joins our conversation
+    const targetAgentId = ctx.agent.idFromName(ctx.conversationId);
+    const targetAgent = ctx.agent.get(targetAgentId);
+
+    // 3. No callback needed - responses are visible to all participants
+    // The input goes directly to the agent without callback metadata
+    ctx.waitUntil(
+      targetAgent
+        .startTurn(ctx.conversationId, input, {
+          type: 'agent',
+          agentId: ctx.conversationId,
           turnId,
-          toolCallId,
-        },
-      }
-    : input;
+        })
+        .catch((error: Error) => {
+          ctx.emitter.emitTrace({
+            type: 'dispatch.agent.error',
+            payload: { turnId, toolCallId, agentId, mode: 'loop_in', error: error.message },
+          });
+        }),
+    );
+  } else {
+    // Delegate mode: agent works in a separate conversation
+    // Create new conversation ID for the delegated agent
+    const targetConversationId = ulid();
+    const targetAgentId = ctx.agent.idFromName(targetConversationId);
+    const targetAgent = ctx.agent.get(targetAgentId);
 
-  ctx.waitUntil(
-    targetAgent
-      .startTurn(targetConversationId, targetInput, {
-        type: 'agent',
-        agentId: ctx.conversationId, // The calling agent's conversation ID
+    // Embed callback metadata so target agent can report back
+    const targetInput = {
+      ...(input as Record<string, unknown>),
+      _agentCallback: {
+        conversationId: ctx.conversationId,
         turnId,
-      })
-      .catch((error: Error) => {
-        ctx.emitter.emitTrace({
-          type: 'dispatch.agent.error',
-          payload: { turnId, toolCallId, agentId, error: error.message },
-        });
-      }),
-  );
+        toolCallId,
+      },
+    };
+
+    ctx.waitUntil(
+      targetAgent
+        .startTurn(targetConversationId, targetInput, {
+          type: 'agent',
+          agentId: ctx.conversationId, // The calling agent's conversation ID
+          turnId,
+        })
+        .catch((error: Error) => {
+          ctx.emitter.emitTrace({
+            type: 'dispatch.agent.error',
+            payload: { turnId, toolCallId, agentId, mode: 'delegate', error: error.message },
+          });
+        }),
+    );
+  }
 }
 
 /**

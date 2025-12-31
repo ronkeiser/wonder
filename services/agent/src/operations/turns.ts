@@ -285,6 +285,25 @@ export class TurnManager {
   }
 
   /**
+   * Mark memory extraction as failed for a turn.
+   *
+   * Called when the memory extraction workflow fails after turn completion.
+   * Updates the turn's memoryExtractionFailed flag.
+   */
+  markMemoryExtractionFailed(turnId: string): void {
+    this.db
+      .update(turns)
+      .set({ memoryExtractionFailed: true })
+      .where(eq(turns.id, turnId))
+      .run();
+
+    this.emitter.emitTrace({
+      type: 'operation.turns.memory_extraction_failed',
+      payload: { turnId },
+    });
+  }
+
+  /**
    * Reconstruct caller from flattened fields.
    */
   reconstructCaller(turn: TurnRow): Caller {

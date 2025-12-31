@@ -409,6 +409,46 @@ export class WorkflowCoordinator extends DurableObject {
   }
 
   /**
+   * Handle agent result.
+   * Called by ConversationDO when a workflow-invoked agent completes.
+   *
+   * TODO: Full implementation requires:
+   * - 'waiting_for_agent' token status
+   * - 'RESUME_FROM_AGENT' decision type
+   * - Token tracking for agent dispatch
+   */
+  async handleAgentResult(nodeId: string, output: { response: string }): Promise<void> {
+    this.logger.info({
+      eventType: 'coordinator.agent_result.received',
+      message: 'Received agent result',
+      metadata: { nodeId, hasResponse: !!output.response },
+    });
+
+    // TODO: Implement full agent result handling
+    // For now, log and acknowledge - full implementation needs token tracking
+  }
+
+  /**
+   * Handle agent error.
+   * Called by ConversationDO when a workflow-invoked agent fails.
+   *
+   * TODO: Full implementation requires:
+   * - 'waiting_for_agent' token status
+   * - 'FAIL_FROM_AGENT' decision type
+   * - Token tracking for agent dispatch
+   */
+  async handleAgentError(nodeId: string, error: string): Promise<void> {
+    this.logger.warn({
+      eventType: 'coordinator.agent_error.received',
+      message: 'Received agent error',
+      metadata: { nodeId, error },
+    });
+
+    // TODO: Implement full agent error handling
+    // For now, log and acknowledge - full implementation needs token tracking
+  }
+
+  /**
    * Handle subworkflow failure.
    * Called by subworkflow coordinator when it fails.
    */
