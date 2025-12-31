@@ -637,6 +637,146 @@ export const secrets = sqliteTable(
   (table) => [unique('unique_secrets_workspace_key').on(table.workspaceId, table.key)],
 );
 
+/** Agent Primitives */
+
+/**
+ * Persona: Shareable identity, behavior, and tool configuration.
+ * Versioned, lives in libraries.
+ * @see docs/architecture/agent.md
+ */
+export const personas = sqliteTable(
+  'personas',
+  {
+    id: text().notNull(),
+    version: integer().notNull().default(1),
+    name: text().notNull(),
+    description: text().notNull().default(''),
+
+    // Ownership (exactly one)
+    libraryId: text().references(() => libraries.id),
+
+    // Identity
+    systemPrompt: text().notNull(),
+    modelProfileId: text()
+      .notNull()
+      .references(() => modelProfiles.id),
+
+    // Memory configuration
+    contextAssemblyWorkflowId: text().notNull(),
+    memoryExtractionWorkflowId: text().notNull(),
+    recentTurnsLimit: integer().notNull().default(20),
+
+    // Tools
+    toolIds: text({ mode: 'json' }).$type<string[]>().notNull(),
+    constraints: text({ mode: 'json' }).$type<{
+      maxMovesPerTurn?: number;
+    }>(),
+
+    contentHash: text(),
+
+    createdAt: text().notNull(),
+    updatedAt: text().notNull(),
+  },
+  (table) => [
+    primaryKey({ columns: [table.id, table.version] }),
+    index('idx_personas_library').on(table.libraryId),
+    index('idx_personas_name_version').on(table.name, table.libraryId, table.version),
+    index('idx_personas_content_hash').on(table.name, table.libraryId, table.contentHash),
+  ],
+);
+
+/**
+ * Tool: LLM-facing interface to execution primitives.
+ * Lives in libraries alongside Workflows, Tasks, and Personas.
+ * @see docs/architecture/agent.md
+ */
+export const tools = sqliteTable(
+  'tools',
+  {
+    id: text().primaryKey(),
+    name: text().notNull(),
+    description: text().notNull(),
+
+    // Ownership (exactly one)
+    libraryId: text().references(() => libraries.id),
+
+    // Schema for LLM
+    inputSchema: text({ mode: 'json' }).$type<object>().notNull(),
+
+    // Execution target
+    targetType: text({ enum: ['task', 'workflow', 'agent'] }).notNull(),
+    targetId: text().notNull(),
+
+    // Execution options
+    async: integer({ mode: 'boolean' }).notNull().default(false),
+    invocationMode: text({ enum: ['delegate', 'loop_in'] }), // Only for agent targets
+    inputMapping: text({ mode: 'json' }).$type<Record<string, string>>(),
+
+    // Retry configuration
+    retry: text({ mode: 'json' }).$type<{
+      maxAttempts: number;
+      backoffMs: number;
+      timeoutMs: number;
+    }>(),
+
+    createdAt: text().notNull(),
+    updatedAt: text().notNull(),
+  },
+  (table) => [
+    index('idx_tools_library').on(table.libraryId),
+    index('idx_tools_name').on(table.name, table.libraryId),
+    index('idx_tools_target').on(table.targetType, table.targetId),
+  ],
+);
+
+/**
+ * Agent: Persona + memory, scoped to projects.
+ * The living instance that accumulates knowledge across conversations.
+ * @see docs/architecture/agent.md
+ */
+export const agents = sqliteTable(
+  'agents',
+  {
+    id: text().primaryKey(),
+
+    // Project scope (one or more)
+    projectIds: text({ mode: 'json' }).$type<string[]>().notNull(),
+
+    // Persona reference (either inline or library reference)
+    personaId: text(),
+    personaVersion: integer(),
+
+    // Memory corpus is stored separately (D1 + Vectorize + R2), keyed by agent_id
+
+    createdAt: text().notNull(),
+    updatedAt: text().notNull(),
+  },
+  (table) => [index('idx_agents_persona').on(table.personaId, table.personaVersion)],
+);
+
+/**
+ * Conversation: A session with an agent.
+ * Multi-party collaboration space with participants, messages, and turns.
+ * @see docs/architecture/agent.md
+ */
+export const conversations = sqliteTable(
+  'conversations',
+  {
+    id: text().primaryKey(),
+
+    // Participants (users and agents)
+    participants: text({ mode: 'json' })
+      .$type<Array<{ type: 'user'; userId: string } | { type: 'agent'; agentId: string }>>()
+      .notNull(),
+
+    status: text({ enum: ['active', 'waiting', 'completed', 'failed'] }).notNull(),
+
+    createdAt: text().notNull(),
+    updatedAt: text().notNull(),
+  },
+  (table) => [index('idx_conversations_status').on(table.status)],
+);
+
 // Legacy snake_case exports for backward compatibility during migration
 // TODO: Remove these after all consumers are updated
 export {
