@@ -130,17 +130,35 @@ export class Conversation extends DurableObject {
    * Handle HTTP requests to the Conversation DO.
    *
    * Supports WebSocket upgrade for real-time LLM token streaming.
+   * Clients connect to `/conversations/:id` and upgrade to WebSocket.
    */
   async fetch(request: Request): Promise<Response> {
+    const url = new URL(request.url);
+
     // WebSocket upgrade for streaming
     if (request.headers.get('Upgrade') === 'websocket') {
+      // Extract conversation ID from path: /conversations/:id
+      const pathMatch = url.pathname.match(/^\/conversations\/([^/]+)$/);
+      const conversationId = pathMatch?.[1];
+
+      if (!conversationId) {
+        return new Response('Invalid path. Expected /conversations/:id', { status: 400 });
+      }
+
       const pair = new WebSocketPair();
       const [client, server] = Object.values(pair);
 
       server.accept();
-      this.handleWebSocket(server);
+      this.handleWebSocket(server, conversationId);
 
       return new Response(null, { status: 101, webSocket: client });
+    }
+
+    // Health check endpoint
+    if (url.pathname === '/health') {
+      return new Response(JSON.stringify({ status: 'ok' }), {
+        headers: { 'Content-Type': 'application/json' },
+      });
     }
 
     return new Response('Not found', { status: 404 });
@@ -148,28 +166,76 @@ export class Conversation extends DurableObject {
 
   /**
    * Handle WebSocket connection for streaming.
+   *
+   * Protocol:
+   * - Client sends: { type: 'message', content: string }
+   * - Server sends:
+   *   - { type: 'turn_started', turnId: string }
+   *   - { type: 'token', token: string } (streaming)
+   *   - { type: 'message_complete', turnId: string }
+   *   - { type: 'tool_started', turnId: string, toolCallId: string, toolId: string }
+   *   - { type: 'tool_result', turnId: string, toolCallId: string, success: boolean, result?: unknown }
+   *   - { type: 'turn_complete', turnId: string }
+   *   - { type: 'error', message: string, code?: string }
    */
-  private handleWebSocket(ws: WebSocket): void {
+  private handleWebSocket(ws: WebSocket, conversationId: string): void {
     this.activeWebSocket = ws;
+
+    // Send connection established message
+    this.sendWebSocketMessage({ type: 'connected', conversationId });
 
     ws.addEventListener('message', async (event) => {
       try {
         const data = JSON.parse(event.data as string) as {
           type: string;
-          conversationId?: string;
+          content?: string;
           input?: unknown;
-          caller?: Caller;
         };
 
-        if (data.type === 'start_turn' && data.conversationId && data.caller) {
-          const result = await this.startTurn(data.conversationId, data.input, data.caller);
-          ws.send(JSON.stringify({ type: 'turn_started', turnId: result.turnId }));
+        switch (data.type) {
+          case 'message': {
+            // User sends a message to start a new turn
+            if (!data.content) {
+              this.sendWebSocketMessage({
+                type: 'error',
+                message: 'Missing content field',
+                code: 'INVALID_MESSAGE',
+              });
+              return;
+            }
+
+            const result = await this.startTurn(conversationId, data.content, {
+              type: 'user',
+              userId: 'ws_user', // TODO: Extract from auth when implemented
+            });
+
+            this.sendWebSocketMessage({
+              type: 'turn_started',
+              turnId: result.turnId,
+            });
+            break;
+          }
+
+          case 'ping': {
+            // Keep-alive ping
+            this.sendWebSocketMessage({ type: 'pong' });
+            break;
+          }
+
+          default: {
+            this.sendWebSocketMessage({
+              type: 'error',
+              message: `Unknown message type: ${data.type}`,
+              code: 'UNKNOWN_MESSAGE_TYPE',
+            });
+          }
         }
       } catch (error) {
-        ws.send(JSON.stringify({
+        this.sendWebSocketMessage({
           type: 'error',
           message: error instanceof Error ? error.message : 'Unknown error',
-        }));
+          code: 'INTERNAL_ERROR',
+        });
       }
     });
 
@@ -179,6 +245,62 @@ export class Conversation extends DurableObject {
 
     ws.addEventListener('error', () => {
       this.activeWebSocket = null;
+    });
+  }
+
+  /**
+   * Send a message to the active WebSocket connection.
+   *
+   * Safely handles the case where the connection is closed or not available.
+   * This enables async interleaving - results from async operations can be
+   * sent to the client even during an active LLM stream.
+   */
+  private sendWebSocketMessage(message: {
+    type: string;
+    [key: string]: unknown;
+  }): void {
+    if (this.activeWebSocket?.readyState === WebSocket.OPEN) {
+      this.activeWebSocket.send(JSON.stringify(message));
+    }
+  }
+
+  /**
+   * Notify WebSocket client when a tool starts execution.
+   */
+  notifyToolStarted(turnId: string, toolCallId: string, toolId: string): void {
+    this.sendWebSocketMessage({
+      type: 'tool_started',
+      turnId,
+      toolCallId,
+      toolId,
+    });
+  }
+
+  /**
+   * Notify WebSocket client when a tool completes.
+   */
+  notifyToolResult(
+    turnId: string,
+    toolCallId: string,
+    success: boolean,
+    result?: unknown,
+  ): void {
+    this.sendWebSocketMessage({
+      type: 'tool_result',
+      turnId,
+      toolCallId,
+      success,
+      result,
+    });
+  }
+
+  /**
+   * Notify WebSocket client when a turn completes.
+   */
+  notifyTurnComplete(turnId: string): void {
+    this.sendWebSocketMessage({
+      type: 'turn_complete',
+      turnId,
     });
   }
 
@@ -240,6 +362,9 @@ export class Conversation extends DurableObject {
 
     // Mark turn complete with issues
     this.turns.complete(turnId, issues);
+
+    // Notify WebSocket client of turn completion
+    this.notifyTurnComplete(turnId);
 
     this.logger.info({
       eventType: 'conversation.turn.completed',
@@ -605,6 +730,9 @@ export class Conversation extends DurableObject {
       // Record the tool result
       this.moves.recordResult(turnId, toolCallId, result);
 
+      // Notify WebSocket client of tool result (async interleaving)
+      this.notifyToolResult(turnId, toolCallId, result.success, result.result);
+
       // Mark async operation as completed
       if (result.success) {
         this.asyncOps.complete(toolCallId, result.result);
@@ -690,6 +818,9 @@ export class Conversation extends DurableObject {
       };
       this.moves.recordResult(turnId, toolCallId, result);
 
+      // Notify WebSocket client of tool error (async interleaving)
+      this.notifyToolResult(turnId, toolCallId, false, result.error);
+
       // Mark async operation as failed
       this.asyncOps.fail(toolCallId, result.error);
 
@@ -770,6 +901,9 @@ export class Conversation extends DurableObject {
       };
       this.moves.recordResult(turnId, toolCallId, result);
 
+      // Notify WebSocket client of workflow result (async interleaving)
+      this.notifyToolResult(turnId, toolCallId, true, output);
+
       // Mark async operation as completed
       this.asyncOps.complete(toolCallId, output);
 
@@ -849,6 +983,9 @@ export class Conversation extends DurableObject {
       };
       this.moves.recordResult(turnId, toolCallId, result);
 
+      // Notify WebSocket client of workflow error (async interleaving)
+      this.notifyToolResult(turnId, toolCallId, false, result.error);
+
       // Mark async operation as failed
       this.asyncOps.fail(toolCallId, result.error);
 
@@ -924,6 +1061,9 @@ export class Conversation extends DurableObject {
         result: { response },
       };
       this.moves.recordResult(turnId, toolCallId, result);
+
+      // Notify WebSocket client of agent response (async interleaving)
+      this.notifyToolResult(turnId, toolCallId, true, { response });
 
       // Mark async operation as completed
       this.asyncOps.complete(toolCallId, { response });
@@ -1003,6 +1143,9 @@ export class Conversation extends DurableObject {
         },
       };
       this.moves.recordResult(turnId, toolCallId, result);
+
+      // Notify WebSocket client of agent error (async interleaving)
+      this.notifyToolResult(turnId, toolCallId, false, result.error);
 
       // Mark async operation as failed
       this.asyncOps.fail(toolCallId, result.error);
@@ -1226,15 +1369,48 @@ export class Conversation extends DurableObject {
       });
 
       for (const op of timedOutOps) {
+        // Check if this operation can be retried
+        const canRetry = this.asyncOps.canRetry(op.id);
+
+        if (canRetry) {
+          // Prepare for retry - this updates attempt number and schedules new timeout
+          const newTimeoutAt = this.asyncOps.prepareRetry(op.id, 'Operation timed out');
+
+          if (newTimeoutAt) {
+            this.logger.info({
+              eventType: 'conversation.alarm.operation_retry',
+              message: 'Retrying timed out operation',
+              traceId: op.turnId,
+              metadata: {
+                opId: op.id,
+                turnId: op.turnId,
+                targetType: op.targetType,
+                targetId: op.targetId,
+                attemptNumber: (op.attemptNumber ?? 1) + 1,
+                maxAttempts: op.maxAttempts ?? 1,
+                nextRetryAt: new Date(newTimeoutAt).toISOString(),
+              },
+            });
+
+            // Re-dispatch the operation based on type
+            const ctx = this.getDispatchContext();
+            await this.retryOperation(op, ctx);
+            continue;
+          }
+        }
+
+        // Cannot retry - fail the operation
         this.logger.warn({
           eventType: 'conversation.alarm.operation_timeout',
-          message: 'Async operation timed out',
+          message: 'Async operation timed out (no retries remaining)',
           traceId: op.turnId,
           metadata: {
             opId: op.id,
             turnId: op.turnId,
             targetType: op.targetType,
             targetId: op.targetId,
+            attemptNumber: op.attemptNumber ?? 1,
+            maxAttempts: op.maxAttempts ?? 1,
           },
         });
 
@@ -1244,8 +1420,8 @@ export class Conversation extends DurableObject {
           success: false,
           error: {
             code: 'TIMEOUT',
-            message: `Operation timed out after waiting`,
-            retriable: true,
+            message: `Operation timed out after ${op.attemptNumber ?? 1} attempt(s)`,
+            retriable: false,
           },
         };
         this.moves.recordResult(op.turnId, op.id, result);
@@ -1312,6 +1488,122 @@ export class Conversation extends DurableObject {
 
       await this.ctx.storage.setAlarm(earliestTimeout.getTime());
     }
+  }
+
+  /**
+   * Retry a failed operation.
+   *
+   * Re-dispatches the operation to the appropriate service (Executor, Coordinator, or Agent).
+   * The operation has already been prepared for retry by prepareRetry().
+   */
+  private async retryOperation(
+    op: ReturnType<AsyncOpManager['get']> & object,
+    ctx: DispatchContext,
+  ): Promise<void> {
+    // Get the original move to retrieve the tool input
+    const move = this.moves.getForTurn(op.turnId).find((m) => m.toolCallId === op.targetId);
+
+    if (!move) {
+      this.logger.warn({
+        eventType: 'conversation.retry.move_not_found',
+        message: 'Could not find original move for retry',
+        traceId: op.turnId,
+        metadata: { opId: op.id, targetId: op.targetId },
+      });
+      return;
+    }
+
+    const input = move.toolInput as Record<string, unknown>;
+
+    switch (op.targetType) {
+      case 'task': {
+        // Re-dispatch via Executor
+        ctx.waitUntil(
+          ctx.executor
+            .executeTaskForAgent({
+              toolCallId: op.targetId,
+              conversationId: ctx.conversationId,
+              turnId: op.turnId,
+              taskId: move.toolId!,
+              input,
+            })
+            .catch((error: Error) => {
+              this.emitter.emitTrace({
+                type: 'dispatch.task.retry_error',
+                payload: {
+                  turnId: op.turnId,
+                  toolCallId: op.targetId,
+                  taskId: move.toolId,
+                  attemptNumber: op.attemptNumber,
+                  error: error.message,
+                },
+              });
+            }),
+        );
+        break;
+      }
+
+      case 'workflow': {
+        // Re-start coordinator DO
+        const coordinatorId = ctx.coordinator.idFromName(op.targetId);
+        const coordinator = ctx.coordinator.get(coordinatorId);
+
+        ctx.waitUntil(
+          coordinator.start(op.targetId).catch((error: Error) => {
+            this.emitter.emitTrace({
+              type: 'dispatch.workflow.retry_error',
+              payload: {
+                turnId: op.turnId,
+                toolCallId: op.targetId,
+                workflowId: move.toolId,
+                attemptNumber: op.attemptNumber,
+                error: error.message,
+              },
+            });
+          }),
+        );
+        break;
+      }
+
+      case 'agent': {
+        // Re-dispatch to agent DO
+        const agentId = ctx.agent.idFromName(op.targetId);
+        const agent = ctx.agent.get(agentId);
+
+        ctx.waitUntil(
+          agent
+            .startTurn(op.targetId, input, {
+              type: 'agent',
+              agentId: ctx.conversationId,
+              turnId: op.turnId,
+            })
+            .catch((error: Error) => {
+              this.emitter.emitTrace({
+                type: 'dispatch.agent.retry_error',
+                payload: {
+                  turnId: op.turnId,
+                  toolCallId: op.targetId,
+                  agentId: move.toolId,
+                  attemptNumber: op.attemptNumber,
+                  error: error.message,
+                },
+              });
+            }),
+        );
+        break;
+      }
+    }
+
+    this.emitter.emitTrace({
+      type: 'dispatch.retry.dispatched',
+      payload: {
+        turnId: op.turnId,
+        opId: op.id,
+        targetType: op.targetType,
+        targetId: op.targetId,
+        attemptNumber: op.attemptNumber,
+      },
+    });
   }
 }
 
