@@ -1179,53 +1179,6 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
-    "/workflow-runs/{id}/stream": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        get: {
-            parameters: {
-                query?: never;
-                header?: never;
-                path: {
-                    id: string;
-                };
-                cookie?: never;
-            };
-            requestBody?: never;
-            responses: {
-                /** @description WebSocket connection established */
-                101: {
-                    headers: {
-                        [name: string]: unknown;
-                    };
-                    content?: never;
-                };
-                /** @description WebSocket upgrade required */
-                400: {
-                    headers: {
-                        [name: string]: unknown;
-                    };
-                    content: {
-                        "application/json": {
-                            error: string;
-                            receivedUpgrade?: string;
-                        };
-                    };
-                };
-            };
-        };
-        put?: never;
-        post?: never;
-        delete?: never;
-        options?: never;
-        head?: never;
-        patch?: never;
-        trace?: never;
-    };
     "/workflow-runs/{id}": {
         parameters: {
             query?: never;
@@ -1378,7 +1331,8 @@ export interface paths {
                     /** @description Execution type */
                     executionType?: "workflow" | "conversation";
                     type?: string;
-                    category?: "decision" | "operation" | "dispatch" | "sql";
+                    /** @description Event category filter */
+                    category?: string;
                     projectId?: string;
                     limit?: number;
                     minDurationMs?: number | null;
@@ -2249,8 +2203,8 @@ export interface components {
             timestamp: number;
             /** @description Event type following {category}.{domain}.{action} convention */
             type: string;
-            /** @enum {string} */
-            category: "decision" | "operation" | "dispatch" | "sql" | "debug";
+            /** @description Event category extracted from type prefix */
+            category: string;
             /** @description Outer execution boundary (conversationId or rootRunId) */
             streamId: string;
             /** @description Specific execution (workflowRunId, turnId, etc.) */

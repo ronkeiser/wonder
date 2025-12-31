@@ -241,8 +241,6 @@ export function createClient(baseClient: any) {
             const { data, error } = await baseClient.POST(`/workflow-runs/${id}/cancel`, { body });
             if (error) throw new ApiError(`POST /workflow-runs/${id}/cancel failed`, error);
             return data;
-          },
-          stream: {
           }
         }),
       {

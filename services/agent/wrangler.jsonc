@@ -20,7 +20,18 @@
     { "binding": "EXECUTOR", "service": "wonder-executor" }
   ],
 
-  "migrations": [{ "tag": "v1", "new_sqlite_classes": ["Conversation"] }],
+  "migrations": [
+    { "tag": "v1", "new_sqlite_classes": ["AgentDO"] },
+    { "tag": "v2", "renamed_classes": [{ "from": "AgentDO", "to": "Conversation" }] }
+  ],
+
+  "rules": [
+    {
+      "type": "Text",
+      "globs": ["**/*.sql"],
+      "fallthrough": true
+    }
+  ],
 
   "vars": {
     "SERVICE": "agent",
