@@ -2,6 +2,7 @@
  * Agent DO SQLite Schemas
  *
  * Tables for ConversationDO state management:
+ * - conversationMeta: Cached conversation metadata (single row)
  * - turns: Track agent work units
  * - messages: User and agent utterances
  * - moves: Iterations within a turn
@@ -10,10 +11,81 @@
 
 import { index, integer, sqliteTable, text } from 'drizzle-orm/sqlite-core';
 
-import type { AsyncOpStatus, AsyncOpTargetType, MessageRole, TurnStatus } from '../types';
+import type {
+  AsyncOpStatus,
+  AsyncOpTargetType,
+  ConversationStatus,
+  MessageRole,
+  Participant,
+  TurnStatus,
+} from '../types';
 
 // Re-export types for consumers
-export type { AsyncOpStatus, AsyncOpTargetType, MessageRole, TurnStatus } from '../types';
+export type {
+  AsyncOpStatus,
+  AsyncOpTargetType,
+  ConversationStatus,
+  MessageRole,
+  Participant,
+  TurnStatus,
+} from '../types';
+
+/**
+ * Conversation metadata cached in DO SQLite.
+ * Single row - loaded from D1 on first access, cached for DO lifetime.
+ */
+export const conversationMeta = sqliteTable('conversation_meta', {
+  id: text().primaryKey(),
+  agentId: text().notNull(),
+  participants: text({ mode: 'json' }).$type<Participant[]>().notNull(),
+  status: text().$type<ConversationStatus>().notNull(),
+  createdAt: integer({ mode: 'timestamp_ms' }).notNull(),
+  updatedAt: integer({ mode: 'timestamp_ms' }).notNull(),
+});
+
+/**
+ * Agent definition cached in DO SQLite.
+ * Single row - loaded from D1 on first access.
+ */
+export const agentDef = sqliteTable('agent_def', {
+  id: text().primaryKey(),
+  projectIds: text({ mode: 'json' }).$type<string[]>().notNull(),
+  personaId: text(),
+  personaVersion: integer(),
+});
+
+/**
+ * Persona definition cached in DO SQLite.
+ * Single row - loaded from D1 on first access.
+ */
+export const personaDef = sqliteTable('persona_def', {
+  id: text().notNull(),
+  version: integer().notNull(),
+  name: text().notNull(),
+  systemPrompt: text().notNull(),
+  modelProfileId: text().notNull(),
+  contextAssemblyWorkflowId: text().notNull(),
+  memoryExtractionWorkflowId: text().notNull(),
+  recentTurnsLimit: integer().notNull(),
+  toolIds: text({ mode: 'json' }).$type<string[]>().notNull(),
+  constraints: text({ mode: 'json' }).$type<{ maxMovesPerTurn?: number }>(),
+});
+
+/**
+ * Tool definitions cached in DO SQLite.
+ * Multiple rows - loaded from D1 based on persona.toolIds.
+ */
+export const toolDefs = sqliteTable('tool_defs', {
+  id: text().primaryKey(),
+  name: text().notNull(),
+  description: text().notNull(),
+  inputSchema: text({ mode: 'json' }).$type<object>().notNull(),
+  targetType: text().$type<'task' | 'workflow' | 'agent'>().notNull(),
+  targetId: text().notNull(),
+  async: integer({ mode: 'boolean' }).notNull(),
+  invocationMode: text().$type<'delegate' | 'loop_in'>(),
+  inputMapping: text({ mode: 'json' }).$type<Record<string, string>>(),
+});
 
 /**
  * Turns track one unit of agent work within a conversation.

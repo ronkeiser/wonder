@@ -20,6 +20,17 @@ export type TurnStatus = 'active' | 'completed' | 'failed';
 export type ConversationStatus = 'active' | 'waiting' | 'completed' | 'failed';
 
 // ============================================================================
+// Participant Types
+// ============================================================================
+
+/**
+ * Participant in a conversation - users or agents
+ */
+export type Participant =
+  | { type: 'user'; userId: string }
+  | { type: 'agent'; agentId: string };
+
+// ============================================================================
 // Caller Types
 // ============================================================================
 
