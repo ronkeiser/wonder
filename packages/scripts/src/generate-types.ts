@@ -143,15 +143,37 @@ function discoverPackages(): Map<string, PackageInfo> {
     const packagePath = join(PACKAGES_DIR, entry.name);
     const tsconfigPath = join(packagePath, 'tsconfig.json');
 
-    if (!existsSync(tsconfigPath)) {
-      console.warn(`⚠️  Skipping package ${entry.name}: no tsconfig.json found`);
-      continue;
-    }
+    if (existsSync(tsconfigPath)) {
+      // Standard package with tsconfig at top level
+      packages.set(entry.name, {
+        dirName: entry.name,
+        path: packagePath,
+      });
+    } else {
+      // Check for nested packages (e.g., wflow/core, wflow/cli, etc.)
+      const subEntries = readdirSync(packagePath, { withFileTypes: true });
+      let foundNested = false;
 
-    packages.set(entry.name, {
-      dirName: entry.name,
-      path: packagePath,
-    });
+      for (const subEntry of subEntries) {
+        if (!subEntry.isDirectory()) continue;
+
+        const subPackagePath = join(packagePath, subEntry.name);
+        const subTsconfigPath = join(subPackagePath, 'tsconfig.json');
+
+        if (existsSync(subTsconfigPath)) {
+          foundNested = true;
+          const nestedName = `${entry.name}/${subEntry.name}`;
+          packages.set(nestedName, {
+            dirName: nestedName,
+            path: subPackagePath,
+          });
+        }
+      }
+
+      if (!foundNested) {
+        console.warn(`⚠️  Skipping package ${entry.name}: no tsconfig.json found`);
+      }
+    }
   }
 
   return packages;
