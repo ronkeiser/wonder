@@ -9,13 +9,19 @@ import { auth } from './middleware/auth';
 import { errorLoggerMiddleware } from './middleware/error';
 import { loggerMiddleware } from './middleware/logger';
 import { actions } from './routes/actions/route';
+import { agents } from './routes/agents/route';
+import { artifactTypes } from './routes/artifact-types/route';
+import { conversations } from './routes/conversations/route';
 import { events } from './routes/events/route';
 import { logs } from './routes/logs/route';
+import { messages } from './routes/messages/route';
 import { modelProfiles } from './routes/model-profiles/route';
+import { personas } from './routes/personas/route';
 import { projects } from './routes/projects/route';
 import { promptSpecs } from './routes/prompt-specs/route';
 import { streams } from './routes/streams/route';
 import { tasks } from './routes/tasks/route';
+import { tools } from './routes/tools/route';
 import { workflowDefs } from './routes/workflow-defs/route';
 import { workflowRuns } from './routes/workflow-runs/route';
 import { workflows } from './routes/workflows/route';
@@ -53,18 +59,24 @@ app.use('/*', auth);
 
 // Mount resource routes
 const routes = app
-  .route('/workspaces', workspaces)
-  .route('/projects', projects)
   .route('/actions', actions)
-  .route('/prompt-specs', promptSpecs)
-  .route('/model-profiles', modelProfiles)
-  .route('/tasks', tasks)
-  .route('/workflow-defs', workflowDefs)
-  .route('/workflows', workflows)
-  .route('/workflow-runs', workflowRuns)
-  .route('/streams', streams)
+  .route('/agents', agents)
+  .route('/artifact-types', artifactTypes)
+  .route('/conversations', conversations)
   .route('/events', events)
-  .route('/logs', logs);
+  .route('/logs', logs)
+  .route('/messages', messages)
+  .route('/model-profiles', modelProfiles)
+  .route('/personas', personas)
+  .route('/projects', projects)
+  .route('/prompt-specs', promptSpecs)
+  .route('/streams', streams)
+  .route('/tasks', tasks)
+  .route('/tools', tools)
+  .route('/workflow-defs', workflowDefs)
+  .route('/workflow-runs', workflowRuns)
+  .route('/workflows', workflows)
+  .route('/workspaces', workspaces);
 
 // OpenAPI documentation
 routes.doc('/doc', {

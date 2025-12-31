@@ -5,288 +5,6 @@
 
 import type { JSONSchema } from "@wonder/schemas";
 export interface paths {
-    "/workspaces": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        get: {
-            parameters: {
-                query?: {
-                    limit?: number;
-                    offset?: number | null;
-                };
-                header?: never;
-                path?: never;
-                cookie?: never;
-            };
-            requestBody?: never;
-            responses: {
-                /** @description Workspaces retrieved successfully */
-                200: {
-                    headers: {
-                        [name: string]: unknown;
-                    };
-                    content: {
-                        "application/json": components["schemas"]["WorkspaceListResponse"];
-                    };
-                };
-            };
-        };
-        put?: never;
-        post: {
-            parameters: {
-                query?: never;
-                header?: never;
-                path?: never;
-                cookie?: never;
-            };
-            requestBody?: {
-                content: {
-                    "application/json": components["schemas"]["CreateWorkspace"];
-                };
-            };
-            responses: {
-                /** @description Workspace created successfully */
-                201: {
-                    headers: {
-                        [name: string]: unknown;
-                    };
-                    content: {
-                        "application/json": components["schemas"]["WorkspaceCreateResponse"];
-                    };
-                };
-            };
-        };
-        delete?: never;
-        options?: never;
-        head?: never;
-        patch?: never;
-        trace?: never;
-    };
-    "/workspaces/{id}": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        get: {
-            parameters: {
-                query?: never;
-                header?: never;
-                path: {
-                    id: string;
-                };
-                cookie?: never;
-            };
-            requestBody?: never;
-            responses: {
-                /** @description Workspace retrieved successfully */
-                200: {
-                    headers: {
-                        [name: string]: unknown;
-                    };
-                    content: {
-                        "application/json": components["schemas"]["WorkspaceGetResponse"];
-                    };
-                };
-            };
-        };
-        put?: never;
-        post?: never;
-        delete: {
-            parameters: {
-                query?: never;
-                header?: never;
-                path: {
-                    id: string;
-                };
-                cookie?: never;
-            };
-            requestBody?: never;
-            responses: {
-                /** @description Workspace deleted successfully */
-                200: {
-                    headers: {
-                        [name: string]: unknown;
-                    };
-                    content: {
-                        "application/json": {
-                            success: boolean;
-                        };
-                    };
-                };
-            };
-        };
-        options?: never;
-        head?: never;
-        patch: {
-            parameters: {
-                query?: never;
-                header?: never;
-                path: {
-                    id: string;
-                };
-                cookie?: never;
-            };
-            requestBody?: {
-                content: {
-                    "application/json": components["schemas"]["UpdateWorkspace"];
-                };
-            };
-            responses: {
-                /** @description Workspace updated successfully */
-                200: {
-                    headers: {
-                        [name: string]: unknown;
-                    };
-                    content: {
-                        "application/json": components["schemas"]["WorkspaceUpdateResponse"];
-                    };
-                };
-            };
-        };
-        trace?: never;
-    };
-    "/workspaces/{id}/projects": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        get: {
-            parameters: {
-                query?: never;
-                header?: never;
-                path: {
-                    id: string;
-                };
-                cookie?: never;
-            };
-            requestBody?: never;
-            responses: {
-                /** @description Projects retrieved successfully */
-                200: {
-                    headers: {
-                        [name: string]: unknown;
-                    };
-                    content: {
-                        "application/json": components["schemas"]["WorkspaceProjectsResponse"];
-                    };
-                };
-            };
-        };
-        put?: never;
-        post?: never;
-        delete?: never;
-        options?: never;
-        head?: never;
-        patch?: never;
-        trace?: never;
-    };
-    "/projects": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        get?: never;
-        put?: never;
-        post: {
-            parameters: {
-                query?: never;
-                header?: never;
-                path?: never;
-                cookie?: never;
-            };
-            requestBody?: {
-                content: {
-                    "application/json": components["schemas"]["CreateProject"];
-                };
-            };
-            responses: {
-                /** @description Project created successfully */
-                201: {
-                    headers: {
-                        [name: string]: unknown;
-                    };
-                    content: {
-                        "application/json": components["schemas"]["ProjectCreateResponse"];
-                    };
-                };
-            };
-        };
-        delete?: never;
-        options?: never;
-        head?: never;
-        patch?: never;
-        trace?: never;
-    };
-    "/projects/{id}": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        get: {
-            parameters: {
-                query?: never;
-                header?: never;
-                path: {
-                    id: string;
-                };
-                cookie?: never;
-            };
-            requestBody?: never;
-            responses: {
-                /** @description Project retrieved successfully */
-                200: {
-                    headers: {
-                        [name: string]: unknown;
-                    };
-                    content: {
-                        "application/json": components["schemas"]["ProjectGetResponse"];
-                    };
-                };
-            };
-        };
-        put?: never;
-        post?: never;
-        delete: {
-            parameters: {
-                query?: never;
-                header?: never;
-                path: {
-                    id: string;
-                };
-                cookie?: never;
-            };
-            requestBody?: never;
-            responses: {
-                /** @description Project deleted successfully */
-                200: {
-                    headers: {
-                        [name: string]: unknown;
-                    };
-                    content: {
-                        "application/json": {
-                            success: boolean;
-                        };
-                    };
-                };
-            };
-        };
-        options?: never;
-        head?: never;
-        patch?: never;
-        trace?: never;
-    };
     "/actions": {
         parameters: {
             query?: never;
@@ -386,14 +104,35 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
-    "/prompt-specs": {
+    "/agents": {
         parameters: {
             query?: never;
             header?: never;
             path?: never;
             cookie?: never;
         };
-        get?: never;
+        get: {
+            parameters: {
+                query?: {
+                    limit?: number;
+                };
+                header?: never;
+                path?: never;
+                cookie?: never;
+            };
+            requestBody?: never;
+            responses: {
+                /** @description Agents retrieved successfully */
+                200: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["AgentListResponse"];
+                    };
+                };
+            };
+        };
         put?: never;
         post: {
             parameters: {
@@ -404,17 +143,17 @@ export interface paths {
             };
             requestBody?: {
                 content: {
-                    "application/json": components["schemas"]["CreatePromptSpec"];
+                    "application/json": components["schemas"]["CreateAgent"];
                 };
             };
             responses: {
-                /** @description Prompt spec created successfully */
+                /** @description Agent created successfully */
                 201: {
                     headers: {
                         [name: string]: unknown;
                     };
                     content: {
-                        "application/json": components["schemas"]["PromptSpecCreateResponse"];
+                        "application/json": components["schemas"]["AgentCreateResponse"];
                     };
                 };
             };
@@ -425,7 +164,7 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
-    "/prompt-specs/{id}": {
+    "/agents/{id}": {
         parameters: {
             query?: never;
             header?: never;
@@ -443,13 +182,13 @@ export interface paths {
             };
             requestBody?: never;
             responses: {
-                /** @description Prompt spec retrieved successfully */
+                /** @description Agent retrieved successfully */
                 200: {
                     headers: {
                         [name: string]: unknown;
                     };
                     content: {
-                        "application/json": components["schemas"]["PromptSpecGetResponse"];
+                        "application/json": components["schemas"]["AgentGetResponse"];
                     };
                 };
             };
@@ -467,7 +206,687 @@ export interface paths {
             };
             requestBody?: never;
             responses: {
-                /** @description Prompt spec deleted successfully */
+                /** @description Agent deleted successfully */
+                200: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": {
+                            success: boolean;
+                        };
+                    };
+                };
+            };
+        };
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/artifact-types": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: {
+            parameters: {
+                query?: {
+                    limit?: number;
+                };
+                header?: never;
+                path?: never;
+                cookie?: never;
+            };
+            requestBody?: never;
+            responses: {
+                /** @description Artifact types retrieved successfully */
+                200: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["ArtifactTypeListResponse"];
+                    };
+                };
+            };
+        };
+        put?: never;
+        post: {
+            parameters: {
+                query?: never;
+                header?: never;
+                path?: never;
+                cookie?: never;
+            };
+            requestBody?: {
+                content: {
+                    "application/json": components["schemas"]["CreateArtifactType"];
+                };
+            };
+            responses: {
+                /** @description Artifact type created successfully */
+                201: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["ArtifactTypeCreateResponse"];
+                    };
+                };
+            };
+        };
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/artifact-types/{id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: {
+            parameters: {
+                query?: never;
+                header?: never;
+                path: {
+                    id: string;
+                };
+                cookie?: never;
+            };
+            requestBody?: never;
+            responses: {
+                /** @description Artifact type retrieved successfully (latest version) */
+                200: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["ArtifactTypeGetResponse"];
+                    };
+                };
+            };
+        };
+        put?: never;
+        post?: never;
+        delete: {
+            parameters: {
+                query?: never;
+                header?: never;
+                path: {
+                    id: string;
+                };
+                cookie?: never;
+            };
+            requestBody?: never;
+            responses: {
+                /** @description Artifact type deleted successfully (all versions) */
+                200: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": {
+                            success: boolean;
+                        };
+                    };
+                };
+            };
+        };
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/artifact-types/{id}/versions/{version}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: {
+            parameters: {
+                query?: never;
+                header?: never;
+                path: {
+                    id: string;
+                    version: number;
+                };
+                cookie?: never;
+            };
+            requestBody?: never;
+            responses: {
+                /** @description Artifact type version retrieved successfully */
+                200: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["ArtifactTypeGetResponse"];
+                    };
+                };
+            };
+        };
+        put?: never;
+        post?: never;
+        delete: {
+            parameters: {
+                query?: never;
+                header?: never;
+                path: {
+                    id: string;
+                    version: number;
+                };
+                cookie?: never;
+            };
+            requestBody?: never;
+            responses: {
+                /** @description Artifact type version deleted successfully */
+                200: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": {
+                            success: boolean;
+                        };
+                    };
+                };
+            };
+        };
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/conversations": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: {
+            parameters: {
+                query?: {
+                    status?: "active" | "waiting" | "completed" | "failed";
+                    limit?: number;
+                };
+                header?: never;
+                path?: never;
+                cookie?: never;
+            };
+            requestBody?: never;
+            responses: {
+                /** @description Conversations retrieved successfully */
+                200: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["ConversationListResponse"];
+                    };
+                };
+            };
+        };
+        put?: never;
+        post: {
+            parameters: {
+                query?: never;
+                header?: never;
+                path?: never;
+                cookie?: never;
+            };
+            requestBody?: {
+                content: {
+                    "application/json": components["schemas"]["CreateConversation"];
+                };
+            };
+            responses: {
+                /** @description Conversation created successfully */
+                201: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["ConversationCreateResponse"];
+                    };
+                };
+            };
+        };
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/conversations/{id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: {
+            parameters: {
+                query?: never;
+                header?: never;
+                path: {
+                    id: string;
+                };
+                cookie?: never;
+            };
+            requestBody?: never;
+            responses: {
+                /** @description Conversation retrieved successfully */
+                200: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["ConversationGetResponse"];
+                    };
+                };
+            };
+        };
+        put?: never;
+        post?: never;
+        delete: {
+            parameters: {
+                query?: never;
+                header?: never;
+                path: {
+                    id: string;
+                };
+                cookie?: never;
+            };
+            requestBody?: never;
+            responses: {
+                /** @description Conversation deleted successfully */
+                200: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": {
+                            success: boolean;
+                        };
+                    };
+                };
+            };
+        };
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/conversations/{id}/status": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch: {
+            parameters: {
+                query?: never;
+                header?: never;
+                path: {
+                    id: string;
+                };
+                cookie?: never;
+            };
+            requestBody?: {
+                content: {
+                    "application/json": components["schemas"]["UpdateConversationStatus"];
+                };
+            };
+            responses: {
+                /** @description Conversation status updated successfully */
+                200: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["ConversationGetResponse"];
+                    };
+                };
+            };
+        };
+        trace?: never;
+    };
+    "/conversations/{conversationId}/messages": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: {
+            parameters: {
+                query?: {
+                    limit?: number;
+                };
+                header?: never;
+                path: {
+                    conversationId: string;
+                };
+                cookie?: never;
+            };
+            requestBody?: never;
+            responses: {
+                /** @description Messages retrieved successfully */
+                200: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["MessageListResponse"];
+                    };
+                };
+            };
+        };
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/conversations/{conversationId}/turns/{turnId}/messages": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: {
+            parameters: {
+                query?: never;
+                header?: never;
+                path: {
+                    conversationId: string;
+                    turnId: string;
+                };
+                cookie?: never;
+            };
+            requestBody?: never;
+            responses: {
+                /** @description Messages for turn retrieved successfully */
+                200: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["MessageListResponse"];
+                    };
+                };
+            };
+        };
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/events": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Get execution events */
+        get: {
+            parameters: {
+                query?: {
+                    /** @description Outer execution boundary (conversationId or rootRunId) */
+                    streamId?: string;
+                    /** @description Specific execution (workflowRunId, turnId, etc.) */
+                    executionId?: string;
+                    /** @description Execution type */
+                    executionType?: "workflow" | "conversation";
+                    projectId?: string;
+                    eventType?: string;
+                    limit?: number;
+                    afterSequence?: number | null;
+                };
+                header?: never;
+                path?: never;
+                cookie?: never;
+            };
+            requestBody?: never;
+            responses: {
+                /** @description Execution events retrieved successfully */
+                200: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["EventsResponse"];
+                    };
+                };
+            };
+        };
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/events/trace": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Get trace events */
+        get: {
+            parameters: {
+                query?: {
+                    /** @description Outer execution boundary (conversationId or rootRunId) */
+                    streamId?: string;
+                    /** @description Specific execution (workflowRunId, turnId, etc.) */
+                    executionId?: string;
+                    /** @description Execution type */
+                    executionType?: "workflow" | "conversation";
+                    type?: string;
+                    /** @description Event category filter */
+                    category?: string;
+                    projectId?: string;
+                    limit?: number;
+                    minDurationMs?: number | null;
+                };
+                header?: never;
+                path?: never;
+                cookie?: never;
+            };
+            requestBody?: never;
+            responses: {
+                /** @description Trace events retrieved successfully */
+                200: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["TraceEventsResponse"];
+                    };
+                };
+            };
+        };
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/logs": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: {
+            parameters: {
+                query?: {
+                    service?: string;
+                    level?: "error" | "warn" | "info" | "debug" | "fatal";
+                    eventType?: string;
+                    traceId?: string;
+                    requestId?: string;
+                    workspaceId?: string;
+                    projectId?: string;
+                    userId?: string;
+                    limit?: number;
+                };
+                header?: never;
+                path?: never;
+                cookie?: never;
+            };
+            requestBody?: never;
+            responses: {
+                /** @description Logs retrieved successfully */
+                200: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": {
+                            logs: {
+                                id: string;
+                                timestamp: number;
+                                level: string;
+                                service: string;
+                                environment: string;
+                                eventType: string | null;
+                                message: string | null;
+                                sourceLocation: string | null;
+                                traceId: string | null;
+                                requestId: string | null;
+                                workspaceId: string | null;
+                                projectId: string | null;
+                                userId: string | null;
+                                version: string | null;
+                                instanceId: string | null;
+                                metadata: string;
+                            }[];
+                        };
+                    };
+                };
+            };
+        };
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/messages": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post: {
+            parameters: {
+                query?: never;
+                header?: never;
+                path?: never;
+                cookie?: never;
+            };
+            requestBody?: {
+                content: {
+                    "application/json": components["schemas"]["CreateMessage"];
+                };
+            };
+            responses: {
+                /** @description Message created successfully */
+                201: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["MessageCreateResponse"];
+                    };
+                };
+            };
+        };
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/messages/{id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: {
+            parameters: {
+                query?: never;
+                header?: never;
+                path: {
+                    id: string;
+                };
+                cookie?: never;
+            };
+            requestBody?: never;
+            responses: {
+                /** @description Message retrieved successfully */
+                200: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["MessageGetResponse"];
+                    };
+                };
+            };
+        };
+        put?: never;
+        post?: never;
+        delete: {
+            parameters: {
+                query?: never;
+                header?: never;
+                path: {
+                    id: string;
+                };
+                cookie?: never;
+            };
+            requestBody?: never;
+            responses: {
+                /** @description Message deleted successfully */
                 200: {
                     headers: {
                         [name: string]: unknown;
@@ -590,6 +1009,387 @@ export interface paths {
             requestBody?: never;
             responses: {
                 /** @description Model profile deleted successfully */
+                200: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": {
+                            success: boolean;
+                        };
+                    };
+                };
+            };
+        };
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/personas": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: {
+            parameters: {
+                query?: {
+                    libraryId?: string;
+                    limit?: number;
+                };
+                header?: never;
+                path?: never;
+                cookie?: never;
+            };
+            requestBody?: never;
+            responses: {
+                /** @description Personas retrieved successfully */
+                200: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["PersonaListResponse"];
+                    };
+                };
+            };
+        };
+        put?: never;
+        post: {
+            parameters: {
+                query?: never;
+                header?: never;
+                path?: never;
+                cookie?: never;
+            };
+            requestBody?: {
+                content: {
+                    "application/json": components["schemas"]["CreatePersona"];
+                };
+            };
+            responses: {
+                /** @description Persona created successfully */
+                201: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["PersonaCreateResponse"];
+                    };
+                };
+            };
+        };
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/personas/{id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: {
+            parameters: {
+                query?: never;
+                header?: never;
+                path: {
+                    id: string;
+                };
+                cookie?: never;
+            };
+            requestBody?: never;
+            responses: {
+                /** @description Persona retrieved successfully (latest version) */
+                200: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["PersonaGetResponse"];
+                    };
+                };
+            };
+        };
+        put?: never;
+        post?: never;
+        delete: {
+            parameters: {
+                query?: never;
+                header?: never;
+                path: {
+                    id: string;
+                };
+                cookie?: never;
+            };
+            requestBody?: never;
+            responses: {
+                /** @description Persona deleted successfully (all versions) */
+                200: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": {
+                            success: boolean;
+                        };
+                    };
+                };
+            };
+        };
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/personas/{id}/versions/{version}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: {
+            parameters: {
+                query?: never;
+                header?: never;
+                path: {
+                    id: string;
+                    version: number;
+                };
+                cookie?: never;
+            };
+            requestBody?: never;
+            responses: {
+                /** @description Persona version retrieved successfully */
+                200: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["PersonaGetResponse"];
+                    };
+                };
+            };
+        };
+        put?: never;
+        post?: never;
+        delete: {
+            parameters: {
+                query?: never;
+                header?: never;
+                path: {
+                    id: string;
+                    version: number;
+                };
+                cookie?: never;
+            };
+            requestBody?: never;
+            responses: {
+                /** @description Persona version deleted successfully */
+                200: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": {
+                            success: boolean;
+                        };
+                    };
+                };
+            };
+        };
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/projects": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post: {
+            parameters: {
+                query?: never;
+                header?: never;
+                path?: never;
+                cookie?: never;
+            };
+            requestBody?: {
+                content: {
+                    "application/json": components["schemas"]["CreateProject"];
+                };
+            };
+            responses: {
+                /** @description Project created successfully */
+                201: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["ProjectCreateResponse"];
+                    };
+                };
+            };
+        };
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/projects/{id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: {
+            parameters: {
+                query?: never;
+                header?: never;
+                path: {
+                    id: string;
+                };
+                cookie?: never;
+            };
+            requestBody?: never;
+            responses: {
+                /** @description Project retrieved successfully */
+                200: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["ProjectGetResponse"];
+                    };
+                };
+            };
+        };
+        put?: never;
+        post?: never;
+        delete: {
+            parameters: {
+                query?: never;
+                header?: never;
+                path: {
+                    id: string;
+                };
+                cookie?: never;
+            };
+            requestBody?: never;
+            responses: {
+                /** @description Project deleted successfully */
+                200: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": {
+                            success: boolean;
+                        };
+                    };
+                };
+            };
+        };
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/prompt-specs": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post: {
+            parameters: {
+                query?: never;
+                header?: never;
+                path?: never;
+                cookie?: never;
+            };
+            requestBody?: {
+                content: {
+                    "application/json": components["schemas"]["CreatePromptSpec"];
+                };
+            };
+            responses: {
+                /** @description Prompt spec created successfully */
+                201: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["PromptSpecCreateResponse"];
+                    };
+                };
+            };
+        };
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/prompt-specs/{id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: {
+            parameters: {
+                query?: never;
+                header?: never;
+                path: {
+                    id: string;
+                };
+                cookie?: never;
+            };
+            requestBody?: never;
+            responses: {
+                /** @description Prompt spec retrieved successfully */
+                200: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["PromptSpecGetResponse"];
+                    };
+                };
+            };
+        };
+        put?: never;
+        post?: never;
+        delete: {
+            parameters: {
+                query?: never;
+                header?: never;
+                path: {
+                    id: string;
+                };
+                cookie?: never;
+            };
+            requestBody?: never;
+            responses: {
+                /** @description Prompt spec deleted successfully */
                 200: {
                     headers: {
                         [name: string]: unknown;
@@ -733,6 +1533,166 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/tools": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: {
+            parameters: {
+                query?: {
+                    libraryId?: string;
+                    limit?: number;
+                };
+                header?: never;
+                path?: never;
+                cookie?: never;
+            };
+            requestBody?: never;
+            responses: {
+                /** @description Tools retrieved successfully */
+                200: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["ToolListResponse"];
+                    };
+                };
+            };
+        };
+        put?: never;
+        post: {
+            parameters: {
+                query?: never;
+                header?: never;
+                path?: never;
+                cookie?: never;
+            };
+            requestBody?: {
+                content: {
+                    "application/json": components["schemas"]["CreateTool"];
+                };
+            };
+            responses: {
+                /** @description Tool created successfully */
+                201: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["ToolCreateResponse"];
+                    };
+                };
+            };
+        };
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/tools/{id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: {
+            parameters: {
+                query?: never;
+                header?: never;
+                path: {
+                    id: string;
+                };
+                cookie?: never;
+            };
+            requestBody?: never;
+            responses: {
+                /** @description Tool retrieved successfully */
+                200: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["ToolGetResponse"];
+                    };
+                };
+            };
+        };
+        put?: never;
+        post?: never;
+        delete: {
+            parameters: {
+                query?: never;
+                header?: never;
+                path: {
+                    id: string;
+                };
+                cookie?: never;
+            };
+            requestBody?: never;
+            responses: {
+                /** @description Tool deleted successfully */
+                200: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": {
+                            success: boolean;
+                        };
+                    };
+                };
+            };
+        };
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/tools/batch": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post: {
+            parameters: {
+                query?: never;
+                header?: never;
+                path?: never;
+                cookie?: never;
+            };
+            requestBody?: {
+                content: {
+                    "application/json": components["schemas"]["ToolBatchRequest"];
+                };
+            };
+            responses: {
+                /** @description Tools retrieved successfully */
+                200: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["ToolListResponse"];
+                    };
+                };
+            };
+        };
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/workflow-defs": {
         parameters: {
             query?: never;
@@ -829,6 +1789,137 @@ export interface paths {
                 };
             };
         };
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/workflow-runs": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: {
+            parameters: {
+                query?: {
+                    /** @description Max results (default 50) */
+                    limit?: string;
+                    /** @description Pagination offset */
+                    offset?: string;
+                    /** @description Filter by status (comma-separated: running,completed,failed) */
+                    status?: string;
+                    /** @description Filter by project ID */
+                    projectId?: string;
+                };
+                header?: never;
+                path?: never;
+                cookie?: never;
+            };
+            requestBody?: never;
+            responses: {
+                /** @description List of workflow runs */
+                200: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["WorkflowRunListResponse"];
+                    };
+                };
+            };
+        };
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/workflow-runs/{id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post?: never;
+        delete: {
+            parameters: {
+                query?: never;
+                header?: never;
+                path: {
+                    id: string;
+                };
+                cookie?: never;
+            };
+            requestBody?: never;
+            responses: {
+                /** @description Workflow run deleted successfully */
+                200: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["WorkflowRunDeleteResponse"];
+                    };
+                };
+            };
+        };
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/workflow-runs/{id}/cancel": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post: {
+            parameters: {
+                query?: never;
+                header?: never;
+                path: {
+                    id: string;
+                };
+                cookie?: never;
+            };
+            requestBody?: {
+                content: {
+                    "application/json": components["schemas"]["CancelWorkflowRunRequest"];
+                };
+            };
+            responses: {
+                /** @description Workflow run cancelled successfully */
+                200: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["WorkflowRunCancelResponse"];
+                    };
+                };
+                /** @description Failed to cancel workflow run */
+                500: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["WorkflowRunCancelError"];
+                    };
+                };
+            };
+        };
+        delete?: never;
         options?: never;
         head?: never;
         patch?: never;
@@ -1135,7 +2226,7 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
-    "/workflow-runs": {
+    "/workspaces": {
         parameters: {
             query?: never;
             header?: never;
@@ -1145,14 +2236,8 @@ export interface paths {
         get: {
             parameters: {
                 query?: {
-                    /** @description Max results (default 50) */
-                    limit?: string;
-                    /** @description Pagination offset */
-                    offset?: string;
-                    /** @description Filter by status (comma-separated: running,completed,failed) */
-                    status?: string;
-                    /** @description Filter by project ID */
-                    projectId?: string;
+                    limit?: number;
+                    offset?: number | null;
                 };
                 header?: never;
                 path?: never;
@@ -1160,33 +2245,77 @@ export interface paths {
             };
             requestBody?: never;
             responses: {
-                /** @description List of workflow runs */
+                /** @description Workspaces retrieved successfully */
                 200: {
                     headers: {
                         [name: string]: unknown;
                     };
                     content: {
-                        "application/json": components["schemas"]["WorkflowRunListResponse"];
+                        "application/json": components["schemas"]["WorkspaceListResponse"];
                     };
                 };
             };
         };
         put?: never;
-        post?: never;
+        post: {
+            parameters: {
+                query?: never;
+                header?: never;
+                path?: never;
+                cookie?: never;
+            };
+            requestBody?: {
+                content: {
+                    "application/json": components["schemas"]["CreateWorkspace"];
+                };
+            };
+            responses: {
+                /** @description Workspace created successfully */
+                201: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["WorkspaceCreateResponse"];
+                    };
+                };
+            };
+        };
         delete?: never;
         options?: never;
         head?: never;
         patch?: never;
         trace?: never;
     };
-    "/workflow-runs/{id}": {
+    "/workspaces/{id}": {
         parameters: {
             query?: never;
             header?: never;
             path?: never;
             cookie?: never;
         };
-        get?: never;
+        get: {
+            parameters: {
+                query?: never;
+                header?: never;
+                path: {
+                    id: string;
+                };
+                cookie?: never;
+            };
+            requestBody?: never;
+            responses: {
+                /** @description Workspace retrieved successfully */
+                200: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["WorkspaceGetResponse"];
+                    };
+                };
+            };
+        };
         put?: never;
         post?: never;
         delete: {
@@ -1200,32 +2329,22 @@ export interface paths {
             };
             requestBody?: never;
             responses: {
-                /** @description Workflow run deleted successfully */
+                /** @description Workspace deleted successfully */
                 200: {
                     headers: {
                         [name: string]: unknown;
                     };
                     content: {
-                        "application/json": components["schemas"]["WorkflowRunDeleteResponse"];
+                        "application/json": {
+                            success: boolean;
+                        };
                     };
                 };
             };
         };
         options?: never;
         head?: never;
-        patch?: never;
-        trace?: never;
-    };
-    "/workflow-runs/{id}/cancel": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        get?: never;
-        put?: never;
-        post: {
+        patch: {
             parameters: {
                 query?: never;
                 header?: never;
@@ -1236,133 +2355,24 @@ export interface paths {
             };
             requestBody?: {
                 content: {
-                    "application/json": components["schemas"]["CancelWorkflowRunRequest"];
+                    "application/json": components["schemas"]["UpdateWorkspace"];
                 };
             };
             responses: {
-                /** @description Workflow run cancelled successfully */
+                /** @description Workspace updated successfully */
                 200: {
                     headers: {
                         [name: string]: unknown;
                     };
                     content: {
-                        "application/json": components["schemas"]["WorkflowRunCancelResponse"];
-                    };
-                };
-                /** @description Failed to cancel workflow run */
-                500: {
-                    headers: {
-                        [name: string]: unknown;
-                    };
-                    content: {
-                        "application/json": components["schemas"]["WorkflowRunCancelError"];
+                        "application/json": components["schemas"]["WorkspaceUpdateResponse"];
                     };
                 };
             };
         };
-        delete?: never;
-        options?: never;
-        head?: never;
-        patch?: never;
         trace?: never;
     };
-    "/events": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        /** Get execution events */
-        get: {
-            parameters: {
-                query?: {
-                    /** @description Outer execution boundary (conversationId or rootRunId) */
-                    streamId?: string;
-                    /** @description Specific execution (workflowRunId, turnId, etc.) */
-                    executionId?: string;
-                    /** @description Execution type */
-                    executionType?: "workflow" | "conversation";
-                    projectId?: string;
-                    eventType?: string;
-                    limit?: number;
-                    afterSequence?: number | null;
-                };
-                header?: never;
-                path?: never;
-                cookie?: never;
-            };
-            requestBody?: never;
-            responses: {
-                /** @description Execution events retrieved successfully */
-                200: {
-                    headers: {
-                        [name: string]: unknown;
-                    };
-                    content: {
-                        "application/json": components["schemas"]["EventsResponse"];
-                    };
-                };
-            };
-        };
-        put?: never;
-        post?: never;
-        delete?: never;
-        options?: never;
-        head?: never;
-        patch?: never;
-        trace?: never;
-    };
-    "/events/trace": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        /** Get trace events */
-        get: {
-            parameters: {
-                query?: {
-                    /** @description Outer execution boundary (conversationId or rootRunId) */
-                    streamId?: string;
-                    /** @description Specific execution (workflowRunId, turnId, etc.) */
-                    executionId?: string;
-                    /** @description Execution type */
-                    executionType?: "workflow" | "conversation";
-                    type?: string;
-                    /** @description Event category filter */
-                    category?: string;
-                    projectId?: string;
-                    limit?: number;
-                    minDurationMs?: number | null;
-                };
-                header?: never;
-                path?: never;
-                cookie?: never;
-            };
-            requestBody?: never;
-            responses: {
-                /** @description Trace events retrieved successfully */
-                200: {
-                    headers: {
-                        [name: string]: unknown;
-                    };
-                    content: {
-                        "application/json": components["schemas"]["TraceEventsResponse"];
-                    };
-                };
-            };
-        };
-        put?: never;
-        post?: never;
-        delete?: never;
-        options?: never;
-        head?: never;
-        patch?: never;
-        trace?: never;
-    };
-    "/logs": {
+    "/workspaces/{id}/projects": {
         parameters: {
             query?: never;
             header?: never;
@@ -1371,49 +2381,22 @@ export interface paths {
         };
         get: {
             parameters: {
-                query?: {
-                    service?: string;
-                    level?: "error" | "warn" | "info" | "debug" | "fatal";
-                    eventType?: string;
-                    traceId?: string;
-                    requestId?: string;
-                    workspaceId?: string;
-                    projectId?: string;
-                    userId?: string;
-                    limit?: number;
-                };
+                query?: never;
                 header?: never;
-                path?: never;
+                path: {
+                    id: string;
+                };
                 cookie?: never;
             };
             requestBody?: never;
             responses: {
-                /** @description Logs retrieved successfully */
+                /** @description Projects retrieved successfully */
                 200: {
                     headers: {
                         [name: string]: unknown;
                     };
                     content: {
-                        "application/json": {
-                            logs: {
-                                id: string;
-                                timestamp: number;
-                                level: string;
-                                service: string;
-                                environment: string;
-                                eventType: string | null;
-                                message: string | null;
-                                sourceLocation: string | null;
-                                traceId: string | null;
-                                requestId: string | null;
-                                workspaceId: string | null;
-                                projectId: string | null;
-                                userId: string | null;
-                                version: string | null;
-                                instanceId: string | null;
-                                metadata: string;
-                            }[];
-                        };
+                        "application/json": components["schemas"]["WorkspaceProjectsResponse"];
                     };
                 };
             };
@@ -1432,104 +2415,6 @@ export type webhooks = Record<string, never>;
 
 export interface components {
     schemas: {
-        Workspace: {
-            /** @example 01ARZ3NDEKTSV4RRFFQ69G5FAV */
-            id: string;
-            /** @example My Workspace */
-            name: string;
-            settings: {
-                allowedModelProviders: string[] | null;
-                allowedMcpServers: string[] | null;
-                budgetMaxMonthlySpendCents: number | null;
-                budgetAlertThresholdCents: number | null;
-            } | null;
-            /** @example 2024-01-01T00:00:00Z */
-            createdAt: string;
-            /** @example 2024-01-01T00:00:00Z */
-            updatedAt: string;
-        };
-        WorkspaceListResponse: {
-            workspaces: components["schemas"]["Workspace"][];
-        };
-        WorkspaceCreateResponse: {
-            workspaceId: string;
-            workspace: components["schemas"]["Workspace"];
-        };
-        CreateWorkspace: {
-            /** @example My Workspace */
-            name: string;
-            /** @example {} */
-            settings?: {
-                allowedModelProviders?: string[] | null;
-                allowedMcpServers?: string[] | null;
-                budgetMaxMonthlySpendCents?: number | null;
-                budgetAlertThresholdCents?: number | null;
-            };
-        };
-        WorkspaceGetResponse: {
-            workspace: components["schemas"]["Workspace"];
-        };
-        WorkspaceUpdateResponse: {
-            workspace: components["schemas"]["Workspace"];
-        };
-        UpdateWorkspace: {
-            /** @example My Workspace */
-            name?: string;
-            /** @example {} */
-            settings?: {
-                allowedModelProviders?: string[] | null;
-                allowedMcpServers?: string[] | null;
-                budgetMaxMonthlySpendCents?: number | null;
-                budgetAlertThresholdCents?: number | null;
-            };
-        };
-        Project: {
-            id: string;
-            workspaceId: string;
-            name: string;
-            description: string | null;
-            settings: {
-                defaultModelProfileId: string | null;
-                rateLimitMaxConcurrentRuns: number | null;
-                rateLimitMaxLlmCallsPerHour: number | null;
-                budgetMaxMonthlySpendCents: number | null;
-                budgetAlertThresholdCents: number | null;
-                snapshotPolicyEveryNEvents: number | null;
-                snapshotPolicyEveryNSeconds: number | null;
-                snapshotPolicyOnFanInComplete: boolean | null;
-            } | null;
-            createdAt: string;
-            updatedAt: string;
-        };
-        WorkspaceProjectsResponse: {
-            projects: components["schemas"]["Project"][];
-        };
-        ProjectCreateResponse: {
-            projectId: string;
-            project: components["schemas"]["Project"];
-        };
-        CreateProject: {
-            /** @example 01ARZ3NDEKTSV4RRFFQ69G5FAV */
-            workspaceId: string;
-            /** @example My Project */
-            name: string;
-            /** @example Project description */
-            description?: string;
-            /** @example {} */
-            settings?: {
-                defaultModelProfileId?: string | null;
-                rateLimitMaxConcurrentRuns?: number | null;
-                rateLimitMaxLlmCallsPerHour?: number | null;
-                budgetMaxMonthlySpendCents?: number | null;
-                budgetAlertThresholdCents?: number | null;
-                snapshotPolicyEveryNEvents?: number | null;
-                snapshotPolicyEveryNSeconds?: number | null;
-                snapshotPolicyOnFanInComplete?: boolean | null;
-            };
-        };
-        ProjectGetResponse: {
-            project: components["schemas"]["Project"];
-        };
         Action: {
             /** @example send-email */
             id: string;
@@ -1604,6 +2489,392 @@ export interface components {
         ActionGetResponse: {
             action: components["schemas"]["Action"];
         };
+        Agent: {
+            /** @example 01ARZ3NDEKTSV4RRFFQ69G5FAV */
+            id: string;
+            projectIds: string[];
+            personaId: string | null;
+            personaVersion: number | null;
+            createdAt: string;
+            updatedAt: string;
+        };
+        AgentCreateResponse: {
+            agentId: string;
+            agent: components["schemas"]["Agent"];
+        };
+        CreateAgent: {
+            /**
+             * @example [
+             *       "proj_123"
+             *     ]
+             */
+            projectIds: string[];
+            /** @example persona_abc */
+            personaId?: string;
+            /** @example 1 */
+            personaVersion?: number;
+        };
+        AgentListResponse: {
+            agents: components["schemas"]["Agent"][];
+        };
+        AgentGetResponse: {
+            agent: components["schemas"]["Agent"];
+        };
+        ArtifactType: {
+            /** @example document */
+            id: string;
+            name: string;
+            description: string;
+            schema: {
+                [key: string]: unknown;
+            };
+            version: number;
+            contentHash: string | null;
+            createdAt: string;
+            updatedAt: string;
+        };
+        ArtifactTypeCreateResponse: {
+            artifactTypeId: string;
+            artifactType: components["schemas"]["ArtifactType"];
+            /** @description True if an existing artifact type was reused (autoversion matched) */
+            reused: boolean;
+        };
+        CreateArtifactType: {
+            /** @example document */
+            name: string;
+            /**
+             * @default
+             * @example A text document
+             */
+            description: string;
+            /**
+             * @example {
+             *       "type": "object"
+             *     }
+             */
+            schema: {
+                [key: string]: unknown;
+            };
+            /**
+             * @default 1
+             * @example 1
+             */
+            version: number;
+            /** @description When true, compute content hash for deduplication. If existing artifact type with same name and content exists, return it. Otherwise auto-increment version. */
+            autoversion?: boolean;
+        };
+        ArtifactTypeListResponse: {
+            artifactTypes: components["schemas"]["ArtifactType"][];
+        };
+        ArtifactTypeGetResponse: {
+            artifactType: components["schemas"]["ArtifactType"];
+        };
+        Conversation: {
+            /** @example 01ARZ3NDEKTSV4RRFFQ69G5FAV */
+            id: string;
+            participants: ({
+                /** @enum {string} */
+                type: "user";
+                userId: string;
+            } | {
+                /** @enum {string} */
+                type: "agent";
+                agentId: string;
+            })[];
+            /** @enum {string} */
+            status: "active" | "waiting" | "completed" | "failed";
+            createdAt: string;
+            updatedAt: string;
+        };
+        ConversationCreateResponse: {
+            conversationId: string;
+            conversation: components["schemas"]["Conversation"];
+        };
+        CreateConversation: {
+            /**
+             * @example [
+             *       {
+             *         "type": "user",
+             *         "userId": "user_123"
+             *       },
+             *       {
+             *         "type": "agent",
+             *         "agentId": "agent_456"
+             *       }
+             *     ]
+             */
+            participants: ({
+                /** @enum {string} */
+                type: "user";
+                userId: string;
+            } | {
+                /** @enum {string} */
+                type: "agent";
+                agentId: string;
+            })[];
+            /**
+             * @default active
+             * @example active
+             * @enum {string}
+             */
+            status: "active" | "waiting" | "completed" | "failed";
+        };
+        ConversationListResponse: {
+            conversations: components["schemas"]["Conversation"][];
+        };
+        ConversationGetResponse: {
+            conversation: components["schemas"]["Conversation"];
+        };
+        UpdateConversationStatus: {
+            /**
+             * @example completed
+             * @enum {string}
+             */
+            status: "active" | "waiting" | "completed" | "failed";
+        };
+        Message: {
+            /** @example 01ARZ3NDEKTSV4RRFFQ69G5FAV */
+            id: string;
+            conversationId: string;
+            turnId: string;
+            /** @enum {string} */
+            role: "user" | "agent";
+            content: string;
+            createdAt: string;
+        };
+        MessageListResponse: {
+            messages: components["schemas"]["Message"][];
+        };
+        EventEntry: {
+            id: string;
+            timestamp: number;
+            sequence: number;
+            /** @description Outer execution boundary (conversationId or rootRunId) */
+            streamId: string;
+            /** @description Specific execution (workflowRunId, turnId, etc.) */
+            executionId: string;
+            /** @description Execution type: workflow, conversation, etc. */
+            executionType: string;
+            eventType: string;
+            projectId: string;
+            message?: string | null;
+            /** @description JSON blob with all domain-specific fields */
+            metadata: string;
+        };
+        EventsResponse: {
+            events: components["schemas"]["EventEntry"][];
+        };
+        /** @description Contains domain-specific fields including tokenId, nodeId */
+        TraceEventPayload: {
+            [key: string]: unknown;
+        };
+        TraceEventEntry: {
+            id: string;
+            sequence: number;
+            timestamp: number;
+            /** @description Event type following {category}.{domain}.{action} convention */
+            type: string;
+            /** @description Event category extracted from type prefix */
+            category: string;
+            /** @description Outer execution boundary (conversationId or rootRunId) */
+            streamId: string;
+            /** @description Specific execution (workflowRunId, turnId, etc.) */
+            executionId: string;
+            /** @description Execution type: workflow, conversation, etc. */
+            executionType: string;
+            projectId: string;
+            durationMs: number | null;
+            payload: components["schemas"]["TraceEventPayload"];
+        };
+        TraceEventsResponse: {
+            events: components["schemas"]["TraceEventEntry"][];
+        };
+        MessageCreateResponse: {
+            message: components["schemas"]["Message"];
+        };
+        CreateMessage: {
+            /** @example 01ARZ3NDEKTSV4RRFFQ69G5FAV */
+            id: string;
+            /** @example 01ARZ3NDEKTSV4RRFFQ69G5FAV */
+            conversationId: string;
+            /** @example 01ARZ3NDEKTSV4RRFFQ69G5FAV */
+            turnId: string;
+            /**
+             * @example user
+             * @enum {string}
+             */
+            role: "user" | "agent";
+            /** @example Hello, how can I help? */
+            content: string;
+        };
+        MessageGetResponse: {
+            message: components["schemas"]["Message"];
+        };
+        ModelProfile: {
+            id: string;
+            name: string;
+            /** @enum {string} */
+            provider: "anthropic" | "openai" | "google" | "cloudflare" | "local";
+            /** @enum {string} */
+            modelId: "@cf/meta/llama-4-scout-17b-16e-instruct" | "@cf/meta/llama-3.3-70b-instruct-fp8-fast" | "@cf/openai/gpt-oss-120b" | "@cf/openai/gpt-oss-20b" | "claude-opus-4-20250514" | "claude-sonnet-4-20250514" | "claude-3-5-sonnet-20241022" | "claude-3-5-haiku-20241022" | "claude-3-opus-20240229" | "claude-3-haiku-20240307" | "anthropic-dummy" | "openai-dummy" | "google-dummy" | "local-dummy";
+            parameters?: unknown;
+            executionConfig?: unknown;
+            costPer1kInputTokens: number;
+            costPer1kOutputTokens: number;
+        };
+        ModelProfileGetResponse: {
+            modelProfile: components["schemas"]["ModelProfile"];
+        };
+        ModelProfileCreateResponse: {
+            modelProfileId: string;
+            modelProfile: components["schemas"]["ModelProfile"];
+        };
+        CreateModelProfile: {
+            /** @example GPT-4 Default */
+            name: string;
+            /**
+             * @example openai
+             * @enum {string}
+             */
+            provider: "anthropic" | "openai" | "google" | "cloudflare" | "local";
+            /**
+             * @example claude-3-5-sonnet-20241022
+             * @enum {string}
+             */
+            modelId: "@cf/meta/llama-4-scout-17b-16e-instruct" | "@cf/meta/llama-3.3-70b-instruct-fp8-fast" | "@cf/openai/gpt-oss-120b" | "@cf/openai/gpt-oss-20b" | "claude-opus-4-20250514" | "claude-sonnet-4-20250514" | "claude-3-5-sonnet-20241022" | "claude-3-5-haiku-20241022" | "claude-3-opus-20240229" | "claude-3-haiku-20240307" | "anthropic-dummy" | "openai-dummy" | "google-dummy" | "local-dummy";
+            /**
+             * @example {
+             *       "temperature": 0.7
+             *     }
+             */
+            parameters: {
+                [key: string]: unknown;
+            };
+            executionConfig?: {
+                [key: string]: unknown;
+            };
+            /** @example 0.03 */
+            costPer1kInputTokens: number;
+            /** @example 0.06 */
+            costPer1kOutputTokens: number;
+        };
+        Persona: {
+            /** @example code-reviewer */
+            id: string;
+            version: number;
+            name: string;
+            description: string;
+            libraryId: string | null;
+            systemPrompt: string;
+            modelProfileId: string;
+            contextAssemblyWorkflowId: string;
+            memoryExtractionWorkflowId: string;
+            recentTurnsLimit: number;
+            toolIds: string[];
+            constraints: {
+                maxMovesPerTurn?: number;
+            } | null;
+            contentHash: string | null;
+            createdAt: string;
+            updatedAt: string;
+        };
+        PersonaCreateResponse: {
+            personaId: string;
+            persona: components["schemas"]["Persona"];
+            /** @description True if an existing persona was reused (autoversion matched) */
+            reused: boolean;
+        };
+        CreatePersona: {
+            /** @example Code Reviewer */
+            name: string;
+            /**
+             * @default
+             * @example Reviews code for best practices
+             */
+            description: string;
+            /**
+             * @default 1
+             * @example 1
+             */
+            version: number;
+            /** @example lib_123 */
+            libraryId?: string;
+            /** @example You are a helpful code reviewer. */
+            systemPrompt: string;
+            /** @example 01ARZ3NDEKTSV4RRFFQ69G5FAV */
+            modelProfileId: string;
+            /** @example wf_context */
+            contextAssemblyWorkflowId: string;
+            /** @example wf_memory */
+            memoryExtractionWorkflowId: string;
+            /**
+             * @default 20
+             * @example 20
+             */
+            recentTurnsLimit: number;
+            /**
+             * @example [
+             *       "tool_1",
+             *       "tool_2"
+             *     ]
+             */
+            toolIds: string[];
+            constraints?: {
+                maxMovesPerTurn?: number;
+            };
+            /** @description When true, compute content hash for deduplication. If existing persona with same name and content exists, return it. Otherwise auto-increment version. */
+            autoversion?: boolean;
+        };
+        PersonaListResponse: {
+            personas: components["schemas"]["Persona"][];
+        };
+        PersonaGetResponse: {
+            persona: components["schemas"]["Persona"];
+        };
+        Project: {
+            id: string;
+            workspaceId: string;
+            name: string;
+            description: string | null;
+            settings: {
+                defaultModelProfileId: string | null;
+                rateLimitMaxConcurrentRuns: number | null;
+                rateLimitMaxLlmCallsPerHour: number | null;
+                budgetMaxMonthlySpendCents: number | null;
+                budgetAlertThresholdCents: number | null;
+                snapshotPolicyEveryNEvents: number | null;
+                snapshotPolicyEveryNSeconds: number | null;
+                snapshotPolicyOnFanInComplete: boolean | null;
+            } | null;
+            createdAt: string;
+            updatedAt: string;
+        };
+        ProjectCreateResponse: {
+            projectId: string;
+            project: components["schemas"]["Project"];
+        };
+        CreateProject: {
+            /** @example 01ARZ3NDEKTSV4RRFFQ69G5FAV */
+            workspaceId: string;
+            /** @example My Project */
+            name: string;
+            /** @example Project description */
+            description?: string;
+            /** @example {} */
+            settings?: {
+                defaultModelProfileId?: string | null;
+                rateLimitMaxConcurrentRuns?: number | null;
+                rateLimitMaxLlmCallsPerHour?: number | null;
+                budgetMaxMonthlySpendCents?: number | null;
+                budgetAlertThresholdCents?: number | null;
+                snapshotPolicyEveryNEvents?: number | null;
+                snapshotPolicyEveryNSeconds?: number | null;
+                snapshotPolicyOnFanInComplete?: boolean | null;
+            };
+        };
+        ProjectGetResponse: {
+            project: components["schemas"]["Project"];
+        };
         PromptSpec: {
             /** @example summarize-text */
             id: string;
@@ -1663,54 +2934,6 @@ export interface components {
         };
         PromptSpecGetResponse: {
             promptSpec: components["schemas"]["PromptSpec"];
-        };
-        ModelProfile: {
-            id: string;
-            name: string;
-            /** @enum {string} */
-            provider: "anthropic" | "openai" | "google" | "cloudflare" | "local";
-            /** @enum {string} */
-            modelId: "@cf/meta/llama-4-scout-17b-16e-instruct" | "@cf/meta/llama-3.3-70b-instruct-fp8-fast" | "@cf/openai/gpt-oss-120b" | "@cf/openai/gpt-oss-20b" | "claude-opus-4-20250514" | "claude-sonnet-4-20250514" | "claude-3-5-sonnet-20241022" | "claude-3-5-haiku-20241022" | "claude-3-opus-20240229" | "claude-3-haiku-20240307" | "anthropic-dummy" | "openai-dummy" | "google-dummy" | "local-dummy";
-            parameters?: unknown;
-            executionConfig?: unknown;
-            costPer1kInputTokens: number;
-            costPer1kOutputTokens: number;
-        };
-        ModelProfileGetResponse: {
-            modelProfile: components["schemas"]["ModelProfile"];
-        };
-        ModelProfileCreateResponse: {
-            modelProfileId: string;
-            modelProfile: components["schemas"]["ModelProfile"];
-        };
-        CreateModelProfile: {
-            /** @example GPT-4 Default */
-            name: string;
-            /**
-             * @example openai
-             * @enum {string}
-             */
-            provider: "anthropic" | "openai" | "google" | "cloudflare" | "local";
-            /**
-             * @example claude-3-5-sonnet-20241022
-             * @enum {string}
-             */
-            modelId: "@cf/meta/llama-4-scout-17b-16e-instruct" | "@cf/meta/llama-3.3-70b-instruct-fp8-fast" | "@cf/openai/gpt-oss-120b" | "@cf/openai/gpt-oss-20b" | "claude-opus-4-20250514" | "claude-sonnet-4-20250514" | "claude-3-5-sonnet-20241022" | "claude-3-5-haiku-20241022" | "claude-3-opus-20240229" | "claude-3-haiku-20240307" | "anthropic-dummy" | "openai-dummy" | "google-dummy" | "local-dummy";
-            /**
-             * @example {
-             *       "temperature": 0.7
-             *     }
-             */
-            parameters: {
-                [key: string]: unknown;
-            };
-            executionConfig?: {
-                [key: string]: unknown;
-            };
-            /** @example 0.03 */
-            costPer1kInputTokens: number;
-            /** @example 0.06 */
-            costPer1kOutputTokens: number;
         };
         Step: {
             /** @example 01ARZ3NDEKTSV4RRFFQ69G5FAV */
@@ -1903,6 +3126,83 @@ export interface components {
         TaskGetResponse: {
             task: components["schemas"]["Task"];
         };
+        Tool: {
+            /** @example 01ARZ3NDEKTSV4RRFFQ69G5FAV */
+            id: string;
+            name: string;
+            description: string;
+            libraryId: string | null;
+            inputSchema: {
+                [key: string]: unknown;
+            };
+            /** @enum {string} */
+            targetType: "task" | "workflow" | "agent";
+            targetId: string;
+            async: boolean;
+            /** @enum {string|null} */
+            invocationMode: "delegate" | "loop_in" | null;
+            inputMapping: {
+                [key: string]: string;
+            } | null;
+            retry: {
+                maxAttempts: number;
+                backoffMs: number;
+                timeoutMs: number;
+            } | null;
+            createdAt: string;
+            updatedAt: string;
+        };
+        ToolCreateResponse: {
+            toolId: string;
+            tool: components["schemas"]["Tool"];
+        };
+        CreateTool: {
+            /** @example search_files */
+            name: string;
+            /** @example Search for files in the codebase */
+            description: string;
+            /** @example lib_123 */
+            libraryId?: string;
+            /**
+             * @example {
+             *       "type": "object"
+             *     }
+             */
+            inputSchema: {
+                [key: string]: unknown;
+            };
+            /**
+             * @example task
+             * @enum {string}
+             */
+            targetType: "task" | "workflow" | "agent";
+            /** @example task_abc */
+            targetId: string;
+            /**
+             * @default false
+             * @example false
+             */
+            async: boolean;
+            /** @enum {string} */
+            invocationMode?: "delegate" | "loop_in";
+            inputMapping?: {
+                [key: string]: string;
+            };
+            retry?: {
+                maxAttempts: number;
+                backoffMs: number;
+                timeoutMs: number;
+            };
+        };
+        ToolListResponse: {
+            tools: components["schemas"]["Tool"][];
+        };
+        ToolGetResponse: {
+            tool: components["schemas"]["Tool"];
+        };
+        ToolBatchRequest: {
+            ids: string[];
+        };
         WorkflowDef: {
             id: string;
             name: string;
@@ -2063,6 +3363,43 @@ export interface components {
             nodes: components["schemas"]["Node"][];
             transitions: components["schemas"]["Transition"][];
         };
+        WorkflowRunSummary: {
+            id: string;
+            projectId: string;
+            workflowId: string;
+            workflowName: string;
+            workflowDefId: string;
+            workflowVersion: number;
+            /** @enum {string} */
+            status: "running" | "completed" | "failed" | "waiting";
+            parentRunId: string | null;
+            createdAt: string;
+            updatedAt: string;
+            completedAt: string | null;
+        };
+        WorkflowRunListResponse: {
+            runs: components["schemas"]["WorkflowRunSummary"][];
+            total: number;
+            limit: number;
+            offset: number;
+        };
+        WorkflowRunDeleteResponse: {
+            success: boolean;
+        };
+        WorkflowRunCancelResponse: {
+            cancelled: boolean;
+            workflowRunId: string;
+        };
+        WorkflowRunCancelError: {
+            error: string;
+        };
+        CancelWorkflowRunRequest: {
+            /**
+             * @description Reason for cancellation
+             * @example User requested cancellation
+             */
+            reason?: string;
+        };
         Workflow: {
             id: string;
             projectId: string;
@@ -2130,13 +3467,6 @@ export interface components {
              */
             enableTraceEvents?: boolean;
         };
-        WorkflowRunCancelResponse: {
-            cancelled: boolean;
-            workflowRunId: string;
-        };
-        WorkflowRunCancelError: {
-            error: string;
-        };
         CancelWorkflowRun: {
             /**
              * @description Reason for cancellation
@@ -2144,79 +3474,59 @@ export interface components {
              */
             reason?: string;
         };
-        WorkflowRunSummary: {
+        Workspace: {
+            /** @example 01ARZ3NDEKTSV4RRFFQ69G5FAV */
             id: string;
-            projectId: string;
-            workflowId: string;
-            workflowName: string;
-            workflowDefId: string;
-            workflowVersion: number;
-            /** @enum {string} */
-            status: "running" | "completed" | "failed" | "waiting";
-            parentRunId: string | null;
+            /** @example My Workspace */
+            name: string;
+            settings: {
+                allowedModelProviders: string[] | null;
+                allowedMcpServers: string[] | null;
+                budgetMaxMonthlySpendCents: number | null;
+                budgetAlertThresholdCents: number | null;
+            } | null;
+            /** @example 2024-01-01T00:00:00Z */
             createdAt: string;
+            /** @example 2024-01-01T00:00:00Z */
             updatedAt: string;
-            completedAt: string | null;
         };
-        WorkflowRunListResponse: {
-            runs: components["schemas"]["WorkflowRunSummary"][];
-            total: number;
-            limit: number;
-            offset: number;
+        WorkspaceListResponse: {
+            workspaces: components["schemas"]["Workspace"][];
         };
-        WorkflowRunDeleteResponse: {
-            success: boolean;
+        WorkspaceCreateResponse: {
+            workspaceId: string;
+            workspace: components["schemas"]["Workspace"];
         };
-        CancelWorkflowRunRequest: {
-            /**
-             * @description Reason for cancellation
-             * @example User requested cancellation
-             */
-            reason?: string;
+        CreateWorkspace: {
+            /** @example My Workspace */
+            name: string;
+            /** @example {} */
+            settings?: {
+                allowedModelProviders?: string[] | null;
+                allowedMcpServers?: string[] | null;
+                budgetMaxMonthlySpendCents?: number | null;
+                budgetAlertThresholdCents?: number | null;
+            };
         };
-        EventEntry: {
-            id: string;
-            timestamp: number;
-            sequence: number;
-            /** @description Outer execution boundary (conversationId or rootRunId) */
-            streamId: string;
-            /** @description Specific execution (workflowRunId, turnId, etc.) */
-            executionId: string;
-            /** @description Execution type: workflow, conversation, etc. */
-            executionType: string;
-            eventType: string;
-            projectId: string;
-            message?: string | null;
-            /** @description JSON blob with all domain-specific fields */
-            metadata: string;
+        WorkspaceGetResponse: {
+            workspace: components["schemas"]["Workspace"];
         };
-        EventsResponse: {
-            events: components["schemas"]["EventEntry"][];
+        WorkspaceUpdateResponse: {
+            workspace: components["schemas"]["Workspace"];
         };
-        /** @description Contains domain-specific fields including tokenId, nodeId */
-        TraceEventPayload: {
-            [key: string]: unknown;
+        UpdateWorkspace: {
+            /** @example My Workspace */
+            name?: string;
+            /** @example {} */
+            settings?: {
+                allowedModelProviders?: string[] | null;
+                allowedMcpServers?: string[] | null;
+                budgetMaxMonthlySpendCents?: number | null;
+                budgetAlertThresholdCents?: number | null;
+            };
         };
-        TraceEventEntry: {
-            id: string;
-            sequence: number;
-            timestamp: number;
-            /** @description Event type following {category}.{domain}.{action} convention */
-            type: string;
-            /** @description Event category extracted from type prefix */
-            category: string;
-            /** @description Outer execution boundary (conversationId or rootRunId) */
-            streamId: string;
-            /** @description Specific execution (workflowRunId, turnId, etc.) */
-            executionId: string;
-            /** @description Execution type: workflow, conversation, etc. */
-            executionType: string;
-            projectId: string;
-            durationMs: number | null;
-            payload: components["schemas"]["TraceEventPayload"];
-        };
-        TraceEventsResponse: {
-            events: components["schemas"]["TraceEventEntry"][];
+        WorkspaceProjectsResponse: {
+            projects: components["schemas"]["Project"][];
         };
     };
     responses: never;
