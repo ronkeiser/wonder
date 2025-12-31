@@ -67,6 +67,12 @@ export interface AgentTaskPayload {
 
   // Execution config
   timeoutMs?: number;
+
+  // Branch context for shell operations
+  branchContext?: {
+    repoId: string;
+    branch: string;
+  };
 }
 
 // Legacy interface - to be removed after migration

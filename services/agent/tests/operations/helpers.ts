@@ -87,6 +87,64 @@ const MIGRATION_SQL = `
   CREATE INDEX IF NOT EXISTS idx_async_ops_turn ON async_ops(turn_id);
   CREATE INDEX IF NOT EXISTS idx_async_ops_status ON async_ops(status);
   CREATE INDEX IF NOT EXISTS idx_async_ops_timeout ON async_ops(timeout_at);
+
+  -- Conversation meta table
+  CREATE TABLE IF NOT EXISTS conversation_meta (
+    id TEXT PRIMARY KEY,
+    agent_id TEXT NOT NULL,
+    participants TEXT NOT NULL,
+    status TEXT NOT NULL,
+    branch_context TEXT,
+    created_at INTEGER NOT NULL,
+    updated_at INTEGER NOT NULL
+  );
+
+  -- Agent def table
+  CREATE TABLE IF NOT EXISTS agent_def (
+    id TEXT PRIMARY KEY,
+    project_ids TEXT NOT NULL,
+    persona_id TEXT,
+    persona_version INTEGER
+  );
+
+  -- Persona def table
+  CREATE TABLE IF NOT EXISTS persona_def (
+    id TEXT NOT NULL,
+    version INTEGER NOT NULL,
+    name TEXT NOT NULL,
+    system_prompt TEXT NOT NULL,
+    model_profile_id TEXT NOT NULL,
+    context_assembly_workflow_id TEXT NOT NULL,
+    memory_extraction_workflow_id TEXT NOT NULL,
+    recent_turns_limit INTEGER NOT NULL,
+    tool_ids TEXT NOT NULL,
+    constraints TEXT
+  );
+
+  -- Tool defs table
+  CREATE TABLE IF NOT EXISTS tool_defs (
+    id TEXT PRIMARY KEY,
+    name TEXT NOT NULL,
+    description TEXT NOT NULL,
+    input_schema TEXT NOT NULL,
+    target_type TEXT NOT NULL,
+    target_id TEXT NOT NULL,
+    async INTEGER NOT NULL,
+    invocation_mode TEXT,
+    input_mapping TEXT
+  );
+
+  -- Participants table
+  CREATE TABLE IF NOT EXISTS participants (
+    id TEXT PRIMARY KEY,
+    conversation_id TEXT NOT NULL,
+    participant_type TEXT NOT NULL,
+    participant_id TEXT NOT NULL,
+    added_at INTEGER NOT NULL,
+    added_by_turn_id TEXT
+  );
+  CREATE INDEX IF NOT EXISTS idx_participants_conversation ON participants(conversation_id);
+  CREATE INDEX IF NOT EXISTS idx_participants_type ON participants(participant_type);
 `;
 
 /**

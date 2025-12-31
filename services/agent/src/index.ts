@@ -123,6 +123,7 @@ export class Conversation extends DurableObject {
       streamToken: this.activeWebSocket
         ? (token: string) => this.activeWebSocket?.send(JSON.stringify({ type: 'token', token }))
         : undefined,
+      branchContext: conversation.branchContext ?? undefined,
     };
   }
 

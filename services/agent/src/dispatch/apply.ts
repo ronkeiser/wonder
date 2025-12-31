@@ -281,6 +281,7 @@ function dispatchTask(
 
   // Dispatch via Executor (fire-and-forget)
   // Executor calls back via agent.handleTaskResult()
+  // Include branchContext for shell operations
   ctx.waitUntil(
     ctx.executor
       .executeTaskForAgent({
@@ -289,6 +290,7 @@ function dispatchTask(
         turnId,
         taskId,
         input: input as Record<string, unknown>,
+        branchContext: ctx.branchContext,
       })
       .catch((error: Error) => {
         ctx.emitter.emitTrace({

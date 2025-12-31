@@ -12,6 +12,7 @@ import type { MessageManager } from '../operations/messages';
 import type { MoveManager } from '../operations/moves';
 import type { ParticipantManager } from '../operations/participants';
 import type { TurnManager } from '../operations/turns';
+import type { BranchContext } from '../types';
 
 /**
  * Context for dispatching decisions.
@@ -49,4 +50,7 @@ export type DispatchContext = {
 
   // Streaming callback (set when WebSocket is connected)
   streamToken?: (token: string) => void;
+
+  // Branch context for shell operations (from conversation or inherited from parent)
+  branchContext?: BranchContext;
 };

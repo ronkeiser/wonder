@@ -14,6 +14,7 @@ import { index, integer, sqliteTable, text } from 'drizzle-orm/sqlite-core';
 import type {
   AsyncOpStatus,
   AsyncOpTargetType,
+  BranchContext,
   ConversationStatus,
   MessageRole,
   Participant,
@@ -24,6 +25,7 @@ import type {
 export type {
   AsyncOpStatus,
   AsyncOpTargetType,
+  BranchContext,
   ConversationStatus,
   MessageRole,
   Participant,
@@ -39,6 +41,8 @@ export const conversationMeta = sqliteTable('conversation_meta', {
   agentId: text().notNull(),
   participants: text({ mode: 'json' }).$type<Participant[]>().notNull(),
   status: text().$type<ConversationStatus>().notNull(),
+  /** Branch context for shell operations (created on first turn) */
+  branchContext: text({ mode: 'json' }).$type<BranchContext>(),
   createdAt: integer({ mode: 'timestamp_ms' }).notNull(),
   updatedAt: integer({ mode: 'timestamp_ms' }).notNull(),
 });

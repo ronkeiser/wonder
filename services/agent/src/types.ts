@@ -20,6 +20,23 @@ export type TurnStatus = 'active' | 'completed' | 'failed';
 export type ConversationStatus = 'active' | 'waiting' | 'completed' | 'failed';
 
 // ============================================================================
+// Branch Context
+// ============================================================================
+
+/**
+ * Branch context for shell operations.
+ *
+ * Each conversation operates on a dedicated git branch. When tools execute
+ * shell commands, they run in the context of this branch.
+ */
+export type BranchContext = {
+  /** Repository ID */
+  repoId: string;
+  /** Git branch name (e.g., "wonder/conv-{conversationId}") */
+  branch: string;
+};
+
+// ============================================================================
 // Participant Types
 // ============================================================================
 
@@ -333,8 +350,5 @@ export type AgentCallParams = {
   /** Optional callback for when turn completes */
   callback?: WorkflowCallback | AgentCallback;
   /** Optional branch context from parent workflow (for shell operations) */
-  branchContext?: {
-    repoId: string;
-    branch: string;
-  };
+  branchContext?: BranchContext;
 };
