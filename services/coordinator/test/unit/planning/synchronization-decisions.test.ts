@@ -179,7 +179,7 @@ describe('decideSynchronization()', () => {
       },
     });
 
-    test('dispatches immediately on first arrival', () => {
+    test('activates fan-in immediately on first arrival', () => {
       const result = decideSynchronization({
         token: baseToken,
         transition: makeTransition(),
@@ -187,8 +187,8 @@ describe('decideSynchronization()', () => {
         workflowRunId: 'run_1',
       });
 
-      // 'any' strategy = dispatch immediately
-      expect(result.decisions).toEqual([{ type: 'MARK_FOR_DISPATCH', tokenId: 'tok_collect_1' }]);
+      // 'any' strategy = activate fan-in immediately (uses race-protected path)
+      expect(result.decisions).toContainEqual(expect.objectContaining({ type: 'ACTIVATE_FAN_IN' }));
     });
   });
 
@@ -345,8 +345,8 @@ describe('decideFanInContinuation()', () => {
 
     expect(result.events).toContainEqual({
       type: 'decision.sync.continuation',
-      nodeId: 'node_after_merge',
       payload: {
+        nodeId: 'node_after_merge',
         workflowRunId: 'run_1',
         fanInPath: 'fanout_group:node_after_merge',
       },

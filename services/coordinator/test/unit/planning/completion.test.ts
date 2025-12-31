@@ -2,9 +2,11 @@
  * Tests for completion planning functions
  *
  * Pure unit tests for:
- * - extractFromContext: JSONPath-style extraction
+ * - extractFromContext: Expression-based extraction
  * - extractFinalOutput: Workflow output mapping
  * - applyInputMapping: Task/action input extraction
+ *
+ * Uses @wonder/expressions syntax (e.g., input.name, state.score).
  */
 
 import { describe, expect, test } from 'vitest';
@@ -51,71 +53,67 @@ const baseContext: ContextSnapshot = {
 describe('extractFromContext', () => {
   describe('input paths', () => {
     test('extracts top-level input field', () => {
-      expect(extractFromContext('$.input.name', baseContext)).toBe('Alice');
+      expect(extractFromContext('input.name', baseContext)).toBe('Alice');
     });
 
     test('extracts numeric input field', () => {
-      expect(extractFromContext('$.input.age', baseContext)).toBe(30);
+      expect(extractFromContext('input.age', baseContext)).toBe(30);
     });
 
     test('extracts nested input field', () => {
-      expect(extractFromContext('$.input.config.verbose', baseContext)).toBe(true);
+      expect(extractFromContext('input.config.verbose', baseContext)).toBe(true);
     });
   });
 
   describe('state paths', () => {
     test('extracts top-level state field', () => {
-      expect(extractFromContext('$.state.score', baseContext)).toBe(85);
+      expect(extractFromContext('state.score', baseContext)).toBe(85);
     });
 
     test('extracts string state field', () => {
-      expect(extractFromContext('$.state.status', baseContext)).toBe('approved');
+      expect(extractFromContext('state.status', baseContext)).toBe('approved');
     });
 
     test('extracts deeply nested state field', () => {
-      expect(extractFromContext('$.state.nested.deep.value', baseContext)).toBe('found');
+      expect(extractFromContext('state.nested.deep.value', baseContext)).toBe('found');
     });
 
     test('extracts array from state', () => {
-      expect(extractFromContext('$.state.items', baseContext)).toEqual([1, 2, 3]);
+      expect(extractFromContext('state.items', baseContext)).toEqual([1, 2, 3]);
     });
   });
 
   describe('output paths', () => {
     test('extracts top-level output field', () => {
-      expect(extractFromContext('$.output.result', baseContext)).toBe('success');
+      expect(extractFromContext('output.result', baseContext)).toBe('success');
     });
 
     test('extracts nested output field', () => {
-      expect(extractFromContext('$.output.data.greeting', baseContext)).toBe('Hello, Alice!');
+      expect(extractFromContext('output.data.greeting', baseContext)).toBe('Hello, Alice!');
     });
   });
 
-  describe('literal values (non-JSONPath)', () => {
+  describe('literal values', () => {
     test('returns string literal as-is', () => {
-      expect(extractFromContext('hello world', baseContext)).toBe('hello world');
+      expect(extractFromContext('"hello world"', baseContext)).toBe('hello world');
     });
 
-    test('returns numeric string as-is', () => {
-      expect(extractFromContext('123', baseContext)).toBe('123');
-    });
-
-    test('returns empty string as-is', () => {
-      expect(extractFromContext('', baseContext)).toBe('');
+    test('returns numeric literal', () => {
+      expect(extractFromContext('123', baseContext)).toBe(123);
     });
   });
 
   describe('missing paths', () => {
     test('returns undefined for missing top-level field', () => {
-      expect(extractFromContext('$.input.nonexistent', baseContext)).toBeUndefined();
+      expect(extractFromContext('input.nonexistent', baseContext)).toBeUndefined();
     });
 
     test('returns undefined for missing nested field', () => {
-      expect(extractFromContext('$.state.nested.missing.value', baseContext)).toBeUndefined();
+      expect(extractFromContext('state.nested.missing.value', baseContext)).toBeUndefined();
     });
 
-    test('returns undefined for invalid section', () => {
-      expect(extractFromContext('$.invalid.field', baseContext)).toBeUndefined();
+    test('returns undefined for undefined variable', () => {
+      expect(extractFromContext('invalid.field', baseContext)).toBeUndefined();
     });
   });
 
@@ -126,18 +124,36 @@ describe('extractFromContext', () => {
         state: {},
         output: {},
       };
-      expect(extractFromContext('$.input.value', context)).toBeNull();
+      expect(extractFromContext('input.value', context)).toBeNull();
     });
 
     test('handles object value', () => {
-      expect(extractFromContext('$.input.config', baseContext)).toEqual({
+      expect(extractFromContext('input.config', baseContext)).toEqual({
         verbose: true,
         retries: 3,
       });
     });
 
     test('returns undefined traversing through non-object', () => {
-      expect(extractFromContext('$.input.name.invalid', baseContext)).toBeUndefined();
+      expect(extractFromContext('input.name.invalid', baseContext)).toBeUndefined();
+    });
+  });
+
+  describe('computed expressions', () => {
+    test('computes arithmetic expression', () => {
+      expect(extractFromContext('state.score * 2', baseContext)).toBe(170);
+    });
+
+    test('computes comparison expression', () => {
+      expect(extractFromContext('state.score >= 80', baseContext)).toBe(true);
+    });
+
+    test('computes ternary expression', () => {
+      expect(extractFromContext('state.score >= 80 ? "pass" : "fail"', baseContext)).toBe('pass');
+    });
+
+    test('computes length function', () => {
+      expect(extractFromContext('length(state.items)', baseContext)).toBe(3);
     });
   });
 });
@@ -148,7 +164,7 @@ describe('extractFromContext', () => {
 
 describe('extractFinalOutput', () => {
   test('extracts single field', () => {
-    const result = extractFinalOutput({ final_result: '$.output.result' }, baseContext);
+    const result = extractFinalOutput({ final_result: 'output.result' }, baseContext);
 
     expect(result.output).toEqual({ final_result: 'success' });
   });
@@ -156,9 +172,9 @@ describe('extractFinalOutput', () => {
   test('extracts multiple fields', () => {
     const result = extractFinalOutput(
       {
-        name: '$.input.name',
-        score: '$.state.score',
-        result: '$.output.result',
+        name: 'input.name',
+        score: 'state.score',
+        result: 'output.result',
       },
       baseContext,
     );
@@ -171,7 +187,7 @@ describe('extractFinalOutput', () => {
   });
 
   test('extracts nested source to flat target', () => {
-    const result = extractFinalOutput({ greeting: '$.output.data.greeting' }, baseContext);
+    const result = extractFinalOutput({ greeting: 'output.data.greeting' }, baseContext);
 
     expect(result.output).toEqual({ greeting: 'Hello, Alice!' });
   });
@@ -191,8 +207,8 @@ describe('extractFinalOutput', () => {
   test('handles missing paths (undefined values)', () => {
     const result = extractFinalOutput(
       {
-        existing: '$.state.score',
-        missing: '$.state.nonexistent',
+        existing: 'state.score',
+        missing: 'state.nonexistent',
       },
       baseContext,
     );
@@ -206,8 +222,8 @@ describe('extractFinalOutput', () => {
   test('handles literal values in mapping', () => {
     const result = extractFinalOutput(
       {
-        version: 'v1.0.0',
-        computed: '$.state.score',
+        version: '"v1.0.0"',
+        computed: 'state.score',
       },
       baseContext,
     );
@@ -220,21 +236,21 @@ describe('extractFinalOutput', () => {
 
   describe('events', () => {
     test('emits start event', () => {
-      const result = extractFinalOutput({ x: '$.state.score' }, baseContext);
+      const result = extractFinalOutput({ x: 'state.score' }, baseContext);
 
       const startEvent = result.events.find((e) => e.type === 'decision.completion.start');
       expect(startEvent).toBeDefined();
     });
 
     test('emits extract events for each field', () => {
-      const result = extractFinalOutput({ a: '$.input.name', b: '$.state.score' }, baseContext);
+      const result = extractFinalOutput({ a: 'input.name', b: 'state.score' }, baseContext);
 
       const extractEvents = result.events.filter((e) => e.type === 'decision.completion.extract');
       expect(extractEvents).toHaveLength(2);
     });
 
     test('emits complete event with final output', () => {
-      const result = extractFinalOutput({ result: '$.output.result' }, baseContext);
+      const result = extractFinalOutput({ result: 'output.result' }, baseContext);
 
       const completeEvent = result.events.find((e) => e.type === 'decision.completion.complete');
       expect(completeEvent).toMatchObject({
@@ -260,7 +276,7 @@ describe('extractFinalOutput', () => {
 
 describe('applyInputMapping', () => {
   test('extracts single field', () => {
-    const result = applyInputMapping({ userName: '$.input.name' }, baseContext);
+    const result = applyInputMapping({ userName: 'input.name' }, baseContext);
 
     expect(result).toEqual({ userName: 'Alice' });
   });
@@ -268,9 +284,9 @@ describe('applyInputMapping', () => {
   test('extracts multiple fields', () => {
     const result = applyInputMapping(
       {
-        name: '$.input.name',
-        currentScore: '$.state.score',
-        previousResult: '$.output.result',
+        name: 'input.name',
+        currentScore: 'state.score',
+        previousResult: 'output.result',
       },
       baseContext,
     );
@@ -297,8 +313,8 @@ describe('applyInputMapping', () => {
   test('handles missing paths', () => {
     const result = applyInputMapping(
       {
-        exists: '$.state.score',
-        missing: '$.state.nonexistent',
+        exists: 'state.score',
+        missing: 'state.nonexistent',
       },
       baseContext,
     );
@@ -310,7 +326,7 @@ describe('applyInputMapping', () => {
   });
 
   test('extracts nested objects', () => {
-    const result = applyInputMapping({ config: '$.input.config' }, baseContext);
+    const result = applyInputMapping({ config: 'input.config' }, baseContext);
 
     expect(result).toEqual({
       config: { verbose: true, retries: 3 },
@@ -318,16 +334,16 @@ describe('applyInputMapping', () => {
   });
 
   test('extracts arrays', () => {
-    const result = applyInputMapping({ items: '$.state.items' }, baseContext);
+    const result = applyInputMapping({ items: 'state.items' }, baseContext);
 
     expect(result).toEqual({ items: [1, 2, 3] });
   });
 
-  test('handles literal values', () => {
+  test('handles literal string values', () => {
     const result = applyInputMapping(
       {
-        staticValue: 'constant',
-        dynamicValue: '$.input.name',
+        staticValue: '"constant"',
+        dynamicValue: 'input.name',
       },
       baseContext,
     );

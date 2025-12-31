@@ -1263,6 +1263,70 @@ export class Conversation extends DurableObject {
   }
 
   /**
+   * Handle context assembly error.
+   *
+   * Called when the context assembly workflow fails.
+   * Context assembly is critical - failure means the turn cannot proceed.
+   */
+  async handleContextAssemblyError(turnId: string, runId: string, error: string): Promise<void> {
+    try {
+      const turn = this.turns.get(turnId);
+      if (!turn) {
+        this.logger.warn({
+          eventType: 'conversation.context_assembly_error.turn_not_found',
+          message: 'Turn not found for context assembly error',
+          metadata: { turnId, runId },
+        });
+        return;
+      }
+
+      this.logger.error({
+        eventType: 'conversation.context_assembly_error.received',
+        message: 'Context assembly failed',
+        traceId: turn.conversationId,
+        metadata: { turnId, runId, error },
+      });
+
+      // Fail the turn - context assembly is critical
+      this.turns.fail(turnId, 'CONTEXT_ASSEMBLY_FAILED', error);
+
+      // Notify WebSocket client if connected
+      this.sendWebSocketMessage({
+        type: 'error',
+        turnId,
+        message: error,
+        code: 'CONTEXT_ASSEMBLY_FAILED',
+      });
+
+      // Sync failure to D1
+      const ctx = this.getDispatchContext();
+      ctx.waitUntil(
+        ctx.resources
+          .turns()
+          .fail(turnId)
+          .catch((syncError: Error) => {
+            this.emitter.emitTrace({
+              type: 'dispatch.turn.d1_sync_failed',
+              payload: { turnId, action: 'fail', error: syncError.message },
+            });
+          }),
+      );
+    } catch (err) {
+      this.logger.error({
+        eventType: 'conversation.context_assembly_error.handler_failed',
+        message: 'Failed to handle context assembly error',
+        metadata: {
+          turnId,
+          runId,
+          originalError: error,
+          handlerError: err instanceof Error ? err.message : String(err),
+        },
+      });
+      throw err;
+    }
+  }
+
+  /**
    * Handle memory extraction completion.
    *
    * Called when the memory extraction workflow completes.

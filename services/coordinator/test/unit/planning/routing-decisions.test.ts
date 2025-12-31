@@ -5,12 +5,18 @@
  * Tests priority tiers, condition evaluation, spawn counts, and path building.
  */
 
+import { parse } from '@wonder/expressions';
 import { describe, expect, test } from 'vitest';
 
 import type { TransitionRow } from '../../../src/operations/defs';
 import type { TokenRow } from '../../../src/operations/tokens';
 import { decideRouting } from '../../../src/planning/routing';
 import type { Condition, ContextSnapshot } from '../../../src/types';
+
+// Helper to create condition from expression string
+function cond(expr: string): Condition {
+  return parse(expr);
+}
 
 // ============================================================================
 // Test Fixtures
@@ -110,12 +116,7 @@ describe('decideRouting - unconditional', () => {
 
 describe('decideRouting - conditional', () => {
   test('matching condition creates token', () => {
-    const condition: Condition = {
-      type: 'comparison',
-      left: { field: 'state.score' },
-      operator: '>=',
-      right: { literal: 80 },
-    };
+    const condition = cond('state.score >= 80');
 
     const result = decideRouting({
       completedToken: createToken(),
@@ -130,12 +131,7 @@ describe('decideRouting - conditional', () => {
   });
 
   test('non-matching condition creates no token', () => {
-    const condition: Condition = {
-      type: 'comparison',
-      left: { field: 'state.score' },
-      operator: '>=',
-      right: { literal: 90 },
-    };
+    const condition = cond('state.score >= 90');
 
     const result = decideRouting({
       completedToken: createToken(),
@@ -160,12 +156,7 @@ describe('decideRouting - priority tiers', () => {
         id: 'trans_p1',
         priority: 1,
         toNodeId: 'nodeB',
-        condition: {
-          type: 'comparison',
-          left: { field: 'state.status' },
-          operator: '==',
-          right: { literal: 'approved' },
-        },
+        condition: cond('state.status === "approved"'),
       }),
       createTransition({
         id: 'trans_p2',
@@ -196,12 +187,7 @@ describe('decideRouting - priority tiers', () => {
         id: 'trans_p1',
         priority: 1,
         toNodeId: 'nodeB',
-        condition: {
-          type: 'comparison',
-          left: { field: 'state.status' },
-          operator: '==',
-          right: { literal: 'rejected' },
-        },
+        condition: cond('state.status === "rejected"'),
       }),
       createTransition({
         id: 'trans_p2',
@@ -232,23 +218,13 @@ describe('decideRouting - priority tiers', () => {
         id: 'trans_1',
         priority: 1,
         toNodeId: 'nodeB',
-        condition: {
-          type: 'comparison',
-          left: { field: 'state.score' },
-          operator: '>=',
-          right: { literal: 80 },
-        },
+        condition: cond('state.score >= 80'),
       }),
       createTransition({
         id: 'trans_2',
         priority: 1,
         toNodeId: 'nodeC',
-        condition: {
-          type: 'comparison',
-          left: { field: 'state.status' },
-          operator: '==',
-          right: { literal: 'approved' },
-        },
+        condition: cond('state.status === "approved"'),
       }),
     ];
 
@@ -273,23 +249,13 @@ describe('decideRouting - priority tiers', () => {
         id: 'trans_1',
         priority: 1,
         toNodeId: 'nodeB',
-        condition: {
-          type: 'comparison',
-          left: { field: 'state.score' },
-          operator: '>=',
-          right: { literal: 80 },
-        },
+        condition: cond('state.score >= 80'),
       }),
       createTransition({
         id: 'trans_2',
         priority: 1,
         toNodeId: 'nodeC',
-        condition: {
-          type: 'comparison',
-          left: { field: 'state.score' },
-          operator: '>=',
-          right: { literal: 90 },
-        },
+        condition: cond('state.score >= 90'),
       }),
     ];
 
@@ -532,8 +498,10 @@ describe('decideRouting - events', () => {
     expect(startEvent).toBeDefined();
     expect(startEvent).toMatchObject({
       type: 'decision.routing.start',
-      tokenId: 'tok_completed',
-      nodeId: 'nodeA',
+      payload: {
+        tokenId: 'tok_completed',
+        nodeId: 'nodeA',
+      },
     });
   });
 

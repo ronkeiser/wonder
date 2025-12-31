@@ -674,19 +674,66 @@ async function applyOne(decision: Decision, ctx: DispatchContext): Promise<Apply
       }
 
       // Check for agent callback metadata in workflow run input
-      // Only route errors for workflow tool calls (context_assembly and memory_extraction
-      // don't need error callbacks - they're internal)
+      // Route errors based on callback type
       const runContext = run.context as { input?: { _callback?: AgentCallback } };
       const callback = runContext.input?._callback;
 
-      if (callback?.conversationId && callback.type === 'workflow' && callback.toolCallId) {
+      if (callback?.conversationId) {
         const agentId = ctx.agent.idFromName(callback.conversationId);
         const agent = ctx.agent.get(agentId);
 
-        ctx.waitUntil(
-          agent
-            .handleWorkflowError(callback.turnId, callback.toolCallId, decision.error)
-            .catch((error) => {
+        if (callback.type === 'context_assembly') {
+          // Context assembly failure is critical - fail the turn
+          ctx.waitUntil(
+            agent.handleContextAssemblyError(callback.turnId, ctx.workflowRunId, decision.error).catch((error) => {
+              ctx.emitter.emitTrace({
+                type: 'workflow.agent_callback.error',
+                payload: {
+                  workflowRunId: ctx.workflowRunId,
+                  callbackType: 'context_assembly_error',
+                  error: errorMessage(error),
+                },
+              });
+            }),
+          );
+
+          ctx.emitter.emit({
+            eventType: 'workflow.agent_callback.sent',
+            message: 'Agent context assembly error callback sent',
+            metadata: {
+              conversationId: callback.conversationId,
+              turnId: callback.turnId,
+              error: decision.error,
+            },
+          });
+        } else if (callback.type === 'memory_extraction') {
+          // Memory extraction failure - turn already complete, just mark the failure
+          ctx.waitUntil(
+            agent.handleMemoryExtractionError(callback.turnId, ctx.workflowRunId, decision.error).catch((error) => {
+              ctx.emitter.emitTrace({
+                type: 'workflow.agent_callback.error',
+                payload: {
+                  workflowRunId: ctx.workflowRunId,
+                  callbackType: 'memory_extraction_error',
+                  error: errorMessage(error),
+                },
+              });
+            }),
+          );
+
+          ctx.emitter.emit({
+            eventType: 'workflow.agent_callback.sent',
+            message: 'Agent memory extraction error callback sent',
+            metadata: {
+              conversationId: callback.conversationId,
+              turnId: callback.turnId,
+              error: decision.error,
+            },
+          });
+        } else if (callback.type === 'workflow' && callback.toolCallId) {
+          // Workflow tool call error
+          ctx.waitUntil(
+            agent.handleWorkflowError(callback.turnId, callback.toolCallId, decision.error).catch((error) => {
               ctx.emitter.emitTrace({
                 type: 'workflow.agent_callback.error',
                 payload: {
@@ -696,18 +743,19 @@ async function applyOne(decision: Decision, ctx: DispatchContext): Promise<Apply
                 },
               });
             }),
-        );
+          );
 
-        ctx.emitter.emit({
-          eventType: 'workflow.agent_callback.sent',
-          message: 'Agent error callback sent',
-          metadata: {
-            conversationId: callback.conversationId,
-            turnId: callback.turnId,
-            toolCallId: callback.toolCallId,
-            error: decision.error,
-          },
-        });
+          ctx.emitter.emit({
+            eventType: 'workflow.agent_callback.sent',
+            message: 'Agent workflow error callback sent',
+            metadata: {
+              conversationId: callback.conversationId,
+              turnId: callback.turnId,
+              toolCallId: callback.toolCallId,
+              error: decision.error,
+            },
+          });
+        }
       }
 
       return {};
