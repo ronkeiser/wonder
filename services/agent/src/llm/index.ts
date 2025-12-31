@@ -169,6 +169,8 @@ function parseAnthropicResponse(response: AnthropicResponse): LLMResponse {
     text: text || undefined,
     toolUse,
     stopReason,
+    // Preserve raw content blocks for tool continuation
+    rawContent: response.content,
   };
 }
 
@@ -258,6 +260,7 @@ async function processAnthropicStream(
   let buffer = '';
   let fullText = '';
   const toolUseBlocks: LLMToolUse[] = [];
+  const rawContentBlocks: unknown[] = [];
   let stopReason: LLMResponse['stopReason'] = 'end_turn';
 
   // Track current tool use being built
@@ -289,6 +292,13 @@ async function processAnthropicStream(
           }
           if (result.toolUse) {
             toolUseBlocks.push(result.toolUse);
+            // Add to raw content blocks for continuation
+            rawContentBlocks.push({
+              type: 'tool_use',
+              id: result.toolUse.id,
+              name: result.toolUse.name,
+              input: result.toolUse.input,
+            });
             currentToolUse = null;
           }
           if (result.currentToolUse !== undefined) {
@@ -306,10 +316,16 @@ async function processAnthropicStream(
     reader.releaseLock();
   }
 
+  // Build final raw content (text block + tool blocks)
+  if (fullText) {
+    rawContentBlocks.unshift({ type: 'text', text: fullText });
+  }
+
   return {
     text: fullText || undefined,
     toolUse: toolUseBlocks.length > 0 ? toolUseBlocks : undefined,
     stopReason,
+    rawContent: rawContentBlocks.length > 0 ? rawContentBlocks : undefined,
   };
 }
 

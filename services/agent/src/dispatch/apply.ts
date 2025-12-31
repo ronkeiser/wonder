@@ -194,7 +194,7 @@ function dispatchTask(
   decision: Extract<AgentDecision, { type: 'DISPATCH_TASK' }>,
   ctx: DispatchContext,
 ): void {
-  const { turnId, toolCallId, taskId, input } = decision;
+  const { turnId, toolCallId, taskId, input, rawContent } = decision;
 
   // Record move for this tool call
   ctx.moves.record({
@@ -204,6 +204,7 @@ function dispatchTask(
       toolId: taskId,
       input: input as Record<string, unknown>,
     },
+    rawContent,
   });
 
   // Track as async operation
@@ -248,7 +249,7 @@ async function dispatchWorkflow(
   decision: Extract<AgentDecision, { type: 'DISPATCH_WORKFLOW' }>,
   ctx: DispatchContext,
 ): Promise<void> {
-  const { turnId, toolCallId, workflowId, input, async: isAsync } = decision;
+  const { turnId, toolCallId, workflowId, input, async: isAsync, rawContent } = decision;
 
   // Record move for this tool call
   ctx.moves.record({
@@ -258,6 +259,7 @@ async function dispatchWorkflow(
       toolId: workflowId,
       input: input as Record<string, unknown>,
     },
+    rawContent,
   });
 
   // Track as async operation
@@ -309,7 +311,7 @@ function dispatchAgent(
   decision: Extract<AgentDecision, { type: 'DISPATCH_AGENT' }>,
   ctx: DispatchContext,
 ): void {
-  const { turnId, toolCallId, agentId, input, mode, async: isAsync } = decision;
+  const { turnId, toolCallId, agentId, input, mode, async: isAsync, rawContent } = decision;
 
   // Record move for this tool call
   ctx.moves.record({
@@ -319,6 +321,7 @@ function dispatchAgent(
       toolId: agentId,
       input: input as Record<string, unknown>,
     },
+    rawContent,
   });
 
   // Track as async operation
@@ -340,9 +343,21 @@ function dispatchAgent(
   const targetAgentId = ctx.agent.idFromName(targetConversationId);
   const targetAgent = ctx.agent.get(targetAgentId);
 
+  // For delegate mode, embed callback metadata so target agent can report back
+  const targetInput = mode === 'delegate'
+    ? {
+        ...(input as Record<string, unknown>),
+        _agentCallback: {
+          conversationId: ctx.conversationId,
+          turnId,
+          toolCallId,
+        },
+      }
+    : input;
+
   ctx.waitUntil(
     targetAgent
-      .startTurn(targetConversationId, input, {
+      .startTurn(targetConversationId, targetInput, {
         type: 'agent',
         agentId: ctx.conversationId, // The calling agent's conversation ID
         turnId,

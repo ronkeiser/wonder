@@ -16,7 +16,7 @@ import { ulid } from 'ulid';
 
 import { applyDecisions } from './dispatch/apply';
 import type { DispatchContext } from './dispatch/context';
-import { callLLM } from './llm';
+import { callLLM, callLLMWithStreaming } from './llm';
 import type { DefinitionManager, ToolDefRow } from './operations/defs';
 import type { MoveRow } from './operations/moves';
 import { interpretResponse, resolveTools, type Tool } from './planning';
@@ -160,8 +160,10 @@ export async function runLLMLoop(params: RunLLMLoopParams): Promise<RunLLMLoopRe
     },
   });
 
-  // Call LLM
-  const response = await callLLM(llmRequest, specs, ctx.env.ANTHROPIC_API_KEY);
+  // Call LLM (use streaming if WebSocket connected)
+  const response = ctx.streamToken
+    ? await callLLMWithStreaming(llmRequest, specs, ctx.env.ANTHROPIC_API_KEY, ctx.streamToken)
+    : await callLLM(llmRequest, specs, ctx.env.ANTHROPIC_API_KEY);
 
   ctx.emitter.emitTrace({
     type: 'loop.llm.response',

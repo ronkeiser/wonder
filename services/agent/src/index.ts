@@ -24,7 +24,7 @@ import {
   MoveManager,
   TurnManager,
 } from './operations';
-import type { Caller, LLMRequest, ToolResult } from './types';
+import type { AgentCallback, Caller, LLMRequest, ToolResult } from './types';
 
 /**
  * Conversation Durable Object
@@ -39,6 +39,9 @@ export class Conversation extends DurableObject {
   private messages: MessageManager;
   private moves: MoveManager;
   private asyncOps: AsyncOpManager;
+
+  /** Active WebSocket connection for streaming LLM tokens */
+  private activeWebSocket: WebSocket | null = null;
 
   constructor(ctx: DurableObjectState, env: Env) {
     super(ctx, env);
@@ -98,7 +101,66 @@ export class Conversation extends DurableObject {
       resources: this.env.RESOURCES,
       env: this.env,
       waitUntil: (promise) => this.ctx.waitUntil(promise),
+      streamToken: this.activeWebSocket
+        ? (token: string) => this.activeWebSocket?.send(JSON.stringify({ type: 'token', token }))
+        : undefined,
     };
+  }
+
+  /**
+   * Handle HTTP requests to the Conversation DO.
+   *
+   * Supports WebSocket upgrade for real-time LLM token streaming.
+   */
+  async fetch(request: Request): Promise<Response> {
+    // WebSocket upgrade for streaming
+    if (request.headers.get('Upgrade') === 'websocket') {
+      const pair = new WebSocketPair();
+      const [client, server] = Object.values(pair);
+
+      server.accept();
+      this.handleWebSocket(server);
+
+      return new Response(null, { status: 101, webSocket: client });
+    }
+
+    return new Response('Not found', { status: 404 });
+  }
+
+  /**
+   * Handle WebSocket connection for streaming.
+   */
+  private handleWebSocket(ws: WebSocket): void {
+    this.activeWebSocket = ws;
+
+    ws.addEventListener('message', async (event) => {
+      try {
+        const data = JSON.parse(event.data as string) as {
+          type: string;
+          conversationId?: string;
+          input?: unknown;
+          caller?: Caller;
+        };
+
+        if (data.type === 'start_turn' && data.conversationId && data.caller) {
+          const result = await this.startTurn(data.conversationId, data.input, data.caller);
+          ws.send(JSON.stringify({ type: 'turn_started', turnId: result.turnId }));
+        }
+      } catch (error) {
+        ws.send(JSON.stringify({
+          type: 'error',
+          message: error instanceof Error ? error.message : 'Unknown error',
+        }));
+      }
+    });
+
+    ws.addEventListener('close', () => {
+      this.activeWebSocket = null;
+    });
+
+    ws.addEventListener('error', () => {
+      this.activeWebSocket = null;
+    });
   }
 
   /**
@@ -156,6 +218,51 @@ export class Conversation extends DurableObject {
       traceId: ctx.conversationId,
       metadata: { turnId },
     });
+
+    // Check for agent callback (delegate mode completion)
+    const turn = this.turns.get(turnId);
+    const inputWithCallback = turn?.input as { _agentCallback?: AgentCallback } | null;
+    const callback = inputWithCallback?._agentCallback;
+
+    if (callback) {
+      // Extract final response from moves (last reasoning text)
+      const moves = this.moves.getForTurn(turnId);
+      const lastMoveWithReasoning = [...moves].reverse().find((m) => m.reasoning);
+      const response = lastMoveWithReasoning?.reasoning ?? '';
+
+      // Call back to parent agent
+      const parentAgentId = ctx.agent.idFromName(callback.conversationId);
+      const parentAgent = ctx.agent.get(parentAgentId);
+
+      this.logger.info({
+        eventType: 'conversation.turn.agent_callback',
+        message: 'Calling back to parent agent',
+        traceId: ctx.conversationId,
+        metadata: {
+          turnId,
+          parentConversationId: callback.conversationId,
+          parentTurnId: callback.turnId,
+          toolCallId: callback.toolCallId,
+        },
+      });
+
+      ctx.waitUntil(
+        parentAgent
+          .handleAgentResponse(callback.turnId, callback.toolCallId, response)
+          .catch((error: Error) => {
+            this.logger.error({
+              eventType: 'conversation.turn.agent_callback_failed',
+              message: 'Failed to call back to parent agent',
+              traceId: ctx.conversationId,
+              metadata: {
+                turnId,
+                parentConversationId: callback.conversationId,
+                error: error.message,
+              },
+            });
+          }),
+      );
+    }
   }
 
   /**
@@ -169,34 +276,78 @@ export class Conversation extends DurableObject {
     toolCallId: string,
     result: ToolResult,
   ): LLMRequest {
-    // Get all messages for this turn
-    const messages = this.messages.getForTurn(turnId);
+    // Build conversation history in Anthropic format:
+    // 1. User message
+    // 2. For each LLM response with tool_use: assistant message + tool_result
+    // 3. New tool_result for this completion
 
-    // Build the continuation with the tool result appended
-    // The format depends on the LLM provider, but typically:
-    // - Previous messages (user, assistant with tool_use)
-    // - Tool result message
-    const formattedMessages = messages.map((m) => ({
-      role: m.role,
-      content: m.content,
-    }));
+    type AnthropicMessage = {
+      role: 'user' | 'assistant';
+      content: string | unknown[];
+    };
 
-    // Append tool result as a tool_result message
-    // This is a simplified format - actual implementation depends on provider
-    formattedMessages.push({
-      role: 'user' as const,
-      content: JSON.stringify({
+    const messages: AnthropicMessage[] = [];
+
+    // Get the user message for this turn
+    const turnMessages = this.messages.getForTurn(turnId);
+    const userMessage = turnMessages.find((m) => m.role === 'user');
+    if (userMessage) {
+      messages.push({
+        role: 'user',
+        content: userMessage.content,
+      });
+    }
+
+    // Get all moves for this turn to reconstruct the conversation
+    const moves = this.moves.getForTurn(turnId);
+
+    for (const move of moves) {
+      // If this move has raw content (assistant response with tool_use), add it
+      if (move.rawContent) {
+        messages.push({
+          role: 'assistant',
+          content: move.rawContent as unknown[],
+        });
+
+        // If this move has a tool result, add it as user message with tool_result block
+        if (move.toolResult !== null) {
+          const toolResultContent = move.toolResult as { success: boolean; result?: unknown; error?: { message: string } };
+          messages.push({
+            role: 'user',
+            content: [{
+              type: 'tool_result',
+              tool_use_id: move.toolCallId,
+              content: toolResultContent.success
+                ? (typeof toolResultContent.result === 'string'
+                    ? toolResultContent.result
+                    : JSON.stringify(toolResultContent.result))
+                : `Error: ${toolResultContent.error?.message ?? 'Unknown error'}`,
+              is_error: !toolResultContent.success,
+            }],
+          });
+        }
+      }
+    }
+
+    // Add the new tool result for the completing tool
+    messages.push({
+      role: 'user',
+      content: [{
         type: 'tool_result',
         tool_use_id: toolCallId,
         content: result.success
-          ? JSON.stringify(result.result)
+          ? (typeof result.result === 'string' ? result.result : JSON.stringify(result.result))
           : `Error: ${result.error?.message ?? 'Unknown error'}`,
         is_error: !result.success,
-      }),
+      }],
     });
 
+    // Get persona for model settings
+    const persona = this.defs.getPersona();
+
     return {
-      messages: formattedMessages,
+      messages,
+      systemPrompt: persona?.systemPrompt,
     };
   }
 

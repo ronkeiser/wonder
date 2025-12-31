@@ -31,6 +31,8 @@ export type RecordMoveParams = {
     toolId: string;
     input: Record<string, unknown>;
   };
+  /** Raw LLM response content blocks for tool continuation */
+  rawContent?: unknown[];
   raw?: string;
 };
 
@@ -70,6 +72,7 @@ export class MoveManager {
         toolCallId: params.toolCall?.id ?? null,
         toolId: params.toolCall?.toolId ?? null,
         toolInput: params.toolCall?.input ?? null,
+        rawContent: params.rawContent ?? null,
         raw: params.raw ?? null,
         createdAt: now,
       })

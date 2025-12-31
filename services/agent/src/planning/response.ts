@@ -22,6 +22,8 @@ export type LLMResponse = {
   text?: string;
   toolUse?: LLMToolUse[];
   stopReason: 'end_turn' | 'tool_use' | 'max_tokens';
+  /** Raw content blocks from LLM response (for tool continuation) */
+  rawContent?: unknown[];
 };
 
 // ============================================================================
@@ -43,6 +45,8 @@ export type InterpretResponseParams = {
  */
 export function interpretResponse(params: InterpretResponseParams): PlanningResult {
   const { turnId, response, toolLookup } = params;
+  // Use rawContent from response for tool continuation
+  const rawContent = response.rawContent;
 
   const decisions: AgentDecision[] = [];
   const events: PlanningResult['events'] = [];
@@ -91,7 +95,7 @@ export function interpretResponse(params: InterpretResponseParams): PlanningResu
       }
 
       // Generate dispatch decision based on target type
-      const dispatchDecision = createDispatchDecision(turnId, toolCall, tool);
+      const dispatchDecision = createDispatchDecision(turnId, toolCall, tool, rawContent);
       decisions.push(dispatchDecision);
 
       // Track async operations
@@ -138,7 +142,8 @@ export function interpretResponse(params: InterpretResponseParams): PlanningResu
 function createDispatchDecision(
   turnId: string,
   toolCall: LLMToolUse,
-  tool: Tool
+  tool: Tool,
+  rawContent?: unknown[],
 ): AgentDecision {
   const input = applyInputMapping(toolCall.input, tool.inputMapping);
 
@@ -150,6 +155,7 @@ function createDispatchDecision(
         toolCallId: toolCall.id,
         taskId: tool.targetId,
         input,
+        rawContent,
       };
 
     case 'workflow':
@@ -160,6 +166,7 @@ function createDispatchDecision(
         workflowId: tool.targetId,
         input,
         async: tool.async ?? false,
+        rawContent,
       };
 
     case 'agent':
@@ -171,6 +178,7 @@ function createDispatchDecision(
         input,
         mode: tool.invocationMode ?? 'delegate',
         async: tool.async ?? false,
+        rawContent,
       };
   }
 }

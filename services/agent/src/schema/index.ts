@@ -162,6 +162,11 @@ export const moves = sqliteTable(
     toolInput: text({ mode: 'json' }),
     toolResult: text({ mode: 'json' }),
 
+    // Raw LLM response content blocks (for tool continuation)
+    // Stores the full assistant content array so we can reconstruct
+    // the assistant message with tool_use blocks for continuation
+    rawContent: text({ mode: 'json' }).$type<unknown[]>(),
+
     // Debug
     raw: text(),
 

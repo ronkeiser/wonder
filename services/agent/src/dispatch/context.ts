@@ -41,4 +41,7 @@ export type DispatchContext = {
 
   // Async primitives
   waitUntil: (promise: Promise<unknown>) => void;
+
+  // Streaming callback (set when WebSocket is connected)
+  streamToken?: (token: string) => void;
 };

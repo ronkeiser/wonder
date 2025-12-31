@@ -187,6 +187,8 @@ export type AgentDecision =
       toolCallId: string;
       taskId: string;
       input: unknown;
+      /** Raw content blocks from LLM response (for tool continuation) */
+      rawContent?: unknown[];
     }
   | {
       type: 'DISPATCH_WORKFLOW';
@@ -195,6 +197,8 @@ export type AgentDecision =
       workflowId: string;
       input: unknown;
       async: boolean;
+      /** Raw content blocks from LLM response (for tool continuation) */
+      rawContent?: unknown[];
     }
   | {
       type: 'DISPATCH_AGENT';
@@ -204,6 +208,8 @@ export type AgentDecision =
       input: unknown;
       mode: 'delegate' | 'loop_in';
       async: boolean;
+      /** Raw content blocks from LLM response (for tool continuation) */
+      rawContent?: unknown[];
     }
 
   // Async tracking
@@ -237,3 +243,20 @@ export type AgentDecision =
       workflowId: string;
       input: MemoryExtractionInput;
     };
+
+// ============================================================================
+// Agent Callback Type (for delegate mode agent invocation)
+// ============================================================================
+
+/**
+ * Callback metadata for agent-to-agent delegation.
+ * Embedded in target agent's input to enable callback on completion.
+ */
+export type AgentCallback = {
+  /** The calling agent's conversation ID */
+  conversationId: string;
+  /** The calling agent's turn ID */
+  turnId: string;
+  /** The tool call ID to report result back to */
+  toolCallId: string;
+};
