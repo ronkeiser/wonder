@@ -6,6 +6,7 @@
 import { WorkerEntrypoint } from 'cloudflare:workers';
 import { Actions } from './resources/actions';
 import { Agents } from './resources/agents';
+import { ArtifactTypes } from './resources/artifact-types';
 import { Conversations } from './resources/conversations';
 import { Messages } from './resources/messages';
 import { ModelProfiles } from './resources/model-profiles';
@@ -25,82 +26,70 @@ import { Workspaces } from './resources/workspaces';
  * Handles HTTP requests, queue messages, and provides RPC methods
  */
 class WonderResources extends WorkerEntrypoint<Env> {
-  /** RPC: Workspaces adapter */
-  workspaces() {
-    return new Workspaces(this.env, this.ctx);
-  }
-
-  /** RPC: Projects adapter */
-  projects() {
-    return new Projects(this.env, this.ctx);
-  }
-
-  /** RPC: WorkflowDefs adapter */
-  workflowDefs() {
-    return new WorkflowDefs(this.env, this.ctx);
-  }
-
-  /** RPC: Workflows adapter */
-  workflows() {
-    return new Workflows(this.env, this.ctx);
-  }
-
-  /** RPC: WorkflowRuns adapter */
-  workflowRuns() {
-    return new WorkflowRuns(this.env, this.ctx);
-  }
-
-  /** RPC: Actions adapter */
   actions() {
     return new Actions(this.env, this.ctx);
   }
 
-  /** RPC: Tasks adapter */
-  tasks() {
-    return new Tasks(this.env, this.ctx);
-  }
-
-  /** RPC: PromptSpecs adapter */
-  promptSpecs() {
-    return new PromptSpecs(this.env, this.ctx);
-  }
-
-  /** RPC: ModelProfiles adapter */
-  modelProfiles() {
-    return new ModelProfiles(this.env, this.ctx);
-  }
-
-  /** RPC: Personas adapter */
-  personas() {
-    return new Personas(this.env, this.ctx);
-  }
-
-  /** RPC: Tools adapter */
-  tools() {
-    return new Tools(this.env, this.ctx);
-  }
-
-  /** RPC: Agents adapter */
   agents() {
     return new Agents(this.env, this.ctx);
   }
 
-  /** RPC: Conversations adapter */
+  artifactTypes() {
+    return new ArtifactTypes(this.env, this.ctx);
+  }
+
   conversations() {
     return new Conversations(this.env, this.ctx);
   }
 
-  /** RPC: Turns adapter */
-  turns() {
-    return new Turns(this.env, this.ctx);
-  }
-
-  /** RPC: Messages adapter */
   messages() {
     return new Messages(this.env, this.ctx);
   }
 
-  /** HTTP fetch handler */
+  modelProfiles() {
+    return new ModelProfiles(this.env, this.ctx);
+  }
+
+  personas() {
+    return new Personas(this.env, this.ctx);
+  }
+
+  projects() {
+    return new Projects(this.env, this.ctx);
+  }
+
+  promptSpecs() {
+    return new PromptSpecs(this.env, this.ctx);
+  }
+
+  tasks() {
+    return new Tasks(this.env, this.ctx);
+  }
+
+  tools() {
+    return new Tools(this.env, this.ctx);
+  }
+
+  turns() {
+    return new Turns(this.env, this.ctx);
+  }
+
+  workflowDefs() {
+    return new WorkflowDefs(this.env, this.ctx);
+  }
+
+  workflowRuns() {
+    return new WorkflowRuns(this.env, this.ctx);
+  }
+
+  workflows() {
+    return new Workflows(this.env, this.ctx);
+  }
+
+  workspaces() {
+    return new Workspaces(this.env, this.ctx);
+  }
+
   fetch(): Response {
     return new Response('OK');
   }
