@@ -160,7 +160,7 @@ interface Agent {
 - **Embeddings in Vectorize** — Semantic search over memory content
 - **Overflow in R2** — Large memory content exceeding 4KB
 
-The persona defines how the agent behaves. The memory corpus *is* what the agent knows. When you create an agent, you're creating an entity that will learn and remember across every conversation it participates in.
+The persona defines how the agent behaves. The memory corpus _is_ what the agent knows. When you create an agent, you're creating an entity that will learn and remember across every conversation it participates in.
 
 Scope determines what the agent can see (repos, artifacts, other agents) and what memory it accumulates. An Implementer might be scoped to a single project; an Executive might span multiple projects.
 
@@ -222,8 +222,8 @@ The agent _has_ a persona and _uses_ workflows, but is neither.
 
 ConversationDO is the **actor that runs the agent loop for a single conversation**. It follows the same pattern as CoordinatorDO: receive messages, make decisions, dispatch work, wait for results.
 
-| DO             | Receives                                         | Decides                         | Dispatches to                         |
-| -------------- | ------------------------------------------------ | ------------------------------- | ------------------------------------- |
+| DO             | Receives                                         | Decides                         | Dispatches to                           |
+| -------------- | ------------------------------------------------ | ------------------------------- | --------------------------------------- |
 | CoordinatorDO  | Task results, subworkflow completions            | Graph traversal (deterministic) | Executor, CoordinatorDO, ConversationDO |
 | ConversationDO | User messages, workflow completions, agent calls | Agent loop (LLM-driven)         | Executor, CoordinatorDO, ConversationDO |
 
@@ -532,10 +532,10 @@ Observability comes from events:
 
 ### Durable Objects
 
-| DO             | Purpose                                                                             |
-| -------------- | ----------------------------------------------------------------------------------- |
-| CoordinatorDO  | Workflow execution — graph traversal, token management, fan-in sync                 |
-| ConversationDO | Conversation handling — agent loop, WebSocket streaming, turn management            |
+| DO             | Purpose                                                                  |
+| -------------- | ------------------------------------------------------------------------ |
+| CoordinatorDO  | Workflow execution — graph traversal, token management, fan-in sync      |
+| ConversationDO | Conversation handling — agent loop, WebSocket streaming, turn management |
 
 ## Context Assembly and Memory Extraction
 
@@ -724,12 +724,12 @@ export class ConversationDO extends DurableObject<Env> {
 
 **Entry point differences:**
 
-|                        | `startTurn`                  | `startAgentCall`                            |
-| ---------------------- | ---------------------------- | ------------------------------------------- |
-| **Caller**             | User via WebSocket           | Parent coordinator or another conversation  |
-| **Context**            | Conversation + user message  | Depends on invocation mode                  |
-| **Result destination** | Streams to WebSocket client  | Callbacks to parent coordinator/conversation|
-| **Conversation**       | Always within a conversation | `delegate`: none. `loop_in`: joins existing |
+|                        | `startTurn`                  | `startAgentCall`                             |
+| ---------------------- | ---------------------------- | -------------------------------------------- |
+| **Caller**             | User via WebSocket           | Parent coordinator or another conversation   |
+| **Context**            | Conversation + user message  | Depends on invocation mode                   |
+| **Result destination** | Streams to WebSocket client  | Callbacks to parent coordinator/conversation |
+| **Conversation**       | Always within a conversation | `delegate`: none. `loop_in`: joins existing  |
 
 For `delegate` mode, the agent sees only explicit input—no conversation context. For `loop_in` mode, the agent joins the caller's conversation as a participant and sees shared history.
 
@@ -818,15 +818,15 @@ startTurn(conversationId, userMessage, replyToMessageId?)
 
 ### Parallel to CoordinatorDO
 
-| Aspect               | CoordinatorDO                            | ConversationDO                                  |
-| -------------------- | ---------------------------------------- | ----------------------------------------------- |
-| **Instance scope**   | One workflow run                         | One conversation (multiple concurrent turns)    |
-| **State management** | Tokens, context, transitions             | Turns, messages, async operations               |
-| **Decision driver**  | Graph traversal (deterministic)          | LLM reasoning (non-deterministic)               |
-| **Dispatches to**    | Executor, CoordinatorDO, ConversationDO  | Executor, CoordinatorDO, ConversationDO         |
-| **Callbacks from**   | Executor, child coordinators, agents     | Executor, coordinators, child conversations     |
-| **Concurrency**      | Single workflow execution                | Parallel turns, each with sync/async operations |
-| **LLM calls**        | Via dispatched tasks                     | Direct (with streaming to client)               |
+| Aspect               | CoordinatorDO                           | ConversationDO                                  |
+| -------------------- | --------------------------------------- | ----------------------------------------------- |
+| **Instance scope**   | One workflow run                        | One conversation (multiple concurrent turns)    |
+| **State management** | Tokens, context, transitions            | Turns, messages, async operations               |
+| **Decision driver**  | Graph traversal (deterministic)         | LLM reasoning (non-deterministic)               |
+| **Dispatches to**    | Executor, CoordinatorDO, ConversationDO | Executor, CoordinatorDO, ConversationDO         |
+| **Callbacks from**   | Executor, child coordinators, agents    | Executor, coordinators, child conversations     |
+| **Concurrency**      | Single workflow execution               | Parallel turns, each with sync/async operations |
+| **LLM calls**        | Via dispatched tasks                    | Direct (with streaming to client)               |
 
 The core pattern is identical: receive → decide → dispatch → wait → resume. The difference is what drives the "decide" step. ConversationDO also handles WebSocket connections and makes LLM calls directly for streaming.
 
@@ -956,6 +956,17 @@ The workflow uses `memory.search`, `memory.read`, `artifact.search`, etc. to ret
 
 Side effects only—memory updates happen via `memory.write`, `memory.delete` actions during execution.
 
+### Streaming
+
+ConversationDO handles WebSocket connections and makes LLM calls directly, enabling real-time streaming:
+
+- **WebSocket connection:** Browser clients connect to `/conversations/:id`, which upgrades to a WebSocket handled by ConversationDO
+- **LLM streaming:** ConversationDO calls the LLM provider directly and streams tokens to the client as they arrive
+- **Per-message streaming:** Each agent message streams independently; tool results appear as discrete messages
+- **Async interleaving:** When async operations complete, results appear as new messages on the WebSocket, even if another stream is active
+
+This design keeps streaming simple: ConversationDO owns the client connection and the LLM call, so there's no indirection or callback coordination for the real-time path.
+
 ## Open Questions
 
 The following areas need further specification before implementation:
@@ -968,14 +979,3 @@ The decision types include `FAIL_TURN` but error semantics aren't detailed:
 - **Memory extraction failure** — does this fail the turn retroactively, or log and continue
 - **Delegated agent errors** — how do errors propagate back to the caller
 - **Retry semantics** — which operations are retryable, with what backoff
-
-### Streaming
-
-ConversationDO handles WebSocket connections and makes LLM calls directly, enabling real-time streaming:
-
-- **WebSocket connection:** Browser clients connect to `/conversations/:id`, which upgrades to a WebSocket handled by ConversationDO
-- **LLM streaming:** ConversationDO calls the LLM provider directly and streams tokens to the client as they arrive
-- **Per-message streaming:** Each agent message streams independently; tool results appear as discrete messages
-- **Async interleaving:** When async operations complete, results appear as new messages on the WebSocket, even if another stream is active
-
-This design keeps streaming simple: ConversationDO owns the client connection and the LLM call, so there's no indirection or callback coordination for the real-time path.
