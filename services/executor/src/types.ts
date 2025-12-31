@@ -49,6 +49,26 @@ export interface TaskResult {
   };
 }
 
+/**
+ * AgentTaskPayload - from AgentDO for tool execution
+ *
+ * Simpler than TaskPayload since agent context differs from workflow context.
+ * Agent provides conversation routing info for callback.
+ */
+export interface AgentTaskPayload {
+  toolCallId: string; // For result correlation (maps to tokenId in callback)
+  conversationId: string; // For callback routing to agent
+  turnId: string; // For callback context
+  taskId: string; // Task to execute
+  input: Record<string, unknown>; // Tool input from LLM
+
+  // Observability context
+  projectId?: string; // For trace events (optional, derived from agent if not provided)
+
+  // Execution config
+  timeoutMs?: number;
+}
+
 // Legacy interface - to be removed after migration
 export interface LLMCallParams {
   modelProfile: ModelProfile;

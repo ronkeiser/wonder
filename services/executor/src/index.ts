@@ -2,9 +2,15 @@ import { createEmitter } from '@wonder/events';
 import { createLogger } from '@wonder/logs';
 import { WorkerEntrypoint } from 'cloudflare:workers';
 import { runTask } from './execution/task-runner';
-import type { LLMCallParams, TaskPayload } from './types';
+import type { AgentTaskPayload, LLMCallParams, TaskPayload } from './types';
 
-export type { LLMCallParams, LLMCallResult, TaskPayload, TaskResult } from './types';
+export type {
+  AgentTaskPayload,
+  LLMCallParams,
+  LLMCallResult,
+  TaskPayload,
+  TaskResult,
+} from './types';
 
 /**
  * Wonder Executor Service
@@ -135,6 +141,144 @@ export default class ExecutorService extends WorkerEntrypoint<Env> {
         metrics: {
           durationMs: 0,
           stepsExecuted: 0,
+        },
+      });
+    }
+  }
+
+  /**
+   * RPC method - Execute a task for an agent (fire-and-forget, calls back to AgentDO)
+   *
+   * Similar to executeTask but with agent-specific callback routing.
+   * Used when an agent's tool invokes a task directly.
+   */
+  async executeTaskForAgent(payload: AgentTaskPayload): Promise<void> {
+    const { toolCallId, conversationId, turnId, taskId, input } = payload;
+
+    this.logger.info({
+      eventType: 'agent_task_execution_started',
+      message: 'Agent task execution started',
+      traceId: conversationId,
+      metadata: {
+        toolCallId,
+        conversationId,
+        turnId,
+        taskId,
+        inputKeys: Object.keys(input),
+      },
+    });
+
+    try {
+      // Load task definition from Resources (use latest version)
+      using tasksResource = this.env.RESOURCES.tasks();
+      const { task } = await tasksResource.get(taskId);
+
+      // Create emitter for this task execution
+      const emitter = createEmitter(
+        this.env.STREAMER,
+        {
+          streamId: conversationId, // Agent uses conversationId as stream boundary
+          executionId: conversationId,
+          executionType: 'conversation',
+          projectId: payload.projectId ?? 'unknown',
+        },
+        { traceEnabled: false }, // TODO: Make configurable
+      );
+
+      // Build a TaskPayload-compatible structure for runTask
+      // We use conversationId as workflowRunId/rootRunId since there's no workflow
+      const taskPayload = {
+        tokenId: toolCallId,
+        workflowRunId: conversationId,
+        rootRunId: conversationId,
+        projectId: payload.projectId ?? 'unknown',
+        taskId,
+        taskVersion: task.version,
+        input,
+        timeoutMs: payload.timeoutMs,
+      };
+
+      // Execute the task using the task runner
+      const result = await runTask(taskPayload, task, {
+        logger: this.logger,
+        emitter,
+        env: this.env,
+      });
+
+      // Callback to agent with result
+      const agentId = this.env.AGENT.idFromName(conversationId);
+      const agent = this.env.AGENT.get(agentId);
+
+      if (result.success) {
+        this.logger.info({
+          eventType: 'agent_task_result_sending',
+          message: 'Sending task result to agent',
+          traceId: conversationId,
+          metadata: {
+            toolCallId,
+            turnId,
+            outputKeys: result.output ? Object.keys(result.output) : [],
+          },
+        });
+        await agent.handleTaskResult(turnId, toolCallId, {
+          toolCallId,
+          success: true,
+          result: result.output,
+        });
+      } else {
+        this.logger.info({
+          eventType: 'agent_task_error_sending',
+          message: 'Sending task error to agent',
+          traceId: conversationId,
+          metadata: {
+            toolCallId,
+            turnId,
+            error: result.error,
+          },
+        });
+
+        // Map task error types to agent ToolErrorCode
+        const errorCode =
+          result.error?.type === 'task_timeout'
+            ? 'TIMEOUT'
+            : result.error?.type === 'validation_error'
+              ? 'INVALID_INPUT'
+              : 'EXECUTION_FAILED';
+
+        await agent.handleTaskResult(turnId, toolCallId, {
+          toolCallId,
+          success: false,
+          error: {
+            code: errorCode,
+            message: result.error?.message ?? 'Unknown error',
+            retriable: result.error?.retryable ?? false,
+          },
+        });
+      }
+    } catch (error) {
+      this.logger.error({
+        eventType: 'agent_task_execution_failed',
+        message: 'Agent task execution failed with unexpected error',
+        traceId: conversationId,
+        metadata: {
+          toolCallId,
+          turnId,
+          taskId,
+          error: error instanceof Error ? error.message : String(error),
+          stack: error instanceof Error ? error.stack : undefined,
+        },
+      });
+
+      // Callback with error result
+      const agentId = this.env.AGENT.idFromName(conversationId);
+      const agent = this.env.AGENT.get(agentId);
+      await agent.handleTaskResult(turnId, toolCallId, {
+        toolCallId,
+        success: false,
+        error: {
+          code: 'EXECUTION_FAILED',
+          message: error instanceof Error ? error.message : String(error),
+          retriable: false,
         },
       });
     }

@@ -229,4 +229,115 @@ export class AsyncOpManager {
 
     return result[0]?.count ?? 0;
   }
+
+  /**
+   * Mark an operation as waiting (for sync tool dispatch).
+   *
+   * Used when a sync tool is dispatched and the turn needs to wait
+   * for the result before continuing the LLM loop.
+   */
+  markWaiting(turnId: string, operationId: string): void {
+    // First, ensure the operation exists (track it if not)
+    let op = this.get(operationId);
+
+    if (!op) {
+      // Track the operation as waiting
+      const now = new Date();
+      this.db
+        .insert(asyncOps)
+        .values({
+          id: operationId,
+          turnId,
+          targetType: 'task', // Default, will be updated by dispatch
+          targetId: operationId,
+          status: 'waiting',
+          createdAt: now,
+        })
+        .run();
+
+      this.emitter.emitTrace({
+        type: 'operation.async.marked_waiting',
+        payload: { opId: operationId, turnId },
+      });
+      return;
+    }
+
+    // Update existing operation to waiting
+    this.db
+      .update(asyncOps)
+      .set({ status: 'waiting' })
+      .where(eq(asyncOps.id, operationId))
+      .run();
+
+    this.emitter.emitTrace({
+      type: 'operation.async.marked_waiting',
+      payload: { opId: operationId, turnId: op.turnId },
+    });
+  }
+
+  /**
+   * Resume from a sync tool result.
+   *
+   * Called when a sync tool completes and we need to continue the LLM loop.
+   * This marks the operation as completed with the result.
+   */
+  resume(operationId: string, result: unknown): boolean {
+    const op = this.get(operationId);
+
+    if (!op) {
+      this.emitter.emitTrace({
+        type: 'operation.async.resume_failed',
+        payload: { opId: operationId, reason: 'operation not found' },
+      });
+      return false;
+    }
+
+    if (op.status !== 'waiting' && op.status !== 'pending') {
+      this.emitter.emitTrace({
+        type: 'operation.async.resume_blocked',
+        payload: {
+          opId: operationId,
+          currentStatus: op.status,
+          reason: 'operation not waiting or pending',
+        },
+      });
+      return false;
+    }
+
+    const now = new Date();
+
+    this.db
+      .update(asyncOps)
+      .set({
+        status: 'completed',
+        result,
+        completedAt: now,
+      })
+      .where(eq(asyncOps.id, operationId))
+      .run();
+
+    this.emitter.emitTrace({
+      type: 'operation.async.resumed',
+      payload: {
+        opId: operationId,
+        turnId: op.turnId,
+        targetType: op.targetType,
+      },
+    });
+
+    return true;
+  }
+
+  /**
+   * Check if turn has any waiting operations.
+   */
+  hasWaiting(turnId: string): boolean {
+    const result = this.db
+      .select({ count: count() })
+      .from(asyncOps)
+      .where(and(eq(asyncOps.turnId, turnId), eq(asyncOps.status, 'waiting')))
+      .all();
+
+    return (result[0]?.count ?? 0) > 0;
+  }
 }

@@ -123,6 +123,24 @@ export type MemoryExtractionInput = {
 };
 
 // ============================================================================
+// LLM Request (output of context assembly workflow)
+// ============================================================================
+
+/**
+ * Provider-native LLM request format.
+ *
+ * Context assembly workflow outputs this format directly.
+ * The messages array is in the provider's native format (Anthropic, OpenAI, etc.)
+ */
+export type LLMRequest = {
+  messages: unknown[];
+  model?: string;
+  maxTokens?: number;
+  temperature?: number;
+  systemPrompt?: string;
+};
+
+// ============================================================================
 // Message Types
 // ============================================================================
 
@@ -132,7 +150,7 @@ export type MessageRole = 'user' | 'agent';
 // Async Operation Types
 // ============================================================================
 
-export type AsyncOpStatus = 'pending' | 'completed' | 'failed';
+export type AsyncOpStatus = 'pending' | 'waiting' | 'completed' | 'failed';
 
 export type AsyncOpTargetType = 'task' | 'workflow' | 'agent';
 
@@ -201,6 +219,10 @@ export type AgentDecision =
       operationId: string;
       result: ToolResult;
     }
+
+  // Sync tool waiting
+  | { type: 'MARK_WAITING'; turnId: string; operationId: string }
+  | { type: 'RESUME_FROM_TOOL'; turnId: string; operationId: string; result: unknown }
 
   // Context assembly / memory extraction workflow dispatch
   | {

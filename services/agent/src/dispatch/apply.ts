@@ -7,6 +7,8 @@
  * This is the bridge between planning (pure) and execution (effectful).
  */
 
+import { ulid } from 'ulid';
+
 import type { AgentDecision } from '../types';
 import type { DispatchContext } from './context';
 
@@ -125,6 +127,20 @@ function applyOne(decision: AgentDecision, ctx: DispatchContext): ApplyOutcome {
     }
 
     // ========================================================================
+    // Sync Tool Waiting
+    // ========================================================================
+
+    case 'MARK_WAITING': {
+      ctx.asyncOps.markWaiting(decision.turnId, decision.operationId);
+      return {};
+    }
+
+    case 'RESUME_FROM_TOOL': {
+      ctx.asyncOps.resume(decision.operationId, decision.result);
+      return {};
+    }
+
+    // ========================================================================
     // External Dispatch (RPC)
     // ========================================================================
 
@@ -170,70 +186,181 @@ function applyOne(decision: AgentDecision, ctx: DispatchContext): ApplyOutcome {
 
 /**
  * Dispatch a task execution.
- * TODO: Implement RPC to Executor via Coordinator
+ *
+ * Records the move for the tool call, then dispatches via Executor.
+ * Executor will call back to handleTaskResult when complete.
  */
 function dispatchTask(
   decision: Extract<AgentDecision, { type: 'DISPATCH_TASK' }>,
   ctx: DispatchContext,
 ): void {
-  ctx.emitter.emitTrace({
-    type: 'dispatch.task.queued',
-    payload: {
-      turnId: decision.turnId,
-      toolCallId: decision.toolCallId,
-      taskId: decision.taskId,
+  const { turnId, toolCallId, taskId, input } = decision;
+
+  // Record move for this tool call
+  ctx.moves.record({
+    turnId,
+    toolCall: {
+      id: toolCallId,
+      toolId: taskId,
+      input: input as Record<string, unknown>,
     },
   });
 
-  // TODO: ctx.waitUntil(coordinator.dispatchTask(...))
+  // Track as async operation
+  ctx.asyncOps.track({
+    turnId,
+    targetType: 'task',
+    targetId: toolCallId,
+  });
+
+  ctx.emitter.emitTrace({
+    type: 'dispatch.task.queued',
+    payload: { turnId, toolCallId, taskId },
+  });
+
+  // Dispatch via Executor (fire-and-forget)
+  // Executor calls back via agent.handleTaskResult()
+  ctx.waitUntil(
+    ctx.executor
+      .executeTaskForAgent({
+        toolCallId,
+        conversationId: ctx.conversationId,
+        turnId,
+        taskId,
+        input: input as Record<string, unknown>,
+      })
+      .catch((error: Error) => {
+        ctx.emitter.emitTrace({
+          type: 'dispatch.task.error',
+          payload: { turnId, toolCallId, taskId, error: error.message },
+        });
+      }),
+  );
 }
 
 /**
  * Dispatch a workflow execution.
- * TODO: Implement RPC to Coordinator
+ *
+ * Creates a workflow run in D1, then starts the coordinator DO.
+ * Coordinator calls back via agent.handleWorkflowResult/Error().
  */
-function dispatchWorkflow(
+async function dispatchWorkflow(
   decision: Extract<AgentDecision, { type: 'DISPATCH_WORKFLOW' }>,
   ctx: DispatchContext,
-): void {
-  ctx.emitter.emitTrace({
-    type: 'dispatch.workflow.queued',
-    payload: {
-      turnId: decision.turnId,
-      toolCallId: decision.toolCallId,
-      workflowId: decision.workflowId,
-      async: decision.async,
+): Promise<void> {
+  const { turnId, toolCallId, workflowId, input, async: isAsync } = decision;
+
+  // Record move for this tool call
+  ctx.moves.record({
+    turnId,
+    toolCall: {
+      id: toolCallId,
+      toolId: workflowId,
+      input: input as Record<string, unknown>,
     },
   });
 
-  // TODO: ctx.waitUntil(coordinator.runWorkflow(...))
+  // Track as async operation
+  ctx.asyncOps.track({
+    turnId,
+    targetType: 'workflow',
+    targetId: toolCallId,
+  });
+
+  ctx.emitter.emitTrace({
+    type: 'dispatch.workflow.queued',
+    payload: { turnId, toolCallId, workflowId, async: isAsync },
+  });
+
+  // Create workflow run in D1
+  const workflowRunsResource = ctx.resources.workflowRuns();
+  const { workflowRunId } = await workflowRunsResource.create(workflowId, {
+    ...(input as Record<string, unknown>),
+    // Include callback routing info
+    _callback: {
+      conversationId: ctx.conversationId,
+      turnId,
+      toolCallId,
+      type: 'workflow',
+    },
+  });
+
+  // Start coordinator DO
+  const coordinatorId = ctx.coordinator.idFromName(workflowRunId);
+  const coordinator = ctx.coordinator.get(coordinatorId);
+
+  ctx.waitUntil(
+    coordinator.start(workflowRunId).catch((error: Error) => {
+      ctx.emitter.emitTrace({
+        type: 'dispatch.workflow.error',
+        payload: { turnId, toolCallId, workflowId, workflowRunId, error: error.message },
+      });
+    }),
+  );
 }
 
 /**
  * Dispatch to another agent.
- * TODO: Implement RPC to Agent service
+ *
+ * Gets the target agent's DO and starts a turn.
+ * Target agent calls back via agent.handleAgentResponse().
  */
 function dispatchAgent(
   decision: Extract<AgentDecision, { type: 'DISPATCH_AGENT' }>,
   ctx: DispatchContext,
 ): void {
-  ctx.emitter.emitTrace({
-    type: 'dispatch.agent.queued',
-    payload: {
-      turnId: decision.turnId,
-      toolCallId: decision.toolCallId,
-      agentId: decision.agentId,
-      mode: decision.mode,
-      async: decision.async,
+  const { turnId, toolCallId, agentId, input, mode, async: isAsync } = decision;
+
+  // Record move for this tool call
+  ctx.moves.record({
+    turnId,
+    toolCall: {
+      id: toolCallId,
+      toolId: agentId,
+      input: input as Record<string, unknown>,
     },
   });
 
-  // TODO: ctx.waitUntil(agent.invoke(...))
+  // Track as async operation
+  ctx.asyncOps.track({
+    turnId,
+    targetType: 'agent',
+    targetId: toolCallId,
+  });
+
+  ctx.emitter.emitTrace({
+    type: 'dispatch.agent.queued',
+    payload: { turnId, toolCallId, agentId, mode, async: isAsync },
+  });
+
+  // Get target agent's DO
+  // For delegate mode: use a new conversation ID
+  // For loop_in mode: use the same conversation ID (not supported yet)
+  const targetConversationId = mode === 'delegate' ? ulid() : ctx.conversationId;
+  const targetAgentId = ctx.agent.idFromName(targetConversationId);
+  const targetAgent = ctx.agent.get(targetAgentId);
+
+  ctx.waitUntil(
+    targetAgent
+      .startTurn(targetConversationId, input, {
+        type: 'agent',
+        agentId: ctx.conversationId, // The calling agent's conversation ID
+        turnId,
+      })
+      .catch((error: Error) => {
+        ctx.emitter.emitTrace({
+          type: 'dispatch.agent.error',
+          payload: { turnId, toolCallId, agentId, error: error.message },
+        });
+      }),
+  );
 }
 
 /**
  * Dispatch context assembly workflow.
- * TODO: Implement RPC to Coordinator
+ *
+ * This is handled by the loop module directly, not through decisions.
+ * This handler exists for completeness but should not normally be called.
  */
 function dispatchContextAssembly(
   decision: Extract<AgentDecision, { type: 'DISPATCH_CONTEXT_ASSEMBLY' }>,
@@ -247,24 +374,52 @@ function dispatchContextAssembly(
     },
   });
 
-  // TODO: ctx.waitUntil(coordinator.runWorkflow(...))
+  // Context assembly is handled by loop.dispatchContextAssembly()
+  // This is here for decision type completeness
 }
 
 /**
  * Dispatch memory extraction workflow.
- * TODO: Implement RPC to Coordinator
+ *
+ * Creates a workflow run in D1, then starts the coordinator DO.
+ * Memory extraction runs async and doesn't block turn completion.
  */
-function dispatchMemoryExtraction(
+async function dispatchMemoryExtraction(
   decision: Extract<AgentDecision, { type: 'DISPATCH_MEMORY_EXTRACTION' }>,
   ctx: DispatchContext,
-): void {
+): Promise<void> {
+  const { turnId, workflowId, input } = decision;
+
   ctx.emitter.emitTrace({
     type: 'dispatch.memory_extraction.queued',
-    payload: {
-      turnId: decision.turnId,
-      workflowId: decision.workflowId,
+    payload: { turnId, workflowId },
+  });
+
+  // Create workflow run in D1
+  const workflowRunsResource = ctx.resources.workflowRuns();
+  const { workflowRunId } = await workflowRunsResource.create(workflowId, {
+    ...input,
+    // Include callback routing info
+    _callback: {
+      conversationId: ctx.conversationId,
+      turnId,
+      type: 'memory_extraction',
     },
   });
 
-  // TODO: ctx.waitUntil(coordinator.runWorkflow(...))
+  // Link to turn
+  ctx.turns.linkMemoryExtraction(turnId, workflowRunId);
+
+  // Start coordinator DO
+  const coordinatorId = ctx.coordinator.idFromName(workflowRunId);
+  const coordinator = ctx.coordinator.get(coordinatorId);
+
+  ctx.waitUntil(
+    coordinator.start(workflowRunId).catch((error: Error) => {
+      ctx.emitter.emitTrace({
+        type: 'dispatch.memory_extraction.error',
+        payload: { turnId, workflowId, workflowRunId, error: error.message },
+      });
+    }),
+  );
 }

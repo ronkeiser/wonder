@@ -31,9 +31,10 @@ export type DispatchContext = {
   conversationId: string;
 
   // External services (RPC boundaries)
-  // TODO: Add service bindings when implementing external dispatch
-  // coordinator: Env['COORDINATOR'];
-  // agent: Env['AGENT'];
+  coordinator: Env['COORDINATOR'];
+  executor: Env['EXECUTOR'];
+  agent: Env['AGENT'];
+  resources: Env['RESOURCES'];
 
   // Async primitives
   waitUntil: (promise: Promise<unknown>) => void;
