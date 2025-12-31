@@ -2,6 +2,25 @@ import { describe, expect, it } from 'vitest';
 import { decideContextAssembly, type ContextAssemblyParams } from '../../src/planning/context';
 
 describe('decideContextAssembly', () => {
+  const baseToolDefinitions = [
+    {
+      id: 'tool_search',
+      name: 'search',
+      description: 'Search the codebase',
+      inputSchema: { type: 'object' },
+      targetType: 'task' as const,
+      async: false,
+    },
+    {
+      id: 'tool_implement',
+      name: 'implement',
+      description: 'Implement code',
+      inputSchema: { type: 'object' },
+      targetType: 'task' as const,
+      async: false,
+    },
+  ];
+
   const baseParams: ContextAssemblyParams = {
     turnId: 'turn_123',
     conversationId: 'conv_456',
@@ -10,6 +29,7 @@ describe('decideContextAssembly', () => {
     contextAssemblyWorkflowId: 'workflow_context_assembly_v1',
     modelProfileId: 'profile_claude',
     toolIds: ['tool_search', 'tool_implement'],
+    toolDefinitions: baseToolDefinitions,
   };
 
   it('generates DISPATCH_CONTEXT_ASSEMBLY decision', () => {
@@ -26,6 +46,7 @@ describe('decideContextAssembly', () => {
         recentTurns: [],
         modelProfileId: 'profile_claude',
         toolIds: ['tool_search', 'tool_implement'],
+        toolDefinitions: baseToolDefinitions,
       },
     });
   });

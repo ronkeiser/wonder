@@ -61,6 +61,7 @@ const MIGRATION_SQL = `
     tool_id TEXT,
     tool_input TEXT,
     tool_result TEXT,
+    raw_content TEXT,
     raw TEXT,
     created_at INTEGER NOT NULL
   );
@@ -76,10 +77,16 @@ const MIGRATION_SQL = `
     status TEXT NOT NULL,
     result TEXT,
     created_at INTEGER NOT NULL,
-    completed_at INTEGER
+    completed_at INTEGER,
+    timeout_at INTEGER,
+    attempt_number INTEGER DEFAULT 1,
+    max_attempts INTEGER DEFAULT 1,
+    backoff_ms INTEGER,
+    last_error TEXT
   );
   CREATE INDEX IF NOT EXISTS idx_async_ops_turn ON async_ops(turn_id);
   CREATE INDEX IF NOT EXISTS idx_async_ops_status ON async_ops(status);
+  CREATE INDEX IF NOT EXISTS idx_async_ops_timeout ON async_ops(timeout_at);
 `;
 
 /**

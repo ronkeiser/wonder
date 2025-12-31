@@ -8,6 +8,7 @@ import type {
   AgentDecision,
   ContextAssemblyInput,
   PlanningResult,
+  ToolDefinition,
   TurnSnapshot,
 } from '../types';
 
@@ -23,6 +24,7 @@ export type ContextAssemblyParams = {
   contextAssemblyWorkflowId: string;
   modelProfileId: string;
   toolIds: string[];
+  toolDefinitions: ToolDefinition[];
 };
 
 // ============================================================================
@@ -41,6 +43,7 @@ export function decideContextAssembly(params: ContextAssemblyParams): PlanningRe
     contextAssemblyWorkflowId,
     modelProfileId,
     toolIds,
+    toolDefinitions,
   } = params;
 
   const input: ContextAssemblyInput = {
@@ -49,6 +52,7 @@ export function decideContextAssembly(params: ContextAssemblyParams): PlanningRe
     recentTurns,
     modelProfileId,
     toolIds,
+    toolDefinitions,
   };
 
   const decision: AgentDecision = {

@@ -84,16 +84,63 @@ function applyOne(decision: AgentDecision, ctx: DispatchContext): ApplyOutcome {
         caller: decision.caller,
         input: decision.input,
       });
+
+      // Sync to D1 for observability (fire-and-forget)
+      ctx.waitUntil(
+        ctx.resources
+          .turns()
+          .create({
+            id: turnId,
+            conversationId: decision.conversationId,
+            caller: decision.caller,
+            input: decision.input,
+          })
+          .catch((error: Error) => {
+            ctx.emitter.emitTrace({
+              type: 'dispatch.turn.d1_sync_failed',
+              payload: { turnId, error: error.message },
+            });
+          }),
+      );
+
       return { turnId };
     }
 
     case 'COMPLETE_TURN': {
       ctx.turns.complete(decision.turnId, decision.issues);
+
+      // Sync to D1 for observability (fire-and-forget)
+      ctx.waitUntil(
+        ctx.resources
+          .turns()
+          .complete(decision.turnId, decision.issues)
+          .catch((error: Error) => {
+            ctx.emitter.emitTrace({
+              type: 'dispatch.turn.d1_sync_failed',
+              payload: { turnId: decision.turnId, action: 'complete', error: error.message },
+            });
+          }),
+      );
+
       return {};
     }
 
     case 'FAIL_TURN': {
       ctx.turns.fail(decision.turnId, decision.error.code, decision.error.message);
+
+      // Sync to D1 for observability (fire-and-forget)
+      ctx.waitUntil(
+        ctx.resources
+          .turns()
+          .fail(decision.turnId)
+          .catch((error: Error) => {
+            ctx.emitter.emitTrace({
+              type: 'dispatch.turn.d1_sync_failed',
+              payload: { turnId: decision.turnId, action: 'fail', error: error.message },
+            });
+          }),
+      );
+
       return {};
     }
 

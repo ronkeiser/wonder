@@ -104,12 +104,24 @@ export type ActiveTurnInfo = {
   pendingOperations: PendingOperationInfo[];
 };
 
+/** Tool definition passed to context assembly workflow */
+export type ToolDefinition = {
+  id: string;
+  name: string;
+  description: string;
+  inputSchema: Record<string, unknown>;
+  targetType: 'task' | 'workflow' | 'agent';
+  async: boolean;
+};
+
 export type ContextAssemblyInput = {
   conversationId: string;
   userMessage: string;
   recentTurns: TurnSnapshot[];
   modelProfileId: string;
   toolIds: string[];
+  /** Resolved tool definitions for the persona */
+  toolDefinitions: ToolDefinition[];
   /** Active turns with pending operations (for agent awareness of parallel work) */
   activeTurns?: ActiveTurnInfo[];
 };
@@ -189,7 +201,7 @@ export type PlanningResult = {
  */
 export type AgentDecision =
   // Turn lifecycle
-  | { type: 'START_TURN'; conversationId: string; input: unknown; caller: Caller }
+  | { type: 'START_TURN'; conversationId: string; input?: object; caller: Caller }
   | { type: 'COMPLETE_TURN'; turnId: string; issues?: TurnIssues }
   | { type: 'FAIL_TURN'; turnId: string; error: TurnError }
 

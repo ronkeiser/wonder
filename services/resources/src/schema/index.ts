@@ -777,6 +777,74 @@ export const conversations = sqliteTable(
   (table) => [index('idx_conversations_status').on(table.status)],
 );
 
+/**
+ * Turn: One unit of agent work within a conversation.
+ * Contains input, processing, and responses.
+ * @see docs/architecture/agent.md
+ */
+export const turns = sqliteTable(
+  'turns',
+  {
+    id: text().primaryKey(),
+    conversationId: text()
+      .notNull()
+      .references(() => conversations.id, { onDelete: 'cascade' }),
+
+    // Who initiated this turn
+    callerType: text({ enum: ['user', 'workflow', 'agent'] }).notNull(),
+    callerUserId: text(),
+    callerRunId: text(),
+    callerAgentId: text(),
+    callerTurnId: text(),
+
+    input: text({ mode: 'json' }).$type<object>(),
+    replyToMessageId: text(),
+
+    status: text({ enum: ['active', 'completed', 'failed'] }).notNull(),
+
+    // Linked workflow runs
+    contextAssemblyRunId: text(),
+    memoryExtractionRunId: text(),
+
+    // Issues (set on completion)
+    memoryExtractionFailed: integer({ mode: 'boolean' }),
+    toolFailureCount: integer(),
+
+    createdAt: text().notNull(),
+    completedAt: text(),
+  },
+  (table) => [
+    index('idx_turns_conversation').on(table.conversationId),
+    index('idx_turns_status').on(table.status),
+  ],
+);
+
+/**
+ * Message: User or agent utterance within a conversation.
+ * @see docs/architecture/agent.md
+ */
+export const messages = sqliteTable(
+  'messages',
+  {
+    id: text().primaryKey(),
+    conversationId: text()
+      .notNull()
+      .references(() => conversations.id, { onDelete: 'cascade' }),
+    turnId: text()
+      .notNull()
+      .references(() => turns.id, { onDelete: 'cascade' }),
+
+    role: text({ enum: ['user', 'agent'] }).notNull(),
+    content: text().notNull(),
+
+    createdAt: text().notNull(),
+  },
+  (table) => [
+    index('idx_messages_conversation').on(table.conversationId),
+    index('idx_messages_turn').on(table.turnId),
+  ],
+);
+
 // Legacy snake_case exports for backward compatibility during migration
 // TODO: Remove these after all consumers are updated
 export {

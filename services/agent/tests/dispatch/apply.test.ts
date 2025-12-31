@@ -12,14 +12,32 @@ import type { DispatchContext } from '../../src/dispatch/context';
 import type { AgentDecision } from '../../src/types';
 
 /**
+ * Create a mock RPC service that returns chainable promise-like objects.
+ */
+function createMockRpcService() {
+  const mockMethod = () => ({
+    then: vi.fn().mockReturnValue(Promise.resolve()),
+    catch: vi.fn().mockReturnValue(Promise.resolve()),
+  });
+  return {
+    create: mockMethod,
+    complete: mockMethod,
+    fail: mockMethod,
+  };
+}
+
+/**
  * Create a mock dispatch context with spied managers.
  */
 function createMockContext(): DispatchContext {
+  const mockTurnsRpc = createMockRpcService();
+
   return {
     turns: {
       create: vi.fn().mockReturnValue('turn_created'),
       complete: vi.fn().mockReturnValue(true),
       fail: vi.fn().mockReturnValue(true),
+      linkMemoryExtraction: vi.fn().mockReturnValue(true),
     } as never,
     messages: {
       append: vi.fn().mockReturnValue('msg_created'),
@@ -32,12 +50,39 @@ function createMockContext(): DispatchContext {
       track: vi.fn().mockReturnValue('op_created'),
       complete: vi.fn().mockReturnValue(true),
       fail: vi.fn().mockReturnValue(true),
+      markWaiting: vi.fn().mockReturnValue(true),
+      resume: vi.fn().mockReturnValue(true),
+    } as never,
+    participants: {
+      add: vi.fn().mockReturnValue(true),
     } as never,
     emitter: {
       emitTrace: vi.fn(),
     } as never,
     conversationId: 'conv_test',
     waitUntil: vi.fn(),
+    scheduleAlarm: vi.fn().mockResolvedValue(undefined),
+    resources: {
+      turns: vi.fn().mockReturnValue(mockTurnsRpc),
+      workflowRuns: vi.fn().mockReturnValue({
+        create: vi.fn().mockResolvedValue({ workflowRunId: 'wfr_test' }),
+      }),
+    } as never,
+    executor: {
+      executeTaskForAgent: vi.fn().mockResolvedValue(undefined),
+    } as never,
+    coordinator: {
+      idFromName: vi.fn().mockReturnValue('coord_id'),
+      get: vi.fn().mockReturnValue({
+        start: vi.fn().mockResolvedValue(undefined),
+      }),
+    } as never,
+    agent: {
+      idFromName: vi.fn().mockReturnValue('agent_id'),
+      get: vi.fn().mockReturnValue({
+        startTurn: vi.fn().mockResolvedValue(undefined),
+      }),
+    } as never,
   };
 }
 

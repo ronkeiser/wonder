@@ -5,8 +5,13 @@
  * and message decisions for text content.
  */
 
+import { CustomTypeRegistry, validateSchema, type JSONSchema } from '@wonder/schemas';
+
 import type { AgentDecision, PlanningResult, ToolResult } from '../types';
 import type { Tool } from './tools';
+
+// Shared empty registry for basic JSON Schema validation (no custom types)
+const emptyCustomTypes = new CustomTypeRegistry();
 
 // ============================================================================
 // LLM Response Types (provider-agnostic)
@@ -94,6 +99,40 @@ export function interpretResponse(params: InterpretResponseParams): PlanningResu
         continue;
       }
 
+      // Validate input against tool's JSON Schema
+      const validation = validateToolInput(toolCall.input, tool);
+      if (!validation.valid) {
+        events.push({
+          type: 'planning.response.invalid_input',
+          payload: {
+            turnId,
+            toolCallId: toolCall.id,
+            toolName: tool.name,
+            errors: validation.errors,
+          },
+        });
+
+        // Create immediate error result for invalid input
+        const errorResult: ToolResult = {
+          toolCallId: toolCall.id,
+          success: false,
+          error: {
+            code: 'INVALID_INPUT',
+            message: `Invalid input: ${validation.errors.join('; ')}`,
+            retriable: false,
+          },
+        };
+
+        decisions.push({
+          type: 'ASYNC_OP_COMPLETED',
+          turnId,
+          operationId: toolCall.id,
+          result: errorResult,
+        });
+
+        continue;
+      }
+
       // Generate dispatch decision based on target type
       const dispatchDecision = createDispatchDecision(turnId, toolCall, tool, rawContent);
       decisions.push(dispatchDecision);
@@ -133,6 +172,45 @@ export function interpretResponse(params: InterpretResponseParams): PlanningResu
   });
 
   return { decisions, events };
+}
+
+// ============================================================================
+// Input Validation
+// ============================================================================
+
+type InputValidationResult = {
+  valid: true;
+} | {
+  valid: false;
+  errors: string[];
+};
+
+/**
+ * Validate tool input against the tool's JSON Schema.
+ *
+ * Returns validation errors if input doesn't match schema.
+ */
+function validateToolInput(input: Record<string, unknown>, tool: Tool): InputValidationResult {
+  const schema = tool.inputSchema as JSONSchema;
+
+  // Skip validation if no schema type defined (permissive)
+  if (!schema.type) {
+    return { valid: true };
+  }
+
+  const result = validateSchema(input, schema, emptyCustomTypes, {
+    collectAllErrors: true,
+    strictNullChecks: true,
+  });
+
+  if (result.valid) {
+    return { valid: true };
+  }
+
+  return {
+    valid: false,
+    errors: result.errors.map((e) => `${e.path || '/'}: ${e.message}`),
+  };
 }
 
 // ============================================================================

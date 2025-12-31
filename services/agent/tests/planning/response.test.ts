@@ -319,6 +319,117 @@ describe('interpretResponse', () => {
     });
   });
 
+  describe('input validation', () => {
+    it('generates error result for invalid input', () => {
+      const tools: Tool[] = [
+        {
+          id: 'tool_search',
+          name: 'search',
+          description: 'Search',
+          inputSchema: {
+            type: 'object',
+            properties: {
+              query: { type: 'string' },
+            },
+            required: ['query'],
+          },
+          targetType: 'task',
+          targetId: 'task_search',
+        },
+      ];
+
+      const response: LLMResponse = {
+        toolUse: [{ id: 'call_1', name: 'search', input: {} }], // Missing required 'query'
+        stopReason: 'tool_use',
+      };
+
+      const result = interpretResponse({
+        turnId: 'turn_123',
+        response,
+        toolLookup: createToolLookup(tools),
+      });
+
+      // Should have error result, not dispatch
+      const errorDecision = result.decisions.find((d) => d.type === 'ASYNC_OP_COMPLETED');
+      expect(errorDecision).toBeDefined();
+      if (errorDecision?.type === 'ASYNC_OP_COMPLETED') {
+        expect(errorDecision.result.success).toBe(false);
+        expect(errorDecision.result.error?.code).toBe('INVALID_INPUT');
+      }
+
+      // Should emit invalid_input event
+      expect(result.events).toContainEqual(
+        expect.objectContaining({
+          type: 'planning.response.invalid_input',
+        })
+      );
+
+      // Should NOT have dispatch decision
+      expect(result.decisions.find((d) => d.type === 'DISPATCH_TASK')).toBeUndefined();
+    });
+
+    it('allows valid input', () => {
+      const tools: Tool[] = [
+        {
+          id: 'tool_search',
+          name: 'search',
+          description: 'Search',
+          inputSchema: {
+            type: 'object',
+            properties: {
+              query: { type: 'string' },
+            },
+            required: ['query'],
+          },
+          targetType: 'task',
+          targetId: 'task_search',
+        },
+      ];
+
+      const response: LLMResponse = {
+        toolUse: [{ id: 'call_1', name: 'search', input: { query: 'hello' } }],
+        stopReason: 'tool_use',
+      };
+
+      const result = interpretResponse({
+        turnId: 'turn_123',
+        response,
+        toolLookup: createToolLookup(tools),
+      });
+
+      // Should have dispatch, not error
+      expect(result.decisions.find((d) => d.type === 'DISPATCH_TASK')).toBeDefined();
+      expect(result.decisions.find((d) => d.type === 'ASYNC_OP_COMPLETED')).toBeUndefined();
+    });
+
+    it('skips validation for schemas without type', () => {
+      const tools: Tool[] = [
+        {
+          id: 'tool_search',
+          name: 'search',
+          description: 'Search',
+          inputSchema: {}, // No type defined - permissive
+          targetType: 'task',
+          targetId: 'task_search',
+        },
+      ];
+
+      const response: LLMResponse = {
+        toolUse: [{ id: 'call_1', name: 'search', input: { anything: 123 } }],
+        stopReason: 'tool_use',
+      };
+
+      const result = interpretResponse({
+        turnId: 'turn_123',
+        response,
+        toolLookup: createToolLookup(tools),
+      });
+
+      // Should dispatch without validation error
+      expect(result.decisions.find((d) => d.type === 'DISPATCH_TASK')).toBeDefined();
+    });
+  });
+
   describe('events', () => {
     it('emits interpreted event', () => {
       const response: LLMResponse = {

@@ -26,6 +26,7 @@ import type {
   LLMRequest,
   MoveSnapshot,
   PendingOperationInfo,
+  ToolDefinition,
   TurnSnapshot,
 } from './types';
 
@@ -96,6 +97,17 @@ export async function dispatchContextAssembly(
       };
     });
 
+  // Resolve tool definitions for context assembly
+  const toolDefRows = defs.getTools();
+  const toolDefinitions: ToolDefinition[] = toolDefRows.map((def) => ({
+    id: def.id,
+    name: def.name,
+    description: def.description,
+    inputSchema: def.inputSchema as Record<string, unknown>,
+    targetType: def.targetType,
+    async: def.async,
+  }));
+
   // Build context assembly input
   const input: ContextAssemblyInput = {
     conversationId: ctx.conversationId,
@@ -103,6 +115,7 @@ export async function dispatchContextAssembly(
     recentTurns,
     modelProfileId: persona.modelProfileId,
     toolIds: persona.toolIds,
+    toolDefinitions,
     activeTurns: activeTurns.length > 0 ? activeTurns : undefined,
   };
 

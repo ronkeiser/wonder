@@ -7,12 +7,14 @@ import { WorkerEntrypoint } from 'cloudflare:workers';
 import { Actions } from './resources/actions';
 import { Agents } from './resources/agents';
 import { Conversations } from './resources/conversations';
+import { Messages } from './resources/messages';
 import { ModelProfiles } from './resources/model-profiles';
 import { Personas } from './resources/personas';
 import { Projects } from './resources/projects';
 import { PromptSpecs } from './resources/prompt-specs';
 import { Tasks } from './resources/tasks';
 import { Tools } from './resources/tools';
+import { Turns } from './resources/turns';
 import { WorkflowDefs } from './resources/workflow-defs';
 import { WorkflowRuns } from './resources/workflow-runs';
 import { Workflows } from './resources/workflows';
@@ -86,6 +88,16 @@ class WonderResources extends WorkerEntrypoint<Env> {
   /** RPC: Conversations adapter */
   conversations() {
     return new Conversations(this.env, this.ctx);
+  }
+
+  /** RPC: Turns adapter */
+  turns() {
+    return new Turns(this.env, this.ctx);
+  }
+
+  /** RPC: Messages adapter */
+  messages() {
+    return new Messages(this.env, this.ctx);
   }
 
   /** HTTP fetch handler */
