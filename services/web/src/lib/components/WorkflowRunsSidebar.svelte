@@ -79,7 +79,7 @@
     status = 'connecting';
 
     // WebSocket connections go directly to the API service (can't proxy WS through SvelteKit)
-    const wsUrl = 'wss://api.wflow.app/workflow-runs/stream';
+    const wsUrl = 'wss://api.wflow.app/streams/status';
     const socket = new WebSocket(wsUrl);
     ws = socket;
 
