@@ -967,15 +967,172 @@ ConversationDO handles WebSocket connections and makes LLM calls directly, enabl
 
 This design keeps streaming simple: ConversationDO owns the client connection and the LLM call, so there's no indirection or callback coordination for the real-time path.
 
-## Open Questions
+## Error Handling
 
-The following areas need further specification before implementation:
+Errors in agent execution fall into two categories: **infrastructure errors** (transient failures that should retry invisibly) and **business errors** (meaningful failures the agent should reason about).
 
-### Error Handling
+### Infrastructure vs Business Errors
 
-The decision types include `FAIL_TURN` but error semantics aren't detailed:
+| Error Type | Examples | Handling |
+|------------|----------|----------|
+| Infrastructure | Network timeout, rate limit, provider 5xx | Auto-retry with backoff, invisible to agent |
+| Business | Tool returned error, agent couldn't complete task, validation failed | Surface to LLM for reasoning |
 
-- **Context assembly failure** — does the turn fail, or proceed with degraded context
-- **Memory extraction failure** — does this fail the turn retroactively, or log and continue
-- **Delegated agent errors** — how do errors propagate back to the caller
-- **Retry semantics** — which operations are retryable, with what backoff
+Infrastructure errors are handled by the platform. Business errors flow back to the agent as tool results with error information.
+
+### Context Assembly Failure
+
+Context assembly runs before every LLM call. On failure:
+
+1. **Retry** — Infrastructure errors retry automatically (max 3 attempts, exponential backoff)
+2. **Abort turn** — If retries exhausted, the turn fails with `FAIL_TURN`
+
+No degraded mode. Context assembly is critical—an agent without retrieved context might hallucinate or give harmful answers. If we can't assemble context, we don't proceed.
+
+The user sees an error message and can retry. The failure is logged with full details for debugging.
+
+### Memory Extraction Failure
+
+Memory extraction runs after the turn completes. The user already saw the response. On failure:
+
+1. **Retry** — Infrastructure errors retry automatically (max 3 attempts)
+2. **Log and continue** — If retries exhausted, log the failure, mark the turn with `memoryExtractionFailed: true`
+
+Memory extraction failure doesn't retroactively fail the turn. The conversation succeeded from the user's perspective. However:
+
+- The turn metadata records the failure
+- Monitoring surfaces repeated extraction failures (indicates systemic issues)
+- The agent's memory may have gaps, but this degrades gracefully over time
+
+### Tool Dispatch Failures
+
+When a tool (task, workflow, or agent) fails during execution, the error flows back to the LLM as a tool result:
+
+```typescript
+interface ToolResult {
+  tool_call_id: string;
+  success: boolean;
+  result?: unknown;        // Present if success: true
+  error?: {                // Present if success: false
+    code: ToolErrorCode;
+    message: string;
+    retriable: boolean;
+  };
+}
+
+type ToolErrorCode =
+  | 'EXECUTION_FAILED'     // Tool ran but failed (task error, workflow failed)
+  | 'TIMEOUT'              // Tool exceeded timeout
+  | 'NOT_FOUND'            // Tool/workflow/agent doesn't exist
+  | 'PERMISSION_DENIED'    // Agent lacks access
+  | 'INVALID_INPUT'        // Input didn't match schema
+  | 'AGENT_DECLINED'       // Delegated agent couldn't/wouldn't complete
+  | 'INTERNAL_ERROR';      // Platform error (should be rare)
+```
+
+**Sync tools:** The agent is waiting. When the tool fails, the error appears in the next LLM call's context. The agent reasons about the failure and decides whether to retry, try an alternative, or respond to the user explaining the issue.
+
+**Async tools:** The agent already responded. When the async operation fails:
+
+1. The failure triggers a new LLM call on the same turn (turn is still `active`)
+2. The agent sees the error in context
+3. The agent posts a follow-up message: "The research I started earlier failed because..."
+
+The agent always learns about async failures—they're never silently dropped.
+
+### Delegated Agent Errors
+
+When Agent A delegates to Agent B:
+
+- A's turn enters `waiting` state
+- B executes a turn with the provided input
+- B's result (success or failure) flows back as a tool result
+
+Agent errors use `AGENT_DECLINED` or `EXECUTION_FAILED`:
+
+```typescript
+// Agent B couldn't complete the task
+{
+  success: false,
+  error: {
+    code: 'AGENT_DECLINED',
+    message: "I don't have enough context to review this code",
+    retriable: false
+  }
+}
+
+// Agent B crashed
+{
+  success: false,
+  error: {
+    code: 'EXECUTION_FAILED',
+    message: "Turn failed during execution",
+    retriable: true
+  }
+}
+```
+
+Agent A sees these as tool failures and reasons about them. "The reviewer couldn't complete the review—let me provide more context and try again."
+
+### Retry Configuration
+
+Retries are configured at multiple levels:
+
+**Platform defaults (not configurable):**
+
+| Operation | Max Attempts | Backoff | Timeout |
+|-----------|--------------|---------|---------|
+| Context assembly workflow | 3 | Exponential (100ms, 200ms, 400ms) | 30s |
+| Memory extraction workflow | 3 | Exponential (100ms, 200ms, 400ms) | 30s |
+| LLM call | 3 | Exponential (500ms, 1s, 2s) | 120s |
+
+**Tool-level (configurable per tool definition):**
+
+```typescript
+interface Tool {
+  // ... existing fields
+  retry?: {
+    maxAttempts: number;    // Default: 1 (no retry)
+    backoffMs: number;      // Default: 1000
+    timeoutMs: number;      // Default: 60000
+  };
+}
+```
+
+Tool retries are for infrastructure errors only. Business errors don't retry—they surface to the agent immediately.
+
+### Turn State Machine
+
+Turns have three terminal states:
+
+| State | Meaning |
+|-------|---------|
+| `completed` | Turn finished successfully (may have metadata flags for minor issues) |
+| `failed` | Turn could not complete (context assembly failed, unrecoverable error) |
+
+The `completed` state can carry metadata about issues that didn't prevent completion:
+
+```typescript
+interface Turn {
+  // ... existing fields
+  status: 'active' | 'completed' | 'failed';
+  issues?: {
+    memoryExtractionFailed?: boolean;
+    toolFailures?: number;  // Count of tools that returned errors
+  };
+}
+```
+
+This keeps the state machine simple (three states) while preserving information about what went wrong.
+
+### Error Events
+
+All errors emit events for observability:
+
+- `turn.failed` — Turn could not complete
+- `turn.completed` with `issues` — Turn completed with problems
+- `tool.failed` — Tool returned an error (includes error details)
+- `context_assembly.failed` — Context assembly couldn't complete
+- `memory_extraction.failed` — Memory extraction couldn't complete
+
+Events include full error details, enabling debugging and monitoring for systemic issues.
