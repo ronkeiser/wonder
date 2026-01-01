@@ -4,11 +4,26 @@
 
 import { createRoute, z } from '@hono/zod-openapi';
 import { ulid } from '../../validators';
+import { EventEntrySchema, TraceEventEntrySchema } from '../events/schema';
 import {
   CreateWorkflowSchema,
   WorkflowCreateResponseSchema,
   WorkflowGetResponseSchema,
 } from './schema';
+
+/**
+ * SSE event envelope - wraps events with stream type discriminator
+ */
+const WorkflowSSEEventSchema = z
+  .object({
+    stream: z.enum(['events', 'trace']).openapi({
+      description: 'Which event stream this belongs to',
+    }),
+    event: z.union([EventEntrySchema, TraceEventEntrySchema]).openapi({
+      description: 'The event payload',
+    }),
+  })
+  .openapi('WorkflowSSEEvent');
 
 export const createWorkflowRoute = createRoute({
   method: 'post',
@@ -97,10 +112,7 @@ export const startWorkflowRoute = createRoute({
             .openapi('WorkflowStartResponse'),
         },
         'text/event-stream': {
-          schema: z.string().openapi({
-            description: 'SSE stream of workflow events',
-            example: 'data: {"stream":"events","event":{...}}\n\n',
-          }),
+          schema: WorkflowSSEEventSchema,
         },
       },
       description: 'Workflow execution started successfully',

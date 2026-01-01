@@ -195,7 +195,7 @@
       connectionId = 'global';
     } else if (workflowRunId) {
       // Per-resource stream mode: connect to stream endpoint
-      wsUrl = `wss://api.wflow.app/streams/${workflowRunId}`;
+      wsUrl = `wss://api.wflow.app/streams/${workflowRunId}/ws`;
       connectionId = workflowRunId;
     } else {
       // No stream path and no workflow run selected - can't connect

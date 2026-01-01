@@ -2053,7 +2053,7 @@ export interface paths {
                     };
                     content: {
                         "application/json": components["schemas"]["WorkflowStartResponse"];
-                        "text/event-stream": string;
+                        "text/event-stream": components["schemas"]["WorkflowSSEEvent"];
                     };
                 };
                 /** @description Failed to start workflow */
@@ -3428,6 +3428,15 @@ export interface components {
         WorkflowStartResponse: {
             workflowRunId: string;
             durableObjectId: string;
+        };
+        WorkflowSSEEvent: {
+            /**
+             * @description Which event stream this belongs to
+             * @enum {string}
+             */
+            stream: "events" | "trace";
+            /** @description The event payload */
+            event: components["schemas"]["EventEntry"] | components["schemas"]["TraceEventEntry"];
         };
         WorkflowStartError: {
             error: string;

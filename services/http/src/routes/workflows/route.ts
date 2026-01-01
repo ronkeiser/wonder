@@ -65,30 +65,8 @@ workflows.openapi(startWorkflowRoute, async (c) => {
 
   const sseResponse = await streamer.fetch(new Request(sseUrl));
 
-  // Create a transform stream to prepend the runId event
-  const encoder = new TextEncoder();
-  const initialEvent = encoder.encode(
-    `data: ${JSON.stringify({ type: 'run.created', workflowRunId })}\n\n`,
-  );
-
-  const prependTransform = new TransformStream<Uint8Array, Uint8Array>({
-    start(controller) {
-      // Send initial event immediately
-      controller.enqueue(initialEvent);
-    },
-    transform(chunk, controller) {
-      controller.enqueue(chunk);
-    },
-  });
-
-  // Pipe streamer response through our transform
-  if (sseResponse.body) {
-    sseResponse.body.pipeTo(prependTransform.writable).catch(() => {
-      // Stream closed
-    });
-  }
-
-  return new Response(prependTransform.readable, {
+  // Return the SSE stream directly from the Streamer
+  return new Response(sseResponse.body, {
     headers: {
       'Content-Type': 'text/event-stream',
       'Cache-Control': 'no-cache',

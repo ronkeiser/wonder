@@ -6,8 +6,11 @@
 
 import { HttpMethod, NodeType, RouteNode } from './parse-paths';
 
-const CONTENT_TYPE = 'application/json';
+const JSON_CONTENT_TYPE = 'application/json';
+const SSE_CONTENT_TYPE = 'text/event-stream';
 const DEFAULT_STATUS_CODE = '200';
+
+// Used by generateCollectionObject - moved here to avoid duplication
 
 /**
  * Map HTTP verb to JavaScript method name
@@ -127,8 +130,6 @@ export interface ClientProperty {
   children?: ClientProperty[];
 }
 
-const SSE_CONTENT_TYPE = 'text/event-stream';
-
 /**
  * Generate collection object structure with methods and nested resources
  */
@@ -193,11 +194,11 @@ export function generateRootClient(roots: RouteNode[]): ClientStructure {
  */
 function buildRequestBodyType(originalPath: string, verb: HttpMethod): string {
   // RequestBody is optional, so we use NonNullable to unwrap it
-  return `NonNullable<paths['${originalPath}']['${verb}']['requestBody']>['content']['${CONTENT_TYPE}']`;
+  return `NonNullable<paths['${originalPath}']['${verb}']['requestBody']>['content']['${JSON_CONTENT_TYPE}']`;
 }
 
-function buildResponseType(originalPath: string, verb: HttpMethod, statusCode: string): string {
-  return `paths['${originalPath}']['${verb}']['responses']['${statusCode}']['content']['${CONTENT_TYPE}']`;
+function buildResponseType(originalPath: string, verb: HttpMethod, statusCode: string, contentType: string = JSON_CONTENT_TYPE): string {
+  return `paths['${originalPath}']['${verb}']['responses']['${statusCode}']['content']['${contentType}']`;
 }
 
 /**
@@ -221,11 +222,11 @@ function formatMethod(
 
   const hasBody = method.signature.parameters.some((p) => p.name === 'body');
   const bodyParam = hasBody ? '{ body }' : '{}';
-  const returnType = buildResponseType(method.originalPath, method.verb, method.successStatusCode);
 
-  // For SSE endpoints, generate an async generator that yields parsed events
+  // For SSE endpoints, use text/event-stream content type for response type
   if (method.supportsSSE) {
-    return `${indent}${method.name}: async function* (${params.join(', ')}): AsyncGenerator<SSEEvent<${returnType}>> {
+    const sseReturnType = buildResponseType(method.originalPath, method.verb, method.successStatusCode, SSE_CONTENT_TYPE);
+    return `${indent}${method.name}: async function* (${params.join(', ')}): AsyncGenerator<${sseReturnType}> {
 ${indent}  const response = await baseClient.${method.verb.toUpperCase()}(\`${method.path}\`, ${bodyParam});
 ${indent}  if (!response.response.ok) {
 ${indent}    throw new ApiError(\`${method.verb.toUpperCase()} ${method.path} failed\`, response.error);
@@ -233,10 +234,11 @@ ${indent}  }
 ${indent}  if (!response.response.body) {
 ${indent}    throw new ApiError(\`${method.verb.toUpperCase()} ${method.path} returned no body\`, null);
 ${indent}  }
-${indent}  yield* parseSSEStream<${returnType}>(response.response.body);
+${indent}  yield* parseSSEStream<${sseReturnType}>(response.response.body);
 ${indent}}`;
   }
 
+  const returnType = buildResponseType(method.originalPath, method.verb, method.successStatusCode);
   return `${indent}${method.name}: async (${params.join(', ')}): Promise<${returnType}> => {
 ${indent}  const { data, error } = await baseClient.${method.verb.toUpperCase()}(\`${method.path}\`, ${bodyParam});
 ${indent}  if (error) throw new ApiError(\`${method.verb.toUpperCase()} ${method.path} failed\`, error);
@@ -388,21 +390,11 @@ export function formatClientCode(structure: ClientStructure): string {
   lines.push("import type { paths } from './schema.js';");
   lines.push('');
 
-  // SSE Event type
-  lines.push('/**');
-  lines.push(' * SSE event wrapper with stream type and parsed event data');
-  lines.push(' */');
-  lines.push('export interface SSEEvent<T = unknown> {');
-  lines.push('  stream: "events" | "trace";');
-  lines.push('  event: T;');
-  lines.push('}');
-  lines.push('');
-
   // SSE parser function
   lines.push('/**');
   lines.push(' * Parse SSE stream into async generator of events');
   lines.push(' */');
-  lines.push('async function* parseSSEStream<T>(body: ReadableStream<Uint8Array>): AsyncGenerator<SSEEvent<T>> {');
+  lines.push('async function* parseSSEStream<T>(body: ReadableStream<Uint8Array>): AsyncGenerator<T> {');
   lines.push('  const reader = body.getReader();');
   lines.push('  const decoder = new TextDecoder();');
   lines.push('  let buffer = "";');
@@ -426,7 +418,7 @@ export function formatClientCode(structure: ClientStructure): string {
   lines.push('          if (line.startsWith("data: ")) {');
   lines.push('            const jsonStr = line.slice(6);');
   lines.push('            try {');
-  lines.push('              yield JSON.parse(jsonStr) as SSEEvent<T>;');
+  lines.push('              yield JSON.parse(jsonStr) as T;');
   lines.push('            } catch {');
   lines.push('              // Skip malformed JSON');
   lines.push('            }');
