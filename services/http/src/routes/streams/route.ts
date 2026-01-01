@@ -1,6 +1,6 @@
 /**
  * Streams Hono Router
- * Generic WebSocket streaming endpoint for any execution context
+ * WebSocket and SSE streaming endpoints for any execution context
  */
 
 import { OpenAPIHono } from '@hono/zod-openapi';
@@ -35,8 +35,8 @@ streams.get('/status', async (c) => {
   return stub.fetch(request);
 });
 
-/** GET /:streamId - WebSocket connection for real-time event streaming */
-streams.get('/:streamId', async (c) => {
+/** GET /:streamId/ws - WebSocket connection for real-time event streaming */
+streams.get('/:streamId/ws', async (c) => {
   const streamId = c.req.param('streamId');
   const upgradeHeader = c.req.header('Upgrade');
 
@@ -54,9 +54,25 @@ streams.get('/:streamId', async (c) => {
   const doId = c.env.EVENTS_STREAMER.idFromName(streamId);
   const stub = c.env.EVENTS_STREAMER.get(doId);
 
-  // Rewrite the URL to /stream (what Streamer expects)
+  // Rewrite the URL to /ws (what Streamer expects)
   const url = new URL(c.req.url);
-  url.pathname = '/stream';
+  url.pathname = '/ws';
+  const request = new Request(url, c.req.raw);
+
+  return stub.fetch(request);
+});
+
+/** GET /:streamId/sse - SSE connection for real-time event streaming */
+streams.get('/:streamId/sse', async (c) => {
+  const streamId = c.req.param('streamId');
+
+  // Route to per-stream Streamer DO
+  const doId = c.env.EVENTS_STREAMER.idFromName(streamId);
+  const stub = c.env.EVENTS_STREAMER.get(doId);
+
+  // Rewrite the URL to /sse, preserve query params for filtering
+  const url = new URL(c.req.url);
+  url.pathname = '/sse';
   const request = new Request(url, c.req.raw);
 
   return stub.fetch(request);

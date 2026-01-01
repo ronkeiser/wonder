@@ -9,8 +9,6 @@ import {
   type EmbeddedNode,
   type EmbeddedWorkflowDef,
   type EventEntry,
-  type StreamEvent,
-  type Subscription,
   type TraceEventEntry,
 } from '@wonder/sdk';
 import { TraceEventCollection } from './trace';
@@ -31,12 +29,21 @@ export type { ExecuteWorkflowResult, TestWorkflowResult, WorkflowTestSetup } fro
 const DEFAULT_TIMEOUT_MS = 300000; // 5 minutes
 const DEFAULT_IDLE_TIMEOUT_MS = 30000; // 30 seconds
 const DEFAULT_GRACE_PERIOD_MS = 100; // Grace period after terminal event
-const WEBSOCKET_HANDSHAKE_DELAY_MS = 100;
 
-type InternalEvent = StreamEvent & { stream?: 'events' | 'trace' };
+/**
+ * SSE event format from the Streamer DO
+ */
+interface SSEEvent {
+  stream: 'events' | 'trace';
+  event: EventEntry | TraceEventEntry;
+}
 
-interface StreamSubscription {
-  close: () => void;
+/**
+ * Initial event sent when SSE stream is established
+ */
+interface RunCreatedEvent {
+  type: 'run.created';
+  workflowRunId: string;
 }
 
 /**
@@ -135,10 +142,13 @@ export async function createWorkflow(
 }
 
 /**
- * Executes a workflow using two-phase execution to avoid missing early events:
- * 1. Create the workflow run (doesn't start execution)
- * 2. Subscribe to events via WebSocket
- * 3. Start execution after subscription is established
+ * Executes a workflow using SSE streaming.
+ *
+ * Calls POST /workflows/{id}/start with stream: true, which:
+ * 1. Creates the workflow run
+ * 2. Establishes SSE connection to Streamer DO
+ * 3. Starts the coordinator
+ * 4. Streams events until completion
  */
 export async function executeWorkflow(
   workflowId: string,
@@ -155,128 +165,165 @@ export async function executeWorkflow(
   const timeout = options?.timeout ?? DEFAULT_TIMEOUT_MS;
   const idleTimeout = options?.idleTimeout ?? DEFAULT_IDLE_TIMEOUT_MS;
   const gracePeriod = DEFAULT_GRACE_PERIOD_MS;
-  const enableTraceEvents = options?.enableTraceEvents;
 
-  // Phase 1: Create the workflow run (doesn't start execution)
-  const createResponse = await wonder.POST('/workflows/{id}/runs', {
+  // Call the streaming endpoint
+  const response = await wonder.POST('/workflows/{id}/start', {
     params: { path: { id: workflowId } },
-    body: { input: inputData as Record<string, unknown> },
+    body: {
+      stream: true,
+      input: inputData as Record<string, unknown>,
+    },
+    parseAs: 'stream',
   });
 
-  if (!createResponse.data?.workflowRunId) {
-    throw new Error(`Failed to create workflow run`);
+  if (!response.response.ok) {
+    throw new Error(`Failed to start workflow: ${response.response.status}`);
   }
 
-  const { workflowRunId } = createResponse.data;
+  if (!response.response.body) {
+    throw new Error('No response body from streaming endpoint');
+  }
 
-  // Phase 2: Subscribe to events BEFORE starting execution
-  return new Promise<ExecuteWorkflowResult>((resolve, reject) => {
-    const events: EventEntry[] = [];
-    const traceEvents: TraceEventEntry[] = [];
-    let totalTimer: NodeJS.Timeout | null = null;
-    let idleTimer: NodeJS.Timeout | null = null;
-    let subscription: StreamSubscription | null = null;
+  const events: EventEntry[] = [];
+  const traceEvents: TraceEventEntry[] = [];
+  let workflowRunId: string | null = null;
 
-    const cleanup = () => {
-      if (totalTimer) clearTimeout(totalTimer);
-      if (idleTimer) clearTimeout(idleTimer);
-      if (subscription) subscription.close();
-    };
+  // Parse SSE stream
+  const reader = response.response.body.getReader();
+  const decoder = new TextDecoder();
+  let buffer = '';
 
-    const resolveWithCleanup = (
-      status: ExecuteWorkflowResult['status'],
-      finalEvents = events,
-      finalTraceEvents = traceEvents,
-    ) => {
+  let totalTimer: NodeJS.Timeout | null = null;
+  let idleTimer: NodeJS.Timeout | null = null;
+  let status: ExecuteWorkflowResult['status'] = 'timeout';
+
+  const cleanup = () => {
+    if (totalTimer) clearTimeout(totalTimer);
+    if (idleTimer) clearTimeout(idleTimer);
+    reader.releaseLock();
+  };
+
+  // Set up total timeout
+  if (timeout) {
+    totalTimer = setTimeout(() => {
       cleanup();
-      resolve({
-        workflowRunId,
-        status,
-        events: finalEvents,
-        traceEvents: finalTraceEvents,
-        trace: new TraceEventCollection(finalTraceEvents),
-      });
-    };
+    }, timeout);
+  }
 
-    // Set up total timeout
-    if (timeout) {
-      totalTimer = setTimeout(() => resolveWithCleanup('timeout'), timeout);
+  const resetIdleTimer = () => {
+    if (idleTimer) clearTimeout(idleTimer);
+    if (idleTimeout) {
+      idleTimer = setTimeout(() => {
+        status = 'idle_timeout';
+        cleanup();
+      }, idleTimeout);
     }
+  };
 
-    const resetIdleTimer = () => {
-      if (idleTimer) clearTimeout(idleTimer);
-      if (idleTimeout) {
-        idleTimer = setTimeout(() => resolveWithCleanup('idle_timeout'), idleTimeout);
-      }
-    };
+  resetIdleTimer();
 
-    const eventCallback = (event: InternalEvent) => {
-      resetIdleTimer();
+  try {
+    while (true) {
+      const { done, value } = await reader.read();
+      if (done) break;
 
-      // Log events if requested
-      if (options?.logEvents) {
-        if ('eventType' in event) {
-          console.log(`📨 ${event.eventType}`, JSON.stringify(event.metadata ?? {}, null, 2));
-        } else if ('type' in event) {
-          console.log(`🔍 ${event.type}`, JSON.stringify(event.payload ?? {}, null, 2));
+      buffer += decoder.decode(value, { stream: true });
+
+      // Process complete SSE messages (end with \n\n)
+      const messages = buffer.split('\n\n');
+      buffer = messages.pop() ?? '';
+
+      for (const message of messages) {
+        if (!message.trim()) continue;
+
+        // Parse SSE format: "data: {...}"
+        for (const line of message.split('\n')) {
+          if (line.startsWith('data: ')) {
+            const jsonStr = line.slice(6);
+            try {
+              const parsed = JSON.parse(jsonStr);
+              resetIdleTimer();
+
+              // Handle initial run.created event
+              if (parsed.type === 'run.created' && parsed.workflowRunId) {
+                workflowRunId = parsed.workflowRunId;
+                continue;
+              }
+
+              // Handle SSE events from Streamer
+              const sseEvent = parsed as SSEEvent;
+
+              // Log events if requested
+              if (options?.logEvents) {
+                if ('eventType' in sseEvent.event) {
+                  console.log(
+                    `📨 ${sseEvent.event.eventType}`,
+                    JSON.stringify((sseEvent.event as EventEntry).metadata ?? {}, null, 2),
+                  );
+                } else if ('type' in sseEvent.event) {
+                  console.log(
+                    `🔍 ${(sseEvent.event as TraceEventEntry).type}`,
+                    JSON.stringify((sseEvent.event as TraceEventEntry).payload ?? {}, null, 2),
+                  );
+                }
+              }
+
+              // Collect events by stream type
+              if (sseEvent.stream === 'trace') {
+                traceEvents.push(sseEvent.event as TraceEventEntry);
+              } else {
+                events.push(sseEvent.event as EventEntry);
+              }
+
+              // Check for terminal conditions
+              if (sseEvent.stream === 'events') {
+                const event = sseEvent.event as EventEntry;
+                if (event.eventType === 'workflow.completed') {
+                  status = 'completed';
+                  // Wait for grace period to collect any in-flight events
+                  await new Promise((r) => setTimeout(r, gracePeriod));
+                  cleanup();
+                  break;
+                }
+                if (event.eventType === 'workflow.failed') {
+                  status = 'failed';
+                  await new Promise((r) => setTimeout(r, gracePeriod));
+                  cleanup();
+                  break;
+                }
+              }
+            } catch {
+              // Skip malformed JSON
+            }
+          }
+        }
+
+        // Check if we should exit after processing messages
+        if (status === 'completed' || status === 'failed') {
+          break;
         }
       }
 
-      // Collect events by stream type
-      if (event.stream === 'trace') {
-        traceEvents.push(event as TraceEventEntry);
-      } else {
-        events.push(event as EventEntry);
+      // Exit outer loop if terminal
+      if (status === 'completed' || status === 'failed') {
+        break;
       }
+    }
+  } finally {
+    cleanup();
+  }
 
-      // Check for terminal conditions (only applies to EventEntry, not TraceEventEntry)
-      if ('eventType' in event && event.eventType === 'workflow.completed') {
-        // Wait for grace period to collect any in-flight events before closing
-        setTimeout(() => resolveWithCleanup('completed'), gracePeriod);
-        return;
-      }
+  if (!workflowRunId) {
+    throw new Error('Never received workflowRunId from SSE stream');
+  }
 
-      if ('eventType' in event && event.eventType === 'workflow.failed') {
-        // Wait for grace period to collect any in-flight events before closing
-        setTimeout(() => resolveWithCleanup('failed'), gracePeriod);
-        return;
-      }
-    };
-
-    // Subscribe to both events and trace events
-    // Use streamId filter to capture both parent and child workflow events.
-    const subscriptions: Subscription[] = (['events', 'trace'] as const).map((stream) => ({
-      id: stream,
-      stream,
-      filters: { streamId: workflowRunId },
-      callback: eventCallback,
-    }));
-
-    wonder.streams
-      .subscribe(subscriptions, workflowRunId)
-      .then((sub) => {
-        subscription = sub;
-        resetIdleTimer();
-
-        // Phase 3: Start execution (after subscription is established)
-        // Small delay to ensure WebSocket handshake completes
-        setTimeout(async () => {
-          try {
-            await wonder.POST('/workflows/{id}/runs/{runId}/start', {
-              params: { path: { id: workflowId, runId: workflowRunId } },
-              body: { enableTraceEvents },
-            });
-          } catch (error) {
-            cleanup();
-            reject(error);
-          }
-        }, WEBSOCKET_HANDSHAKE_DELAY_MS);
-      })
-      .catch((error) => {
-        cleanup();
-        reject(error);
-      });
-  });
+  return {
+    workflowRunId,
+    status,
+    events,
+    traceEvents,
+    trace: new TraceEventCollection(traceEvents),
+  };
 }
 
 /**

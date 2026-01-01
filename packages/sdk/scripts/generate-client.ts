@@ -114,6 +114,10 @@ export interface ClientMethod {
   originalPath: string;
   /** Success status code from OpenAPI spec (e.g., '200', '201', '204') */
   successStatusCode: string;
+  /** Response content types (e.g., ['application/json', 'text/event-stream']) */
+  responseContentTypes?: string[];
+  /** Whether this endpoint supports SSE streaming */
+  supportsSSE: boolean;
 }
 
 export interface ClientProperty {
@@ -123,18 +127,25 @@ export interface ClientProperty {
   children?: ClientProperty[];
 }
 
+const SSE_CONTENT_TYPE = 'text/event-stream';
+
 /**
  * Generate collection object structure with methods and nested resources
  */
 export function generateCollectionObject(node: RouteNode): ClientProperty {
-  const methods = node.methods.map((method) => ({
-    name: getMethodName(node, method.verb),
-    signature: generateMethodSignature(node, method.verb),
-    path: buildPathTemplate(node),
-    verb: method.verb,
-    originalPath: method.originalPath ?? buildPathTemplate(node),
-    successStatusCode: method.successStatusCode ?? DEFAULT_STATUS_CODE,
-  }));
+  const methods = node.methods.map((method) => {
+    const responseContentTypes = method.responseContentTypes ?? [];
+    return {
+      name: getMethodName(node, method.verb),
+      signature: generateMethodSignature(node, method.verb),
+      path: buildPathTemplate(node),
+      verb: method.verb,
+      originalPath: method.originalPath ?? buildPathTemplate(node),
+      successStatusCode: method.successStatusCode ?? DEFAULT_STATUS_CODE,
+      responseContentTypes,
+      supportsSSE: responseContentTypes.includes(SSE_CONTENT_TYPE),
+    };
+  });
 
   const properties = node.children.map((child) =>
     child.type === NodeType.Param
@@ -211,6 +222,20 @@ function formatMethod(
   const hasBody = method.signature.parameters.some((p) => p.name === 'body');
   const bodyParam = hasBody ? '{ body }' : '{}';
   const returnType = buildResponseType(method.originalPath, method.verb, method.successStatusCode);
+
+  // For SSE endpoints, generate an async generator that yields parsed events
+  if (method.supportsSSE) {
+    return `${indent}${method.name}: async function* (${params.join(', ')}): AsyncGenerator<SSEEvent<${returnType}>> {
+${indent}  const response = await baseClient.${method.verb.toUpperCase()}(\`${method.path}\`, ${bodyParam});
+${indent}  if (!response.response.ok) {
+${indent}    throw new ApiError(\`${method.verb.toUpperCase()} ${method.path} failed\`, response.error);
+${indent}  }
+${indent}  if (!response.response.body) {
+${indent}    throw new ApiError(\`${method.verb.toUpperCase()} ${method.path} returned no body\`, null);
+${indent}  }
+${indent}  yield* parseSSEStream<${returnType}>(response.response.body);
+${indent}}`;
+  }
 
   return `${indent}${method.name}: async (${params.join(', ')}): Promise<${returnType}> => {
 ${indent}  const { data, error } = await baseClient.${method.verb.toUpperCase()}(\`${method.path}\`, ${bodyParam});
@@ -361,6 +386,58 @@ export function formatClientCode(structure: ClientStructure): string {
 
   // Imports
   lines.push("import type { paths } from './schema.js';");
+  lines.push('');
+
+  // SSE Event type
+  lines.push('/**');
+  lines.push(' * SSE event wrapper with stream type and parsed event data');
+  lines.push(' */');
+  lines.push('export interface SSEEvent<T = unknown> {');
+  lines.push('  stream: "events" | "trace";');
+  lines.push('  event: T;');
+  lines.push('}');
+  lines.push('');
+
+  // SSE parser function
+  lines.push('/**');
+  lines.push(' * Parse SSE stream into async generator of events');
+  lines.push(' */');
+  lines.push('async function* parseSSEStream<T>(body: ReadableStream<Uint8Array>): AsyncGenerator<SSEEvent<T>> {');
+  lines.push('  const reader = body.getReader();');
+  lines.push('  const decoder = new TextDecoder();');
+  lines.push('  let buffer = "";');
+  lines.push('');
+  lines.push('  try {');
+  lines.push('    while (true) {');
+  lines.push('      const { done, value } = await reader.read();');
+  lines.push('      if (done) break;');
+  lines.push('');
+  lines.push('      buffer += decoder.decode(value, { stream: true });');
+  lines.push('');
+  lines.push('      // Process complete SSE messages (end with \\n\\n)');
+  lines.push('      const messages = buffer.split("\\n\\n");');
+  lines.push('      buffer = messages.pop() ?? "";');
+  lines.push('');
+  lines.push('      for (const message of messages) {');
+  lines.push('        if (!message.trim()) continue;');
+  lines.push('');
+  lines.push('        // Parse SSE format: "data: {...}"');
+  lines.push('        for (const line of message.split("\\n")) {');
+  lines.push('          if (line.startsWith("data: ")) {');
+  lines.push('            const jsonStr = line.slice(6);');
+  lines.push('            try {');
+  lines.push('              yield JSON.parse(jsonStr) as SSEEvent<T>;');
+  lines.push('            } catch {');
+  lines.push('              // Skip malformed JSON');
+  lines.push('            }');
+  lines.push('          }');
+  lines.push('        }');
+  lines.push('      }');
+  lines.push('    }');
+  lines.push('  } finally {');
+  lines.push('    reader.releaseLock();');
+  lines.push('  }');
+  lines.push('}');
   lines.push('');
 
   // ApiError class

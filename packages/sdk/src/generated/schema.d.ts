@@ -2042,9 +2042,7 @@ export interface paths {
             };
             requestBody?: {
                 content: {
-                    "application/json": {
-                        [key: string]: unknown;
-                    };
+                    "application/json": components["schemas"]["StartWorkflowRequest"];
                 };
             };
             responses: {
@@ -2055,6 +2053,7 @@ export interface paths {
                     };
                     content: {
                         "application/json": components["schemas"]["WorkflowStartResponse"];
+                        "text/event-stream": string;
                     };
                 };
                 /** @description Failed to start workflow */
@@ -3432,6 +3431,22 @@ export interface components {
         };
         WorkflowStartError: {
             error: string;
+        };
+        StartWorkflowRequest: {
+            /**
+             * @description If true, returns SSE stream of events instead of JSON response
+             * @example false
+             */
+            stream?: boolean;
+            /**
+             * @description Input data for the workflow
+             * @example {
+             *       "key": "value"
+             *     }
+             */
+            input?: {
+                [key: string]: unknown;
+            };
         };
         WorkflowDeleteResponse: {
             success: boolean;

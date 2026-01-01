@@ -34,18 +34,67 @@ workflows.openapi(getWorkflowRoute, async (c) => {
 /** POST /{id}/start */
 workflows.openapi(startWorkflowRoute, async (c) => {
   const { id } = c.req.valid('param');
-  const input = c.req.valid('json');
+  const { stream, input } = c.req.valid('json');
 
   // 1. Create workflow run
   using workflowRunsResource = c.env.RESOURCES.workflowRuns();
-  const { workflowRunId } = await workflowRunsResource.create(id, input);
+  const { workflowRunId } = await workflowRunsResource.create(id, input ?? {});
 
-  // 2. Start the coordinator DO
+  // 2. Get coordinator DO
   const coordinatorId = c.env.COORDINATOR.idFromName(workflowRunId);
   const coordinator = c.env.COORDINATOR.get(coordinatorId);
-  await coordinator.start(workflowRunId);
 
-  return c.json({ workflowRunId, durableObjectId: workflowRunId }, 200);
+  // Non-streaming mode: start and return immediately
+  if (!stream) {
+    await coordinator.start(workflowRunId);
+    return c.json({ workflowRunId, durableObjectId: workflowRunId }, 200);
+  }
+
+  // Streaming mode: connect to Streamer DO for SSE
+  const streamerId = c.env.EVENTS_STREAMER.idFromName(workflowRunId);
+  const streamer = c.env.EVENTS_STREAMER.get(streamerId);
+
+  // Start coordinator in background (don't await)
+  c.executionCtx.waitUntil(coordinator.start(workflowRunId));
+
+  // Connect to Streamer's SSE endpoint
+  const sseUrl = new URL(c.req.url);
+  sseUrl.pathname = '/sse';
+  // Filter to this specific workflow run
+  sseUrl.searchParams.set('streamId', workflowRunId);
+
+  const sseResponse = await streamer.fetch(new Request(sseUrl));
+
+  // Create a transform stream to prepend the runId event
+  const encoder = new TextEncoder();
+  const initialEvent = encoder.encode(
+    `data: ${JSON.stringify({ type: 'run.created', workflowRunId })}\n\n`,
+  );
+
+  const prependTransform = new TransformStream<Uint8Array, Uint8Array>({
+    start(controller) {
+      // Send initial event immediately
+      controller.enqueue(initialEvent);
+    },
+    transform(chunk, controller) {
+      controller.enqueue(chunk);
+    },
+  });
+
+  // Pipe streamer response through our transform
+  if (sseResponse.body) {
+    sseResponse.body.pipeTo(prependTransform.writable).catch(() => {
+      // Stream closed
+    });
+  }
+
+  return new Response(prependTransform.readable, {
+    headers: {
+      'Content-Type': 'text/event-stream',
+      'Cache-Control': 'no-cache',
+      Connection: 'keep-alive',
+    },
+  });
 });
 
 /** DELETE /{id} */

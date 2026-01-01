@@ -35,6 +35,8 @@ export interface RouteMethod {
   originalPath?: string;
   /** Success status code from OpenAPI spec (e.g., 200, 201, 204) */
   successStatusCode?: string;
+  /** Response content types (e.g., ['application/json', 'text/event-stream']) */
+  responseContentTypes?: string[];
 }
 
 /**
@@ -101,12 +103,14 @@ export interface PathDefinition {
   method: HttpMethod;
   operationId?: string;
   responses?: Record<string, unknown>;
+  /** Response content types extracted from OpenAPI spec */
+  responseContentTypes?: string[];
 }
 
 export function buildRouteTree(paths: PathDefinition[]): RouteNode[] {
   const roots: RouteNode[] = [];
 
-  for (const { path, method, operationId, responses } of paths) {
+  for (const { path, method, operationId, responses, responseContentTypes } of paths) {
     const segments = parsePathSegments(path);
     const segmentTypes = segments.map(classifySegment);
     let currentLevel = roots;
@@ -156,6 +160,7 @@ export function buildRouteTree(paths: PathDefinition[]): RouteNode[] {
           operationId,
           originalPath: path,
           successStatusCode: successStatusCode ?? DEFAULT_SUCCESS_STATUS,
+          responseContentTypes,
         });
       }
 

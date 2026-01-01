@@ -39,6 +39,26 @@ function shouldUseJSONSchema(path: string): boolean {
 }
 
 /**
+ * Extract content types from OpenAPI response object
+ */
+function extractResponseContentTypes(responses: Record<string, any> | undefined): string[] {
+  if (!responses) return [];
+
+  const contentTypes = new Set<string>();
+
+  // Look at 2xx responses for content types
+  for (const [statusCode, response] of Object.entries(responses)) {
+    if (/^2\d\d$/.test(statusCode) && response?.content) {
+      for (const contentType of Object.keys(response.content)) {
+        contentTypes.add(contentType);
+      }
+    }
+  }
+
+  return Array.from(contentTypes);
+}
+
+/**
  * Convert OpenAPI paths object to PathDefinition array
  */
 export function convertOpenApiPaths(paths: Record<string, Record<string, any>>): PathDefinition[] {
@@ -53,6 +73,7 @@ export function convertOpenApiPaths(paths: Record<string, Record<string, any>>):
         method: method as HttpMethod,
         operationId: operation?.operationId,
         responses: operation?.responses,
+        responseContentTypes: extractResponseContentTypes(operation?.responses),
       })),
   );
 }

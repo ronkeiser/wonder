@@ -56,6 +56,19 @@ export const getWorkflowRoute = createRoute({
   },
 });
 
+const StartWorkflowRequestSchema = z
+  .object({
+    stream: z.boolean().optional().openapi({
+      description: 'If true, returns SSE stream of events instead of JSON response',
+      example: false,
+    }),
+    input: z.record(z.string(), z.unknown()).optional().openapi({
+      description: 'Input data for the workflow',
+      example: { key: 'value' },
+    }),
+  })
+  .openapi('StartWorkflowRequest');
+
 export const startWorkflowRoute = createRoute({
   method: 'post',
   path: '/{id}/start',
@@ -67,7 +80,7 @@ export const startWorkflowRoute = createRoute({
     body: {
       content: {
         'application/json': {
-          schema: z.record(z.string(), z.unknown()).openapi({ example: { input: 'value' } }),
+          schema: StartWorkflowRequestSchema,
         },
       },
     },
@@ -82,6 +95,12 @@ export const startWorkflowRoute = createRoute({
               durableObjectId: z.string(),
             })
             .openapi('WorkflowStartResponse'),
+        },
+        'text/event-stream': {
+          schema: z.string().openapi({
+            description: 'SSE stream of workflow events',
+            example: 'data: {"stream":"events","event":{...}}\n\n',
+          }),
         },
       },
       description: 'Workflow execution started successfully',

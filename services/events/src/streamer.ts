@@ -27,13 +27,22 @@ const ROWS_PER_INSERT = 7;
 const MAX_RETRY_ATTEMPTS = 3;
 
 /**
+ * SSE connection with writer and subscription info
+ */
+interface SSEConnection {
+  writer: WritableStreamDefaultWriter<Uint8Array>;
+  filters: SubscriptionFilter;
+  streams: Array<'events' | 'trace'>;
+}
+
+/**
  * Streamer Durable Object - one instance per streamId (conversationId or rootRunId)
  *
  * Responsibilities:
  * - Assigns sequences atomically (single-threaded per stream)
  * - Buffers and batches events for efficient D1 writes
- * - Broadcasts events to WebSocket subscribers immediately
- * - Manages WebSocket connections for real-time streaming
+ * - Broadcasts events to WebSocket and SSE subscribers immediately
+ * - Manages WebSocket and SSE connections for real-time streaming
  */
 export class Streamer extends DurableObject<Env> {
   private logger: Logger;
@@ -47,6 +56,9 @@ export class Streamer extends DurableObject<Env> {
   private traceBuffer: TraceEventEntry[] = [];
   private flushScheduled = false;
   private retryCount = 0;
+
+  // SSE connections (in-memory only, not persisted)
+  private sseConnections: Set<SSEConnection> = new Set();
 
   constructor(ctx: DurableObjectState, env: Env) {
     super(ctx, env);
@@ -242,16 +254,17 @@ export class Streamer extends DurableObject<Env> {
   }
 
   // ============================================================================
-  // WebSocket Management
+  // Connection Management (WebSocket & SSE)
   // ============================================================================
 
   /**
-   * Handle WebSocket upgrade and initial connection
+   * Handle WebSocket upgrade and SSE connections
    */
   async fetch(request: Request): Promise<Response> {
     const url = new URL(request.url);
 
-    if (url.pathname === '/stream') {
+    // WebSocket endpoint
+    if (url.pathname === '/ws') {
       const upgradeHeader = request.headers.get('Upgrade');
       if (upgradeHeader !== 'websocket') {
         return new Response('Expected WebSocket', { status: 426 });
@@ -269,7 +282,62 @@ export class Streamer extends DurableObject<Env> {
       });
     }
 
+    // SSE endpoint
+    if (url.pathname === '/sse') {
+      return this.handleSSE(url);
+    }
+
     return new Response('Not Found', { status: 404 });
+  }
+
+  /**
+   * Handle SSE connection setup
+   */
+  private handleSSE(url: URL): Response {
+    const { readable, writable } = new TransformStream<Uint8Array, Uint8Array>();
+    const writer = writable.getWriter();
+    const encoder = new TextEncoder();
+
+    // Parse filters from query params
+    const filters: SubscriptionFilter = {};
+    if (url.searchParams.has('streamId')) filters.streamId = url.searchParams.get('streamId')!;
+    if (url.searchParams.has('executionId')) filters.executionId = url.searchParams.get('executionId')!;
+    if (url.searchParams.has('executionType')) {
+      filters.executionType = url.searchParams.get('executionType') as 'workflow' | 'conversation';
+    }
+    if (url.searchParams.has('projectId')) filters.projectId = url.searchParams.get('projectId')!;
+    if (url.searchParams.has('eventType')) filters.eventType = url.searchParams.get('eventType')!;
+    if (url.searchParams.has('eventTypes')) {
+      filters.eventTypes = url.searchParams.get('eventTypes')!.split(',');
+    }
+
+    // Parse which streams to subscribe to (default: both)
+    const streamsParam = url.searchParams.get('streams');
+    const streams: Array<'events' | 'trace'> = streamsParam
+      ? (streamsParam.split(',') as Array<'events' | 'trace'>)
+      : ['events', 'trace'];
+
+    const connection: SSEConnection = { writer, filters, streams };
+    this.sseConnections.add(connection);
+
+    // Send initial comment to establish connection
+    writer.write(encoder.encode(': connected\n\n')).catch(() => {
+      // Connection closed during write
+      this.sseConnections.delete(connection);
+    });
+
+    // Clean up when the readable stream is cancelled (client disconnects)
+    readable.pipeTo(new WritableStream()).catch(() => {
+      this.sseConnections.delete(connection);
+    });
+
+    return new Response(readable, {
+      headers: {
+        'Content-Type': 'text/event-stream',
+        'Cache-Control': 'no-cache',
+        Connection: 'keep-alive',
+      },
+    });
   }
 
   /**
@@ -310,6 +378,7 @@ export class Streamer extends DurableObject<Env> {
   // ============================================================================
 
   private broadcastEvent(entry: BroadcastEventEntry): void {
+    // Broadcast to WebSocket subscribers
     this.ctx.getWebSockets().forEach((ws) => {
       const subsObj = (ws.deserializeAttachment() as Record<string, Subscription>) || {};
 
@@ -333,9 +402,13 @@ export class Streamer extends DurableObject<Env> {
         }
       }
     });
+
+    // Broadcast to SSE subscribers
+    this.broadcastToSSE('events', entry);
   }
 
   private broadcastTraceEvent(entry: BroadcastTraceEventEntry): void {
+    // Broadcast to WebSocket subscribers
     this.ctx.getWebSockets().forEach((ws) => {
       const subsObj = (ws.deserializeAttachment() as Record<string, Subscription>) || {};
 
@@ -359,6 +432,43 @@ export class Streamer extends DurableObject<Env> {
         }
       }
     });
+
+    // Broadcast to SSE subscribers
+    this.broadcastToSSE('trace', entry);
+  }
+
+  private broadcastToSSE(
+    stream: 'events' | 'trace',
+    entry: BroadcastEventEntry | BroadcastTraceEventEntry,
+  ): void {
+    const encoder = new TextEncoder();
+    const toRemove: SSEConnection[] = [];
+
+    for (const connection of this.sseConnections) {
+      // Check if connection subscribes to this stream type
+      if (!connection.streams.includes(stream)) continue;
+
+      // Check if event matches filters
+      const matches =
+        stream === 'events'
+          ? matchesEventFilter(entry as BroadcastEventEntry, connection.filters)
+          : matchesTraceFilter(entry as BroadcastTraceEventEntry, connection.filters);
+
+      if (!matches) continue;
+
+      // Format as SSE: data: {json}\n\n
+      const sseData = `data: ${JSON.stringify({ stream, event: entry })}\n\n`;
+
+      connection.writer.write(encoder.encode(sseData)).catch(() => {
+        // Connection closed, mark for removal
+        toRemove.push(connection);
+      });
+    }
+
+    // Clean up closed connections
+    for (const conn of toRemove) {
+      this.sseConnections.delete(conn);
+    }
   }
 
 }

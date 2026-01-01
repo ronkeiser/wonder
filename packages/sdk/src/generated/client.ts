@@ -6,6 +6,54 @@
 import type { paths } from './schema.js';
 
 /**
+ * SSE event wrapper with stream type and parsed event data
+ */
+export interface SSEEvent<T = unknown> {
+  stream: "events" | "trace";
+  event: T;
+}
+
+/**
+ * Parse SSE stream into async generator of events
+ */
+async function* parseSSEStream<T>(body: ReadableStream<Uint8Array>): AsyncGenerator<SSEEvent<T>> {
+  const reader = body.getReader();
+  const decoder = new TextDecoder();
+  let buffer = "";
+
+  try {
+    while (true) {
+      const { done, value } = await reader.read();
+      if (done) break;
+
+      buffer += decoder.decode(value, { stream: true });
+
+      // Process complete SSE messages (end with \n\n)
+      const messages = buffer.split("\n\n");
+      buffer = messages.pop() ?? "";
+
+      for (const message of messages) {
+        if (!message.trim()) continue;
+
+        // Parse SSE format: "data: {...}"
+        for (const line of message.split("\n")) {
+          if (line.startsWith("data: ")) {
+            const jsonStr = line.slice(6);
+            try {
+              yield JSON.parse(jsonStr) as SSEEvent<T>;
+            } catch {
+              // Skip malformed JSON
+            }
+          }
+        }
+      }
+    }
+  } finally {
+    reader.releaseLock();
+  }
+}
+
+/**
  * Error thrown when an API request fails
  */
 export class ApiError extends Error {
@@ -370,10 +418,15 @@ export function createClient(baseClient: any) {
             if (error) throw new ApiError(`DELETE /workflows/${id} failed`, error);
             return data;
           },
-          start: async (body: NonNullable<paths['/workflows/{id}/start']['post']['requestBody']>['content']['application/json'], options?: any): Promise<paths['/workflows/{id}/start']['post']['responses']['200']['content']['application/json']> => {
-            const { data, error } = await baseClient.POST(`/workflows/${id}/start`, { body });
-            if (error) throw new ApiError(`POST /workflows/${id}/start failed`, error);
-            return data;
+          start: async function* (body: NonNullable<paths['/workflows/{id}/start']['post']['requestBody']>['content']['application/json'], options?: any): AsyncGenerator<SSEEvent<paths['/workflows/{id}/start']['post']['responses']['200']['content']['application/json']>> {
+            const response = await baseClient.POST(`/workflows/${id}/start`, { body });
+            if (!response.response.ok) {
+              throw new ApiError(`POST /workflows/${id}/start failed`, response.error);
+            }
+            if (!response.response.body) {
+              throw new ApiError(`POST /workflows/${id}/start returned no body`, null);
+            }
+            yield* parseSSEStream<paths['/workflows/{id}/start']['post']['responses']['200']['content']['application/json']>(response.response.body);
           },
           create: async (body: NonNullable<paths['/workflows/{id}/runs']['post']['requestBody']>['content']['application/json'], options?: any): Promise<paths['/workflows/{id}/runs']['post']['responses']['201']['content']['application/json']> => {
             const { data, error } = await baseClient.POST(`/workflows/${id}/runs`, { body });
