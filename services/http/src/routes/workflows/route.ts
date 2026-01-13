@@ -65,14 +65,9 @@ workflows.openapi(startWorkflowRoute, async (c) => {
 
   const sseResponse = await streamer.fetch(new Request(sseUrl));
 
-  // Return the SSE stream directly from the Streamer
-  return new Response(sseResponse.body, {
-    headers: {
-      'Content-Type': 'text/event-stream',
-      'Cache-Control': 'no-cache',
-      Connection: 'keep-alive',
-    },
-  });
+  // Return the SSE response directly - don't wrap it as that can cause
+  // "ReadableStream is disturbed" errors if body is accessed elsewhere
+  return sseResponse;
 });
 
 /** DELETE /{id} */

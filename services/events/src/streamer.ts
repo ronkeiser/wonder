@@ -326,8 +326,10 @@ export class Streamer extends DurableObject<Env> {
       this.sseConnections.delete(connection);
     });
 
-    // Clean up when the readable stream is cancelled (client disconnects)
-    readable.pipeTo(new WritableStream()).catch(() => {
+    // Clean up connection when writer closes (client disconnect or error)
+    // We detect this through writer.closed promise instead of pipeTo
+    // which would consume the readable stream
+    writer.closed.catch(() => {
       this.sseConnections.delete(connection);
     });
 

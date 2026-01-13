@@ -224,10 +224,13 @@ function formatMethod(
   const bodyParam = hasBody ? '{ body }' : '{}';
 
   // For SSE endpoints, use text/event-stream content type for response type
+  // Must use parseAs: "stream" to prevent openapi-fetch from consuming the body
   if (method.supportsSSE) {
     const sseReturnType = buildResponseType(method.originalPath, method.verb, method.successStatusCode, SSE_CONTENT_TYPE);
+    // Merge body with parseAs option
+    const sseBodyParam = hasBody ? '{ body, parseAs: "stream" }' : '{ parseAs: "stream" }';
     return `${indent}${method.name}: async function* (${params.join(', ')}): AsyncGenerator<${sseReturnType}> {
-${indent}  const response = await baseClient.${method.verb.toUpperCase()}(\`${method.path}\`, ${bodyParam});
+${indent}  const response = await baseClient.${method.verb.toUpperCase()}(\`${method.path}\`, ${sseBodyParam});
 ${indent}  if (!response.response.ok) {
 ${indent}    throw new ApiError(\`${method.verb.toUpperCase()} ${method.path} failed\`, response.error);
 ${indent}  }

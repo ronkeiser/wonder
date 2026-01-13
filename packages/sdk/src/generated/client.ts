@@ -153,7 +153,7 @@ export function createClient(baseClient: any) {
             return data;
           },
           turns: async function* (body: NonNullable<paths['/conversations/{id}/turns']['post']['requestBody']>['content']['application/json'], options?: any): AsyncGenerator<paths['/conversations/{id}/turns']['post']['responses']['200']['content']['text/event-stream']> {
-            const response = await baseClient.POST(`/conversations/${id}/turns`, { body });
+            const response = await baseClient.POST(`/conversations/${id}/turns`, { body, parseAs: "stream" });
             if (!response.response.ok) {
               throw new ApiError(`POST /conversations/${id}/turns failed`, response.error);
             }
@@ -421,7 +421,7 @@ export function createClient(baseClient: any) {
             return data;
           },
           start: async function* (body: NonNullable<paths['/workflows/{id}/start']['post']['requestBody']>['content']['application/json'], options?: any): AsyncGenerator<paths['/workflows/{id}/start']['post']['responses']['200']['content']['text/event-stream']> {
-            const response = await baseClient.POST(`/workflows/${id}/start`, { body });
+            const response = await baseClient.POST(`/workflows/${id}/start`, { body, parseAs: "stream" });
             if (!response.response.ok) {
               throw new ApiError(`POST /workflows/${id}/start failed`, response.error);
             }
