@@ -9,33 +9,37 @@
     "bindings": [
       { "name": "AGENT", "class_name": "Conversation" },
       { "name": "STREAMER", "class_name": "Streamer", "script_name": "wonder-events" },
-      { "name": "COORDINATOR", "class_name": "WorkflowCoordinator", "script_name": "wonder-coordinator" }
-    ]
+      {
+        "name": "COORDINATOR",
+        "class_name": "WorkflowCoordinator",
+        "script_name": "wonder-coordinator",
+      },
+    ],
   },
 
   "services": [
     { "binding": "LOGS", "service": "wonder-logs" },
     { "binding": "EVENTS", "service": "wonder-events" },
     { "binding": "RESOURCES", "service": "wonder-resources" },
-    { "binding": "EXECUTOR", "service": "wonder-executor" }
+    { "binding": "EXECUTOR", "service": "wonder-executor" },
   ],
 
   "migrations": [
     { "tag": "v1", "new_sqlite_classes": ["AgentDO"] },
-    { "tag": "v2", "renamed_classes": [{ "from": "AgentDO", "to": "Conversation" }] }
+    { "tag": "v2", "renamed_classes": [{ "from": "AgentDO", "to": "Conversation" }] },
   ],
 
   "rules": [
     {
       "type": "Text",
       "globs": ["**/*.sql"],
-      "fallthrough": true
-    }
+      "fallthrough": true,
+    },
   ],
 
   "vars": {
     "SERVICE": "agent",
     "ENVIRONMENT": "development",
-    "TRACE_EVENTS_ENABLED": "false"
-  }
+    "TRACE_EVENTS_ENABLED": "true",
+  },
 }
