@@ -147,7 +147,7 @@ export default class ExecutorService extends WorkerEntrypoint<Env> {
   }
 
   /**
-   * RPC method - Execute a task for an agent (fire-and-forget, calls back to AgentDO)
+   * RPC method - Execute a task for an agent (fire-and-forget, calls back to Conversation)
    *
    * Similar to executeTask but with agent-specific callback routing.
    * Used when an agent's tool invokes a task directly.

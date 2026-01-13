@@ -50,7 +50,7 @@ export interface TaskResult {
 }
 
 /**
- * AgentTaskPayload - from AgentDO for tool execution
+ * AgentTaskPayload - from Conversation for tool execution
  *
  * Simpler than TaskPayload since agent context differs from workflow context.
  * Agent provides conversation routing info for callback.

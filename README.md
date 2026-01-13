@@ -87,7 +87,7 @@ WorkflowDef
   Action
 ```
 
-**WorkflowDef**: Graphs of nodes and transitions. Supports parallelism, fan-out/fan-in, human gates, sub-workflows. State is durable (DO SQLite). Coordinated by CoordinatorDO.
+**WorkflowDef**: Graphs of nodes and transitions. Supports parallelism, fan-out/fan-in, human gates, sub-workflows. State is durable (DO SQLite). Coordinated by WorkflowCoordinator.
 
 **Node**: A point in the workflow graph. Each node executes exactly one task.
 
@@ -117,7 +117,7 @@ Persona
 
 **Agent**: A persona bound to a project. Has access to project resources and can invoke workflows as capabilities.
 
-**Conversation**: A session with an agent. Durable state in AgentDO. Contains turns and accumulated memories.
+**Conversation**: A session with an agent. Durable state in Conversation. Contains turns and accumulated memories.
 
 **Turn**: A request-response cycle within a conversation. User submits a message, agent reasons and acts, then responds.
 
@@ -132,10 +132,10 @@ receive → decide → dispatch → wait → resume
 ```
 
 The difference is what drives "decide":
-- **CoordinatorDO**: Graph traversal determines next node based on transitions and conditions
-- **AgentDO**: LLM reasoning determines next action based on conversation and context
+- **WorkflowCoordinator**: Graph traversal determines next node based on transitions and conditions
+- **Conversation**: LLM reasoning determines next action based on conversation and context
 
-Both dispatch to the same targets: Executor (for tasks), CoordinatorDO (for sub-workflows), or AgentDO (for agent invocation).
+Both dispatch to the same targets: Executor (for tasks), WorkflowCoordinator (for sub-workflows), or Conversation (for agent invocation).
 
 ### Why Tasks?
 
@@ -337,13 +337,13 @@ The agent receives context, reasons about it, and returns a response. Useful whe
 
 Every execution gets its own Durable Object implementing the Actor Model:
 
-**CoordinatorDO** (one per workflow run):
+**WorkflowCoordinator** (one per workflow run):
 - Maintains authoritative state (context, tokens)
 - Tracks fan-in synchronization
 - Evaluates transitions to determine next nodes
 - Dispatches tasks to Executor
 
-**AgentDO** (one per conversation):
+**Conversation** (one per conversation):
 - Maintains conversation state (turns, messages, memories)
 - Assembles context for LLM calls
 - Reasons via LLM to decide next action
@@ -355,7 +355,7 @@ Both are lightweight—decision logic only. Actual work happens in Executor or n
 
 The Executor service executes tasks:
 
-1. Receive task definition and inputs from CoordinatorDO or AgentDO
+1. Receive task definition and inputs from WorkflowCoordinator or Conversation
 2. Execute steps sequentially
 3. Handle retries and conditionals
 4. Return result to calling DO
@@ -396,7 +396,7 @@ This enables full replay, live UI updates, audit trails, and time-travel debuggi
 
 | Service          | Role                                                              |
 | ---------------- | ----------------------------------------------------------------- |
-| Durable Objects  | CoordinatorDO (workflows), AgentDO (conversations), ContainerDO   |
+| Durable Objects  | WorkflowCoordinator (workflows), Conversation (conversations), ContainerDO |
 | Workers          | Executor service, API routes                                      |
 | D1               | Definitions, refs, metadata, completed runs, conversation history |
 | R2               | Git objects, pnpm store, large artifacts                          |
