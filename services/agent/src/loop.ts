@@ -246,13 +246,13 @@ export async function runLLMLoop(params: RunLLMLoopParams): Promise<RunLLMLoopRe
   // Check for sync tools
   const hasSyncTools = decisions.some(
     (d) =>
-      d.type === 'DISPATCH_TASK' || (d.type === 'DISPATCH_WORKFLOW' && !d.async),
+      (d.type === 'DISPATCH_TASK' && !d.async) || (d.type === 'DISPATCH_WORKFLOW' && !d.async),
   );
 
   if (hasSyncTools) {
     // Mark waiting for sync tools
     for (const d of decisions) {
-      if (d.type === 'DISPATCH_TASK') {
+      if (d.type === 'DISPATCH_TASK' && !d.async) {
         ctx.asyncOps.markWaiting(turnId, d.toolCallId);
       } else if (d.type === 'DISPATCH_WORKFLOW' && !d.async) {
         ctx.asyncOps.markWaiting(turnId, d.toolCallId);

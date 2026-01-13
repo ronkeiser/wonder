@@ -232,6 +232,7 @@ export type AgentDecision =
       toolCallId: string;
       taskId: string;
       input: unknown;
+      async: boolean;
       /** Raw content blocks from LLM response (for tool continuation) */
       rawContent?: unknown[];
       /** Retry configuration for infrastructure errors */

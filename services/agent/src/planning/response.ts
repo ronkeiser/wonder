@@ -238,6 +238,7 @@ function createDispatchDecision(
         toolCallId: toolCall.id,
         taskId: tool.targetId,
         input,
+        async: tool.async ?? false,
         rawContent,
         retry,
       };

@@ -37,21 +37,26 @@ Tools are the LLM-facing interface. Each tool binds to an execution target (Task
 
 ```typescript
 interface Persona {
-  identity: { systemPrompt: string; modelProfileId: string; ... }
-  memory: {
-    contextAssemblyWorkflowId: string;
-    memoryExtractionWorkflowId: string;
-    recentTurnsLimit?: number;   // How many turns to keep in DO SQLite (default: 20)
-  }
-  tools: {
-    toolIds: string[];           // References to Tool definitions in libraries
-    constraints: AgentConstraints;
-  }
+  id: string;
+  version: string;
+  name: string;
+
+  // Identity
+  systemPrompt: string;
+  modelProfileId: string;
+
+  // Memory configuration
+  contextAssemblyWorkflowId: string;
+  memoryExtractionWorkflowId: string;
+  recentTurnsLimit?: number;     // How many turns to keep in DO SQLite (default: 20)
+
+  // Tools
+  toolIds: string[];             // References to Tool definitions in libraries
+  constraints?: AgentConstraints;
 }
 
 interface AgentConstraints {
   maxMovesPerTurn?: number;      // Limits iterations before agent must respond
-  // ... other constraints (allowed actions, budgets)
 }
 ```
 
