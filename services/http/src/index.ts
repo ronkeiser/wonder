@@ -6,7 +6,7 @@
 import { OpenAPIHono } from '@hono/zod-openapi';
 import { cors } from 'hono/cors';
 import { auth } from './middleware/auth';
-import { errorLoggerMiddleware } from './middleware/error';
+import { errorHandler, errorLoggerMiddleware } from './middleware/error';
 import { loggerMiddleware } from './middleware/logger';
 import { actions } from './routes/actions/route';
 import { agents } from './routes/agents/route';
@@ -41,6 +41,9 @@ const app = new OpenAPIHono<HttpEnv>({
     }
   },
 });
+
+// Global error handler - returns structured JSON error responses
+app.onError(errorHandler);
 
 // CORS middleware
 app.use('/*', cors());
