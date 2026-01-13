@@ -249,9 +249,6 @@ export interface ExecutionStatusChange {
   /** Definition ID (workflowDefId for workflows, agentId for conversations) */
   definitionId: string;
 
-  /** Project ID */
-  projectId: string;
-
   /** Parent execution ID (for subworkflows) */
   parentExecutionId: string | null;
 
@@ -267,7 +264,6 @@ export interface ExecutionStatusChange {
  */
 export interface HubSubscriptionFilter {
   executionType?: ExecutionType;
-  projectId?: string;
   definitionId?: string;
   status?: ExecutionStatus;
 }

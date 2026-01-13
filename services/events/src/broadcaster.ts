@@ -142,7 +142,6 @@ export class Broadcaster extends DurableObject<Env> {
 
   private matchesFilter(change: ExecutionStatusChange, filter: HubSubscriptionFilter): boolean {
     if (filter.executionType && change.executionType !== filter.executionType) return false;
-    if (filter.projectId && change.projectId !== filter.projectId) return false;
     if (filter.definitionId && change.definitionId !== filter.definitionId) return false;
     if (filter.status && change.status !== filter.status) return false;
     return true;

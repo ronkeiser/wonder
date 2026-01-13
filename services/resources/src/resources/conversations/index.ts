@@ -1,44 +1,58 @@
 /** Conversations RPC resource */
 
-import { ConflictError, NotFoundError, extractDbError } from '~/shared/errors';
+import type { Broadcaster, ExecutionStatus } from '@wonder/events';
+import { NotFoundError } from '~/shared/errors';
 import { Resource } from '~/shared/resource';
 import * as repo from './repository';
-import type { Conversation, ConversationInput, ConversationStatus } from './types';
+import type { Conversation, ConversationInput, ConversationStatus, Participant } from './types';
+
+/** Map conversation status to execution status for Broadcaster */
+function toExecutionStatus(status: ConversationStatus): ExecutionStatus {
+  // Conversation 'active' maps to execution 'running'
+  return status === 'active' ? 'running' : status;
+}
+
+/** Extract agentId from participants array */
+function getAgentId(participants: Participant[]): string | null {
+  const agentParticipant = participants.find((p) => p.type === 'agent');
+  return agentParticipant?.type === 'agent' ? agentParticipant.agentId : null;
+}
 
 export class Conversations extends Resource {
   async create(data: ConversationInput): Promise<{
     conversationId: string;
     conversation: Conversation;
   }> {
-    this.serviceCtx.logger.info({
-      eventType: 'conversation.create.started',
-      metadata: { participantCount: data.participants.length },
-    });
+    const agentId = getAgentId(data.participants);
 
-    try {
-      const conversation = await repo.createConversation(this.serviceCtx.db, data);
+    return this.withLogging(
+      'create',
+      { metadata: { agentId, participantCount: data.participants.length } },
+      async () => {
+        const conversation = await repo.createConversation(this.serviceCtx.db, data);
 
-      return {
-        conversationId: conversation.id,
-        conversation,
-      };
-    } catch (error) {
-      const dbError = extractDbError(error);
+        // Notify Broadcaster about the new conversation
+        const broadcaster = (
+          this.env as unknown as { BROADCASTER: DurableObjectNamespace<Broadcaster> }
+        ).BROADCASTER;
+        const broadcasterId = broadcaster.idFromName('global');
+        const broadcasterStub = broadcaster.get(broadcasterId);
+        broadcasterStub.notifyStatusChange({
+          executionType: 'conversation',
+          streamId: conversation.id,
+          executionId: conversation.id,
+          definitionId: agentId ?? conversation.id,
+          parentExecutionId: null,
+          status: toExecutionStatus(conversation.status),
+          timestamp: Date.now(),
+        });
 
-      if (dbError.constraint === 'unique') {
-        throw new ConflictError(
-          `Conversation with ${dbError.field} already exists`,
-          dbError.field,
-          'unique',
-        );
-      }
-
-      if (dbError.constraint === 'foreign_key') {
-        throw new ConflictError('Referenced entity does not exist', undefined, 'foreign_key');
-      }
-
-      throw error;
-    }
+        return {
+          conversationId: conversation.id,
+          conversation,
+        };
+      },
+    );
   }
 
   async get(id: string): Promise<{
@@ -84,6 +98,24 @@ export class Conversations extends Resource {
       if (!conversation) {
         throw new NotFoundError(`Conversation not found: ${id}`, 'conversation', id);
       }
+
+      const agentId = getAgentId(conversation.participants);
+
+      // Notify Broadcaster about the status change
+      const broadcaster = (
+        this.env as unknown as { BROADCASTER: DurableObjectNamespace<Broadcaster> }
+      ).BROADCASTER;
+      const broadcasterId = broadcaster.idFromName('global');
+      const broadcasterStub = broadcaster.get(broadcasterId);
+      broadcasterStub.notifyStatusChange({
+        executionType: 'conversation',
+        streamId: conversation.id,
+        executionId: conversation.id,
+        definitionId: agentId ?? conversation.id,
+        parentExecutionId: null,
+        status: toExecutionStatus(conversation.status),
+        timestamp: Date.now(),
+      });
 
       return { conversation };
     });
