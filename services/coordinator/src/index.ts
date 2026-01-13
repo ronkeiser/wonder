@@ -410,7 +410,7 @@ export class WorkflowCoordinator extends DurableObject {
 
   /**
    * Handle agent result.
-   * Called by ConversationDO when a workflow-invoked agent completes.
+   * Called by ConversationRunner when a workflow-invoked agent completes.
    *
    * TODO: Full implementation requires:
    * - 'waiting_for_agent' token status
@@ -430,7 +430,7 @@ export class WorkflowCoordinator extends DurableObject {
 
   /**
    * Handle agent error.
-   * Called by ConversationDO when a workflow-invoked agent fails.
+   * Called by ConversationRunner when a workflow-invoked agent fails.
    *
    * TODO: Full implementation requires:
    * - 'waiting_for_agent' token status

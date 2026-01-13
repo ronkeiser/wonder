@@ -356,7 +356,7 @@ describe('executeEffects', () => {
 
 ## Applies to Agent Service
 
-The agent service (ConversationDO) follows the same pattern. Same refactor applies:
+The agent service (ConversationRunner) follows the same pattern. Same refactor applies:
 - Planning takes ConversationState, returns AgentDecision[]
 - Execution is two-phase loop
 - No recursive decision generation

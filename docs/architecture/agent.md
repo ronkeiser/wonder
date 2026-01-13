@@ -33,7 +33,7 @@ A persona is **identity and behavior** — the shareable, versionable configurat
 - Tool IDs referencing library definitions
 - Constraints (move budgets, allowed actions)
 
-Tools are the LLM-facing interface. Each tool binds to an execution target (Task, Workflow, or Agent). When the LLM invokes a tool, the Conversation dispatches to the appropriate target.
+Tools are the LLM-facing interface. Each tool binds to an execution target (Task, Workflow, or Agent). When the LLM invokes a tool, the ConversationRunner dispatches to the appropriate target.
 
 ```typescript
 interface Persona {
@@ -130,7 +130,7 @@ interface Tool {
 }
 ```
 
-When the LLM invokes `implement_feature`, the Conversation:
+When the LLM invokes `implement_feature`, the ConversationRunner:
 
 1. Resolves `tool_implement_feature` from the library
 2. Validates input against `inputSchema`
@@ -172,15 +172,15 @@ The agent executes a fixed loop:
 receive → assemble context → LLM decides → execute → extract memories → respond → wait → (loop)
 ```
 
-This loop runs in **Conversation**, not in the agent itself. Each conversation has its own Conversation instance that:
+This loop runs in **ConversationRunner**, not in the agent itself. Each conversation has its own ConversationRunner instance that:
 
 - Handles WebSocket connections for real-time streaming
 - Runs the turn loop (context assembly → LLM → execute → memory extraction)
 - Makes LLM calls directly and streams responses to the client
-- Dispatches tools to Executor (tasks), WorkflowCoordinator (workflows), or other Conversations (agent calls)
+- Dispatches tools to Executor (tasks), WorkflowCoordinator (workflows), or other ConversationRunners (agent calls)
 - Passes `agent_id` when dispatching memory operations
 
-The agent is not an actor—it's the identity and memory that Conversation instances share. Multiple conversations with the same agent run in separate Conversations, all reading from and writing to the same memory corpus.
+The agent is not an actor—it's the identity and memory that ConversationRunner instances share. Multiple conversations with the same agent run in separate ConversationRunners, all reading from and writing to the same memory corpus.
 
 ### Async Tool Execution
 
@@ -218,28 +218,28 @@ User: "Research authentication patterns for our API"
 
 The agent _has_ a persona and _uses_ workflows, but is neither.
 
-### Conversation
+### ConversationRunner
 
-Conversation is the **actor that runs the agent loop for a single conversation**. It follows the same pattern as WorkflowCoordinator: receive messages, make decisions, dispatch work, wait for results.
+ConversationRunner is the **actor that runs the agent loop for a single conversation**. It follows the same pattern as WorkflowCoordinator: receive messages, make decisions, dispatch work, wait for results.
 
 | DO             | Receives                                         | Decides                         | Dispatches to                           |
 | -------------- | ------------------------------------------------ | ------------------------------- | --------------------------------------- |
-| WorkflowCoordinator  | Task results, subworkflow completions            | Graph traversal (deterministic) | Executor, WorkflowCoordinator, Conversation |
-| Conversation | User messages, workflow completions, agent calls | Agent loop (LLM-driven)         | Executor, WorkflowCoordinator, Conversation |
+| WorkflowCoordinator  | Task results, subworkflow completions            | Graph traversal (deterministic) | Executor, WorkflowCoordinator, ConversationRunner |
+| ConversationRunner | User messages, workflow completions, agent calls | Agent loop (LLM-driven)         | Executor, WorkflowCoordinator, ConversationRunner |
 
-**Conversation responsibilities:**
+**ConversationRunner responsibilities:**
 
 - Handles WebSocket connections and streams LLM responses to clients
 - Runs the agent loop (context assembly → LLM → execute → memory extraction)
 - Makes LLM calls directly (not dispatched as tasks)
 - Dispatches context assembly and memory extraction workflows to Executor
-- Dispatches tools to Executor (tasks), WorkflowCoordinator (workflows), or other Conversations (agent calls)
+- Dispatches tools to Executor (tasks), WorkflowCoordinator (workflows), or other ConversationRunners (agent calls)
 - Handles async workflow completions and triggers new turns
 - Manages parallel turns within the conversation
 
-Each conversation has exactly one Conversation. The DO loads the agent record to get the persona and project scope, and passes `agent_id` when dispatching memory operations.
+Each conversation has exactly one ConversationRunner. The DO loads the agent record to get the persona and project scope, and passes `agent_id` when dispatching memory operations.
 
-When a workflow node dispatches to an agent, it routes to the Conversation for that conversation. The parent WorkflowCoordinator's token enters `waiting_for_agent` state. When the turn completes, the result flows back and the token resumes.
+When a workflow node dispatches to an agent, it routes to the ConversationRunner for that conversation. The parent WorkflowCoordinator's token enters `waiting_for_agent` state. When the turn completes, the result flows back and the token resumes.
 
 ## Context Assembly
 
@@ -294,7 +294,7 @@ Different personas need different indices. A code assistant might include file t
 
 ## Memory Extraction
 
-After turns complete, Conversation invokes the memory extraction workflow specified by the persona. The workflow receives the turn transcript and can use `memory.*` actions to read existing memory and write updates.
+After turns complete, ConversationRunner invokes the memory extraction workflow specified by the persona. The workflow receives the turn transcript and can use `memory.*` actions to read existing memory and write updates.
 
 What the workflow does is a library design choice. The platform provides the hook and the primitives; libraries provide the strategy.
 
@@ -319,7 +319,7 @@ interface Conversation {
 
 Conversations are not limited to user-agent pairs. Multiple agents can participate—a user might start a conversation with a manager agent, then the architect gets looped in, and now all three share context.
 
-**Relationship to Conversation:** Each conversation has exactly one Conversation instance. When a message arrives, it routes to that Conversation, which:
+**Relationship to ConversationRunner:** Each conversation has exactly one ConversationRunner instance. When a message arrives, it routes to that ConversationRunner, which:
 
 - Runs a turn for the agent participant
 - Stores new turns and messages (D1, for observability and UI)
@@ -328,9 +328,9 @@ Conversations are not limited to user-agent pairs. Multiple agents can participa
 
 Note: The agent doesn't query the Messages table for context—it queries memory. See [Memory](#memory) for how conversation history relates to agent recall. However, conversation history _is_ available to looped-in agents during context assembly.
 
-**Multiple conversations:** An agent can participate in many concurrent conversations. Each conversation has its own Conversation. Memory is shared across all conversations (the agent's accumulated knowledge), but conversation history is per-session.
+**Multiple conversations:** An agent can participate in many concurrent conversations. Each conversation has its own ConversationRunner. Memory is shared across all conversations (the agent's accumulated knowledge), but conversation history is per-session.
 
-**Async completion routing:** When an async operation completes, it carries conversation_id and turn_id. The completion routes to the appropriate Conversation, which continues the turn—the agent posts a new message with the results.
+**Async completion routing:** When an async operation completes, it carries conversation_id and turn_id. The completion routes to the appropriate ConversationRunner, which continues the turn—the agent posts a new message with the results.
 
 Conversations link to messages via Turn and Message entities.
 
@@ -421,12 +421,12 @@ Workflow nodes and other agents can invoke agents. Agent invocation is a **node-
 | ------------- | -------------- | ------------------------------ |
 | Task          | Executor       | RPC to stateless worker        |
 | Subworkflow   | WorkflowCoordinator  | DO-to-DO, waits for completion |
-| Agent         | Conversation | DO-to-DO, waits for response   |
+| Agent         | ConversationRunner | DO-to-DO, waits for response   |
 
 When dispatching to an agent:
 
 - Parent token (or calling agent's turn) enters waiting state
-- Conversation runs a turn with the provided input
+- ConversationRunner runs a turn with the provided input
 - Response flows back to parent coordinator or calling agent
 - Parent resumes with agent output
 
@@ -535,7 +535,7 @@ Observability comes from events:
 | DO             | Purpose                                                                  |
 | -------------- | ------------------------------------------------------------------------ |
 | WorkflowCoordinator  | Workflow execution — graph traversal, token management, fan-in sync      |
-| Conversation | Conversation handling — agent loop, WebSocket streaming, turn management |
+| ConversationRunner | Conversation handling — agent loop, WebSocket streaming, turn management |
 
 ## Context Assembly and Memory Extraction
 
@@ -546,7 +546,7 @@ Each persona references:
 - `context_assembly_workflow_id` — invoked at the start of each turn
 - `memory_extraction_workflow_id` — invoked at the end of each turn
 
-Conversation dispatches these workflows to Executor, passing `agent_id` in the execution context so memory operations know which agent's memory to access.
+ConversationRunner dispatches these workflows to Executor, passing `agent_id` in the execution context so memory operations know which agent's memory to access.
 
 These workflows get the same observability, composition, and versioning as any other workflow.
 
@@ -610,8 +610,8 @@ The `metadata` field provides flexibility for structured data without schema ver
 Memory lives in shared infrastructure, not in any DO's SQLite. This is necessary because:
 
 1. **Executor writes memory** — Memory extraction runs as a workflow dispatched to Executor.
-2. **Multiple Conversations** — Many conversations share one agent's memory, so it must be externally accessible.
-3. **External queryability** — Memories may need to be queried across agents or from services outside Conversation.
+2. **Multiple ConversationRunners** — Many conversations share one agent's memory, so it must be externally accessible.
+3. **External queryability** — Memories may need to be queried across agents or from services outside ConversationRunner.
 
 Storage model:
 
@@ -631,7 +631,7 @@ The `memory` action kind handles operations atomically:
 - `memory.search` — Query Vectorize, return matching memory refs
 - `memory.read` — Fetch from D1 (transparently fetching from R2 if content_ref is set)
 
-The `agent_id` is passed in execution context when Conversation dispatches memory workflows, so actions know which agent's memories to access.
+The `agent_id` is passed in execution context when ConversationRunner dispatches memory workflows, so actions know which agent's memories to access.
 
 ### Lifecycle
 
@@ -647,8 +647,8 @@ The platform provides **dispatch plumbing**. Libraries provide **intelligence**.
 
 **Platform responsibilities:**
 
-- Conversation coordinates the agent loop (receive → decide → dispatch → wait → resume)
-- Dispatch to execution targets (Executor for tasks, WorkflowCoordinator for workflows, Conversation for agents)
+- ConversationRunner coordinates the agent loop (receive → decide → dispatch → wait → resume)
+- Dispatch to execution targets (Executor for tasks, WorkflowCoordinator for workflows, ConversationRunner for agents)
 - Storage primitives (D1 for structured, Vectorize for semantic, R2 for archive)
 - Event emission and observability
 
@@ -662,7 +662,7 @@ The platform provides **dispatch plumbing**. Libraries provide **intelligence**.
 
 The platform calls the workflows the persona specifies. This keeps the platform simple and lets libraries encode domain-specific intelligence.
 
-**Example:** Conversation calls `contextAssemblyWorkflowId` before every LLM call. A library provides `context_assembly_code_assistant_v2` that knows to retrieve recent code changes, relevant design decisions, and similar past conversations. The platform provides the hook; the library provides the strategy.
+**Example:** ConversationRunner calls `contextAssemblyWorkflowId` before every LLM call. A library provides `context_assembly_code_assistant_v2` that knows to retrieve recent code changes, relevant design decisions, and similar past conversations. The platform provides the hook; the library provides the strategy.
 
 ## Implementation Structure
 
@@ -673,7 +673,7 @@ The agent service follows the same patterns as the coordinator service.
 ```
 services/agent/
 ├── src/
-│   ├── index.ts              # Conversation extends DurableObject
+│   ├── index.ts              # ConversationRunner extends DurableObject
 │   ├── types.ts              # ConversationContext, TurnPayload, TurnResult
 │   │
 │   ├── operations/           # State managers (DO SQLite only)
@@ -696,12 +696,12 @@ services/agent/
 │       └── extraction.ts     # Plan memory extraction dispatch
 ```
 
-Memory operations (`memory.write`, `memory.read`, `memory.search`) are handled by workflows dispatched to Executor, which access D1/Vectorize/R2 directly. Conversation doesn't manage memory state locally—it dispatches memory extraction workflows and context assembly workflows that handle memory through actions.
+Memory operations (`memory.write`, `memory.read`, `memory.search`) are handled by workflows dispatched to Executor, which access D1/Vectorize/R2 directly. ConversationRunner doesn't manage memory state locally—it dispatches memory extraction workflows and context assembly workflows that handle memory through actions.
 
-### Conversation Class
+### ConversationRunner Class
 
 ```typescript
-export class Conversation extends DurableObject<Env> {
+export class ConversationRunner extends DurableObject<Env> {
   // WebSocket handling
   async fetch(request: Request): Promise<Response>; // Upgrades to WebSocket
 
@@ -818,23 +818,23 @@ startTurn(conversationId, userMessage, replyToMessageId?)
 
 ### Parallel to WorkflowCoordinator
 
-| Aspect               | WorkflowCoordinator                           | Conversation                                  |
+| Aspect               | WorkflowCoordinator                           | ConversationRunner                                  |
 | -------------------- | --------------------------------------- | ----------------------------------------------- |
 | **Instance scope**   | One workflow run                        | One conversation (multiple concurrent turns)    |
 | **State management** | Tokens, context, transitions            | Turns, messages, async operations               |
 | **Decision driver**  | Graph traversal (deterministic)         | LLM reasoning (non-deterministic)               |
-| **Dispatches to**    | Executor, WorkflowCoordinator, Conversation | Executor, WorkflowCoordinator, Conversation         |
+| **Dispatches to**    | Executor, WorkflowCoordinator, ConversationRunner | Executor, WorkflowCoordinator, ConversationRunner         |
 | **Callbacks from**   | Executor, child coordinators, agents    | Executor, coordinators, child conversations     |
 | **Concurrency**      | Single workflow execution               | Parallel turns, each with sync/async operations |
 | **LLM calls**        | Via dispatched tasks                    | Direct (with streaming to client)               |
 
-The core pattern is identical: receive → decide → dispatch → wait → resume. The difference is what drives the "decide" step. Conversation also handles WebSocket connections and makes LLM calls directly for streaming.
+The core pattern is identical: receive → decide → dispatch → wait → resume. The difference is what drives the "decide" step. ConversationRunner also handles WebSocket connections and makes LLM calls directly for streaming.
 
 ### Turn Context and Moves
 
 During a turn, context accumulates with each iteration of the agent loop. Every tool call, result, and reasoning output is recorded. This context must persist across dispatch → wait → resume cycles, so it lives in DO SQLite.
 
-**Recent turns in DO SQLite:** Conversation keeps the last N turns locally (per `recentTurnsLimit`). This enables fast context assembly—no D1 query needed for recent history. Turns are also written to D1 for observability and UI, but the hot path reads from DO SQLite. Older turns roll off locally but persist in D1; if the agent needs something older, it goes through memory or explicit history tools.
+**Recent turns in DO SQLite:** ConversationRunner keeps the last N turns locally (per `recentTurnsLimit`). This enables fast context assembly—no D1 query needed for recent history. Turns are also written to D1 for observability and UI, but the hot path reads from DO SQLite. Older turns roll off locally but persist in D1; if the agent needs something older, it goes through memory or explicit history tools.
 
 The `moves` table records the sequence of events within a turn:
 
@@ -885,19 +885,19 @@ Conversation created for agent scoped to project P
   → Stored in conversation context
 ```
 
-All shell operations during the conversation use this branch. The conversation has its own ContainerDO (keyed by conv_id) for shell execution.
+All shell operations during the conversation use this branch. The conversation has its own ContainerHost (keyed by conv_id) for shell execution.
 
 ### Tool Execution Context
 
 When a tool invokes a task with shell actions:
 
-1. Conversation dispatches to Executor with conversation context (conv_id, repo_id, branch)
-2. Executor gets the conversation's ContainerDO (keyed by conv_id)
-3. Executor calls `containerDO.exec(command, timeout)`
+1. ConversationRunner dispatches to Executor with conversation context (conv_id, repo_id, branch)
+2. Executor gets the conversation's ContainerHost (keyed by conv_id)
+3. Executor calls `containerHost.exec(command, timeout)`
 4. Command executes on the conversation's branch
-5. Result returns to Conversation
+5. Result returns to ConversationRunner
 
-Container and branch are implicit from conversation context. The ContainerDO stays warm via `sleepAfter` between commands.
+Container and branch are implicit from conversation context. The ContainerHost stays warm via `sleepAfter` between commands.
 
 ### Multiple Conversations
 
@@ -924,7 +924,7 @@ This allows agents to continue work in progress on a workflow's branch.
 
 ## Memory Workflow Contracts
 
-Memory workflows use `memory.*` actions directly. The `agent_id` is provided automatically from execution context when Conversation dispatches these workflows.
+Memory workflows use `memory.*` actions directly. The `agent_id` is provided automatically from execution context when ConversationRunner dispatches these workflows.
 
 ### Context Assembly
 
@@ -958,14 +958,14 @@ Side effects only—memory updates happen via `memory.write`, `memory.delete` ac
 
 ### Streaming
 
-Conversation handles WebSocket connections and makes LLM calls directly, enabling real-time streaming:
+ConversationRunner handles WebSocket connections and makes LLM calls directly, enabling real-time streaming:
 
-- **WebSocket connection:** Browser clients connect to `/conversations/:id`, which upgrades to a WebSocket handled by Conversation
-- **LLM streaming:** Conversation calls the LLM provider directly and streams tokens to the client as they arrive
+- **WebSocket connection:** Browser clients connect to `/conversations/:id`, which upgrades to a WebSocket handled by ConversationRunner
+- **LLM streaming:** ConversationRunner calls the LLM provider directly and streams tokens to the client as they arrive
 - **Per-message streaming:** Each agent message streams independently; tool results appear as discrete messages
 - **Async interleaving:** When async operations complete, results appear as new messages on the WebSocket, even if another stream is active
 
-This design keeps streaming simple: Conversation owns the client connection and the LLM call, so there's no indirection or callback coordination for the real-time path.
+This design keeps streaming simple: ConversationRunner owns the client connection and the LLM call, so there's no indirection or callback coordination for the real-time path.
 
 ## Error Handling
 

@@ -117,7 +117,7 @@ Persona
 
 **Agent**: A persona bound to a project. Has access to project resources and can invoke workflows as capabilities.
 
-**Conversation**: A session with an agent. Durable state in Conversation. Contains turns and accumulated memories.
+**Conversation**: A session with an agent. Durable state in ConversationRunner. Contains turns and accumulated memories.
 
 **Turn**: A request-response cycle within a conversation. User submits a message, agent reasons and acts, then responds.
 
@@ -133,9 +133,9 @@ receive → decide → dispatch → wait → resume
 
 The difference is what drives "decide":
 - **WorkflowCoordinator**: Graph traversal determines next node based on transitions and conditions
-- **Conversation**: LLM reasoning determines next action based on conversation and context
+- **ConversationRunner**: LLM reasoning determines next action based on conversation and context
 
-Both dispatch to the same targets: Executor (for tasks), WorkflowCoordinator (for sub-workflows), or Conversation (for agent invocation).
+Both dispatch to the same targets: Executor (for tasks), WorkflowCoordinator (for sub-workflows), or ConversationRunner (for agent invocation).
 
 ### Why Tasks?
 
@@ -216,7 +216,7 @@ Note: Sub-workflows are invoked via Node's `subworkflowId`, not an action.
 
 Workflows can provision containers for agents to execute shell commands—editing code, running tests, deploying. Containers are workflow-level resources with linear ownership.
 
-**One ContainerDO per resource declaration per run.** Each workflow run provisions its own container instance(s) based on WorkflowDef.resources declarations. Multiple runs can work on the same repo concurrently via branch isolation.
+**One ContainerHost per resource declaration per run.** Each workflow run provisions its own container instance(s) based on WorkflowDef.resources declarations. Multiple runs can work on the same repo concurrently via branch isolation.
 
 **Ownership rules:**
 
@@ -343,7 +343,7 @@ Every execution gets its own Durable Object implementing the Actor Model:
 - Evaluates transitions to determine next nodes
 - Dispatches tasks to Executor
 
-**Conversation** (one per conversation):
+**ConversationRunner** (one per conversation):
 - Maintains conversation state (turns, messages, memories)
 - Assembles context for LLM calls
 - Reasons via LLM to decide next action
@@ -355,7 +355,7 @@ Both are lightweight—decision logic only. Actual work happens in Executor or n
 
 The Executor service executes tasks:
 
-1. Receive task definition and inputs from WorkflowCoordinator or Conversation
+1. Receive task definition and inputs from WorkflowCoordinator or ConversationRunner
 2. Execute steps sequentially
 3. Handle retries and conditionals
 4. Return result to calling DO
@@ -364,11 +364,11 @@ Executor is stateless. Task state is in-memory for the task's duration.
 
 ### Container Execution
 
-Shell commands route through ContainerDO:
+Shell commands route through ContainerHost:
 
 1. Executor calls `containerStub.exec(run_id, command, timeout)`
-2. ContainerDO validates ownership
-3. ContainerDO forwards to container's shell server
+2. ContainerHost validates ownership
+3. ContainerHost forwards to container's shell server
 4. Result returns to Executor
 
 ## Event Sourcing
@@ -396,7 +396,7 @@ This enables full replay, live UI updates, audit trails, and time-travel debuggi
 
 | Service          | Role                                                              |
 | ---------------- | ----------------------------------------------------------------- |
-| Durable Objects  | WorkflowCoordinator (workflows), Conversation (conversations), ContainerDO |
+| Durable Objects  | WorkflowCoordinator (workflows), ConversationRunner (conversations), ContainerHost |
 | Workers          | Executor service, API routes                                      |
 | D1               | Definitions, refs, metadata, completed runs, conversation history |
 | R2               | Git objects, pnpm store, large artifacts                          |

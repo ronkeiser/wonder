@@ -836,7 +836,7 @@ Metadata for single workflow execution. Each run gets its own Coordinator DO ins
 
 **Container resource tracking:**
 
-- `container_resources`: Maps resource_id (from WorkflowDef.resources) to ContainerDO ID
+- `container_resources`: Maps resource_id (from WorkflowDef.resources) to ContainerHost ID
 - Enables container ownership validation and cleanup
 - Example: `{ "dev_env": "container_abc123", "test_env": "container_def456" }`
 
@@ -850,7 +850,7 @@ Metadata for single workflow execution. Each run gets its own Coordinator DO ins
 
 ### Container
 
-**Storage:** DO SQLite (ContainerDO)  
+**Storage:** DO SQLite (ContainerHost)  
 **Schema:**
 
 ```typescript
@@ -873,7 +873,7 @@ Metadata for single workflow execution. Each run gets its own Coordinator DO ins
 }
 ```
 
-Ephemeral container instance with linear ownership. One ContainerDO per resource declaration per run.
+Ephemeral container instance with linear ownership. One ContainerHost per resource declaration per run.
 
 **Ownership:**
 
@@ -929,7 +929,7 @@ resume(run_id: string, sha: string): Promise<void>;
 **Command execution:**
 
 1. Executor calls `exec(run_id, command)`
-2. ContainerDO validates `run_id === owner_run_id`
+2. ContainerHost validates `run_id === owner_run_id`
 3. Executes command via Cloudflare Containers platform
 4. Returns stdout/stderr/exit_code
 

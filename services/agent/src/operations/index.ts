@@ -1,7 +1,7 @@
 /**
  * Agent Operations
  *
- * State managers for ConversationDO SQLite storage.
+ * State managers for ConversationRunner SQLite storage.
  */
 
 export { AsyncOpManager, type AsyncOpRow, type RetryConfig, type TrackAsyncOpParams } from './async';

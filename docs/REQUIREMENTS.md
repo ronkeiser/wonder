@@ -74,8 +74,8 @@
 ## Containers
 
 - Containers are ephemeral compute; git branch is state
-- ContainerDO per caller: identity = run_id or conv_id (1:1 with Cloudflare model)
-- Shell access: executor calls containerDO.exec(command, timeout) on caller's DO
+- ContainerHost per caller: identity = run_id or conv_id (1:1 with Cloudflare model)
+- Shell access: executor calls containerHost.exec(command, timeout) on caller's DO
 - Idle timeout via Cloudflare `sleepAfter`; automatic cleanup
 - Sub-second provisioning via R2 cache and pnpm store
 - Branch isolation: each workflow run or agent conversation gets its own branch
@@ -185,4 +185,4 @@
 - Error propagation: failures bubbling through 5-6 nested layers
 - Synchronization: race-safe fan-in via SQL unique constraints (tryCreateFanIn, tryActivate)
 - Stuck workflow detection: human input timeouts surfaced and recoverable
-- ContainerDO: per-caller provisioning, idle timeout via sleepAfter
+- ContainerHost: per-caller provisioning, idle timeout via sleepAfter

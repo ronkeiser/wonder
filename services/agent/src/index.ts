@@ -1032,7 +1032,7 @@ export class Conversation extends DurableObject {
   }
 
   /**
-   * Handle agent response from another ConversationDO.
+   * Handle agent response from another ConversationRunner.
    *
    * Called when an agent invoked by a tool responds (delegate mode).
    */
@@ -1110,7 +1110,7 @@ export class Conversation extends DurableObject {
   }
 
   /**
-   * Handle agent error from another ConversationDO.
+   * Handle agent error from another ConversationRunner.
    *
    * Called when an agent invoked by a tool fails (delegate mode).
    */

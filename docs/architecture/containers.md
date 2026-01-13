@@ -14,13 +14,13 @@ For how containers interact with repos and artifacts, see [Project Resources](./
 
 When a workflow or agent needs to run a shell command:
 
-1. System provisions a ContainerDO for the caller (run_id or conv_id)
+1. System provisions a ContainerHost for the caller (run_id or conv_id)
 2. Container checks out the caller's branch
 3. Command executes
 4. Changes commit to the branch
 5. Container stays warm via `sleepAfter`, destroyed after idle timeout
 
-Each caller gets its own ContainerDO. The container identity matches the caller identity.
+Each caller gets its own ContainerHost. The container identity matches the caller identity.
 
 ### Why This Model
 
@@ -64,7 +64,7 @@ Shell commands specify the execution context directly:
 The executor:
 
 1. Receives shell action with caller context (run_id or conv_id, repo_id, branch)
-2. Gets or creates ContainerDO for that caller
+2. Gets or creates ContainerHost for that caller
 3. Ensures container is checked out to the correct branch
 4. Executes command
 5. Captures stdout, stderr, exit_code
@@ -129,11 +129,11 @@ Timeout triggers task failure, handled via workflow transitions or agent error h
 
 ## Container Lifecycle
 
-Each caller (workflow run or conversation) gets its own ContainerDO. Container identity = caller identity.
+Each caller (workflow run or conversation) gets its own ContainerHost. Container identity = caller identity.
 
 ### Per-Caller Model
 
-ContainerDO is keyed by caller ID:
+ContainerHost is keyed by caller ID:
 - Workflow run: `container:run:{run_id}`
 - Conversation: `container:conv:{conv_id}`
 
@@ -143,7 +143,7 @@ This maps directly to Cloudflare's 1:1 Container-to-DO relationship. No pool abs
 
 When a shell command arrives for a caller:
 
-1. Get ContainerDO by caller ID (creates if doesn't exist)
+1. Get ContainerHost by caller ID (creates if doesn't exist)
 2. Container provisions on first use:
    - Clone repo from R2 (sub-second, cached)
    - Checkout branch
@@ -258,7 +258,7 @@ If parallel shell execution is truly needed, each fan-out branch can create its 
 
 Wonder containers are built on Cloudflare's Container platform.
 
-**1:1 DO Mapping:** Each ContainerDO manages exactly one container. Container identity = DO identity = caller ID. This is Cloudflare's native model—no pooling layer needed.
+**1:1 DO Mapping:** Each ContainerHost manages exactly one container. Container identity = DO identity = caller ID. This is Cloudflare's native model—no pooling layer needed.
 
 **Provisioning:** Container starts with environment variables pointing to repo. Init script:
 - Clones from R2-backed git
@@ -266,19 +266,19 @@ Wonder containers are built on Cloudflare's Container platform.
 - Installs dependencies via pnpm (store mounted from R2)
 - Starts shell server
 
-**Shell Access:** Container runs HTTP server accepting commands. Executor calls `containerDO.exec(command, timeout)` on the caller's ContainerDO.
+**Shell Access:** Container runs HTTP server accepting commands. Executor calls `containerDO.exec(command, timeout)` on the caller's ContainerHost.
 
-**Lifecycle:** ContainerDO uses `sleepAfter` for idle timeout. Cloudflare handles hibernation and cleanup automatically.
+**Lifecycle:** ContainerHost uses `sleepAfter` for idle timeout. Cloudflare handles hibernation and cleanup automatically.
 
 ## Summary
 
 | Concept | Design Decision |
 | ------- | --------------- |
 | State | Git branch, not container filesystem |
-| Identity | ContainerDO per caller (run_id or conv_id) |
+| Identity | ContainerHost per caller (run_id or conv_id) |
 | Isolation | Branch per workflow run or conversation |
 | Lifecycle | `sleepAfter` idle timeout, Cloudflare manages cleanup |
 | Provisioning | Sub-second via R2 cache |
-| Shell execution | Executor calls caller's ContainerDO directly |
+| Shell execution | Executor calls caller's ContainerHost directly |
 
-The model is simple: git branch is state, container is compute. Each caller gets its own ContainerDO. This supports concurrent workflows, concurrent agent conversations, long-running work with human gates, and deep sub-workflow composition—with clean 1:1 mapping to Cloudflare's container model.
+The model is simple: git branch is state, container is compute. Each caller gets its own ContainerHost. This supports concurrent workflows, concurrent agent conversations, long-running work with human gates, and deep sub-workflow composition—with clean 1:1 mapping to Cloudflare's container model.

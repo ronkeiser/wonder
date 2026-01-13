@@ -5,7 +5,7 @@
 Wonder supports two execution models that share infrastructure but differ in what drives decisions:
 
 - **Workflows**: Graph-driven execution coordinated by WorkflowCoordinator
-- **Agents**: LLM-driven execution coordinated by Conversation
+- **Agents**: LLM-driven execution coordinated by ConversationRunner
 
 Both follow the same pattern: receive → decide → dispatch → wait → resume. The difference is what drives "decide" — graph traversal for workflows, LLM reasoning for agents.
 
@@ -68,7 +68,7 @@ The worker runs all three steps in memory. Same result, one-third the overhead.
 
 ## Agent Execution
 
-Agents have a simpler execution model. The agent loop is built into Conversation, not expressed as a workflow graph.
+Agents have a simpler execution model. The agent loop is built into ConversationRunner, not expressed as a workflow graph.
 
 ```
 Persona
@@ -94,20 +94,20 @@ Persona
 
 ### The Agent Loop
 
-Conversation executes a fixed loop:
+ConversationRunner executes a fixed loop:
 
 ```
 receive → assemble context → LLM decides → execute → extract memories → respond → wait
 ```
 
-The agent loop is **not a workflow**. It's built into Conversation as a first-class execution model. Agents *invoke* workflows as tools, but the agent loop itself is not expressed as a graph.
+The agent loop is **not a workflow**. It's built into ConversationRunner as a first-class execution model. Agents *invoke* workflows as tools, but the agent loop itself is not expressed as a graph.
 
 ### How Agents Use Workflows
 
 Context assembly and memory extraction are workflows — but they're **hooks called by the agent loop**, not the agent loop itself:
 
 ```
-Conversation receives user message
+ConversationRunner receives user message
   │
   ├─ Calls contextAssemblyWorkflowId → workflow runs, returns assembled context
   │
@@ -116,7 +116,7 @@ Conversation receives user message
   │   └─ If tool_use → dispatch to tool's target
   │       ├─ tool.taskId → Executor
   │       ├─ tool.workflowId → WorkflowCoordinator
-  │       └─ tool.agentId → another Conversation
+  │       └─ tool.agentId → another ConversationRunner
   │
   ├─ Calls memoryExtractionWorkflowId → workflow runs, returns facts to store
   │
@@ -127,7 +127,7 @@ The platform provides the agent loop structure. Libraries provide the workflows 
 
 ## Comparison: Workflows vs Agents
 
-| Aspect           | Workflow (WorkflowCoordinator)           | Agent (Conversation)                          |
+| Aspect           | Workflow (WorkflowCoordinator)           | Agent (ConversationRunner)                          |
 | ---------------- | ---------------------------------- | ---------------------------------------- |
 | Decision driver  | Graph traversal (deterministic)    | LLM reasoning (non-deterministic)        |
 | State            | Fixed tables (tokens) + schema-driven context | Fixed tables (turns, messages) + schema-driven memory |
@@ -135,15 +135,15 @@ The platform provides the agent loop structure. Libraries provide the workflows 
 | Parallelism      | Fan-out/fan-in                     | None (sequential turns)                  |
 | Human gates      | Yes (token pauses)                 | Natural (multi-turn conversation)        |
 | Duration         | Seconds to days                    | Sessions span days to weeks              |
-| Dispatches to    | Executor, WorkflowCoordinator, Conversation   | Executor, WorkflowCoordinator, Conversation         |
+| Dispatches to    | Executor, WorkflowCoordinator, ConversationRunner   | Executor, WorkflowCoordinator, ConversationRunner         |
 
 ## Unified Dispatch
 
-Both WorkflowCoordinator and Conversation dispatch to the same targets:
+Both WorkflowCoordinator and ConversationRunner dispatch to the same targets:
 
 - **Executor** — for tasks (stateless worker execution)
 - **WorkflowCoordinator** — for sub-workflows (nested graph execution)
-- **Conversation** — for agent invocation (LLM-driven subtasks)
+- **ConversationRunner** — for agent invocation (LLM-driven subtasks)
 
 This creates a unified dispatch layer where workflows can invoke agents and agents can invoke workflows.
 
@@ -271,8 +271,8 @@ WorkflowCoordinator
 
 | Coordinator   | Decision Driver                   | State                              | Dispatches to                    |
 | ------------- | --------------------------------- | ---------------------------------- | -------------------------------- |
-| WorkflowCoordinator | Graph traversal (deterministic)   | Fixed (tokens) + schema-driven context | Executor, WorkflowCoordinator, Conversation |
-| Conversation       | LLM reasoning (non-deterministic) | Fixed (turns, messages) + schema-driven memory | Executor, WorkflowCoordinator, Conversation |
+| WorkflowCoordinator | Graph traversal (deterministic)   | Fixed (tokens) + schema-driven context | Executor, WorkflowCoordinator, ConversationRunner |
+| ConversationRunner       | LLM reasoning (non-deterministic) | Fixed (turns, messages) + schema-driven memory | Executor, WorkflowCoordinator, ConversationRunner |
 
 | Layer       | Contains           | Responsibility                            |
 | ----------- | ------------------ | ----------------------------------------- |

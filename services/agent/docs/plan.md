@@ -114,8 +114,8 @@ Conversation created for agent scoped to project P
 ### Branch Context in Tool Execution (spec lines 891-901)
 
 When a tool invokes a task with shell actions:
-1. ConversationDO dispatches to Executor with conversation context (conv_id, repo_id, branch)
-2. Executor gets the conversation's ContainerDO (keyed by conv_id)
+1. ConversationRunner dispatches to Executor with conversation context (conv_id, repo_id, branch)
+2. Executor gets the conversation's ContainerHost (keyed by conv_id)
 3. Command executes on the conversation's branch
 
 ### Workflow-Initiated Agent Calls (spec lines 915-923)
@@ -172,7 +172,7 @@ ctx.executor.executeTaskForAgent({
 
 ### Required (spec lines 962-968)
 - Browser clients connect to `/conversations/:id`, upgrades to WebSocket
-- ConversationDO calls LLM provider directly and streams tokens
+- ConversationRunner calls LLM provider directly and streams tokens
 - Per-message streaming: each agent message streams independently
 - Async interleaving: results appear as new messages even during active stream
 

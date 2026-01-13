@@ -128,7 +128,7 @@ Every component in Wonder is either a **package** or a **service**:
 
 **Responsibilities:**
 
-- ContainerDO per repo (container identity = repo identity)
+- ContainerHost per repo (container identity = repo identity)
 - Ownership tracking (claim, release, transfer)
 - Shell command execution with ownership validation
 - Hibernation (record SHA) and resume (restore from SHA)

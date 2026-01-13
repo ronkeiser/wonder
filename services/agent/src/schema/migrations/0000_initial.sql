@@ -1,5 +1,5 @@
 -- Agent DO SQLite Initial Migration
--- Creates tables for ConversationDO state management
+-- Creates tables for ConversationRunner state management
 
 -- Conversation metadata (single row, cached from D1)
 CREATE TABLE `conversation_meta` (

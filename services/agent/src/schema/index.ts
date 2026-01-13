@@ -1,7 +1,7 @@
 /**
  * Agent DO SQLite Schemas
  *
- * Tables for ConversationDO state management:
+ * Tables for ConversationRunner state management:
  * - conversationMeta: Cached conversation metadata (single row)
  * - turns: Track agent work units
  * - messages: User and agent utterances

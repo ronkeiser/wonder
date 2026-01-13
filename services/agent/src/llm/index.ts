@@ -2,7 +2,7 @@
  * LLM Module
  *
  * Direct LLM calls with streaming support.
- * ConversationDO makes LLM calls directly (not via task dispatch)
+ * ConversationRunner makes LLM calls directly (not via task dispatch)
  * to enable real-time streaming to the client.
  */
 
@@ -74,7 +74,7 @@ type AnthropicError = {
 /**
  * Call the LLM with the assembled context and tools.
  *
- * This is called directly by ConversationDO after context assembly completes.
+ * This is called directly by ConversationRunner after context assembly completes.
  * The LLM request is in provider-native format (from context assembly workflow).
  *
  * @param request - Provider-native LLM request (from context assembly)
