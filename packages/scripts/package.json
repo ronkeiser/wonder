@@ -10,6 +10,7 @@
   "scripts": {
     "gen:tasks": "tsx src/generate-tasks.ts",
     "gen:types": "tsx src/generate-types.ts",
+    "test:conversations": "tsx src/run-test.ts conversations",
     "test:models": "tsx src/run-test.ts models",
     "test:workflows": "tsx src/run-test.ts workflows"
   },

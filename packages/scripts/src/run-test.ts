@@ -10,7 +10,12 @@
 
 import { execSync } from 'child_process';
 import { readdirSync, statSync } from 'fs';
-import { join } from 'path';
+import { dirname, join } from 'path';
+import { fileURLToPath } from 'url';
+
+// Get monorepo root (this script is at packages/scripts/src/run-test.ts)
+const __dirname = dirname(fileURLToPath(import.meta.url));
+const monorepoRoot = join(__dirname, '../../..');
 
 const args = process.argv.slice(2);
 const category = args[0];
@@ -32,14 +37,14 @@ if (!isLatest && !testNum) {
 }
 
 // Find the test files
-const testsDir = join(process.cwd(), 'packages/tests/src/tests', category);
+const testsDir = join(monorepoRoot, 'packages/tests/src/tests', category);
 let files: string[];
 try {
   files = readdirSync(testsDir);
 } catch {
   console.error(`Category "${category}" not found.`);
   console.error('\nAvailable categories:');
-  const categories = readdirSync(join(process.cwd(), 'packages/tests/src/tests'));
+  const categories = readdirSync(join(monorepoRoot, 'packages/tests/src/tests'));
   categories.forEach((c) => console.error(`  ${c}`));
   process.exit(1);
 }
@@ -81,7 +86,7 @@ if (isLatest) {
     process.exit(1);
   }
 
-  testPath = testNum!.padStart(2, '0');
+  testPath = join('packages/tests/src/tests', category, testFile);
 }
 
 // Run the test
@@ -89,7 +94,7 @@ console.log(`Running ${category} test: ${testFile}\n`);
 try {
   execSync(`vitest run --config packages/tests/vitest.config.ts --reporter=verbose ${testPath}`, {
     stdio: 'inherit',
-    cwd: process.cwd(),
+    cwd: monorepoRoot,
   });
 } catch {
   process.exit(1);

@@ -16,6 +16,7 @@
     "gen:sdk": "pnpm --filter @wonder/sdk run generate",
     "gen:tasks": "pnpm --filter @wonder/scripts run gen:tasks",
     "test:all": "vitest run --config packages/tests/vitest.config.ts",
+    "test:conversations": "pnpm --filter @wonder/scripts run test:conversations",
     "test:models": "pnpm --filter @wonder/scripts run test:models",
     "test:workflows": "pnpm --filter @wonder/scripts run test:workflows",
     "typecheck": "pnpm run --parallel --filter \"./services/*\" typecheck",

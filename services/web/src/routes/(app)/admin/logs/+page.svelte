@@ -2,6 +2,7 @@
   import StreamViewer from '$lib/components/StreamViewer.svelte';
 
   const serviceOptions = [
+    { value: 'agent', label: 'agent' },
     { value: 'coordinator', label: 'coordinator' },
     { value: 'executor', label: 'executor' },
     { value: 'events', label: 'events' },

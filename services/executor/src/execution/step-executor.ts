@@ -121,6 +121,18 @@ export async function executeStep(
     logger,
   );
 
+  // Trace event for output mapping result (debugging)
+  emitter.emitTrace({
+    type: 'executor.step.output_mapping_applied',
+    payload: {
+      tokenId: tokenId,
+      stepRef: step.ref,
+      outputMapping: step.outputMapping,
+      actionOutput: actionResult.output,
+      contextOutputAfter: context.output,
+    },
+  });
+
   // Preserve _subworkflow signal for coordinator
   // Workflow actions return this metadata to trigger parent token waiting
   if (actionResult.output._subworkflow) {

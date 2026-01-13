@@ -7,6 +7,7 @@ CREATE TABLE `conversation_meta` (
   `agent_id` text NOT NULL,
   `participants` text NOT NULL,
   `status` text NOT NULL,
+  `branch_context` text,
   `created_at` integer NOT NULL,
   `updated_at` integer NOT NULL
 );

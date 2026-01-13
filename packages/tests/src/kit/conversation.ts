@@ -5,15 +5,24 @@
  * Follows the same patterns as the workflow test kit.
  */
 
-import type { EventEntry, TraceEventEntry } from '@wonder/sdk';
+import {
+  action,
+  node,
+  schema as s,
+  step,
+  task,
+  workflow,
+  type EventEntry,
+  type TraceEventEntry,
+} from '@wonder/sdk';
 import { ConversationTraceEventCollection } from './conversation-trace';
 import { wonder } from '~/client';
 import { setupTestContext } from './context';
+import { createWorkflow } from './workflow';
 import type {
   ConversationTestSetup,
   CreatedConversationResources,
   ExecuteConversationResult,
-  TestContext,
   TestConversationResult,
 } from './types';
 
@@ -363,6 +372,154 @@ export interface TestPersonaConfig {
 }
 
 // =============================================================================
+// Passthrough Workflows for Tests
+// =============================================================================
+
+/**
+ * Creates a passthrough context assembly workflow.
+ *
+ * Context assembly receives ContextAssemblyInput and outputs { llmRequest: LLMRequest }.
+ * This passthrough version builds a minimal LLMRequest with just the user message.
+ */
+function buildContextAssemblyPassthroughWorkflow(systemPrompt: string) {
+  // Context assembly output must be { llmRequest: { messages: [...], systemPrompt: '...' } }
+  const contextAction = action({
+    name: 'Build LLM Request',
+    description: 'Builds minimal LLM request from user message',
+    kind: 'context',
+    implementation: {},
+  });
+
+  const buildRequestStep = step({
+    ref: 'build_request',
+    ordinal: 0,
+    action: contextAction,
+    inputMapping: {
+      userMessage: 'input.userMessage',
+    },
+    // Build the nested llmRequest structure
+    // Expression syntax uses unquoted keys like JS, and single quotes for string literals
+    outputMapping: {
+      'output.llmRequest': `{ messages: [{ role: 'user', content: result.userMessage }], systemPrompt: '${systemPrompt.replace(/'/g, "\\'")}' }`,
+    },
+  });
+
+  // Define the LLM request message schema
+  const messageSchema = s.object({
+    role: s.string(),
+    content: s.string(),
+  });
+
+  // Define the LLM request schema
+  const llmRequestSchema = s.object({
+    messages: s.array(messageSchema),
+    systemPrompt: s.string(),
+  });
+
+  const buildRequestTask = task({
+    name: 'Context Assembly Passthrough',
+    description: 'Builds LLM request from user message',
+    inputSchema: s.object({
+      userMessage: s.string(),
+    }),
+    outputSchema: s.object({
+      llmRequest: llmRequestSchema,
+    }),
+    steps: [buildRequestStep],
+  });
+
+  const buildRequestNode = node({
+    ref: 'build_request',
+    name: 'Build Request',
+    task: buildRequestTask,
+    taskVersion: 1,
+    inputMapping: {
+      userMessage: 'input.userMessage',
+    },
+    outputMapping: {
+      'output.llmRequest': 'result.llmRequest',
+    },
+  });
+
+  return workflow({
+    name: 'Context Assembly Passthrough',
+    description: 'Test passthrough for context assembly',
+    inputSchema: s.object({
+      conversationId: s.string(),
+      userMessage: s.string(),
+      recentTurns: s.array(s.object({})),
+      modelProfileId: s.string(),
+      toolIds: s.array(s.string()),
+      toolDefinitions: s.array(s.object({})),
+    }),
+    outputSchema: s.object({
+      llmRequest: llmRequestSchema,
+    }),
+    outputMapping: {
+      llmRequest: 'output.llmRequest',
+    },
+    initialNodeRef: 'build_request',
+    nodes: [buildRequestNode],
+    transitions: [],
+  });
+}
+
+/**
+ * Creates a noop memory extraction workflow.
+ *
+ * Memory extraction receives MemoryExtractionInput and has side effects only.
+ * This noop version does nothing - just passes through.
+ */
+function buildMemoryExtractionNoopWorkflow() {
+  const noopAction = action({
+    name: 'Noop',
+    description: 'Does nothing',
+    kind: 'context',
+    implementation: {},
+  });
+
+  const noopStep = step({
+    ref: 'noop',
+    ordinal: 0,
+    action: noopAction,
+    inputMapping: {},
+    outputMapping: {},
+  });
+
+  const noopTask = task({
+    name: 'Memory Extraction Noop',
+    description: 'Does nothing',
+    inputSchema: s.object({}),
+    outputSchema: s.object({}),
+    steps: [noopStep],
+  });
+
+  const noopNode = node({
+    ref: 'noop',
+    name: 'Noop',
+    task: noopTask,
+    taskVersion: 1,
+    inputMapping: {},
+    outputMapping: {},
+  });
+
+  return workflow({
+    name: 'Memory Extraction Noop',
+    description: 'Test noop for memory extraction',
+    inputSchema: s.object({
+      agentId: s.string(),
+      turnId: s.string(),
+      transcript: s.array(s.object({})),
+    }),
+    outputSchema: s.object({}),
+    outputMapping: {},
+    initialNodeRef: 'noop',
+    nodes: [noopNode],
+    transitions: [],
+  });
+}
+
+// =============================================================================
 // Main Test Helper
 // =============================================================================
 
@@ -411,17 +568,29 @@ export async function runTestConversation(
     workflowIds: [],
   };
 
-  // TODO: Create passthrough workflows for context assembly and memory extraction
-  // For now, we'll require them to be provided or skip
-  if (!personaConfig.contextAssemblyWorkflowId) {
-    throw new Error(
-      'Context assembly workflow ID is required. Create a passthrough workflow and pass its ID.',
-    );
+  // Create passthrough workflows if not provided
+  let contextAssemblyWorkflowId = personaConfig.contextAssemblyWorkflowId;
+  let memoryExtractionWorkflowId = personaConfig.memoryExtractionWorkflowId;
+
+  if (!contextAssemblyWorkflowId) {
+    console.log('📦 Creating context assembly passthrough workflow...');
+    const systemPrompt = personaConfig.systemPrompt ?? 'You are a helpful assistant.';
+    const contextAssemblyDef = buildContextAssemblyPassthroughWorkflow(systemPrompt);
+    const contextAssemblySetup = await createWorkflow(ctx, contextAssemblyDef);
+    contextAssemblyWorkflowId = contextAssemblySetup.workflowId;
+    createdResources.workflowIds.push(contextAssemblyWorkflowId);
+    // Track the created resources from the workflow
+    createdResources.taskIds.push(...contextAssemblySetup.createdResources.taskIds);
   }
-  if (!personaConfig.memoryExtractionWorkflowId) {
-    throw new Error(
-      'Memory extraction workflow ID is required. Create a passthrough workflow and pass its ID.',
-    );
+
+  if (!memoryExtractionWorkflowId) {
+    console.log('📦 Creating memory extraction noop workflow...');
+    const memoryExtractionDef = buildMemoryExtractionNoopWorkflow();
+    const memoryExtractionSetup = await createWorkflow(ctx, memoryExtractionDef);
+    memoryExtractionWorkflowId = memoryExtractionSetup.workflowId;
+    createdResources.workflowIds.push(memoryExtractionWorkflowId);
+    // Track the created resources from the workflow
+    createdResources.taskIds.push(...memoryExtractionSetup.createdResources.taskIds);
   }
 
   // Create persona
@@ -431,8 +600,8 @@ export async function runTestConversation(
     description: `Test persona: ${personaConfig.name}`,
     systemPrompt: personaConfig.systemPrompt ?? 'You are a helpful assistant.',
     modelProfileId: ctx.modelProfileId,
-    contextAssemblyWorkflowId: personaConfig.contextAssemblyWorkflowId,
-    memoryExtractionWorkflowId: personaConfig.memoryExtractionWorkflowId,
+    contextAssemblyWorkflowId,
+    memoryExtractionWorkflowId,
     toolIds: [],
     recentTurnsLimit: 10,
   });
