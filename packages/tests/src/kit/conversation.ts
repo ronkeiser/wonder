@@ -36,89 +36,6 @@ const DEFAULT_TIMEOUT_MS = 300000; // 5 minutes
 const DEFAULT_IDLE_TIMEOUT_MS = 30000; // 30 seconds
 
 // =============================================================================
-// SSE Parsing (until SDK is regenerated with conversation streaming)
-// =============================================================================
-
-interface ConversationSSEEvent {
-  stream: 'events' | 'trace';
-  event: EventEntry | TraceEventEntry;
-}
-
-/**
- * Parse SSE stream into async generator of events
- */
-async function* parseSSEStream<T>(body: ReadableStream<Uint8Array>): AsyncGenerator<T> {
-  const reader = body.getReader();
-  const decoder = new TextDecoder();
-  let buffer = '';
-
-  try {
-    while (true) {
-      const { done, value } = await reader.read();
-      if (done) break;
-
-      buffer += decoder.decode(value, { stream: true });
-
-      // Process complete SSE messages (end with \n\n)
-      const messages = buffer.split('\n\n');
-      buffer = messages.pop() ?? '';
-
-      for (const message of messages) {
-        if (!message.trim()) continue;
-
-        // Parse SSE format: "data: {...}"
-        for (const line of message.split('\n')) {
-          if (line.startsWith('data: ')) {
-            const jsonStr = line.slice(6);
-            try {
-              yield JSON.parse(jsonStr) as T;
-            } catch {
-              // Skip malformed JSON
-            }
-          }
-        }
-      }
-    }
-  } finally {
-    reader.releaseLock();
-  }
-}
-
-/**
- * Start a conversation turn with SSE streaming.
- *
- * This is a temporary helper until the SDK is regenerated with
- * the conversation startTurn method.
- */
-async function* startTurn(
-  conversationId: string,
-  body: { stream: true; content: string; enableTraceEvents?: boolean },
-): AsyncGenerator<ConversationSSEEvent> {
-  const baseUrl = 'https://api.wflow.app';
-  const apiKey = process.env.API_KEY;
-
-  const response = await fetch(`${baseUrl}/conversations/${conversationId}/turns`, {
-    method: 'POST',
-    headers: {
-      'Content-Type': 'application/json',
-      'X-API-Key': apiKey ?? '',
-    },
-    body: JSON.stringify(body),
-  });
-
-  if (!response.ok) {
-    const error = await response.text();
-    throw new Error(`POST /conversations/${conversationId}/turns failed: ${error}`);
-  }
-
-  if (!response.body) {
-    throw new Error(`POST /conversations/${conversationId}/turns returned no body`);
-  }
-
-  yield* parseSSEStream<ConversationSSEEvent>(response.body);
-}
-
-// =============================================================================
 // Conversation Execution
 // =============================================================================
 
@@ -176,8 +93,8 @@ export async function executeConversation(
 
       resetIdleTimer();
 
-      // Start turn via SSE endpoint
-      const stream = startTurn(conversationId, {
+      // Start turn via SDK (returns SSE stream)
+      const stream = wonder.conversations(conversationId).turns({
         stream: true,
         content: message.content,
         enableTraceEvents: options?.enableTraceEvents ?? true,

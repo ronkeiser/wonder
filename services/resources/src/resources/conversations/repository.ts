@@ -1,6 +1,6 @@
 /** Repository for conversation data access */
 
-import { eq } from 'drizzle-orm';
+import { desc, eq } from 'drizzle-orm';
 import type { DrizzleD1Database } from 'drizzle-orm/d1';
 import { ulid } from 'ulid';
 import { conversations } from '../../schema';
@@ -39,7 +39,12 @@ export async function listConversations(
   db: DrizzleD1Database,
   limit: number = 100,
 ): Promise<Conversation[]> {
-  return await db.select().from(conversations).limit(limit).all();
+  return await db
+    .select()
+    .from(conversations)
+    .orderBy(desc(conversations.createdAt))
+    .limit(limit)
+    .all();
 }
 
 export async function listConversationsByStatus(
@@ -51,6 +56,7 @@ export async function listConversationsByStatus(
     .select()
     .from(conversations)
     .where(eq(conversations.status, status))
+    .orderBy(desc(conversations.createdAt))
     .limit(limit)
     .all();
 }
