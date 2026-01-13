@@ -152,6 +152,16 @@ export function createClient(baseClient: any) {
             if (error) throw new ApiError(`DELETE /conversations/${id} failed`, error);
             return data;
           },
+          turns: async function* (body: NonNullable<paths['/conversations/{id}/turns']['post']['requestBody']>['content']['application/json'], options?: any): AsyncGenerator<paths['/conversations/{id}/turns']['post']['responses']['200']['content']['text/event-stream']> {
+            const response = await baseClient.POST(`/conversations/${id}/turns`, { body });
+            if (!response.response.ok) {
+              throw new ApiError(`POST /conversations/${id}/turns failed`, response.error);
+            }
+            if (!response.response.body) {
+              throw new ApiError(`POST /conversations/${id}/turns returned no body`, null);
+            }
+            yield* parseSSEStream<paths['/conversations/{id}/turns']['post']['responses']['200']['content']['text/event-stream']>(response.response.body);
+          },
           status: {
             patch: async (body: NonNullable<paths['/conversations/{id}/status']['patch']['requestBody']>['content']['application/json'], options?: any): Promise<paths['/conversations/{id}/status']['patch']['responses']['200']['content']['application/json']> => {
               const { data, error } = await baseClient.PATCH(`/conversations/${id}/status`, { body });

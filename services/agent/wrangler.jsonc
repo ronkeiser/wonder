@@ -35,6 +35,7 @@
 
   "vars": {
     "SERVICE": "agent",
-    "ENVIRONMENT": "development"
+    "ENVIRONMENT": "development",
+    "TRACE_EVENTS_ENABLED": "false"
   }
 }

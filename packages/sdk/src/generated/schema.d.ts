@@ -568,6 +568,57 @@ export interface paths {
         };
         trace?: never;
     };
+    "/conversations/{id}/turns": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post: {
+            parameters: {
+                query?: never;
+                header?: never;
+                path: {
+                    id: string;
+                };
+                cookie?: never;
+            };
+            requestBody?: {
+                content: {
+                    "application/json": components["schemas"]["StartTurnRequest"];
+                };
+            };
+            responses: {
+                /** @description Turn started successfully */
+                200: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["StartTurnResponse"];
+                        "text/event-stream": components["schemas"]["ConversationSSEEvent"];
+                    };
+                };
+                /** @description Failed to start turn */
+                500: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["StartTurnError"];
+                    };
+                };
+            };
+        };
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/conversations/{conversationId}/messages": {
         parameters: {
             query?: never;
@@ -2631,18 +2682,9 @@ export interface components {
              */
             status: "active" | "waiting" | "completed" | "failed";
         };
-        Message: {
-            /** @example 01ARZ3NDEKTSV4RRFFQ69G5FAV */
-            id: string;
-            conversationId: string;
+        StartTurnResponse: {
             turnId: string;
-            /** @enum {string} */
-            role: "user" | "agent";
-            content: string;
-            createdAt: string;
-        };
-        MessageListResponse: {
-            messages: components["schemas"]["Message"][];
+            conversationId: string;
         };
         EventEntry: {
             id: string;
@@ -2659,9 +2701,6 @@ export interface components {
             message?: string | null;
             /** @description JSON blob with all domain-specific fields */
             metadata: string;
-        };
-        EventsResponse: {
-            events: components["schemas"]["EventEntry"][];
         };
         /** @description Contains domain-specific fields including tokenId, nodeId */
         TraceEventPayload: {
@@ -2684,6 +2723,51 @@ export interface components {
             projectId: string;
             durationMs: number | null;
             payload: components["schemas"]["TraceEventPayload"];
+        };
+        ConversationSSEEvent: {
+            /**
+             * @description Which event stream this belongs to
+             * @enum {string}
+             */
+            stream: "events" | "trace";
+            /** @description The event payload */
+            event: components["schemas"]["EventEntry"] | components["schemas"]["TraceEventEntry"];
+        };
+        StartTurnError: {
+            error: string;
+        };
+        StartTurnRequest: {
+            /**
+             * @description If true, returns SSE stream of events instead of JSON response
+             * @example false
+             */
+            stream?: boolean;
+            /**
+             * @description The user message content
+             * @example Hello, how are you?
+             */
+            content: string;
+            /**
+             * @description If true, enables trace event emission (for testing)
+             * @example false
+             */
+            enableTraceEvents?: boolean;
+        };
+        Message: {
+            /** @example 01ARZ3NDEKTSV4RRFFQ69G5FAV */
+            id: string;
+            conversationId: string;
+            turnId: string;
+            /** @enum {string} */
+            role: "user" | "agent";
+            content: string;
+            createdAt: string;
+        };
+        MessageListResponse: {
+            messages: components["schemas"]["Message"][];
+        };
+        EventsResponse: {
+            events: components["schemas"]["EventEntry"][];
         };
         TraceEventsResponse: {
             events: components["schemas"]["TraceEventEntry"][];
@@ -2791,11 +2875,6 @@ export interface components {
              * @example Reviews code for best practices
              */
             description: string;
-            /**
-             * @default 1
-             * @example 1
-             */
-            version: number;
             /** @example lib_123 */
             libraryId?: string;
             /** @example You are a helpful code reviewer. */

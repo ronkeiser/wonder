@@ -9,7 +9,6 @@ export const CreatePersonaSchema = z
   .object({
     name: z.string().min(1).max(255).openapi({ example: 'Code Reviewer' }),
     description: z.string().default('').openapi({ example: 'Reviews code for best practices' }),
-    version: z.number().int().positive().default(1).openapi({ example: 1 }),
     libraryId: z.string().optional().openapi({ example: 'lib_123' }),
     systemPrompt: z.string().min(1).openapi({ example: 'You are a helpful code reviewer.' }),
     modelProfileId: ulid().openapi({ example: '01ARZ3NDEKTSV4RRFFQ69G5FAV' }),

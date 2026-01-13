@@ -81,7 +81,7 @@ export class Conversation extends DurableObject {
           projectId: agent.projectIds[0], // Use first project from agent's scope
         };
       },
-      { traceEnabled: false }, // TODO: Add trace events config
+      { traceEnabled: (this.env.TRACE_EVENTS_ENABLED as string) === 'true' },
     );
 
     // All managers share the same db instance
@@ -551,15 +551,22 @@ export class Conversation extends DurableObject {
    * @param conversationId - The conversation ID (must match DO ID)
    * @param input - The input for this turn (user message or caller's input)
    * @param caller - Who initiated this turn
+   * @param options - Optional settings for this turn
    */
   async startTurn(
     conversationId: string,
     input: unknown,
     caller: Caller,
+    options?: { enableTraceEvents?: boolean },
   ): Promise<{ turnId: string }> {
     try {
       // Initialize definitions (loads from D1 on first call, cached thereafter)
       await this.defs.initializeConversation(conversationId);
+
+      // Enable trace events if requested (for testing)
+      if (options?.enableTraceEvents !== undefined) {
+        this.emitter.setTraceEnabled(options.enableTraceEvents);
+      }
 
       this.logger.info({
         eventType: 'conversation.turn.starting',

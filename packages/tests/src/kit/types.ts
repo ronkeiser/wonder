@@ -71,3 +71,52 @@ export interface TestWorkflowResult {
   /** Cleanup function - call this when done */
   cleanup: () => Promise<void>;
 }
+
+// =============================================================================
+// Conversation Types
+// =============================================================================
+
+import type { ConversationTraceEventCollection } from './conversation-trace';
+
+/**
+ * Tracks IDs of created conversation resources for cleanup
+ */
+export interface CreatedConversationResources {
+  personaId?: string;
+  agentId?: string;
+  toolIds: string[];
+  taskIds: string[];
+  workflowIds: string[];
+}
+
+export interface ConversationTestSetup extends TestContext {
+  agentId: string;
+  personaId: string;
+  conversationId: string;
+  /** IDs of all created resources for cleanup (in creation order) */
+  createdResources: CreatedConversationResources;
+}
+
+/**
+ * Result from executing a conversation turn
+ */
+export interface ExecuteConversationResult {
+  conversationId: string;
+  turnIds: string[];
+  status: 'completed' | 'failed' | 'timeout' | 'idle_timeout';
+  events: EventEntry[];
+  traceEvents: TraceEventEntry[];
+  trace: ConversationTraceEventCollection;
+}
+
+/**
+ * Result from runTestConversation
+ */
+export interface TestConversationResult {
+  /** Results from executing the conversation */
+  result: ExecuteConversationResult;
+  /** The setup object with IDs of created resources */
+  setup: ConversationTestSetup;
+  /** Cleanup function - call this when done */
+  cleanup: () => Promise<void>;
+}

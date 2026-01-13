@@ -1,5 +1,6 @@
 import { createRoute, z } from '@hono/zod-openapi';
 import { ulid } from '../../validators';
+import { EventEntrySchema, TraceEventEntrySchema } from '../events/schema';
 import {
   ConversationCreateResponseSchema,
   ConversationGetResponseSchema,
@@ -121,6 +122,81 @@ export const deleteConversationRoute = createRoute({
         },
       },
       description: 'Conversation deleted successfully',
+    },
+  },
+});
+
+/**
+ * SSE event envelope for conversation streaming
+ */
+const ConversationSSEEventSchema = z
+  .object({
+    stream: z.enum(['events', 'trace']).openapi({
+      description: 'Which event stream this belongs to',
+    }),
+    event: z.union([EventEntrySchema, TraceEventEntrySchema]).openapi({
+      description: 'The event payload',
+    }),
+  })
+  .openapi('ConversationSSEEvent');
+
+const StartTurnRequestSchema = z
+  .object({
+    stream: z.boolean().optional().openapi({
+      description: 'If true, returns SSE stream of events instead of JSON response',
+      example: false,
+    }),
+    content: z.string().openapi({
+      description: 'The user message content',
+      example: 'Hello, how are you?',
+    }),
+    enableTraceEvents: z.boolean().optional().openapi({
+      description: 'If true, enables trace event emission (for testing)',
+      example: false,
+    }),
+  })
+  .openapi('StartTurnRequest');
+
+export const startTurnRoute = createRoute({
+  method: 'post',
+  path: '/{id}/turns',
+  tags: ['conversations'],
+  request: {
+    params: z.object({
+      id: ulid().openapi({ param: { name: 'id', in: 'path' } }),
+    }),
+    body: {
+      content: {
+        'application/json': {
+          schema: StartTurnRequestSchema,
+        },
+      },
+    },
+  },
+  responses: {
+    200: {
+      content: {
+        'application/json': {
+          schema: z
+            .object({
+              turnId: ulid(),
+              conversationId: ulid(),
+            })
+            .openapi('StartTurnResponse'),
+        },
+        'text/event-stream': {
+          schema: ConversationSSEEventSchema,
+        },
+      },
+      description: 'Turn started successfully',
+    },
+    500: {
+      content: {
+        'application/json': {
+          schema: z.object({ error: z.string() }).openapi('StartTurnError'),
+        },
+      },
+      description: 'Failed to start turn',
     },
   },
 });

@@ -29,16 +29,16 @@ Key insight: **ConversationRunner follows the same pattern as WorkflowCoordinato
 
 ## Workflow vs Agent: Parallel Structure
 
-| Workflow | Agent |
-|----------|-------|
-| WorkflowCoordinator | ConversationRunner |
-| Token | Turn |
-| Token status transitions | Turn status (`active` → `completed`/`failed`) |
-| Graph traversal decides next node | LLM reasoning decides next action |
-| Fan-out creates parallel tokens | Parallel turns (multiple active simultaneously) |
-| Context (input/state/output in DO SQLite) | Recent turns in DO SQLite, memory in D1/Vectorize |
-| Task dispatch to Executor | Tool dispatch to Executor/WorkflowCoordinator/ConversationRunner |
-| Subworkflow invocation | Agent invocation (`delegate` or `loop_in` mode) |
+| Workflow                                  | Agent                                                            |
+| ----------------------------------------- | ---------------------------------------------------------------- |
+| WorkflowCoordinator                       | ConversationRunner                                               |
+| Token                                     | Turn                                                             |
+| Token status transitions                  | Turn status (`active` → `completed`/`failed`)                    |
+| Graph traversal decides next node         | LLM reasoning decides next action                                |
+| Fan-out creates parallel tokens           | Parallel turns (multiple active simultaneously)                  |
+| Context (input/state/output in DO SQLite) | Recent turns in DO SQLite, memory in D1/Vectorize                |
+| Task dispatch to Executor                 | Tool dispatch to Executor/WorkflowCoordinator/ConversationRunner |
+| Subworkflow invocation                    | Agent invocation (`delegate` or `loop_in` mode)                  |
 
 ## What Agent Tests Verify
 
@@ -88,7 +88,7 @@ interface Move {
   id: string;
   turn_id: string;
   sequence: number;
-  reasoning?: string;      // LLM text output
+  reasoning?: string; // LLM text output
   tool_call?: { tool_id: string; input: Record<string, unknown> };
   tool_result?: Record<string, unknown>;
   created_at: string;
@@ -101,11 +101,11 @@ Tests verify moves accumulate correctly and in causal order.
 
 Tools dispatch to three targets (same as workflow nodes):
 
-| Target | Mechanism | Wait behavior |
-|--------|-----------|---------------|
-| Executor (task) | RPC to stateless worker | Sync: wait. Async: continue. |
-| WorkflowCoordinator (workflow) | DO-to-DO | Sync: wait. Async: continue. |
-| ConversationRunner (agent) | DO-to-DO | Sync: wait. Async: continue. |
+| Target                         | Mechanism               | Wait behavior                |
+| ------------------------------ | ----------------------- | ---------------------------- |
+| Executor (task)                | RPC to stateless worker | Sync: wait. Async: continue. |
+| WorkflowCoordinator (workflow) | DO-to-DO                | Sync: wait. Async: continue. |
+| ConversationRunner (agent)     | DO-to-DO                | Sync: wait. Async: continue. |
 
 **Sync tools**: Turn enters waiting state, result returns via callback, LLM continues reasoning.
 
@@ -115,10 +115,10 @@ Tools dispatch to three targets (same as workflow nodes):
 
 When dispatching to another agent:
 
-| Mode | Context | Participation | Result destination |
-|------|---------|---------------|-------------------|
-| `delegate` | Only explicit input | No (one-shot) | Caller only |
-| `loop_in` | Sees conversation history | Yes (joins as participant) | ConversationRunner (all see it) |
+| Mode       | Context                   | Participation              | Result destination              |
+| ---------- | ------------------------- | -------------------------- | ------------------------------- |
+| `delegate` | Only explicit input       | No (one-shot)              | Caller only                     |
+| `loop_in`  | Sees conversation history | Yes (joins as participant) | ConversationRunner (all see it) |
 
 ### Parallel Turns
 
@@ -148,12 +148,12 @@ The platform provides the hooks; libraries provide the strategy.
 
 ### Error Handling
 
-| Error Type | Handling |
-|------------|----------|
-| Infrastructure (network, rate limit, 5xx) | Auto-retry with backoff, invisible to agent |
-| Business (tool failed, validation error) | Surface to LLM as tool result with error info |
-| Context assembly failure | Retry exhausted → `FAIL_TURN` (no degraded mode) |
-| Memory extraction failure | Log and continue, mark turn with `memoryExtractionFailed: true` |
+| Error Type                                | Handling                                                        |
+| ----------------------------------------- | --------------------------------------------------------------- |
+| Infrastructure (network, rate limit, 5xx) | Auto-retry with backoff, invisible to agent                     |
+| Business (tool failed, validation error)  | Surface to LLM as tool result with error info                   |
+| Context assembly failure                  | Retry exhausted → `FAIL_TURN` (no degraded mode)                |
+| Memory extraction failure                 | Log and continue, mark turn with `memoryExtractionFailed: true` |
 
 ## Test Structure
 
@@ -324,8 +324,8 @@ describe('Foundation: 02 - Single Turn, Sync Tool', () => {
     // MOVES (at least 2: tool call, then final response)
     const moves = trace.moves.forTurn(turnId);
     expect(moves.length).toBeGreaterThanOrEqual(2);
-    expect(moves.some(m => m.payload.tool_call?.tool_id === 'echo')).toBe(true);
-    expect(moves.some(m => m.payload.tool_result)).toBe(true);
+    expect(moves.some((m) => m.payload.tool_call?.tool_id === 'echo')).toBe(true);
+    expect(moves.some((m) => m.payload.tool_result)).toBe(true);
   });
 });
 ```
@@ -422,8 +422,8 @@ describe('Foundation: 05 - Parallel Turns', () => {
 
     // Send two messages that will create parallel turns
     const { result } = await runTestConversation(testPersona, [
-      { role: 'user', content: 'Do slow research' },    // Turn A - async
-      { role: 'user', content: 'Do fast lookup' },      // Turn B - sync
+      { role: 'user', content: 'Do slow research' }, // Turn A - async
+      { role: 'user', content: 'Do fast lookup' }, // Turn B - sync
     ]);
 
     const { trace } = result;
@@ -432,7 +432,7 @@ describe('Foundation: 05 - Parallel Turns', () => {
     // TWO TURNS CREATED
     const turnStarts = trace.turns.starts();
     expect(turnStarts).toHaveLength(2);
-    const [turnA, turnB] = turnStarts.map(t => t.payload.turnId);
+    const [turnA, turnB] = turnStarts.map((t) => t.payload.turnId);
 
     // TURN B COMPLETES BEFORE TURN A
     const turnAComplete = trace.turns.completion(turnA);
@@ -554,7 +554,7 @@ describe('Foundation: 12 - Tool Failure Handling', () => {
 
     // ERROR SURFACED TO LLM
     const moves = trace.moves.forTurn(trace.turns.starts()[0].payload.turnId);
-    const failureMove = moves.find(m => m.payload.tool_result?.success === false);
+    const failureMove = moves.find((m) => m.payload.tool_result?.success === false);
     expect(failureMove).toBeDefined();
     expect(failureMove!.payload.tool_result.error.message).toContain('Connection refused');
 
@@ -729,15 +729,15 @@ function assertConversationInvariants(
     if (invocation.payload.async) continue; // Async checked separately
     const toolCallId = invocation.payload.toolCallId;
     const hasResult =
-      trace.tools.completions().some(c => c.payload.toolCallId === toolCallId) ||
-      trace.tools.failures().some(f => f.payload.toolCallId === toolCallId);
+      trace.tools.completions().some((c) => c.payload.toolCallId === toolCallId) ||
+      trace.tools.failures().some((f) => f.payload.toolCallId === toolCallId);
     expect(hasResult, `Sync tool call ${toolCallId} has no result`).toBe(true);
   }
 
   // 3. Every async operation tracked on a turn has a completion
   for (const track of trace.turns.asyncOperations()) {
     const opId = track.payload.operationId;
-    const completion = trace.turns.asyncCompletions().find(c => c.payload.operationId === opId);
+    const completion = trace.turns.asyncCompletions().find((c) => c.payload.operationId === opId);
     expect(completion, `Async operation ${opId} never completed`).toBeDefined();
   }
 
@@ -756,8 +756,11 @@ function assertConversationInvariants(
   }
 
   // 6. Sequences are positive
-  const sequences = trace.all().map(e => e.sequence);
-  expect(sequences.every(seq => seq > 0), 'All sequences must be positive').toBe(true);
+  const sequences = trace.all().map((e) => e.sequence);
+  expect(
+    sequences.every((seq) => seq > 0),
+    'All sequences must be positive',
+  ).toBe(true);
 
   // 7. No error events (unless allowFailedTurns)
   if (!options?.allowFailedTurns) {
@@ -770,67 +773,67 @@ function assertConversationInvariants(
 
 ### Turn Events
 
-| Event Type | Payload | Description |
-|------------|---------|-------------|
-| `turn.started` | `{ turnId, conversationId, callerId, callerType }` | Turn began |
-| `turn.completed` | `{ turnId, issues? }` | Turn finished successfully |
-| `turn.failed` | `{ turnId, error }` | Turn failed (e.g., context assembly exhausted retries) |
-| `turn.waiting` | `{ turnId, operationId }` | Turn waiting for sync tool result |
-| `turn.resumed` | `{ turnId, operationId }` | Turn resumed after sync tool completed |
-| `turn.async_tracked` | `{ turnId, operationId }` | Async operation started, turn stays active |
-| `turn.async_completed` | `{ turnId, operationId, result }` | Async operation finished |
+| Event Type             | Payload                                            | Description                                            |
+| ---------------------- | -------------------------------------------------- | ------------------------------------------------------ |
+| `turn.started`         | `{ turnId, conversationId, callerId, callerType }` | Turn began                                             |
+| `turn.completed`       | `{ turnId, issues? }`                              | Turn finished successfully                             |
+| `turn.failed`          | `{ turnId, error }`                                | Turn failed (e.g., context assembly exhausted retries) |
+| `turn.waiting`         | `{ turnId, operationId }`                          | Turn waiting for sync tool result                      |
+| `turn.resumed`         | `{ turnId, operationId }`                          | Turn resumed after sync tool completed                 |
+| `turn.async_tracked`   | `{ turnId, operationId }`                          | Async operation started, turn stays active             |
+| `turn.async_completed` | `{ turnId, operationId, result }`                  | Async operation finished                               |
 
 ### Move Events
 
-| Event Type | Payload | Description |
-|------------|---------|-------------|
+| Event Type      | Payload                                                              | Description               |
+| --------------- | -------------------------------------------------------------------- | ------------------------- |
 | `move.recorded` | `{ turnId, moveId, sequence, reasoning?, tool_call?, tool_result? }` | Move recorded within turn |
 
 ### Message Events
 
-| Event Type | Payload | Description |
-|------------|---------|-------------|
-| `message.user` | `{ turnId, messageId, content }` | User message appended |
+| Event Type          | Payload                                      | Description                |
+| ------------------- | -------------------------------------------- | -------------------------- |
+| `message.user`      | `{ turnId, messageId, content }`             | User message appended      |
 | `message.assistant` | `{ turnId, messageId, content, hasToolUse }` | Assistant message appended |
 
 ### Tool Events
 
-| Event Type | Payload | Description |
-|------------|---------|-------------|
-| `tool.invoked` | `{ turnId, toolCallId, toolName, targetType, targetId, async }` | Tool dispatch started |
-| `tool.completed` | `{ turnId, toolCallId, output }` | Tool succeeded |
-| `tool.failed` | `{ turnId, toolCallId, error: { code, message, retriable } }` | Tool failed |
+| Event Type       | Payload                                                         | Description           |
+| ---------------- | --------------------------------------------------------------- | --------------------- |
+| `tool.invoked`   | `{ turnId, toolCallId, toolName, targetType, targetId, async }` | Tool dispatch started |
+| `tool.completed` | `{ turnId, toolCallId, output }`                                | Tool succeeded        |
+| `tool.failed`    | `{ turnId, toolCallId, error: { code, message, retriable } }`   | Tool failed           |
 
 ### Context Assembly Events
 
-| Event Type | Payload | Description |
-|------------|---------|-------------|
-| `context_assembly.started` | `{ turnId, workflowId }` | Context assembly workflow dispatched |
-| `context_assembly.completed` | `{ turnId, tokenCount }` | Context assembly finished |
-| `context_assembly.failed` | `{ turnId, error, retriesExhausted }` | Context assembly failed |
+| Event Type                   | Payload                               | Description                          |
+| ---------------------------- | ------------------------------------- | ------------------------------------ |
+| `context_assembly.started`   | `{ turnId, workflowId }`              | Context assembly workflow dispatched |
+| `context_assembly.completed` | `{ turnId, tokenCount }`              | Context assembly finished            |
+| `context_assembly.failed`    | `{ turnId, error, retriesExhausted }` | Context assembly failed              |
 
 ### Memory Extraction Events
 
-| Event Type | Payload | Description |
-|------------|---------|-------------|
-| `memory_extraction.started` | `{ turnId, workflowId }` | Memory extraction workflow dispatched |
-| `memory_extraction.completed` | `{ turnId }` | Memory extraction finished |
-| `memory_extraction.failed` | `{ turnId, error }` | Memory extraction failed (turn still completed) |
+| Event Type                    | Payload                  | Description                                     |
+| ----------------------------- | ------------------------ | ----------------------------------------------- |
+| `memory_extraction.started`   | `{ turnId, workflowId }` | Memory extraction workflow dispatched           |
+| `memory_extraction.completed` | `{ turnId }`             | Memory extraction finished                      |
+| `memory_extraction.failed`    | `{ turnId, error }`      | Memory extraction failed (turn still completed) |
 
 ### LLM Events
 
-| Event Type | Payload | Description |
-|------------|---------|-------------|
-| `llm.call.started` | `{ turnId, modelProfileId, inputTokens }` | LLM call started |
+| Event Type           | Payload                                            | Description       |
+| -------------------- | -------------------------------------------------- | ----------------- |
+| `llm.call.started`   | `{ turnId, modelProfileId, inputTokens }`          | LLM call started  |
 | `llm.call.completed` | `{ turnId, outputTokens, hasToolUse, stopReason }` | LLM call finished |
 
 ### Agent Invocation Events
 
-| Event Type | Payload | Description |
-|------------|---------|-------------|
-| `agent.call.started` | `{ turnId, callId, agentId, mode }` | Agent invocation started |
-| `agent.call.completed` | `{ turnId, callId, output }` | Agent invocation completed |
-| `agent.call.failed` | `{ turnId, callId, error }` | Agent invocation failed |
+| Event Type             | Payload                             | Description                |
+| ---------------------- | ----------------------------------- | -------------------------- |
+| `agent.call.started`   | `{ turnId, callId, agentId, mode }` | Agent invocation started   |
+| `agent.call.completed` | `{ turnId, callId, output }`        | Agent invocation completed |
+| `agent.call.failed`    | `{ turnId, callId, error }`         | Agent invocation failed    |
 
 ## Implementation Plan
 
@@ -858,15 +861,15 @@ function assertConversationInvariants(
 
 ## File Changes
 
-| File | Change |
-|------|--------|
-| `services/agent/src/trace.ts` | New — Trace event emission |
-| `packages/tests/src/kit/conversation-trace.ts` | New — ConversationTraceEventCollection |
-| `packages/tests/src/kit/conversation.ts` | New — runTestConversation, createConversation |
-| `packages/tests/src/kit/conversation-verify.ts` | New — ConversationVerifier |
-| `packages/tests/src/kit/conversation-invariants.ts` | New — assertConversationInvariants |
-| `packages/tests/src/kit/index.ts` | Export conversation utilities |
-| `packages/tests/src/tests/conversations/*.test.ts` | New — Test files |
+| File                                                | Change                                        |
+| --------------------------------------------------- | --------------------------------------------- |
+| `services/agent/src/trace.ts`                       | New — Trace event emission                    |
+| `packages/tests/src/kit/conversation-trace.ts`      | New — ConversationTraceEventCollection        |
+| `packages/tests/src/kit/conversation.ts`            | New — runTestConversation, createConversation |
+| `packages/tests/src/kit/conversation-verify.ts`     | New — ConversationVerifier                    |
+| `packages/tests/src/kit/conversation-invariants.ts` | New — assertConversationInvariants            |
+| `packages/tests/src/kit/index.ts`                   | Export conversation utilities                 |
+| `packages/tests/src/tests/conversations/*.test.ts`  | New — Test files                              |
 
 ## Dependencies
 
@@ -885,7 +888,3 @@ function assertConversationInvariants(
    - Option A: Create minimal test workflows that pass through
    - Option B: Test with null workflows (if platform supports skipping)
    - Option C: Use library-provided defaults
-
-3. **WebSocket vs SSE** — The architecture mentions WebSocket for streaming. Need to confirm:
-   - Does the SDK expose WebSocket connection for conversations?
-   - Or is there an SSE endpoint similar to workflow execution?
