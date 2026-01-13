@@ -164,8 +164,8 @@ function generateTestCategoryTasks(tests: TestFile[]): Task[] {
     tasks.push({
       label: `Test: ${categoryTitle} All`,
       type: 'shell',
-      command: 'pnpm',
-      args: ['test', `tests/${category}`],
+      command: 'vitest',
+      args: ['run', '--config', 'packages/tests/vitest.config.ts', `packages/tests/src/tests/${category}`],
       group: 'test',
       presentation: {
         reveal: 'always',
