@@ -120,6 +120,17 @@ export async function executeConversation(
               turnIds.push(payload.turnId);
             }
           }
+
+          // Check for terminal conditions in trace events
+          // Conversations emit trace events, not regular events for turn lifecycle
+          if (traceEvent.type === 'operation.turns.completed') {
+            // Turn done, continue to next message
+            break;
+          }
+          if (traceEvent.type === 'operation.turns.failed') {
+            status = 'failed';
+            break;
+          }
         } else {
           const event = sseEvent.event as EventEntry;
           events.push(event);
@@ -128,7 +139,7 @@ export async function executeConversation(
             console.log(`📨 ${event.eventType}`, event.metadata);
           }
 
-          // Check for terminal conditions
+          // Check for terminal conditions in regular events (fallback)
           if (event.eventType === 'turn.completed') {
             // Turn done, continue to next message
             break;
