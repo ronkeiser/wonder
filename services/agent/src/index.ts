@@ -720,37 +720,24 @@ export class Conversation extends DurableObject {
       // Notify WebSocket client of tool result (async interleaving)
       this.notifyToolResult(turnId, toolCallId, result.success, result.result);
 
-      // Check if this was a sync tool we were waiting for (before marking complete)
-      const wasWaiting = this.asyncOps.hasWaiting(turnId);
-
       // Mark async operation as completed (resume handles both waiting and pending)
       this.asyncOps.resume(toolCallId, result.success ? result.result : result.error);
 
       // Get dispatch context
       const ctx = this.getDispatchContext();
 
-      if (wasWaiting) {
-        // Resume from sync tool - continue LLM loop with tool result
-        // Build continuation request with tool result included
-        const continuationRequest = this.buildContinuationRequest(turnId);
+      // Continue LLM loop with tool result
+      const continuationRequest = this.buildContinuationRequest(turnId);
 
-        const loopResult = await runLLMLoop({
-          turnId,
-          llmRequest: continuationRequest,
-          defs: this.defs,
-          ctx,
-        });
+      const loopResult = await runLLMLoop({
+        turnId,
+        llmRequest: continuationRequest,
+        defs: this.defs,
+        ctx,
+      });
 
-        // Check if turn should complete
-        await this.maybeCompleteTurn(turnId, loopResult, ctx);
-      } else {
-        // Async tool completed - check if turn can complete now
-        const loopResult: RunLLMLoopResult = {
-          waitingForSync: false,
-          pendingAsyncOps: this.asyncOps.getPendingCount(turnId),
-        };
-        await this.maybeCompleteTurn(turnId, loopResult, ctx);
-      }
+      // Check if turn should complete
+      await this.maybeCompleteTurn(turnId, loopResult, ctx);
     } catch (error) {
       this.logger.error({
         eventType: 'conversation.task_result.failed',
@@ -804,35 +791,23 @@ export class Conversation extends DurableObject {
       // Notify WebSocket client of tool error (async interleaving)
       this.notifyToolResult(turnId, toolCallId, false, result.error);
 
-      // Check if this was a sync tool we were waiting for (before marking complete)
-      const wasWaiting = this.asyncOps.hasWaiting(turnId);
-
       // Mark async operation as completed with error (resume handles both waiting and pending)
       this.asyncOps.resume(toolCallId, result.error);
 
       // Get dispatch context
       const ctx = this.getDispatchContext();
 
-      if (wasWaiting) {
-        // Resume from sync tool - continue LLM loop with error result
-        const continuationRequest = this.buildContinuationRequest(turnId);
+      // Continue LLM loop with error result
+      const continuationRequest = this.buildContinuationRequest(turnId);
 
-        const loopResult = await runLLMLoop({
-          turnId,
-          llmRequest: continuationRequest,
-          defs: this.defs,
-          ctx,
-        });
+      const loopResult = await runLLMLoop({
+        turnId,
+        llmRequest: continuationRequest,
+        defs: this.defs,
+        ctx,
+      });
 
-        await this.maybeCompleteTurn(turnId, loopResult, ctx);
-      } else {
-        // Async tool failed - check if turn can complete now
-        const loopResult: RunLLMLoopResult = {
-          waitingForSync: false,
-          pendingAsyncOps: this.asyncOps.getPendingCount(turnId),
-        };
-        await this.maybeCompleteTurn(turnId, loopResult, ctx);
-      }
+      await this.maybeCompleteTurn(turnId, loopResult, ctx);
     } catch (err) {
       this.logger.error({
         eventType: 'conversation.task_error.failed',
@@ -887,35 +862,23 @@ export class Conversation extends DurableObject {
       // Notify WebSocket client of workflow result (async interleaving)
       this.notifyToolResult(turnId, toolCallId, true, output);
 
-      // Check if this was a sync tool we were waiting for (before marking complete)
-      const wasWaiting = this.asyncOps.hasWaiting(turnId);
-
       // Mark async operation as completed (resume handles both waiting and pending)
       this.asyncOps.resume(toolCallId, output);
 
       // Get dispatch context
       const ctx = this.getDispatchContext();
 
-      if (wasWaiting) {
-        // Resume from sync tool - continue LLM loop with tool result
-        const continuationRequest = this.buildContinuationRequest(turnId);
+      // Continue LLM loop with tool result
+      const continuationRequest = this.buildContinuationRequest(turnId);
 
-        const loopResult = await runLLMLoop({
-          turnId,
-          llmRequest: continuationRequest,
-          defs: this.defs,
-          ctx,
-        });
+      const loopResult = await runLLMLoop({
+        turnId,
+        llmRequest: continuationRequest,
+        defs: this.defs,
+        ctx,
+      });
 
-        await this.maybeCompleteTurn(turnId, loopResult, ctx);
-      } else {
-        // Async tool completed - check if turn can complete now
-        const loopResult: RunLLMLoopResult = {
-          waitingForSync: false,
-          pendingAsyncOps: this.asyncOps.getPendingCount(turnId),
-        };
-        await this.maybeCompleteTurn(turnId, loopResult, ctx);
-      }
+      await this.maybeCompleteTurn(turnId, loopResult, ctx);
     } catch (error) {
       this.logger.error({
         eventType: 'conversation.workflow_result.failed',
@@ -969,35 +932,23 @@ export class Conversation extends DurableObject {
       // Notify WebSocket client of workflow error (async interleaving)
       this.notifyToolResult(turnId, toolCallId, false, result.error);
 
-      // Check if this was a sync tool we were waiting for (before marking complete)
-      const wasWaiting = this.asyncOps.hasWaiting(turnId);
-
       // Mark async operation as completed with error (resume handles both waiting and pending)
       this.asyncOps.resume(toolCallId, result.error);
 
       // Get dispatch context
       const ctx = this.getDispatchContext();
 
-      if (wasWaiting) {
-        // Resume from sync tool - continue LLM loop with error result
-        const continuationRequest = this.buildContinuationRequest(turnId);
+      // Continue LLM loop with error result
+      const continuationRequest = this.buildContinuationRequest(turnId);
 
-        const loopResult = await runLLMLoop({
-          turnId,
-          llmRequest: continuationRequest,
-          defs: this.defs,
-          ctx,
-        });
+      const loopResult = await runLLMLoop({
+        turnId,
+        llmRequest: continuationRequest,
+        defs: this.defs,
+        ctx,
+      });
 
-        await this.maybeCompleteTurn(turnId, loopResult, ctx);
-      } else {
-        // Async tool failed - check if turn can complete now
-        const loopResult: RunLLMLoopResult = {
-          waitingForSync: false,
-          pendingAsyncOps: this.asyncOps.getPendingCount(turnId),
-        };
-        await this.maybeCompleteTurn(turnId, loopResult, ctx);
-      }
+      await this.maybeCompleteTurn(turnId, loopResult, ctx);
     } catch (err) {
       this.logger.error({
         eventType: 'conversation.workflow_error.failed',
@@ -1048,35 +999,23 @@ export class Conversation extends DurableObject {
       // Notify WebSocket client of agent response (async interleaving)
       this.notifyToolResult(turnId, toolCallId, true, { response });
 
-      // Check if this was a sync tool we were waiting for (before marking complete)
-      const wasWaiting = this.asyncOps.hasWaiting(turnId);
-
       // Mark async operation as completed (resume handles both waiting and pending)
       this.asyncOps.resume(toolCallId, { response });
 
       // Get dispatch context
       const ctx = this.getDispatchContext();
 
-      if (wasWaiting) {
-        // Resume from sync tool - continue LLM loop with agent response
-        const continuationRequest = this.buildContinuationRequest(turnId);
+      // Continue LLM loop with agent response
+      const continuationRequest = this.buildContinuationRequest(turnId);
 
-        const loopResult = await runLLMLoop({
-          turnId,
-          llmRequest: continuationRequest,
-          defs: this.defs,
-          ctx,
-        });
+      const loopResult = await runLLMLoop({
+        turnId,
+        llmRequest: continuationRequest,
+        defs: this.defs,
+        ctx,
+      });
 
-        await this.maybeCompleteTurn(turnId, loopResult, ctx);
-      } else {
-        // Async agent response - check if turn can complete now
-        const loopResult: RunLLMLoopResult = {
-          waitingForSync: false,
-          pendingAsyncOps: this.asyncOps.getPendingCount(turnId),
-        };
-        await this.maybeCompleteTurn(turnId, loopResult, ctx);
-      }
+      await this.maybeCompleteTurn(turnId, loopResult, ctx);
     } catch (error) {
       this.logger.error({
         eventType: 'conversation.agent_response.failed',
@@ -1130,35 +1069,23 @@ export class Conversation extends DurableObject {
       // Notify WebSocket client of agent error (async interleaving)
       this.notifyToolResult(turnId, toolCallId, false, result.error);
 
-      // Check if this was a sync tool we were waiting for (before marking complete)
-      const wasWaiting = this.asyncOps.hasWaiting(turnId);
-
       // Mark async operation as completed with error (resume handles both waiting and pending)
       this.asyncOps.resume(toolCallId, result.error);
 
       // Get dispatch context
       const ctx = this.getDispatchContext();
 
-      if (wasWaiting) {
-        // Resume from sync tool - continue LLM loop with error result
-        const continuationRequest = this.buildContinuationRequest(turnId);
+      // Continue LLM loop with error result
+      const continuationRequest = this.buildContinuationRequest(turnId);
 
-        const loopResult = await runLLMLoop({
-          turnId,
-          llmRequest: continuationRequest,
-          defs: this.defs,
-          ctx,
-        });
+      const loopResult = await runLLMLoop({
+        turnId,
+        llmRequest: continuationRequest,
+        defs: this.defs,
+        ctx,
+      });
 
-        await this.maybeCompleteTurn(turnId, loopResult, ctx);
-      } else {
-        // Async agent failed - check if turn can complete now
-        const loopResult: RunLLMLoopResult = {
-          waitingForSync: false,
-          pendingAsyncOps: this.asyncOps.getPendingCount(turnId),
-        };
-        await this.maybeCompleteTurn(turnId, loopResult, ctx);
-      }
+      await this.maybeCompleteTurn(turnId, loopResult, ctx);
     } catch (err) {
       this.logger.error({
         eventType: 'conversation.agent_error.failed',
