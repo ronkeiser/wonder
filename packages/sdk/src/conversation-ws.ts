@@ -276,6 +276,53 @@ export class ConversationConnection {
   }
 
   /**
+   * Send a message and wait for the resulting turn to complete.
+   *
+   * This is useful for sequential multi-turn conversations where
+   * each turn must complete before the next one starts.
+   *
+   * @returns The turn ID of the completed turn
+   */
+  async sendAndWait(
+    content: string,
+    options?: { enableTraceEvents?: boolean; timeout?: number },
+  ): Promise<string> {
+    const startTurnCount = this.turnIds.length;
+    const timeout = options?.timeout ?? 30000;
+
+    // Send the message
+    this.send(content, options);
+
+    // Wait for the new turn to be created
+    const startTime = Date.now();
+    while (this.turnIds.length <= startTurnCount) {
+      if (Date.now() - startTime > timeout) {
+        throw new Error('Timeout waiting for turn to be created');
+      }
+      if (this.state === 'closed') {
+        throw new Error('Connection closed while waiting for turn creation');
+      }
+      await new Promise((resolve) => setTimeout(resolve, 50));
+    }
+
+    // Get the new turn ID
+    const newTurnId = this.turnIds[startTurnCount];
+
+    // Wait for the turn to complete
+    while (this.activeTurnIds.has(newTurnId)) {
+      if (Date.now() - startTime > timeout) {
+        throw new Error(`Timeout waiting for turn ${newTurnId} to complete`);
+      }
+      if (this.state === 'closed') {
+        throw new Error('Connection closed while waiting for turn completion');
+      }
+      await new Promise((resolve) => setTimeout(resolve, 50));
+    }
+
+    return newTurnId;
+  }
+
+  /**
    * Get all collected trace events
    */
   getTraceEvents(): TraceEventEntry[] {

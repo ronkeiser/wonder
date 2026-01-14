@@ -34,7 +34,7 @@ describe('Conversation: 04 - Multi-Turn Sequential', () => {
         { role: 'user', content: 'What is my name?' },
         { role: 'user', content: 'Thank you for remembering!' },
       ],
-      { logEvents: true },
+      { logEvents: true, sequential: true },
     );
 
     try {

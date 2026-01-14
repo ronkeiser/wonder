@@ -95,10 +95,12 @@ describe('Conversation: 01 - Single Turn, No Tools', () => {
       // ASSERT: Move creation
       // =======================================================================
 
-      // No moves should be created when there are no tool calls
-      // (moves are only recorded for tool dispatches, not text responses)
+      // Moves are recorded for all LLM responses (text-only or with tool calls)
+      // A text-only response creates one move with hasToolCall: false
       const moves = trace.moves.all();
-      expect(moves.length).toBe(0);
+      expect(moves.length).toBe(1);
+      expect(moves[0].payload.hasToolCall).toBe(false);
+      expect(moves[0].payload.hasReasoning).toBe(true);
 
       // =======================================================================
       // ASSERT: Messages

@@ -67,13 +67,16 @@ describe('interpretResponse', () => {
         toolLookup: createToolLookup(tools),
       });
 
-      expect(result.decisions).toContainEqual({
-        type: 'DISPATCH_TASK',
-        turnId: 'turn_123',
-        toolCallId: 'call_1',
-        taskId: 'task_search',
-        input: { query: 'foo' },
-      });
+      expect(result.decisions).toContainEqual(
+        expect.objectContaining({
+          type: 'DISPATCH_TASK',
+          turnId: 'turn_123',
+          toolCallId: 'call_1',
+          taskId: 'task_search',
+          input: { query: 'foo' },
+          async: false,
+        }),
+      );
     });
 
     it('generates DISPATCH_WORKFLOW for workflow tools', () => {
@@ -99,14 +102,16 @@ describe('interpretResponse', () => {
         toolLookup: createToolLookup(tools),
       });
 
-      expect(result.decisions).toContainEqual({
-        type: 'DISPATCH_WORKFLOW',
-        turnId: 'turn_123',
-        toolCallId: 'call_1',
-        workflowId: 'workflow_implement',
-        input: { feature: 'auth' },
-        async: false,
-      });
+      expect(result.decisions).toContainEqual(
+        expect.objectContaining({
+          type: 'DISPATCH_WORKFLOW',
+          turnId: 'turn_123',
+          toolCallId: 'call_1',
+          workflowId: 'workflow_implement',
+          input: { feature: 'auth' },
+          async: false,
+        }),
+      );
     });
 
     it('generates DISPATCH_AGENT for agent tools', () => {
@@ -133,51 +138,21 @@ describe('interpretResponse', () => {
         toolLookup: createToolLookup(tools),
       });
 
-      expect(result.decisions).toContainEqual({
-        type: 'DISPATCH_AGENT',
-        turnId: 'turn_123',
-        toolCallId: 'call_1',
-        agentId: 'agent_reviewer',
-        input: { code: '...' },
-        mode: 'delegate',
-        async: false,
-      });
+      expect(result.decisions).toContainEqual(
+        expect.objectContaining({
+          type: 'DISPATCH_AGENT',
+          turnId: 'turn_123',
+          toolCallId: 'call_1',
+          agentId: 'agent_reviewer',
+          input: { code: '...' },
+          mode: 'delegate',
+          async: false,
+        }),
+      );
     });
   });
 
   describe('async tools', () => {
-    it('tracks async operations', () => {
-      const tools: Tool[] = [
-        {
-          id: 'tool_research',
-          name: 'research',
-          description: 'Research',
-          inputSchema: {},
-          targetType: 'workflow',
-          targetId: 'workflow_research',
-          async: true,
-        },
-      ];
-
-      const response: LLMResponse = {
-        toolUse: [{ id: 'call_1', name: 'research', input: { topic: 'auth' } }],
-        stopReason: 'tool_use',
-      };
-
-      const result = interpretResponse({
-        turnId: 'turn_123',
-        response,
-        toolLookup: createToolLookup(tools),
-      });
-
-      expect(result.decisions).toContainEqual({
-        type: 'TRACK_ASYNC_OP',
-        turnId: 'turn_123',
-        operationId: 'call_1',
-        targetType: 'workflow',
-      });
-    });
-
     it('sets async flag on workflow dispatch', () => {
       const tools: Tool[] = [
         {

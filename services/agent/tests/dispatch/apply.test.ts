@@ -183,26 +183,6 @@ describe('applyDecisions', () => {
     });
   });
 
-  describe('TRACK_ASYNC_OP', () => {
-    it('calls asyncOps.track with correct params', () => {
-      const decision: AgentDecision = {
-        type: 'TRACK_ASYNC_OP',
-        turnId: 'turn_1',
-        operationId: 'op_123',
-        targetType: 'workflow',
-      };
-
-      const result = applyDecisions([decision], ctx);
-
-      expect(ctx.asyncOps.track).toHaveBeenCalledWith({
-        turnId: 'turn_1',
-        targetType: 'workflow',
-        targetId: 'op_123',
-      });
-      expect(result.applied).toBe(1);
-    });
-  });
-
   describe('ASYNC_OP_COMPLETED', () => {
     it('calls asyncOps.complete on success', () => {
       const decision: AgentDecision = {

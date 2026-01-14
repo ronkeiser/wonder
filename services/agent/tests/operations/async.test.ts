@@ -22,7 +22,9 @@ describe('AsyncOpManager', () => {
 
   describe('track', () => {
     it('creates async operation with pending status', () => {
-      const opId = manager.track({
+      const opId = 'op_1';
+      manager.track({
+        opId,
         turnId: 'turn_1',
         targetType: 'workflow',
         targetId: 'workflow_abc',
@@ -37,7 +39,9 @@ describe('AsyncOpManager', () => {
     });
 
     it('tracks task operations', () => {
-      const opId = manager.track({
+      const opId = 'op_task';
+      manager.track({
+        opId,
         turnId: 'turn_1',
         targetType: 'task',
         targetId: 'task_search',
@@ -48,7 +52,9 @@ describe('AsyncOpManager', () => {
     });
 
     it('tracks agent operations', () => {
-      const opId = manager.track({
+      const opId = 'op_agent';
+      manager.track({
+        opId,
         turnId: 'turn_1',
         targetType: 'agent',
         targetId: 'agent_architect',
@@ -60,6 +66,7 @@ describe('AsyncOpManager', () => {
 
     it('emits trace event on track', () => {
       manager.track({
+        opId: 'op_trace',
         turnId: 'turn_1',
         targetType: 'workflow',
         targetId: 'workflow_abc',
@@ -79,7 +86,9 @@ describe('AsyncOpManager', () => {
 
   describe('complete', () => {
     it('marks operation as completed with result', () => {
-      const opId = manager.track({
+      const opId = 'op_complete';
+      manager.track({
+        opId,
         turnId: 'turn_1',
         targetType: 'workflow',
         targetId: 'workflow_abc',
@@ -100,7 +109,9 @@ describe('AsyncOpManager', () => {
     });
 
     it('returns false for already completed operation', () => {
-      const opId = manager.track({
+      const opId = 'op_already_complete';
+      manager.track({
+        opId,
         turnId: 'turn_1',
         targetType: 'workflow',
         targetId: 'workflow_abc',
@@ -112,7 +123,9 @@ describe('AsyncOpManager', () => {
     });
 
     it('returns false for failed operation', () => {
-      const opId = manager.track({
+      const opId = 'op_failed';
+      manager.track({
+        opId,
         turnId: 'turn_1',
         targetType: 'workflow',
         targetId: 'workflow_abc',
@@ -126,7 +139,9 @@ describe('AsyncOpManager', () => {
 
   describe('fail', () => {
     it('marks operation as failed with error', () => {
-      const opId = manager.track({
+      const opId = 'op_to_fail';
+      manager.track({
+        opId,
         turnId: 'turn_1',
         targetType: 'workflow',
         targetId: 'workflow_abc',
@@ -147,7 +162,9 @@ describe('AsyncOpManager', () => {
     });
 
     it('returns false for already failed operation', () => {
-      const opId = manager.track({
+      const opId = 'op_already_failed';
+      manager.track({
+        opId,
         turnId: 'turn_1',
         targetType: 'workflow',
         targetId: 'workflow_abc',
@@ -161,17 +178,22 @@ describe('AsyncOpManager', () => {
 
   describe('getPending', () => {
     it('returns only pending operations for turn', () => {
-      const op1 = manager.track({
+      const op1 = 'op_pending_1';
+      const op2 = 'op_pending_2';
+      manager.track({
+        opId: op1,
         turnId: 'turn_1',
         targetType: 'workflow',
         targetId: 'wf_1',
       });
-      const op2 = manager.track({
+      manager.track({
+        opId: op2,
         turnId: 'turn_1',
         targetType: 'task',
         targetId: 'task_1',
       });
       manager.track({
+        opId: 'op_other_turn',
         turnId: 'turn_2', // different turn
         targetType: 'agent',
         targetId: 'agent_1',
@@ -187,12 +209,16 @@ describe('AsyncOpManager', () => {
 
   describe('getForTurn', () => {
     it('returns all operations for turn regardless of status', () => {
-      const op1 = manager.track({
+      const op1 = 'op_for_turn_1';
+      const op2 = 'op_for_turn_2';
+      manager.track({
+        opId: op1,
         turnId: 'turn_1',
         targetType: 'workflow',
         targetId: 'wf_1',
       });
-      const op2 = manager.track({
+      manager.track({
+        opId: op2,
         turnId: 'turn_1',
         targetType: 'task',
         targetId: 'task_1',
@@ -209,6 +235,7 @@ describe('AsyncOpManager', () => {
   describe('hasPending', () => {
     it('returns true when turn has pending operations', () => {
       manager.track({
+        opId: 'op_has_pending',
         turnId: 'turn_1',
         targetType: 'workflow',
         targetId: 'wf_1',
@@ -218,7 +245,9 @@ describe('AsyncOpManager', () => {
     });
 
     it('returns false when all operations completed', () => {
-      const opId = manager.track({
+      const opId = 'op_all_complete';
+      manager.track({
+        opId,
         turnId: 'turn_1',
         targetType: 'workflow',
         targetId: 'wf_1',
@@ -235,17 +264,21 @@ describe('AsyncOpManager', () => {
 
   describe('getPendingCount', () => {
     it('counts pending operations', () => {
+      const op3 = 'op_count_3';
       manager.track({
+        opId: 'op_count_1',
         turnId: 'turn_1',
         targetType: 'workflow',
         targetId: 'wf_1',
       });
       manager.track({
+        opId: 'op_count_2',
         turnId: 'turn_1',
         targetType: 'task',
         targetId: 'task_1',
       });
-      const op3 = manager.track({
+      manager.track({
+        opId: op3,
         turnId: 'turn_1',
         targetType: 'agent',
         targetId: 'agent_1',

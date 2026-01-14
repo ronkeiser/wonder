@@ -265,7 +265,13 @@ function dispatchTask(
     rawContent,
   });
 
-  // Track as async operation with timeout and retry config
+  // Emit dispatch event first (we're dispatching work)
+  ctx.emitter.emitTrace({
+    type: 'dispatch.task.queued',
+    payload: { turnId, toolCallId, taskId },
+  });
+
+  // Then track the async operation (we're recording that we dispatched it)
   const timeoutAt = Date.now() + DEFAULT_TOOL_TIMEOUT_MS;
   ctx.asyncOps.track({
     opId: toolCallId,
@@ -278,11 +284,6 @@ function dispatchTask(
 
   // Schedule alarm for timeout
   ctx.waitUntil(ctx.scheduleAlarm(timeoutAt));
-
-  ctx.emitter.emitTrace({
-    type: 'dispatch.task.queued',
-    payload: { turnId, toolCallId, taskId },
-  });
 
   // Dispatch via Executor (fire-and-forget)
   // Executor calls back via agent.handleTaskResult()
@@ -329,7 +330,13 @@ async function dispatchWorkflow(
     rawContent,
   });
 
-  // Track as async operation with timeout and retry config
+  // Emit dispatch event first (we're dispatching work)
+  ctx.emitter.emitTrace({
+    type: 'dispatch.workflow.queued',
+    payload: { turnId, toolCallId, workflowId, async: isAsync },
+  });
+
+  // Then track the async operation (we're recording that we dispatched it)
   const timeoutAt = Date.now() + DEFAULT_TOOL_TIMEOUT_MS;
   ctx.asyncOps.track({
     opId: toolCallId,
@@ -342,11 +349,6 @@ async function dispatchWorkflow(
 
   // Schedule alarm for timeout
   ctx.waitUntil(ctx.scheduleAlarm(timeoutAt));
-
-  ctx.emitter.emitTrace({
-    type: 'dispatch.workflow.queued',
-    payload: { turnId, toolCallId, workflowId, async: isAsync },
-  });
 
   // Create workflow run in D1
   const workflowRunsResource = ctx.resources.workflowRuns();
@@ -398,7 +400,13 @@ function dispatchAgent(
     rawContent,
   });
 
-  // Track as async operation with timeout and retry config
+  // Emit dispatch event first (we're dispatching work)
+  ctx.emitter.emitTrace({
+    type: 'dispatch.agent.queued',
+    payload: { turnId, toolCallId, agentId, mode, async: isAsync },
+  });
+
+  // Then track the async operation (we're recording that we dispatched it)
   const timeoutAt = Date.now() + DEFAULT_TOOL_TIMEOUT_MS;
   ctx.asyncOps.track({
     opId: toolCallId,
@@ -411,11 +419,6 @@ function dispatchAgent(
 
   // Schedule alarm for timeout
   ctx.waitUntil(ctx.scheduleAlarm(timeoutAt));
-
-  ctx.emitter.emitTrace({
-    type: 'dispatch.agent.queued',
-    payload: { turnId, toolCallId, agentId, mode, async: isAsync },
-  });
 
   if (mode === 'loop_in') {
     // Loop-in mode: agent joins THIS conversation

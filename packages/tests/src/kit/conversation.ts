@@ -58,11 +58,14 @@ export async function executeConversation(
     timeout?: number;
     /** Log events to console as they arrive */
     logEvents?: boolean;
+    /** Send messages sequentially, waiting for each turn to complete before sending next */
+    sequential?: boolean;
   },
 ): Promise<ExecuteConversationResult> {
   const baseUrl = process.env.RESOURCES_URL ?? 'https://api.wflow.app';
   const apiKey = process.env.API_KEY;
   const timeout = options?.timeout ?? DEFAULT_TIMEOUT_MS;
+  const sequential = options?.sequential ?? false;
 
   console.log('🔌 Connecting to conversation via WebSocket...');
 
@@ -89,29 +92,39 @@ export async function executeConversation(
   });
 
   try {
-    // Send all messages (with optional delays between them)
-    for (let i = 0; i < messages.length; i++) {
-      const msg = messages[i];
+    if (sequential) {
+      // Send messages sequentially, waiting for each turn to complete
+      for (let i = 0; i < messages.length; i++) {
+        const msg = messages[i];
+        console.log(`📤 Sending message ${i + 1}: "${msg.content.substring(0, 50)}..."`);
+        await conn.sendAndWait(msg.content, { timeout });
+        console.log(`✅ Turn ${i + 1} completed`);
+      }
+    } else {
+      // Send all messages (with optional delays between them)
+      for (let i = 0; i < messages.length; i++) {
+        const msg = messages[i];
 
-      if (msg.delayMs && i > 0) {
-        await new Promise((resolve) => setTimeout(resolve, msg.delayMs));
+        if (msg.delayMs && i > 0) {
+          await new Promise((resolve) => setTimeout(resolve, msg.delayMs));
+        }
+
+        console.log(`📤 Sending message ${i + 1}: "${msg.content.substring(0, 50)}..."`);
+        conn.send(msg.content);
       }
 
-      console.log(`📤 Sending message ${i + 1}: "${msg.content.substring(0, 50)}..."`);
-      conn.send(msg.content);
+      // Wait for all turns to complete
+      console.log('⏳ Waiting for all turns to complete...');
+      const waitPromise = conn.waitForTurnsCount(messages.length);
+      const timeoutPromise = new Promise<never>((_, reject) =>
+        setTimeout(() => {
+          status = 'timeout';
+          reject(new Error('Timeout waiting for turns to complete'));
+        }, timeout),
+      );
+
+      await Promise.race([waitPromise, timeoutPromise]);
     }
-
-    // Wait for all turns to complete
-    console.log('⏳ Waiting for all turns to complete...');
-    const waitPromise = conn.waitForTurnsCount(messages.length);
-    const timeoutPromise = new Promise<never>((_, reject) =>
-      setTimeout(() => {
-        status = 'timeout';
-        reject(new Error('Timeout waiting for turns to complete'));
-      }, timeout),
-    );
-
-    await Promise.race([waitPromise, timeoutPromise]);
 
     // Get collected data
     const turnIds = conn.getTurnIds();
@@ -463,6 +476,8 @@ export async function runTestConversation(
     timeout?: number;
     /** Log events to console as they arrive */
     logEvents?: boolean;
+    /** Send messages sequentially, waiting for each turn to complete before sending next */
+    sequential?: boolean;
   },
 ): Promise<TestConversationResult> {
   // Setup infrastructure
