@@ -458,21 +458,13 @@ export class Conversation extends DurableObject {
   }
 
   /**
-   * Build a continuation LLM request after a sync tool completes.
+   * Build a continuation LLM request from the current turn state.
    *
-   * Reconstructs the conversation including the tool result so the LLM
-   * can continue reasoning.
+   * Reconstructs the conversation from the moves table. The moves table
+   * is the canonical source of truth—tool results should already be
+   * recorded before calling this function.
    */
-  private buildContinuationRequest(
-    turnId: string,
-    toolCallId: string,
-    result: ToolResult,
-  ): LLMRequest {
-    // Build conversation history in Anthropic format:
-    // 1. User message
-    // 2. For each LLM response with tool_use: assistant message + tool_result
-    // 3. New tool_result for this completion
-
+  private buildContinuationRequest(turnId: string): LLMRequest {
     type AnthropicMessage = {
       role: 'user' | 'assistant';
       content: string | unknown[];
@@ -502,7 +494,7 @@ export class Conversation extends DurableObject {
         });
 
         // If this move has a tool result, add it as user message with tool_result block
-        if (move.toolResult !== null) {
+        if (move.toolResult !== null && move.toolCallId) {
           const toolResultContent = move.toolResult as { success: boolean; result?: unknown; error?: { message: string } };
           messages.push({
             role: 'user',
@@ -520,19 +512,6 @@ export class Conversation extends DurableObject {
         }
       }
     }
-
-    // Add the new tool result for the completing tool
-    messages.push({
-      role: 'user',
-      content: [{
-        type: 'tool_result',
-        tool_use_id: toolCallId,
-        content: result.success
-          ? (typeof result.result === 'string' ? result.result : JSON.stringify(result.result))
-          : `Error: ${result.error?.message ?? 'Unknown error'}`,
-        is_error: !result.success,
-      }],
-    });
 
     // Get persona for model settings
     const persona = this.defs.getPersona();
@@ -741,15 +720,11 @@ export class Conversation extends DurableObject {
       // Notify WebSocket client of tool result (async interleaving)
       this.notifyToolResult(turnId, toolCallId, result.success, result.result);
 
-      // Mark async operation as completed
-      if (result.success) {
-        this.asyncOps.complete(toolCallId, result.result);
-      } else {
-        this.asyncOps.fail(toolCallId, result.error);
-      }
-
-      // Check if this was a sync tool we were waiting for
+      // Check if this was a sync tool we were waiting for (before marking complete)
       const wasWaiting = this.asyncOps.hasWaiting(turnId);
+
+      // Mark async operation as completed (resume handles both waiting and pending)
+      this.asyncOps.resume(toolCallId, result.success ? result.result : result.error);
 
       // Get dispatch context
       const ctx = this.getDispatchContext();
@@ -757,7 +732,7 @@ export class Conversation extends DurableObject {
       if (wasWaiting) {
         // Resume from sync tool - continue LLM loop with tool result
         // Build continuation request with tool result included
-        const continuationRequest = this.buildContinuationRequest(turnId, toolCallId, result);
+        const continuationRequest = this.buildContinuationRequest(turnId);
 
         const loopResult = await runLLMLoop({
           turnId,
@@ -829,18 +804,18 @@ export class Conversation extends DurableObject {
       // Notify WebSocket client of tool error (async interleaving)
       this.notifyToolResult(turnId, toolCallId, false, result.error);
 
-      // Mark async operation as failed
-      this.asyncOps.fail(toolCallId, result.error);
-
-      // Check if this was a sync tool we were waiting for
+      // Check if this was a sync tool we were waiting for (before marking complete)
       const wasWaiting = this.asyncOps.hasWaiting(turnId);
+
+      // Mark async operation as completed with error (resume handles both waiting and pending)
+      this.asyncOps.resume(toolCallId, result.error);
 
       // Get dispatch context
       const ctx = this.getDispatchContext();
 
       if (wasWaiting) {
         // Resume from sync tool - continue LLM loop with error result
-        const continuationRequest = this.buildContinuationRequest(turnId, toolCallId, result);
+        const continuationRequest = this.buildContinuationRequest(turnId);
 
         const loopResult = await runLLMLoop({
           turnId,
@@ -912,18 +887,18 @@ export class Conversation extends DurableObject {
       // Notify WebSocket client of workflow result (async interleaving)
       this.notifyToolResult(turnId, toolCallId, true, output);
 
-      // Mark async operation as completed
-      this.asyncOps.complete(toolCallId, output);
-
-      // Check if this was a sync tool we were waiting for
+      // Check if this was a sync tool we were waiting for (before marking complete)
       const wasWaiting = this.asyncOps.hasWaiting(turnId);
+
+      // Mark async operation as completed (resume handles both waiting and pending)
+      this.asyncOps.resume(toolCallId, output);
 
       // Get dispatch context
       const ctx = this.getDispatchContext();
 
       if (wasWaiting) {
         // Resume from sync tool - continue LLM loop with tool result
-        const continuationRequest = this.buildContinuationRequest(turnId, toolCallId, result);
+        const continuationRequest = this.buildContinuationRequest(turnId);
 
         const loopResult = await runLLMLoop({
           turnId,
@@ -994,18 +969,18 @@ export class Conversation extends DurableObject {
       // Notify WebSocket client of workflow error (async interleaving)
       this.notifyToolResult(turnId, toolCallId, false, result.error);
 
-      // Mark async operation as failed
-      this.asyncOps.fail(toolCallId, result.error);
-
-      // Check if this was a sync tool we were waiting for
+      // Check if this was a sync tool we were waiting for (before marking complete)
       const wasWaiting = this.asyncOps.hasWaiting(turnId);
+
+      // Mark async operation as completed with error (resume handles both waiting and pending)
+      this.asyncOps.resume(toolCallId, result.error);
 
       // Get dispatch context
       const ctx = this.getDispatchContext();
 
       if (wasWaiting) {
         // Resume from sync tool - continue LLM loop with error result
-        const continuationRequest = this.buildContinuationRequest(turnId, toolCallId, result);
+        const continuationRequest = this.buildContinuationRequest(turnId);
 
         const loopResult = await runLLMLoop({
           turnId,
@@ -1073,18 +1048,18 @@ export class Conversation extends DurableObject {
       // Notify WebSocket client of agent response (async interleaving)
       this.notifyToolResult(turnId, toolCallId, true, { response });
 
-      // Mark async operation as completed
-      this.asyncOps.complete(toolCallId, { response });
-
-      // Check if this was a sync tool we were waiting for
+      // Check if this was a sync tool we were waiting for (before marking complete)
       const wasWaiting = this.asyncOps.hasWaiting(turnId);
+
+      // Mark async operation as completed (resume handles both waiting and pending)
+      this.asyncOps.resume(toolCallId, { response });
 
       // Get dispatch context
       const ctx = this.getDispatchContext();
 
       if (wasWaiting) {
         // Resume from sync tool - continue LLM loop with agent response
-        const continuationRequest = this.buildContinuationRequest(turnId, toolCallId, result);
+        const continuationRequest = this.buildContinuationRequest(turnId);
 
         const loopResult = await runLLMLoop({
           turnId,
@@ -1155,18 +1130,18 @@ export class Conversation extends DurableObject {
       // Notify WebSocket client of agent error (async interleaving)
       this.notifyToolResult(turnId, toolCallId, false, result.error);
 
-      // Mark async operation as failed
-      this.asyncOps.fail(toolCallId, result.error);
-
-      // Check if this was a sync tool we were waiting for
+      // Check if this was a sync tool we were waiting for (before marking complete)
       const wasWaiting = this.asyncOps.hasWaiting(turnId);
+
+      // Mark async operation as completed with error (resume handles both waiting and pending)
+      this.asyncOps.resume(toolCallId, result.error);
 
       // Get dispatch context
       const ctx = this.getDispatchContext();
 
       if (wasWaiting) {
         // Resume from sync tool - continue LLM loop with error result
-        const continuationRequest = this.buildContinuationRequest(turnId, toolCallId, result);
+        const continuationRequest = this.buildContinuationRequest(turnId);
 
         const loopResult = await runLLMLoop({
           turnId,
@@ -1509,7 +1484,7 @@ export class Conversation extends DurableObject {
 
         if (wasWaiting) {
           // Resume from sync tool - continue LLM loop with timeout error
-          const continuationRequest = this.buildContinuationRequest(op.turnId, op.id, result);
+          const continuationRequest = this.buildContinuationRequest(op.turnId);
 
           const loopResult = await runLLMLoop({
             turnId: op.turnId,
