@@ -451,10 +451,7 @@ function dispatchAgent(
     );
   } else {
     // Delegate mode: agent works in a separate conversation
-    // Create new conversation ID for the delegated agent
-    const targetConversationId = ulid();
-    const targetAgentId = ctx.agent.idFromName(targetConversationId);
-    const targetAgent = ctx.agent.get(targetAgentId);
+    // Must create conversation record in D1 before calling startTurn
 
     // Embed callback metadata so target agent can report back
     const targetInput = {
@@ -467,18 +464,38 @@ function dispatchAgent(
     };
 
     ctx.waitUntil(
-      targetAgent
-        .startTurn(targetConversationId, targetInput, {
-          type: 'agent',
-          agentId: ctx.conversationId, // The calling agent's conversation ID
-          turnId,
-        })
-        .catch((error: Error) => {
+      (async () => {
+        try {
+          // 1. Create conversation in D1 with target agent as participant
+          const conversationsResource = ctx.resources.conversations();
+          const { conversationId: targetConversationId } = await conversationsResource.create({
+            participants: [{ type: 'agent', agentId }],
+            status: 'active',
+          });
+
+          // 2. Get target agent's DO using the new conversation ID
+          const targetAgentId = ctx.agent.idFromName(targetConversationId);
+          const targetAgent = ctx.agent.get(targetAgentId);
+
+          // 3. Start turn on the delegated conversation
+          await targetAgent.startTurn(targetConversationId, targetInput, {
+            type: 'agent',
+            agentId: ctx.conversationId, // The calling agent's conversation ID
+            turnId,
+          });
+        } catch (error) {
           ctx.emitter.emitTrace({
             type: 'dispatch.agent.error',
-            payload: { turnId, toolCallId, agentId, mode: 'delegate', error: error.message },
+            payload: {
+              turnId,
+              toolCallId,
+              agentId,
+              mode: 'delegate',
+              error: error instanceof Error ? error.message : String(error),
+            },
           });
-        }),
+        }
+      })(),
     );
   }
 }
