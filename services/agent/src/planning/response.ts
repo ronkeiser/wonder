@@ -56,6 +56,8 @@ export function interpretResponse(params: InterpretResponseParams): PlanningResu
   const decisions: AgentDecision[] = [];
   const events: PlanningResult['events'] = [];
 
+  const hasToolCalls = response.toolUse && response.toolUse.length > 0;
+
   // Handle text content
   if (response.text) {
     decisions.push({
@@ -63,6 +65,17 @@ export function interpretResponse(params: InterpretResponseParams): PlanningResu
       turnId,
       role: 'agent',
       content: response.text,
+    });
+  }
+
+  // Record move for text-only responses (no tool calls)
+  // Tool dispatch already records moves with tool call data
+  if (!hasToolCalls && response.text) {
+    decisions.push({
+      type: 'RECORD_MOVE',
+      turnId,
+      reasoning: response.text,
+      rawContent,
     });
   }
 

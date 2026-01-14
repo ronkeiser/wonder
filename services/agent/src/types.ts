@@ -225,6 +225,15 @@ export type AgentDecision =
   // Messages
   | { type: 'APPEND_MESSAGE'; turnId: string; role: 'user' | 'agent'; content: string }
 
+  // Move recording (LLM iteration tracking)
+  | {
+      type: 'RECORD_MOVE';
+      turnId: string;
+      reasoning?: string;
+      /** Raw content blocks from LLM response */
+      rawContent?: unknown[];
+    }
+
   // Tool dispatch
   | {
       type: 'DISPATCH_TASK';

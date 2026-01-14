@@ -159,6 +159,19 @@ function applyOne(decision: AgentDecision, ctx: DispatchContext): ApplyOutcome {
     }
 
     // ========================================================================
+    // Move Recording
+    // ========================================================================
+
+    case 'RECORD_MOVE': {
+      ctx.moves.record({
+        turnId: decision.turnId,
+        reasoning: decision.reasoning,
+        rawContent: decision.rawContent,
+      });
+      return {};
+    }
+
+    // ========================================================================
     // Async Operation Tracking
     // ========================================================================
 
