@@ -134,18 +134,9 @@ export function interpretResponse(params: InterpretResponseParams): PlanningResu
       }
 
       // Generate dispatch decision based on target type
+      // Note: Dispatch functions handle async operation tracking internally
       const dispatchDecision = createDispatchDecision(turnId, toolCall, tool, rawContent);
       decisions.push(dispatchDecision);
-
-      // Track async operations
-      if (tool.async) {
-        decisions.push({
-          type: 'TRACK_ASYNC_OP',
-          turnId,
-          operationId: toolCall.id,
-          targetType: tool.targetType,
-        });
-      }
 
       events.push({
         type: 'planning.response.tool_dispatch',

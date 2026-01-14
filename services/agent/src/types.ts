@@ -266,12 +266,6 @@ export type AgentDecision =
 
   // Async tracking
   | {
-      type: 'TRACK_ASYNC_OP';
-      turnId: string;
-      operationId: string;
-      targetType: 'task' | 'workflow' | 'agent';
-    }
-  | {
       type: 'ASYNC_OP_COMPLETED';
       turnId: string;
       operationId: string;

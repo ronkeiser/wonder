@@ -94,12 +94,13 @@ export namespace ConversationTracePayloads {
     activeTurnsCount: number;
   }
 
-  // Tool dispatch
+  // Tool dispatch (from planning.response.tool_dispatch event)
   export interface ToolDispatched {
     turnId: string;
     toolCallId: string;
-    toolId: string;
+    toolName: string;
     targetType: string;
+    targetId: string;
     async: boolean;
   }
 }
@@ -329,27 +330,27 @@ export class ConversationTraceEventCollection extends TraceEventCollection {
     return {
       /** All tool dispatch events */
       dispatches(): TypedTraceEvent<ConversationTracePayloads.ToolDispatched>[] {
-        return self.filter<ConversationTracePayloads.ToolDispatched>('dispatch.tool.dispatched');
+        return self.filter<ConversationTracePayloads.ToolDispatched>('planning.response.tool_dispatch');
       },
 
       /** Sync tool dispatches */
       syncDispatches(): TypedTraceEvent<ConversationTracePayloads.ToolDispatched>[] {
         return self
-          .filter<ConversationTracePayloads.ToolDispatched>('dispatch.tool.dispatched')
+          .filter<ConversationTracePayloads.ToolDispatched>('planning.response.tool_dispatch')
           .filter((e) => !e.payload.async);
       },
 
       /** Async tool dispatches */
       asyncDispatches(): TypedTraceEvent<ConversationTracePayloads.ToolDispatched>[] {
         return self
-          .filter<ConversationTracePayloads.ToolDispatched>('dispatch.tool.dispatched')
+          .filter<ConversationTracePayloads.ToolDispatched>('planning.response.tool_dispatch')
           .filter((e) => e.payload.async);
       },
 
       /** Tool dispatches for specific turn */
       forTurn(turnId: string): TypedTraceEvent<ConversationTracePayloads.ToolDispatched>[] {
         return self
-          .filter<ConversationTracePayloads.ToolDispatched>('dispatch.tool.dispatched')
+          .filter<ConversationTracePayloads.ToolDispatched>('planning.response.tool_dispatch')
           .filter((e) => e.payload.turnId === turnId);
       },
     };

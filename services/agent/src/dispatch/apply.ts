@@ -162,15 +162,6 @@ function applyOne(decision: AgentDecision, ctx: DispatchContext): ApplyOutcome {
     // Async Operation Tracking
     // ========================================================================
 
-    case 'TRACK_ASYNC_OP': {
-      ctx.asyncOps.track({
-        turnId: decision.turnId,
-        targetType: decision.targetType,
-        targetId: decision.operationId,
-      });
-      return {};
-    }
-
     case 'ASYNC_OP_COMPLETED': {
       if (decision.result.success) {
         ctx.asyncOps.complete(decision.operationId, decision.result.result);
@@ -264,9 +255,10 @@ function dispatchTask(
   // Track as async operation with timeout and retry config
   const timeoutAt = Date.now() + DEFAULT_TOOL_TIMEOUT_MS;
   ctx.asyncOps.track({
+    opId: toolCallId,
     turnId,
     targetType: 'task',
-    targetId: toolCallId,
+    targetId: taskId,
     timeoutAt,
     retry,
   });
@@ -327,9 +319,10 @@ async function dispatchWorkflow(
   // Track as async operation with timeout and retry config
   const timeoutAt = Date.now() + DEFAULT_TOOL_TIMEOUT_MS;
   ctx.asyncOps.track({
+    opId: toolCallId,
     turnId,
     targetType: 'workflow',
-    targetId: toolCallId,
+    targetId: workflowId,
     timeoutAt,
     retry,
   });
@@ -395,9 +388,10 @@ function dispatchAgent(
   // Track as async operation with timeout and retry config
   const timeoutAt = Date.now() + DEFAULT_TOOL_TIMEOUT_MS;
   ctx.asyncOps.track({
+    opId: toolCallId,
     turnId,
     targetType: 'agent',
-    targetId: toolCallId,
+    targetId: agentId,
     timeoutAt,
     retry,
   });

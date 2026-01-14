@@ -9,7 +9,6 @@
 
 import type { Emitter } from '@wonder/events';
 import { and, count, eq, lt, isNotNull, asc } from 'drizzle-orm';
-import { ulid } from 'ulid';
 
 import { asyncOps } from '../schema';
 import type { AsyncOpTargetType } from '../types';
@@ -26,6 +25,8 @@ export type RetryConfig = {
 
 /** Track async operation parameters */
 export type TrackAsyncOpParams = {
+  /** Operation ID - typically the toolCallId */
+  opId: string;
   turnId: string;
   targetType: AsyncOpTargetType;
   targetId: string;
@@ -52,15 +53,16 @@ export class AsyncOpManager {
 
   /**
    * Track a new async operation.
+   *
+   * The opId should be the toolCallId to ensure a single operation per tool call.
    */
-  track(params: TrackAsyncOpParams): string {
-    const opId = ulid();
+  track(params: TrackAsyncOpParams): void {
     const now = new Date();
 
     this.db
       .insert(asyncOps)
       .values({
-        id: opId,
+        id: params.opId,
         turnId: params.turnId,
         targetType: params.targetType,
         targetId: params.targetId,
@@ -76,7 +78,7 @@ export class AsyncOpManager {
     this.emitter.emitTrace({
       type: 'operation.async.tracked',
       payload: {
-        opId,
+        opId: params.opId,
         turnId: params.turnId,
         targetType: params.targetType,
         targetId: params.targetId,
@@ -84,8 +86,6 @@ export class AsyncOpManager {
         maxAttempts: params.retry?.maxAttempts ?? 1,
       },
     });
-
-    return opId;
   }
 
   /**
