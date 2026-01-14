@@ -288,7 +288,7 @@ describe('Conversation: 02 - Single Turn, Sync Tool', () => {
       const result = await executeConversation(
         conversationId,
         [{ role: 'user', content: 'Please echo: hello world' }],
-        { logEvents: true, enableTraceEvents: true },
+        { logEvents: true },
       );
 
       // Output debug info

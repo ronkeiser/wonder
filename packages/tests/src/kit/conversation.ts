@@ -7,12 +7,12 @@
 
 import {
   action,
+  ConversationConnection,
   node,
   schema as s,
   step,
   task,
   workflow,
-  type EventEntry,
   type TraceEventEntry,
 } from '@wonder/sdk';
 import { ConversationTraceEventCollection } from './conversation-trace';
@@ -33,139 +33,121 @@ export type {
 } from './types';
 
 const DEFAULT_TIMEOUT_MS = 300000; // 5 minutes
-const DEFAULT_IDLE_TIMEOUT_MS = 30000; // 30 seconds
 
 // =============================================================================
 // Conversation Execution
 // =============================================================================
 
 /**
- * Executes conversation turns using SSE streaming.
+ * Execute conversation turns via WebSocket.
  *
- * Sends each message as a turn, collects trace events, and returns
- * the aggregated results.
+ * WebSocket is the natural transport for conversations:
+ * - Persistent bidirectional connection
+ * - Receives all events for all turns
+ * - Supports concurrent active turns
+ * - Handles async operations that complete later
+ *
+ * @param conversationId - The conversation to connect to
+ * @param messages - Messages to send as turns
+ * @param options - Execution options
  */
 export async function executeConversation(
   conversationId: string,
-  messages: Array<{ role: 'user'; content: string }>,
+  messages: Array<{ role: 'user'; content: string; delayMs?: number }>,
   options?: {
     timeout?: number;
-    idleTimeout?: number;
     /** Log events to console as they arrive */
     logEvents?: boolean;
-    /** Enable trace event emission for this conversation */
-    enableTraceEvents?: boolean;
   },
 ): Promise<ExecuteConversationResult> {
+  const baseUrl = process.env.RESOURCES_URL ?? 'https://api.wflow.app';
+  const apiKey = process.env.API_KEY;
   const timeout = options?.timeout ?? DEFAULT_TIMEOUT_MS;
-  const idleTimeout = options?.idleTimeout ?? DEFAULT_IDLE_TIMEOUT_MS;
 
-  const events: EventEntry[] = [];
+  console.log('🔌 Connecting to conversation via WebSocket...');
+
+  const conn = await ConversationConnection.connect(baseUrl, apiKey, conversationId, {
+    enableTraceEvents: true,
+    onError: (error) => console.error('WebSocket error:', error),
+  });
+
   const traceEvents: TraceEventEntry[] = [];
-  const turnIds: string[] = [];
   let status: ExecuteConversationResult['status'] = 'completed';
 
-  let totalTimer: ReturnType<typeof setTimeout> | null = null;
-  let idleTimer: ReturnType<typeof setTimeout> | null = null;
-  let timedOut = false;
-
-  const resetIdleTimer = () => {
-    if (idleTimer) clearTimeout(idleTimer);
-    if (idleTimeout) {
-      idleTimer = setTimeout(() => {
-        status = 'idle_timeout';
-        timedOut = true;
-      }, idleTimeout);
+  // Collect trace events as they arrive
+  conn.onTraceEvent((event) => {
+    traceEvents.push(event);
+    if (options?.logEvents) {
+      const payload = typeof event.payload === 'string' ? JSON.parse(event.payload) : event.payload;
+      console.log(`🔍 ${event.type}`, JSON.stringify(payload, null, 2));
     }
-  };
 
-  // Set up total timeout
-  if (timeout) {
-    totalTimer = setTimeout(() => {
-      status = 'timeout';
-      timedOut = true;
-    }, timeout);
-  }
+    // Check for failures
+    if (event.type === 'operation.turns.failed') {
+      status = 'failed';
+    }
+  });
 
   try {
-    for (const message of messages) {
-      if (timedOut) break;
+    // Send all messages (with optional delays between them)
+    for (let i = 0; i < messages.length; i++) {
+      const msg = messages[i];
 
-      resetIdleTimer();
-
-      // Start turn via SDK (returns SSE stream)
-      const stream = wonder.conversations(conversationId).turns({
-        stream: true,
-        content: message.content,
-        enableTraceEvents: options?.enableTraceEvents ?? true,
-      });
-
-      for await (const sseEvent of stream) {
-        if (timedOut) break;
-
-        resetIdleTimer();
-
-        if (sseEvent.stream === 'trace') {
-          const traceEvent = sseEvent.event as TraceEventEntry;
-          traceEvents.push(traceEvent);
-
-          if (options?.logEvents) {
-            console.log(`🔍 ${traceEvent.type}`, JSON.stringify(traceEvent.payload ?? {}, null, 2));
-          }
-
-          // Extract turnId from turn.created event
-          if (traceEvent.type === 'operation.turns.created') {
-            const payload = traceEvent.payload as { turnId?: string };
-            if (payload.turnId) {
-              turnIds.push(payload.turnId);
-            }
-          }
-
-          // Check for terminal conditions in trace events
-          // Conversations emit trace events, not regular events for turn lifecycle
-          if (traceEvent.type === 'operation.turns.completed') {
-            // Turn done, continue to next message
-            break;
-          }
-          if (traceEvent.type === 'operation.turns.failed') {
-            status = 'failed';
-            break;
-          }
-        } else {
-          const event = sseEvent.event as EventEntry;
-          events.push(event);
-
-          if (options?.logEvents) {
-            console.log(`📨 ${event.eventType}`, event.metadata);
-          }
-
-          // Check for terminal conditions in regular events (fallback)
-          if (event.eventType === 'turn.completed') {
-            // Turn done, continue to next message
-            break;
-          }
-          if (event.eventType === 'turn.failed') {
-            status = 'failed';
-            break;
-          }
-        }
+      if (msg.delayMs && i > 0) {
+        await new Promise((resolve) => setTimeout(resolve, msg.delayMs));
       }
 
-      if (status === 'failed') break;
+      console.log(`📤 Sending message ${i + 1}: "${msg.content.substring(0, 50)}..."`);
+      conn.send(msg.content);
     }
-  } finally {
-    if (totalTimer) clearTimeout(totalTimer);
-    if (idleTimer) clearTimeout(idleTimer);
-  }
 
-  return {
-    conversationId,
-    turnIds,
-    status,
-    events,
-    traceEvents,
-    trace: new ConversationTraceEventCollection(traceEvents),
-  };
+    // Wait for all turns to complete
+    console.log('⏳ Waiting for all turns to complete...');
+    const waitPromise = conn.waitForTurnsCount(messages.length);
+    const timeoutPromise = new Promise<never>((_, reject) =>
+      setTimeout(() => {
+        status = 'timeout';
+        reject(new Error('Timeout waiting for turns to complete'));
+      }, timeout),
+    );
+
+    await Promise.race([waitPromise, timeoutPromise]);
+
+    // Get collected data
+    const turnIds = conn.getTurnIds();
+
+    // Sort events by sequence for consistent analysis
+    traceEvents.sort((a, b) => a.sequence - b.sequence);
+
+    console.log(`✅ All ${turnIds.length} turns completed`);
+
+    return {
+      conversationId,
+      turnIds,
+      status,
+      events: [], // WebSocket doesn't separate event streams - all comes via trace
+      traceEvents,
+      trace: new ConversationTraceEventCollection(traceEvents),
+    };
+  } catch (error) {
+    // Handle timeout - return partial results
+    const turnIds = conn.getTurnIds();
+    traceEvents.sort((a, b) => a.sequence - b.sequence);
+
+    if (error instanceof Error && error.message.includes('Timeout')) {
+      return {
+        conversationId,
+        turnIds,
+        status: 'timeout',
+        events: [],
+        traceEvents,
+        trace: new ConversationTraceEventCollection(traceEvents),
+      };
+    }
+    throw error;
+  } finally {
+    conn.close();
+  }
 }
 
 // =============================================================================
@@ -479,11 +461,8 @@ export async function runTestConversation(
   messages: Array<{ role: 'user'; content: string }>,
   options?: {
     timeout?: number;
-    idleTimeout?: number;
     /** Log events to console as they arrive */
     logEvents?: boolean;
-    /** Enable trace event emission for this conversation */
-    enableTraceEvents?: boolean;
   },
 ): Promise<TestConversationResult> {
   // Setup infrastructure
@@ -574,10 +553,7 @@ export async function runTestConversation(
 
   // Execute conversation
   console.log('🚀 Starting conversation execution...');
-  const result = await executeConversation(conversationId, messages, {
-    ...options,
-    enableTraceEvents: options?.enableTraceEvents ?? true,
-  });
+  const result = await executeConversation(conversationId, messages, options);
 
   // Output conversation info for debugging
   const apiKey = process.env.API_KEY ?? '$API_KEY';
@@ -614,3 +590,4 @@ export async function runTestConversation(
     },
   };
 }
+

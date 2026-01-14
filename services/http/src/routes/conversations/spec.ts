@@ -200,3 +200,70 @@ export const startTurnRoute = createRoute({
     },
   },
 });
+
+/**
+ * WebSocket message schema for sending turns
+ */
+export const WebSocketSendMessageSchema = z
+  .object({
+    type: z.literal('send').openapi({
+      description: 'Message type for sending a turn',
+    }),
+    content: z.string().openapi({
+      description: 'The user message content',
+      example: 'Hello, how are you?',
+    }),
+    enableTraceEvents: z.boolean().optional().openapi({
+      description: 'If true, enables trace event emission',
+      example: true,
+    }),
+  })
+  .openapi('WebSocketSendMessage');
+
+/**
+ * WebSocket connect route - upgrades HTTP to WebSocket for real-time events
+ *
+ * Note: This route uses Hono's raw routing since OpenAPI doesn't support WebSocket.
+ * The schema is documented here for reference.
+ */
+export const connectWebSocketRoute = createRoute({
+  method: 'get',
+  path: '/{id}/ws',
+  tags: ['conversations'],
+  description:
+    'WebSocket connection for real-time conversation events. Supports bidirectional communication - send messages as turns and receive all conversation events.',
+  request: {
+    params: z.object({
+      id: ulid().openapi({ param: { name: 'id', in: 'path' } }),
+    }),
+    query: z.object({
+      enableTraceEvents: z
+        .string()
+        .optional()
+        .transform((v) => v === 'true')
+        .openapi({
+          description: 'If true, enables trace event emission for all turns',
+          example: 'true',
+        }),
+      apiKey: z
+        .string()
+        .optional()
+        .openapi({
+          description: 'API key for authentication (WebSocket cannot use headers)',
+        }),
+    }),
+  },
+  responses: {
+    101: {
+      description: 'WebSocket upgrade successful',
+    },
+    426: {
+      description: 'Upgrade required - WebSocket expected',
+      content: {
+        'application/json': {
+          schema: z.object({ error: z.string() }),
+        },
+      },
+    },
+  },
+});

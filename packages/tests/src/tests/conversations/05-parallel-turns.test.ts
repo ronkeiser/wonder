@@ -1,37 +1,32 @@
 /**
- * Conversation Test 03: Single Turn, Async Tool
+ * Conversation Test 05: Parallel Turns
  *
- * Validates async tool dispatch within the agent loop:
- * 1. Agent receives user message requesting tool use
- * 2. LLM decides to invoke a tool (async: true)
- * 3. Tool dispatch to target (workflow in this case)
- * 4. Agent does NOT wait—responds immediately with acknowledgment
- * 5. Async operation tracked on turn
- * 6. Turn stays active while async work is pending
- * 7. When async completes, agent posts follow-up message with results
- * 8. Turn completes when no pending async work
+ * Validates concurrent active turns with interleaved async operations:
+ * 1. Turn A starts with async tool dispatch (stays active waiting)
+ * 2. Turn B starts while Turn A is still active
+ * 3. Turn B completes quickly (no async operations)
+ * 4. Turn A completes after async operation finishes
+ * 5. Turn B completion happens BEFORE Turn A completion (out-of-order)
  *
- * This test proves the async tool dispatch → immediate response → continuation cycle works correctly.
+ * This test proves that:
+ * - Multiple turns can be active simultaneously
+ * - Turns complete independently based on their pending work
+ * - The conversation correctly tracks multiple active turns
+ *
+ * Uses WebSocket for event collection - essential for concurrent turns
+ * since each SSE stream terminates when its turn completes.
  */
 
 import { action, node, schema as s, step, task, workflow } from '@wonder/sdk';
 import { describe, expect, it } from 'vitest';
-import { assertConversationInvariants } from '~/kit';
+import { assertConversationInvariants, executeConversation } from '~/kit';
 import { setupTestContext } from '~/kit/context';
-import { cleanupConversationTest, executeConversation } from '~/kit/conversation';
-import { ConversationTraceEventCollection } from '~/kit/conversation-trace';
+import { cleanupConversationTest } from '~/kit/conversation';
 import { wonder } from '~/client';
 import { createWorkflow } from '~/kit/workflow';
-import {
-  action as actionBuilder,
-  node as nodeBuilder,
-  step as stepBuilder,
-  task as taskBuilder,
-  workflow as workflowBuilder,
-} from '@wonder/sdk';
 
-describe('Conversation: 03 - Single Turn, Async Tool', () => {
-  it('dispatches async tool, responds immediately, continues on completion', async () => {
+describe('Conversation: 05 - Parallel Turns', () => {
+  it('handles multiple active turns with async operations completing out of order', async () => {
     // =========================================================================
     // SETUP: Create test infrastructure
     // =========================================================================
@@ -43,18 +38,16 @@ describe('Conversation: 03 - Single Turn, Async Tool', () => {
       taskIds: [] as string[],
       workflowIds: [] as string[],
       actionIds: [] as string[],
-      promptSpecIds: [] as string[],
       personaId: undefined as string | undefined,
       agentId: undefined as string | undefined,
     };
 
     try {
       // =========================================================================
-      // SETUP: Create a workflow that the async tool will target
+      // SETUP: Create a SLOW async workflow (for Turn A)
       // =========================================================================
-      console.log('📦 Creating research workflow (async tool target)...');
+      console.log('📦 Creating slow research workflow (async tool target)...');
 
-      // The research workflow simulates a slow operation that returns findings
       const researchOutputSchema = s.object(
         { findings: s.string(), sources: s.array(s.string()) },
         { required: ['findings', 'sources'] },
@@ -62,14 +55,13 @@ describe('Conversation: 03 - Single Turn, Async Tool', () => {
 
       const researchAction = action({
         name: 'Research Action',
-        description: 'Simulates research by returning mock findings',
+        description: 'Simulates slow research',
         kind: 'mock',
         implementation: {
           schema: researchOutputSchema,
           options: {
-            // Delay ensures the async tool takes enough time for the agent
-            // to respond with an acknowledgment before the result arrives
-            delay: { minMs: 2000, maxMs: 3000 },
+            // Delay ensures Turn A stays active while Turn B completes
+            delay: { minMs: 4000, maxMs: 5000 },
           },
         },
       });
@@ -87,7 +79,7 @@ describe('Conversation: 03 - Single Turn, Async Tool', () => {
 
       const researchTask = task({
         name: 'Research Task',
-        description: 'Performs research on a topic',
+        description: 'Performs slow research',
         inputSchema: s.object({ topic: s.string() }),
         outputSchema: researchOutputSchema,
         steps: [researchStep],
@@ -98,9 +90,7 @@ describe('Conversation: 03 - Single Turn, Async Tool', () => {
         name: 'Research',
         task: researchTask,
         taskVersion: 1,
-        inputMapping: {
-          topic: 'input.topic',
-        },
+        inputMapping: { topic: 'input.topic' },
         outputMapping: {
           'output.findings': 'result.findings',
           'output.sources': 'result.sources',
@@ -108,8 +98,8 @@ describe('Conversation: 03 - Single Turn, Async Tool', () => {
       });
 
       const researchWorkflow = workflow({
-        name: 'Research Workflow',
-        description: 'Async research workflow for testing',
+        name: 'Slow Research Workflow',
+        description: 'Async research workflow with delay',
         inputSchema: s.object({ topic: s.string() }),
         outputSchema: researchOutputSchema,
         outputMapping: {
@@ -128,68 +118,55 @@ describe('Conversation: 03 - Single Turn, Async Tool', () => {
       console.log(`   Created research workflow: ${researchWorkflowSetup.workflowId}`);
 
       // =========================================================================
-      // SETUP: Create passthrough workflows for context assembly and memory extraction
+      // SETUP: Create context assembly workflow (single-line system prompt)
       // =========================================================================
       console.log('📦 Creating context assembly passthrough workflow...');
-      const systemPrompt =
-        'You are a helpful research assistant. When asked to research a topic, use the research tool. The research tool is async so respond immediately after invoking it, then summarize the results when they arrive.';
 
-      // Context assembly passthrough
-      const contextAction = actionBuilder({
+      // Single-line system prompt to avoid expression parsing issues
+      const systemPrompt =
+        'You are an assistant. Use the research tool for research questions. For simple math like 2+2, answer directly.';
+
+      const contextAction = action({
         name: 'Build LLM Request',
         description: 'Builds minimal LLM request from user message',
         kind: 'context',
         implementation: {},
       });
 
-      const buildRequestStep = stepBuilder({
+      const buildRequestStep = step({
         ref: 'build_request',
         ordinal: 0,
         action: contextAction,
-        inputMapping: {
-          userMessage: 'input.userMessage',
-        },
+        inputMapping: { userMessage: 'input.userMessage' },
         outputMapping: {
-          'output.llmRequest': `{ messages: [{ role: 'user', content: result.userMessage }], systemPrompt: '${systemPrompt.replace(/'/g, "\\'")}' }`,
+          'output.llmRequest': `{ messages: [{ role: 'user', content: result.userMessage }], systemPrompt: '${systemPrompt}' }`,
         },
       });
 
-      const messageSchema = s.object({
-        role: s.string(),
-        content: s.string(),
-      });
-
+      const messageSchema = s.object({ role: s.string(), content: s.string() });
       const llmRequestSchema = s.object({
         messages: s.array(messageSchema),
         systemPrompt: s.string(),
       });
 
-      const buildRequestTask = taskBuilder({
+      const buildRequestTask = task({
         name: 'Context Assembly Passthrough',
         description: 'Builds LLM request from user message',
-        inputSchema: s.object({
-          userMessage: s.string(),
-        }),
-        outputSchema: s.object({
-          llmRequest: llmRequestSchema,
-        }),
+        inputSchema: s.object({ userMessage: s.string() }),
+        outputSchema: s.object({ llmRequest: llmRequestSchema }),
         steps: [buildRequestStep],
       });
 
-      const buildRequestNode = nodeBuilder({
+      const buildRequestNode = node({
         ref: 'build_request',
         name: 'Build Request',
         task: buildRequestTask,
         taskVersion: 1,
-        inputMapping: {
-          userMessage: 'input.userMessage',
-        },
-        outputMapping: {
-          'output.llmRequest': 'result.llmRequest',
-        },
+        inputMapping: { userMessage: 'input.userMessage' },
+        outputMapping: { 'output.llmRequest': 'result.llmRequest' },
       });
 
-      const contextAssemblyWorkflow = workflowBuilder({
+      const contextAssemblyWorkflow = workflow({
         name: 'Context Assembly Passthrough',
         description: 'Test passthrough for context assembly',
         inputSchema: s.object({
@@ -200,12 +177,8 @@ describe('Conversation: 03 - Single Turn, Async Tool', () => {
           toolIds: s.array(s.string()),
           toolDefinitions: s.array(s.object({})),
         }),
-        outputSchema: s.object({
-          llmRequest: llmRequestSchema,
-        }),
-        outputMapping: {
-          llmRequest: 'output.llmRequest',
-        },
+        outputSchema: s.object({ llmRequest: llmRequestSchema }),
+        outputMapping: { llmRequest: 'output.llmRequest' },
         initialNodeRef: 'build_request',
         nodes: [buildRequestNode],
         transitions: [],
@@ -215,17 +188,18 @@ describe('Conversation: 03 - Single Turn, Async Tool', () => {
       createdResources.workflowIds.push(contextAssemblySetup.workflowId);
       createdResources.taskIds.push(...contextAssemblySetup.createdResources.taskIds);
       createdResources.actionIds.push(...contextAssemblySetup.createdResources.actionIds);
+      console.log(`   Created context assembly workflow: ${contextAssemblySetup.workflowId}`);
 
       // Memory extraction noop
       console.log('📦 Creating memory extraction noop workflow...');
-      const noopAction = actionBuilder({
+      const noopAction = action({
         name: 'Noop',
         description: 'Does nothing',
         kind: 'context',
         implementation: {},
       });
 
-      const noopStep = stepBuilder({
+      const noopStep = step({
         ref: 'noop',
         ordinal: 0,
         action: noopAction,
@@ -233,7 +207,7 @@ describe('Conversation: 03 - Single Turn, Async Tool', () => {
         outputMapping: {},
       });
 
-      const noopTask = taskBuilder({
+      const noopTask = task({
         name: 'Memory Extraction Noop',
         description: 'Does nothing',
         inputSchema: s.object({}),
@@ -241,7 +215,7 @@ describe('Conversation: 03 - Single Turn, Async Tool', () => {
         steps: [noopStep],
       });
 
-      const noopNode = nodeBuilder({
+      const noopNode = node({
         ref: 'noop',
         name: 'Noop',
         task: noopTask,
@@ -250,7 +224,7 @@ describe('Conversation: 03 - Single Turn, Async Tool', () => {
         outputMapping: {},
       });
 
-      const memoryExtractionWorkflow = workflowBuilder({
+      const memoryExtractionWorkflow = workflow({
         name: 'Memory Extraction Noop',
         description: 'Test noop for memory extraction',
         inputSchema: s.object({
@@ -269,15 +243,15 @@ describe('Conversation: 03 - Single Turn, Async Tool', () => {
       createdResources.workflowIds.push(memoryExtractionSetup.workflowId);
       createdResources.taskIds.push(...memoryExtractionSetup.createdResources.taskIds);
       createdResources.actionIds.push(...memoryExtractionSetup.createdResources.actionIds);
+      console.log(`   Created memory extraction workflow: ${memoryExtractionSetup.workflowId}`);
 
       // =========================================================================
-      // SETUP: Create async tool that targets the research workflow
+      // SETUP: Create async research tool
       // =========================================================================
       console.log('🔧 Creating research tool (async)...');
       const toolResponse = await wonder.tools.create({
         name: 'research',
-        description:
-          'Research a topic and gather information. This is an async operation - results will be available after some time.',
+        description: 'Research a topic (async operation). Use for research questions.',
         inputSchema: {
           type: 'object',
           properties: { topic: { type: 'string', description: 'The topic to research' } },
@@ -285,18 +259,18 @@ describe('Conversation: 03 - Single Turn, Async Tool', () => {
         },
         targetType: 'workflow',
         targetId: researchWorkflowSetup.workflowId,
-        async: true, // KEY: This is an async tool
+        async: true,
       });
       createdResources.toolIds.push(toolResponse.toolId);
       console.log(`   Created tool: ${toolResponse.toolId}`);
 
       // =========================================================================
-      // SETUP: Create persona with the async research tool
+      // SETUP: Create persona, agent, conversation
       // =========================================================================
       console.log('👤 Creating persona...');
       const personaResponse = await wonder.personas.create({
-        name: 'Research Agent',
-        description: 'Test agent with async research tool',
+        name: 'Multi-tasker Agent',
+        description: 'Test agent for parallel turns',
         systemPrompt,
         modelProfileId: ctx.modelProfileId,
         contextAssemblyWorkflowId: contextAssemblySetup.workflowId,
@@ -307,9 +281,6 @@ describe('Conversation: 03 - Single Turn, Async Tool', () => {
       createdResources.personaId = personaResponse.personaId;
       console.log(`   Created persona: ${personaResponse.personaId}`);
 
-      // =========================================================================
-      // SETUP: Create agent and conversation
-      // =========================================================================
       console.log('🤖 Creating agent...');
       const agentResponse = await wonder.agents.create({
         projectIds: [ctx.projectId],
@@ -330,21 +301,30 @@ describe('Conversation: 03 - Single Turn, Async Tool', () => {
       console.log(`   Created conversation: ${conversationId}`);
 
       // =========================================================================
-      // EXECUTE: Run conversation with message that should trigger async tool use
+      // EXECUTE: Send two messages in rapid succession (parallel turns)
       // =========================================================================
-      console.log('🚀 Starting conversation execution...');
+      console.log('🚀 Starting parallel turn execution via WebSocket...');
+
+      // Turn A: Research request (will use async tool, stays active ~4-5s)
+      // Turn B: Simple question (no tool, completes quickly)
+      //
+      // The delay ensures Turn A dispatches its async tool before Turn B starts.
       const result = await executeConversation(
         conversationId,
-        [{ role: 'user', content: 'Please research authentication patterns for web APIs' }],
-        { logEvents: true },
+        [
+          { role: 'user', content: 'Please research quantum computing fundamentals' },
+          { role: 'user', content: 'What is 2 + 2?', delayMs: 1000 },
+        ],
+        { logEvents: true, timeout: 120000 },
       );
+
+      const { traceEvents: allTraceEvents, turnIds, trace } = result;
 
       // Output debug info
       const apiKey = process.env.API_KEY ?? '$API_KEY';
       console.log('\n📋 Conversation Info:');
       console.log(`   conversationId: ${conversationId}`);
-      console.log(`   turnIds: ${result.turnIds.join(', ')}`);
-      console.log(`   status: ${result.status}`);
+      console.log(`   turnIds: ${turnIds.join(', ')}`);
       console.log('\n🔍 Debug Query Examples:');
       console.log(
         `   curl -H "X-API-Key: ${apiKey}" "https://api.wflow.app/events?streamId=${conversationId}"`,
@@ -356,10 +336,7 @@ describe('Conversation: 03 - Single Turn, Async Tool', () => {
       // =========================================================================
       // ASSERT: Basic execution success
       // =========================================================================
-      expect(result.status).toBe('completed');
-      expect(result.turnIds).toHaveLength(1);
-
-      const trace = new ConversationTraceEventCollection(result.traceEvents);
+      expect(turnIds.length).toBe(2);
 
       // =========================================================================
       // ASSERT: Structural invariants
@@ -367,145 +344,105 @@ describe('Conversation: 03 - Single Turn, Async Tool', () => {
       assertConversationInvariants(trace);
 
       // =========================================================================
-      // ASSERT: Turn lifecycle
+      // ASSERT: Two turns created
       // =========================================================================
       const turnStarts = trace.turns.starts();
-      expect(turnStarts).toHaveLength(1);
+      expect(turnStarts).toHaveLength(2);
 
-      const turnId = turnStarts[0].payload.turnId;
-      expect(turnId).toBe(result.turnIds[0]);
+      const [turnAId, turnBId] = turnStarts.map((t) => t.payload.turnId);
+      console.log(`\n📊 Turn Analysis:`);
+      console.log(`   Turn A (research): ${turnAId}`);
+      console.log(`   Turn B (simple):   ${turnBId}`);
 
+      // =========================================================================
+      // ASSERT: Both turns eventually complete
+      // =========================================================================
       const turnCompletions = trace.turns.completions();
-      expect(turnCompletions).toHaveLength(1);
-      expect(turnCompletions[0].payload.turnId).toBe(turnId);
+      expect(turnCompletions).toHaveLength(2);
+
+      expect(trace.turns.statusTransitions(turnAId)).toEqual(['active', 'completed']);
+      expect(trace.turns.statusTransitions(turnBId)).toEqual(['active', 'completed']);
 
       // =========================================================================
-      // ASSERT: Tool dispatch (async)
+      // ASSERT: Turn A has async tool dispatch, Turn B does not
       // =========================================================================
-      const toolDispatches = trace.tools.dispatches();
-      expect(toolDispatches.length).toBeGreaterThanOrEqual(1);
+      const turnATools = trace.tools.forTurn(turnAId);
+      const turnBTools = trace.tools.forTurn(turnBId);
 
-      // Should be an async dispatch
-      const asyncDispatches = trace.tools.asyncDispatches();
-      expect(asyncDispatches.length).toBeGreaterThanOrEqual(1);
-
-      // Check tool dispatch payload
-      const asyncDispatch = asyncDispatches[0];
-      expect(asyncDispatch.payload.async).toBe(true);
-      expect(asyncDispatch.payload.targetType).toBe('workflow');
-      expect(asyncDispatch.payload.turnId).toBe(turnId);
-      expect(asyncDispatch.payload.toolName).toBe('research');
-
-      // Should NOT have any sync dispatches for this tool
-      const syncDispatches = trace.tools.syncDispatches();
-      const researchSyncDispatches = syncDispatches.filter(
-        (d) => d.payload.toolName === 'research',
-      );
-      expect(researchSyncDispatches).toHaveLength(0);
+      expect(turnATools.length).toBeGreaterThanOrEqual(1);
+      expect(turnATools.some((t) => t.payload.async === true)).toBe(true);
+      expect(turnBTools).toHaveLength(0);
 
       // =========================================================================
-      // ASSERT: Async operation tracking
+      // ASSERT: Turn B completes BEFORE Turn A (out-of-order completion)
       // =========================================================================
-      // The turn should track the async operation
+      const turnACompletion = turnCompletions.find((t) => t.payload.turnId === turnAId)!;
+      const turnBCompletion = turnCompletions.find((t) => t.payload.turnId === turnBId)!;
+
+      console.log(`   Turn A completion sequence: ${turnACompletion.sequence}`);
+      console.log(`   Turn B completion sequence: ${turnBCompletion.sequence}`);
+
+      // This is the KEY assertion: Turn B should complete before Turn A
+      expect(turnBCompletion.sequence).toBeLessThan(turnACompletion.sequence);
+
+      // =========================================================================
+      // ASSERT: Turn A has async tracking events
+      // =========================================================================
       const asyncTrackedEvents = trace
         .all()
-        .filter((e) => e.type === 'operation.async.tracked');
+        .filter(
+          (e) =>
+            e.type === 'operation.async.tracked' &&
+            (e.payload as { turnId?: string }).turnId === turnAId,
+        );
       expect(asyncTrackedEvents.length).toBeGreaterThanOrEqual(1);
 
-      // The async operation should resume (complete and return to agent)
       const asyncResumedEvents = trace
         .all()
-        .filter((e) => e.type === 'operation.async.resumed');
+        .filter(
+          (e) =>
+            e.type === 'operation.async.resumed' &&
+            (e.payload as { turnId?: string }).turnId === turnAId,
+        );
       expect(asyncResumedEvents.length).toBeGreaterThanOrEqual(1);
 
       // =========================================================================
-      // ASSERT: LLM calls (two rounds: tool dispatch + continuation)
+      // ASSERT: Each turn has its own messages
       // =========================================================================
-      // With async tools and delay, the agent should:
-      // 1. First LLM call decides to use async tool
-      // 2. Second LLM call processes result and responds
-      const llmCalls = trace.llm.calls();
-      expect(llmCalls.length).toBeGreaterThanOrEqual(2);
+      const turnAMessages = trace.messages.forTurn(turnAId);
+      const turnBMessages = trace.messages.forTurn(turnBId);
 
-      const llmResponses = trace.llm.responses();
-      expect(llmResponses.length).toBeGreaterThanOrEqual(2);
+      // Turn A: user message + acknowledgment + final result
+      expect(turnAMessages.filter((m) => m.payload.role === 'user')).toHaveLength(1);
+      expect(turnAMessages.filter((m) => m.payload.role === 'agent').length).toBeGreaterThanOrEqual(
+        2,
+      );
 
-      // First response should have tool call (triggers the async operation)
-      const firstResponse = llmResponses[0];
-      expect(firstResponse.payload.toolCallCount).toBeGreaterThan(0);
-
-      // =========================================================================
-      // ASSERT: Agent messages (acknowledgment + final result)
-      // =========================================================================
-      // With async tools, the agent should:
-      // 1. Send an acknowledgment immediately after dispatching the async tool
-      // 2. Send the final response after the async operation completes
-      const agentMessages = trace.messages.agent();
-      expect(agentMessages.length).toBeGreaterThanOrEqual(2);
-
-      // First message is acknowledgment (before async completes)
-      const firstAgentMessage = agentMessages[0];
-      expect(firstAgentMessage.payload.turnId).toBe(turnId);
-
-      // Second message is final response (after async completes)
-      const lastAgentMessage = agentMessages[agentMessages.length - 1];
-      expect(lastAgentMessage.payload.turnId).toBe(turnId);
+      // Turn B: user message + direct answer
+      expect(turnBMessages.filter((m) => m.payload.role === 'user')).toHaveLength(1);
+      expect(turnBMessages.filter((m) => m.payload.role === 'agent').length).toBeGreaterThanOrEqual(
+        1,
+      );
 
       // =========================================================================
-      // ASSERT: Move recorded for async tool call
+      // ASSERT: Each turn has context assembly
       // =========================================================================
-      const moves = trace.moves.forTurn(turnId);
-      expect(moves.length).toBeGreaterThanOrEqual(1);
-
-      // Should have at least one move with tool call
-      const moveWithToolCall = moves.find((m) => m.payload.hasToolCall);
-      expect(moveWithToolCall).toBeDefined();
+      expect(trace.contextAssembly.forTurn(turnAId).length).toBeGreaterThanOrEqual(1);
+      expect(trace.contextAssembly.forTurn(turnBId).length).toBeGreaterThanOrEqual(1);
 
       // =========================================================================
-      // ASSERT: Causal ordering
-      // =========================================================================
-      // Events should follow causal order:
-      // turn.created < tool.dispatched < async.tracked < first_message < async.resumed < last_message < turn.completed
-
-      const turnStartSeq = turnStarts[0].sequence;
-      const asyncDispatchSeq = asyncDispatch.sequence;
-      const asyncTrackedSeq = asyncTrackedEvents[0].sequence;
-      const asyncResumedSeq = asyncResumedEvents[0].sequence;
-      const turnCompletedSeq = turnCompletions[0].sequence;
-
-      // Async dispatch should come after turn start
-      expect(turnStartSeq).toBeLessThan(asyncDispatchSeq);
-
-      // Async tracked should come after dispatch
-      expect(asyncDispatchSeq).toBeLessThan(asyncTrackedSeq);
-
-      // First agent message (acknowledgment) should come before async resumed
-      expect(firstAgentMessage.sequence).toBeLessThan(asyncResumedSeq);
-
-      // Async resumed should come after tracked
-      expect(asyncTrackedSeq).toBeLessThan(asyncResumedSeq);
-
-      // Last agent message should come after async resumed
-      expect(asyncResumedSeq).toBeLessThan(lastAgentMessage.sequence);
-
-      // Turn completion should come after async resumed
-      expect(asyncResumedSeq).toBeLessThan(turnCompletedSeq);
-
-      // =========================================================================
-      // ASSERT: Event manifest (count by type)
+      // ASSERT: Event manifest
       // =========================================================================
       console.log('\n📊 Event Manifest:');
       console.log(`   Turn starts: ${turnStarts.length}`);
       console.log(`   Turn completions: ${turnCompletions.length}`);
-      console.log(`   Tool dispatches: ${toolDispatches.length}`);
-      console.log(`   Async dispatches: ${asyncDispatches.length}`);
+      console.log(`   Turn A messages: ${turnAMessages.length}`);
+      console.log(`   Turn B messages: ${turnBMessages.length}`);
+      console.log(`   Turn A tools: ${turnATools.length}`);
+      console.log(`   Turn B tools: ${turnBTools.length}`);
       console.log(`   Async tracked: ${asyncTrackedEvents.length}`);
       console.log(`   Async resumed: ${asyncResumedEvents.length}`);
-      console.log(`   Moves with tool calls: ${moves.filter((m) => m.payload.hasToolCall).length}`);
-      console.log(`   LLM calls: ${llmCalls.length}`);
-      console.log(`   LLM responses: ${llmResponses.length}`);
-      console.log(`   Agent messages: ${agentMessages.length}`);
-      console.log(`   Total trace events: ${result.traceEvents.length}`);
+      console.log(`   Total trace events: ${allTraceEvents.length}`);
     } finally {
       // =========================================================================
       // CLEANUP

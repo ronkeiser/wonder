@@ -41,6 +41,16 @@ export { ApiError } from './generated/client';
 
 export type { StreamEvent, StreamSubscription, Subscription, SubscriptionFilter } from './streams';
 
+// Conversation WebSocket
+export {
+  ConversationConnection,
+  type ConversationConnectionOptions,
+  type ConnectionState,
+  type SendMessage,
+  type ServerEvent,
+  type ServerError,
+} from './conversation-ws';
+
 export interface WonderClient extends ReturnType<typeof createGeneratedClient> {
   // WebSocket streaming client
   streams: StreamsClient;
