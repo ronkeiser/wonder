@@ -8,6 +8,7 @@
 
   const navItems: { href: string; label: string; icon: IconName }[] = [
     { href: '/projects', label: 'Projects', icon: 'folder' },
+    { href: '/conversations', label: 'Conversation', icon: 'chat' },
     { href: '/playground', label: 'Playground', icon: 'code' },
     { href: '/admin', label: 'Admin', icon: 'clipboard' },
   ];
