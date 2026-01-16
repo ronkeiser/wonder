@@ -619,6 +619,58 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/conversations/{id}/ws": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** @description WebSocket connection for real-time conversation events. Supports bidirectional communication - send messages as turns and receive all conversation events. */
+        get: {
+            parameters: {
+                query?: {
+                    /** @description If true, enables trace event emission for all turns */
+                    enableTraceEvents?: string;
+                    /** @description API key for authentication (WebSocket cannot use headers) */
+                    apiKey?: string;
+                };
+                header?: never;
+                path: {
+                    id: string;
+                };
+                cookie?: never;
+            };
+            requestBody?: never;
+            responses: {
+                /** @description WebSocket upgrade successful */
+                101: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content?: never;
+                };
+                /** @description Upgrade required - WebSocket expected */
+                426: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": {
+                            error: string;
+                        };
+                    };
+                };
+            };
+        };
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/conversations/{conversationId}/messages": {
         parameters: {
             query?: never;

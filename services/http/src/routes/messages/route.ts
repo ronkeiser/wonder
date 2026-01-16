@@ -36,8 +36,12 @@ export const conversationMessages = new OpenAPIHono<HttpEnv>();
 conversationMessages.openapi(listMessagesForConversationRoute, async (c) => {
   const { conversationId } = c.req.valid('param');
   const { limit } = c.req.valid('query');
-  using resource = c.env.RESOURCES.messages();
-  const result = await resource.listForConversation(conversationId, limit);
+
+  // Get messages from the Conversation DO (source of truth)
+  const conversationDOId = c.env.CONVERSATION.idFromName(conversationId);
+  const conversationDO = c.env.CONVERSATION.get(conversationDOId);
+  const result = await conversationDO.getMessages(conversationId, limit);
+
   return c.json(result);
 });
 

@@ -15,13 +15,30 @@ interface Conversation {
   updatedAt: string;
 }
 
-export const load: PageServerLoad = async ({ fetch, params }) => {
-  const res = await fetch(`/api/conversations/${params.id}`);
+interface Message {
+  id: string;
+  conversationId: string;
+  turnId: string;
+  role: 'user' | 'agent';
+  content: string;
+  createdAt: string;
+}
 
-  if (!res.ok) {
-    error(res.status, 'Conversation not found');
+export const load: PageServerLoad = async ({ fetch, params }) => {
+  const [conversationRes, messagesRes] = await Promise.all([
+    fetch(`/api/conversations/${params.id}`),
+    fetch(`/api/conversations/${params.id}/messages`),
+  ]);
+
+  if (!conversationRes.ok) {
+    error(conversationRes.status, 'Conversation not found');
   }
 
-  const data = await res.json();
-  return { conversation: data.conversation as Conversation };
+  const conversationData = await conversationRes.json();
+  const messagesData = messagesRes.ok ? await messagesRes.json() : { messages: [] };
+
+  return {
+    conversation: conversationData.conversation as Conversation,
+    messages: messagesData.messages as Message[],
+  };
 };

@@ -168,6 +168,8 @@ export function createClient(baseClient: any) {
               if (error) throw new ApiError(`PATCH /conversations/${id}/status failed`, error);
               return data;
             }
+          },
+          ws: {
           }
         }),
       {

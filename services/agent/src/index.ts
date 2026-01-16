@@ -608,6 +608,39 @@ export class Conversation extends DurableObject {
   }
 
   /**
+   * Get messages for this conversation.
+   *
+   * Returns all messages in creation order, optionally limited.
+   *
+   * @param conversationId - The conversation ID (must match DO ID)
+   * @param limit - Maximum number of messages to return (default: all)
+   */
+  async getMessages(
+    conversationId: string,
+    limit?: number,
+  ): Promise<{ messages: Array<{ id: string; conversationId: string; turnId: string; role: 'user' | 'agent'; content: string; createdAt: string }> }> {
+    // Initialize definitions if not already done
+    await this.defs.initializeConversation(conversationId);
+
+    const allMessages = this.messages.getForConversation(conversationId);
+
+    // Apply limit if specified
+    const messages = limit ? allMessages.slice(0, limit) : allMessages;
+
+    // Convert Date to ISO string for serialization
+    return {
+      messages: messages.map((m) => ({
+        id: m.id,
+        conversationId: m.conversationId,
+        turnId: m.turnId,
+        role: m.role,
+        content: m.content,
+        createdAt: m.createdAt instanceof Date ? m.createdAt.toISOString() : String(m.createdAt),
+      })),
+    };
+  }
+
+  /**
    * Start an agent call from a workflow node or another agent.
    *
    * Unlike startTurn (user-initiated via WebSocket), this:
