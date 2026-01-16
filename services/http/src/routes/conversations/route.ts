@@ -2,6 +2,7 @@ import { OpenAPIHono } from '@hono/zod-openapi';
 import type { HttpEnv } from '~/types';
 import { conversationMessages, turnMessages } from '../messages/route';
 import {
+  chatWebSocketRoute,
   connectWebSocketRoute,
   createConversationRoute,
   deleteConversationRoute,
@@ -223,6 +224,39 @@ conversations.openapi(connectWebSocketRoute, async (c) => {
     status: 101,
     webSocket: clientWs,
   });
+});
+
+/**
+ * GET /{id}/chat - WebSocket connection for chat UI
+ *
+ * This endpoint proxies WebSocket connections directly to the Conversation DO.
+ * The Conversation DO handles the chat protocol (messages, tokens, turn lifecycle).
+ */
+conversations.openapi(chatWebSocketRoute, async (c) => {
+  const { id } = c.req.valid('param');
+
+  // Check for WebSocket upgrade
+  const upgradeHeader = c.req.header('Upgrade');
+  if (upgradeHeader !== 'websocket') {
+    return c.json({ error: 'Expected WebSocket upgrade' }, 426);
+  }
+
+  // Get the Conversation DO
+  const conversationDOId = c.env.CONVERSATION.idFromName(id);
+  const conversationDO = c.env.CONVERSATION.get(conversationDOId);
+
+  // Forward the WebSocket upgrade request to the Conversation DO
+  const doUrl = new URL(c.req.url);
+  doUrl.pathname = `/conversations/${id}`;
+
+  const response = await conversationDO.fetch(
+    new Request(doUrl, {
+      headers: { Upgrade: 'websocket' },
+    }),
+  );
+
+  // Return the WebSocket response from the DO
+  return response;
 });
 
 conversations.route('/:conversationId/messages', conversationMessages);

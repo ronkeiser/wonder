@@ -38,8 +38,8 @@
   }
 
   function connectWebSocket() {
-    // Connect directly to the API server (not through SvelteKit proxy, which doesn't support WebSocket)
-    const wsUrl = `wss://api.wflow.app/conversations/${data.conversation.id}/ws?enableTraceEvents=true`;
+    // Connect directly to the API server's chat endpoint (Conversation DO)
+    const wsUrl = `wss://api.wflow.app/conversations/${data.conversation.id}/chat`;
 
     ws = new WebSocket(wsUrl);
 
@@ -69,59 +69,60 @@
 
   function handleWebSocketMessage(msg: {
     type: string;
-    stream?: string;
-    event?: {
-      type: string;
-      payload?: Record<string, unknown>;
-    };
+    turnId?: string;
+    token?: string;
+    conversationId?: string;
+    message?: string;
+    code?: string;
   }) {
-    // Handle streamer events
-    if (msg.type === 'event' && msg.event) {
-      const { type, payload } = msg.event;
+    // Handle Conversation DO protocol
+    switch (msg.type) {
+      case 'connected':
+        // Connection established
+        break;
 
-      switch (type) {
-        case 'operation.turns.started':
-          currentTurnId = payload?.turnId as string;
-          streamingContent = '';
-          break;
+      case 'turn_started':
+        currentTurnId = msg.turnId ?? null;
+        streamingContent = '';
+        scrollToBottom();
+        break;
 
-        case 'operation.messages.appended':
-          // A new message was stored - refresh to get it
-          if (payload?.role === 'agent') {
-            // Agent message complete, add it to the list
-            const newMessage: Message = {
-              id: payload.messageId as string,
-              conversationId: payload.conversationId as string,
-              turnId: payload.turnId as string,
-              role: 'agent',
-              content: streamingContent || (payload.content as string) || '',
-              createdAt: new Date().toISOString(),
-            };
-            messages = [...messages, newMessage];
-            streamingContent = '';
-            scrollToBottom();
-          }
-          break;
-
-        case 'operation.llm.token':
-          // Streaming token
-          streamingContent += payload?.token as string;
+      case 'token':
+        // Streaming token
+        if (msg.token) {
+          streamingContent += msg.token;
           scrollToBottom();
-          break;
+        }
+        break;
 
-        case 'operation.turns.completed':
-          currentTurnId = null;
-          sending = false;
-          // Refresh messages to get the final state
-          refreshMessages();
-          break;
-
-        case 'operation.turns.failed':
-          currentTurnId = null;
-          sending = false;
+      case 'message_complete':
+        // Agent message complete, add it to the list
+        if (streamingContent) {
+          const newMessage: Message = {
+            id: `msg-${Date.now()}`,
+            conversationId: data.conversation.id,
+            turnId: msg.turnId ?? '',
+            role: 'agent',
+            content: streamingContent,
+            createdAt: new Date().toISOString(),
+          };
+          messages = [...messages, newMessage];
           streamingContent = '';
-          break;
-      }
+          scrollToBottom();
+        }
+        break;
+
+      case 'turn_complete':
+        currentTurnId = null;
+        sending = false;
+        break;
+
+      case 'error':
+        currentTurnId = null;
+        sending = false;
+        streamingContent = '';
+        console.error('Conversation error:', msg.message, msg.code);
+        break;
     }
   }
 
@@ -144,8 +145,8 @@
     messages = [...messages, userMessage];
     scrollToBottom();
 
-    // Send via WebSocket
-    ws.send(JSON.stringify({ type: 'send', content }));
+    // Send via WebSocket (Conversation DO protocol)
+    ws.send(JSON.stringify({ type: 'message', content }));
   }
 
   async function refreshMessages() {
@@ -174,6 +175,7 @@
 
   onMount(() => {
     connectWebSocket();
+    scrollToBottom();
   });
 
   onDestroy(() => {
@@ -222,7 +224,19 @@
         </div>
       {/each}
 
-      {#if streamingContent}
+      {#if currentTurnId && !streamingContent}
+        <div class="flex justify-start">
+          <div class="max-w-[80%] px-4 py-2 rounded-lg bg-surface-raised border border-border">
+            <div class="flex items-center gap-2 text-sm text-foreground-muted">
+              <span class="flex gap-1">
+                <span class="w-2 h-2 bg-foreground-muted rounded-full animate-bounce" style="animation-delay: 0ms"></span>
+                <span class="w-2 h-2 bg-foreground-muted rounded-full animate-bounce" style="animation-delay: 150ms"></span>
+                <span class="w-2 h-2 bg-foreground-muted rounded-full animate-bounce" style="animation-delay: 300ms"></span>
+              </span>
+            </div>
+          </div>
+        </div>
+      {:else if streamingContent}
         <div class="flex justify-start">
           <div class="max-w-[80%] px-4 py-2 rounded-lg bg-surface-raised border border-border">
             <p class="text-sm whitespace-pre-wrap">{streamingContent}<span class="animate-pulse">▊</span></p>

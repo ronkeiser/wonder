@@ -231,7 +231,7 @@ export const connectWebSocketRoute = createRoute({
   path: '/{id}/ws',
   tags: ['conversations'],
   description:
-    'WebSocket connection for real-time conversation events. Supports bidirectional communication - send messages as turns and receive all conversation events.',
+    'WebSocket connection for real-time conversation events (observability). Connects to the Streamer DO for event/trace streams.',
   request: {
     params: z.object({
       id: ulid().openapi({ param: { name: 'id', in: 'path' } }),
@@ -251,6 +251,44 @@ export const connectWebSocketRoute = createRoute({
         .openapi({
           description: 'API key for authentication (WebSocket cannot use headers)',
         }),
+    }),
+  },
+  responses: {
+    101: {
+      description: 'WebSocket upgrade successful',
+    },
+    426: {
+      description: 'Upgrade required - WebSocket expected',
+      content: {
+        'application/json': {
+          schema: z.object({ error: z.string() }),
+        },
+      },
+    },
+  },
+});
+
+/**
+ * Chat WebSocket route - connects directly to Conversation DO for chat UI
+ *
+ * Protocol (from Conversation DO):
+ * - Server sends: { type: 'connected', conversationId }
+ * - Client sends: { type: 'message', content: string }
+ * - Server sends: { type: 'turn_started', turnId }
+ * - Server sends: { type: 'token', token } (streaming)
+ * - Server sends: { type: 'message_complete', turnId }
+ * - Server sends: { type: 'turn_complete', turnId }
+ * - Server sends: { type: 'error', message, code }
+ */
+export const chatWebSocketRoute = createRoute({
+  method: 'get',
+  path: '/{id}/chat',
+  tags: ['conversations'],
+  description:
+    'WebSocket connection for chat UI. Connects directly to the Conversation DO for real-time message streaming.',
+  request: {
+    params: z.object({
+      id: ulid().openapi({ param: { name: 'id', in: 'path' } }),
     }),
   },
   responses: {
