@@ -1,12 +1,26 @@
 <script lang="ts">
+  import { onMount, onDestroy } from 'svelte';
   import type { PageData } from './$types';
 
   let { data }: { data: PageData } = $props();
 
-  let messages = $state(data.messages);
+  interface Message {
+    id: string;
+    conversationId: string;
+    turnId: string;
+    role: 'user' | 'agent';
+    content: string;
+    createdAt: string;
+  }
+
+  let messages = $state<Message[]>(data.messages);
   let inputValue = $state('');
   let sending = $state(false);
+  let connected = $state(false);
+  let streamingContent = $state('');
+  let currentTurnId = $state<string | null>(null);
   let messagesContainer: HTMLDivElement;
+  let ws: WebSocket | null = null;
 
   function getStatusClasses(status: string) {
     switch (status) {
@@ -23,33 +37,122 @@
     }
   }
 
-  async function sendMessage() {
+  function connectWebSocket() {
+    // Connect directly to the API server (not through SvelteKit proxy, which doesn't support WebSocket)
+    const wsUrl = `wss://api.wflow.app/conversations/${data.conversation.id}/ws?enableTraceEvents=true`;
+
+    ws = new WebSocket(wsUrl);
+
+    ws.onopen = () => {
+      connected = true;
+    };
+
+    ws.onclose = () => {
+      connected = false;
+      // Reconnect after a delay
+      setTimeout(connectWebSocket, 3000);
+    };
+
+    ws.onerror = () => {
+      connected = false;
+    };
+
+    ws.onmessage = (event) => {
+      try {
+        const msg = JSON.parse(event.data);
+        handleWebSocketMessage(msg);
+      } catch {
+        // Ignore parse errors
+      }
+    };
+  }
+
+  function handleWebSocketMessage(msg: {
+    type: string;
+    stream?: string;
+    event?: {
+      type: string;
+      payload?: Record<string, unknown>;
+    };
+  }) {
+    // Handle streamer events
+    if (msg.type === 'event' && msg.event) {
+      const { type, payload } = msg.event;
+
+      switch (type) {
+        case 'operation.turns.started':
+          currentTurnId = payload?.turnId as string;
+          streamingContent = '';
+          break;
+
+        case 'operation.messages.appended':
+          // A new message was stored - refresh to get it
+          if (payload?.role === 'agent') {
+            // Agent message complete, add it to the list
+            const newMessage: Message = {
+              id: payload.messageId as string,
+              conversationId: payload.conversationId as string,
+              turnId: payload.turnId as string,
+              role: 'agent',
+              content: streamingContent || (payload.content as string) || '',
+              createdAt: new Date().toISOString(),
+            };
+            messages = [...messages, newMessage];
+            streamingContent = '';
+            scrollToBottom();
+          }
+          break;
+
+        case 'operation.llm.token':
+          // Streaming token
+          streamingContent += payload?.token as string;
+          scrollToBottom();
+          break;
+
+        case 'operation.turns.completed':
+          currentTurnId = null;
+          sending = false;
+          // Refresh messages to get the final state
+          refreshMessages();
+          break;
+
+        case 'operation.turns.failed':
+          currentTurnId = null;
+          sending = false;
+          streamingContent = '';
+          break;
+      }
+    }
+  }
+
+  function sendMessage() {
     const content = inputValue.trim();
-    if (!content || sending) return;
+    if (!content || sending || !ws || ws.readyState !== WebSocket.OPEN) return;
 
     sending = true;
     inputValue = '';
 
-    try {
-      const res = await fetch(`/api/conversations/${data.conversation.id}/turns`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ content }),
-      });
+    // Add user message immediately
+    const userMessage: Message = {
+      id: `temp-${Date.now()}`,
+      conversationId: data.conversation.id,
+      turnId: '',
+      role: 'user',
+      content,
+      createdAt: new Date().toISOString(),
+    };
+    messages = [...messages, userMessage];
+    scrollToBottom();
 
-      if (res.ok) {
-        await refreshMessages();
-      }
-    } finally {
-      sending = false;
-    }
+    // Send via WebSocket
+    ws.send(JSON.stringify({ type: 'send', content }));
   }
 
   async function refreshMessages() {
     const res = await fetch(`/api/conversations/${data.conversation.id}/messages`);
     if (res.ok) {
-      const data = await res.json();
-      messages = data.messages;
+      const result = await res.json();
+      messages = result.messages;
       scrollToBottom();
     }
   }
@@ -68,6 +171,16 @@
       sendMessage();
     }
   }
+
+  onMount(() => {
+    connectWebSocket();
+  });
+
+  onDestroy(() => {
+    if (ws) {
+      ws.close();
+    }
+  });
 </script>
 
 <svelte:head>
@@ -80,11 +193,16 @@
     <span class="text-xs px-2 py-0.5 rounded {getStatusClasses(data.conversation.status)}">
       {data.conversation.status}
     </span>
+    <span
+      class="text-xs px-2 py-0.5 rounded {connected ? 'bg-green-500/10 text-green-500' : 'bg-red-500/10 text-red-500'}"
+    >
+      {connected ? 'Connected' : 'Disconnected'}
+    </span>
     <span class="text-xs text-foreground-muted font-mono ml-auto">{data.conversation.id}</span>
   </div>
 
   <div bind:this={messagesContainer} class="flex-1 overflow-y-auto p-4 space-y-4">
-    {#if messages.length === 0}
+    {#if messages.length === 0 && !streamingContent}
       <p class="text-foreground-muted text-sm text-center py-8">No messages yet. Start the conversation below.</p>
     {:else}
       {#each messages as message}
@@ -103,6 +221,14 @@
           </div>
         </div>
       {/each}
+
+      {#if streamingContent}
+        <div class="flex justify-start">
+          <div class="max-w-[80%] px-4 py-2 rounded-lg bg-surface-raised border border-border">
+            <p class="text-sm whitespace-pre-wrap">{streamingContent}<span class="animate-pulse">▊</span></p>
+          </div>
+        </div>
+      {/if}
     {/if}
   </div>
 
@@ -114,11 +240,11 @@
         placeholder="Type a message..."
         rows="1"
         class="flex-1 px-3 py-2 rounded border border-border bg-surface-raised text-sm resize-none focus:outline-none focus:ring-2 focus:ring-blue-500"
-        disabled={sending}
+        disabled={sending || !connected}
       ></textarea>
       <button
         onclick={sendMessage}
-        disabled={sending || !inputValue.trim()}
+        disabled={sending || !inputValue.trim() || !connected}
         class="px-4 py-2 rounded bg-blue-600 text-white text-sm font-medium hover:bg-blue-700 disabled:opacity-50 disabled:cursor-not-allowed"
       >
         {sending ? 'Sending...' : 'Send'}
