@@ -15,7 +15,6 @@
 
   let messages = $state<Message[]>(data.messages);
   let inputValue = $state('');
-  let sending = $state(false);
   let connected = $state(false);
   let streamingContent = $state('');
   let currentTurnId = $state<string | null>(null);
@@ -95,8 +94,8 @@
         }
         break;
 
-      case 'message_complete':
-        // Agent message complete, add it to the list
+      case 'turn_complete':
+        // Turn complete - finalize any streaming content as a message
         if (streamingContent) {
           const newMessage: Message = {
             id: `msg-${Date.now()}`,
@@ -110,16 +109,11 @@
           streamingContent = '';
           scrollToBottom();
         }
-        break;
-
-      case 'turn_complete':
         currentTurnId = null;
-        sending = false;
         break;
 
       case 'error':
         currentTurnId = null;
-        sending = false;
         streamingContent = '';
         console.error('Conversation error:', msg.message, msg.code);
         break;
@@ -128,9 +122,8 @@
 
   function sendMessage() {
     const content = inputValue.trim();
-    if (!content || sending || !ws || ws.readyState !== WebSocket.OPEN) return;
+    if (!content || !ws || ws.readyState !== WebSocket.OPEN) return;
 
-    sending = true;
     inputValue = '';
 
     // Add user message immediately
@@ -254,14 +247,14 @@
         placeholder="Type a message..."
         rows="1"
         class="flex-1 px-3 py-2 rounded border border-border bg-surface-raised text-sm resize-none focus:outline-none focus:ring-2 focus:ring-blue-500"
-        disabled={sending || !connected}
+        disabled={!connected}
       ></textarea>
       <button
         onclick={sendMessage}
-        disabled={sending || !inputValue.trim() || !connected}
+        disabled={!inputValue.trim() || !connected}
         class="px-4 py-2 rounded bg-blue-600 text-white text-sm font-medium hover:bg-blue-700 disabled:opacity-50 disabled:cursor-not-allowed"
       >
-        {sending ? 'Sending...' : 'Send'}
+        Send
       </button>
     </div>
   </div>
