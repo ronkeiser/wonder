@@ -1,79 +1,11 @@
 import { createRoute, z } from '@hono/zod-openapi';
 import { ulid } from '../../validators';
-import {
-  CreateMessageSchema,
-  MessageCreateResponseSchema,
-  MessageGetResponseSchema,
-  MessageListResponseSchema,
-} from './schema';
+import { MessageListResponseSchema } from './schema';
 
-export const createMessageRoute = createRoute({
-  method: 'post',
-  path: '/',
-  tags: ['messages'],
-  request: {
-    body: {
-      content: {
-        'application/json': {
-          schema: CreateMessageSchema,
-        },
-      },
-    },
-  },
-  responses: {
-    201: {
-      content: {
-        'application/json': {
-          schema: MessageCreateResponseSchema,
-        },
-      },
-      description: 'Message created successfully',
-    },
-  },
-});
-
-export const getMessageRoute = createRoute({
-  method: 'get',
-  path: '/{id}',
-  tags: ['messages'],
-  request: {
-    params: z.object({
-      id: ulid().openapi({ param: { name: 'id', in: 'path' } }),
-    }),
-  },
-  responses: {
-    200: {
-      content: {
-        'application/json': {
-          schema: MessageGetResponseSchema,
-        },
-      },
-      description: 'Message retrieved successfully',
-    },
-  },
-});
-
-export const deleteMessageRoute = createRoute({
-  method: 'delete',
-  path: '/{id}',
-  tags: ['messages'],
-  request: {
-    params: z.object({
-      id: ulid().openapi({ param: { name: 'id', in: 'path' } }),
-    }),
-  },
-  responses: {
-    200: {
-      content: {
-        'application/json': {
-          schema: z.object({ success: z.boolean() }),
-        },
-      },
-      description: 'Message deleted successfully',
-    },
-  },
-});
-
+/**
+ * List messages for a conversation.
+ * GET /conversations/:conversationId/messages
+ */
 export const listMessagesForConversationRoute = createRoute({
   method: 'get',
   path: '/',
@@ -98,6 +30,10 @@ export const listMessagesForConversationRoute = createRoute({
   },
 });
 
+/**
+ * List messages for a specific turn.
+ * GET /conversations/:conversationId/turns/:turnId/messages
+ */
 export const listMessagesForTurnRoute = createRoute({
   method: 'get',
   path: '/',

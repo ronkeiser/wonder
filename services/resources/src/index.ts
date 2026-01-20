@@ -8,14 +8,12 @@ import { Actions } from './resources/actions';
 import { Agents } from './resources/agents';
 import { ArtifactTypes } from './resources/artifact-types';
 import { Conversations } from './resources/conversations';
-import { Messages } from './resources/messages';
 import { ModelProfiles } from './resources/model-profiles';
 import { Personas } from './resources/personas';
 import { Projects } from './resources/projects';
 import { PromptSpecs } from './resources/prompt-specs';
 import { Tasks } from './resources/tasks';
 import { Tools } from './resources/tools';
-import { Turns } from './resources/turns';
 import { WorkflowDefs } from './resources/workflow-defs';
 import { WorkflowRuns } from './resources/workflow-runs';
 import { Workflows } from './resources/workflows';
@@ -42,10 +40,6 @@ class WonderResources extends WorkerEntrypoint<Env> {
     return new Conversations(this.env, this.ctx);
   }
 
-  messages() {
-    return new Messages(this.env, this.ctx);
-  }
-
   modelProfiles() {
     return new ModelProfiles(this.env, this.ctx);
   }
@@ -68,10 +62,6 @@ class WonderResources extends WorkerEntrypoint<Env> {
 
   tools() {
     return new Tools(this.env, this.ctx);
-  }
-
-  turns() {
-    return new Turns(this.env, this.ctx);
   }
 
   workflowDefs() {

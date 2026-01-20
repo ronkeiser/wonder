@@ -14,7 +14,6 @@ import { artifactTypes } from './routes/artifact-types/route';
 import { conversations } from './routes/conversations/route';
 import { events } from './routes/events/route';
 import { logs } from './routes/logs/route';
-import { messages } from './routes/messages/route';
 import { modelProfiles } from './routes/model-profiles/route';
 import { personas } from './routes/personas/route';
 import { projects } from './routes/projects/route';
@@ -68,7 +67,6 @@ const routes = app
   .route('/conversations', conversations)
   .route('/events', events)
   .route('/logs', logs)
-  .route('/messages', messages)
   .route('/model-profiles', modelProfiles)
   .route('/personas', personas)
   .route('/projects', projects)

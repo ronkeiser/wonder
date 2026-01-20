@@ -641,6 +641,34 @@ export class Conversation extends DurableObject {
   }
 
   /**
+   * Get messages for a specific turn.
+   *
+   * @param conversationId - The conversation ID (must match DO ID)
+   * @param turnId - The turn ID to get messages for
+   */
+  async getMessagesForTurn(
+    conversationId: string,
+    turnId: string,
+  ): Promise<{ messages: Array<{ id: string; conversationId: string; turnId: string; role: 'user' | 'agent'; content: string; createdAt: string }> }> {
+    // Initialize definitions if not already done
+    await this.defs.initializeConversation(conversationId);
+
+    const messages = this.messages.getForTurn(turnId);
+
+    // Convert Date to ISO string for serialization
+    return {
+      messages: messages.map((m) => ({
+        id: m.id,
+        conversationId: m.conversationId,
+        turnId: m.turnId,
+        role: m.role,
+        content: m.content,
+        createdAt: m.createdAt instanceof Date ? m.createdAt.toISOString() : String(m.createdAt),
+      })),
+    };
+  }
+
+  /**
    * Start an agent call from a workflow node or another agent.
    *
    * Unlike startTurn (user-initiated via WebSocket), this:
@@ -1239,20 +1267,6 @@ export class Conversation extends DurableObject {
         message: error,
         code: 'CONTEXT_ASSEMBLY_FAILED',
       });
-
-      // Sync failure to D1
-      const ctx = this.getDispatchContext();
-      ctx.waitUntil(
-        ctx.resources
-          .turns()
-          .fail(turnId)
-          .catch((syncError: Error) => {
-            this.emitter.emitTrace({
-              type: 'dispatch.turn.d1_sync_failed',
-              payload: { turnId, action: 'fail', error: syncError.message },
-            });
-          }),
-      );
     } catch (err) {
       this.logger.error({
         eventType: 'conversation.context_assembly_error.handler_failed',

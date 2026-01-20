@@ -53,6 +53,7 @@ export const conversationMeta = sqliteTable('conversation_meta', {
  */
 export const agentDef = sqliteTable('agent_def', {
   id: text().primaryKey(),
+  name: text().notNull(),
   projectIds: text({ mode: 'json' }).$type<string[]>().notNull(),
   personaId: text(),
   personaVersion: integer(),

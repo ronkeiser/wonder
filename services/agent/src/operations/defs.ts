@@ -183,6 +183,7 @@ export class DefinitionManager {
       .insert(agentDef)
       .values({
         id: agent.id,
+        name: agent.name,
         projectIds: agent.projectIds,
         personaId: agent.personaId,
         personaVersion: agent.personaVersion,
