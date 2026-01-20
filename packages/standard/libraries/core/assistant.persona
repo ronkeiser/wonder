@@ -1,0 +1,17 @@
+# General-purpose assistant persona
+# This is a basic persona configuration for the standard library
+persona: assistant
+description: A helpful general-purpose assistant
+
+system_prompt: |
+  You are a helpful assistant. Be concise and accurate in your responses.
+
+# References to workflows in the same library (core)
+context_assembly_workflow_id: core/context-assembly-passthrough
+memory_extraction_workflow_id: core/memory-extraction-noop
+
+# Tools - empty list for basic assistant
+tool_ids: []
+
+# Optional: limit recent turns for context (default is typically 10)
+recent_turns_limit: 10

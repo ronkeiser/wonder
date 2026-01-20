@@ -1,0 +1,78 @@
+# Context Assembly Passthrough Workflow
+#
+# A minimal context assembly workflow that passes through the user message
+# as an LLM request. This is the simplest possible implementation - it takes
+# the system prompt from the persona and the user message, and constructs
+# the llmRequest structure expected by the agent loop.
+#
+# Input: ContextAssemblyInput (conversationId, userMessage, recentTurns, etc.)
+# Output: { llmRequest: { messages: [...], systemPrompt: '...' } }
+workflow: context-assembly-passthrough
+description: Passthrough context assembly that builds minimal LLM request
+
+imports:
+  passthrough_task: "./context-assembly-passthrough.task"
+
+input_schema:
+  type: object
+  properties:
+    conversationId:
+      type: string
+    userMessage:
+      type: string
+    systemPrompt:
+      type: string
+    recentTurns:
+      type: array
+      items:
+        type: object
+    modelProfileId:
+      type: string
+    toolIds:
+      type: array
+      items:
+        type: string
+    toolDefinitions:
+      type: array
+      items:
+        type: object
+  required: [conversationId, userMessage, systemPrompt]
+
+output_schema:
+  type: object
+  properties:
+    llmRequest:
+      type: object
+      properties:
+        messages:
+          type: array
+          items:
+            type: object
+            properties:
+              role:
+                type: string
+              content:
+                type: string
+            required: [role, content]
+        systemPrompt:
+          type: string
+      required: [messages, systemPrompt]
+  required: [llmRequest]
+
+output_mapping:
+  llmRequest: "$.output.llmRequest"
+
+initial_node_ref: build_request
+
+nodes:
+  build_request:
+    name: Build LLM Request
+    task_id: passthrough_task
+    task_version: 1
+    input_mapping:
+      userMessage: "$.input.userMessage"
+      systemPrompt: "$.input.systemPrompt"
+    output_mapping:
+      "output.llmRequest": "$.llmRequest"
+
+transitions: []

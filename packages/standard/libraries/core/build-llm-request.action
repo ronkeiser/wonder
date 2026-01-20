@@ -1,0 +1,7 @@
+# Context action for building LLM requests
+# This is a passthrough action that allows output mapping to construct the llmRequest
+action: build-llm-request
+description: Builds minimal LLM request structure (passthrough for output mapping)
+
+kind: context
+implementation: {}

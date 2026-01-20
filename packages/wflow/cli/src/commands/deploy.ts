@@ -8,9 +8,11 @@
 import {
   formatReference,
   getDeployOrder,
+  STANDARD_LIBRARY_WORKSPACE_NAME,
   validateWorkspace,
   type Reference,
   type StandardLibraryManifest,
+  type Workspace,
   type WorkspaceDefinition,
 } from '@wonder/wflow';
 import { createClient, type WonderClient } from '@wonder/sdk';
@@ -134,7 +136,7 @@ async function runDeploy(targetPath: string, options: DeployOptions): Promise<vo
   }
 
   // Deploy!
-  const results = await deployDefinitions(deployOrder, options, c, standardLibrary);
+  const results = await deployDefinitions(deployOrder, workspace, options, c);
 
   // Report results
   reportResults(results, options, c);
@@ -146,11 +148,12 @@ async function runDeploy(targetPath: string, options: DeployOptions): Promise<vo
 
 async function deployDefinitions(
   deployOrder: WorkspaceDefinition[],
+  workspace: Workspace,
   options: DeployOptions,
   c: ReturnType<typeof getChalk>,
-  _standardLibrary?: StandardLibraryManifest,
 ): Promise<DeployResult[]> {
   const results: DeployResult[] = [];
+  const isStandardLibrary = workspace.config?.name === STANDARD_LIBRARY_WORKSPACE_NAME;
 
   if (options.dryRun) {
     // Dry run - just show what would be deployed
@@ -171,14 +174,38 @@ async function deployDefinitions(
   // Create API client
   const client = createClient(options.apiUrl, options.apiKey);
 
-  // Track server IDs for references
+  // Track server IDs for references (includes library IDs)
   const serverIds = new Map<string, string>();
+
+  // For standard library, ensure libraries exist first
+  if (isStandardLibrary) {
+    const libraryNames = new Set<string>();
+    for (const def of deployOrder) {
+      if (def.reference.scope === 'standardLibrary') {
+        libraryNames.add(def.reference.library);
+      }
+    }
+
+    for (const libraryName of libraryNames) {
+      try {
+        const libraryId = await ensureStandardLibrary(client, libraryName, options);
+        serverIds.set(`library:${libraryName}`, libraryId);
+        if (!options.quiet) {
+          console.log(`  ${c.green('✓')} library/${libraryName} - ensured`);
+        }
+      } catch (error) {
+        if (!options.quiet) {
+          console.log(`  ${c.red('✗')} library/${libraryName} - error: ${error instanceof Error ? error.message : error}`);
+        }
+      }
+    }
+  }
 
   for (const def of deployOrder) {
     const refStr = formatReference(def.reference);
 
     try {
-      const result = await deployDefinition(def, client, serverIds, options);
+      const result = await deployDefinition(def, client, serverIds, options, isStandardLibrary);
       results.push(result);
 
       if (result.serverId) {
@@ -210,16 +237,37 @@ async function deployDefinitions(
   return results;
 }
 
+/**
+ * Ensure a standard library exists (with workspaceId: null)
+ * Returns the library ID
+ */
+async function ensureStandardLibrary(
+  client: WonderClient,
+  name: string,
+  _options: DeployOptions,
+): Promise<string> {
+  // Try to find existing library
+  const { libraries } = await client.libraries.list();
+  const existing = libraries.find((lib) => lib.name === name && lib.workspaceId === null);
+
+  if (existing) {
+    return existing.id;
+  }
+
+  // Create new standard library (workspaceId: null makes it standard)
+  const result = await client.libraries.create({ name });
+  return result.libraryId;
+}
+
 async function deployDefinition(
   def: WorkspaceDefinition,
   client: WonderClient,
   serverIds: Map<string, string>,
   options: DeployOptions,
+  isStandardLibrary: boolean,
 ): Promise<DeployResult> {
-  const refStr = formatReference(def.reference);
-
   // Check if definition already exists on server
-  const existing = await findExistingDefinition(def, client, options);
+  const existing = await findExistingDefinition(def, client, serverIds, options);
 
   if (existing && !options.force) {
     // Check if content hash matches
@@ -234,7 +282,7 @@ async function deployDefinition(
   }
 
   // Create or update
-  const serverId = await createDefinition(def, client, serverIds, options);
+  const serverId = await createDefinition(def, client, serverIds, options, isStandardLibrary);
 
   return {
     definition: def,
@@ -246,6 +294,7 @@ async function deployDefinition(
 async function findExistingDefinition(
   def: WorkspaceDefinition,
   client: WonderClient,
+  serverIds: Map<string, string>,
   options: DeployOptions,
 ): Promise<{ id: string; contentHash: string | null } | null> {
   const { reference, definitionType } = def;
@@ -255,8 +304,8 @@ async function findExistingDefinition(
 
     // Use GET with query params to find by name
     const name = getName(reference);
-    const libraryId = getLibraryId(reference, options) ?? undefined;
-    const projectId = getProjectId(reference, options) ?? undefined;
+    const libraryId = getLibraryId(reference, serverIds) ?? undefined;
+    const projectId = getProjectId(reference, serverIds) ?? undefined;
 
     switch (definitionType) {
       case 'persona': {
@@ -324,13 +373,14 @@ async function findExistingDefinition(
 async function createDefinition(
   def: WorkspaceDefinition,
   client: WonderClient,
-  _serverIds: Map<string, string>,
-  options: DeployOptions,
+  serverIds: Map<string, string>,
+  _options: DeployOptions,
+  _isStandardLibrary: boolean,
 ): Promise<string> {
   const { reference, definitionType, document } = def;
 
-  const libraryId = getLibraryId(reference, options);
-  const projectId = getProjectId(reference, options);
+  const libraryId = getLibraryId(reference, serverIds);
+  const projectId = getProjectId(reference, serverIds);
 
   switch (definitionType) {
     case 'persona': {
@@ -381,19 +431,22 @@ function getName(ref: Reference): string {
   return ref.name;
 }
 
-function getLibraryId(ref: Reference, _options: DeployOptions): string | null {
+function getLibraryId(ref: Reference, serverIds: Map<string, string>): string | null {
+  if (ref.scope === 'standardLibrary') {
+    // Standard library - look up from serverIds
+    return serverIds.get(`library:${ref.library}`) ?? null;
+  }
   if (ref.scope === 'workspaceLibrary') {
-    // TODO: Look up library ID from server by name
-    // For now, we'd need the library to already exist
-    return null;
+    // Workspace library - look up from serverIds
+    return serverIds.get(`library:${ref.library}`) ?? null;
   }
   return null;
 }
 
-function getProjectId(ref: Reference, _options: DeployOptions): string | null {
+function getProjectId(ref: Reference, serverIds: Map<string, string>): string | null {
   if (ref.scope === 'project') {
-    // TODO: Look up project ID from server by name
-    return null;
+    // Look up project ID from serverIds
+    return serverIds.get(`project:${ref.project}`) ?? null;
   }
   return null;
 }

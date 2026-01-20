@@ -58,17 +58,18 @@ export function validatePersonaDocument(doc: PersonaDocument, imports: ImportsMa
     });
   }
 
-  // Validate modelProfileId is present
+  // Validate modelProfileId - warn if missing (required for deployment but not local validation)
+  // Model profiles are database entities, not file references, so they can't be validated locally
   if (!doc.modelProfileId) {
     diagnostics.push({
-      severity: DiagnosticSeverity.Error,
+      severity: DiagnosticSeverity.Warning,
       range: {
         start: { line: 0, character: 0 },
         end: { line: 0, character: 0 },
       },
-      message: "Missing required property 'model_profile_id'",
+      message: "Missing 'model_profile_id' - required for deployment",
       source: 'wflow',
-      code: 'MISSING_REQUIRED',
+      code: 'MISSING_DEPLOYMENT_REQUIRED',
     });
   }
 

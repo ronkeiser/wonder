@@ -1,0 +1,7 @@
+# Noop action - does nothing
+# Used as a placeholder in workflows that need to execute but have no operations
+action: noop
+description: Does nothing (passthrough action)
+
+kind: context
+implementation: {}

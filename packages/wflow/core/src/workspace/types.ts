@@ -52,11 +52,16 @@ export interface WorkspaceDefinition {
  * Workspace configuration from wflow.config.yaml
  */
 export interface WorkspaceConfig {
-  /** Default workspace ID for deployment */
-  workspaceId?: string;
+  /** Workspace name - required, must be unique. 'standard' is reserved for the standard library. */
+  name: string;
   /** Glob patterns to exclude from loading */
   exclude?: string[];
 }
+
+/**
+ * Reserved workspace name for the standard library
+ */
+export const STANDARD_LIBRARY_WORKSPACE_NAME = 'standard';
 
 /**
  * Loaded workspace with all definitions

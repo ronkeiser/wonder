@@ -7,6 +7,7 @@ import {
   formatReference,
   getFileType,
   parseDocument,
+  STANDARD_LIBRARY_WORKSPACE_NAME,
   tryParseReference,
   type AnyDocument,
   type DefinitionType,
@@ -223,6 +224,9 @@ export async function loadWorkspace(rootPath: string): Promise<Workspace> {
   const config = await loadWorkspaceConfig(absoluteRoot);
   const exclude = config?.exclude ?? [];
 
+  // Check if this is the standard library workspace
+  const isStandardLibrary = config?.name === STANDARD_LIBRARY_WORKSPACE_NAME;
+
   // Find all definition files in standard directories
   const standardDirs = ['personas', 'agents', 'libraries', 'projects'];
   const allFiles: Array<{ absolutePath: string; relativePath: string }> = [];
@@ -253,7 +257,7 @@ export async function loadWorkspace(rootPath: string): Promise<Workspace> {
     // Determine reference from path
     const pathParts = relativePath.split(path.sep);
     const fileName = path.basename(absolutePath);
-    const reference = deriveReference(pathParts, fileName);
+    const reference = deriveReference(pathParts, fileName, isStandardLibrary);
 
     if (!reference) continue;
 
@@ -280,8 +284,16 @@ export async function loadWorkspace(rootPath: string): Promise<Workspace> {
 
 /**
  * Derive a reference from path parts and filename
+ *
+ * @param pathParts - Path parts relative to workspace root
+ * @param fileName - The file name including extension
+ * @param isStandardLibrary - Whether this is the standard library workspace
  */
-function deriveReference(pathParts: string[], fileName: string): Reference | null {
+function deriveReference(
+  pathParts: string[],
+  fileName: string,
+  isStandardLibrary: boolean,
+): Reference | null {
   const nameWithoutExt = fileName.replace(/\.[^.]+$/, '');
   const rootDir = pathParts[0];
 
@@ -293,6 +305,10 @@ function deriveReference(pathParts: string[], fileName: string): Reference | nul
   if (rootDir === 'libraries' && pathParts.length >= 3) {
     // libraries/mylib/name.ext
     const library = pathParts[1];
+    // Standard library uses 'standardLibrary' scope, others use 'workspaceLibrary'
+    if (isStandardLibrary) {
+      return { scope: 'standardLibrary', library, name: nameWithoutExt };
+    }
     return { scope: 'workspaceLibrary', library, name: nameWithoutExt };
   }
 

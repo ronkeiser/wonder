@@ -1,0 +1,21 @@
+# Noop task for memory extraction
+# This task does nothing - used when memory extraction is not needed
+task: memory-extraction-noop
+description: Does nothing (noop for memory extraction)
+
+imports:
+  noop_action: "./noop.action"
+
+input_schema:
+  type: object
+  properties: {}
+
+output_schema:
+  type: object
+  properties: {}
+
+steps:
+  - ref: noop
+    action_id: noop_action
+    input_mapping: {}
+    output_mapping: {}

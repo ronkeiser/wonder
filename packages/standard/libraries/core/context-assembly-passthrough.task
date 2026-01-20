@@ -1,0 +1,46 @@
+# Task that builds an LLM request from user message
+# This is a passthrough that constructs the required llmRequest structure
+task: context-assembly-passthrough
+description: Builds LLM request from user message for context assembly
+
+imports:
+  build_llm_request: "./build-llm-request.action"
+
+input_schema:
+  type: object
+  properties:
+    userMessage:
+      type: string
+    systemPrompt:
+      type: string
+  required: [userMessage, systemPrompt]
+
+output_schema:
+  type: object
+  properties:
+    llmRequest:
+      type: object
+      properties:
+        messages:
+          type: array
+          items:
+            type: object
+            properties:
+              role:
+                type: string
+              content:
+                type: string
+            required: [role, content]
+        systemPrompt:
+          type: string
+      required: [messages, systemPrompt]
+  required: [llmRequest]
+
+steps:
+  - ref: build_request
+    action_id: build_llm_request
+    input_mapping:
+      userMessage: "$.input.userMessage"
+      systemPrompt: "$.input.systemPrompt"
+    output_mapping:
+      "output.llmRequest": "{ messages: [{ role: 'user', content: result.userMessage }], systemPrompt: result.systemPrompt }"

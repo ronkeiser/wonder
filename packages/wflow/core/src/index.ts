@@ -189,6 +189,8 @@ export {
   type WorkspaceConfig,
   type WorkspaceDefinition,
   type WorkspaceValidationResult,
+  // Constants
+  STANDARD_LIBRARY_WORKSPACE_NAME,
   // Reference parsing
   formatReference,
   isValidName,

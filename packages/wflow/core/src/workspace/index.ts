@@ -14,6 +14,9 @@ export type {
   WorkspaceValidationResult,
 } from './types.js';
 
+// Constants
+export { STANDARD_LIBRARY_WORKSPACE_NAME } from './types.js';
+
 // Reference parsing
 export {
   formatReference,

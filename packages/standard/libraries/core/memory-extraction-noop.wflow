@@ -1,0 +1,44 @@
+# Memory Extraction Noop Workflow
+#
+# A minimal memory extraction workflow that does nothing.
+# Memory extraction is called after each turn to extract facts for long-term memory.
+# This noop implementation is used when memory extraction is not needed.
+#
+# Input: MemoryExtractionInput (agentId, turnId, transcript)
+# Output: {} (side effects only, this does nothing)
+workflow: memory-extraction-noop
+description: Noop memory extraction workflow (does nothing)
+
+imports:
+  noop_task: "./memory-extraction-noop.task"
+
+input_schema:
+  type: object
+  properties:
+    agentId:
+      type: string
+    turnId:
+      type: string
+    transcript:
+      type: array
+      items:
+        type: object
+  required: [agentId, turnId, transcript]
+
+output_schema:
+  type: object
+  properties: {}
+
+output_mapping: {}
+
+initial_node_ref: noop
+
+nodes:
+  noop:
+    name: Noop
+    task_id: noop_task
+    task_version: 1
+    input_mapping: {}
+    output_mapping: {}
+
+transitions: []

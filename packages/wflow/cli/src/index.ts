@@ -1,5 +1,3 @@
-#!/usr/bin/env node
-
 /**
  * wflow CLI - Workflow testing and execution
  */
