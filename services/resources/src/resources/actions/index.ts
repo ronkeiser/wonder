@@ -13,6 +13,8 @@ export class Actions extends Resource {
     reused: boolean;
     /** Version number of the created/reused action */
     version: number;
+    /** Latest version for this name (only present when reused=true) */
+    latestVersion?: number;
   }> {
     this.serviceCtx.logger.info({
       eventType: 'action.create.started',
@@ -31,6 +33,7 @@ export class Actions extends Resource {
         action: autoversionResult.entity,
         reused: true,
         version: autoversionResult.entity.version,
+        latestVersion: autoversionResult.latestVersion,
       };
     }
 

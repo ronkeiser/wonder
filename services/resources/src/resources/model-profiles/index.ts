@@ -13,6 +13,8 @@ export class ModelProfiles extends Resource {
     reused: boolean;
     /** Version number of the created/reused model profile */
     version: number;
+    /** Latest version for this name (only present when reused=true) */
+    latestVersion?: number;
   }> {
     return this.withLogging(
       'create',
@@ -34,6 +36,7 @@ export class ModelProfiles extends Resource {
             modelProfile: autoversionResult.entity,
             reused: true,
             version: 1, // Model profiles don't have versioning yet
+            latestVersion: autoversionResult.latestVersion,
           };
         }
 

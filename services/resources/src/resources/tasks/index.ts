@@ -15,6 +15,8 @@ export class Tasks extends Resource {
     reused: boolean;
     /** Version number of the created/reused task */
     version: number;
+    /** Latest version for this name (only present when reused=true) */
+    latestVersion?: number;
   }> {
     this.serviceCtx.logger.info({
       eventType: 'task.create.started',
@@ -54,6 +56,7 @@ export class Tasks extends Resource {
         task: autoversionResult.entity,
         reused: true,
         version: autoversionResult.entity.version,
+        latestVersion: autoversionResult.latestVersion,
       };
     }
 

@@ -13,6 +13,8 @@ export class Personas extends Resource {
     reused: boolean;
     /** Version number of the created/reused persona */
     version: number;
+    /** Latest version for this name (only present when reused=true) */
+    latestVersion?: number;
   }> {
     this.serviceCtx.logger.info({
       eventType: 'persona.create.started',
@@ -40,6 +42,7 @@ export class Personas extends Resource {
         persona: autoversionResult.entity,
         reused: true,
         version: autoversionResult.entity.version,
+        latestVersion: autoversionResult.latestVersion,
       };
     }
 

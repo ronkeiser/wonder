@@ -38,6 +38,10 @@ interface DeployResult {
   action: 'created' | 'updated' | 'skipped' | 'error';
   serverId?: string;
   message?: string;
+  /** Version that was matched when skipping */
+  matchedVersion?: number;
+  /** Latest version for this name when skipping */
+  latestVersion?: number;
 }
 
 export const deployCommand = new Command('deploy')
@@ -220,7 +224,18 @@ async function deployDefinitions(
             : result.action === 'updated'
               ? c.yellow('↺')
               : c.gray('○');
-        console.log(`  ${icon} ${refStr} (${def.definitionType}) - ${result.action}`);
+
+        // Check if skipping with an old version (not the latest)
+        const isOldVersion = result.action === 'skipped' &&
+          result.matchedVersion !== undefined &&
+          result.latestVersion !== undefined &&
+          result.matchedVersion < result.latestVersion;
+
+        if (isOldVersion) {
+          console.log(`  ${c.yellow('⚠')} ${refStr} (${def.definitionType}) - skipped (matches v${result.matchedVersion}, latest is v${result.latestVersion})`);
+        } else {
+          console.log(`  ${icon} ${refStr} (${def.definitionType}) - ${result.action}`);
+        }
       }
     } catch (error) {
       results.push({
@@ -284,6 +299,8 @@ async function deployDefinition(
     definition: def,
     action,
     serverId: result.id,
+    matchedVersion: result.reused ? result.version : undefined,
+    latestVersion: result.latestVersion,
   };
 }
 
@@ -291,9 +308,9 @@ async function createDefinition(
   def: WorkspaceDefinition,
   client: WonderClient,
   serverIds: Map<string, string>,
-  _options: DeployOptions,
+  options: DeployOptions,
   _isStandardLibrary: boolean,
-): Promise<{ id: string; reused: boolean; version: number }> {
+): Promise<{ id: string; reused: boolean; version: number; latestVersion?: number }> {
   const { reference, definitionType, document } = def;
 
   const libraryId = getLibraryId(reference, serverIds);
@@ -310,9 +327,10 @@ async function createDefinition(
         modelProfileId: resolveReferenceId(personaDoc.modelProfileId as string | undefined, serverIds),
         contextAssemblyWorkflowId: resolveReferenceId(personaDoc.contextAssemblyWorkflowId as string | undefined, serverIds),
         memoryExtractionWorkflowId: resolveReferenceId(personaDoc.memoryExtractionWorkflowId as string | undefined, serverIds),
-        autoversion: true,
+        autoversion: !options.force,
       } as Parameters<typeof client.personas.create>[0]);
-      return { id: result.personaId, reused: result.reused ?? false, version: result.version };
+      const latestVersion = (result as { latestVersion?: number }).latestVersion;
+      return { id: result.personaId, reused: result.reused ?? false, version: result.version, latestVersion };
     }
     case 'tool': {
       // Tools don't support autoversion
@@ -329,9 +347,10 @@ async function createDefinition(
         name: getName(reference),
         libraryId: libraryId ?? undefined,
         projectId: projectId ?? undefined,
-        autoversion: true,
+        autoversion: !options.force,
       } as Parameters<typeof client.tasks.create>[0]);
-      return { id: result.taskId, reused: result.reused ?? false, version: result.version };
+      const latestVersion = (result as { latestVersion?: number }).latestVersion;
+      return { id: result.taskId, reused: result.reused ?? false, version: result.version, latestVersion };
     }
     case 'workflow': {
       const wfClient = client['workflow-defs'];
@@ -340,17 +359,19 @@ async function createDefinition(
         name: getName(reference),
         libraryId: libraryId ?? undefined,
         projectId: projectId ?? undefined,
-        autoversion: true,
+        autoversion: !options.force,
       } as Parameters<typeof wfClient.create>[0]);
-      return { id: result.workflowDefId, reused: result.reused ?? false, version: result.version };
+      const latestVersion = (result as { latestVersion?: number }).latestVersion;
+      return { id: result.workflowDefId, reused: result.reused ?? false, version: result.version, latestVersion };
     }
     case 'model': {
       const result = await client['model-profiles'].create({
         ...(document as Record<string, unknown>),
         name: getName(reference),
-        autoversion: true,
+        autoversion: !options.force,
       } as unknown as Parameters<typeof client['model-profiles']['create']>[0]);
-      return { id: result.modelProfileId, reused: result.reused ?? false, version: result.version };
+      const latestVersion = (result as { latestVersion?: number }).latestVersion;
+      return { id: result.modelProfileId, reused: result.reused ?? false, version: result.version, latestVersion };
     }
     case 'action': {
       const actionDoc = document as Record<string, unknown>;
@@ -364,9 +385,10 @@ async function createDefinition(
         produces: actionDoc.produces as Record<string, unknown> | undefined,
         execution: actionDoc.execution as Record<string, unknown> | undefined,
         idempotency: actionDoc.idempotency as Record<string, unknown> | undefined,
-        autoversion: true,
+        autoversion: !options.force,
       });
-      return { id: result.actionId, reused: result.reused ?? false, version: result.version };
+      const latestVersion = (result as { latestVersion?: number }).latestVersion;
+      return { id: result.actionId, reused: result.reused ?? false, version: result.version, latestVersion };
     }
     default:
       throw new Error(`Unsupported definition type: ${definitionType}`);

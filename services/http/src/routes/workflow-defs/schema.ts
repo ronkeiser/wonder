@@ -161,6 +161,9 @@ export const WorkflowDefCreateResponseSchema = z
     /** True if an existing workflow def was reused (autoversion matched content hash) */
     reused: z.boolean(),
     version: z.number().openapi({ description: 'Version number of the created/reused workflow def' }),
+    latestVersion: z.number().optional().openapi({
+      description: 'Latest version for this name (only present when reused=true)',
+    }),
   })
   .openapi('WorkflowDefCreateResponse');
 

@@ -26,7 +26,7 @@ export interface AutoversionRepo<TEntity> {
  * Result of autoversion check.
  */
 export type AutoversionResult<TEntity> =
-  | { reused: true; entity: TEntity; contentHash: string }
+  | { reused: true; entity: TEntity; contentHash: string; latestVersion: number }
   | { reused: false; version: number; contentHash: string };
 
 /**
@@ -135,6 +135,9 @@ export abstract class Resource extends RpcTarget {
 
     const contentHash = await computeContentHash(data);
 
+    // Get max version first (we need it for both reuse and create paths)
+    const maxVersion = await repo.getMaxVersion(data.name, scope);
+
     // Check for existing entity with same name + content
     const existing = await repo.findByNameAndHash(data.name, contentHash, scope);
 
@@ -144,14 +147,15 @@ export abstract class Resource extends RpcTarget {
         metadata: {
           name: data.name,
           content_hash: contentHash,
+          matched_version: (existing as { version?: number }).version,
+          latest_version: maxVersion,
         },
       });
 
-      return { reused: true, entity: existing, contentHash };
+      return { reused: true, entity: existing, contentHash, latestVersion: maxVersion };
     }
 
     // No exact match - determine version number
-    const maxVersion = await repo.getMaxVersion(data.name, scope);
     const newVersion = maxVersion + 1;
 
     this.serviceCtx.logger.info({

@@ -156,6 +156,9 @@ export const TaskCreateResponseSchema = z
       .boolean()
       .openapi({ description: 'True if an existing task was reused (autoversion matched)' }),
     version: z.number().openapi({ description: 'Version number of the created/reused task' }),
+    latestVersion: z.number().optional().openapi({
+      description: 'Latest version for this name (only present when reused=true)',
+    }),
   })
   .openapi('TaskCreateResponse');
 

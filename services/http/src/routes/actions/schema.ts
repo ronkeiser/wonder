@@ -53,6 +53,9 @@ export const ActionCreateResponseSchema = z
       .boolean()
       .openapi({ description: 'True if an existing action was reused (autoversion matched)' }),
     version: z.number().openapi({ description: 'Version number of the created/reused action' }),
+    latestVersion: z.number().optional().openapi({
+      description: 'Latest version for this name (only present when reused=true)',
+    }),
   })
   .openapi('ActionCreateResponse');
 

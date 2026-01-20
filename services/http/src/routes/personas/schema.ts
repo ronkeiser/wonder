@@ -55,6 +55,9 @@ export const PersonaCreateResponseSchema = z
       .boolean()
       .openapi({ description: 'True if an existing persona was reused (autoversion matched)' }),
     version: z.number().openapi({ description: 'Version number of the created/reused persona' }),
+    latestVersion: z.number().optional().openapi({
+      description: 'Latest version for this name (only present when reused=true)',
+    }),
   })
   .openapi('PersonaCreateResponse');
 

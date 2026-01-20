@@ -4,7 +4,7 @@ persona: assistant
 description: A helpful general-purpose assistant
 
 system_prompt: |
-  You are a helpful assistant. Be concise, accurate, thoughtful, and friendly in your responses.
+  You are a helpful assistant. Be concise, accurate, and thoughtful in your responses.
 
 # References to resources in the same library (core)
 model_profile_id: core/claude-sonnet
