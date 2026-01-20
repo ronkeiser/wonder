@@ -191,18 +191,83 @@ Compares local files against current server state. Shows:
 - Server changes not yet pulled
 - Definitions that exist only locally or only on server
 
+## CLI Architecture
+
+The `wflow check` and `wflow deploy` commands share a common foundation for workspace loading and validation.
+
+### Shared Infrastructure
+
+```
+┌─────────────────────────────────────────────────────────────┐
+│  WorkspaceLoader                                            │
+│  1. Discover files from directory structure                 │
+│  2. Parse each file → AST document                          │
+│  3. Infer (target, name) from path                          │
+│  4. Build reference map: (target, name) → document          │
+└─────────────────────────────────────────────────────────────┘
+                              │
+                              ▼
+┌─────────────────────────────────────────────────────────────┐
+│  WorkspaceValidator                                         │
+│  1. For each document, resolve references against the map   │
+│  2. Report unresolved references as diagnostics             │
+│  3. Detect cycles in dependency graph                       │
+└─────────────────────────────────────────────────────────────┘
+                              │
+              ┌───────────────┴───────────────┐
+              ▼                               ▼
+┌─────────────────────────┐     ┌─────────────────────────────┐
+│  wflow check            │     │  wflow deploy               │
+│  Report diagnostics     │     │  1. Topological sort        │
+│  Exit with status code  │     │  2. Create via API in order │
+└─────────────────────────┘     │  3. Capture ULIDs           │
+                                │  4. Use ULIDs for parents   │
+                                └─────────────────────────────┘
+```
+
+### Reference Resolution
+
+Files reference other definitions by name. During validation, these references are resolved against the workspace's reference map.
+
+Example `.persona` file:
+```yaml
+persona: code-assistant
+toolIds:
+  - shell-exec      # resolved to libraries/core/shell-exec.tool
+  - file-read       # resolved to libraries/core/file-read.tool
+contextAssemblyWorkflowId: context-assembly  # resolved to libraries/core/context-assembly.wflow
+```
+
+The loader builds the reference map from directory structure:
+- `libraries/core/shell-exec.tool` → `(library: core, name: shell-exec)`
+- `libraries/core/context-assembly.wflow` → `(library: core, name: context-assembly)`
+
+Validation verifies that `shell-exec`, `file-read`, and `context-assembly` exist in the map.
+
+### Deploy Order
+
+Deploy creates resources in dependency order. A persona that references tools and workflows requires those to be created first.
+
+1. Parse all files, build dependency graph from references
+2. Topological sort to determine creation order
+3. For each resource in order:
+   - Create via API with `autoversion: true`
+   - Capture returned ULID
+   - Use captured ULIDs when creating dependent resources
+
+This mirrors the pattern used in `packages/tests/src/kit/resources.ts` for embedded resource creation in tests.
+
 ## Relationship to Existing Tooling
 
-The `@wonder/wflow` package already provides:
-- **Parser**: Parses `.wflow`, `.task`, `.action`, `.test`, `.run` files
+The `@wonder/wflow` package provides:
+- **Parser**: Parses `.wflow`, `.task`, `.action`, `.test`, `.run`, `.persona`, `.tool` files
 - **Analyzer**: Graph analysis, data flow analysis, schema validation
 - **LSP**: IDE support with diagnostics, completions, hover, go-to-definition
 
-The `@wonder/wflow-cli` currently supports:
+The `@wonder/wflow-cli` provides:
+- `wflow check` — validate workspace locally (uses shared loader/validator)
 - `wflow test` — run `.test` files against the API
-- `wflow check` — validate files locally
-
-The `wflow deploy` command extends this with sync/deploy functionality.
+- `wflow deploy` — sync local definitions to server (uses shared loader/validator)
 
 ## Multi-Interface Editing
 
