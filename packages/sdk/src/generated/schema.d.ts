@@ -626,7 +626,7 @@ export interface paths {
             path?: never;
             cookie?: never;
         };
-        /** @description WebSocket connection for real-time conversation events. Supports bidirectional communication - send messages as turns and receive all conversation events. */
+        /** @description WebSocket connection for real-time conversation events (observability). Connects to the Streamer DO for event/trace streams. */
         get: {
             parameters: {
                 query?: {
@@ -635,6 +635,53 @@ export interface paths {
                     /** @description API key for authentication (WebSocket cannot use headers) */
                     apiKey?: string;
                 };
+                header?: never;
+                path: {
+                    id: string;
+                };
+                cookie?: never;
+            };
+            requestBody?: never;
+            responses: {
+                /** @description WebSocket upgrade successful */
+                101: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content?: never;
+                };
+                /** @description Upgrade required - WebSocket expected */
+                426: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": {
+                            error: string;
+                        };
+                    };
+                };
+            };
+        };
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/conversations/{id}/chat": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** @description WebSocket connection for chat UI. Connects directly to the Conversation DO for real-time message streaming. */
+        get: {
+            parameters: {
+                query?: never;
                 header?: never;
                 path: {
                     id: string;
@@ -903,105 +950,6 @@ export interface paths {
         put?: never;
         post?: never;
         delete?: never;
-        options?: never;
-        head?: never;
-        patch?: never;
-        trace?: never;
-    };
-    "/messages": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        get?: never;
-        put?: never;
-        post: {
-            parameters: {
-                query?: never;
-                header?: never;
-                path?: never;
-                cookie?: never;
-            };
-            requestBody?: {
-                content: {
-                    "application/json": components["schemas"]["CreateMessage"];
-                };
-            };
-            responses: {
-                /** @description Message created successfully */
-                201: {
-                    headers: {
-                        [name: string]: unknown;
-                    };
-                    content: {
-                        "application/json": components["schemas"]["MessageCreateResponse"];
-                    };
-                };
-            };
-        };
-        delete?: never;
-        options?: never;
-        head?: never;
-        patch?: never;
-        trace?: never;
-    };
-    "/messages/{id}": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        get: {
-            parameters: {
-                query?: never;
-                header?: never;
-                path: {
-                    id: string;
-                };
-                cookie?: never;
-            };
-            requestBody?: never;
-            responses: {
-                /** @description Message retrieved successfully */
-                200: {
-                    headers: {
-                        [name: string]: unknown;
-                    };
-                    content: {
-                        "application/json": components["schemas"]["MessageGetResponse"];
-                    };
-                };
-            };
-        };
-        put?: never;
-        post?: never;
-        delete: {
-            parameters: {
-                query?: never;
-                header?: never;
-                path: {
-                    id: string;
-                };
-                cookie?: never;
-            };
-            requestBody?: never;
-            responses: {
-                /** @description Message deleted successfully */
-                200: {
-                    headers: {
-                        [name: string]: unknown;
-                    };
-                    content: {
-                        "application/json": {
-                            success: boolean;
-                        };
-                    };
-                };
-            };
-        };
         options?: never;
         head?: never;
         patch?: never;
@@ -2594,6 +2542,7 @@ export interface components {
         Agent: {
             /** @example 01ARZ3NDEKTSV4RRFFQ69G5FAV */
             id: string;
+            name: string;
             projectIds: string[];
             personaId: string | null;
             personaVersion: number | null;
@@ -2605,6 +2554,8 @@ export interface components {
             agent: components["schemas"]["Agent"];
         };
         CreateAgent: {
+            /** @example Jimmy */
+            name: string;
             /**
              * @example [
              *       "proj_123"
@@ -2823,27 +2774,6 @@ export interface components {
         };
         TraceEventsResponse: {
             events: components["schemas"]["TraceEventEntry"][];
-        };
-        MessageCreateResponse: {
-            message: components["schemas"]["Message"];
-        };
-        CreateMessage: {
-            /** @example 01ARZ3NDEKTSV4RRFFQ69G5FAV */
-            id: string;
-            /** @example 01ARZ3NDEKTSV4RRFFQ69G5FAV */
-            conversationId: string;
-            /** @example 01ARZ3NDEKTSV4RRFFQ69G5FAV */
-            turnId: string;
-            /**
-             * @example user
-             * @enum {string}
-             */
-            role: "user" | "agent";
-            /** @example Hello, how can I help? */
-            content: string;
-        };
-        MessageGetResponse: {
-            message: components["schemas"]["Message"];
         };
         ModelProfile: {
             id: string;

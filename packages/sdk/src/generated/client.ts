@@ -170,6 +170,8 @@ export function createClient(baseClient: any) {
             }
           },
           ws: {
+          },
+          chat: {
           }
         }),
       {
@@ -199,27 +201,6 @@ export function createClient(baseClient: any) {
         return data;
       }
     },
-    messages: Object.assign(
-      (id: string) => ({
-          get: async (options?: any): Promise<paths['/messages/{id}']['get']['responses']['200']['content']['application/json']> => {
-            const { data, error } = await baseClient.GET(`/messages/${id}`, {});
-            if (error) throw new ApiError(`GET /messages/${id} failed`, error);
-            return data;
-          },
-          delete: async (options?: any): Promise<paths['/messages/{id}']['delete']['responses']['200']['content']['application/json']> => {
-            const { data, error } = await baseClient.DELETE(`/messages/${id}`, {});
-            if (error) throw new ApiError(`DELETE /messages/${id} failed`, error);
-            return data;
-          }
-        }),
-      {
-        create: async (body: NonNullable<paths['/messages']['post']['requestBody']>['content']['application/json'], options?: any): Promise<paths['/messages']['post']['responses']['201']['content']['application/json']> => {
-          const { data, error } = await baseClient.POST(`/messages`, { body });
-          if (error) throw new ApiError(`POST /messages failed`, error);
-          return data;
-        }
-      }
-    ),
     "model-profiles": Object.assign(
       (id: string) => ({
           get: async (options?: any): Promise<paths['/model-profiles/{id}']['get']['responses']['200']['content']['application/json']> => {
