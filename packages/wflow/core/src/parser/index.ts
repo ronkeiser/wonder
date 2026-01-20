@@ -4,6 +4,7 @@ import type {
   AnyDocument,
   FileType,
   ModelDocument,
+  NodeDecl,
   PersonaDocument,
   RunDocument,
   TaskDocument,
@@ -14,9 +15,10 @@ import type {
 
 /**
  * Convert snake_case string to camelCase
+ * Handles underscore followed by any alphanumeric character (e.g., cost_per_1k -> costPer1k)
  */
 function snakeToCamel(str: string): string {
-  return str.replace(/_([a-z])/g, (_, letter) => letter.toUpperCase());
+  return str.replace(/_([a-z0-9])/gi, (_, char) => char.toUpperCase());
 }
 
 /**
@@ -181,13 +183,68 @@ export function parseDocument<T extends AnyDocument>(
 
 /**
  * Parse a workflow document
+ * Normalizes nodes from object format (YAML-friendly) to array format (API-compatible)
+ * Preserves original node ref keys (they are user-defined identifiers, not schema keys)
  */
 export function parseWorkflow(
   text: string,
   uri: string,
   resolveImportPath?: (importPath: string) => string | null,
 ): ParseResult<WflowDocument> {
-  return parseDocument<WflowDocument>(text, uri, resolveImportPath);
+  const fileType = getFileType(uri);
+  const lines = text.split('\n');
+
+  try {
+    const rawDocument = parseYaml(text) as Record<string, unknown> | null;
+
+    if (!rawDocument) {
+      return {
+        document: null,
+        imports: { byAlias: new Map(), all: [] },
+        fileType,
+      };
+    }
+
+    // Extract original node refs BEFORE snake_to_camel conversion
+    // Node refs are user-defined identifiers that should stay as-is
+    const originalNodeRefs = rawDocument.nodes && typeof rawDocument.nodes === 'object' && !Array.isArray(rawDocument.nodes)
+      ? Object.keys(rawDocument.nodes)
+      : null;
+
+    // Convert snake_case keys to camelCase
+    const document = deepSnakeToCamel(rawDocument) as WflowDocument;
+
+    // Normalize nodes from object to array, using original refs
+    if (document.nodes && !Array.isArray(document.nodes) && originalNodeRefs) {
+      const nodesObj = document.nodes as unknown as Record<string, Omit<NodeDecl, 'ref'>>;
+      const convertedKeys = Object.keys(nodesObj);
+
+      // Map converted keys back to original refs
+      document.nodes = convertedKeys.map((convertedKey, index) => ({
+        ref: originalNodeRefs[index], // Use original ref, not the camelCased one
+        ...nodesObj[convertedKey],
+      }));
+    }
+
+    const imports = parseImports(
+      document.imports,
+      lines,
+      resolveImportPath,
+    );
+
+    return {
+      document,
+      imports,
+      fileType,
+    };
+  } catch (e) {
+    return {
+      document: null,
+      imports: { byAlias: new Map(), all: [] },
+      fileType,
+      error: e as Error,
+    };
+  }
 }
 
 /**

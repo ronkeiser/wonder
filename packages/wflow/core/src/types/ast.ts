@@ -117,7 +117,8 @@ export interface WflowDocument {
   outputSchema?: JSONSchemaProperty;
   outputMapping?: Record<string, string>;
   resources?: Record<string, ResourceDecl>;
-  nodes?: Record<string, NodeDecl>;
+  /** Nodes in API-compatible array format (normalized from YAML object format by parser) */
+  nodes?: NodeDecl[];
   transitions?: Record<string, TransitionDecl>;
   initialNodeRef?: string;
   timeoutMs?: number;
@@ -495,7 +496,6 @@ export interface ToolDocument {
 
 /**
  * Model profile document (.model file)
- * Note: costPer_1k* property names are due to snake_to_camel not converting _1 (digit after underscore)
  */
 export interface ModelDocument {
   imports?: Record<string, string>;
@@ -505,8 +505,8 @@ export interface ModelDocument {
   modelId?: string;
   parameters?: Record<string, unknown>;
   executionConfig?: Record<string, unknown>;
-  costPer_1kInputTokens?: number;
-  costPer_1kOutputTokens?: number;
+  costPer1kInputTokens?: number;
+  costPer1kOutputTokens?: number;
   _loc?: SourceLocation;
 }
 

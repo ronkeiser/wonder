@@ -84,7 +84,7 @@ export function validateModelDocument(doc: ModelDocument, _imports: ImportsMap):
   }
 
   // Validate cost fields are non-negative if provided
-  if (doc.costPer_1kInputTokens !== undefined && doc.costPer_1kInputTokens < 0) {
+  if (doc.costPer1kInputTokens !== undefined && doc.costPer1kInputTokens < 0) {
     diagnostics.push({
       severity: DiagnosticSeverity.Error,
       range: {
@@ -97,7 +97,7 @@ export function validateModelDocument(doc: ModelDocument, _imports: ImportsMap):
     });
   }
 
-  if (doc.costPer_1kOutputTokens !== undefined && doc.costPer_1kOutputTokens < 0) {
+  if (doc.costPer1kOutputTokens !== undefined && doc.costPer1kOutputTokens < 0) {
     diagnostics.push({
       severity: DiagnosticSeverity.Error,
       range: {

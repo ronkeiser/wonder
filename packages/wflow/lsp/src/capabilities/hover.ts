@@ -206,8 +206,9 @@ export function handleHover(
 
   // For workflows, check if hovering over a node ref
   const wflowDoc = documentManager.getAsWorkflow(uri);
-  if (wflowDoc?.nodes?.[word]) {
-    return createNodeHover(word, wflowDoc.nodes[word], imports);
+  const hoveredNode = wflowDoc?.nodes?.find((n) => n.ref === word);
+  if (hoveredNode) {
+    return createNodeHover(word, hoveredNode, imports);
   }
 
   // Check if hovering over a JSONPath ($.input.*, $.state.*)

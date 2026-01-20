@@ -61,7 +61,7 @@ export function handleDefinition(
 
   // Check if it's a node ref - go to its definition
   const wflowDoc = documentManager.getAsWorkflow(uri);
-  if (wflowDoc?.nodes?.[word]) {
+  if (wflowDoc?.nodes?.some((n) => n.ref === word)) {
     // Find the line where this node is defined
     const nodeDefLine = lines.findIndex((l) => {
       const regex = new RegExp(`^\\s{2}${escapeRegex(word)}\\s*:`);

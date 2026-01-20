@@ -39,6 +39,9 @@ export function analyzeDataFlow(
   // Build transition lookup for checking conditions
   const transitionMap = buildTransitionMap(doc);
 
+  // Build node lookup map (nodes array to ref-keyed map)
+  const nodesByRef = new Map(doc.nodes?.map((n) => [n.ref, n]) ?? []);
+
   // Process nodes in topological order
   for (const nodeRef of order) {
     // Start with input paths (always available)
@@ -47,7 +50,7 @@ export function analyzeDataFlow(
     const preds = graph.predecessors.get(nodeRef) || [];
 
     for (const pred of preds) {
-      const predNode = doc.nodes?.[pred];
+      const predNode = nodesByRef.get(pred);
       if (!predNode?.outputMapping) continue;
 
       // Check if transition from pred to this node is conditional

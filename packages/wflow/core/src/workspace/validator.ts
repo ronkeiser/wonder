@@ -1,12 +1,13 @@
 import type { Diagnostic, Range } from '../types/diagnostics.js';
 import { DiagnosticSeverity } from '../types/diagnostics.js';
 import { formatReference, referencesEqual } from './reference.js';
-import type {
-  Reference,
-  StandardLibraryManifest,
-  Workspace,
-  WorkspaceDefinition,
-  WorkspaceValidationResult,
+import {
+  STANDARD_LIBRARY_WORKSPACE_NAME,
+  type Reference,
+  type StandardLibraryManifest,
+  type Workspace,
+  type WorkspaceDefinition,
+  type WorkspaceValidationResult,
 } from './types.js';
 
 /**
@@ -242,7 +243,14 @@ function resolveReference(
     case 'project':
       return resolveWorkspaceReference(ref, workspace);
 
-    case 'standardLibrary':
+    case 'standardLibrary': {
+      // When deploying the standard library workspace itself, standard library
+      // references should resolve against the workspace being deployed
+      if (workspace.config?.name === STANDARD_LIBRARY_WORKSPACE_NAME) {
+        const localDef = resolveWorkspaceReference(ref, workspace);
+        if (localDef) return localDef;
+      }
+
       if (standardLibrary && resolveStandardLibraryReference(ref, standardLibrary)) {
         return 'standard-library';
       }
@@ -252,6 +260,7 @@ function resolveReference(
         return 'standard-library'; // Assume valid when we can't check
       }
       return null;
+    }
   }
 }
 

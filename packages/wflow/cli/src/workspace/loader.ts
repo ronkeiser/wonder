@@ -7,6 +7,7 @@ import {
   formatReference,
   getFileType,
   parseDocument,
+  parseWorkflow,
   STANDARD_LIBRARY_WORKSPACE_NAME,
   tryParseReference,
   type AnyDocument,
@@ -254,7 +255,10 @@ export async function loadWorkspace(rootPath: string): Promise<Workspace> {
 
     if (definitionType === null) continue;
 
-    const parseResult = parseDocument(content, absolutePath);
+    // Use file-type-specific parser for workflows to normalize nodes format
+    const parseResult = fileType === 'wflow'
+      ? parseWorkflow(content, absolutePath)
+      : parseDocument(content, absolutePath);
 
     if (parseResult.error || !parseResult.document) {
       // Skip files that fail to parse - validation will catch these

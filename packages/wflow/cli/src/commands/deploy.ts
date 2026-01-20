@@ -8,6 +8,7 @@
 import {
   formatReference,
   getDeployOrder,
+  parseReference,
   STANDARD_LIBRARY_WORKSPACE_NAME,
   validateWorkspace,
   type Reference,
@@ -354,6 +355,11 @@ async function findExistingDefinition(
         }
         break;
       }
+      case 'action': {
+        // Actions API doesn't have a list endpoint with filtering
+        // The create endpoint handles autoversion matching, so we always return null
+        return null;
+      }
       default:
         return null;
     }
@@ -395,10 +401,15 @@ async function createDefinition(
 
   switch (definitionType) {
     case 'persona': {
+      const personaDoc = document as Record<string, unknown>;
       const result = await client.personas.create({
-        ...(document as Record<string, unknown>),
+        ...personaDoc,
         name: getName(reference),
         libraryId: libraryId ?? undefined,
+        // Resolve reference IDs to server IDs
+        modelProfileId: resolveReferenceId(personaDoc.modelProfileId as string | undefined, serverIds),
+        contextAssemblyWorkflowId: resolveReferenceId(personaDoc.contextAssemblyWorkflowId as string | undefined, serverIds),
+        memoryExtractionWorkflowId: resolveReferenceId(personaDoc.memoryExtractionWorkflowId as string | undefined, serverIds),
         autoversion: true,
       } as Parameters<typeof client.personas.create>[0]);
       return result.personaId;
@@ -440,6 +451,21 @@ async function createDefinition(
       } as Parameters<typeof client['model-profiles']['create']>[0]);
       return result.modelProfileId;
     }
+    case 'action': {
+      const actionDoc = document as Record<string, unknown>;
+      const result = await client.actions.create({
+        name: getName(reference),
+        description: actionDoc.description as string,
+        version: (actionDoc.version as number) ?? 1,
+        kind: actionDoc.kind as 'llm' | 'mcp' | 'http' | 'human' | 'context' | 'artifact' | 'vector' | 'metric' | 'mock',
+        implementation: actionDoc.implementation as Record<string, unknown>,
+        requires: actionDoc.requires as Record<string, unknown> | undefined,
+        produces: actionDoc.produces as Record<string, unknown> | undefined,
+        execution: actionDoc.execution as Record<string, unknown> | undefined,
+        idempotency: actionDoc.idempotency as Record<string, unknown> | undefined,
+      });
+      return result.actionId;
+    }
     default:
       throw new Error(`Unsupported definition type: ${definitionType}`);
   }
@@ -467,6 +493,23 @@ function getProjectId(ref: Reference, serverIds: Map<string, string>): string | 
     return serverIds.get(`project:${ref.project}`) ?? null;
   }
   return null;
+}
+
+/**
+ * Resolve a reference string (e.g., "core/claude-sonnet") to its server ID (ULID)
+ * Returns the original value if it's not a valid reference or not found in serverIds
+ */
+function resolveReferenceId(refString: string | undefined, serverIds: Map<string, string>): string | undefined {
+  if (!refString) return undefined;
+
+  try {
+    const ref = parseReference(refString);
+    const formatted = formatReference(ref);
+    return serverIds.get(formatted) ?? refString;
+  } catch {
+    // Not a valid reference format, return as-is (might be a literal ID)
+    return refString;
+  }
 }
 
 async function fetchStandardLibraryManifest(

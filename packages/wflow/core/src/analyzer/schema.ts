@@ -161,7 +161,6 @@ export const TOOL_ALLOWED_PROPS = new Set([
 export const TOOL_RETRY_ALLOWED_PROPS = new Set(['maxAttempts', 'backoffMs', 'timeoutMs']);
 
 // Model profile allowed properties
-// Note: costPer_1k* is because snake_to_camel doesn't convert _1 (digit after underscore)
 export const MODEL_ALLOWED_PROPS = new Set([
   'imports',
   'model',
@@ -170,8 +169,8 @@ export const MODEL_ALLOWED_PROPS = new Set([
   'modelId',
   'parameters',
   'executionConfig',
-  'costPer_1kInputTokens',
-  'costPer_1kOutputTokens',
+  'costPer1kInputTokens',
+  'costPer1kOutputTokens',
 ]);
 
 // Valid model providers
