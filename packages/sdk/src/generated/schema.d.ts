@@ -891,6 +891,127 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/libraries": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: {
+            parameters: {
+                query?: {
+                    workspaceId?: string;
+                    limit?: number;
+                };
+                header?: never;
+                path?: never;
+                cookie?: never;
+            };
+            requestBody?: never;
+            responses: {
+                /** @description Libraries retrieved successfully */
+                200: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["LibraryListResponse"];
+                    };
+                };
+            };
+        };
+        put?: never;
+        post: {
+            parameters: {
+                query?: never;
+                header?: never;
+                path?: never;
+                cookie?: never;
+            };
+            requestBody?: {
+                content: {
+                    "application/json": components["schemas"]["CreateLibrary"];
+                };
+            };
+            responses: {
+                /** @description Library created successfully */
+                201: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["LibraryCreateResponse"];
+                    };
+                };
+            };
+        };
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/libraries/{id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: {
+            parameters: {
+                query?: never;
+                header?: never;
+                path: {
+                    id: string;
+                };
+                cookie?: never;
+            };
+            requestBody?: never;
+            responses: {
+                /** @description Library retrieved successfully */
+                200: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["LibraryGetResponse"];
+                    };
+                };
+            };
+        };
+        put?: never;
+        post?: never;
+        delete: {
+            parameters: {
+                query?: never;
+                header?: never;
+                path: {
+                    id: string;
+                };
+                cookie?: never;
+            };
+            requestBody?: never;
+            responses: {
+                /** @description Library deleted successfully */
+                200: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": {
+                            success: boolean;
+                        };
+                    };
+                };
+            };
+        };
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/logs": {
         parameters: {
             query?: never;
@@ -1088,6 +1209,7 @@ export interface paths {
             parameters: {
                 query?: {
                     libraryId?: string;
+                    name?: string;
                     limit?: number;
                 };
                 header?: never;
@@ -1458,6 +1580,113 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/standard-library": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: {
+            parameters: {
+                query?: never;
+                header?: never;
+                path?: never;
+                cookie?: never;
+            };
+            requestBody?: never;
+            responses: {
+                /** @description List of all standard libraries */
+                200: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["StandardLibraryListResponse"];
+                    };
+                };
+            };
+        };
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/standard-library/manifest": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: {
+            parameters: {
+                query?: never;
+                header?: never;
+                path?: never;
+                cookie?: never;
+            };
+            requestBody?: never;
+            responses: {
+                /** @description Manifest of all standard library definitions for validation */
+                200: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["StandardLibraryManifest"];
+                    };
+                };
+            };
+        };
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/standard-library/{library}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: {
+            parameters: {
+                query?: never;
+                header?: never;
+                path: {
+                    library: string;
+                };
+                cookie?: never;
+            };
+            requestBody?: never;
+            responses: {
+                /** @description List of definitions in a standard library */
+                200: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["StandardLibraryDefinitionsResponse"];
+                    };
+                };
+            };
+        };
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/tasks": {
         parameters: {
             query?: never;
@@ -1470,6 +1699,7 @@ export interface paths {
                 query?: {
                     projectId?: string;
                     libraryId?: string;
+                    name?: string;
                     limit?: number;
                 };
                 header?: never;
@@ -1595,6 +1825,7 @@ export interface paths {
             parameters: {
                 query?: {
                     libraryId?: string;
+                    name?: string;
                     limit?: number;
                 };
                 header?: never;
@@ -1751,7 +1982,31 @@ export interface paths {
             path?: never;
             cookie?: never;
         };
-        get?: never;
+        get: {
+            parameters: {
+                query?: {
+                    projectId?: string;
+                    libraryId?: string;
+                    name?: string;
+                    limit?: number;
+                };
+                header?: never;
+                path?: never;
+                cookie?: never;
+            };
+            requestBody?: never;
+            responses: {
+                /** @description Workflow definitions retrieved successfully */
+                200: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["WorkflowDefListResponse"];
+                    };
+                };
+            };
+        };
         put?: never;
         post: {
             parameters: {
@@ -2775,6 +3030,33 @@ export interface components {
         TraceEventsResponse: {
             events: components["schemas"]["TraceEventEntry"][];
         };
+        Library: {
+            /** @example 01ARZ3NDEKTSV4RRFFQ69G5FAV */
+            id: string;
+            workspaceId: string | null;
+            name: string;
+            description: string | null;
+            createdAt: string;
+            updatedAt: string;
+        };
+        LibraryCreateResponse: {
+            libraryId: string;
+            library: components["schemas"]["Library"];
+        };
+        CreateLibrary: {
+            /** @example ws_123 */
+            workspaceId?: string;
+            /** @example my-utilities */
+            name: string;
+            /** @example Shared utility definitions */
+            description?: string;
+        };
+        LibraryListResponse: {
+            libraries: components["schemas"]["Library"][];
+        };
+        LibraryGetResponse: {
+            library: components["schemas"]["Library"];
+        };
         ModelProfile: {
             id: string;
             name: string;
@@ -2994,6 +3276,26 @@ export interface components {
         };
         PromptSpecGetResponse: {
             promptSpec: components["schemas"]["PromptSpec"];
+        };
+        StandardLibraryListResponse: {
+            libraries: components["schemas"]["Library"][];
+        };
+        StandardLibraryManifest: {
+            libraries: {
+                [key: string]: {
+                    definitions: {
+                        [key: string]: "workflow" | "task" | "action" | "tool";
+                    };
+                };
+            };
+        };
+        StandardLibraryDefinitionsResponse: {
+            definitions: {
+                name: string;
+                /** @enum {string} */
+                type: "workflow" | "task" | "action" | "tool";
+                id: string;
+            }[];
         };
         Step: {
             /** @example 01ARZ3NDEKTSV4RRFFQ69G5FAV */
@@ -3374,6 +3676,9 @@ export interface components {
             }[];
             /** @description Enable content-based deduplication. If true, returns existing workflow def when content matches. */
             autoversion?: boolean;
+        };
+        WorkflowDefListResponse: {
+            workflowDefs: components["schemas"]["WorkflowDef"][];
         };
         Node: {
             id: string;

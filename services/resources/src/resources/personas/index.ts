@@ -96,10 +96,20 @@ export class Personas extends Resource {
     });
   }
 
-  async list(options?: { libraryId?: string; limit?: number }): Promise<{
+  async list(options?: { libraryId?: string; name?: string; limit?: number }): Promise<{
     personas: Persona[];
   }> {
     return this.withLogging('list', { metadata: options }, async () => {
+      // If name is specified, return single-item list or empty
+      if (options?.name) {
+        const persona = await repo.getPersonaByName(
+          this.serviceCtx.db,
+          options.name,
+          options?.libraryId ?? null,
+        );
+        return { personas: persona ? [persona] : [] };
+      }
+
       let personas: Persona[];
 
       if (options?.libraryId) {

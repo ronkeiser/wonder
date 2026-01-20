@@ -64,10 +64,20 @@ export class Tools extends Resource {
     });
   }
 
-  async list(options?: { libraryId?: string; limit?: number }): Promise<{
+  async list(options?: { libraryId?: string; name?: string; limit?: number }): Promise<{
     tools: Tool[];
   }> {
     return this.withLogging('list', { metadata: options }, async () => {
+      // If name is specified, return single-item list or empty
+      if (options?.name) {
+        const tool = await repo.getToolByName(
+          this.serviceCtx.db,
+          options.name,
+          options?.libraryId ?? null,
+        );
+        return { tools: tool ? [tool] : [] };
+      }
+
       let tools: Tool[];
 
       if (options?.libraryId) {

@@ -117,10 +117,26 @@ export class Tasks extends Resource {
     });
   }
 
-  async list(options?: { projectId?: string; libraryId?: string; limit?: number }): Promise<{
+  async list(options?: {
+    projectId?: string;
+    libraryId?: string;
+    name?: string;
+    limit?: number;
+  }): Promise<{
     tasks: Task[];
   }> {
     return this.withLogging('list', { metadata: options }, async () => {
+      // If name is specified, return single-item list or empty
+      if (options?.name) {
+        const task = await repo.getTaskByName(
+          this.serviceCtx.db,
+          options.name,
+          options?.projectId ?? null,
+          options?.libraryId ?? null,
+        );
+        return { tasks: task ? [task] : [] };
+      }
+
       let tasks: Task[];
 
       if (options?.projectId) {

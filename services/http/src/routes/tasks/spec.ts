@@ -70,6 +70,7 @@ export const listTasksRoute = createRoute({
     query: z.object({
       projectId: z.string().optional(),
       libraryId: z.string().optional(),
+      name: z.string().optional(),
       limit: z.coerce.number().int().positive().max(100).optional(),
     }),
   },

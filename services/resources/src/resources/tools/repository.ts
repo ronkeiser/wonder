@@ -70,3 +70,21 @@ export async function updateTool(
     .returning();
   return updated ?? null;
 }
+
+export async function getToolByName(
+  db: DrizzleD1Database,
+  name: string,
+  libraryId: string | null,
+): Promise<Tool | null> {
+  const result = await db
+    .select()
+    .from(tools)
+    .where(
+      and(
+        eq(tools.name, name),
+        libraryId ? eq(tools.libraryId, libraryId) : isNull(tools.libraryId),
+      ),
+    )
+    .get();
+  return result ?? null;
+}

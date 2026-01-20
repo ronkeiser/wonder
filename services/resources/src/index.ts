@@ -8,6 +8,7 @@ import { Actions } from './resources/actions';
 import { Agents } from './resources/agents';
 import { ArtifactTypes } from './resources/artifact-types';
 import { Conversations } from './resources/conversations';
+import { Libraries } from './resources/libraries';
 import { ModelProfiles } from './resources/model-profiles';
 import { Personas } from './resources/personas';
 import { Projects } from './resources/projects';
@@ -38,6 +39,10 @@ class WonderResources extends WorkerEntrypoint<Env> {
 
   conversations() {
     return new Conversations(this.env, this.ctx);
+  }
+
+  libraries() {
+    return new Libraries(this.env, this.ctx);
   }
 
   modelProfiles() {

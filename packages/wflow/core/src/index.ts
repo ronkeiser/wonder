@@ -173,3 +173,33 @@ export { validatePersonaDocument } from './analyzer/persona.js';
 
 // Analyzer - Tool
 export { validateToolDocument } from './analyzer/tool.js';
+
+// Workspace
+export {
+  // Types
+  type DefinitionType,
+  type DeployResult,
+  type DeployStatus,
+  type DiffEntry,
+  type DiffResult,
+  type Reference,
+  type ReferenceScope,
+  type StandardLibraryManifest,
+  type Workspace,
+  type WorkspaceConfig,
+  type WorkspaceDefinition,
+  type WorkspaceValidationResult,
+  // Reference parsing
+  formatReference,
+  isValidName,
+  parseReference,
+  referencesEqual,
+  tryParseReference,
+  // Validation
+  canResolveReference,
+  DiagnosticCodes,
+  validateWorkspace,
+  // Ordering
+  getDeployOrder,
+  groupByType,
+} from './workspace/index.js';

@@ -123,3 +123,22 @@ export async function getMaxVersionByName(
     .get();
   return result?.version ?? 0;
 }
+
+export async function getPersonaByName(
+  db: DrizzleD1Database,
+  name: string,
+  libraryId: string | null,
+): Promise<Persona | null> {
+  const result = await db
+    .select()
+    .from(personas)
+    .where(
+      and(
+        eq(personas.name, name),
+        libraryId ? eq(personas.libraryId, libraryId) : isNull(personas.libraryId),
+      ),
+    )
+    .orderBy(desc(personas.version))
+    .get();
+  return result ?? null;
+}

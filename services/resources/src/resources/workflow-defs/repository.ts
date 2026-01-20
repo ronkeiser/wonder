@@ -1,6 +1,6 @@
 /** Repository for workflow definition data access */
 
-import { and, desc, eq } from 'drizzle-orm';
+import { and, desc, eq, isNull } from 'drizzle-orm';
 import type { DrizzleD1Database } from 'drizzle-orm/d1';
 import { ulid } from 'ulid';
 import { nodes, transitions, workflowDefs } from '~/schema';
@@ -175,6 +175,34 @@ export async function getMaxVersionByName(
     .get();
 
   return result?.version ?? 0;
+}
+
+export async function listWorkflowDefs(
+  db: DrizzleD1Database,
+  limit: number = 100,
+): Promise<WorkflowDef[]> {
+  return await db.select().from(workflowDefs).limit(limit).all();
+}
+
+export async function getWorkflowDefByName(
+  db: DrizzleD1Database,
+  name: string,
+  projectId: string | null,
+  libraryId: string | null,
+): Promise<WorkflowDef | null> {
+  const result = await db
+    .select()
+    .from(workflowDefs)
+    .where(
+      and(
+        eq(workflowDefs.name, name),
+        projectId ? eq(workflowDefs.projectId, projectId) : isNull(workflowDefs.projectId),
+        libraryId ? eq(workflowDefs.libraryId, libraryId) : isNull(workflowDefs.libraryId),
+      ),
+    )
+    .orderBy(desc(workflowDefs.version))
+    .get();
+  return result ?? null;
 }
 
 /** Node */

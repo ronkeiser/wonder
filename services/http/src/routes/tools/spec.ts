@@ -40,6 +40,7 @@ export const listToolsRoute = createRoute({
   request: {
     query: z.object({
       libraryId: z.string().optional(),
+      name: z.string().optional(),
       limit: z.coerce.number().int().positive().max(100).optional(),
     }),
   },

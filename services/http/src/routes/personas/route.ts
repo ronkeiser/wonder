@@ -19,9 +19,9 @@ personas.openapi(createPersonaRoute, async (c) => {
 });
 
 personas.openapi(listPersonasRoute, async (c) => {
-  const { libraryId, limit } = c.req.valid('query');
+  const { libraryId, name, limit } = c.req.valid('query');
   using resource = c.env.RESOURCES.personas();
-  const result = await resource.list({ libraryId, limit });
+  const result = await resource.list({ libraryId, name, limit });
   return c.json(result);
 });
 

@@ -8,6 +8,7 @@ import {
   CreateWorkflowDefSchema,
   WorkflowDefCreateResponseSchema,
   WorkflowDefGetResponseSchema,
+  WorkflowDefListResponseSchema,
 } from './schema';
 
 export const createWorkflowDefRoute = createRoute({
@@ -60,6 +61,30 @@ export const getWorkflowDefRoute = createRoute({
         },
       },
       description: 'Workflow definition retrieved successfully',
+    },
+  },
+});
+
+export const listWorkflowDefsRoute = createRoute({
+  method: 'get',
+  path: '/',
+  tags: ['workflow-defs'],
+  request: {
+    query: z.object({
+      projectId: z.string().optional(),
+      libraryId: z.string().optional(),
+      name: z.string().optional(),
+      limit: z.coerce.number().int().positive().max(100).optional(),
+    }),
+  },
+  responses: {
+    200: {
+      content: {
+        'application/json': {
+          schema: WorkflowDefListResponseSchema,
+        },
+      },
+      description: 'Workflow definitions retrieved successfully',
     },
   },
 });

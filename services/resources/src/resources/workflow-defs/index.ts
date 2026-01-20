@@ -220,6 +220,40 @@ export class WorkflowDefs extends Resource {
     );
   }
 
+  async list(options?: {
+    projectId?: string;
+    libraryId?: string;
+    name?: string;
+    limit?: number;
+  }): Promise<{
+    workflowDefs: WorkflowDef[];
+  }> {
+    return this.withLogging('list', { metadata: options }, async () => {
+      // If name is specified, return single-item list or empty
+      if (options?.name) {
+        const workflowDef = await repo.getWorkflowDefByName(
+          this.serviceCtx.db,
+          options.name,
+          options?.projectId ?? null,
+          options?.libraryId ?? null,
+        );
+        return { workflowDefs: workflowDef ? [workflowDef] : [] };
+      }
+
+      let workflowDefs: WorkflowDef[];
+
+      if (options?.projectId) {
+        workflowDefs = await repo.listWorkflowDefsByProject(this.serviceCtx.db, options.projectId);
+      } else if (options?.libraryId) {
+        workflowDefs = await repo.listWorkflowDefsByLibrary(this.serviceCtx.db, options.libraryId);
+      } else {
+        workflowDefs = await repo.listWorkflowDefs(this.serviceCtx.db, options?.limit);
+      }
+
+      return { workflowDefs };
+    });
+  }
+
   async delete(workflowDefId: string, version?: number): Promise<void> {
     return this.withLogging(
       'delete',

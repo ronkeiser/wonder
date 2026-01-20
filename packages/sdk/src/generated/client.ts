@@ -194,6 +194,32 @@ export function createClient(baseClient: any) {
         return data;
       }
     },
+    libraries: Object.assign(
+      (id: string) => ({
+          get: async (options?: any): Promise<paths['/libraries/{id}']['get']['responses']['200']['content']['application/json']> => {
+            const { data, error } = await baseClient.GET(`/libraries/${id}`, {});
+            if (error) throw new ApiError(`GET /libraries/${id} failed`, error);
+            return data;
+          },
+          delete: async (options?: any): Promise<paths['/libraries/{id}']['delete']['responses']['200']['content']['application/json']> => {
+            const { data, error } = await baseClient.DELETE(`/libraries/${id}`, {});
+            if (error) throw new ApiError(`DELETE /libraries/${id} failed`, error);
+            return data;
+          }
+        }),
+      {
+        create: async (body: NonNullable<paths['/libraries']['post']['requestBody']>['content']['application/json'], options?: any): Promise<paths['/libraries']['post']['responses']['201']['content']['application/json']> => {
+          const { data, error } = await baseClient.POST(`/libraries`, { body });
+          if (error) throw new ApiError(`POST /libraries failed`, error);
+          return data;
+        },
+        list: async (options?: any): Promise<paths['/libraries']['get']['responses']['200']['content']['application/json']> => {
+          const { data, error } = await baseClient.GET(`/libraries`, {});
+          if (error) throw new ApiError(`GET /libraries failed`, error);
+          return data;
+        }
+      }
+    ),
     logs: {
       list: async (options?: any): Promise<paths['/logs']['get']['responses']['200']['content']['application/json']> => {
         const { data, error } = await baseClient.GET(`/logs`, {});
@@ -297,6 +323,22 @@ export function createClient(baseClient: any) {
         }
       }
     ),
+    "standard-library": Object.assign(
+      (library: string) => ({
+          get: async (options?: any): Promise<paths['/standard-library/{library}']['get']['responses']['200']['content']['application/json']> => {
+            const { data, error } = await baseClient.GET(`/standard-library/${library}`, {});
+            if (error) throw new ApiError(`GET /standard-library/${library} failed`, error);
+            return data;
+          }
+        }),
+      {
+        list: async (options?: any): Promise<paths['/standard-library']['get']['responses']['200']['content']['application/json']> => {
+          const { data, error } = await baseClient.GET(`/standard-library`, {});
+          if (error) throw new ApiError(`GET /standard-library failed`, error);
+          return data;
+        }
+      }
+    ),
     tasks: Object.assign(
       (id: string) => ({
           get: async (options?: any): Promise<paths['/tasks/{id}']['get']['responses']['200']['content']['application/json']> => {
@@ -366,6 +408,11 @@ export function createClient(baseClient: any) {
         create: async (body: NonNullable<paths['/workflow-defs']['post']['requestBody']>['content']['application/json'], options?: any): Promise<paths['/workflow-defs']['post']['responses']['201']['content']['application/json']> => {
           const { data, error } = await baseClient.POST(`/workflow-defs`, { body });
           if (error) throw new ApiError(`POST /workflow-defs failed`, error);
+          return data;
+        },
+        list: async (options?: any): Promise<paths['/workflow-defs']['get']['responses']['200']['content']['application/json']> => {
+          const { data, error } = await baseClient.GET(`/workflow-defs`, {});
+          if (error) throw new ApiError(`GET /workflow-defs failed`, error);
           return data;
         }
       }
@@ -472,6 +519,7 @@ export function createClient(baseClient: any) {
     artifactTypes: client["artifact-types"],
     modelProfiles: client["model-profiles"],
     promptSpecs: client["prompt-specs"],
+    standardLibrary: client["standard-library"],
     workflowDefs: client["workflow-defs"],
     workflowRuns: client["workflow-runs"]
   });

@@ -13,11 +13,13 @@ import { agents } from './routes/agents/route';
 import { artifactTypes } from './routes/artifact-types/route';
 import { conversations } from './routes/conversations/route';
 import { events } from './routes/events/route';
+import { libraries } from './routes/libraries/route';
 import { logs } from './routes/logs/route';
 import { modelProfiles } from './routes/model-profiles/route';
 import { personas } from './routes/personas/route';
 import { projects } from './routes/projects/route';
 import { promptSpecs } from './routes/prompt-specs/route';
+import { standardLibrary } from './routes/standard-library/route';
 import { streams } from './routes/streams/route';
 import { tasks } from './routes/tasks/route';
 import { tools } from './routes/tools/route';
@@ -66,11 +68,13 @@ const routes = app
   .route('/artifact-types', artifactTypes)
   .route('/conversations', conversations)
   .route('/events', events)
+  .route('/libraries', libraries)
   .route('/logs', logs)
   .route('/model-profiles', modelProfiles)
   .route('/personas', personas)
   .route('/projects', projects)
   .route('/prompt-specs', promptSpecs)
+  .route('/standard-library', standardLibrary)
   .route('/streams', streams)
   .route('/tasks', tasks)
   .route('/tools', tools)
