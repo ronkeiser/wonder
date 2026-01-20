@@ -549,6 +549,7 @@ export async function runTestConversation(
   // Create agent
   console.log('🤖 Creating agent...');
   const agentResponse = await wonder.agents.create({
+    name: personaConfig.name ?? 'Test Agent',
     projectIds: [ctx.projectId],
     personaId,
   });

@@ -302,6 +302,7 @@ describe('Conversation: 08 - Tool Dispatch to Agent (Loop-In Mode)', () => {
 
       console.log('Creating architect agent...');
       const architectAgentResponse = await wonder.agents.create({
+        name: 'Architect',
         projectIds: [ctx.projectId],
         personaId: architectPersonaResponse.personaId,
       });
@@ -350,6 +351,7 @@ describe('Conversation: 08 - Tool Dispatch to Agent (Loop-In Mode)', () => {
 
       console.log('Creating manager agent...');
       const managerAgentResponse = await wonder.agents.create({
+        name: 'Manager',
         projectIds: [ctx.projectId],
         personaId: managerPersonaResponse.personaId,
       });

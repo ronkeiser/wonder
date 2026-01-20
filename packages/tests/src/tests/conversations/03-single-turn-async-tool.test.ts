@@ -312,6 +312,7 @@ describe('Conversation: 03 - Single Turn, Async Tool', () => {
       // =========================================================================
       console.log('🤖 Creating agent...');
       const agentResponse = await wonder.agents.create({
+        name: 'Async Tool Agent',
         projectIds: [ctx.projectId],
         personaId: personaResponse.personaId,
       });

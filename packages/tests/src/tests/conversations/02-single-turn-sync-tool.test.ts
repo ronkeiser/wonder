@@ -264,6 +264,7 @@ describe('Conversation: 02 - Single Turn, Sync Tool', () => {
       // =========================================================================
       console.log('🤖 Creating agent...');
       const agentResponse = await wonder.agents.create({
+        name: 'File Reader Agent',
         projectIds: [ctx.projectId],
         personaId: personaResponse.personaId,
       });

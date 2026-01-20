@@ -315,6 +315,7 @@ describe('Conversation: 06 - Tool Dispatch to Workflow (Sync)', () => {
       // =========================================================================
       console.log('Creating agent...');
       const agentResponse = await wonder.agents.create({
+        name: 'Workflow Agent',
         projectIds: [ctx.projectId],
         personaId: personaResponse.personaId,
       });

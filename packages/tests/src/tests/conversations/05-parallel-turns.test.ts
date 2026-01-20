@@ -283,6 +283,7 @@ describe('Conversation: 05 - Parallel Turns', () => {
 
       console.log('🤖 Creating agent...');
       const agentResponse = await wonder.agents.create({
+        name: 'Parallel Turns Agent',
         projectIds: [ctx.projectId],
         personaId: personaResponse.personaId,
       });

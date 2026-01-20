@@ -301,6 +301,7 @@ describe('Conversation: 07 - Tool Dispatch to Agent (Delegate Mode)', () => {
 
       console.log('Creating reviewer agent...');
       const reviewerAgentResponse = await wonder.agents.create({
+        name: 'Reviewer',
         projectIds: [ctx.projectId],
         personaId: reviewerPersonaResponse.personaId,
       });
@@ -349,6 +350,7 @@ describe('Conversation: 07 - Tool Dispatch to Agent (Delegate Mode)', () => {
 
       console.log('Creating manager agent...');
       const managerAgentResponse = await wonder.agents.create({
+        name: 'Manager',
         projectIds: [ctx.projectId],
         personaId: managerPersonaResponse.personaId,
       });
