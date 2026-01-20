@@ -270,9 +270,19 @@ async function deployDefinition(
   // Create definition - server handles deduplication via autoversion
   const result = await createDefinition(def, client, serverIds, options, isStandardLibrary);
 
+  // Determine action based on reused flag and version number
+  let action: DeployResult['action'];
+  if (result.reused) {
+    action = 'skipped';
+  } else if (result.version > 1) {
+    action = 'updated';
+  } else {
+    action = 'created';
+  }
+
   return {
     definition: def,
-    action: result.reused ? 'skipped' : 'created',
+    action,
     serverId: result.id,
   };
 }
@@ -283,7 +293,7 @@ async function createDefinition(
   serverIds: Map<string, string>,
   _options: DeployOptions,
   _isStandardLibrary: boolean,
-): Promise<{ id: string; reused: boolean }> {
+): Promise<{ id: string; reused: boolean; version: number }> {
   const { reference, definitionType, document } = def;
 
   const libraryId = getLibraryId(reference, serverIds);
@@ -302,7 +312,7 @@ async function createDefinition(
         memoryExtractionWorkflowId: resolveReferenceId(personaDoc.memoryExtractionWorkflowId as string | undefined, serverIds),
         autoversion: true,
       } as Parameters<typeof client.personas.create>[0]);
-      return { id: result.personaId, reused: result.reused ?? false };
+      return { id: result.personaId, reused: result.reused ?? false, version: result.version };
     }
     case 'tool': {
       // Tools don't support autoversion
@@ -311,7 +321,7 @@ async function createDefinition(
         name: getName(reference),
         libraryId: libraryId ?? undefined,
       } as Parameters<typeof client.tools.create>[0]);
-      return { id: result.toolId, reused: false };
+      return { id: result.toolId, reused: false, version: 1 };
     }
     case 'task': {
       const result = await client.tasks.create({
@@ -321,7 +331,7 @@ async function createDefinition(
         projectId: projectId ?? undefined,
         autoversion: true,
       } as Parameters<typeof client.tasks.create>[0]);
-      return { id: result.taskId, reused: result.reused ?? false };
+      return { id: result.taskId, reused: result.reused ?? false, version: result.version };
     }
     case 'workflow': {
       const wfClient = client['workflow-defs'];
@@ -332,7 +342,7 @@ async function createDefinition(
         projectId: projectId ?? undefined,
         autoversion: true,
       } as Parameters<typeof wfClient.create>[0]);
-      return { id: result.workflowDefId, reused: result.reused ?? false };
+      return { id: result.workflowDefId, reused: result.reused ?? false, version: result.version };
     }
     case 'model': {
       const result = await client['model-profiles'].create({
@@ -340,7 +350,7 @@ async function createDefinition(
         name: getName(reference),
         autoversion: true,
       } as unknown as Parameters<typeof client['model-profiles']['create']>[0]);
-      return { id: result.modelProfileId, reused: (result as { reused?: boolean }).reused ?? false };
+      return { id: result.modelProfileId, reused: result.reused ?? false, version: result.version };
     }
     case 'action': {
       const actionDoc = document as Record<string, unknown>;
@@ -356,7 +366,7 @@ async function createDefinition(
         idempotency: actionDoc.idempotency as Record<string, unknown> | undefined,
         autoversion: true,
       });
-      return { id: result.actionId, reused: result.reused ?? false };
+      return { id: result.actionId, reused: result.reused ?? false, version: result.version };
     }
     default:
       throw new Error(`Unsupported definition type: ${definitionType}`);

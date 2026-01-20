@@ -13,6 +13,8 @@ export class Tasks extends Resource {
     task: Task;
     /** True if an existing task was reused (autoversion matched content hash) */
     reused: boolean;
+    /** Version number of the created/reused task */
+    version: number;
   }> {
     this.serviceCtx.logger.info({
       eventType: 'task.create.started',
@@ -51,6 +53,7 @@ export class Tasks extends Resource {
         taskId: autoversionResult.entity.id,
         task: autoversionResult.entity,
         reused: true,
+        version: autoversionResult.entity.version,
       };
     }
 
@@ -74,6 +77,7 @@ export class Tasks extends Resource {
         taskId: task.id,
         task,
         reused: false,
+        version,
       };
     } catch (error) {
       const dbError = extractDbError(error);

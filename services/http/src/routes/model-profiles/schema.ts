@@ -76,6 +76,7 @@ export const ModelProfileCreateResponseSchema = z
     modelProfileId: ulid(),
     modelProfile: ModelProfileSchema,
     reused: z.boolean().optional().openapi({ description: 'True if an existing model profile was reused' }),
+    version: z.number().openapi({ description: 'Version number of the created/reused model profile' }),
   })
   .openapi('ModelProfileCreateResponse');
 

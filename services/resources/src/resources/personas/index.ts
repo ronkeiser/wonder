@@ -11,6 +11,8 @@ export class Personas extends Resource {
     persona: Persona;
     /** True if an existing persona was reused (autoversion matched content hash) */
     reused: boolean;
+    /** Version number of the created/reused persona */
+    version: number;
   }> {
     this.serviceCtx.logger.info({
       eventType: 'persona.create.started',
@@ -37,6 +39,7 @@ export class Personas extends Resource {
         personaId: autoversionResult.entity.id,
         persona: autoversionResult.entity,
         reused: true,
+        version: autoversionResult.entity.version,
       };
     }
 
@@ -53,6 +56,7 @@ export class Personas extends Resource {
         personaId: persona.id,
         persona,
         reused: false,
+        version,
       };
     } catch (error) {
       const dbError = extractDbError(error);

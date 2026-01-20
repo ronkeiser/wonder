@@ -13,6 +13,8 @@ export class WorkflowDefs extends Resource {
     workflowDef: WorkflowDef;
     /** True if an existing workflow def was reused (autoversion matched content hash) */
     reused: boolean;
+    /** Version number of the created/reused workflow def */
+    version: number;
   }> {
     this.serviceCtx.logger.info({
       eventType: 'workflow_def.create.started',
@@ -65,6 +67,7 @@ export class WorkflowDefs extends Resource {
         workflowDefId: autoversionResult.entity.id,
         workflowDef: autoversionResult.entity,
         reused: true,
+        version: autoversionResult.entity.version,
       };
     }
 
@@ -177,6 +180,7 @@ export class WorkflowDefs extends Resource {
       workflowDefId: workflowDef.id,
       workflowDef: workflowDef,
       reused: false,
+      version,
     };
   }
 

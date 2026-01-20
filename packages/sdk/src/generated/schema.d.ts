@@ -2753,6 +2753,8 @@ export interface components {
             action: components["schemas"]["Action"];
             /** @description True if an existing action was reused (autoversion matched) */
             reused: boolean;
+            /** @description Version number of the created/reused action */
+            version: number;
         };
         CreateAction: {
             /** @example Generate Summary */
@@ -3078,6 +3080,8 @@ export interface components {
             modelProfile: components["schemas"]["ModelProfile"];
             /** @description True if an existing model profile was reused */
             reused?: boolean;
+            /** @description Version number of the created/reused model profile */
+            version: number;
         };
         CreateModelProfile: {
             /** @example GPT-4 Default */
@@ -3135,6 +3139,8 @@ export interface components {
             persona: components["schemas"]["Persona"];
             /** @description True if an existing persona was reused (autoversion matched) */
             reused: boolean;
+            /** @description Version number of the created/reused persona */
+            version: number;
         };
         CreatePersona: {
             /** @example Code Reviewer */
@@ -3383,6 +3389,8 @@ export interface components {
             task: components["schemas"]["Task"];
             /** @description True if an existing task was reused (autoversion matched) */
             reused: boolean;
+            /** @description Version number of the created/reused task */
+            version: number;
         };
         CreateStep: {
             /** @example call_llm */
@@ -3590,6 +3598,8 @@ export interface components {
             workflowDefId: string;
             workflowDef: components["schemas"]["WorkflowDef"];
             reused: boolean;
+            /** @description Version number of the created/reused workflow def */
+            version: number;
         };
         CreateWorkflowDef: {
             /** @example Content Generation Pipeline */

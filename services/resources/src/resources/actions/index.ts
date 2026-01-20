@@ -11,6 +11,8 @@ export class Actions extends Resource {
     action: Action;
     /** True if an existing action was reused (autoversion matched content hash) */
     reused: boolean;
+    /** Version number of the created/reused action */
+    version: number;
   }> {
     this.serviceCtx.logger.info({
       eventType: 'action.create.started',
@@ -28,6 +30,7 @@ export class Actions extends Resource {
         actionId: autoversionResult.entity.id,
         action: autoversionResult.entity,
         reused: true,
+        version: autoversionResult.entity.version,
       };
     }
 
@@ -44,6 +47,7 @@ export class Actions extends Resource {
         actionId: action.id,
         action,
         reused: false,
+        version,
       };
     } catch (error) {
       const dbError = extractDbError(error);

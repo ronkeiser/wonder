@@ -11,6 +11,8 @@ export class ModelProfiles extends Resource {
     modelProfile: ModelProfile;
     /** True if an existing model profile was reused (autoversion matched content hash) */
     reused: boolean;
+    /** Version number of the created/reused model profile */
+    version: number;
   }> {
     return this.withLogging(
       'create',
@@ -31,6 +33,7 @@ export class ModelProfiles extends Resource {
             modelProfileId: autoversionResult.entity.id,
             modelProfile: autoversionResult.entity,
             reused: true,
+            version: 1, // Model profiles don't have versioning yet
           };
         }
 
@@ -44,6 +47,7 @@ export class ModelProfiles extends Resource {
             modelProfileId: profile.id,
             modelProfile: profile,
             reused: false,
+            version: autoversionResult.version,
           };
         } catch (error) {
           const dbError = extractDbError(error);
