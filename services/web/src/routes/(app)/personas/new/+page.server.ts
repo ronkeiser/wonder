@@ -47,6 +47,11 @@ export const actions: Actions = {
           .filter(Boolean)
       : [];
 
+    // Parse recentTurnsLimit to number, default to 20
+    const recentTurnsLimit = result.data.recentTurnsLimit
+      ? parseInt(result.data.recentTurnsLimit, 10) || 20
+      : 20;
+
     const res = await fetch('/api/personas', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
@@ -57,7 +62,7 @@ export const actions: Actions = {
         modelProfileId: result.data.modelProfileId,
         contextAssemblyWorkflowId: result.data.contextAssemblyWorkflowId,
         memoryExtractionWorkflowId: result.data.memoryExtractionWorkflowId,
-        recentTurnsLimit: result.data.recentTurnsLimit,
+        recentTurnsLimit,
         toolIds,
       }),
     });
@@ -66,8 +71,6 @@ export const actions: Actions = {
       const error = await res.json().catch(() => ({ error: 'Unknown error' }));
       return formError({ name: error.error ?? 'Failed to create persona' }, result.data);
     }
-
-    const data = await res.json();
 
     redirect(302, `/personas`);
   },

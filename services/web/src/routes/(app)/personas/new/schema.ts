@@ -7,7 +7,7 @@ export const createPersonaSchema = z.object({
   modelProfileId: z.string().min(1, 'Model profile is required'),
   contextAssemblyWorkflowId: z.string().min(1, 'Context assembly workflow is required'),
   memoryExtractionWorkflowId: z.string().min(1, 'Memory extraction workflow is required'),
-  recentTurnsLimit: z.coerce.number().int().positive().default(20),
+  recentTurnsLimit: z.string().optional(), // Parsed to number server-side
   toolIds: z.string().optional(), // Comma-separated list, will be parsed
 });
 
