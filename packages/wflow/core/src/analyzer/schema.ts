@@ -128,6 +128,44 @@ export const ACTION_RETRY_POLICY_ALLOWED_PROPS = new Set([
 
 export const ACTION_IDEMPOTENCY_ALLOWED_PROPS = new Set(['keyTemplate', 'ttlSeconds']);
 
+// Persona allowed properties
+export const PERSONA_ALLOWED_PROPS = new Set([
+  'imports',
+  'persona',
+  'description',
+  'systemPrompt',
+  'modelProfileId',
+  'contextAssemblyWorkflowId',
+  'memoryExtractionWorkflowId',
+  'recentTurnsLimit',
+  'toolIds',
+  'constraints',
+]);
+
+export const PERSONA_CONSTRAINTS_ALLOWED_PROPS = new Set(['maxMovesPerTurn']);
+
+// Tool allowed properties
+export const TOOL_ALLOWED_PROPS = new Set([
+  'imports',
+  'tool',
+  'description',
+  'inputSchema',
+  'targetType',
+  'targetId',
+  'async',
+  'invocationMode',
+  'inputMapping',
+  'retry',
+]);
+
+export const TOOL_RETRY_ALLOWED_PROPS = new Set(['maxAttempts', 'backoffMs', 'timeoutMs']);
+
+// Valid tool target types
+export const VALID_TOOL_TARGET_TYPES = ['task', 'workflow', 'agent'] as const;
+
+// Valid tool invocation modes
+export const VALID_TOOL_INVOCATION_MODES = ['delegate', 'loop_in'] as const;
+
 // Kind-specific implementation properties
 export const IMPLEMENTATION_PROPS_BY_KIND: Record<string, Set<string>> = {
   llm: new Set(['promptSpecId', 'modelProfileId']),

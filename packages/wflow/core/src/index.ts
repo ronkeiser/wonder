@@ -48,6 +48,9 @@ export type {
   MockDecl,
   MockResponseDecl,
   NodeDecl,
+  // Persona types
+  PersonaConstraints,
+  PersonaDocument,
   Position,
   Range,
   ResourceDecl,
@@ -64,6 +67,9 @@ export type {
   TestDocument,
   TestGroupDecl,
   TestHooksDecl,
+  // Tool types
+  ToolDocument,
+  ToolRetryConfig,
   TransitionDecl,
   ValidationResult,
   WflowDocument,
@@ -79,9 +85,11 @@ export {
   parseAction,
   parseDocument,
   parseImports,
+  parsePersona,
   parseRun,
   parseTask,
   parseTest,
+  parseTool,
   parseWorkflow,
   type ImportsMap,
   type ParseResult,
@@ -111,14 +119,20 @@ export {
   JSON_SCHEMA_ALLOWED_PROPS,
   MERGE_ALLOWED_PROPS,
   NODE_ALLOWED_PROPS,
+  PERSONA_ALLOWED_PROPS,
+  PERSONA_CONSTRAINTS_ALLOWED_PROPS,
   RESOURCE_ALLOWED_PROPS,
   RETRY_ALLOWED_PROPS,
   STEP_ALLOWED_PROPS,
   STEP_CONDITION_ALLOWED_PROPS,
   SYNCHRONIZATION_ALLOWED_PROPS,
   TASK_ALLOWED_PROPS,
+  TOOL_ALLOWED_PROPS,
+  TOOL_RETRY_ALLOWED_PROPS,
   TRANSITION_ALLOWED_PROPS,
   VALID_ACTION_KINDS,
+  VALID_TOOL_INVOCATION_MODES,
+  VALID_TOOL_TARGET_TYPES,
   // Allowed property sets
   WORKFLOW_ALLOWED_PROPS,
   // Functions
@@ -153,3 +167,9 @@ export {
   validateTestDocument,
   type TestAnalysis,
 } from './analyzer/test.js';
+
+// Analyzer - Persona
+export { validatePersonaDocument } from './analyzer/persona.js';
+
+// Analyzer - Tool
+export { validateToolDocument } from './analyzer/tool.js';

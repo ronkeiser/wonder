@@ -3,9 +3,11 @@ import type {
   ActionDocument,
   AnyDocument,
   FileType,
+  PersonaDocument,
   RunDocument,
   TaskDocument,
   TestDocument,
+  ToolDocument,
   WflowDocument,
 } from '../types/ast.js';
 
@@ -75,6 +77,8 @@ export function getFileType(pathOrUri: string): FileType {
   if (pathOrUri.endsWith('.action')) return 'action';
   if (pathOrUri.endsWith('.test')) return 'test';
   if (pathOrUri.endsWith('.run')) return 'run';
+  if (pathOrUri.endsWith('.persona')) return 'persona';
+  if (pathOrUri.endsWith('.tool')) return 'tool';
   return 'unknown';
 }
 
@@ -226,4 +230,26 @@ export function parseRun(
   resolveImportPath?: (importPath: string) => string | null,
 ): ParseResult<RunDocument> {
   return parseDocument<RunDocument>(text, uri, resolveImportPath);
+}
+
+/**
+ * Parse a persona document
+ */
+export function parsePersona(
+  text: string,
+  uri: string,
+  resolveImportPath?: (importPath: string) => string | null,
+): ParseResult<PersonaDocument> {
+  return parseDocument<PersonaDocument>(text, uri, resolveImportPath);
+}
+
+/**
+ * Parse a tool document
+ */
+export function parseTool(
+  text: string,
+  uri: string,
+  resolveImportPath?: (importPath: string) => string | null,
+): ParseResult<ToolDocument> {
+  return parseDocument<ToolDocument>(text, uri, resolveImportPath);
 }

@@ -6,9 +6,13 @@ import {
   DiagnosticSeverity,
   getFileType,
   parseAction,
+  parsePersona,
   parseTask,
   parseTest,
+  parseTool,
   parseWorkflow,
+  validatePersonaDocument,
+  validateToolDocument,
   type Diagnostic,
 } from '@wonder/wflow';
 import chalk from 'chalk';
@@ -50,7 +54,7 @@ export const checkCommand = new Command('check')
         if (stats.isFile()) {
           files.push(resolved);
         } else if (stats.isDirectory()) {
-          const found = await glob('**/*.{wflow,task,action,test}', {
+          const found = await glob('**/*.{wflow,task,action,test,persona,tool}', {
             cwd: resolved,
             absolute: true,
             ignore: ['**/node_modules/**', '**/dist/**'],
@@ -152,6 +156,36 @@ function checkFile(filePath: string): CheckResult {
             source: 'wflow',
             code: 'PARSE_ERROR',
           });
+        }
+        break;
+      }
+      case 'persona': {
+        const result = parsePersona(content, filePath);
+        if (result.error) {
+          diagnostics.push({
+            severity: DiagnosticSeverity.Error,
+            range: { start: { line: 0, character: 0 }, end: { line: 0, character: 0 } },
+            message: `Parse error: ${result.error.message}`,
+            source: 'wflow',
+            code: 'PARSE_ERROR',
+          });
+        } else if (result.document) {
+          diagnostics.push(...validatePersonaDocument(result.document, result.imports));
+        }
+        break;
+      }
+      case 'tool': {
+        const result = parseTool(content, filePath);
+        if (result.error) {
+          diagnostics.push({
+            severity: DiagnosticSeverity.Error,
+            range: { start: { line: 0, character: 0 }, end: { line: 0, character: 0 } },
+            message: `Parse error: ${result.error.message}`,
+            source: 'wflow',
+            code: 'PARSE_ERROR',
+          });
+        } else if (result.document) {
+          diagnostics.push(...validateToolDocument(result.document, result.imports));
         }
         break;
       }

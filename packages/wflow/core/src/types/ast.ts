@@ -432,6 +432,64 @@ export interface TestDocument {
 }
 
 // =============================================================================
+// Persona Types
+// =============================================================================
+
+/**
+ * Persona constraints configuration
+ */
+export interface PersonaConstraints {
+  maxMovesPerTurn?: number;
+}
+
+/**
+ * Persona document (.persona file)
+ */
+export interface PersonaDocument {
+  imports?: Record<string, string>;
+  persona?: string;
+  description?: string;
+  systemPrompt?: string;
+  modelProfileId?: string;
+  contextAssemblyWorkflowId?: string;
+  memoryExtractionWorkflowId?: string;
+  recentTurnsLimit?: number;
+  toolIds?: string[];
+  constraints?: PersonaConstraints;
+  _loc?: SourceLocation;
+}
+
+// =============================================================================
+// Tool Types
+// =============================================================================
+
+/**
+ * Tool retry configuration
+ */
+export interface ToolRetryConfig {
+  maxAttempts?: number;
+  backoffMs?: number;
+  timeoutMs?: number;
+}
+
+/**
+ * Tool document (.tool file)
+ */
+export interface ToolDocument {
+  imports?: Record<string, string>;
+  tool?: string;
+  description?: string;
+  inputSchema?: JSONSchemaProperty;
+  targetType?: 'task' | 'workflow' | 'agent';
+  targetId?: string;
+  async?: boolean;
+  invocationMode?: 'delegate' | 'loop_in';
+  inputMapping?: Record<string, string>;
+  retry?: ToolRetryConfig;
+  _loc?: SourceLocation;
+}
+
+// =============================================================================
 // Run Types
 // =============================================================================
 
@@ -490,9 +548,11 @@ export type AnyDocument =
   | TaskDocument
   | ActionDocument
   | TestDocument
-  | RunDocument;
+  | RunDocument
+  | PersonaDocument
+  | ToolDocument;
 
 /**
  * Detected file type from extension
  */
-export type FileType = 'wflow' | 'task' | 'action' | 'test' | 'run' | 'unknown';
+export type FileType = 'wflow' | 'task' | 'action' | 'test' | 'run' | 'persona' | 'tool' | 'unknown';
