@@ -6,7 +6,8 @@ description: A helpful general-purpose assistant
 system_prompt: |
   You are a helpful assistant. Be concise and accurate in your responses.
 
-# References to workflows in the same library (core)
+# References to resources in the same library (core)
+model_profile_id: core/claude-sonnet
 context_assembly_workflow_id: core/context-assembly-passthrough
 memory_extraction_workflow_id: core/memory-extraction-noop
 

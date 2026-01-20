@@ -47,6 +47,8 @@ export type {
   MergeConfig,
   MockDecl,
   MockResponseDecl,
+  // Model types
+  ModelDocument,
   NodeDecl,
   // Persona types
   PersonaConstraints,
@@ -85,6 +87,7 @@ export {
   parseAction,
   parseDocument,
   parseImports,
+  parseModel,
   parsePersona,
   parseRun,
   parseTask,
@@ -118,6 +121,7 @@ export {
   IMPLEMENTATION_PROPS_BY_KIND,
   JSON_SCHEMA_ALLOWED_PROPS,
   MERGE_ALLOWED_PROPS,
+  MODEL_ALLOWED_PROPS,
   NODE_ALLOWED_PROPS,
   PERSONA_ALLOWED_PROPS,
   PERSONA_CONSTRAINTS_ALLOWED_PROPS,
@@ -131,6 +135,7 @@ export {
   TOOL_RETRY_ALLOWED_PROPS,
   TRANSITION_ALLOWED_PROPS,
   VALID_ACTION_KINDS,
+  VALID_MODEL_PROVIDERS,
   VALID_TOOL_INVOCATION_MODES,
   VALID_TOOL_TARGET_TYPES,
   // Allowed property sets
@@ -173,6 +178,9 @@ export { validatePersonaDocument } from './analyzer/persona.js';
 
 // Analyzer - Tool
 export { validateToolDocument } from './analyzer/tool.js';
+
+// Analyzer - Model
+export { validateModelDocument } from './analyzer/model.js';
 
 // Workspace
 export {

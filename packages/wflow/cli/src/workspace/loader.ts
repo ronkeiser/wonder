@@ -37,6 +37,8 @@ function fileTypeToDefinitionType(fileType: FileType): DefinitionType | null {
       return 'tool';
     case 'persona':
       return 'persona';
+    case 'model':
+      return 'model';
     default:
       return null;
   }
@@ -79,6 +81,11 @@ export function extractDependencies(doc: AnyDocument, fileType: FileType): Refer
 
       if (persona.memoryExtractionWorkflowId) {
         const ref = tryParseReference(persona.memoryExtractionWorkflowId);
+        if (ref) refs.push(ref);
+      }
+
+      if (persona.modelProfileId) {
+        const ref = tryParseReference(persona.modelProfileId);
         if (ref) refs.push(ref);
       }
       break;

@@ -11,11 +11,13 @@ import {
   formatReference,
   getFileType,
   parseAction,
+  parseModel,
   parsePersona,
   parseTask,
   parseTest,
   parseTool,
   parseWorkflow,
+  validateModelDocument,
   validatePersonaDocument,
   validateToolDocument,
   validateWorkspace,
@@ -106,7 +108,7 @@ async function runFileCheck(
     if (stats.isFile()) {
       files.push(resolved);
     } else if (stats.isDirectory()) {
-      const found = await glob('**/*.{wflow,task,action,test,persona,tool}', {
+      const found = await glob('**/*.{wflow,task,action,test,persona,tool,model}', {
         cwd: resolved,
         absolute: true,
         ignore: ['**/node_modules/**', '**/dist/**'],
@@ -351,6 +353,21 @@ function checkFile(filePath: string): CheckResult {
           });
         } else if (result.document) {
           diagnostics.push(...validateToolDocument(result.document, result.imports));
+        }
+        break;
+      }
+      case 'model': {
+        const result = parseModel(content, filePath);
+        if (result.error) {
+          diagnostics.push({
+            severity: DiagnosticSeverity.Error,
+            range: { start: { line: 0, character: 0 }, end: { line: 0, character: 0 } },
+            message: `Parse error: ${result.error.message}`,
+            source: 'wflow',
+            code: 'PARSE_ERROR',
+          });
+        } else if (result.document) {
+          diagnostics.push(...validateModelDocument(result.document, result.imports));
         }
         break;
       }

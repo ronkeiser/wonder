@@ -28,7 +28,7 @@ export type Reference =
 /**
  * Definition types that can exist in a workspace
  */
-export type DefinitionType = 'workflow' | 'task' | 'action' | 'tool' | 'persona' | 'agent';
+export type DefinitionType = 'workflow' | 'task' | 'action' | 'tool' | 'persona' | 'agent' | 'model';
 
 /**
  * A parsed definition within the workspace

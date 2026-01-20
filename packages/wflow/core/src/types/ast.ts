@@ -490,6 +490,27 @@ export interface ToolDocument {
 }
 
 // =============================================================================
+// Model Profile Types
+// =============================================================================
+
+/**
+ * Model profile document (.model file)
+ * Note: costPer_1k* property names are due to snake_to_camel not converting _1 (digit after underscore)
+ */
+export interface ModelDocument {
+  imports?: Record<string, string>;
+  model?: string;
+  description?: string;
+  provider?: 'anthropic' | 'openai' | 'google' | 'cloudflare' | 'local';
+  modelId?: string;
+  parameters?: Record<string, unknown>;
+  executionConfig?: Record<string, unknown>;
+  costPer_1kInputTokens?: number;
+  costPer_1kOutputTokens?: number;
+  _loc?: SourceLocation;
+}
+
+// =============================================================================
 // Run Types
 // =============================================================================
 
@@ -550,9 +571,10 @@ export type AnyDocument =
   | TestDocument
   | RunDocument
   | PersonaDocument
-  | ToolDocument;
+  | ToolDocument
+  | ModelDocument;
 
 /**
  * Detected file type from extension
  */
-export type FileType = 'wflow' | 'task' | 'action' | 'test' | 'run' | 'persona' | 'tool' | 'unknown';
+export type FileType = 'wflow' | 'task' | 'action' | 'test' | 'run' | 'persona' | 'tool' | 'model' | 'unknown';

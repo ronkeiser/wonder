@@ -3,6 +3,7 @@ import type {
   ActionDocument,
   AnyDocument,
   FileType,
+  ModelDocument,
   PersonaDocument,
   RunDocument,
   TaskDocument,
@@ -79,6 +80,7 @@ export function getFileType(pathOrUri: string): FileType {
   if (pathOrUri.endsWith('.run')) return 'run';
   if (pathOrUri.endsWith('.persona')) return 'persona';
   if (pathOrUri.endsWith('.tool')) return 'tool';
+  if (pathOrUri.endsWith('.model')) return 'model';
   return 'unknown';
 }
 
@@ -252,4 +254,15 @@ export function parseTool(
   resolveImportPath?: (importPath: string) => string | null,
 ): ParseResult<ToolDocument> {
   return parseDocument<ToolDocument>(text, uri, resolveImportPath);
+}
+
+/**
+ * Parse a model profile document
+ */
+export function parseModel(
+  text: string,
+  uri: string,
+  resolveImportPath?: (importPath: string) => string | null,
+): ParseResult<ModelDocument> {
+  return parseDocument<ModelDocument>(text, uri, resolveImportPath);
 }

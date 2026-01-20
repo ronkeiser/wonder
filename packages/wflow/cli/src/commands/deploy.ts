@@ -343,6 +343,17 @@ async function findExistingDefinition(
         }
         break;
       }
+      case 'model': {
+        // Model profiles API doesn't support name filtering, so we fetch all and filter
+        try {
+          const mpData = await client['model-profiles'].list();
+          const matching = mpData.modelProfiles?.filter((mp) => mp.name === name) ?? [];
+          result = { data: { modelProfiles: matching } };
+        } catch (e) {
+          result = { error: e };
+        }
+        break;
+      }
       default:
         return null;
     }
@@ -356,10 +367,10 @@ async function findExistingDefinition(
       tools?: Array<{ id: string; contentHash: string | null }>;
     } & { tasks?: Array<{ id: string; contentHash: string | null }> } & {
       workflowDefs?: Array<{ id: string; contentHash: string | null }>;
-    };
+    } & { modelProfiles?: Array<{ id: string; contentHash: string | null }> };
 
     const items =
-      data.personas ?? data.tools ?? data.tasks ?? data.workflowDefs ?? ([] as Array<{ id: string; contentHash: string | null }>);
+      data.personas ?? data.tools ?? data.tasks ?? data.workflowDefs ?? data.modelProfiles ?? ([] as Array<{ id: string; contentHash: string | null }>);
     if (items.length > 0) {
       return { id: items[0].id, contentHash: items[0].contentHash };
     }
@@ -421,6 +432,13 @@ async function createDefinition(
         autoversion: true,
       } as Parameters<typeof wfClient.create>[0]);
       return result.workflowDefId;
+    }
+    case 'model': {
+      const result = await client['model-profiles'].create({
+        ...(document as Record<string, unknown>),
+        name: getName(reference),
+      } as Parameters<typeof client['model-profiles']['create']>[0]);
+      return result.modelProfileId;
     }
     default:
       throw new Error(`Unsupported definition type: ${definitionType}`);
