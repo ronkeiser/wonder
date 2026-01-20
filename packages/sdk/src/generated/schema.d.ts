@@ -1087,6 +1087,7 @@ export interface paths {
             parameters: {
                 query?: {
                     provider?: "anthropic" | "openai" | "google" | "cloudflare" | "local";
+                    name?: string;
                 };
                 header?: never;
                 path?: never;
@@ -3075,6 +3076,8 @@ export interface components {
         ModelProfileCreateResponse: {
             modelProfileId: string;
             modelProfile: components["schemas"]["ModelProfile"];
+            /** @description True if an existing model profile was reused */
+            reused?: boolean;
         };
         CreateModelProfile: {
             /** @example GPT-4 Default */
@@ -3104,6 +3107,8 @@ export interface components {
             costPer1kInputTokens: number;
             /** @example 0.06 */
             costPer1kOutputTokens: number;
+            /** @description Enable content-based deduplication */
+            autoversion?: boolean;
         };
         Persona: {
             /** @example code-reviewer */

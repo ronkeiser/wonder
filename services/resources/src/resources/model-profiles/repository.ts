@@ -1,6 +1,6 @@
 /** Repository for model profile data access */
 
-import { eq } from 'drizzle-orm';
+import { and, eq, max } from 'drizzle-orm';
 import type { DrizzleD1Database } from 'drizzle-orm/d1';
 import { ulid } from 'ulid';
 import { modelProfiles } from '~/schema';
@@ -56,4 +56,45 @@ export async function listModelProfilesByProvider(
 
 export async function deleteModelProfile(db: DrizzleD1Database, id: string): Promise<void> {
   await db.delete(modelProfiles).where(eq(modelProfiles.id, id)).run();
+}
+
+/**
+ * Find a model profile by name
+ */
+export async function getModelProfileByName(
+  db: DrizzleD1Database,
+  name: string,
+): Promise<ModelProfile | null> {
+  const result = await db.select().from(modelProfiles).where(eq(modelProfiles.name, name)).get();
+  return (result as ModelProfile) ?? null;
+}
+
+/**
+ * Find a model profile by name and content hash (for autoversion deduplication)
+ */
+export async function getModelProfileByNameAndHash(
+  db: DrizzleD1Database,
+  name: string,
+  contentHash: string,
+): Promise<ModelProfile | null> {
+  const result = await db
+    .select()
+    .from(modelProfiles)
+    .where(and(eq(modelProfiles.name, name), eq(modelProfiles.contentHash, contentHash)))
+    .get();
+  return (result as ModelProfile) ?? null;
+}
+
+/**
+ * Model profiles don't have versioning - there's only ever one profile per name.
+ * This returns 0 if no profile exists, or 1 if one does.
+ */
+export async function getMaxVersionByName(db: DrizzleD1Database, name: string): Promise<number> {
+  const result = await db
+    .select({ count: max(modelProfiles.id) })
+    .from(modelProfiles)
+    .where(eq(modelProfiles.name, name))
+    .get();
+  // If any profile exists with this name, return 1; otherwise 0
+  return result?.count ? 1 : 0;
 }

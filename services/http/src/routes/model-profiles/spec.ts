@@ -18,6 +18,7 @@ export const listModelProfilesRoute = createRoute({
   request: {
     query: z.object({
       provider: z.enum(['anthropic', 'openai', 'google', 'cloudflare', 'local']).optional(),
+      name: z.string().optional(),
     }),
   },
   responses: {

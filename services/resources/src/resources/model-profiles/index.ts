@@ -6,20 +6,44 @@ import * as repo from './repository';
 import type { ModelId, ModelProfile, ModelProfileInput, ModelProvider } from './types';
 
 export class ModelProfiles extends Resource {
-  async create(data: ModelProfileInput): Promise<{
+  async create(data: ModelProfileInput & { autoversion?: boolean }): Promise<{
     modelProfileId: string;
     modelProfile: ModelProfile;
+    /** True if an existing model profile was reused (autoversion matched content hash) */
+    reused: boolean;
   }> {
     return this.withLogging(
       'create',
-      { metadata: { name: data.name, provider: data.provider } },
+      { metadata: { name: data.name, provider: data.provider, autoversion: data.autoversion } },
       async () => {
+        // Autoversion deduplication check
+        const autoversionResult = await this.withAutoversion(
+          data as unknown as Record<string, unknown> & { name: string; autoversion?: boolean },
+          {
+            findByNameAndHash: (name, hash) =>
+              repo.getModelProfileByNameAndHash(this.serviceCtx.db, name, hash),
+            getMaxVersion: (name) => repo.getMaxVersionByName(this.serviceCtx.db, name),
+          },
+        );
+
+        if (autoversionResult.reused) {
+          return {
+            modelProfileId: autoversionResult.entity.id,
+            modelProfile: autoversionResult.entity,
+            reused: true,
+          };
+        }
+
         try {
-          const profile = await repo.createModelProfile(this.serviceCtx.db, data);
+          const profile = await repo.createModelProfile(this.serviceCtx.db, {
+            ...data,
+            contentHash: autoversionResult.contentHash,
+          });
 
           return {
             modelProfileId: profile.id,
             modelProfile: profile,
+            reused: false,
           };
         } catch (error) {
           const dbError = extractDbError(error);
@@ -54,10 +78,16 @@ export class ModelProfiles extends Resource {
     );
   }
 
-  async list(params?: { limit?: number; provider?: ModelProvider }): Promise<{
+  async list(params?: { limit?: number; provider?: ModelProvider; name?: string }): Promise<{
     modelProfiles: ModelProfile[];
   }> {
     return this.withLogging('list', { metadata: params }, async () => {
+      // If name is specified, find by name (efficient single-row lookup)
+      if (params?.name) {
+        const profile = await repo.getModelProfileByName(this.serviceCtx.db, params.name);
+        return { modelProfiles: profile ? [profile] : [] };
+      }
+
       const profiles = params?.provider
         ? await repo.listModelProfilesByProvider(this.serviceCtx.db, params.provider, params.limit)
         : await repo.listModelProfiles(this.serviceCtx.db, params?.limit);

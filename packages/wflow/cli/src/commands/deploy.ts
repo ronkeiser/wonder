@@ -267,124 +267,14 @@ async function deployDefinition(
   options: DeployOptions,
   isStandardLibrary: boolean,
 ): Promise<DeployResult> {
-  // Check if definition already exists on server
-  const existing = await findExistingDefinition(def, client, serverIds, options);
-
-  if (existing && !options.force) {
-    // Check if content hash matches
-    if (existing.contentHash === def.contentHash) {
-      return {
-        definition: def,
-        action: 'skipped',
-        serverId: existing.id,
-        message: 'Content unchanged',
-      };
-    }
-  }
-
-  // Create or update
-  const serverId = await createDefinition(def, client, serverIds, options, isStandardLibrary);
+  // Create definition - server handles deduplication via autoversion
+  const result = await createDefinition(def, client, serverIds, options, isStandardLibrary);
 
   return {
     definition: def,
-    action: existing ? 'updated' : 'created',
-    serverId,
+    action: result.reused ? 'skipped' : 'created',
+    serverId: result.id,
   };
-}
-
-async function findExistingDefinition(
-  def: WorkspaceDefinition,
-  client: WonderClient,
-  serverIds: Map<string, string>,
-  options: DeployOptions,
-): Promise<{ id: string; contentHash: string | null } | null> {
-  const { reference, definitionType } = def;
-
-  try {
-    let result: { data?: unknown; error?: unknown };
-
-    // Use GET with query params to find by name
-    const name = getName(reference);
-    const libraryId = getLibraryId(reference, serverIds) ?? undefined;
-    const projectId = getProjectId(reference, serverIds) ?? undefined;
-
-    switch (definitionType) {
-      case 'persona': {
-        result = await client.GET('/personas', {
-          params: { query: { name, libraryId } },
-        });
-        break;
-      }
-      case 'tool': {
-        result = await client.GET('/tools', {
-          params: { query: { name, libraryId } },
-        });
-        break;
-      }
-      case 'task': {
-        result = await client.GET('/tasks', {
-          params: { query: { name, libraryId, projectId } },
-        });
-        break;
-      }
-      case 'workflow': {
-        // Fetch workflow-defs with query params
-        const url = new URL('/workflow-defs', options.apiUrl);
-        url.searchParams.set('name', name);
-        if (libraryId) url.searchParams.set('libraryId', libraryId);
-        if (projectId) url.searchParams.set('projectId', projectId);
-
-        const response = await fetch(url.toString(), {
-          headers: options.apiKey ? { 'X-API-Key': options.apiKey } : {},
-        });
-        if (!response.ok) {
-          result = { error: `${response.status} ${response.statusText}` };
-        } else {
-          result = { data: await response.json() };
-        }
-        break;
-      }
-      case 'model': {
-        // Model profiles API doesn't support name filtering, so we fetch all and filter
-        try {
-          const mpData = await client['model-profiles'].list();
-          const matching = mpData.modelProfiles?.filter((mp) => mp.name === name) ?? [];
-          result = { data: { modelProfiles: matching } };
-        } catch (e) {
-          result = { error: e };
-        }
-        break;
-      }
-      case 'action': {
-        // Actions API doesn't have a list endpoint with filtering
-        // The create endpoint handles autoversion matching, so we always return null
-        return null;
-      }
-      default:
-        return null;
-    }
-
-    if (result.error) {
-      return null;
-    }
-
-    // Extract first item from list response
-    const data = result.data as { personas?: Array<{ id: string; contentHash: string | null }> } & {
-      tools?: Array<{ id: string; contentHash: string | null }>;
-    } & { tasks?: Array<{ id: string; contentHash: string | null }> } & {
-      workflowDefs?: Array<{ id: string; contentHash: string | null }>;
-    } & { modelProfiles?: Array<{ id: string; contentHash: string | null }> };
-
-    const items =
-      data.personas ?? data.tools ?? data.tasks ?? data.workflowDefs ?? data.modelProfiles ?? ([] as Array<{ id: string; contentHash: string | null }>);
-    if (items.length > 0) {
-      return { id: items[0].id, contentHash: items[0].contentHash };
-    }
-
-    return null;
-  } catch {
-    return null;
-  }
 }
 
 async function createDefinition(
@@ -393,7 +283,7 @@ async function createDefinition(
   serverIds: Map<string, string>,
   _options: DeployOptions,
   _isStandardLibrary: boolean,
-): Promise<string> {
+): Promise<{ id: string; reused: boolean }> {
   const { reference, definitionType, document } = def;
 
   const libraryId = getLibraryId(reference, serverIds);
@@ -412,16 +302,16 @@ async function createDefinition(
         memoryExtractionWorkflowId: resolveReferenceId(personaDoc.memoryExtractionWorkflowId as string | undefined, serverIds),
         autoversion: true,
       } as Parameters<typeof client.personas.create>[0]);
-      return result.personaId;
+      return { id: result.personaId, reused: result.reused ?? false };
     }
     case 'tool': {
-      // Tools don't support autoversion - create directly
+      // Tools don't support autoversion
       const result = await client.tools.create({
         ...(document as Record<string, unknown>),
         name: getName(reference),
         libraryId: libraryId ?? undefined,
       } as Parameters<typeof client.tools.create>[0]);
-      return result.toolId;
+      return { id: result.toolId, reused: false };
     }
     case 'task': {
       const result = await client.tasks.create({
@@ -431,7 +321,7 @@ async function createDefinition(
         projectId: projectId ?? undefined,
         autoversion: true,
       } as Parameters<typeof client.tasks.create>[0]);
-      return result.taskId;
+      return { id: result.taskId, reused: result.reused ?? false };
     }
     case 'workflow': {
       const wfClient = client['workflow-defs'];
@@ -442,14 +332,15 @@ async function createDefinition(
         projectId: projectId ?? undefined,
         autoversion: true,
       } as Parameters<typeof wfClient.create>[0]);
-      return result.workflowDefId;
+      return { id: result.workflowDefId, reused: result.reused ?? false };
     }
     case 'model': {
       const result = await client['model-profiles'].create({
         ...(document as Record<string, unknown>),
         name: getName(reference),
-      } as Parameters<typeof client['model-profiles']['create']>[0]);
-      return result.modelProfileId;
+        autoversion: true,
+      } as unknown as Parameters<typeof client['model-profiles']['create']>[0]);
+      return { id: result.modelProfileId, reused: (result as { reused?: boolean }).reused ?? false };
     }
     case 'action': {
       const actionDoc = document as Record<string, unknown>;
@@ -463,8 +354,9 @@ async function createDefinition(
         produces: actionDoc.produces as Record<string, unknown> | undefined,
         execution: actionDoc.execution as Record<string, unknown> | undefined,
         idempotency: actionDoc.idempotency as Record<string, unknown> | undefined,
+        autoversion: true,
       });
-      return result.actionId;
+      return { id: result.actionId, reused: result.reused ?? false };
     }
     default:
       throw new Error(`Unsupported definition type: ${definitionType}`);

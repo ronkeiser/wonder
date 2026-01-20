@@ -46,10 +46,72 @@ function fileTypeToDefinitionType(fileType: FileType): DefinitionType | null {
 }
 
 /**
- * Compute SHA-256 hash of file content
+ * Fields excluded from content hash (same as server fingerprint.ts)
  */
-export function computeContentHash(content: string): string {
-  return createHash('sha256').update(content, 'utf8').digest('hex');
+const METADATA_FIELDS = new Set([
+  'id',
+  'version',
+  'name',
+  'description',
+  'createdAt',
+  'updatedAt',
+  'created_at',
+  'updated_at',
+  'tags',
+  'projectId',
+  'libraryId',
+  'project_id',
+  'library_id',
+  'autoversion',
+  'contentHash',
+  'content_hash',
+  'imports', // Local-only field not sent to server
+  // Document-type identifier keys (equivalent to 'name' on the server)
+  'workflow',
+  'task',
+  'action',
+  'persona',
+  'tool',
+  'model',
+]);
+
+/**
+ * Recursively sort object keys for deterministic serialization
+ */
+function sortObjectKeys(obj: unknown): unknown {
+  if (obj === null || obj === undefined) return obj;
+  if (Array.isArray(obj)) return obj.map(sortObjectKeys);
+  if (typeof obj === 'object') {
+    const sorted: Record<string, unknown> = {};
+    for (const key of Object.keys(obj).sort()) {
+      sorted[key] = sortObjectKeys((obj as Record<string, unknown>)[key]);
+    }
+    return sorted;
+  }
+  return obj;
+}
+
+/**
+ * Extract content fields, excluding metadata
+ */
+function extractContent(data: Record<string, unknown>): Record<string, unknown> {
+  const content: Record<string, unknown> = {};
+  for (const [key, value] of Object.entries(data)) {
+    if (!METADATA_FIELDS.has(key)) {
+      content[key] = value;
+    }
+  }
+  return content;
+}
+
+/**
+ * Compute SHA-256 hash of document content (matching server fingerprint algorithm)
+ */
+export function computeContentHash(document: Record<string, unknown>): string {
+  const content = extractContent(document);
+  const sortedContent = sortObjectKeys(content);
+  const jsonString = JSON.stringify(sortedContent);
+  return createHash('sha256').update(jsonString, 'utf8').digest('hex');
 }
 
 /**
@@ -273,7 +335,7 @@ export async function loadWorkspace(rootPath: string): Promise<Workspace> {
     if (!reference) continue;
 
     const refKey = formatReference(reference);
-    const contentHash = computeContentHash(content);
+    const contentHash = computeContentHash(parseResult.document as Record<string, unknown>);
     const dependencies = extractDependencies(parseResult.document, fileType);
 
     definitions.set(refKey, {

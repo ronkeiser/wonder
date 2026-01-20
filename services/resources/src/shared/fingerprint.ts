@@ -16,11 +16,16 @@ const METADATA_FIELDS = new Set([
   'description',
   'created_at',
   'updated_at',
+  'createdAt',
+  'updatedAt',
   'tags',
   'project_id',
   'library_id',
+  'projectId',
+  'libraryId',
   'autoversion',
   'content_hash',
+  'contentHash',
 ]);
 
 /**
@@ -82,4 +87,21 @@ export async function computeContentHash(data: Record<string, unknown>): Promise
   // Convert to hex string
   const hashArray = Array.from(new Uint8Array(hashBuffer));
   return hashArray.map((b) => b.toString(16).padStart(2, '0')).join('');
+}
+
+/**
+ * Get the keys that will be included in the content hash (for debugging)
+ */
+export function getContentKeys(data: Record<string, unknown>): string[] {
+  const content = extractContent(data);
+  return Object.keys(content).sort();
+}
+
+/**
+ * Get the JSON that will be hashed (for debugging)
+ */
+export function getContentJson(data: Record<string, unknown>): string {
+  const content = extractContent(data);
+  const sortedContent = sortObjectKeys(content);
+  return JSON.stringify(sortedContent);
 }

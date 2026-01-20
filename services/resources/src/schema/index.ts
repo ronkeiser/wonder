@@ -347,21 +347,27 @@ export const promptSpecs = sqliteTable(
   ],
 );
 
-export const modelProfiles = sqliteTable('model_profiles', {
-  id: text().primaryKey(),
-  name: text().notNull(),
-  provider: text().notNull(),
-  modelId: text().$type<ModelId>().notNull(),
+export const modelProfiles = sqliteTable(
+  'model_profiles',
+  {
+    id: text().primaryKey(),
+    name: text().notNull(),
+    provider: text().notNull(),
+    modelId: text().$type<ModelId>().notNull(),
 
-  parameters: text({ mode: 'json' }).$type<ModelProfile['parameters']>().notNull().default({}),
-  executionConfig: text({ mode: 'json' }).$type<object>(),
+    parameters: text({ mode: 'json' }).$type<ModelProfile['parameters']>().notNull().default({}),
+    executionConfig: text({ mode: 'json' }).$type<object>(),
 
-  costPer1kInputTokens: real('cost_per_1k_input_tokens').notNull().default(0),
-  costPer1kOutputTokens: real('cost_per_1k_output_tokens').notNull().default(0),
+    costPer1kInputTokens: real('cost_per_1k_input_tokens').notNull().default(0),
+    costPer1kOutputTokens: real('cost_per_1k_output_tokens').notNull().default(0),
 
-  createdAt: text().notNull(),
-  updatedAt: text().notNull(),
-});
+    contentHash: text(),
+
+    createdAt: text().notNull(),
+    updatedAt: text().notNull(),
+  },
+  (table) => [index('idx_model_profiles_name_hash').on(table.name, table.contentHash)],
+);
 
 /** Workflow Runs & Execution */
 

@@ -207,6 +207,9 @@ export type ModelProfile = {
     executionConfig: object | null;
     costPer1kInputTokens: number;
     costPer1kOutputTokens: number;
+    contentHash: string | null;
+    createdAt: string;
+    updatedAt: string;
   };
 }[ModelId];
 

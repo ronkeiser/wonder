@@ -20,9 +20,9 @@ export const modelProfiles = new OpenAPIHono<HttpEnv>();
  * GET /
  */
 modelProfiles.openapi(listModelProfilesRoute, async (c) => {
-  const { provider } = c.req.valid('query');
+  const { provider, name } = c.req.valid('query');
   using modelProfiles = c.env.RESOURCES.modelProfiles();
-  const filters = provider ? { provider } : undefined;
+  const filters = provider || name ? { provider, name } : undefined;
   const result = await modelProfiles.list(filters);
   return c.json(result);
 });

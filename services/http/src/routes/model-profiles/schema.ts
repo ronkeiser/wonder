@@ -36,6 +36,7 @@ export const CreateModelProfileSchema = z
     executionConfig: z.record(z.string(), z.unknown()).optional(),
     costPer1kInputTokens: z.number().nonnegative().openapi({ example: 0.03 }),
     costPer1kOutputTokens: z.number().nonnegative().openapi({ example: 0.06 }),
+    autoversion: z.boolean().optional().openapi({ description: 'Enable content-based deduplication' }),
   })
   .openapi('CreateModelProfile');
 
@@ -74,6 +75,7 @@ export const ModelProfileCreateResponseSchema = z
   .object({
     modelProfileId: ulid(),
     modelProfile: ModelProfileSchema,
+    reused: z.boolean().optional().openapi({ description: 'True if an existing model profile was reused' }),
   })
   .openapi('ModelProfileCreateResponse');
 
