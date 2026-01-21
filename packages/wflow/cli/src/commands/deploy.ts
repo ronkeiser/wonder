@@ -21,6 +21,7 @@ import chalk from 'chalk';
 import { Command } from 'commander';
 import * as fs from 'node:fs';
 import * as path from 'node:path';
+import { loadConfig } from '../config';
 import { isWorkspaceRoot, loadWorkspace } from '../workspace/loader';
 
 interface DeployOptions {
@@ -50,13 +51,23 @@ export const deployCommand = new Command('deploy')
   .option('--dry-run', 'Show what would be deployed without making changes')
   .option('--force', 'Deploy all definitions, even if unchanged')
   .option('--workspace-id <id>', 'Target workspace ID on the server')
-  .option('--api-url <url>', 'API URL', process.env.RESOURCES_URL || 'https://api.wflow.app')
-  .option('--api-key <key>', 'API key for authentication', process.env.WONDER_API_KEY)
+  .option('--api-url <url>', 'API URL')
+  .option('--api-key <key>', 'API key for authentication')
   .option('--quiet', 'Minimal output')
   .option('--no-color', 'Disable colored output')
   .action(async (targetPath: string, options: DeployOptions) => {
     try {
-      await runDeploy(targetPath, options);
+      // Load config from .env files (searched from cwd upward)
+      const config = loadConfig();
+
+      // Apply config as defaults (CLI flags take precedence)
+      const resolvedOptions: DeployOptions = {
+        ...options,
+        apiUrl: options.apiUrl ?? config.apiUrl ?? 'https://api.wflow.app',
+        apiKey: options.apiKey ?? config.apiKey,
+      };
+
+      await runDeploy(targetPath, resolvedOptions);
     } catch (error) {
       console.error('Error:', error instanceof Error ? error.message : error);
       process.exit(2);

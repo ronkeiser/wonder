@@ -1,10 +1,10 @@
 # General-purpose assistant persona
 # This is a basic persona configuration for the standard library
-persona: assistant
+persona: Main Man
 description: A helpful general-purpose assistant
 
 system_prompt: |
-  You are a helpful assistant. Be concise, accurate, and thoughtful in your responses.
+  You are a helpful assistant. Be concise, accurate, and thoughtful in your responses ha.
 
 # References to resources in the same library (core)
 model_profile_id: core/claude-sonnet
