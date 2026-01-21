@@ -104,6 +104,9 @@ export const workflowDefs = sqliteTable(
     description: text().notNull().default(''),
     version: integer().notNull().default(1),
 
+    // Stable identity for autoversion scoping (derived from file path in CLI)
+    reference: text(),
+
     projectId: text().references(() => projects.id),
     libraryId: text(),
 
@@ -124,14 +127,14 @@ export const workflowDefs = sqliteTable(
     primaryKey({ columns: [table.id, table.version] }),
     index('idx_workflow_defs_project').on(table.projectId),
     index('idx_workflow_defs_library').on(table.libraryId),
-    index('idx_workflow_defs_name_version').on(
-      table.name,
+    index('idx_workflow_defs_reference_version').on(
+      table.reference,
       table.projectId,
       table.libraryId,
       table.version,
     ),
     index('idx_workflow_defs_content_hash').on(
-      table.name,
+      table.reference,
       table.projectId,
       table.libraryId,
       table.contentHash,
@@ -252,6 +255,9 @@ export const actions = sqliteTable(
     description: text().notNull().default(''),
     version: integer().notNull().default(1),
 
+    // Stable identity for autoversion scoping (derived from file path in CLI)
+    reference: text(),
+
     kind: text({
       enum: ['llm', 'mcp', 'http', 'human', 'context', 'artifact', 'vector', 'metric', 'mock'],
     }).notNull(),
@@ -270,7 +276,8 @@ export const actions = sqliteTable(
   },
   (table) => [
     primaryKey({ columns: [table.id, table.version] }),
-    index('idx_actions_content_hash').on(table.name, table.contentHash),
+    index('idx_actions_reference_version').on(table.reference, table.version),
+    index('idx_actions_content_hash').on(table.reference, table.contentHash),
   ],
 );
 
@@ -283,6 +290,9 @@ export const tasks = sqliteTable(
     version: integer().notNull().default(1),
     name: text().notNull(),
     description: text().notNull().default(''),
+
+    // Stable identity for autoversion scoping (derived from file path in CLI)
+    reference: text(),
 
     // Ownership (exactly one)
     projectId: text().references(() => projects.id),
@@ -308,9 +318,9 @@ export const tasks = sqliteTable(
     primaryKey({ columns: [table.id, table.version] }),
     index('idx_tasks_project').on(table.projectId),
     index('idx_tasks_library').on(table.libraryId),
-    index('idx_tasks_name_version').on(table.name, table.projectId, table.libraryId, table.version),
+    index('idx_tasks_reference_version').on(table.reference, table.projectId, table.libraryId, table.version),
     index('idx_tasks_content_hash').on(
-      table.name,
+      table.reference,
       table.projectId,
       table.libraryId,
       table.contentHash,
@@ -352,6 +362,8 @@ export const modelProfiles = sqliteTable(
   {
     id: text().primaryKey(),
     name: text().notNull(),
+    // Stable identity for autoversion scoping (derived from file path in CLI)
+    reference: text(),
     provider: text().notNull(),
     modelId: text().$type<ModelId>().notNull(),
 
@@ -366,7 +378,7 @@ export const modelProfiles = sqliteTable(
     createdAt: text().notNull(),
     updatedAt: text().notNull(),
   },
-  (table) => [index('idx_model_profiles_name_hash').on(table.name, table.contentHash)],
+  (table) => [index('idx_model_profiles_reference_hash').on(table.reference, table.contentHash)],
 );
 
 /** Workflow Runs & Execution */
@@ -658,6 +670,9 @@ export const personas = sqliteTable(
     name: text().notNull(),
     description: text().notNull().default(''),
 
+    // Stable identity for autoversion scoping (derived from file path in CLI)
+    reference: text(),
+
     // Ownership (exactly one)
     libraryId: text().references(() => libraries.id),
 
@@ -686,8 +701,8 @@ export const personas = sqliteTable(
   (table) => [
     primaryKey({ columns: [table.id, table.version] }),
     index('idx_personas_library').on(table.libraryId),
-    index('idx_personas_name_version').on(table.name, table.libraryId, table.version),
-    index('idx_personas_content_hash').on(table.name, table.libraryId, table.contentHash),
+    index('idx_personas_reference_version').on(table.reference, table.libraryId, table.version),
+    index('idx_personas_content_hash').on(table.reference, table.libraryId, table.contentHash),
   ],
 );
 

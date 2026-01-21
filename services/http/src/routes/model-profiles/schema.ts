@@ -8,6 +8,10 @@ import { ulid } from '../../validators';
 export const CreateModelProfileSchema = z
   .object({
     name: z.string().min(1).max(255).openapi({ example: 'GPT-4 Default' }),
+    reference: z.string().optional().openapi({
+      example: 'core/gpt4-default',
+      description: 'Stable identity for autoversion scoping. Required when autoversion=true.',
+    }),
     provider: z
       .enum(['anthropic', 'openai', 'google', 'cloudflare', 'local'])
       .openapi({ example: 'openai' }),
@@ -44,6 +48,7 @@ export const ModelProfileSchema = z
   .object({
     id: ulid(),
     name: z.string(),
+    reference: z.string().nullable().openapi({ description: 'Stable identity for autoversion scoping' }),
     provider: z.enum(['anthropic', 'openai', 'google', 'cloudflare', 'local']),
     modelId: z.enum([
       // Cloudflare Workers AI models

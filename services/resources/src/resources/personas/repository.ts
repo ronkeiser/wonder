@@ -84,9 +84,9 @@ export async function deletePersona(
   }
 }
 
-export async function getPersonaByNameAndHash(
+export async function getPersonaByReferenceAndHash(
   db: DrizzleD1Database,
-  name: string,
+  reference: string,
   contentHash: string,
   libraryId: string | null,
 ): Promise<Persona | null> {
@@ -95,7 +95,7 @@ export async function getPersonaByNameAndHash(
     .from(personas)
     .where(
       and(
-        eq(personas.name, name),
+        eq(personas.reference, reference),
         eq(personas.contentHash, contentHash),
         libraryId ? eq(personas.libraryId, libraryId) : isNull(personas.libraryId),
       ),
@@ -104,9 +104,9 @@ export async function getPersonaByNameAndHash(
   return result ?? null;
 }
 
-export async function getMaxVersionByName(
+export async function getMaxVersionByReference(
   db: DrizzleD1Database,
-  name: string,
+  reference: string,
   libraryId: string | null,
 ): Promise<number> {
   const result = await db
@@ -114,7 +114,7 @@ export async function getMaxVersionByName(
     .from(personas)
     .where(
       and(
-        eq(personas.name, name),
+        eq(personas.reference, reference),
         libraryId ? eq(personas.libraryId, libraryId) : isNull(personas.libraryId),
       ),
     )

@@ -8,11 +8,14 @@
 /**
  * Fields that are excluded from fingerprinting across all resources.
  * These are identity, organizational, or system-managed fields.
+ *
+ * Note: `name` is NOT excluded - it's user-facing content that should affect versioning.
+ * `reference` is the stable identity used for autoversion scoping.
  */
 const METADATA_FIELDS = new Set([
   'id',
   'version',
-  'name',
+  'reference',
   'description',
   'created_at',
   'updated_at',
@@ -64,8 +67,10 @@ function extractContent(data: Record<string, unknown>): Record<string, unknown> 
 /**
  * Computes a SHA-256 fingerprint of an object's structural content.
  *
- * Automatically excludes common metadata fields (id, version, name, description,
+ * Automatically excludes metadata fields (id, version, reference, description,
  * timestamps, tags, project_id, library_id, autoversion, content_hash).
+ *
+ * Note: `name` is included in the hash since it's user-facing content.
  *
  * Uses the Web Crypto API (available in Cloudflare Workers runtime).
  *

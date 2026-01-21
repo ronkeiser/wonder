@@ -28,21 +28,21 @@ export class Tasks extends Resource {
       libraryId: data.libraryId ?? null,
     };
 
-    const autoversionResult = await this.withAutoversion(
+    const autoversionResult = await this.withAutoversion<Task>(
       data,
       {
-        findByNameAndHash: (name, hash, s) =>
-          repo.getTaskByNameAndHash(
+        findByReferenceAndHash: (reference, hash, s) =>
+          repo.getTaskByReferenceAndHash(
             this.serviceCtx.db,
-            name,
+            reference,
             hash,
             s?.projectId ?? null,
             s?.libraryId ?? null,
           ),
-        getMaxVersion: (name, s) =>
-          repo.getMaxVersionByName(
+        getMaxVersion: (reference, s) =>
+          repo.getMaxVersionByReference(
             this.serviceCtx.db,
-            name,
+            reference,
             s?.projectId ?? null,
             s?.libraryId ?? null,
           ),

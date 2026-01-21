@@ -201,6 +201,7 @@ export type ModelProfile = {
   [K in ModelId]: {
     id: string;
     name: string;
+    reference: string | null;
     modelId: K;
     provider: (typeof MODEL_CATALOG)[K]['provider'];
     parameters: (typeof MODEL_CATALOG)[K]['parameters'];

@@ -327,77 +327,84 @@ async function createDefinition(
   const libraryId = getLibraryId(reference, serverIds);
   const projectId = getProjectId(reference, serverIds);
 
+  const doc = document as Record<string, unknown>;
+  const refString = getReference(reference);
+  const displayName = getDisplayName(doc, reference);
+
   switch (definitionType) {
     case 'persona': {
-      const personaDoc = document as Record<string, unknown>;
       const result = await client.personas.create({
-        ...personaDoc,
-        name: getName(reference),
+        ...doc,
+        name: displayName,
+        reference: refString,
         libraryId: libraryId ?? undefined,
         // Resolve reference IDs to server IDs
-        modelProfileId: resolveReferenceId(personaDoc.modelProfileId as string | undefined, serverIds),
-        contextAssemblyWorkflowId: resolveReferenceId(personaDoc.contextAssemblyWorkflowId as string | undefined, serverIds),
-        memoryExtractionWorkflowId: resolveReferenceId(personaDoc.memoryExtractionWorkflowId as string | undefined, serverIds),
+        modelProfileId: resolveReferenceId(doc.modelProfileId as string | undefined, serverIds),
+        contextAssemblyWorkflowId: resolveReferenceId(doc.contextAssemblyWorkflowId as string | undefined, serverIds),
+        memoryExtractionWorkflowId: resolveReferenceId(doc.memoryExtractionWorkflowId as string | undefined, serverIds),
         autoversion: !options.force,
-      } as Parameters<typeof client.personas.create>[0]);
+      } as unknown as Parameters<typeof client.personas.create>[0]);
       const latestVersion = (result as { latestVersion?: number }).latestVersion;
       return { id: result.personaId, reused: result.reused ?? false, version: result.version, latestVersion };
     }
     case 'tool': {
       // Tools don't support autoversion
       const result = await client.tools.create({
-        ...(document as Record<string, unknown>),
-        name: getName(reference),
+        ...doc,
+        name: displayName,
         libraryId: libraryId ?? undefined,
       } as Parameters<typeof client.tools.create>[0]);
       return { id: result.toolId, reused: false, version: 1 };
     }
     case 'task': {
       const result = await client.tasks.create({
-        ...(document as Record<string, unknown>),
-        name: getName(reference),
+        ...doc,
+        name: displayName,
+        reference: refString,
         libraryId: libraryId ?? undefined,
         projectId: projectId ?? undefined,
         autoversion: !options.force,
-      } as Parameters<typeof client.tasks.create>[0]);
+      } as unknown as Parameters<typeof client.tasks.create>[0]);
       const latestVersion = (result as { latestVersion?: number }).latestVersion;
       return { id: result.taskId, reused: result.reused ?? false, version: result.version, latestVersion };
     }
     case 'workflow': {
       const wfClient = client['workflow-defs'];
       const result = await wfClient.create({
-        ...(document as Record<string, unknown>),
-        name: getName(reference),
+        ...doc,
+        name: displayName,
+        reference: refString,
         libraryId: libraryId ?? undefined,
         projectId: projectId ?? undefined,
         autoversion: !options.force,
-      } as Parameters<typeof wfClient.create>[0]);
+      } as unknown as Parameters<typeof wfClient.create>[0]);
       const latestVersion = (result as { latestVersion?: number }).latestVersion;
       return { id: result.workflowDefId, reused: result.reused ?? false, version: result.version, latestVersion };
     }
     case 'model': {
       const result = await client['model-profiles'].create({
-        ...(document as Record<string, unknown>),
-        name: getName(reference),
+        ...doc,
+        name: displayName,
+        reference: refString,
         autoversion: !options.force,
       } as unknown as Parameters<typeof client['model-profiles']['create']>[0]);
       const latestVersion = (result as { latestVersion?: number }).latestVersion;
       return { id: result.modelProfileId, reused: result.reused ?? false, version: result.version, latestVersion };
     }
     case 'action': {
-      const actionDoc = document as Record<string, unknown>;
       const result = await client.actions.create({
-        name: getName(reference),
-        description: actionDoc.description as string,
-        version: (actionDoc.version as number) ?? 1,
-        kind: actionDoc.kind as 'llm' | 'mcp' | 'http' | 'human' | 'context' | 'artifact' | 'vector' | 'metric' | 'mock',
-        implementation: actionDoc.implementation as Record<string, unknown>,
-        requires: actionDoc.requires as Record<string, unknown> | undefined,
-        produces: actionDoc.produces as Record<string, unknown> | undefined,
-        execution: actionDoc.execution as Record<string, unknown> | undefined,
-        idempotency: actionDoc.idempotency as Record<string, unknown> | undefined,
+        name: displayName,
+        reference: refString,
+        description: doc.description as string,
+        version: (doc.version as number) ?? 1,
+        kind: doc.kind as 'llm' | 'mcp' | 'http' | 'human' | 'context' | 'artifact' | 'vector' | 'metric' | 'mock',
+        implementation: doc.implementation as Record<string, unknown>,
+        requires: doc.requires as Record<string, unknown> | undefined,
+        produces: doc.produces as Record<string, unknown> | undefined,
+        execution: doc.execution as Record<string, unknown> | undefined,
+        idempotency: doc.idempotency as Record<string, unknown> | undefined,
         autoversion: !options.force,
-      });
+      } as unknown as Parameters<typeof client.actions.create>[0]);
       const latestVersion = (result as { latestVersion?: number }).latestVersion;
       return { id: result.actionId, reused: result.reused ?? false, version: result.version, latestVersion };
     }
@@ -406,7 +413,26 @@ async function createDefinition(
   }
 }
 
-function getName(ref: Reference): string {
+/**
+ * Get the reference string from a file-path-derived Reference
+ */
+function getReference(ref: Reference): string {
+  return formatReference(ref);
+}
+
+/**
+ * Get the user-facing name from the document.
+ * Falls back to the reference name if the document doesn't have a name field.
+ */
+function getDisplayName(doc: Record<string, unknown>, ref: Reference): string {
+  // Document type identifier fields that contain the name
+  const nameFields = ['persona', 'workflow', 'task', 'action', 'model', 'tool', 'name'];
+  for (const field of nameFields) {
+    if (typeof doc[field] === 'string' && doc[field]) {
+      return doc[field] as string;
+    }
+  }
+  // Fallback to reference name
   return ref.name;
 }
 

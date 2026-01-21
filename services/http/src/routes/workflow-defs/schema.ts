@@ -31,6 +31,10 @@ const MergeConfigSchema = z.object({
 export const CreateWorkflowDefSchema = z
   .object({
     name: z.string().min(1).max(255).openapi({ example: 'Content Generation Pipeline' }),
+    reference: z.string().optional().openapi({
+      example: 'core/content-pipeline',
+      description: 'Stable identity for autoversion scoping. Required when autoversion=true.',
+    }),
     description: z.string().min(1).openapi({ example: 'Generates and reviews content' }),
     projectId: ulid().optional().openapi({ example: '01ARZ3NDEKTSV4RRFFQ69G5FAV' }),
     libraryId: ulid().optional(),
@@ -139,6 +143,7 @@ export const WorkflowDefSchema = z
   .object({
     id: ulid(),
     name: z.string(),
+    reference: z.string().nullable().openapi({ description: 'Stable identity for autoversion scoping' }),
     description: z.string(),
     version: z.number().int(),
     projectId: ulid().nullable(),

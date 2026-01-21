@@ -8,6 +8,10 @@ const AgentConstraintsSchema = z.object({
 export const CreatePersonaSchema = z
   .object({
     name: z.string().min(1).max(255).openapi({ example: 'Code Reviewer' }),
+    reference: z.string().optional().openapi({
+      example: 'core/code-reviewer',
+      description: 'Stable identity for autoversion scoping. Required when autoversion=true.',
+    }),
     description: z.string().default('').openapi({ example: 'Reviews code for best practices' }),
     libraryId: z.string().optional().openapi({ example: 'lib_123' }),
     systemPrompt: z.string().min(1).openapi({ example: 'You are a helpful code reviewer.' }),
@@ -22,7 +26,7 @@ export const CreatePersonaSchema = z
       .optional()
       .openapi({
         description:
-          'When true, compute content hash for deduplication. If existing persona with same name and content exists, return it. Otherwise auto-increment version.',
+          'When true, compute content hash for deduplication. If existing persona with same reference and content exists, return it. Otherwise auto-increment version.',
       }),
   })
   .openapi('CreatePersona');
@@ -32,6 +36,7 @@ export const PersonaSchema = z
     id: z.string().openapi({ example: 'code-reviewer' }),
     version: z.number().int(),
     name: z.string(),
+    reference: z.string().nullable().openapi({ description: 'Stable identity for autoversion scoping' }),
     description: z.string(),
     libraryId: z.string().nullable(),
     systemPrompt: z.string(),

@@ -81,24 +81,24 @@ export async function deleteAction(
   }
 }
 
-export async function getActionByNameAndHash(
+export async function getActionByReferenceAndHash(
   db: DrizzleD1Database,
-  name: string,
+  reference: string,
   contentHash: string,
 ): Promise<Action | null> {
   const result = await db
     .select()
     .from(actions)
-    .where(and(eq(actions.name, name), eq(actions.contentHash, contentHash)))
+    .where(and(eq(actions.reference, reference), eq(actions.contentHash, contentHash)))
     .get();
   return result ?? null;
 }
 
-export async function getMaxVersionByName(db: DrizzleD1Database, name: string): Promise<number> {
+export async function getMaxVersionByReference(db: DrizzleD1Database, reference: string): Promise<number> {
   const result = await db
     .select({ version: actions.version })
     .from(actions)
-    .where(eq(actions.name, name))
+    .where(eq(actions.reference, reference))
     .orderBy(desc(actions.version))
     .limit(1)
     .get();

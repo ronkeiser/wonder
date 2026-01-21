@@ -7,6 +7,10 @@ import { z } from '@hono/zod-openapi';
 export const CreateActionSchema = z
   .object({
     name: z.string().min(1).max(255).openapi({ example: 'Generate Summary' }),
+    reference: z.string().optional().openapi({
+      example: 'core/generate-summary',
+      description: 'Stable identity for autoversion scoping. Required when autoversion=true.',
+    }),
     description: z.string().min(1).openapi({ example: 'Generates a summary using LLM' }),
     version: z.number().int().positive().default(1).openapi({ example: 1 }),
     kind: z
@@ -22,7 +26,7 @@ export const CreateActionSchema = z
       .optional()
       .openapi({
         description:
-          'When true, compute content hash for deduplication. If existing action with same name and content exists, return it. Otherwise auto-increment version.',
+          'When true, compute content hash for deduplication. If existing action with same reference and content exists, return it. Otherwise auto-increment version.',
       }),
   })
   .openapi('CreateAction');
@@ -31,6 +35,7 @@ export const ActionSchema = z
   .object({
     id: z.string().openapi({ example: 'send-email' }),
     name: z.string(),
+    reference: z.string().nullable().openapi({ description: 'Stable identity for autoversion scoping' }),
     description: z.string(),
     version: z.number().int(),
     kind: z.enum(['llm', 'mcp', 'http', 'human', 'context', 'artifact', 'vector', 'metric', 'mock']),

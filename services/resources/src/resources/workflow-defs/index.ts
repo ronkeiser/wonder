@@ -42,21 +42,21 @@ export class WorkflowDefs extends Resource {
     };
 
     // 2. Autoversion deduplication check
-    const autoversionResult = await this.withAutoversion(
-      data as unknown as Record<string, unknown> & { name: string; autoversion?: boolean },
+    const autoversionResult = await this.withAutoversion<WorkflowDef>(
+      data as unknown as Record<string, unknown> & { name: string; reference?: string; autoversion?: boolean },
       {
-        findByNameAndHash: (name, hash, s) =>
-          repo.getWorkflowDefByNameAndHash(
+        findByReferenceAndHash: (reference, hash, s) =>
+          repo.getWorkflowDefByReferenceAndHash(
             this.serviceCtx.db,
-            name,
+            reference,
             s?.projectId ?? null,
             s?.libraryId ?? null,
             hash,
           ),
-        getMaxVersion: (name, s) =>
-          repo.getMaxVersionByName(
+        getMaxVersion: (reference, s) =>
+          repo.getMaxVersionByReference(
             this.serviceCtx.db,
-            name,
+            reference,
             s?.projectId ?? null,
             s?.libraryId ?? null,
           ),

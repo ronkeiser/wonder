@@ -8,16 +8,16 @@ import { computeContentHash } from './fingerprint';
  * Repository functions required for autoversioning.
  */
 export interface AutoversionRepo<TEntity> {
-  /** Find an existing entity by name, content hash, and optional scope */
-  findByNameAndHash(
-    name: string,
+  /** Find an existing entity by reference, content hash, and optional scope */
+  findByReferenceAndHash(
+    reference: string,
     hash: string,
     scope?: { projectId?: string | null; libraryId?: string | null },
   ): Promise<TEntity | null>;
 
-  /** Get the maximum version number for a name within optional scope */
+  /** Get the maximum version number for a reference within optional scope */
   getMaxVersion(
-    name: string,
+    reference: string,
     scope?: { projectId?: string | null; libraryId?: string | null },
   ): Promise<number>;
 }
@@ -116,13 +116,13 @@ export abstract class Resource extends RpcTarget {
   /**
    * Handles autoversion logic: checks for existing matching content or determines next version.
    *
-   * @param data - The input data (must include `name` and optionally `autoversion`)
+   * @param data - The input data (must include `reference` when `autoversion` is true)
    * @param repo - Repository functions for finding existing entities and getting max version
    * @param scope - Optional scope for scoped resources (project_id, library_id)
    * @returns Either the existing entity (reused) or the version number to use for creation
    */
   protected async withAutoversion<TEntity>(
-    data: Record<string, unknown> & { name: string; autoversion?: boolean },
+    data: Record<string, unknown> & { name: string; reference?: string | null; autoversion?: boolean },
     repo: AutoversionRepo<TEntity>,
     scope?: { projectId?: string | null; libraryId?: string | null },
   ): Promise<AutoversionResult<TEntity>> {
@@ -133,18 +133,24 @@ export abstract class Resource extends RpcTarget {
       return { reused: false, version: 1, contentHash };
     }
 
+    // Reference is required when autoversion is true
+    if (!data.reference) {
+      throw new Error('reference is required when autoversion is true');
+    }
+
     const contentHash = await computeContentHash(data);
 
     // Get max version first (we need it for both reuse and create paths)
-    const maxVersion = await repo.getMaxVersion(data.name, scope);
+    const maxVersion = await repo.getMaxVersion(data.reference, scope);
 
-    // Check for existing entity with same name + content
-    const existing = await repo.findByNameAndHash(data.name, contentHash, scope);
+    // Check for existing entity with same reference + content
+    const existing = await repo.findByReferenceAndHash(data.reference, contentHash, scope);
 
     if (existing) {
       this.serviceCtx.logger.info({
         eventType: `${this.resourceName}.autoversion.matched`,
         metadata: {
+          reference: data.reference,
           name: data.name,
           content_hash: contentHash,
           matched_version: (existing as { version?: number }).version,
@@ -161,6 +167,7 @@ export abstract class Resource extends RpcTarget {
     this.serviceCtx.logger.info({
       eventType: `${this.resourceName}.autoversion.creating`,
       metadata: {
+        reference: data.reference,
         name: data.name,
         version: newVersion,
         content_hash: contentHash,

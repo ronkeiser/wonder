@@ -70,31 +70,31 @@ export async function getModelProfileByName(
 }
 
 /**
- * Find a model profile by name and content hash (for autoversion deduplication)
+ * Find a model profile by reference and content hash (for autoversion deduplication)
  */
-export async function getModelProfileByNameAndHash(
+export async function getModelProfileByReferenceAndHash(
   db: DrizzleD1Database,
-  name: string,
+  reference: string,
   contentHash: string,
 ): Promise<ModelProfile | null> {
   const result = await db
     .select()
     .from(modelProfiles)
-    .where(and(eq(modelProfiles.name, name), eq(modelProfiles.contentHash, contentHash)))
+    .where(and(eq(modelProfiles.reference, reference), eq(modelProfiles.contentHash, contentHash)))
     .get();
   return (result as ModelProfile) ?? null;
 }
 
 /**
- * Model profiles don't have versioning - there's only ever one profile per name.
+ * Model profiles don't have versioning - there's only ever one profile per reference.
  * This returns 0 if no profile exists, or 1 if one does.
  */
-export async function getMaxVersionByName(db: DrizzleD1Database, name: string): Promise<number> {
+export async function getMaxVersionByReference(db: DrizzleD1Database, reference: string): Promise<number> {
   const result = await db
     .select({ count: max(modelProfiles.id) })
     .from(modelProfiles)
-    .where(eq(modelProfiles.name, name))
+    .where(eq(modelProfiles.reference, reference))
     .get();
-  // If any profile exists with this name, return 1; otherwise 0
+  // If any profile exists with this reference, return 1; otherwise 0
   return result?.count ? 1 : 0;
 }

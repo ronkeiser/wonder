@@ -25,13 +25,13 @@ export class Personas extends Resource {
       libraryId: data.libraryId ?? null,
     };
 
-    const autoversionResult = await this.withAutoversion(
+    const autoversionResult = await this.withAutoversion<Persona>(
       data,
       {
-        findByNameAndHash: (name, hash, s) =>
-          repo.getPersonaByNameAndHash(this.serviceCtx.db, name, hash, s?.libraryId ?? null),
-        getMaxVersion: (name, s) =>
-          repo.getMaxVersionByName(this.serviceCtx.db, name, s?.libraryId ?? null),
+        findByReferenceAndHash: (reference, hash, s) =>
+          repo.getPersonaByReferenceAndHash(this.serviceCtx.db, reference, hash, s?.libraryId ?? null),
+        getMaxVersion: (reference, s) =>
+          repo.getMaxVersionByReference(this.serviceCtx.db, reference, s?.libraryId ?? null),
       },
       scope,
     );

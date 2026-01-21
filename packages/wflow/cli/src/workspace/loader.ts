@@ -47,11 +47,14 @@ function fileTypeToDefinitionType(fileType: FileType): DefinitionType | null {
 
 /**
  * Fields excluded from content hash (same as server fingerprint.ts)
+ *
+ * Note: `name` is NOT excluded - it's user-facing content that should affect versioning.
+ * The document-type identifier keys (workflow, task, etc.) map to `name` and are also included.
  */
 const METADATA_FIELDS = new Set([
   'id',
   'version',
-  'name',
+  'reference',
   'description',
   'createdAt',
   'updatedAt',
@@ -66,13 +69,6 @@ const METADATA_FIELDS = new Set([
   'contentHash',
   'content_hash',
   'imports', // Local-only field not sent to server
-  // Document-type identifier keys (equivalent to 'name' on the server)
-  'workflow',
-  'task',
-  'action',
-  'persona',
-  'tool',
-  'model',
 ]);
 
 /**

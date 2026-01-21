@@ -97,9 +97,9 @@ export async function deleteTask(
   }
 }
 
-export async function getTaskByNameAndHash(
+export async function getTaskByReferenceAndHash(
   db: DrizzleD1Database,
-  name: string,
+  reference: string,
   contentHash: string,
   projectId: string | null,
   libraryId: string | null,
@@ -109,7 +109,7 @@ export async function getTaskByNameAndHash(
     .from(tasks)
     .where(
       and(
-        eq(tasks.name, name),
+        eq(tasks.reference, reference),
         eq(tasks.contentHash, contentHash),
         projectId ? eq(tasks.projectId, projectId) : isNull(tasks.projectId),
         libraryId ? eq(tasks.libraryId, libraryId) : isNull(tasks.libraryId),
@@ -119,9 +119,9 @@ export async function getTaskByNameAndHash(
   return result ?? null;
 }
 
-export async function getMaxVersionByName(
+export async function getMaxVersionByReference(
   db: DrizzleD1Database,
-  name: string,
+  reference: string,
   projectId: string | null,
   libraryId: string | null,
 ): Promise<number> {
@@ -130,7 +130,7 @@ export async function getMaxVersionByName(
     .from(tasks)
     .where(
       and(
-        eq(tasks.name, name),
+        eq(tasks.reference, reference),
         projectId ? eq(tasks.projectId, projectId) : isNull(tasks.projectId),
         libraryId ? eq(tasks.libraryId, libraryId) : isNull(tasks.libraryId),
       ),

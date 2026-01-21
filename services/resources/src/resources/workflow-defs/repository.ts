@@ -114,12 +114,12 @@ export async function listWorkflowDefsByLibrary(
 }
 
 /**
- * Find a workflow def by name, project/library, and content hash.
+ * Find a workflow def by reference, project/library, and content hash.
  * Used for autoversion deduplication.
  */
-export async function getWorkflowDefByNameAndHash(
+export async function getWorkflowDefByReferenceAndHash(
   db: DrizzleD1Database,
-  name: string,
+  reference: string,
   projectId: string | null,
   libraryId: string | null,
   contentHash: string,
@@ -128,13 +128,13 @@ export async function getWorkflowDefByNameAndHash(
 
   if (projectId) {
     whereClause = and(
-      eq(workflowDefs.name, name),
+      eq(workflowDefs.reference, reference),
       eq(workflowDefs.projectId, projectId),
       eq(workflowDefs.contentHash, contentHash),
     );
   } else if (libraryId) {
     whereClause = and(
-      eq(workflowDefs.name, name),
+      eq(workflowDefs.reference, reference),
       eq(workflowDefs.libraryId, libraryId),
       eq(workflowDefs.contentHash, contentHash),
     );
@@ -147,21 +147,21 @@ export async function getWorkflowDefByNameAndHash(
 }
 
 /**
- * Get the maximum version number for a workflow def by name and project/library.
- * Returns 0 if no existing workflow def with that name exists.
+ * Get the maximum version number for a workflow def by reference and project/library.
+ * Returns 0 if no existing workflow def with that reference exists.
  */
-export async function getMaxVersionByName(
+export async function getMaxVersionByReference(
   db: DrizzleD1Database,
-  name: string,
+  reference: string,
   projectId: string | null,
   libraryId: string | null,
 ): Promise<number> {
   let whereClause;
 
   if (projectId) {
-    whereClause = and(eq(workflowDefs.name, name), eq(workflowDefs.projectId, projectId));
+    whereClause = and(eq(workflowDefs.reference, reference), eq(workflowDefs.projectId, projectId));
   } else if (libraryId) {
-    whereClause = and(eq(workflowDefs.name, name), eq(workflowDefs.libraryId, libraryId));
+    whereClause = and(eq(workflowDefs.reference, reference), eq(workflowDefs.libraryId, libraryId));
   } else {
     return 0;
   }

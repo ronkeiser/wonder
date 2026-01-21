@@ -21,10 +21,10 @@ export class Actions extends Resource {
       metadata: { name: data.name, kind: data.kind, autoversion: data.autoversion ?? false },
     });
 
-    const autoversionResult = await this.withAutoversion(data, {
-      findByNameAndHash: (name, hash) =>
-        repo.getActionByNameAndHash(this.serviceCtx.db, name, hash),
-      getMaxVersion: (name) => repo.getMaxVersionByName(this.serviceCtx.db, name),
+    const autoversionResult = await this.withAutoversion<Action>(data, {
+      findByReferenceAndHash: (reference, hash) =>
+        repo.getActionByReferenceAndHash(this.serviceCtx.db, reference, hash),
+      getMaxVersion: (reference) => repo.getMaxVersionByReference(this.serviceCtx.db, reference),
     });
 
     if (autoversionResult.reused) {

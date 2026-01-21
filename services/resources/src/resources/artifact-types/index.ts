@@ -1,6 +1,7 @@
 /** ArtifactTypes RPC resource */
 
 import { ConflictError, NotFoundError, extractDbError } from '~/shared/errors';
+import { computeContentHash } from '~/shared/fingerprint';
 import { Resource } from '~/shared/resource';
 import * as repo from './repository';
 import type { ArtifactType, ArtifactTypeInput } from './types';
@@ -17,27 +18,36 @@ export class ArtifactTypes extends Resource {
       metadata: { name: data.name, autoversion: data.autoversion ?? false },
     });
 
-    const autoversionResult = await this.withAutoversion(data, {
-      findByNameAndHash: (name, hash) =>
-        repo.getArtifactTypeByNameAndHash(this.serviceCtx.db, name, hash),
-      getMaxVersion: (name) => repo.getMaxVersionByName(this.serviceCtx.db, name),
-    });
+    // Artifact types use name-based autoversioning (no reference field)
+    const contentHash = await computeContentHash(data as Record<string, unknown>);
+    let version = data.version ?? 1;
 
-    if (autoversionResult.reused) {
-      return {
-        artifactTypeId: autoversionResult.entity.id,
-        artifactType: autoversionResult.entity,
-        reused: true,
-      };
+    if (data.autoversion) {
+      // Check for existing artifact type with same name + content
+      const existing = await repo.getArtifactTypeByNameAndHash(
+        this.serviceCtx.db,
+        data.name,
+        contentHash,
+      );
+
+      if (existing) {
+        return {
+          artifactTypeId: existing.id,
+          artifactType: existing,
+          reused: true,
+        };
+      }
+
+      // Get max version and increment
+      const maxVersion = await repo.getMaxVersionByName(this.serviceCtx.db, data.name);
+      version = maxVersion + 1;
     }
-
-    const version = data.autoversion ? autoversionResult.version : (data.version ?? 1);
 
     try {
       const artifactType = await repo.createArtifactType(this.serviceCtx.db, {
         ...data,
         version,
-        contentHash: autoversionResult.contentHash,
+        contentHash,
       });
 
       return {

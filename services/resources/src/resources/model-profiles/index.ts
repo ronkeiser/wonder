@@ -21,12 +21,12 @@ export class ModelProfiles extends Resource {
       { metadata: { name: data.name, provider: data.provider, autoversion: data.autoversion } },
       async () => {
         // Autoversion deduplication check
-        const autoversionResult = await this.withAutoversion(
-          data as unknown as Record<string, unknown> & { name: string; autoversion?: boolean },
+        const autoversionResult = await this.withAutoversion<ModelProfile>(
+          data as unknown as Record<string, unknown> & { name: string; reference?: string; autoversion?: boolean },
           {
-            findByNameAndHash: (name, hash) =>
-              repo.getModelProfileByNameAndHash(this.serviceCtx.db, name, hash),
-            getMaxVersion: (name) => repo.getMaxVersionByName(this.serviceCtx.db, name),
+            findByReferenceAndHash: (reference, hash) =>
+              repo.getModelProfileByReferenceAndHash(this.serviceCtx.db, reference, hash),
+            getMaxVersion: (reference) => repo.getMaxVersionByReference(this.serviceCtx.db, reference),
           },
         );
 

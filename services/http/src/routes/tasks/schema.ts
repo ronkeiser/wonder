@@ -88,6 +88,10 @@ export const CreateStepSchema = z
 export const CreateTaskSchema = z
   .object({
     name: z.string().min(1).max(255).openapi({ example: 'Write File Verified' }),
+    reference: z.string().optional().openapi({
+      example: 'core/write-file-verified',
+      description: 'Stable identity for autoversion scoping. Required when autoversion=true.',
+    }),
     description: z
       .string()
       .optional()
@@ -133,6 +137,7 @@ export const TaskSchema = z
     id: z.string().openapi({ example: '01ARZ3NDEKTSV4RRFFQ69G5FAV' }),
     version: z.number().int(),
     name: z.string(),
+    reference: z.string().nullable().openapi({ description: 'Stable identity for autoversion scoping' }),
     description: z.string(),
     projectId: z.string().nullable(),
     libraryId: z.string().nullable(),

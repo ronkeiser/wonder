@@ -2725,6 +2725,8 @@ export interface components {
             /** @example send-email */
             id: string;
             name: string;
+            /** @description Stable identity for autoversion scoping */
+            reference: string | null;
             description: string;
             version: number;
             /** @enum {string} */
@@ -2755,10 +2757,17 @@ export interface components {
             reused: boolean;
             /** @description Version number of the created/reused action */
             version: number;
+            /** @description Latest version for this name (only present when reused=true) */
+            latestVersion?: number;
         };
         CreateAction: {
             /** @example Generate Summary */
             name: string;
+            /**
+             * @description Stable identity for autoversion scoping. Required when autoversion=true.
+             * @example core/generate-summary
+             */
+            reference?: string;
             /** @example Generates a summary using LLM */
             description: string;
             /**
@@ -2791,7 +2800,7 @@ export interface components {
             idempotency?: {
                 [key: string]: unknown;
             };
-            /** @description When true, compute content hash for deduplication. If existing action with same name and content exists, return it. Otherwise auto-increment version. */
+            /** @description When true, compute content hash for deduplication. If existing action with same reference and content exists, return it. Otherwise auto-increment version. */
             autoversion?: boolean;
         };
         ActionGetResponse: {
@@ -3063,6 +3072,8 @@ export interface components {
         ModelProfile: {
             id: string;
             name: string;
+            /** @description Stable identity for autoversion scoping */
+            reference: string | null;
             /** @enum {string} */
             provider: "anthropic" | "openai" | "google" | "cloudflare" | "local";
             /** @enum {string} */
@@ -3082,10 +3093,17 @@ export interface components {
             reused?: boolean;
             /** @description Version number of the created/reused model profile */
             version: number;
+            /** @description Latest version for this name (only present when reused=true) */
+            latestVersion?: number;
         };
         CreateModelProfile: {
             /** @example GPT-4 Default */
             name: string;
+            /**
+             * @description Stable identity for autoversion scoping. Required when autoversion=true.
+             * @example core/gpt4-default
+             */
+            reference?: string;
             /**
              * @example openai
              * @enum {string}
@@ -3119,6 +3137,8 @@ export interface components {
             id: string;
             version: number;
             name: string;
+            /** @description Stable identity for autoversion scoping */
+            reference: string | null;
             description: string;
             libraryId: string | null;
             systemPrompt: string;
@@ -3141,10 +3161,17 @@ export interface components {
             reused: boolean;
             /** @description Version number of the created/reused persona */
             version: number;
+            /** @description Latest version for this name (only present when reused=true) */
+            latestVersion?: number;
         };
         CreatePersona: {
             /** @example Code Reviewer */
             name: string;
+            /**
+             * @description Stable identity for autoversion scoping. Required when autoversion=true.
+             * @example core/code-reviewer
+             */
+            reference?: string;
             /**
              * @default
              * @example Reviews code for best practices
@@ -3175,7 +3202,7 @@ export interface components {
             constraints?: {
                 maxMovesPerTurn?: number;
             };
-            /** @description When true, compute content hash for deduplication. If existing persona with same name and content exists, return it. Otherwise auto-increment version. */
+            /** @description When true, compute content hash for deduplication. If existing persona with same reference and content exists, return it. Otherwise auto-increment version. */
             autoversion?: boolean;
         };
         PersonaListResponse: {
@@ -3367,6 +3394,8 @@ export interface components {
             id: string;
             version: number;
             name: string;
+            /** @description Stable identity for autoversion scoping */
+            reference: string | null;
             description: string;
             projectId: string | null;
             libraryId: string | null;
@@ -3391,6 +3420,8 @@ export interface components {
             reused: boolean;
             /** @description Version number of the created/reused task */
             version: number;
+            /** @description Latest version for this name (only present when reused=true) */
+            latestVersion?: number;
         };
         CreateStep: {
             /** @example call_llm */
@@ -3437,6 +3468,11 @@ export interface components {
         CreateTask: {
             /** @example Write File Verified */
             name: string;
+            /**
+             * @description Stable identity for autoversion scoping. Required when autoversion=true.
+             * @example core/write-file-verified
+             */
+            reference?: string;
             /** @example Write file with read-back verification */
             description?: string;
             /**
@@ -3581,6 +3617,8 @@ export interface components {
         WorkflowDef: {
             id: string;
             name: string;
+            /** @description Stable identity for autoversion scoping */
+            reference: string | null;
             description: string;
             version: number;
             projectId: string | null;
@@ -3600,10 +3638,17 @@ export interface components {
             reused: boolean;
             /** @description Version number of the created/reused workflow def */
             version: number;
+            /** @description Latest version for this name (only present when reused=true) */
+            latestVersion?: number;
         };
         CreateWorkflowDef: {
             /** @example Content Generation Pipeline */
             name: string;
+            /**
+             * @description Stable identity for autoversion scoping. Required when autoversion=true.
+             * @example core/content-pipeline
+             */
+            reference?: string;
             /** @example Generates and reviews content */
             description: string;
             /** @example 01ARZ3NDEKTSV4RRFFQ69G5FAV */
