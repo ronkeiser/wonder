@@ -1,4 +1,5 @@
 <script lang="ts">
+  import { enhance } from '$app/forms';
   import type { PageData } from './$types';
 
   let { data }: { data: PageData } = $props();
@@ -65,7 +66,17 @@
     </div>
   </dl>
 
-  <h2 class="text-lg font-semibold mt-8 mb-4">Conversations</h2>
+  <div class="flex items-center justify-between mt-8 mb-4">
+    <h2 class="text-lg font-semibold">Conversations</h2>
+    <form method="POST" action="?/startConversation" use:enhance>
+      <button
+        type="submit"
+        class="px-3 py-1.5 text-sm bg-accent text-white border-none rounded cursor-pointer hover:bg-accent/90 transition-colors"
+      >
+        New Conversation
+      </button>
+    </form>
+  </div>
 
   {#if data.conversations.length === 0}
     <p class="text-foreground-muted text-sm">No conversations yet.</p>

@@ -1,5 +1,5 @@
-import { error } from '@sveltejs/kit';
-import type { PageServerLoad } from './$types';
+import { error, redirect } from '@sveltejs/kit';
+import type { Actions, PageServerLoad } from './$types';
 
 interface Agent {
   id: string;
@@ -41,4 +41,24 @@ export const load: PageServerLoad = async ({ fetch, params }) => {
     agent: agentData.agent as Agent,
     conversations: conversationsData.conversations as Conversation[],
   };
+};
+
+export const actions: Actions = {
+  startConversation: async ({ fetch, params }) => {
+    const res = await fetch('/api/conversations', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        participants: [{ type: 'agent', agentId: params.id }],
+        status: 'active',
+      }),
+    });
+
+    if (!res.ok) {
+      error(res.status, 'Failed to create conversation');
+    }
+
+    const data = await res.json();
+    redirect(303, `/conversations/${data.conversationId}`);
+  },
 };
