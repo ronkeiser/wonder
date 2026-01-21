@@ -8,6 +8,13 @@
       "when": 1768356361355,
       "tag": "0000_initial",
       "breakpoints": true
+    },
+    {
+      "idx": 1,
+      "version": "6",
+      "when": 1768977342707,
+      "tag": "0001_damp_bishop",
+      "breakpoints": true
     }
   ]
 }
