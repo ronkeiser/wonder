@@ -1,6 +1,6 @@
 /** Repository for agent data access */
 
-import { eq } from 'drizzle-orm';
+import { desc, eq } from 'drizzle-orm';
 import type { DrizzleD1Database } from 'drizzle-orm/d1';
 import { ulid } from 'ulid';
 import { agents } from '../../schema';
@@ -30,7 +30,7 @@ export async function getAgent(db: DrizzleD1Database, id: string): Promise<Agent
 }
 
 export async function listAgents(db: DrizzleD1Database, limit: number = 100): Promise<Agent[]> {
-  return await db.select().from(agents).limit(limit).all();
+  return await db.select().from(agents).orderBy(desc(agents.createdAt)).limit(limit).all();
 }
 
 export async function deleteAgent(db: DrizzleD1Database, id: string): Promise<void> {

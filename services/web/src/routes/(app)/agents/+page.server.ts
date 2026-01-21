@@ -2,6 +2,7 @@ import type { PageServerLoad } from './$types';
 
 interface Agent {
   id: string;
+  name: string;
   projectIds: string[];
   personaId: string | null;
   personaVersion: number | null;
@@ -9,12 +10,21 @@ interface Agent {
   updatedAt: string;
 }
 
-export const load: PageServerLoad = async ({ fetch }) => {
-  const res = await fetch('/api/agents?limit=50');
-  if (!res.ok) {
-    return { agents: [] };
-  }
+interface Persona {
+  id: string;
+  name: string;
+}
 
-  const data = await res.json();
-  return { agents: data.agents as Agent[] };
+export const load: PageServerLoad = async ({ fetch }) => {
+  const [agentsRes, personasRes] = await Promise.all([
+    fetch('/api/agents?limit=50'),
+    fetch('/api/personas?limit=100'),
+  ]);
+
+  const agents: Agent[] = agentsRes.ok ? (await agentsRes.json()).agents : [];
+  const personas: Persona[] = personasRes.ok ? (await personasRes.json()).personas : [];
+
+  const personaMap = new Map(personas.map((p) => [p.id, p.name]));
+
+  return { agents, personaMap: Object.fromEntries(personaMap) };
 };

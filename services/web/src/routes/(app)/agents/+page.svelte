@@ -22,16 +22,17 @@
       {#each data.agents as agent}
         <div class="p-4 border border-border rounded bg-surface-raised">
           <div class="flex items-center justify-between">
-            <a href="/agents/{agent.id}" class="text-sm font-medium text-link hover:underline font-mono">
-              {agent.id}
+            <a href="/agents/{agent.id}" class="text-sm font-medium text-link hover:underline">
+              {agent.name}
             </a>
+            <span class="text-xs text-foreground-muted font-mono">{agent.id}</span>
           </div>
           <p class="text-xs text-foreground-muted mt-1">
             {agent.projectIds.length} project{agent.projectIds.length !== 1 ? 's' : ''}
           </p>
           {#if agent.personaId}
             <p class="text-xs text-foreground-muted mt-1">
-              Persona: <span class="font-mono">{agent.personaId}</span>
+              Persona: {data.personaMap[agent.personaId] ?? agent.personaId}
             </p>
           {/if}
           <p class="text-xs text-foreground-muted mt-1">
