@@ -17,6 +17,7 @@ export const AgentSchema = z
     projectIds: z.array(z.string()),
     personaId: z.string().nullable(),
     personaVersion: z.number().int().nullable(),
+    personaName: z.string().nullable(),
     createdAt: z.string(),
     updatedAt: z.string(),
   })

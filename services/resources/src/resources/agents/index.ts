@@ -3,12 +3,12 @@
 import { ConflictError, NotFoundError, extractDbError } from '~/shared/errors';
 import { Resource } from '~/shared/resource';
 import * as repo from './repository';
-import type { Agent, AgentInput } from './types';
+import type { Agent, AgentInput, AgentWithRelations } from './types';
 
 export class Agents extends Resource {
   async create(data: AgentInput): Promise<{
     agentId: string;
-    agent: Agent;
+    agent: AgentWithRelations;
   }> {
     this.serviceCtx.logger.info({
       eventType: 'agent.create.started',
@@ -42,7 +42,7 @@ export class Agents extends Resource {
   }
 
   async get(id: string): Promise<{
-    agent: Agent;
+    agent: AgentWithRelations;
   }> {
     return this.withLogging('get', { metadata: { agentId: id } }, async () => {
       const agent = await repo.getAgent(this.serviceCtx.db, id);
@@ -56,7 +56,7 @@ export class Agents extends Resource {
   }
 
   async list(options?: { limit?: number }): Promise<{
-    agents: Agent[];
+    agents: AgentWithRelations[];
   }> {
     return this.withLogging('list', { metadata: options }, async () => {
       const agents = await repo.listAgents(this.serviceCtx.db, options?.limit);
@@ -78,4 +78,4 @@ export class Agents extends Resource {
   }
 }
 
-export type { Agent };
+export type { Agent, AgentWithRelations };

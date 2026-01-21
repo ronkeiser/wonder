@@ -30,9 +30,9 @@
           <p class="text-xs text-foreground-muted mt-1">
             {agent.projectIds.length} project{agent.projectIds.length !== 1 ? 's' : ''}
           </p>
-          {#if agent.personaId}
+          {#if agent.personaName}
             <p class="text-xs text-foreground-muted mt-1">
-              Persona: {data.personaMap[agent.personaId] ?? agent.personaId}
+              Persona: {agent.personaName}
             </p>
           {/if}
           <p class="text-xs text-foreground-muted mt-1">

@@ -1,36 +1,74 @@
 /** Repository for agent data access */
 
-import { desc, eq } from 'drizzle-orm';
+import { and, desc, eq } from 'drizzle-orm';
 import type { DrizzleD1Database } from 'drizzle-orm/d1';
 import { ulid } from 'ulid';
-import { agents } from '../../schema';
+import { agents, personas } from '../../schema';
 import type { NewEntity } from '../../shared/types';
-import type { Agent } from './types';
+import type { Agent, AgentWithRelations } from './types';
 
 type NewAgent = NewEntity<typeof agents.$inferInsert>;
 
-export async function createAgent(db: DrizzleD1Database, data: NewAgent): Promise<Agent> {
+export async function createAgent(db: DrizzleD1Database, data: NewAgent): Promise<AgentWithRelations> {
   const now = new Date().toISOString();
-  const [agent] = await db
-    .insert(agents)
-    .values({
-      id: ulid(),
-      ...data,
-      createdAt: now,
-      updatedAt: now,
-    })
-    .returning();
+  const id = ulid();
+  await db.insert(agents).values({
+    id,
+    ...data,
+    createdAt: now,
+    updatedAt: now,
+  });
 
-  return agent;
+  // Re-fetch with join to get personaName
+  const agent = await getAgent(db, id);
+  return agent!;
 }
 
-export async function getAgent(db: DrizzleD1Database, id: string): Promise<Agent | null> {
-  const result = await db.select().from(agents).where(eq(agents.id, id)).get();
+export async function getAgent(db: DrizzleD1Database, id: string): Promise<AgentWithRelations | null> {
+  const result = await db
+    .select({
+      id: agents.id,
+      name: agents.name,
+      projectIds: agents.projectIds,
+      personaId: agents.personaId,
+      personaVersion: agents.personaVersion,
+      createdAt: agents.createdAt,
+      updatedAt: agents.updatedAt,
+      personaName: personas.name,
+    })
+    .from(agents)
+    .leftJoin(
+      personas,
+      and(eq(agents.personaId, personas.id), eq(agents.personaVersion, personas.version)),
+    )
+    .where(eq(agents.id, id))
+    .get();
+
   return result ?? null;
 }
 
-export async function listAgents(db: DrizzleD1Database, limit: number = 100): Promise<Agent[]> {
-  return await db.select().from(agents).orderBy(desc(agents.createdAt)).limit(limit).all();
+export async function listAgents(db: DrizzleD1Database, limit: number = 100): Promise<AgentWithRelations[]> {
+  const results = await db
+    .select({
+      id: agents.id,
+      name: agents.name,
+      projectIds: agents.projectIds,
+      personaId: agents.personaId,
+      personaVersion: agents.personaVersion,
+      createdAt: agents.createdAt,
+      updatedAt: agents.updatedAt,
+      personaName: personas.name,
+    })
+    .from(agents)
+    .leftJoin(
+      personas,
+      and(eq(agents.personaId, personas.id), eq(agents.personaVersion, personas.version)),
+    )
+    .orderBy(desc(agents.createdAt))
+    .limit(limit)
+    .all();
+
+  return results;
 }
 
 export async function deleteAgent(db: DrizzleD1Database, id: string): Promise<void> {

@@ -9,6 +9,11 @@ import { agents } from '../../schema';
 /** Agent entity - inferred from database schema */
 export type Agent = typeof agents.$inferSelect;
 
+/** Agent with expanded relations */
+export type AgentWithRelations = Agent & {
+  personaName: string | null;
+};
+
 // ============================================================================
 // API DTOs (inferred from schema with API-specific modifications)
 // ============================================================================
