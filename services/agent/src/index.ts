@@ -334,22 +334,31 @@ export class Conversation extends DurableObject {
     const agent = this.defs.getAgent();
     const moves = this.moves.getForTurn(turnId);
 
-    if (persona?.memoryExtractionWorkflowId) {
-      const extractionDecisions = decideMemoryExtraction({
-        turnId,
-        agentId: agent.id,
-        memoryExtractionWorkflowId: persona.memoryExtractionWorkflowId,
-        transcript: moves.map((m) => ({
-          sequence: m.sequence,
-          reasoning: m.reasoning ?? undefined,
-          toolCall: m.toolId
-            ? { toolId: m.toolId, input: (m.toolInput as Record<string, unknown>) ?? {} }
-            : undefined,
-          toolResult: (m.toolResult as Record<string, unknown>) ?? undefined,
-        })),
-      });
+    if (persona?.memoryExtractionWorkflowDefId) {
+      const projectId = agent.projectIds[0];
+      if (!projectId) {
+        this.emitter.emitTrace({
+          type: 'operation.turns.memory_extraction_skipped',
+          payload: { turnId, reason: 'no_project_id' },
+        });
+      } else {
+        const extractionDecisions = decideMemoryExtraction({
+          turnId,
+          agentId: agent.id,
+          memoryExtractionWorkflowDefId: persona.memoryExtractionWorkflowDefId,
+          projectId,
+          transcript: moves.map((m) => ({
+            sequence: m.sequence,
+            reasoning: m.reasoning ?? undefined,
+            toolCall: m.toolId
+              ? { toolId: m.toolId, input: (m.toolInput as Record<string, unknown>) ?? {} }
+              : undefined,
+            toolResult: (m.toolResult as Record<string, unknown>) ?? undefined,
+          })),
+        });
 
-      applyDecisions(extractionDecisions.decisions, ctx);
+        applyDecisions(extractionDecisions.decisions, ctx);
+      }
     }
 
     // Count tool failures for turn issues tracking

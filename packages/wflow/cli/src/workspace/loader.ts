@@ -4,7 +4,7 @@ import * as fs from 'node:fs/promises';
 import * as path from 'node:path';
 import { parse as parseYaml } from 'yaml';
 import {
-  formatReference,
+  formatTypedReference,
   getFileType,
   parseDocument,
   parseWorkflow,
@@ -133,13 +133,13 @@ export function extractDependencies(doc: AnyDocument, fileType: FileType): Refer
         }
       }
 
-      if (persona.contextAssemblyWorkflowId) {
-        const ref = tryParseReference(persona.contextAssemblyWorkflowId);
+      if (persona.contextAssemblyWorkflowDefId) {
+        const ref = tryParseReference(persona.contextAssemblyWorkflowDefId);
         if (ref) refs.push(ref);
       }
 
-      if (persona.memoryExtractionWorkflowId) {
-        const ref = tryParseReference(persona.memoryExtractionWorkflowId);
+      if (persona.memoryExtractionWorkflowDefId) {
+        const ref = tryParseReference(persona.memoryExtractionWorkflowDefId);
         if (ref) refs.push(ref);
       }
 
@@ -330,7 +330,8 @@ export async function loadWorkspace(rootPath: string): Promise<Workspace> {
 
     if (!reference) continue;
 
-    const refKey = formatReference(reference);
+    // Include definition type in key to avoid collisions between .task and .wflow with same name
+    const refKey = formatTypedReference(reference, definitionType);
     const contentHash = computeContentHash(parseResult.document as Record<string, unknown>);
     const dependencies = extractDependencies(parseResult.document, fileType);
 

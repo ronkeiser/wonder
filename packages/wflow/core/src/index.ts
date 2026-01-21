@@ -201,6 +201,7 @@ export {
   STANDARD_LIBRARY_WORKSPACE_NAME,
   // Reference parsing
   formatReference,
+  formatTypedReference,
   isValidName,
   parseReference,
   referencesEqual,

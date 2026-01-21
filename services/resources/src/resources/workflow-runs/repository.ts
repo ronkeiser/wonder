@@ -134,3 +134,40 @@ export async function listWorkflowRuns(
 
   return { runs, total };
 }
+
+/**
+ * Create a workflow run directly from a workflow definition (no workflow record).
+ * Used for agent workflows like context assembly that are library-level.
+ */
+export async function createWorkflowRunFromDef(
+  db: DrizzleD1Database,
+  data: {
+    id: string;
+    projectId: string;
+    workflowDefId: string;
+    workflowVersion: number;
+    status: 'running' | 'completed' | 'failed' | 'waiting';
+    context: object;
+    activeTokens: object[];
+    durableObjectId: string;
+    rootRunId: string;
+    parentRunId?: string | null;
+    parentNodeId?: string | null;
+    parentTokenId?: string | null;
+  },
+): Promise<WorkflowRun> {
+  const now = new Date().toISOString();
+  const [run] = await db
+    .insert(workflowRuns)
+    .values({
+      ...data,
+      workflowId: null,
+      latestSnapshot: null,
+      createdAt: now,
+      updatedAt: now,
+      completedAt: null,
+    })
+    .returning();
+
+  return run;
+}

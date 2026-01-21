@@ -484,24 +484,28 @@ async function dispatchMemoryExtraction(
   decision: Extract<AgentDecision, { type: 'DISPATCH_MEMORY_EXTRACTION' }>,
   ctx: DispatchContext,
 ): Promise<void> {
-  const { turnId, workflowId, input } = decision;
+  const { turnId, workflowDefId, projectId, input } = decision;
 
   ctx.emitter.emitTrace({
     type: 'dispatch.memory_extraction.queued',
-    payload: { turnId, workflowId },
+    payload: { turnId, workflowDefId },
   });
 
-  // Create workflow run in D1
+  // Create workflow run in D1 directly from workflow def
   const workflowRunsResource = ctx.resources.workflowRuns();
-  const { workflowRunId } = await workflowRunsResource.create(workflowId, {
-    ...input,
-    // Include callback routing info
-    _callback: {
-      conversationId: ctx.conversationId,
-      turnId,
-      type: 'memory_extraction',
+  const { workflowRunId } = await workflowRunsResource.createFromWorkflowDef(
+    workflowDefId,
+    {
+      ...input,
+      // Include callback routing info
+      _callback: {
+        conversationId: ctx.conversationId,
+        turnId,
+        type: 'memory_extraction',
+      },
     },
-  });
+    { projectId },
+  );
 
   // Link to turn
   ctx.turns.linkMemoryExtraction(turnId, workflowRunId);
@@ -514,7 +518,7 @@ async function dispatchMemoryExtraction(
     coordinator.start(workflowRunId).catch((error: Error) => {
       ctx.emitter.emitTrace({
         type: 'dispatch.memory_extraction.error',
-        payload: { turnId, workflowId, workflowRunId, error: error.message },
+        payload: { turnId, workflowDefId, workflowRunId, error: error.message },
       });
     }),
   );

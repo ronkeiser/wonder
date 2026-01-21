@@ -452,8 +452,8 @@ export interface PersonaDocument {
   description?: string;
   systemPrompt?: string;
   modelProfileId?: string;
-  contextAssemblyWorkflowId?: string;
-  memoryExtractionWorkflowId?: string;
+  contextAssemblyWorkflowDefId?: string;
+  memoryExtractionWorkflowDefId?: string;
   recentTurnsLimit?: number;
   toolIds?: string[];
   constraints?: PersonaConstraints;

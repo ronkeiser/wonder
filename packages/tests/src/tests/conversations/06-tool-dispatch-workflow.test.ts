@@ -287,7 +287,7 @@ describe('Conversation: 06 - Tool Dispatch to Workflow (Sync)', () => {
           required: ['query'],
         },
         targetType: 'workflow', // KEY: This tool targets a workflow, not a task
-        targetId: lookupWorkflowSetup.workflowId,
+        targetId: lookupWorkflowSetup.workflowDefId,
         async: false, // KEY: This is a sync tool - agent waits for result
       });
       createdResources.toolIds.push(toolResponse.toolId);
@@ -302,8 +302,8 @@ describe('Conversation: 06 - Tool Dispatch to Workflow (Sync)', () => {
         description: 'Test agent with sync workflow tool',
         systemPrompt,
         modelProfileId: ctx.modelProfileId,
-        contextAssemblyWorkflowId: contextAssemblySetup.workflowId,
-        memoryExtractionWorkflowId: memoryExtractionSetup.workflowId,
+        contextAssemblyWorkflowDefId: contextAssemblySetup.workflowDefId,
+        memoryExtractionWorkflowDefId: memoryExtractionSetup.workflowDefId,
         toolIds: [toolResponse.toolId],
         recentTurnsLimit: 10,
       });
@@ -422,7 +422,7 @@ describe('Conversation: 06 - Tool Dispatch to Workflow (Sync)', () => {
 
       // The queued dispatch should reference our lookup workflow
       const lookupDispatchQueued = workflowQueued.find(
-        (e) => (e.payload as { workflowId?: string }).workflowId === lookupWorkflowSetup.workflowId,
+        (e) => (e.payload as { workflowId?: string }).workflowId === lookupWorkflowSetup.workflowDefId,
       );
       expect(lookupDispatchQueued).toBeDefined();
       expect((lookupDispatchQueued!.payload as { async: boolean }).async).toBe(false);

@@ -6,6 +6,7 @@ import { ulid } from 'ulid';
 import { NotFoundError } from '~/shared/errors';
 import * as schema from '~/schema';
 import { Resource } from '~/shared/resource';
+import * as workflowDefRepo from '../workflow-defs/repository';
 import * as workflowRepo from '../workflows/repository';
 import * as repo from './repository';
 import type {
@@ -117,6 +118,126 @@ export class WorkflowRuns extends Resource {
         message: error instanceof Error ? error.message : String(error),
         metadata: {
           workflowId: workflowId,
+          stack: error instanceof Error ? error.stack : undefined,
+        },
+      });
+      throw error;
+    }
+  }
+
+  /**
+   * Create a workflow run directly from a workflow definition.
+   *
+   * This bypasses the workflows table - useful for agent workflows
+   * (context assembly, memory extraction) that are defined in libraries
+   * and don't have project-specific workflow deployments.
+   */
+  async createFromWorkflowDef(
+    workflowDefId: string,
+    input: Record<string, unknown>,
+    options: {
+      projectId: string;
+      version?: number; // defaults to latest
+      rootRunId?: string;
+      parentRunId?: string;
+      parentTokenId?: string;
+    },
+  ): Promise<{
+    workflowRunId: string;
+    projectId: string;
+    workspaceId: string;
+  }> {
+    this.serviceCtx.logger.info({
+      eventType: 'workflow_run.create_from_def.requested',
+      metadata: { workflowDefId, projectId: options.projectId, version: options.version },
+    });
+
+    try {
+      // Get workflow definition directly (use specified version or latest)
+      const workflowDef = await workflowDefRepo.getWorkflowDef(
+        this.serviceCtx.db,
+        workflowDefId,
+        options.version,
+      );
+      if (!workflowDef) {
+        this.serviceCtx.logger.warn({
+          eventType: 'workflow_def.not_found',
+          metadata: { workflowDefId, version: options.version },
+        });
+        throw new NotFoundError(
+          `WorkflowDef not found: ${workflowDefId}${options.version ? ` version ${options.version}` : ''}`,
+          'workflow_def',
+          workflowDefId,
+        );
+      }
+
+      // Get project to access workspace_id
+      const project = await this.serviceCtx.db
+        .select()
+        .from(schema.projects)
+        .where(eq(schema.projects.id, options.projectId))
+        .get();
+      if (!project) {
+        throw new NotFoundError(
+          `Project not found: ${options.projectId}`,
+          'project',
+          options.projectId,
+        );
+      }
+
+      // Generate workflow_run_id (ULID)
+      const workflowRunId = ulid();
+
+      // Initialize context with input
+      const context = {
+        input,
+        state: {},
+        output: {},
+        artifacts: [],
+      };
+
+      // Initialize with a single token at the initial node
+      const activeTokens = [
+        {
+          id: ulid(),
+          nodeId: workflowDef.initialNodeId,
+          status: 'ready',
+          context: {},
+        },
+      ];
+
+      // Create workflow run record (workflowId is null for def-only runs)
+      await repo.createWorkflowRunFromDef(this.serviceCtx.db, {
+        id: workflowRunId,
+        projectId: options.projectId,
+        workflowDefId: workflowDef.id,
+        workflowVersion: workflowDef.version,
+        status: 'waiting',
+        context,
+        activeTokens: activeTokens,
+        durableObjectId: workflowRunId,
+        rootRunId: options.rootRunId ?? workflowRunId,
+        parentRunId: options.parentRunId,
+        parentTokenId: options.parentTokenId,
+      });
+
+      this.serviceCtx.logger.info({
+        eventType: 'workflow_run.created_from_def',
+        metadata: { workflowDefId, workflowRunId, version: workflowDef.version },
+      });
+
+      return {
+        workflowRunId,
+        projectId: options.projectId,
+        workspaceId: project.workspaceId,
+      };
+    } catch (error) {
+      this.serviceCtx.logger.error({
+        eventType: 'workflow_run.create_from_def.failed',
+        message: error instanceof Error ? error.message : String(error),
+        metadata: {
+          workflowDefId,
+          projectId: options.projectId,
           stack: error instanceof Error ? error.stack : undefined,
         },
       });

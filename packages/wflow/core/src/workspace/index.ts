@@ -20,6 +20,7 @@ export { STANDARD_LIBRARY_WORKSPACE_NAME } from './types.js';
 // Reference parsing
 export {
   formatReference,
+  formatTypedReference,
   isValidName,
   parseReference,
   referencesEqual,

@@ -3186,8 +3186,8 @@ export interface components {
             libraryId: string | null;
             systemPrompt: string;
             modelProfileId: string;
-            contextAssemblyWorkflowId: string;
-            memoryExtractionWorkflowId: string;
+            contextAssemblyWorkflowDefId: string;
+            memoryExtractionWorkflowDefId: string;
             recentTurnsLimit: number;
             toolIds: string[];
             constraints: {
@@ -3226,10 +3226,10 @@ export interface components {
             systemPrompt: string;
             /** @example 01ARZ3NDEKTSV4RRFFQ69G5FAV */
             modelProfileId: string;
-            /** @example wf_context */
-            contextAssemblyWorkflowId: string;
-            /** @example wf_memory */
-            memoryExtractionWorkflowId: string;
+            /** @example wfdef_context */
+            contextAssemblyWorkflowDefId: string;
+            /** @example wfdef_memory */
+            memoryExtractionWorkflowDefId: string;
             /**
              * @default 20
              * @example 20
@@ -3834,7 +3834,7 @@ export interface components {
         WorkflowRunSummary: {
             id: string;
             projectId: string;
-            workflowId: string;
+            workflowId: string | null;
             workflowName: string;
             workflowDefId: string;
             workflowVersion: number;

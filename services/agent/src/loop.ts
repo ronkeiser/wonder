@@ -119,10 +119,17 @@ export async function dispatchContextAssembly(
     activeTurns: activeTurns.length > 0 ? activeTurns : undefined,
   };
 
-  // Create workflow run in D1
+  // Get projectId from agent
+  const agent = defs.getAgent();
+  const projectId = agent.projectIds[0];
+  if (!projectId) {
+    throw new Error('Agent has no projectIds configured');
+  }
+
+  // Create workflow run in D1 directly from workflow def
   const workflowRunsResource = ctx.resources.workflowRuns();
-  const { workflowRunId } = await workflowRunsResource.create(
-    persona.contextAssemblyWorkflowId,
+  const { workflowRunId } = await workflowRunsResource.createFromWorkflowDef(
+    persona.contextAssemblyWorkflowDefId,
     {
       ...input,
       // Include callback routing info in input for coordinator to use
@@ -132,6 +139,7 @@ export async function dispatchContextAssembly(
         type: 'context_assembly',
       },
     },
+    { projectId },
   );
 
   // Start the coordinator DO
@@ -144,7 +152,7 @@ export async function dispatchContextAssembly(
         type: 'loop.context_assembly.dispatch_error',
         payload: {
           turnId,
-          workflowId: persona.contextAssemblyWorkflowId,
+          workflowDefId: persona.contextAssemblyWorkflowDefId,
           workflowRunId,
           error: error.message,
         },
@@ -160,7 +168,7 @@ export async function dispatchContextAssembly(
     payload: {
       turnId,
       workflowRunId,
-      workflowId: persona.contextAssemblyWorkflowId,
+      workflowDefId: persona.contextAssemblyWorkflowDefId,
       recentTurnsCount: recentTurns.length,
       activeTurnsCount: activeTurns.length,
     },

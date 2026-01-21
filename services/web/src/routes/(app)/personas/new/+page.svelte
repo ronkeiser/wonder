@@ -52,44 +52,44 @@
     </div>
 
     <div>
-      <label for="contextAssemblyWorkflowId" class="block text-sm font-medium mb-1"
-        >Context Assembly Workflow</label
+      <label for="contextAssemblyWorkflowDefId" class="block text-sm font-medium mb-1"
+        >Context Assembly Workflow Def</label
       >
       <select
-        id="contextAssemblyWorkflowId"
-        name="contextAssemblyWorkflowId"
+        id="contextAssemblyWorkflowDefId"
+        name="contextAssemblyWorkflowDefId"
         required
         class="w-full px-3 py-2 border border-gray-300 rounded-md bg-white"
-        value={$formValues['contextAssemblyWorkflowId'] ?? ''}
+        value={$formValues['contextAssemblyWorkflowDefId'] ?? ''}
       >
-        <option value="">Select a workflow...</option>
+        <option value="">Select a workflow def...</option>
         {#each data.workflowDefs as workflow}
           <option value={workflow.id}>{workflow.name}</option>
         {/each}
       </select>
-      {#if $errors?.['contextAssemblyWorkflowId']}
-        <p class="mt-1 text-sm text-red-600" role="alert">{$errors['contextAssemblyWorkflowId']}</p>
+      {#if $errors?.['contextAssemblyWorkflowDefId']}
+        <p class="mt-1 text-sm text-red-600" role="alert">{$errors['contextAssemblyWorkflowDefId']}</p>
       {/if}
     </div>
 
     <div>
-      <label for="memoryExtractionWorkflowId" class="block text-sm font-medium mb-1"
-        >Memory Extraction Workflow</label
+      <label for="memoryExtractionWorkflowDefId" class="block text-sm font-medium mb-1"
+        >Memory Extraction Workflow Def</label
       >
       <select
-        id="memoryExtractionWorkflowId"
-        name="memoryExtractionWorkflowId"
+        id="memoryExtractionWorkflowDefId"
+        name="memoryExtractionWorkflowDefId"
         required
         class="w-full px-3 py-2 border border-gray-300 rounded-md bg-white"
-        value={$formValues['memoryExtractionWorkflowId'] ?? ''}
+        value={$formValues['memoryExtractionWorkflowDefId'] ?? ''}
       >
-        <option value="">Select a workflow...</option>
+        <option value="">Select a workflow def...</option>
         {#each data.workflowDefs as workflow}
           <option value={workflow.id}>{workflow.name}</option>
         {/each}
       </select>
-      {#if $errors?.['memoryExtractionWorkflowId']}
-        <p class="mt-1 text-sm text-red-600" role="alert">{$errors['memoryExtractionWorkflowId']}</p>
+      {#if $errors?.['memoryExtractionWorkflowDefId']}
+        <p class="mt-1 text-sm text-red-600" role="alert">{$errors['memoryExtractionWorkflowDefId']}</p>
       {/if}
     </div>
 

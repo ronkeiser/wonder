@@ -390,9 +390,7 @@ export const workflowRuns = sqliteTable(
     projectId: text()
       .notNull()
       .references(() => projects.id),
-    workflowId: text()
-      .notNull()
-      .references(() => workflows.id),
+    workflowId: text().references(() => workflows.id), // Nullable for def-only runs (agent workflows)
     workflowDefId: text().notNull(),
     workflowVersion: integer().notNull(),
 
@@ -682,9 +680,9 @@ export const personas = sqliteTable(
       .notNull()
       .references(() => modelProfiles.id),
 
-    // Memory configuration
-    contextAssemblyWorkflowId: text().notNull(),
-    memoryExtractionWorkflowId: text().notNull(),
+    // Memory configuration (references workflow_defs directly, not workflows)
+    contextAssemblyWorkflowDefId: text().notNull(),
+    memoryExtractionWorkflowDefId: text().notNull(),
     recentTurnsLimit: integer().notNull().default(20),
 
     // Tools

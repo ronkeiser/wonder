@@ -68,7 +68,7 @@ export async function getWorkflowDef(
         .select()
         .from(workflowDefs)
         .where(eq(workflowDefs.id, id))
-        .orderBy(workflowDefs.version);
+        .orderBy(desc(workflowDefs.version));
 
   const result = await query.get();
   return result ?? null;

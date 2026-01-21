@@ -291,8 +291,8 @@ describe('Conversation: 07 - Tool Dispatch to Agent (Delegate Mode)', () => {
         description: 'Code reviewer agent for testing delegate mode',
         systemPrompt: reviewerSystemPrompt,
         modelProfileId: ctx.modelProfileId,
-        contextAssemblyWorkflowId: reviewerContextAssemblySetup.workflowId,
-        memoryExtractionWorkflowId: memoryExtractionSetup.workflowId,
+        contextAssemblyWorkflowDefId: reviewerContextAssemblySetup.workflowDefId,
+        memoryExtractionWorkflowDefId: memoryExtractionSetup.workflowDefId,
         toolIds: [], // Reviewer has no tools - just responds with text
         recentTurnsLimit: 10,
       });
@@ -340,8 +340,8 @@ describe('Conversation: 07 - Tool Dispatch to Agent (Delegate Mode)', () => {
         description: 'Manager agent that delegates to reviewer',
         systemPrompt: managerSystemPrompt,
         modelProfileId: ctx.modelProfileId,
-        contextAssemblyWorkflowId: managerContextAssemblySetup.workflowId,
-        memoryExtractionWorkflowId: memoryExtractionSetup.workflowId,
+        contextAssemblyWorkflowDefId: managerContextAssemblySetup.workflowDefId,
+        memoryExtractionWorkflowDefId: memoryExtractionSetup.workflowDefId,
         toolIds: [toolResponse.toolId],
         recentTurnsLimit: 10,
       });

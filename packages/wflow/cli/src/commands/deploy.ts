@@ -338,10 +338,10 @@ async function createDefinition(
         name: displayName,
         reference: refString,
         libraryId: libraryId ?? undefined,
-        // Resolve reference IDs to server IDs
+        // Resolve reference IDs to server IDs (workflow references resolve to workflow_def IDs)
         modelProfileId: resolveReferenceId(doc.modelProfileId as string | undefined, serverIds),
-        contextAssemblyWorkflowId: resolveReferenceId(doc.contextAssemblyWorkflowId as string | undefined, serverIds),
-        memoryExtractionWorkflowId: resolveReferenceId(doc.memoryExtractionWorkflowId as string | undefined, serverIds),
+        contextAssemblyWorkflowDefId: resolveReferenceId(doc.contextAssemblyWorkflowDefId as string | undefined, serverIds),
+        memoryExtractionWorkflowDefId: resolveReferenceId(doc.memoryExtractionWorkflowDefId as string | undefined, serverIds),
         autoversion: !options.force,
       } as unknown as Parameters<typeof client.personas.create>[0]);
       const latestVersion = (result as { latestVersion?: number }).latestVersion;
@@ -357,8 +357,17 @@ async function createDefinition(
       return { id: result.toolId, reused: false, version: 1 };
     }
     case 'task': {
+      // Resolve step references (import aliases -> server IDs)
+      const imports = doc.imports as Record<string, string> | undefined;
+      const resolvedSteps = resolveStepReferences(
+        doc.steps as Array<Record<string, unknown>> | undefined,
+        imports,
+        def.filePath,
+        serverIds,
+      );
       const result = await client.tasks.create({
         ...doc,
+        steps: resolvedSteps,
         name: displayName,
         reference: refString,
         libraryId: libraryId ?? undefined,
@@ -370,8 +379,17 @@ async function createDefinition(
     }
     case 'workflow': {
       const wfClient = client['workflow-defs'];
+      // Resolve taskId references in nodes (import aliases -> server IDs)
+      const imports = doc.imports as Record<string, string> | undefined;
+      const resolvedNodes = resolveNodeReferences(
+        doc.nodes as Record<string, unknown> | undefined,
+        imports,
+        def.filePath,
+        serverIds,
+      );
       const result = await wfClient.create({
         ...doc,
+        nodes: resolvedNodes,
         name: displayName,
         reference: refString,
         libraryId: libraryId ?? undefined,
@@ -471,6 +489,175 @@ function resolveReferenceId(refString: string | undefined, serverIds: Map<string
     // Not a valid reference format, return as-is (might be a literal ID)
     return refString;
   }
+}
+
+/**
+ * Resolve step references in a task document.
+ * Converts import aliases to server IDs and adds required fields (ordinal, actionVersion).
+ */
+function resolveStepReferences(
+  steps: Array<Record<string, unknown>> | undefined,
+  imports: Record<string, string> | undefined,
+  taskFilePath: string,
+  serverIds: Map<string, string>,
+): unknown[] | undefined {
+  if (!steps) return undefined;
+
+  const resolved: unknown[] = [];
+  for (let i = 0; i < steps.length; i++) {
+    const step = steps[i];
+    const actionIdAlias = (step.action_id ?? step.actionId) as string | undefined;
+    const actionId = actionIdAlias
+      ? resolveImportAlias(actionIdAlias, imports, taskFilePath, serverIds)
+      : undefined;
+
+    resolved.push({
+      ref: step.ref,
+      ordinal: i,
+      actionId,
+      actionVersion: 1,
+      inputMapping: step.input_mapping ?? step.inputMapping ?? null,
+      outputMapping: step.output_mapping ?? step.outputMapping ?? null,
+      onFailure: step.on_failure ?? step.onFailure ?? 'abort',
+      condition: step.condition ?? null,
+    });
+  }
+  return resolved;
+}
+
+/**
+ * Resolve taskId and subworkflowId references in workflow nodes.
+ * Import aliases (e.g., "passthrough_task") get resolved to server IDs (ULIDs).
+ *
+ * Handles both:
+ * - Object format: { build_request: { taskId: '...' } } (raw YAML before parsing)
+ * - Array format: [{ ref: 'build_request', taskId: '...' }] (after parseWorkflow)
+ *
+ * Outputs array format for API with camelCase field names.
+ *
+ * @param nodes - The nodes from the workflow document (array or object)
+ * @param imports - The imports object mapping aliases to relative paths
+ * @param workflowFilePath - Absolute path to the workflow file (for resolving relative imports)
+ * @param serverIds - Map of reference strings to server IDs
+ * @returns Array of nodes with resolved references (API format)
+ */
+function resolveNodeReferences(
+  nodes: unknown[] | Record<string, unknown> | undefined,
+  imports: Record<string, string> | undefined,
+  workflowFilePath: string,
+  serverIds: Map<string, string>,
+): unknown[] | undefined {
+  if (!nodes) return undefined;
+
+  // Convert object format to array format if needed
+  const nodesArray: Array<Record<string, unknown>> = Array.isArray(nodes)
+    ? nodes as Array<Record<string, unknown>>
+    : Object.entries(nodes).map(([ref, nodeDef]) => ({
+        ref,
+        ...(typeof nodeDef === 'object' && nodeDef !== null ? nodeDef : {}),
+      }));
+
+  const resolved: unknown[] = [];
+  for (const node of nodesArray) {
+    if (typeof node !== 'object' || node === null) {
+      continue;
+    }
+
+    // Handle both snake_case (from YAML) and camelCase (after parsing)
+    const taskIdAlias = (node.task_id ?? node.taskId) as string | undefined;
+    const taskVersion = (node.task_version ?? node.taskVersion) as number | undefined;
+    const subworkflowIdAlias = (node.subworkflow_id ?? node.subworkflowId) as string | undefined;
+    const subworkflowVersion = (node.subworkflow_version ?? node.subworkflowVersion) as number | undefined;
+    const inputMapping = node.input_mapping ?? node.inputMapping;
+    const outputMapping = node.output_mapping ?? node.outputMapping;
+    const resourceBindings = node.resource_bindings ?? node.resourceBindings;
+
+    resolved.push({
+      ref: node.ref,
+      name: node.name,
+      // Resolve taskId if present (import alias -> server ID)
+      taskId: taskIdAlias
+        ? resolveImportAlias(taskIdAlias, imports, workflowFilePath, serverIds)
+        : undefined,
+      taskVersion: taskVersion ?? (taskIdAlias ? 1 : undefined),
+      // Resolve subworkflowId if present
+      subworkflowId: subworkflowIdAlias
+        ? resolveImportAlias(subworkflowIdAlias, imports, workflowFilePath, serverIds)
+        : undefined,
+      subworkflowVersion: subworkflowVersion ?? (subworkflowIdAlias ? 1 : undefined),
+      inputMapping: inputMapping ?? undefined,
+      outputMapping: outputMapping ?? undefined,
+      resourceBindings: resourceBindings ?? undefined,
+    });
+  }
+  return resolved;
+}
+
+/**
+ * Resolve an import alias to a server ID.
+ *
+ * Flow: import alias -> relative path -> full reference -> server ID
+ *
+ * @param alias - The import alias (e.g., "passthrough_task")
+ * @param imports - The imports object mapping aliases to relative paths
+ * @param workflowFilePath - Absolute path to the workflow file
+ * @param serverIds - Map of reference strings to server IDs
+ */
+function resolveImportAlias(
+  alias: string,
+  imports: Record<string, string> | undefined,
+  workflowFilePath: string,
+  serverIds: Map<string, string>,
+): string {
+  // First, try direct reference resolution (for explicit references like "core/task-name")
+  const directResolution = resolveReferenceId(alias, serverIds);
+  if (directResolution !== alias) {
+    return directResolution ?? alias;
+  }
+
+  // If not a direct reference, try resolving via imports
+  // Note: imports keys may be camelCase (after parsing) but alias may be snake_case (from YAML value)
+  // Try both the original alias and camelCase version
+  const camelAlias = alias.replace(/_([a-z0-9])/gi, (_, char) => char.toUpperCase());
+  const relativePath = imports?.[alias] ?? imports?.[camelAlias];
+
+  if (!relativePath) {
+    return alias; // Return as-is if no import found
+  }
+
+  // Resolve the relative path to an absolute path, then derive the reference
+  const workflowDir = path.dirname(workflowFilePath);
+  const importedFilePath = path.resolve(workflowDir, relativePath);
+
+  // Find the server ID by matching against all known references
+  // The reference is derived from the file path structure
+  for (const [refString, serverId] of serverIds.entries()) {
+    // Check if the file path matches this reference
+    // Reference format: "library/name" -> file would be in "libraries/library/name.ext"
+    const pathPattern = refString.replace('/', path.sep);
+    if (importedFilePath.includes(pathPattern)) {
+      return serverId;
+    }
+  }
+
+  // Try to derive the reference from the imported file path
+  // Path like: .../libraries/core/context-assembly-passthrough.task
+  // Reference: core/context-assembly-passthrough
+  const pathParts = importedFilePath.split(path.sep);
+  const librariesIndex = pathParts.indexOf('libraries');
+  if (librariesIndex !== -1 && librariesIndex < pathParts.length - 2) {
+    const libraryName = pathParts[librariesIndex + 1];
+    const fileName = pathParts[pathParts.length - 1];
+    const baseName = fileName.replace(/\.[^.]+$/, ''); // Remove extension
+    const derivedRef = `${libraryName}/${baseName}`;
+
+    const serverId = serverIds.get(derivedRef);
+    if (serverId) {
+      return serverId;
+    }
+  }
+
+  return alias; // Return as-is if resolution fails
 }
 
 async function fetchStandardLibraryManifest(

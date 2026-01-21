@@ -288,10 +288,10 @@ export interface TestPersonaConfig {
     targetId: string;
     async?: boolean;
   }>;
-  /** Override context assembly workflow ID (uses passthrough by default) */
-  contextAssemblyWorkflowId?: string;
-  /** Override memory extraction workflow ID (uses passthrough by default) */
-  memoryExtractionWorkflowId?: string;
+  /** Override context assembly workflow def ID (uses passthrough by default) */
+  contextAssemblyWorkflowDefId?: string;
+  /** Override memory extraction workflow def ID (uses passthrough by default) */
+  memoryExtractionWorkflowDefId?: string;
 }
 
 // =============================================================================
@@ -491,42 +491,43 @@ export async function runTestConversation(
   };
 
   // Create passthrough workflows if not provided
-  let contextAssemblyWorkflowId = personaConfig.contextAssemblyWorkflowId;
-  let memoryExtractionWorkflowId = personaConfig.memoryExtractionWorkflowId;
+  let contextAssemblyWorkflowDefId = personaConfig.contextAssemblyWorkflowDefId;
+  let memoryExtractionWorkflowDefId = personaConfig.memoryExtractionWorkflowDefId;
 
-  if (!contextAssemblyWorkflowId) {
+  if (!contextAssemblyWorkflowDefId) {
     console.log('📦 Creating context assembly passthrough workflow...');
     const systemPrompt = personaConfig.systemPrompt ?? 'You are a helpful assistant.';
     const contextAssemblyDef = buildContextAssemblyPassthroughWorkflow(systemPrompt);
     const contextAssemblySetup = await createWorkflow(ctx, contextAssemblyDef);
-    contextAssemblyWorkflowId = contextAssemblySetup.workflowId;
-    createdResources.workflowIds.push(contextAssemblyWorkflowId);
+    contextAssemblyWorkflowDefId = contextAssemblySetup.workflowDefId;
+    createdResources.workflowIds.push(contextAssemblySetup.workflowId);
     // Track the created resources from the workflow
     createdResources.taskIds.push(...contextAssemblySetup.createdResources.taskIds);
   }
 
-  if (!memoryExtractionWorkflowId) {
+  if (!memoryExtractionWorkflowDefId) {
     console.log('📦 Creating memory extraction noop workflow...');
     const memoryExtractionDef = buildMemoryExtractionNoopWorkflow();
     const memoryExtractionSetup = await createWorkflow(ctx, memoryExtractionDef);
-    memoryExtractionWorkflowId = memoryExtractionSetup.workflowId;
-    createdResources.workflowIds.push(memoryExtractionWorkflowId);
+    memoryExtractionWorkflowDefId = memoryExtractionSetup.workflowDefId;
+    createdResources.workflowIds.push(memoryExtractionSetup.workflowId);
     // Track the created resources from the workflow
     createdResources.taskIds.push(...memoryExtractionSetup.createdResources.taskIds);
   }
 
   // Create persona
   console.log('👤 Creating persona...');
+  // Note: SDK types use old field names until deployed and regenerated
   const personaResponse = await wonder.personas.create({
     name: personaConfig.name,
     description: `Test persona: ${personaConfig.name}`,
     systemPrompt: personaConfig.systemPrompt ?? 'You are a helpful assistant.',
     modelProfileId: ctx.modelProfileId,
-    contextAssemblyWorkflowId,
-    memoryExtractionWorkflowId,
+    contextAssemblyWorkflowDefId,
+    memoryExtractionWorkflowDefId,
     toolIds: [],
     recentTurnsLimit: 10,
-  });
+  } as unknown as Parameters<typeof wonder.personas.create>[0]);
   const personaId = personaResponse.personaId;
   createdResources.personaId = personaId;
 

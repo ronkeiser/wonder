@@ -258,7 +258,7 @@ describe('Conversation: 05 - Parallel Turns', () => {
           required: ['topic'],
         },
         targetType: 'workflow',
-        targetId: researchWorkflowSetup.workflowId,
+        targetId: researchWorkflowSetup.workflowDefId,
         async: true,
       });
       createdResources.toolIds.push(toolResponse.toolId);
@@ -273,8 +273,8 @@ describe('Conversation: 05 - Parallel Turns', () => {
         description: 'Test agent for parallel turns',
         systemPrompt,
         modelProfileId: ctx.modelProfileId,
-        contextAssemblyWorkflowId: contextAssemblySetup.workflowId,
-        memoryExtractionWorkflowId: memoryExtractionSetup.workflowId,
+        contextAssemblyWorkflowDefId: contextAssemblySetup.workflowDefId,
+        memoryExtractionWorkflowDefId: memoryExtractionSetup.workflowDefId,
         toolIds: [toolResponse.toolId],
         recentTurnsLimit: 10,
       });

@@ -72,8 +72,8 @@ export function validatePersonaDocument(doc: PersonaDocument, imports: ImportsMa
     });
   }
 
-  // Validate contextAssemblyWorkflowId is present
-  if (!doc.contextAssemblyWorkflowId) {
+  // Validate contextAssemblyWorkflowDefId is present
+  if (!doc.contextAssemblyWorkflowDefId) {
     diagnostics.push({
       severity: DiagnosticSeverity.Error,
       range: {
@@ -86,8 +86,8 @@ export function validatePersonaDocument(doc: PersonaDocument, imports: ImportsMa
     });
   }
 
-  // Validate memoryExtractionWorkflowId is present
-  if (!doc.memoryExtractionWorkflowId) {
+  // Validate memoryExtractionWorkflowDefId is present
+  if (!doc.memoryExtractionWorkflowDefId) {
     diagnostics.push({
       severity: DiagnosticSeverity.Error,
       range: {

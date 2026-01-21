@@ -1,5 +1,18 @@
-import { formatReference } from './reference.js';
-import type { Workspace, WorkspaceDefinition, WorkspaceValidationResult } from './types.js';
+import { formatReference, formatTypedReference, referencesEqual } from './reference.js';
+import type { Reference, Workspace, WorkspaceDefinition, WorkspaceValidationResult } from './types.js';
+
+/**
+ * Find a definition in the workspace that matches a reference (regardless of type)
+ */
+function findDefinitionByReference(ref: Reference, workspace: Workspace): WorkspaceDefinition | null {
+  const refString = formatReference(ref);
+  for (const [key, def] of workspace.definitions) {
+    if (key.endsWith(`:${refString}`) && referencesEqual(def.reference, ref)) {
+      return def;
+    }
+  }
+  return null;
+}
 
 /**
  * Get definitions in topological order for deployment
@@ -18,6 +31,7 @@ export function getDeployOrder(
   const { dependencyGraph } = validation;
 
   // Build in-degree map (count of dependencies for each definition)
+  // Keys are typed references (type:reference)
   const inDegree = new Map<string, number>();
   const allRefs = new Set<string>();
 
@@ -28,12 +42,14 @@ export function getDeployOrder(
   }
 
   // Count incoming edges (dependencies within the workspace)
+  // The dependency graph keys are typed references, but the dep values are plain References
   for (const [refKey, deps] of dependencyGraph) {
     for (const dep of deps) {
-      const depKey = formatReference(dep);
+      // Find if this dependency exists in the workspace (could be any type)
+      const depDef = findDefinitionByReference(dep, workspace);
       // Only count dependencies that are in the workspace
       // (standard library deps don't affect deploy order)
-      if (workspace.definitions.has(depKey)) {
+      if (depDef) {
         inDegree.set(refKey, (inDegree.get(refKey) ?? 0) + 1);
       }
     }
@@ -62,10 +78,16 @@ export function getDeployOrder(
     }
 
     // Find definitions that depend on this one and reduce their in-degree
+    // We need to check if any dependency in the graph points to the current definition
     for (const [otherRefKey, deps] of dependencyGraph) {
       if (processed.has(otherRefKey)) continue;
 
-      const dependsOnCurrent = deps.some((d) => formatReference(d) === refKey);
+      // Check if any dependency in deps matches the current definition
+      const dependsOnCurrent = deps.some((d) => {
+        const depDef = findDefinitionByReference(d, workspace);
+        return depDef && formatTypedReference(depDef.reference, depDef.definitionType) === refKey;
+      });
+
       if (dependsOnCurrent) {
         const newDegree = (inDegree.get(otherRefKey) ?? 1) - 1;
         inDegree.set(otherRefKey, newDegree);

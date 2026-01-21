@@ -284,7 +284,7 @@ describe('Conversation: 03 - Single Turn, Async Tool', () => {
           required: ['topic'],
         },
         targetType: 'workflow',
-        targetId: researchWorkflowSetup.workflowId,
+        targetId: researchWorkflowSetup.workflowDefId,
         async: true, // KEY: This is an async tool
       });
       createdResources.toolIds.push(toolResponse.toolId);
@@ -299,8 +299,8 @@ describe('Conversation: 03 - Single Turn, Async Tool', () => {
         description: 'Test agent with async research tool',
         systemPrompt,
         modelProfileId: ctx.modelProfileId,
-        contextAssemblyWorkflowId: contextAssemblySetup.workflowId,
-        memoryExtractionWorkflowId: memoryExtractionSetup.workflowId,
+        contextAssemblyWorkflowDefId: contextAssemblySetup.workflowDefId,
+        memoryExtractionWorkflowDefId: memoryExtractionSetup.workflowDefId,
         toolIds: [toolResponse.toolId],
         recentTurnsLimit: 10,
       });

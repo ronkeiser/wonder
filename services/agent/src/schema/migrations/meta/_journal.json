@@ -15,6 +15,13 @@
       "when": 1768977342707,
       "tag": "0001_damp_bishop",
       "breakpoints": true
+    },
+    {
+      "idx": 2,
+      "version": "6",
+      "when": 1737453600000,
+      "tag": "0002_persona_workflow_def_ids",
+      "breakpoints": true
     }
   ]
 }

@@ -135,6 +135,18 @@ export function formatReference(ref: Reference): string {
 }
 
 /**
+ * Format a Reference with its definition type for use as a unique key
+ *
+ * This is necessary because different definition types (e.g., workflow vs task)
+ * can have the same reference name. The file extension determines the type.
+ *
+ * Format: `type:reference` (e.g., `workflow:core/context-assembly-passthrough`)
+ */
+export function formatTypedReference(ref: Reference, definitionType: string): string {
+  return `${definitionType}:${formatReference(ref)}`;
+}
+
+/**
  * Check if two references are equal
  */
 export function referencesEqual(a: Reference, b: Reference): boolean {

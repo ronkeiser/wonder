@@ -10,7 +10,7 @@ const workflowRunSummarySchema = z
   .object({
     id: z.string(),
     projectId: z.string(),
-    workflowId: z.string(),
+    workflowId: z.string().nullable(), // Nullable for def-only runs (agent workflows)
     workflowName: z.string(),
     workflowDefId: z.string(),
     workflowVersion: z.number(),

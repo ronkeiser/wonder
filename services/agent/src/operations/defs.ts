@@ -127,8 +127,8 @@ export class DefinitionManager {
         name: fetchedPersona.name,
         systemPrompt: fetchedPersona.systemPrompt,
         modelProfileId: fetchedPersona.modelProfileId,
-        contextAssemblyWorkflowId: fetchedPersona.contextAssemblyWorkflowId,
-        memoryExtractionWorkflowId: fetchedPersona.memoryExtractionWorkflowId,
+        contextAssemblyWorkflowDefId: fetchedPersona.contextAssemblyWorkflowDefId,
+        memoryExtractionWorkflowDefId: fetchedPersona.memoryExtractionWorkflowDefId,
         recentTurnsLimit: fetchedPersona.recentTurnsLimit,
         toolIds: fetchedPersona.toolIds,
         constraints: fetchedPersona.constraints,
@@ -285,25 +285,25 @@ export class DefinitionManager {
   }
 
   /**
-   * Get the context assembly workflow ID.
+   * Get the context assembly workflow definition ID.
    */
-  getContextAssemblyWorkflowId(): string {
+  getContextAssemblyWorkflowDefId(): string {
     const persona = this.getPersona();
     if (!persona) {
       throw new Error('No persona configured for this agent');
     }
-    return persona.contextAssemblyWorkflowId;
+    return persona.contextAssemblyWorkflowDefId;
   }
 
   /**
-   * Get the memory extraction workflow ID.
+   * Get the memory extraction workflow definition ID.
    */
-  getMemoryExtractionWorkflowId(): string {
+  getMemoryExtractionWorkflowDefId(): string {
     const persona = this.getPersona();
     if (!persona) {
       throw new Error('No persona configured for this agent');
     }
-    return persona.memoryExtractionWorkflowId;
+    return persona.memoryExtractionWorkflowDefId;
   }
 
   /**

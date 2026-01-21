@@ -8,8 +8,8 @@ system_prompt: |
 
 # References to resources in the same library (core)
 model_profile_id: core/claude-sonnet
-context_assembly_workflow_id: core/context-assembly-passthrough
-memory_extraction_workflow_id: core/memory-extraction-noop
+context_assembly_workflow_def_id: core/context-assembly-passthrough
+memory_extraction_workflow_def_id: core/memory-extraction-noop
 
 # Tools - empty list for basic assistant
 tool_ids: []

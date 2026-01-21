@@ -60,7 +60,7 @@ output_schema:
   required: [llmRequest]
 
 output_mapping:
-  llmRequest: "$.output.llmRequest"
+  llmRequest: "output.llmRequest"
 
 initial_node_ref: build_request
 
@@ -70,9 +70,9 @@ nodes:
     task_id: passthrough_task
     task_version: 1
     input_mapping:
-      userMessage: "$.input.userMessage"
-      systemPrompt: "$.input.systemPrompt"
+      userMessage: "input.userMessage"
+      systemPrompt: "input.systemPrompt"
     output_mapping:
-      "output.llmRequest": "$.llmRequest"
+      "output.llmRequest": "result.llmRequest"
 
 transitions: []

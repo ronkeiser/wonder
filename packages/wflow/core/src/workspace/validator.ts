@@ -1,6 +1,6 @@
 import type { Diagnostic, Range } from '../types/diagnostics.js';
 import { DiagnosticSeverity } from '../types/diagnostics.js';
-import { formatReference, referencesEqual } from './reference.js';
+import { formatReference, formatTypedReference, referencesEqual } from './reference.js';
 import {
   STANDARD_LIBRARY_WORKSPACE_NAME,
   type Reference,
@@ -32,13 +32,23 @@ export const DiagnosticCodes = {
 
 /**
  * Check if a reference can be resolved within the workspace
+ *
+ * Since definitions are keyed by typed reference (type:reference), we need to
+ * search for any definition that matches the reference regardless of type.
  */
 function resolveWorkspaceReference(
   ref: Reference,
   workspace: Workspace,
 ): WorkspaceDefinition | null {
-  const refKey = formatReference(ref);
-  return workspace.definitions.get(refKey) ?? null;
+  const refString = formatReference(ref);
+  // Search for any definition matching this reference (keys are type:reference)
+  for (const [key, def] of workspace.definitions) {
+    // Key format is "type:reference", so check if it ends with the reference string
+    if (key.endsWith(`:${refString}`) && referencesEqual(def.reference, ref)) {
+      return def;
+    }
+  }
+  return null;
 }
 
 /**
@@ -125,20 +135,23 @@ function detectDependencyCycles(workspace: Workspace): Reference[][] {
   const path: Reference[] = [];
 
   function dfs(def: WorkspaceDefinition): void {
-    const refKey = formatReference(def.reference);
+    const refKey = formatTypedReference(def.reference, def.definitionType);
     visited.add(refKey);
     recursionStack.add(refKey);
     path.push(def.reference);
 
     for (const dep of def.dependencies) {
-      const depKey = formatReference(dep);
-      const depDef = workspace.definitions.get(depKey);
+      // Find the definition matching this dependency reference
+      const depDef = resolveWorkspaceReference(dep, workspace);
+      if (!depDef) continue;
 
-      if (depDef && !visited.has(depKey)) {
+      const depKey = formatTypedReference(depDef.reference, depDef.definitionType);
+
+      if (!visited.has(depKey)) {
         dfs(depDef);
-      } else if (depDef && recursionStack.has(depKey)) {
+      } else if (recursionStack.has(depKey)) {
         // Found a cycle
-        const cycleStartIdx = path.findIndex((r) => formatReference(r) === depKey);
+        const cycleStartIdx = path.findIndex((r) => referencesEqual(r, dep));
         if (cycleStartIdx !== -1) {
           const cycle = path.slice(cycleStartIdx);
           cycle.push(dep); // Complete the cycle
@@ -152,7 +165,7 @@ function detectDependencyCycles(workspace: Workspace): Reference[][] {
   }
 
   for (const def of workspace.definitions.values()) {
-    const refKey = formatReference(def.reference);
+    const refKey = formatTypedReference(def.reference, def.definitionType);
     if (!visited.has(refKey)) {
       dfs(def);
     }
@@ -183,7 +196,7 @@ export function validateWorkspace(
 
   // Validate each definition's dependencies
   for (const def of workspace.definitions.values()) {
-    const refKey = formatReference(def.reference);
+    const refKey = formatTypedReference(def.reference, def.definitionType);
     dependencyGraph.set(refKey, def.dependencies);
 
     for (const dep of def.dependencies) {
@@ -202,8 +215,8 @@ export function validateWorkspace(
   for (const cycle of cycles) {
     // Add a diagnostic to the first definition in the cycle
     const firstRef = cycle[0];
-    const firstRefKey = formatReference(firstRef);
-    const firstDef = workspace.definitions.get(firstRefKey);
+    // Find the definition by searching (we don't know the type from just the reference)
+    const firstDef = resolveWorkspaceReference(firstRef, workspace);
 
     if (firstDef) {
       const cycleStr = cycle.map(formatReference).join(' → ');
