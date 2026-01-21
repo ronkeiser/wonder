@@ -133,6 +133,22 @@ export class Conversations extends Resource {
       return { success: true };
     });
   }
+
+  async listByAgentId(
+    agentId: string,
+    options?: { limit?: number },
+  ): Promise<{
+    conversations: Conversation[];
+  }> {
+    return this.withLogging('listByAgentId', { metadata: { agentId, ...options } }, async () => {
+      const conversations = await repo.listConversationsByAgentId(
+        this.serviceCtx.db,
+        agentId,
+        options?.limit,
+      );
+      return { conversations };
+    });
+  }
 }
 
 export type { Conversation };

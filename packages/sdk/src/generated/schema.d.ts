@@ -224,6 +224,45 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/agents/{id}/conversations": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: {
+            parameters: {
+                query?: {
+                    limit?: number;
+                };
+                header?: never;
+                path: {
+                    id: string;
+                };
+                cookie?: never;
+            };
+            requestBody?: never;
+            responses: {
+                /** @description Agent conversations retrieved successfully */
+                200: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["AgentConversationsResponse"];
+                    };
+                };
+            };
+        };
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/artifact-types": {
         parameters: {
             query?: never;
@@ -2813,6 +2852,7 @@ export interface components {
             projectIds: string[];
             personaId: string | null;
             personaVersion: number | null;
+            personaName: string | null;
             createdAt: string;
             updatedAt: string;
         };
@@ -2839,6 +2879,26 @@ export interface components {
         };
         AgentGetResponse: {
             agent: components["schemas"]["Agent"];
+        };
+        Conversation: {
+            /** @example 01ARZ3NDEKTSV4RRFFQ69G5FAV */
+            id: string;
+            participants: ({
+                /** @enum {string} */
+                type: "user";
+                userId: string;
+            } | {
+                /** @enum {string} */
+                type: "agent";
+                agentId: string;
+            })[];
+            /** @enum {string} */
+            status: "active" | "waiting" | "completed" | "failed";
+            createdAt: string;
+            updatedAt: string;
+        };
+        AgentConversationsResponse: {
+            conversations: components["schemas"]["Conversation"][];
         };
         ArtifactType: {
             /** @example document */
@@ -2888,23 +2948,6 @@ export interface components {
         };
         ArtifactTypeGetResponse: {
             artifactType: components["schemas"]["ArtifactType"];
-        };
-        Conversation: {
-            /** @example 01ARZ3NDEKTSV4RRFFQ69G5FAV */
-            id: string;
-            participants: ({
-                /** @enum {string} */
-                type: "user";
-                userId: string;
-            } | {
-                /** @enum {string} */
-                type: "agent";
-                agentId: string;
-            })[];
-            /** @enum {string} */
-            status: "active" | "waiting" | "completed" | "failed";
-            createdAt: string;
-            updatedAt: string;
         };
         ConversationCreateResponse: {
             conversationId: string;

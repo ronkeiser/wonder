@@ -97,6 +97,13 @@ export function createClient(baseClient: any) {
             const { data, error } = await baseClient.DELETE(`/agents/${id}`, {});
             if (error) throw new ApiError(`DELETE /agents/${id} failed`, error);
             return data;
+          },
+          conversations: {
+            list: async (options?: any): Promise<paths['/agents/{id}/conversations']['get']['responses']['200']['content']['application/json']> => {
+              const { data, error } = await baseClient.GET(`/agents/${id}/conversations`, {});
+              if (error) throw new ApiError(`GET /agents/${id}/conversations failed`, error);
+              return data;
+            }
           }
         }),
       {

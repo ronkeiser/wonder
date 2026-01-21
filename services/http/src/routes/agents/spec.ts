@@ -1,6 +1,7 @@
 import { createRoute, z } from '@hono/zod-openapi';
 import { ulid } from '../../validators';
 import {
+  AgentConversationsResponseSchema,
   AgentCreateResponseSchema,
   AgentGetResponseSchema,
   AgentListResponseSchema,
@@ -91,6 +92,30 @@ export const deleteAgentRoute = createRoute({
         },
       },
       description: 'Agent deleted successfully',
+    },
+  },
+});
+
+export const getAgentConversationsRoute = createRoute({
+  method: 'get',
+  path: '/{id}/conversations',
+  tags: ['agents'],
+  request: {
+    params: z.object({
+      id: ulid().openapi({ param: { name: 'id', in: 'path' } }),
+    }),
+    query: z.object({
+      limit: z.coerce.number().int().positive().max(100).optional(),
+    }),
+  },
+  responses: {
+    200: {
+      content: {
+        'application/json': {
+          schema: AgentConversationsResponseSchema,
+        },
+      },
+      description: 'Agent conversations retrieved successfully',
     },
   },
 });

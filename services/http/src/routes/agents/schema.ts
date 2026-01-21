@@ -1,5 +1,6 @@
 import { z } from '@hono/zod-openapi';
 import { ulid } from '../../validators';
+import { ConversationSchema } from '../conversations/schema';
 
 export const CreateAgentSchema = z
   .object({
@@ -41,3 +42,9 @@ export const AgentListResponseSchema = z
     agents: z.array(AgentSchema),
   })
   .openapi('AgentListResponse');
+
+export const AgentConversationsResponseSchema = z
+  .object({
+    conversations: z.array(ConversationSchema),
+  })
+  .openapi('AgentConversationsResponse');

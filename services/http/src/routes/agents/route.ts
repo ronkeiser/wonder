@@ -1,6 +1,12 @@
 import { OpenAPIHono } from '@hono/zod-openapi';
 import type { HttpEnv } from '~/types';
-import { createAgentRoute, deleteAgentRoute, getAgentRoute, listAgentsRoute } from './spec';
+import {
+  createAgentRoute,
+  deleteAgentRoute,
+  getAgentConversationsRoute,
+  getAgentRoute,
+  listAgentsRoute,
+} from './spec';
 
 export const agents = new OpenAPIHono<HttpEnv>();
 
@@ -30,4 +36,12 @@ agents.openapi(deleteAgentRoute, async (c) => {
   using resource = c.env.RESOURCES.agents();
   await resource.delete(id);
   return c.json({ success: true });
+});
+
+agents.openapi(getAgentConversationsRoute, async (c) => {
+  const { id } = c.req.valid('param');
+  const { limit } = c.req.valid('query');
+  using resource = c.env.RESOURCES.conversations();
+  const result = await resource.listByAgentId(id, { limit });
+  return c.json(result);
 });

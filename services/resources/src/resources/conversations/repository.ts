@@ -78,3 +78,26 @@ export async function updateConversationStatus(
     .returning();
   return updated ?? null;
 }
+
+export async function listConversationsByAgentId(
+  db: DrizzleD1Database,
+  agentId: string,
+  limit: number = 100,
+): Promise<Conversation[]> {
+  // SQLite JSON querying: participants is a JSON array, we need to find conversations
+  // where at least one participant has type='agent' and agentId matching our target
+  const all = await db
+    .select()
+    .from(conversations)
+    .orderBy(desc(conversations.createdAt))
+    .all();
+
+  // Filter in application layer since D1 SQLite JSON querying is limited
+  return all
+    .filter((c) =>
+      c.participants.some(
+        (p) => p.type === 'agent' && p.agentId === agentId,
+      ),
+    )
+    .slice(0, limit);
+}
