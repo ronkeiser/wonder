@@ -134,6 +134,8 @@ export type ToolDefinition = {
 export type ContextAssemblyInput = {
   conversationId: string;
   userMessage: string;
+  /** System prompt from persona */
+  systemPrompt: string;
   recentTurns: TurnSnapshot[];
   modelProfileId: string;
   toolIds: string[];

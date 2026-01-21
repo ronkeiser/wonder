@@ -112,6 +112,7 @@ export async function dispatchContextAssembly(
   const input: ContextAssemblyInput = {
     conversationId: ctx.conversationId,
     userMessage,
+    systemPrompt: persona.systemPrompt,
     recentTurns,
     modelProfileId: persona.modelProfileId,
     toolIds: persona.toolIds,

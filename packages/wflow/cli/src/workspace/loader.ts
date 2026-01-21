@@ -111,16 +111,84 @@ export function computeContentHash(document: Record<string, unknown>): string {
 }
 
 /**
+ * Resolve an import alias or direct reference to a Reference
+ *
+ * @param value - Either an import alias (e.g., "passthrough_task") or a direct reference (e.g., "core/my-task")
+ * @param imports - The imports section from the document
+ * @param filePath - Absolute path to the document file (for resolving relative imports)
+ * @returns A Reference if resolved, null otherwise
+ */
+function resolveToReference(
+  value: string,
+  imports: Record<string, string> | undefined,
+  filePath: string,
+): Reference | null {
+  // First, try to parse as a direct reference (e.g., "core/my-task")
+  const directRef = tryParseReference(value);
+  if (directRef) return directRef;
+
+  // If not a direct reference, try to resolve as an import alias
+  if (!imports) return null;
+
+  // Try both the original alias and camelCase version (since parser converts snake_case to camelCase)
+  const camelAlias = value.replace(/_([a-z0-9])/gi, (_, char) => char.toUpperCase());
+  const relativePath = imports[value] ?? imports[camelAlias];
+
+  if (!relativePath) return null;
+
+  // Resolve the relative import path to an absolute path
+  const fileDir = path.dirname(filePath);
+  const importedFilePath = path.resolve(fileDir, relativePath);
+
+  // Derive reference from the imported file path
+  // Path like: .../libraries/core/context-assembly-passthrough.task
+  // Reference: core/context-assembly-passthrough (standardLibrary scope)
+  const pathParts = importedFilePath.split(path.sep);
+  const librariesIndex = pathParts.indexOf('libraries');
+  const projectsIndex = pathParts.indexOf('projects');
+
+  if (librariesIndex !== -1 && librariesIndex < pathParts.length - 2) {
+    const libraryName = pathParts[librariesIndex + 1];
+    const fileName = pathParts[pathParts.length - 1];
+    const baseName = fileName.replace(/\.[^.]+$/, ''); // Remove extension
+
+    // Determine if this is standard library or workspace library
+    // For now, assume standardLibrary (most common case for imports)
+    // The validator will catch mismatches
+    return { scope: 'standardLibrary', library: libraryName, name: baseName };
+  }
+
+  if (projectsIndex !== -1 && projectsIndex < pathParts.length - 2) {
+    const projectName = pathParts[projectsIndex + 1];
+    const fileName = pathParts[pathParts.length - 1];
+    const baseName = fileName.replace(/\.[^.]+$/, '');
+
+    return { scope: 'project', project: projectName, name: baseName };
+  }
+
+  return null;
+}
+
+/**
  * Extract dependencies from a parsed document
  *
  * This extracts references from fields that point to other definitions:
  * - PersonaDocument: toolIds, contextAssemblyWorkflowId, memoryExtractionWorkflowId
  * - ToolDocument: targetId
- * - WflowDocument: nodes[].taskId
- * - TaskDocument: steps[].actionId
+ * - WflowDocument: nodes[].taskId (resolves import aliases)
+ * - TaskDocument: steps[].actionId (resolves import aliases)
+ *
+ * @param doc - The parsed document
+ * @param fileType - The type of file (wflow, task, etc.)
+ * @param filePath - Absolute path to the document file (for resolving relative imports)
  */
-export function extractDependencies(doc: AnyDocument, fileType: FileType): Reference[] {
+export function extractDependencies(
+  doc: AnyDocument,
+  fileType: FileType,
+  filePath: string,
+): Reference[] {
   const refs: Reference[] = [];
+  const imports = (doc as { imports?: Record<string, string> }).imports;
 
   switch (fileType) {
     case 'persona': {
@@ -166,7 +234,7 @@ export function extractDependencies(doc: AnyDocument, fileType: FileType): Refer
       if (wflow.nodes) {
         for (const node of Object.values(wflow.nodes)) {
           if (node.taskId) {
-            const ref = tryParseReference(node.taskId);
+            const ref = resolveToReference(node.taskId, imports, filePath);
             if (ref) refs.push(ref);
           }
         }
@@ -180,7 +248,7 @@ export function extractDependencies(doc: AnyDocument, fileType: FileType): Refer
       if (task.steps) {
         for (const step of task.steps) {
           if (step.actionId) {
-            const ref = tryParseReference(step.actionId);
+            const ref = resolveToReference(step.actionId, imports, filePath);
             if (ref) refs.push(ref);
           }
         }
@@ -333,7 +401,7 @@ export async function loadWorkspace(rootPath: string): Promise<Workspace> {
     // Include definition type in key to avoid collisions between .task and .wflow with same name
     const refKey = formatTypedReference(reference, definitionType);
     const contentHash = computeContentHash(parseResult.document as Record<string, unknown>);
-    const dependencies = extractDependencies(parseResult.document, fileType);
+    const dependencies = extractDependencies(parseResult.document, fileType, absolutePath);
 
     definitions.set(refKey, {
       reference,

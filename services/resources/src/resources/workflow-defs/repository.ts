@@ -142,7 +142,14 @@ export async function getWorkflowDefByReferenceAndHash(
     return null;
   }
 
-  const result = await db.select().from(workflowDefs).where(whereClause).get();
+  // Order by createdAt DESC to get newest matching entity when duplicates exist
+  // (can happen with --force deploys that skip autoversion checks)
+  const result = await db
+    .select()
+    .from(workflowDefs)
+    .where(whereClause)
+    .orderBy(desc(workflowDefs.createdAt))
+    .get();
   return result ?? null;
 }
 

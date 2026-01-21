@@ -86,10 +86,13 @@ export async function getActionByReferenceAndHash(
   reference: string,
   contentHash: string,
 ): Promise<Action | null> {
+  // Order by createdAt DESC to get newest matching entity when duplicates exist
+  // (can happen with --force deploys that skip autoversion checks)
   const result = await db
     .select()
     .from(actions)
     .where(and(eq(actions.reference, reference), eq(actions.contentHash, contentHash)))
+    .orderBy(desc(actions.createdAt))
     .get();
   return result ?? null;
 }

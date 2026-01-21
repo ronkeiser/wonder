@@ -90,6 +90,8 @@ export async function getPersonaByReferenceAndHash(
   contentHash: string,
   libraryId: string | null,
 ): Promise<Persona | null> {
+  // Order by createdAt DESC to get newest matching entity when duplicates exist
+  // (can happen with --force deploys that skip autoversion checks)
   const result = await db
     .select()
     .from(personas)
@@ -100,6 +102,7 @@ export async function getPersonaByReferenceAndHash(
         libraryId ? eq(personas.libraryId, libraryId) : isNull(personas.libraryId),
       ),
     )
+    .orderBy(desc(personas.createdAt))
     .get();
   return result ?? null;
 }

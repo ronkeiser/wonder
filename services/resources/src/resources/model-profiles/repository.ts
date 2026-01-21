@@ -1,6 +1,6 @@
 /** Repository for model profile data access */
 
-import { and, eq, max } from 'drizzle-orm';
+import { and, desc, eq, max } from 'drizzle-orm';
 import type { DrizzleD1Database } from 'drizzle-orm/d1';
 import { ulid } from 'ulid';
 import { modelProfiles } from '~/schema';
@@ -77,10 +77,13 @@ export async function getModelProfileByReferenceAndHash(
   reference: string,
   contentHash: string,
 ): Promise<ModelProfile | null> {
+  // Order by createdAt DESC to get newest matching entity when duplicates exist
+  // (can happen with --force deploys that skip autoversion checks)
   const result = await db
     .select()
     .from(modelProfiles)
     .where(and(eq(modelProfiles.reference, reference), eq(modelProfiles.contentHash, contentHash)))
+    .orderBy(desc(modelProfiles.createdAt))
     .get();
   return (result as ModelProfile) ?? null;
 }

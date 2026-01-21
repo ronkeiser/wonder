@@ -20,6 +20,7 @@ export type ContextAssemblyParams = {
   turnId: string;
   conversationId: string;
   userMessage: string;
+  systemPrompt: string;
   recentTurns: TurnSnapshot[];
   contextAssemblyWorkflowId: string;
   modelProfileId: string;
@@ -39,6 +40,7 @@ export function decideContextAssembly(params: ContextAssemblyParams): PlanningRe
     turnId,
     conversationId,
     userMessage,
+    systemPrompt,
     recentTurns,
     contextAssemblyWorkflowId,
     modelProfileId,
@@ -49,6 +51,7 @@ export function decideContextAssembly(params: ContextAssemblyParams): PlanningRe
   const input: ContextAssemblyInput = {
     conversationId,
     userMessage,
+    systemPrompt,
     recentTurns,
     modelProfileId,
     toolIds,

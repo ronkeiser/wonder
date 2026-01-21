@@ -104,6 +104,8 @@ export async function getTaskByReferenceAndHash(
   projectId: string | null,
   libraryId: string | null,
 ): Promise<Task | null> {
+  // Order by createdAt DESC to get newest matching entity when duplicates exist
+  // (can happen with --force deploys that skip autoversion checks)
   const result = await db
     .select()
     .from(tasks)
@@ -115,6 +117,7 @@ export async function getTaskByReferenceAndHash(
         libraryId ? eq(tasks.libraryId, libraryId) : isNull(tasks.libraryId),
       ),
     )
+    .orderBy(desc(tasks.createdAt))
     .get();
   return result ?? null;
 }
