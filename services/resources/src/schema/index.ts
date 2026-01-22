@@ -107,7 +107,7 @@ export const workflowDefs = sqliteTable(
     // Stable identity for autoversion scoping (derived from file path in CLI)
     reference: text(),
 
-    projectId: text().references(() => projects.id),
+    projectId: text().references(() => projects.id, { onDelete: 'cascade' }),
     libraryId: text(),
 
     tags: text({ mode: 'json' }).$type<string[]>(),
@@ -199,7 +199,7 @@ export const nodes = sqliteTable(
     foreignKey({
       columns: [table.workflowDefId, table.workflowDefVersion],
       foreignColumns: [workflowDefs.id, workflowDefs.version],
-    }),
+    }).onDelete('cascade'),
     index('idx_nodes_workflow_def').on(table.workflowDefId, table.workflowDefVersion),
     index('idx_nodes_task').on(table.taskId, table.taskVersion),
     index('idx_nodes_ref').on(table.workflowDefId, table.workflowDefVersion, table.ref),
@@ -229,7 +229,7 @@ export const transitions = sqliteTable(
     foreignKey({
       columns: [table.workflowDefId, table.workflowDefVersion],
       foreignColumns: [workflowDefs.id, workflowDefs.version],
-    }),
+    }).onDelete('cascade'),
     foreignKey({
       columns: [table.workflowDefId, table.workflowDefVersion, table.fromNodeId],
       foreignColumns: [nodes.workflowDefId, nodes.workflowDefVersion, nodes.id],
@@ -295,7 +295,7 @@ export const tasks = sqliteTable(
     reference: text(),
 
     // Ownership (exactly one)
-    projectId: text().references(() => projects.id),
+    projectId: text().references(() => projects.id, { onDelete: 'cascade' }),
     libraryId: text(),
 
     tags: text({ mode: 'json' }).$type<string[]>(),
@@ -389,7 +389,7 @@ export const workflowRuns = sqliteTable(
     id: text().primaryKey(),
     projectId: text()
       .notNull()
-      .references(() => projects.id),
+      .references(() => projects.id, { onDelete: 'cascade' }),
     workflowId: text().references(() => workflows.id), // Nullable for def-only runs (agent workflows)
     workflowDefId: text().notNull(),
     workflowVersion: integer().notNull(),
@@ -417,7 +417,7 @@ export const workflowRuns = sqliteTable(
     foreignKey({
       columns: [table.workflowDefId, table.workflowVersion, table.parentNodeId],
       foreignColumns: [nodes.workflowDefId, nodes.workflowDefVersion, nodes.id],
-    }),
+    }).onDelete('cascade'),
     index('idx_workflow_runs_project').on(table.projectId),
     index('idx_workflow_runs_workflow').on(table.workflowId),
     index('idx_workflow_runs_status').on(table.status),
@@ -496,7 +496,7 @@ export const artifacts = sqliteTable(
     id: text().primaryKey(),
     projectId: text()
       .notNull()
-      .references(() => projects.id),
+      .references(() => projects.id, { onDelete: 'cascade' }),
     typeId: text().notNull(),
     typeVersion: integer().notNull(),
 
@@ -517,7 +517,7 @@ export const artifacts = sqliteTable(
         table.createdByNodeId,
       ],
       foreignColumns: [nodes.workflowDefId, nodes.workflowDefVersion, nodes.id],
-    }),
+    }).onDelete('cascade'),
     index('idx_artifacts_project_type').on(table.projectId, table.typeId),
     index('idx_artifacts_workflow_run').on(table.createdByWorkflowRunId),
     index('idx_artifacts_created_at').on(table.createdAt),

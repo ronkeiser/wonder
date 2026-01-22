@@ -5,43 +5,8 @@
     {
       "idx": 0,
       "version": "6",
-      "when": 1766532196837,
-      "tag": "0000_overrated_spirit",
-      "breakpoints": true
-    },
-    {
-      "idx": 1,
-      "version": "6",
-      "when": 1766548068711,
-      "tag": "0001_youthful_anthem",
-      "breakpoints": true
-    },
-    {
-      "idx": 2,
-      "version": "6",
-      "when": 1767163218025,
-      "tag": "0002_youthful_sage",
-      "breakpoints": true
-    },
-    {
-      "idx": 3,
-      "version": "6",
-      "when": 1768867659251,
-      "tag": "0003_closed_red_shift",
-      "breakpoints": true
-    },
-    {
-      "idx": 4,
-      "version": "6",
-      "when": 1768915671639,
-      "tag": "0004_fine_screwball",
-      "breakpoints": true
-    },
-    {
-      "idx": 5,
-      "version": "6",
-      "when": 1768973734519,
-      "tag": "0005_steep_wasp",
+      "when": 1769084007671,
+      "tag": "0000_military_young_avengers",
       "breakpoints": true
     }
   ]

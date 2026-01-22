@@ -260,7 +260,7 @@ export async function cleanupConversationTest(
     // Ignore
   }
 
-  // Delete project
+  // Delete project (cascade deletes workflow_runs, workflow_defs, tasks, artifacts)
   try {
     await wonder.projects(setup.projectId).delete();
     deleted++;
