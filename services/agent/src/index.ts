@@ -305,6 +305,14 @@ export class Conversation extends DurableObject {
     });
   }
 
+  notifyTurnFinalized(turnId: string, memoryExtractionStatus: 'completed' | 'failed' | 'skipped'): void {
+    this.sendWebSocketMessage({
+      type: 'turn_finalized',
+      turnId,
+      memoryExtractionStatus,
+    });
+  }
+
   /**
    * Check if turn should complete after LLM loop iteration.
    *
@@ -334,6 +342,10 @@ export class Conversation extends DurableObject {
     const agent = this.defs.getAgent();
     const moves = this.moves.getForTurn(turnId);
 
+    // Track whether memory extraction was dispatched (finalized event comes from callback)
+    // or skipped (finalized event emitted immediately after turn completion)
+    let memoryExtractionDispatched = false;
+
     if (persona?.memoryExtractionWorkflowDefId) {
       const projectId = agent.projectIds[0];
       if (!projectId) {
@@ -357,6 +369,11 @@ export class Conversation extends DurableObject {
           })),
         });
 
+        // Check if extraction was actually dispatched (non-empty decisions)
+        if (extractionDecisions.decisions.length > 0) {
+          memoryExtractionDispatched = true;
+        }
+
         applyDecisions(extractionDecisions.decisions, ctx);
       }
     }
@@ -375,6 +392,16 @@ export class Conversation extends DurableObject {
 
     // Notify WebSocket client of turn completion
     this.notifyTurnComplete(turnId);
+
+    // If memory extraction was skipped, emit finalized immediately
+    // (otherwise finalized is emitted when extraction callback returns)
+    if (!memoryExtractionDispatched) {
+      this.emitter.emitTrace({
+        type: 'operation.turns.finalized',
+        payload: { turnId, memoryExtractionStatus: 'skipped' },
+      });
+      this.notifyTurnFinalized(turnId, 'skipped');
+    }
 
     this.logger.info({
       eventType: 'conversation.turn.completed',
@@ -1318,9 +1345,14 @@ export class Conversation extends DurableObject {
       // Link the workflow run to the turn
       this.turns.linkMemoryExtraction(turnId, runId);
 
-      // Memory extraction is fire-and-forget - turn was already completed
-      // in maybeCompleteTurn before dispatching extraction.
-      // This callback is just for bookkeeping/logging.
+      // Emit turn.finalized - all side effects are now complete
+      this.emitter.emitTrace({
+        type: 'operation.turns.finalized',
+        payload: { turnId, memoryExtractionStatus: 'completed' },
+      });
+
+      // Notify WebSocket client
+      this.notifyTurnFinalized(turnId, 'completed');
     } catch (error) {
       this.logger.error({
         eventType: 'conversation.memory_extraction.failed',
@@ -1363,6 +1395,15 @@ export class Conversation extends DurableObject {
       // Mark the turn with memoryExtractionFailed flag
       // The turn is already complete - this updates the issues metadata
       this.turns.markMemoryExtractionFailed(turnId);
+
+      // Emit turn.finalized - all side effects are now complete (even if failed)
+      this.emitter.emitTrace({
+        type: 'operation.turns.finalized',
+        payload: { turnId, memoryExtractionStatus: 'failed' },
+      });
+
+      // Notify WebSocket client
+      this.notifyTurnFinalized(turnId, 'failed');
     } catch (err) {
       this.logger.error({
         eventType: 'conversation.memory_extraction_error.failed',

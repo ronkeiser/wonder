@@ -100,6 +100,10 @@ export async function executeConversation(
         await conn.sendAndWait(msg.content, { timeout });
         console.log(`✅ Turn ${i + 1} completed`);
       }
+
+      // Wait for all turns to be finalized (side effects complete)
+      console.log('⏳ Waiting for all turns to finalize...');
+      await conn.waitForTurnsFinalizedCount(messages.length);
     } else {
       // Send all messages (with optional delays between them)
       for (let i = 0; i < messages.length; i++) {
@@ -124,6 +128,18 @@ export async function executeConversation(
       );
 
       await Promise.race([waitPromise, timeoutPromise]);
+
+      // Wait for all turns to be finalized (side effects complete)
+      console.log('⏳ Waiting for all turns to finalize...');
+      const finalizePromise = conn.waitForTurnsFinalizedCount(messages.length);
+      const finalizeTimeoutPromise = new Promise<never>((_, reject) =>
+        setTimeout(() => {
+          status = 'timeout';
+          reject(new Error('Timeout waiting for turns to finalize'));
+        }, timeout),
+      );
+
+      await Promise.race([finalizePromise, finalizeTimeoutPromise]);
     }
 
     // Get collected data
@@ -132,7 +148,7 @@ export async function executeConversation(
     // Sort events by sequence for consistent analysis
     traceEvents.sort((a, b) => a.sequence - b.sequence);
 
-    console.log(`✅ All ${turnIds.length} turns completed`);
+    console.log(`✅ All ${turnIds.length} turns completed and finalized`);
 
     return {
       conversationId,

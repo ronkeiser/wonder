@@ -105,10 +105,13 @@ export class ConversationConnection {
   private events: EventEntry[] = [];
   private turnIds: string[] = [];
   private activeTurnIds: Set<string> = new Set();
+  private finalizedTurnIds: Set<string> = new Set();
 
   // Promise resolvers for waitFor methods
   private turnCompleteResolvers: Map<string, () => void> = new Map();
   private allTurnsCompleteResolvers: Array<() => void> = [];
+  private turnFinalizedResolvers: Map<string, () => void> = new Map();
+  private allTurnsFinalizedResolvers: Array<() => void> = [];
 
   private constructor(
     ws: WebSocket,
@@ -276,6 +279,47 @@ export class ConversationConnection {
   }
 
   /**
+   * Wait for a specific turn to be finalized (all side effects complete)
+   */
+  waitForTurnFinalized(turnId: string): Promise<void> {
+    // Check if already finalized
+    if (this.finalizedTurnIds.has(turnId)) {
+      return Promise.resolve();
+    }
+
+    return new Promise((resolve) => {
+      this.turnFinalizedResolvers.set(turnId, resolve);
+    });
+  }
+
+  /**
+   * Wait for all turns to be finalized (all side effects complete)
+   */
+  waitForAllTurnsFinalized(): Promise<void> {
+    // Check if all turns already finalized
+    if (this.finalizedTurnIds.size === this.turnIds.length && this.turnIds.length > 0) {
+      return Promise.resolve();
+    }
+
+    return new Promise((resolve) => {
+      this.allTurnsFinalizedResolvers.push(resolve);
+    });
+  }
+
+  /**
+   * Wait for a specific number of turns to be finalized
+   */
+  async waitForTurnsFinalizedCount(count: number): Promise<void> {
+    while (this.getFinalizedTurnIds().length < count) {
+      await new Promise((resolve) => setTimeout(resolve, 100));
+      // Check if connection closed
+      if (this.state === 'closed') {
+        throw new Error('Connection closed while waiting for turns to finalize');
+      }
+    }
+  }
+
+  /**
    * Send a message and wait for the resulting turn to complete.
    *
    * This is useful for sequential multi-turn conversations where
@@ -358,6 +402,13 @@ export class ConversationConnection {
   }
 
   /**
+   * Get finalized turn IDs (all side effects complete)
+   */
+  getFinalizedTurnIds(): string[] {
+    return this.turnIds.filter((id) => this.finalizedTurnIds.has(id));
+  }
+
+  /**
    * Close the connection
    */
   close(): void {
@@ -428,6 +479,23 @@ export class ConversationConnection {
       if (this.activeTurnIds.size === 0 && this.turnIds.length > 0) {
         this.allTurnsCompleteResolvers.forEach((resolve) => resolve());
         this.allTurnsCompleteResolvers = [];
+      }
+    }
+
+    if (event.type === 'operation.turns.finalized') {
+      this.finalizedTurnIds.add(turnId);
+
+      // Resolve turn-specific finalized waiters
+      const resolver = this.turnFinalizedResolvers.get(turnId);
+      if (resolver) {
+        resolver();
+        this.turnFinalizedResolvers.delete(turnId);
+      }
+
+      // Check if all turns finalized
+      if (this.finalizedTurnIds.size === this.turnIds.length && this.turnIds.length > 0) {
+        this.allTurnsFinalizedResolvers.forEach((resolve) => resolve());
+        this.allTurnsFinalizedResolvers = [];
       }
     }
   }
