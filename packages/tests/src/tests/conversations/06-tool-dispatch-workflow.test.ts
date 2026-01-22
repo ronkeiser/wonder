@@ -422,7 +422,7 @@ describe('Conversation: 06 - Tool Dispatch to Workflow (Sync)', () => {
 
       // The queued dispatch should reference our lookup workflow
       const lookupDispatchQueued = workflowQueued.find(
-        (e) => (e.payload as { workflowId?: string }).workflowId === lookupWorkflowSetup.workflowDefId,
+        (e) => (e.payload as { workflowDefId?: string }).workflowDefId === lookupWorkflowSetup.workflowDefId,
       );
       expect(lookupDispatchQueued).toBeDefined();
       expect((lookupDispatchQueued!.payload as { async: boolean }).async).toBe(false);
