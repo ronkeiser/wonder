@@ -678,7 +678,7 @@ export const personas = sqliteTable(
     systemPrompt: text().notNull(),
     modelProfileId: text()
       .notNull()
-      .references(() => modelProfiles.id),
+      .references(() => modelProfiles.id, { onDelete: 'cascade' }),
 
     // Memory configuration (references workflow_defs directly, not workflows)
     contextAssemblyWorkflowDefId: text().notNull(),

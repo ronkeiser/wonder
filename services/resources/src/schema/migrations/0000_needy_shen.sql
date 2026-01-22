@@ -194,7 +194,7 @@ CREATE TABLE `personas` (
 	`updated_at` text NOT NULL,
 	PRIMARY KEY(`id`, `version`),
 	FOREIGN KEY (`library_id`) REFERENCES `libraries`(`id`) ON UPDATE no action ON DELETE no action,
-	FOREIGN KEY (`model_profile_id`) REFERENCES `model_profiles`(`id`) ON UPDATE no action ON DELETE no action
+	FOREIGN KEY (`model_profile_id`) REFERENCES `model_profiles`(`id`) ON UPDATE no action ON DELETE cascade
 );
 --> statement-breakpoint
 CREATE INDEX `idx_personas_library` ON `personas` (`library_id`);--> statement-breakpoint

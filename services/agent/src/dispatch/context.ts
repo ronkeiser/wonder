@@ -33,6 +33,9 @@ export type DispatchContext = {
   // Conversation identity
   conversationId: string;
 
+  // Project identity (from agent's first projectId)
+  projectId: string;
+
   // External services (RPC boundaries)
   coordinator: Env['COORDINATOR'];
   executor: Env['EXECUTOR'];

@@ -262,21 +262,25 @@ function dispatchTask(
 /**
  * Dispatch a workflow execution.
  *
- * Creates a workflow run in D1, then starts the coordinator DO.
+ * Creates a workflow run in D1 from the workflow def, then starts the coordinator DO.
  * Coordinator calls back via agent.handleWorkflowResult/Error().
+ *
+ * Note: workflowId here is actually a workflow_def_id (from tool.targetId).
+ * Tools reference workflow definitions, not workflow instances.
  */
 async function dispatchWorkflow(
   decision: Extract<AgentDecision, { type: 'DISPATCH_WORKFLOW' }>,
   ctx: DispatchContext,
 ): Promise<void> {
-  const { turnId, toolCallId, workflowId, input, async: isAsync, rawContent, retry } = decision;
+  // Note: workflowId is actually a workflow_def_id (tools target definitions)
+  const { turnId, toolCallId, workflowId: workflowDefId, input, async: isAsync, rawContent, retry } = decision;
 
   // Record move for this tool call
   ctx.moves.record({
     turnId,
     toolCall: {
       id: toolCallId,
-      toolId: workflowId,
+      toolId: workflowDefId,
       input: input as Record<string, unknown>,
     },
     rawContent,
@@ -285,7 +289,7 @@ async function dispatchWorkflow(
   // Emit dispatch event first (we're dispatching work)
   ctx.emitter.emitTrace({
     type: 'dispatch.workflow.queued',
-    payload: { turnId, toolCallId, workflowId, async: isAsync },
+    payload: { turnId, toolCallId, workflowDefId, async: isAsync },
   });
 
   // Then track the async operation (we're recording that we dispatched it)
@@ -294,7 +298,7 @@ async function dispatchWorkflow(
     opId: toolCallId,
     turnId,
     targetType: 'workflow',
-    targetId: workflowId,
+    targetId: workflowDefId,
     timeoutAt,
     retry,
   });
@@ -302,18 +306,22 @@ async function dispatchWorkflow(
   // Schedule alarm for timeout
   ctx.waitUntil(ctx.scheduleAlarm(timeoutAt));
 
-  // Create workflow run in D1
+  // Create workflow run in D1 from workflow def
   const workflowRunsResource = ctx.resources.workflowRuns();
-  const { workflowRunId } = await workflowRunsResource.create(workflowId, {
-    ...(input as Record<string, unknown>),
-    // Include callback routing info
-    _callback: {
-      conversationId: ctx.conversationId,
-      turnId,
-      toolCallId,
-      type: 'workflow',
+  const { workflowRunId } = await workflowRunsResource.createFromWorkflowDef(
+    workflowDefId,
+    {
+      ...(input as Record<string, unknown>),
+      // Include callback routing info
+      _callback: {
+        conversationId: ctx.conversationId,
+        turnId,
+        toolCallId,
+        type: 'workflow',
+      },
     },
-  });
+    { projectId: ctx.projectId },
+  );
 
   // Start coordinator DO
   const coordinatorId = ctx.coordinator.idFromName(workflowRunId);
@@ -323,7 +331,7 @@ async function dispatchWorkflow(
     coordinator.start(workflowRunId).catch((error: Error) => {
       ctx.emitter.emitTrace({
         type: 'dispatch.workflow.error',
-        payload: { turnId, toolCallId, workflowId, workflowRunId, error: error.message },
+        payload: { turnId, toolCallId, workflowDefId, workflowRunId, error: error.message },
       });
     }),
   );

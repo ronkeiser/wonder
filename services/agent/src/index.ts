@@ -99,6 +99,11 @@ export class Conversation extends DurableObject {
    */
   private getDispatchContext(): DispatchContext {
     const conversation = this.defs.getConversation();
+    const agent = this.defs.getAgent();
+    const projectId = agent.projectIds[0];
+    if (!projectId) {
+      throw new Error('Agent has no projectIds configured');
+    }
     return {
       turns: this.turns,
       messages: this.messages,
@@ -107,6 +112,7 @@ export class Conversation extends DurableObject {
       participants: this.participants,
       emitter: this.emitter,
       conversationId: conversation.id,
+      projectId,
       coordinator: this.env.COORDINATOR,
       executor: this.env.EXECUTOR,
       agent: this.env.AGENT,
