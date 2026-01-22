@@ -26,6 +26,29 @@ input_schema:
       type: array
       items:
         type: object
+        properties:
+          id:
+            type: string
+          input:
+            type: object
+          messages:
+            type: array
+            items:
+              type: object
+              properties:
+                role:
+                  type: string
+                content:
+                  type: string
+                createdAt:
+                  type: string
+              required: [role, content, createdAt]
+          moves:
+            type: array
+            items:
+              type: object
+          completedAt:
+            type: string
     modelProfileId:
       type: string
     toolIds:
@@ -72,6 +95,7 @@ nodes:
     input_mapping:
       userMessage: "input.userMessage"
       systemPrompt: "input.systemPrompt"
+      recentTurns: "input.recentTurns"
     output_mapping:
       "output.llmRequest": "result.llmRequest"
 

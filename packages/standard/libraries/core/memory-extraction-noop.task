@@ -4,7 +4,7 @@ task: memory-extraction-noop
 description: Does nothing (noop for memory extraction)
 
 imports:
-  noop_action: "./noop.action"
+  noop: "./noop.action"
 
 input_schema:
   type: object
@@ -16,6 +16,6 @@ output_schema:
 
 steps:
   - ref: noop
-    action_id: noop_action
+    action_id: noop
     input_mapping: {}
     output_mapping: {}

@@ -24,6 +24,7 @@ import type {
   ActiveTurnInfo,
   ContextAssemblyInput,
   LLMRequest,
+  MessageSnapshot,
   MoveSnapshot,
   PendingOperationInfo,
   ToolDefinition,
@@ -319,11 +320,24 @@ function toTurnSnapshot(
   ctx: DispatchContext,
 ): TurnSnapshot {
   const moves = ctx.moves.getForTurn(turn.id);
+  const messages = ctx.messages.getForTurn(turn.id);
   return {
     id: turn.id,
     input: turn.input,
+    messages: messages.map(toMessageSnapshot),
     moves: moves.map(toMoveSnapshot),
     completedAt: turn.completedAt?.toISOString() ?? null,
+  };
+}
+
+/**
+ * Convert message row to snapshot for context assembly.
+ */
+function toMessageSnapshot(message: { role: 'user' | 'agent'; content: string; createdAt: Date }): MessageSnapshot {
+  return {
+    role: message.role,
+    content: message.content,
+    createdAt: message.createdAt.toISOString(),
   };
 }
 

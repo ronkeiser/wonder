@@ -23,7 +23,7 @@
   <title>Conversations</title>
 </svelte:head>
 
-<div class="p-6">
+<div class="p-6 h-full overflow-y-auto">
   <h1 class="text-xl font-semibold mb-6">Conversations</h1>
 
   {#if data.conversations.length === 0}

@@ -123,50 +123,45 @@ function resolveToReference(
   imports: Record<string, string> | undefined,
   filePath: string,
 ): Reference | null {
-  // First, try to parse as a direct reference (e.g., "core/my-task")
-  const directRef = tryParseReference(value);
-  if (directRef) return directRef;
-
-  // If not a direct reference, try to resolve as an import alias
-  if (!imports) return null;
-
+  // First, try to resolve as an import alias (import takes precedence over direct reference)
   // Try both the original alias and camelCase version (since parser converts snake_case to camelCase)
   const camelAlias = value.replace(/_([a-z0-9])/gi, (_, char) => char.toUpperCase());
-  const relativePath = imports[value] ?? imports[camelAlias];
+  const relativePath = imports?.[value] ?? imports?.[camelAlias];
 
-  if (!relativePath) return null;
+  if (relativePath) {
+    // Resolve the relative import path to an absolute path
+    const fileDir = path.dirname(filePath);
+    const importedFilePath = path.resolve(fileDir, relativePath);
 
-  // Resolve the relative import path to an absolute path
-  const fileDir = path.dirname(filePath);
-  const importedFilePath = path.resolve(fileDir, relativePath);
+    // Derive reference from the imported file path
+    // Path like: .../libraries/core/context-assembly-passthrough.task
+    // Reference: core/context-assembly-passthrough (standardLibrary scope)
+    const pathParts = importedFilePath.split(path.sep);
+    const librariesIndex = pathParts.indexOf('libraries');
+    const projectsIndex = pathParts.indexOf('projects');
 
-  // Derive reference from the imported file path
-  // Path like: .../libraries/core/context-assembly-passthrough.task
-  // Reference: core/context-assembly-passthrough (standardLibrary scope)
-  const pathParts = importedFilePath.split(path.sep);
-  const librariesIndex = pathParts.indexOf('libraries');
-  const projectsIndex = pathParts.indexOf('projects');
+    if (librariesIndex !== -1 && librariesIndex < pathParts.length - 2) {
+      const libraryName = pathParts[librariesIndex + 1];
+      const fileName = pathParts[pathParts.length - 1];
+      const baseName = fileName.replace(/\.[^.]+$/, ''); // Remove extension
 
-  if (librariesIndex !== -1 && librariesIndex < pathParts.length - 2) {
-    const libraryName = pathParts[librariesIndex + 1];
-    const fileName = pathParts[pathParts.length - 1];
-    const baseName = fileName.replace(/\.[^.]+$/, ''); // Remove extension
+      // Determine if this is standard library or workspace library
+      // For now, assume standardLibrary (most common case for imports)
+      // The validator will catch mismatches
+      return { scope: 'standardLibrary', library: libraryName, name: baseName };
+    }
 
-    // Determine if this is standard library or workspace library
-    // For now, assume standardLibrary (most common case for imports)
-    // The validator will catch mismatches
-    return { scope: 'standardLibrary', library: libraryName, name: baseName };
+    if (projectsIndex !== -1 && projectsIndex < pathParts.length - 2) {
+      const projectName = pathParts[projectsIndex + 1];
+      const fileName = pathParts[pathParts.length - 1];
+      const baseName = fileName.replace(/\.[^.]+$/, '');
+
+      return { scope: 'project', project: projectName, name: baseName };
+    }
   }
 
-  if (projectsIndex !== -1 && projectsIndex < pathParts.length - 2) {
-    const projectName = pathParts[projectsIndex + 1];
-    const fileName = pathParts[pathParts.length - 1];
-    const baseName = fileName.replace(/\.[^.]+$/, '');
-
-    return { scope: 'project', project: projectName, name: baseName };
-  }
-
-  return null;
+  // Fall back to direct reference (e.g., "core/my-task")
+  return tryParseReference(value);
 }
 
 /**

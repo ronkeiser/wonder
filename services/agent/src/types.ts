@@ -145,9 +145,16 @@ export type ContextAssemblyInput = {
   activeTurns?: ActiveTurnInfo[];
 };
 
+export type MessageSnapshot = {
+  role: MessageRole;
+  content: string;
+  createdAt: string;
+};
+
 export type TurnSnapshot = {
   id: string;
   input: unknown;
+  messages: MessageSnapshot[];
   moves: MoveSnapshot[];
   completedAt: string | null;
 };
