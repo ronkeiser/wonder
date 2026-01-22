@@ -84,29 +84,12 @@ The standard library is minimal — 9 files in `libraries/core/`:
 
 ### Phase A: Validate Wflow
 
-Ensure the CLI and core packages work end-to-end:
-
-1. Run `wflow check` on standard library — verify it passes
-2. Test `wflow deploy` with standard library
-3. Verify reference resolution works across all scopes
-4. Add tests for edge cases in parser and validator
-5. Document any bugs or missing features found
+The wflow CLI should parse, validate, and deploy definitions as documented. The standard library in `packages/standard` serves as the test case — it contains real definitions that need to work end-to-end.
 
 ### Phase B: Agent Onboarding
 
-Create documentation that teaches agents how to use wflow:
-
-1. Update `docs/architecture/wflow-libraries.md` — done
-2. Create this status document — done
-3. Update `.claude/commands/wflow.md` with reading list
-4. Test the onboarding flow with a fresh agent session
+Create an onboarding process that brings agents to the point where they understand Wonder's execution model and can author wflow definitions. The key concepts: workflows orchestrate (graphs, parallelism, durable state), tasks execute reliably (linear sequences, atomic retries), personas are stateless templates, agents are stateful instances that accumulate memory.
 
 ### Phase C: Experiment with Agent Workflows
 
-Iterate on context assembly and memory extraction:
-
-1. Define what good context assembly looks like
-2. Implement a real memory extraction workflow
-3. Add tools to the standard library
-4. Measure impact on agent performance
-5. Document findings and iterate
+Context assembly determines what an agent sees when it starts reasoning. Memory extraction determines what an agent remembers across conversations. The current implementations are minimal placeholders. This phase is about exploring what actually helps agents perform better.
