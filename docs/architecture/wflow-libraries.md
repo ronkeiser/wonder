@@ -2,7 +2,7 @@
 
 ## Overview
 
-Wonder definitions (workflows, tasks, actions, personas, agents) are authored as local files and deployed to the platform via CLI. The `wflow deploy` command syncs local definitions to D1 through the SDK.
+Wonder definitions (workflows, tasks, actions, personas, agents, tools, models) are authored as local YAML files and deployed to the platform via CLI. The `wflow deploy` command syncs local definitions to D1 through the SDK.
 
 ## Directory Structure
 
@@ -12,37 +12,82 @@ Convention-based structure with the workspace root as the organizing principle:
 workspace/
 ├── wflow.config.yaml        # optional root config for overrides
 ├── personas/
-│   └── code_assistant.persona
+│   └── assistant.persona
 ├── agents/
-│   └── reviewer.agent
+│   └── code-reviewer.agent
 ├── libraries/
-│   ├── core/
-│   │   ├── write_file.task
-│   │   ├── react_reasoning.wflow
-│   │   └── llm_call.action
-│   └── experimental/
-│       └── new_thing.task
+│   └── core/
+│       ├── write-file.task
+│       ├── react-reasoning.wflow
+│       ├── llm-call.action
+│       ├── shell-exec.tool
+│       └── claude-sonnet.model
 └── projects/
     ├── backend-rewrite/
-    │   └── deploy_feature.wflow
+    │   └── deploy-feature.wflow
     └── ml-platform/
-        └── train_model.wflow
+        └── train-model.wflow
 ```
 
 Directory names encode identity:
-- `libraries/{name}/` — library name
-- `projects/{name}/` — project name
-- `personas/` and `agents/` — workspace-scoped
+- `personas/` — workspace-scoped persona definitions (flat, no subdirectories)
+- `agents/` — workspace-scoped agent definitions (flat, no subdirectories)
+- `libraries/{name}/` — named library (flat, no nested subdirectories within a library)
+- `projects/{name}/` — named project
 
-## File Types and Deploy Targets
+## File Types
 
-| File Extension | Deploy Target | Scope |
-|----------------|---------------|-------|
-| `.wflow` | Library (reusable) or Project (bound with triggers) | Depends on location |
-| `.task` | Library | Library |
-| `.action` | Library | Library |
-| `.persona` | Library | Workspace |
-| `.agent` | Workspace | Workspace (can access multiple projects) |
+| Extension | Description | Location |
+|-----------|-------------|----------|
+| `.wflow` | Workflow graph (nodes + transitions) | `libraries/` or `projects/` |
+| `.task` | Linear step sequence | `libraries/` |
+| `.action` | Atomic operation (llm, mcp, http, shell, context, etc.) | `libraries/` |
+| `.tool` | Tool wrapper for agent use | `libraries/` |
+| `.model` | Model profile (provider, parameters, pricing) | `libraries/` |
+| `.persona` | Agent template (system prompt, tools, workflows) — stateless | `personas/` |
+| `.agent` | Agent instance (persona + project bindings) — accumulates memory | `agents/` |
+| `.test` | Test suite with mocks and assertions | anywhere |
+
+## YAML Conventions
+
+All wflow files use snake_case for field names:
+
+```yaml
+# Example persona file
+name: assistant
+description: General-purpose assistant
+system_prompt: |
+  You are a helpful assistant.
+model_profile_id: core/claude-sonnet
+context_assembly_workflow_def_id: core/context-assembly-passthrough
+memory_extraction_workflow_def_id: core/memory-extraction-noop
+tool_ids: []
+recent_turns_limit: 10
+```
+
+The parser converts snake_case to camelCase for TypeScript consumption.
+
+## Reference Syntax
+
+Definitions reference other definitions using explicit scope prefixes:
+
+| Syntax | Scope | Example |
+|--------|-------|---------|
+| `library/name` | Standard library (global, provided by Wonder) | `core/context-assembly-passthrough` |
+| `$library/name` | Workspace library (user-defined) | `$my-lib/custom-task` |
+| `@project/name` | Project scope | `@backend-rewrite/deploy-feature` |
+| `name` | Workspace scope (personas, agents) | `assistant` |
+
+**Standard Library**: The standard library is a global scope available to all workspaces. It provides common tools, tasks, and workflows (like context assembly and memory extraction) that workspaces can reference without defining themselves.
+
+Example references in a persona:
+```yaml
+model_profile_id: core/claude-sonnet              # standard library
+context_assembly_workflow_def_id: core/context-assembly-passthrough
+tool_ids:
+  - core/shell-exec                               # standard library
+  - $my-lib/custom-tool                           # workspace library
+```
 
 ## Deploy Flow
 
@@ -60,30 +105,32 @@ The CLI:
 1. Walks the directory tree from the specified path
 2. Infers deploy target from directory structure
 3. Parses and validates each file
-4. Sends definitions to the API via SDK
+4. Resolves references and computes dependency order
+5. Sends definitions to the API in topological order
 
 ## Identity and Versioning
 
-**Identity**: Each definition has a ULID (primary key). The composite key `(library or project, name)` is used for lookup, derived from directory structure and filename.
+**Identity**: Each definition has a ULID (primary key). The composite key `(scope, name)` is used for lookup, derived from directory structure and filename.
 
-- `libraries/core/write_file.task` → library `core`, name `write_file`
-- `projects/backend-rewrite/deploy_feature.wflow` → project `backend-rewrite`, name `deploy_feature`
+- `libraries/core/write-file.task` → library `core`, name `write-file`
+- `projects/backend-rewrite/deploy-feature.wflow` → project `backend-rewrite`, name `deploy-feature`
+- `personas/assistant.persona` → workspace scope, name `assistant`
 
 **Versioning**: Hash-based auto-versioning on the server. Each version is immutable.
 
 1. CLI sends definition with name (derived from filename)
 2. Server computes content hash
-3. Server looks up existing definition by `(target, name)`, gets its ULID
+3. Server looks up existing definition by `(scope, name)`, gets its ULID
 4. If no match → create definition with new ULID, version 1
-5. If match and hash differs → create new version (new ULID) under same definition
+5. If match and hash differs → create new version under same definition
 6. If match and hash identical → no-op (idempotent)
 
-Definitions do not embed version numbers. The server manages version history. Once a version is created, its content cannot be modified (immutability enforced by resources service).
+Definitions do not embed version numbers. The server manages version history.
 
 ## Name Uniqueness
 
 Names must be unique within their scope:
-- Task/action/workflow names unique within a library
+- Task/action/workflow/tool/model names unique within a library
 - Workflow names unique within a project
 - Persona names unique within workspace
 - Agent names unique within workspace
@@ -93,20 +140,25 @@ Different libraries can have definitions with the same name — the library is p
 ## Scope Hierarchy
 
 ```
+Standard Library (global, provided by Wonder)
+└── core/ (workflows, tasks, actions, tools, models)
+
 Workspace
-├── Personas (workspace-scoped, reusable definitions)
-├── Agents (workspace-scoped, can access multiple projects)
-├── Libraries (contain reusable workflows, tasks, actions)
-│   └── Definitions referenced by (library, name, version)
-└── Projects (contain bound workflows with triggers)
-    └── Workflows reference library definitions
+├── Personas (workspace-scoped)
+├── Agents (workspace-scoped, reference personas)
+├── Libraries (workspace-scoped, user-defined)
+│   └── Definitions referenced by $library/name
+└── Projects
+    └── Workflows referenced by @project/name
 ```
 
-**Library definitions**: Reusable building blocks. Workflows, tasks, actions, personas live here. Referenced by ID, optionally pinned to version.
+**Standard library**: Global scope available to all workspaces. Contains common building blocks.
 
-**Project workflows**: Library workflows bound to a project with triggers (webhook, schedule, event). Execute within project context with access to project resources.
+**Workspace libraries**: User-defined reusable definitions. Referenced with `$library/name`.
 
-**Agents**: Workspace-scoped. Reference a persona (from library) and specify which projects they can access. Not bound to a single project.
+**Project workflows**: Workflows bound to a project with triggers (webhook, schedule, event). Execute within project context.
+
+**Agents**: Reference a persona and specify which projects they can access. Not bound to a single project. Unlike personas, agents are stateful — they accumulate memory across conversations via the memory extraction workflow. Different agents from the same persona build up different memories.
 
 ## Configuration
 
@@ -128,6 +180,24 @@ Default behavior requires no configuration — directory structure encodes every
 
 ## CLI Commands
 
+### wflow check
+
+Validate files locally without deploying.
+
+```bash
+# Check all files in current directory
+wflow check
+
+# Check with cross-file reference validation
+wflow check --workspace
+
+# Treat warnings as errors
+wflow check --strict
+
+# Output as JSON
+wflow check --format=json
+```
+
 ### wflow deploy
 
 Push local definitions to the server.
@@ -140,19 +210,19 @@ wflow deploy
 wflow deploy ./libraries/core
 
 # Deploy single file
-wflow deploy ./libraries/core/write_file.task
+wflow deploy ./libraries/core/write-file.task
 
 # Dry run — show what would be deployed
 wflow deploy --dry-run
 
 # Deploy to specific workspace (overrides config)
-wflow deploy --workspace=my-workspace-id
+wflow deploy --workspace-id=my-workspace-id
 
 # Force deploy even if server has newer version
 wflow deploy --force
 ```
 
-**Conflict detection**: On deploy, the CLI queries the server to compare the local file's content hash against the current version. If the server has a newer version (someone edited via dashboard or SDK), deploy fails unless `--force` is specified. This prevents accidentally overwriting changes made through other interfaces.
+**Conflict detection**: On deploy, the CLI compares content hashes. If the server has a newer version, deploy fails unless `--force` is specified.
 
 ### wflow pull
 
@@ -164,12 +234,9 @@ wflow pull
 
 # Pull specific library
 wflow pull ./libraries/core
-
-# Pull and overwrite local files (default behavior)
-wflow pull --force
 ```
 
-Writes server state to local files following directory conventions. Useful when definitions were edited via dashboard or SDK and you want local files to reflect current state.
+Writes server state to local files following directory conventions.
 
 ### wflow diff
 
@@ -186,30 +253,40 @@ wflow diff ./libraries/core
 wflow diff --format=json
 ```
 
-Compares local files against current server state. Shows:
-- Local changes not yet deployed
-- Server changes not yet pulled
-- Definitions that exist only locally or only on server
+### wflow test
+
+Run test files against the API.
+
+```bash
+# Run all tests
+wflow test
+
+# Run specific test file
+wflow test ./tests/my-workflow.test
+
+# Filter by pattern
+wflow test --filter "context-assembly"
+
+# Run in parallel
+wflow test --parallel --max-concurrent=4
+```
 
 ## CLI Architecture
-
-The `wflow check` and `wflow deploy` commands share a common foundation for workspace loading and validation.
-
-### Shared Infrastructure
 
 ```
 ┌─────────────────────────────────────────────────────────────┐
 │  WorkspaceLoader                                            │
 │  1. Discover files from directory structure                 │
 │  2. Parse each file → AST document                          │
-│  3. Infer (target, name) from path                          │
-│  4. Build reference map: (target, name) → document          │
+│  3. Infer (scope, name) from path                           │
+│  4. Compute content hash for each definition                │
+│  5. Build reference map: (scope, name) → document           │
 └─────────────────────────────────────────────────────────────┘
                               │
                               ▼
 ┌─────────────────────────────────────────────────────────────┐
 │  WorkspaceValidator                                         │
-│  1. For each document, resolve references against the map   │
+│  1. Resolve references against workspace + standard library │
 │  2. Report unresolved references as diagnostics             │
 │  3. Detect cycles in dependency graph                       │
 └─────────────────────────────────────────────────────────────┘
@@ -221,53 +298,26 @@ The `wflow check` and `wflow deploy` commands share a common foundation for work
 │  Report diagnostics     │     │  1. Topological sort        │
 │  Exit with status code  │     │  2. Create via API in order │
 └─────────────────────────┘     │  3. Capture ULIDs           │
-                                │  4. Use ULIDs for parents   │
+                                │  4. Use ULIDs for dependents│
                                 └─────────────────────────────┘
 ```
 
-### Reference Resolution
+## Tooling
 
-Files reference other definitions by name. During validation, these references are resolved against the workspace's reference map.
-
-Example `.persona` file:
-```yaml
-persona: code-assistant
-toolIds:
-  - shell-exec      # resolved to libraries/core/shell-exec.tool
-  - file-read       # resolved to libraries/core/file-read.tool
-contextAssemblyWorkflowId: context-assembly  # resolved to libraries/core/context-assembly.wflow
-```
-
-The loader builds the reference map from directory structure:
-- `libraries/core/shell-exec.tool` → `(library: core, name: shell-exec)`
-- `libraries/core/context-assembly.wflow` → `(library: core, name: context-assembly)`
-
-Validation verifies that `shell-exec`, `file-read`, and `context-assembly` exist in the map.
-
-### Deploy Order
-
-Deploy creates resources in dependency order. A persona that references tools and workflows requires those to be created first.
-
-1. Parse all files, build dependency graph from references
-2. Topological sort to determine creation order
-3. For each resource in order:
-   - Create via API with `autoversion: true`
-   - Capture returned ULID
-   - Use captured ULIDs when creating dependent resources
-
-This mirrors the pattern used in `packages/tests/src/kit/resources.ts` for embedded resource creation in tests.
-
-## Relationship to Existing Tooling
-
-The `@wonder/wflow` package provides:
-- **Parser**: Parses `.wflow`, `.task`, `.action`, `.test`, `.run`, `.persona`, `.tool` files
+The `@wonder/wflow` package (core) provides:
+- **Parser**: Parses all file types, handles snake_case → camelCase conversion
 - **Analyzer**: Graph analysis, data flow analysis, schema validation
-- **LSP**: IDE support with diagnostics, completions, hover, go-to-definition
+- **Workspace**: Reference resolution, dependency ordering
 
-The `@wonder/wflow-cli` provides:
-- `wflow check` — validate workspace locally (uses shared loader/validator)
+The `@wonder/wflow-cli` package provides:
+- `wflow check` — validate workspace locally
 - `wflow test` — run `.test` files against the API
-- `wflow deploy` — sync local definitions to server (uses shared loader/validator)
+- `wflow deploy` — sync local definitions to server
+- `wflow diff` — compare local vs server state
+- `wflow pull` — fetch definitions from server
+
+The `@wonder/wflow-lsp` package provides:
+- IDE support with diagnostics, completions, hover, go-to-definition
 
 ## Multi-Interface Editing
 
@@ -276,14 +326,15 @@ Definitions can be edited through multiple interfaces:
 - **Dashboard**: Visual editor in the web UI
 - **SDK**: Programmatic access via HTTP API
 
-All interfaces write to the same server state. The CLI is not the sole source of truth—it's one way to manage definitions. Use `wflow pull` to sync server changes to local files, and `wflow diff` to see divergence before deploying.
+All interfaces write to the same server state. Use `wflow pull` to sync server changes to local files, and `wflow diff` to see divergence before deploying.
 
 ## Design Principles
 
-1. **Convention over configuration**: Directory structure is the primary source of truth for local files
-2. **Files are portable**: No library/project embedded in file content
-3. **Idempotent deploys**: Same content → same result, no side effects
-4. **Server-managed versioning**: CLI declares desired state, server handles versions
-5. **Immutable versions**: Once created, a version's content cannot change
-6. **Conflict-aware**: Deploy fails if server has diverged, preventing accidental overwrites
-7. **Multi-interface**: CLI, dashboard, and SDK are equal citizens for editing definitions
+1. **Convention over configuration**: Directory structure encodes identity
+2. **Explicit scopes**: References use prefixes to indicate scope unambiguously
+3. **Snake_case in YAML**: Human-readable format, converted to camelCase for code
+4. **Idempotent deploys**: Same content → same result
+5. **Server-managed versioning**: CLI declares desired state, server handles versions
+6. **Immutable versions**: Once created, a version's content cannot change
+7. **Conflict-aware**: Deploy fails if server has diverged
+8. **Multi-interface**: CLI, dashboard, and SDK are equal citizens
