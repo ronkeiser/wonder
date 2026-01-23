@@ -525,10 +525,6 @@ async function applyOne(decision: Decision, ctx: DispatchContext): Promise<Apply
         const parentCoordinatorId = ctx.coordinator.idFromName(run.parentRunId);
         const parentCoordinator = ctx.coordinator.get(parentCoordinatorId);
 
-        ctx.waitUntil(
-          parentCoordinator.handleSubworkflowResult(run.parentTokenId, decision.output),
-        );
-
         ctx.emitter.emit({
           eventType: 'subworkflow.notifying_parent',
           message: 'Notifying parent workflow of completion',
@@ -537,6 +533,32 @@ async function applyOne(decision: Decision, ctx: DispatchContext): Promise<Apply
             parentTokenId: run.parentTokenId,
           },
         });
+
+        ctx.waitUntil(
+          parentCoordinator
+            .handleSubworkflowResult(run.parentTokenId, decision.output)
+            .then(() => {
+              ctx.emitter.emit({
+                eventType: 'subworkflow.parent_callback_success',
+                message: 'Parent callback completed successfully',
+                metadata: {
+                  parentRunId: run.parentRunId,
+                  parentTokenId: run.parentTokenId,
+                },
+              });
+            })
+            .catch((error) => {
+              ctx.emitter.emit({
+                eventType: 'subworkflow.parent_callback_error',
+                message: `Parent callback failed: ${error instanceof Error ? error.message : String(error)}`,
+                metadata: {
+                  parentRunId: run.parentRunId,
+                  parentTokenId: run.parentTokenId,
+                  error: error instanceof Error ? error.stack : String(error),
+                },
+              });
+            }),
+        );
       }
 
       // Check for agent callback metadata in workflow run input
@@ -660,8 +682,6 @@ async function applyOne(decision: Decision, ctx: DispatchContext): Promise<Apply
         const parentCoordinatorId = ctx.coordinator.idFromName(run.parentRunId);
         const parentCoordinator = ctx.coordinator.get(parentCoordinatorId);
 
-        ctx.waitUntil(parentCoordinator.handleSubworkflowError(run.parentTokenId, decision.error));
-
         ctx.emitter.emit({
           eventType: 'subworkflow.notifying_parent_failure',
           message: 'Notifying parent workflow of failure',
@@ -671,6 +691,32 @@ async function applyOne(decision: Decision, ctx: DispatchContext): Promise<Apply
             error: decision.error,
           },
         });
+
+        ctx.waitUntil(
+          parentCoordinator
+            .handleSubworkflowError(run.parentTokenId, decision.error)
+            .then(() => {
+              ctx.emitter.emit({
+                eventType: 'subworkflow.parent_error_callback_success',
+                message: 'Parent error callback completed successfully',
+                metadata: {
+                  parentRunId: run.parentRunId,
+                  parentTokenId: run.parentTokenId,
+                },
+              });
+            })
+            .catch((callbackError) => {
+              ctx.emitter.emit({
+                eventType: 'subworkflow.parent_error_callback_error',
+                message: `Parent error callback failed: ${callbackError instanceof Error ? callbackError.message : String(callbackError)}`,
+                metadata: {
+                  parentRunId: run.parentRunId,
+                  parentTokenId: run.parentTokenId,
+                  error: callbackError instanceof Error ? callbackError.stack : String(callbackError),
+                },
+              });
+            }),
+        );
       }
 
       // Check for agent callback metadata in workflow run input

@@ -133,7 +133,44 @@ export class DefinitionManager {
   private async fetchAndInsert(workflowRunId: string): Promise<void> {
     // 1. Fetch workflow run
     const workflowRunsResource = this.env.RESOURCES.workflowRuns();
-    const runResponse = await workflowRunsResource.get(workflowRunId);
+    this.logger.info({
+      eventType: 'defs.fetch_workflow_run.starting',
+      message: 'Fetching workflow run from RESOURCES',
+      traceId: workflowRunId,
+      metadata: { workflowRunId },
+    });
+
+    let runResponse;
+    try {
+      runResponse = await workflowRunsResource.get(workflowRunId);
+    } catch (error) {
+      // Log detailed error info for debugging
+      const errorInfo: Record<string, unknown> = {
+        workflowRunId,
+        error_name: error instanceof Error ? error.name : 'Unknown',
+        error_message: error instanceof Error ? error.message : String(error),
+      };
+      if (error && typeof error === 'object') {
+        const err = error as Record<string, unknown>;
+        if ('cause' in err) errorInfo.cause = String(err.cause);
+        if ('code' in err) errorInfo.code = err.code;
+      }
+      this.logger.error({
+        eventType: 'defs.fetch_workflow_run.failed',
+        message: 'Failed to fetch workflow run from RESOURCES',
+        traceId: workflowRunId,
+        metadata: errorInfo,
+      });
+      throw error;
+    }
+
+    this.logger.info({
+      eventType: 'defs.fetch_workflow_run.success',
+      message: 'Successfully fetched workflow run',
+      traceId: workflowRunId,
+      metadata: { workflowRunId, workflowDefId: runResponse.workflowRun.workflowDefId },
+    });
+
     const run = runResponse.workflowRun;
 
     // 2. Fetch workflow def with nodes and transitions

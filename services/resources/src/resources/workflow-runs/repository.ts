@@ -11,8 +11,27 @@ export async function getWorkflowRun(
   db: DrizzleD1Database,
   id: string,
 ): Promise<WorkflowRun | null> {
-  const result = await db.select().from(workflowRuns).where(eq(workflowRuns.id, id)).get();
-  return result ?? null;
+  try {
+    const result = await db.select().from(workflowRuns).where(eq(workflowRuns.id, id)).get();
+    return result ?? null;
+  } catch (error) {
+    // Log detailed error info before re-throwing
+    const errorInfo: Record<string, unknown> = {
+      workflowRunId: id,
+      error_name: error instanceof Error ? error.name : 'Unknown',
+      error_message: error instanceof Error ? error.message : String(error),
+      stack: error instanceof Error ? error.stack : undefined,
+    };
+    if (error && typeof error === 'object') {
+      const err = error as Record<string, unknown>;
+      if ('cause' in err) errorInfo.cause = String(err.cause);
+      if ('code' in err) errorInfo.code = err.code;
+      if ('errno' in err) errorInfo.errno = err.errno;
+      if ('meta' in err) errorInfo.meta = err.meta;
+    }
+    console.error('[workflow-runs.repository] getWorkflowRun failed:', JSON.stringify(errorInfo));
+    throw error;
+  }
 }
 
 export async function getWorkflowRunWithProject(

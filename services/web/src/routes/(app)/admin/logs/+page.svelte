@@ -21,7 +21,7 @@
 
   const levelColorMap: Record<string, string> = {
     fatal: 'var(--color-red)',
-    error: 'var(--color-orange)',
+    error: 'var(--color-red)',
     warn: 'var(--color-yellow)',
     info: 'var(--color-blue)',
     debug: 'var(--color-gray-lighter)',

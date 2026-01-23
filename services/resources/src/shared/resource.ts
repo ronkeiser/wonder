@@ -89,14 +89,32 @@ export abstract class Resource extends RpcTarget {
 
       return result;
     } catch (error) {
+      // Extract detailed error information for debugging D1/drizzle issues
+      const errorInfo: Record<string, unknown> = {
+        error_name: error instanceof Error ? error.name : 'Unknown',
+        error_message: error instanceof Error ? error.message : String(error),
+        stack: error instanceof Error ? error.stack : undefined,
+      };
+
+      // Check for D1-specific error properties
+      if (error && typeof error === 'object') {
+        const err = error as Record<string, unknown>;
+        if ('cause' in err) errorInfo.cause = String(err.cause);
+        if ('code' in err) errorInfo.code = err.code;
+        if ('errno' in err) errorInfo.errno = err.errno;
+        if ('meta' in err) errorInfo.meta = err.meta;
+        // Drizzle sometimes wraps errors
+        if ('query' in err) errorInfo.query = err.query;
+        if ('params' in err) errorInfo.params = err.params;
+      }
+
       this.serviceCtx.logger.error({
         eventType: `${resourceName}.${operationName}.error`,
         message: error instanceof Error ? error.message : String(error),
         ...context,
         metadata: {
           ...context.metadata,
-          error_name: error instanceof Error ? error.name : 'Unknown',
-          stack: error instanceof Error ? error.stack : undefined,
+          ...errorInfo,
         },
       });
       throw error;
