@@ -30,7 +30,7 @@ input_schema:
           id:
             type: string
           input:
-            type: object
+            type: string
           messages:
             type: array
             items:
@@ -49,6 +49,7 @@ input_schema:
               type: object
           completedAt:
             type: string
+            nullable: true
     modelProfileId:
       type: string
     toolIds:
@@ -91,7 +92,6 @@ nodes:
   build_request:
     name: Build LLM Request
     task_id: passthrough_task
-    task_version: 1
     input_mapping:
       userMessage: "input.userMessage"
       systemPrompt: "input.systemPrompt"

@@ -89,6 +89,20 @@ export async function dispatchToken(ctx: DispatchContext, tokenId: string): Prom
   // Apply input mapping to get task input (pure function from planning/completion)
   const taskInput = applyInputMapping(node.inputMapping as Record<string, string> | null, context);
 
+  ctx.logger.info({
+    eventType: 'dispatch.task.inputMapping.debug',
+    message: 'Applied input mapping for task dispatch',
+    traceId: ctx.workflowRunId,
+    metadata: {
+      tokenId: tokenId,
+      nodeId: node.id,
+      inputMapping: node.inputMapping,
+      taskInput: taskInput,
+      contextInputKeys: Object.keys(context.input),
+      contextInput: context.input,
+    },
+  });
+
   ctx.emitter.emitTrace({
     type: 'dispatch.task.inputMapping.applied',
     payload: {

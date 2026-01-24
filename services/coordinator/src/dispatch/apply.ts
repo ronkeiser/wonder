@@ -469,11 +469,40 @@ async function applyOne(decision: Decision, ctx: DispatchContext): Promise<Apply
 
     // Workflow lifecycle
     case 'INITIALIZE_WORKFLOW': {
+      ctx.logger.info({
+        eventType: 'dispatch.initialize_workflow.start',
+        message: 'Initializing workflow (status + context)',
+        traceId: ctx.workflowRunId,
+        metadata: {
+          inputKeys: Object.keys(decision.input),
+          inputPreview: decision.input,
+        },
+      });
+
       // Initialize workflow status to 'running'
       ctx.status.initialize(ctx.workflowRunId);
 
       // Initialize context tables and store input
-      ctx.context.initialize(decision.input);
+      try {
+        ctx.context.initialize(decision.input);
+      } catch (initError) {
+        ctx.logger.error({
+          eventType: 'dispatch.initialize_workflow.context_failed',
+          message: 'Failed to initialize context tables',
+          traceId: ctx.workflowRunId,
+          metadata: {
+            error: initError instanceof Error ? initError.message : String(initError),
+            stack: initError instanceof Error ? initError.stack : undefined,
+          },
+        });
+        throw initError;
+      }
+
+      ctx.logger.info({
+        eventType: 'dispatch.initialize_workflow.complete',
+        message: 'Workflow initialization complete',
+        traceId: ctx.workflowRunId,
+      });
 
       // Emit appropriate started event based on whether this is root or subworkflow
       const isSubworkflow = ctx.workflowRunId !== ctx.rootRunId;

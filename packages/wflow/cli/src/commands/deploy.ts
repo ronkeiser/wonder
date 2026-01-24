@@ -38,6 +38,8 @@ interface DeployResult {
   definition: WorkspaceDefinition;
   action: 'created' | 'updated' | 'skipped' | 'error';
   serverId?: string;
+  /** The version that was deployed or matched */
+  version?: number;
   message?: string;
   /** Version that was matched when skipping */
   matchedVersion?: number;
@@ -190,8 +192,8 @@ async function deployDefinitions(
   // Create API client
   const client = createClient(options.apiUrl, options.apiKey);
 
-  // Track server IDs for references (includes library IDs)
-  const serverIds = new Map<string, string>();
+  // Track server IDs and versions for references (includes library IDs)
+  const serverIds = new Map<string, { id: string; version: number }>();
 
   // For standard library, ensure libraries exist first
   if (isStandardLibrary) {
@@ -205,7 +207,7 @@ async function deployDefinitions(
     for (const libraryName of libraryNames) {
       try {
         const libraryId = await ensureStandardLibrary(client, libraryName, options);
-        serverIds.set(`library:${libraryName}`, libraryId);
+        serverIds.set(`library:${libraryName}`, { id: libraryId, version: 1 });
         if (!options.quiet) {
           console.log(`  ${c.green('✓')} library/${libraryName} - ensured`);
         }
@@ -225,7 +227,7 @@ async function deployDefinitions(
       results.push(result);
 
       if (result.serverId) {
-        serverIds.set(refStr, result.serverId);
+        serverIds.set(refStr, { id: result.serverId, version: result.version ?? 1 });
       }
 
       if (!options.quiet) {
@@ -289,7 +291,7 @@ async function ensureStandardLibrary(
 async function deployDefinition(
   def: WorkspaceDefinition,
   client: WonderClient,
-  serverIds: Map<string, string>,
+  serverIds: Map<string, { id: string; version: number }>,
   options: DeployOptions,
   isStandardLibrary: boolean,
 ): Promise<DeployResult> {
@@ -310,6 +312,7 @@ async function deployDefinition(
     definition: def,
     action,
     serverId: result.id,
+    version: result.version,
     matchedVersion: result.reused ? result.version : undefined,
     latestVersion: result.latestVersion,
   };
@@ -318,7 +321,7 @@ async function deployDefinition(
 async function createDefinition(
   def: WorkspaceDefinition,
   client: WonderClient,
-  serverIds: Map<string, string>,
+  serverIds: Map<string, { id: string; version: number }>,
   options: DeployOptions,
   _isStandardLibrary: boolean,
 ): Promise<{ id: string; reused: boolean; version: number; latestVersion?: number }> {
@@ -454,22 +457,22 @@ function getDisplayName(doc: Record<string, unknown>, ref: Reference): string {
   return ref.name;
 }
 
-function getLibraryId(ref: Reference, serverIds: Map<string, string>): string | null {
+function getLibraryId(ref: Reference, serverIds: Map<string, { id: string; version: number }>): string | null {
   if (ref.scope === 'standardLibrary') {
     // Standard library - look up from serverIds
-    return serverIds.get(`library:${ref.library}`) ?? null;
+    return serverIds.get(`library:${ref.library}`)?.id ?? null;
   }
   if (ref.scope === 'workspaceLibrary') {
     // Workspace library - look up from serverIds
-    return serverIds.get(`library:${ref.library}`) ?? null;
+    return serverIds.get(`library:${ref.library}`)?.id ?? null;
   }
   return null;
 }
 
-function getProjectId(ref: Reference, serverIds: Map<string, string>): string | null {
+function getProjectId(ref: Reference, serverIds: Map<string, { id: string; version: number }>): string | null {
   if (ref.scope === 'project') {
     // Look up project ID from serverIds
-    return serverIds.get(`project:${ref.project}`) ?? null;
+    return serverIds.get(`project:${ref.project}`)?.id ?? null;
   }
   return null;
 }
@@ -478,13 +481,13 @@ function getProjectId(ref: Reference, serverIds: Map<string, string>): string | 
  * Resolve a reference string (e.g., "core/claude-sonnet") to its server ID (ULID)
  * Returns the original value if it's not a valid reference or not found in serverIds
  */
-function resolveReferenceId(refString: string | undefined, serverIds: Map<string, string>): string | undefined {
+function resolveReferenceId(refString: string | undefined, serverIds: Map<string, { id: string; version: number }>): string | undefined {
   if (!refString) return undefined;
 
   try {
     const ref = parseReference(refString);
     const formatted = formatReference(ref);
-    return serverIds.get(formatted) ?? refString;
+    return serverIds.get(formatted)?.id ?? refString;
   } catch {
     // Not a valid reference format, return as-is (might be a literal ID)
     return refString;
@@ -499,7 +502,7 @@ function resolveStepReferences(
   steps: Array<Record<string, unknown>> | undefined,
   imports: Record<string, string> | undefined,
   taskFilePath: string,
-  serverIds: Map<string, string>,
+  serverIds: Map<string, { id: string; version: number }>,
 ): unknown[] | undefined {
   if (!steps) return undefined;
 
@@ -507,15 +510,16 @@ function resolveStepReferences(
   for (let i = 0; i < steps.length; i++) {
     const step = steps[i];
     const actionIdAlias = (step.action_id ?? step.actionId) as string | undefined;
-    const actionId = actionIdAlias
+    const actionVersion = (step.action_version ?? step.actionVersion) as number | undefined;
+    const resolvedAction = actionIdAlias
       ? resolveImportAlias(actionIdAlias, imports, taskFilePath, serverIds)
       : undefined;
 
     resolved.push({
       ref: step.ref,
       ordinal: i,
-      actionId,
-      actionVersion: 1,
+      actionId: resolvedAction?.id,
+      actionVersion: actionVersion ?? resolvedAction?.version,
       inputMapping: step.input_mapping ?? step.inputMapping ?? null,
       outputMapping: step.output_mapping ?? step.outputMapping ?? null,
       onFailure: step.on_failure ?? step.onFailure ?? 'abort',
@@ -538,14 +542,14 @@ function resolveStepReferences(
  * @param nodes - The nodes from the workflow document (array or object)
  * @param imports - The imports object mapping aliases to relative paths
  * @param workflowFilePath - Absolute path to the workflow file (for resolving relative imports)
- * @param serverIds - Map of reference strings to server IDs
+ * @param serverIds - Map of reference strings to server IDs and versions
  * @returns Array of nodes with resolved references (API format)
  */
 function resolveNodeReferences(
   nodes: unknown[] | Record<string, unknown> | undefined,
   imports: Record<string, string> | undefined,
   workflowFilePath: string,
-  serverIds: Map<string, string>,
+  serverIds: Map<string, { id: string; version: number }>,
 ): unknown[] | undefined {
   if (!nodes) return undefined;
 
@@ -572,19 +576,21 @@ function resolveNodeReferences(
     const outputMapping = node.output_mapping ?? node.outputMapping;
     const resourceBindings = node.resource_bindings ?? node.resourceBindings;
 
+    // Resolve references to get both ID and version
+    const resolvedTask = taskIdAlias
+      ? resolveImportAlias(taskIdAlias, imports, workflowFilePath, serverIds)
+      : undefined;
+    const resolvedSubworkflow = subworkflowIdAlias
+      ? resolveImportAlias(subworkflowIdAlias, imports, workflowFilePath, serverIds)
+      : undefined;
+
     resolved.push({
       ref: node.ref,
       name: node.name,
-      // Resolve taskId if present (import alias -> server ID)
-      taskId: taskIdAlias
-        ? resolveImportAlias(taskIdAlias, imports, workflowFilePath, serverIds)
-        : undefined,
-      taskVersion: taskVersion ?? (taskIdAlias ? 1 : undefined),
-      // Resolve subworkflowId if present
-      subworkflowId: subworkflowIdAlias
-        ? resolveImportAlias(subworkflowIdAlias, imports, workflowFilePath, serverIds)
-        : undefined,
-      subworkflowVersion: subworkflowVersion ?? (subworkflowIdAlias ? 1 : undefined),
+      taskId: resolvedTask?.id,
+      taskVersion: taskVersion ?? resolvedTask?.version,
+      subworkflowId: resolvedSubworkflow?.id,
+      subworkflowVersion: subworkflowVersion ?? resolvedSubworkflow?.version,
       inputMapping: inputMapping ?? undefined,
       outputMapping: outputMapping ?? undefined,
       resourceBindings: resourceBindings ?? undefined,
@@ -594,25 +600,32 @@ function resolveNodeReferences(
 }
 
 /**
- * Resolve an import alias to a server ID.
+ * Resolve an import alias to a server ID and version.
  *
- * Flow: import alias -> relative path -> full reference -> server ID
+ * Flow: import alias -> relative path -> full reference -> { id, version }
  *
  * @param alias - The import alias (e.g., "passthrough_task")
  * @param imports - The imports object mapping aliases to relative paths
- * @param workflowFilePath - Absolute path to the workflow file
- * @param serverIds - Map of reference strings to server IDs
+ * @param filePath - Absolute path to the file containing the import
+ * @param serverIds - Map of reference strings to server IDs and versions
+ * @returns The resolved { id, version } or undefined if not found
  */
 function resolveImportAlias(
   alias: string,
   imports: Record<string, string> | undefined,
-  workflowFilePath: string,
-  serverIds: Map<string, string>,
-): string {
+  filePath: string,
+  serverIds: Map<string, { id: string; version: number }>,
+): { id: string; version: number } | undefined {
   // First, try direct reference resolution (for explicit references like "core/task-name")
-  const directResolution = resolveReferenceId(alias, serverIds);
-  if (directResolution !== alias) {
-    return directResolution ?? alias;
+  try {
+    const ref = parseReference(alias);
+    const formatted = formatReference(ref);
+    const entry = serverIds.get(formatted);
+    if (entry) {
+      return entry;
+    }
+  } catch {
+    // Not a valid reference format, continue to import resolution
   }
 
   // If not a direct reference, try resolving via imports
@@ -622,21 +635,21 @@ function resolveImportAlias(
   const relativePath = imports?.[alias] ?? imports?.[camelAlias];
 
   if (!relativePath) {
-    return alias; // Return as-is if no import found
+    return undefined; // No import found
   }
 
   // Resolve the relative path to an absolute path, then derive the reference
-  const workflowDir = path.dirname(workflowFilePath);
-  const importedFilePath = path.resolve(workflowDir, relativePath);
+  const fileDir = path.dirname(filePath);
+  const importedFilePath = path.resolve(fileDir, relativePath);
 
-  // Find the server ID by matching against all known references
+  // Find the server entry by matching against all known references
   // The reference is derived from the file path structure
-  for (const [refString, serverId] of serverIds.entries()) {
+  for (const [refString, entry] of serverIds.entries()) {
     // Check if the file path matches this reference
     // Reference format: "library/name" -> file would be in "libraries/library/name.ext"
     const pathPattern = refString.replace('/', path.sep);
     if (importedFilePath.includes(pathPattern)) {
-      return serverId;
+      return entry;
     }
   }
 
@@ -651,13 +664,13 @@ function resolveImportAlias(
     const baseName = fileName.replace(/\.[^.]+$/, ''); // Remove extension
     const derivedRef = `${libraryName}/${baseName}`;
 
-    const serverId = serverIds.get(derivedRef);
-    if (serverId) {
-      return serverId;
+    const entry = serverIds.get(derivedRef);
+    if (entry) {
+      return entry;
     }
   }
 
-  return alias; // Return as-is if resolution fails
+  return undefined; // Resolution failed
 }
 
 async function fetchStandardLibraryManifest(

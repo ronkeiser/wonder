@@ -73,6 +73,22 @@ export class ContextManager {
   initialize(input: Record<string, unknown>): void {
     const workflowDef = this.defs.getWorkflowDef();
 
+    this.emitter.emit({
+      eventType: 'context.initialize.starting',
+      message: 'ContextManager.initialize called',
+      metadata: {
+        inputKeys: Object.keys(input),
+        workflowDefId: workflowDef.id,
+        inputSchemaType: typeof workflowDef.inputSchema,
+        inputSchemaKeys: workflowDef.inputSchema && typeof workflowDef.inputSchema === 'object'
+          ? Object.keys(workflowDef.inputSchema)
+          : [],
+        inputSchemaProperties: (workflowDef.inputSchema as { properties?: object })?.properties
+          ? Object.keys((workflowDef.inputSchema as { properties?: object }).properties!)
+          : [],
+      },
+    });
+
     const inputSchema = new Schema(workflowDef.inputSchema as JSONSchema);
     const outputSchema = new Schema(workflowDef.outputSchema as JSONSchema);
 
@@ -109,6 +125,13 @@ export class ContextManager {
         hasContextSchema: this.stateTable !== null,
         tableCount: tablesCreated.length,
         tablesCreated: tablesCreated,
+        inputSchemaType: typeof workflowDef.inputSchema,
+        inputSchemaKeys: workflowDef.inputSchema && typeof workflowDef.inputSchema === 'object'
+          ? Object.keys(workflowDef.inputSchema)
+          : [],
+        inputSchemaProperties: (workflowDef.inputSchema as { properties?: object })?.properties
+          ? Object.keys((workflowDef.inputSchema as { properties?: object }).properties!)
+          : [],
       },
     });
 
@@ -132,6 +155,15 @@ export class ContextManager {
 
     this.inputTable!.insert(input);
 
+    this.emitter.emit({
+      eventType: 'context.initialize.input_inserted',
+      message: 'Input inserted into context_input table',
+      metadata: {
+        inputTableSet: !!this.inputTable,
+        inputKeys: Object.keys(input),
+      },
+    });
+
     this.emitter.emitTrace({
       type: 'operation.context.section_replaced',
       payload: {
@@ -148,6 +180,19 @@ export class ContextManager {
   /** Read entire section from context. */
   getSection(section: string): Record<string, unknown> {
     const table = this.getTable(section);
+
+    this.emitter.emit({
+      eventType: 'context.getSection.debug',
+      message: `Reading section: ${section}`,
+      metadata: {
+        section,
+        tableExists: !!table,
+        inputTableExists: !!this.inputTable,
+        stateTableExists: !!this.stateTable,
+        outputTableExists: !!this.outputTable,
+      },
+    });
+
     const value = (table?.selectFirst() as Record<string, unknown>) ?? {};
 
     this.emitter.emitTrace({

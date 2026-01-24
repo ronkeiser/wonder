@@ -180,6 +180,21 @@ export class DefinitionManager {
     const nodesList = defResponse.nodes;
     const transitionsList = defResponse.transitions;
 
+    // Log the context before inserting
+    this.logger.info({
+      eventType: 'defs.insert_workflow_run.context',
+      message: 'Workflow run context before insert',
+      traceId: workflowRunId,
+      metadata: {
+        contextType: typeof run.context,
+        context: run.context,
+        contextKeys: run.context ? Object.keys(run.context as object) : [],
+        inputKeys: (run.context as { input?: object })?.input
+          ? Object.keys((run.context as { input: object }).input)
+          : [],
+      },
+    });
+
     // 3. Insert workflow run
     this.db.insert(workflowRuns).values(run).run();
 
@@ -312,7 +327,17 @@ export class DefinitionManager {
     if (result.length === 0) {
       throw new Error('WorkflowRun not found');
     }
-    return result[0];
+    const run = result[0];
+    this.logger.info({
+      eventType: 'defs.get_workflow_run.context',
+      message: 'Workflow run context after read',
+      metadata: {
+        contextType: typeof run.context,
+        context: run.context,
+        contextKeys: run.context ? Object.keys(run.context as object) : [],
+      },
+    });
+    return run;
   }
 
   /**

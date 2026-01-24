@@ -58,6 +58,8 @@ export async function executeUpdateContextAction(
         stepRef: context.stepRef,
         actionId: action.id,
         inputKeys: Object.keys(input),
+        inputValues: input,
+        inputType: typeof input,
       },
     });
 

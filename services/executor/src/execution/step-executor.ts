@@ -92,6 +92,9 @@ export async function executeStep(
     metadata: {
       stepRef: step.ref,
       inputKeys: Object.keys(actionInput),
+      actionInput: actionInput,
+      stepInputMapping: step.inputMapping,
+      contextInput: context.input,
     },
   });
 

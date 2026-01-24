@@ -1230,7 +1230,11 @@ export class Conversation extends DurableObject {
         eventType: 'conversation.context_assembly.completed',
         message: 'Context assembly completed',
         traceId: turn.conversationId,
-        metadata: { turnId, runId },
+        metadata: {
+          turnId,
+          runId,
+          llmRequest: JSON.stringify(context.llmRequest, null, 2),
+        },
       });
 
       // Link the workflow run to the turn (already linked in dispatchContextAssembly, but update if needed)
