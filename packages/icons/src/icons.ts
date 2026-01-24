@@ -14,6 +14,7 @@ import folderSimple from '@phosphor-icons/core/assets/regular/folder-simple.svg?
 import chatCircle from '@phosphor-icons/core/assets/regular/chat-circle.svg?raw';
 import robot from '@phosphor-icons/core/assets/regular/robot.svg?raw';
 import userCircle from '@phosphor-icons/core/assets/regular/user-circle.svg?raw';
+import buildings from '@phosphor-icons/core/assets/regular/buildings.svg?raw';
 
 export const icons = {
 	copy,
@@ -32,6 +33,7 @@ export const icons = {
 	chat: chatCircle,
 	robot,
 	user: userCircle,
+	workspaces: buildings,
 } as const;
 
 export type IconName = keyof typeof icons;

@@ -7,6 +7,7 @@
   const sidebarCollapsed = createPersisted('sidebar-collapsed', data.sidebarCollapsed);
 
   const navItems: { href: string; label: string; icon: IconName }[] = [
+    { href: '/workspaces', label: 'Workspaces', icon: 'workspaces' },
     { href: '/projects', label: 'Projects', icon: 'folder' },
     { href: '/agents', label: 'Agents', icon: 'robot' },
     { href: '/personas', label: 'Personas', icon: 'user' },

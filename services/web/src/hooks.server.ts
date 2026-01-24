@@ -18,8 +18,8 @@ export const handle: Handle = async ({ event, resolve }) => {
     // Make auth state available to all pages
     event.locals.authenticated = true;
 
-    // Check for workspace cookie (skip for /workspaces and /api/ routes)
-    const isWorkspacesRoute = event.url.pathname === '/workspaces';
+    // Check for workspace cookie (skip for /workspaces routes and /api/ routes)
+    const isWorkspacesRoute = event.url.pathname.startsWith('/workspaces');
     const isApiRoute = event.url.pathname.startsWith('/api/');
     if (!isWorkspacesRoute && !isApiRoute) {
       const workspaceCookie = event.cookies.get('workspace');

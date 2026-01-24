@@ -1,6 +1,6 @@
 /** Repository for workspace data access */
 
-import { eq } from 'drizzle-orm';
+import { desc, eq } from 'drizzle-orm';
 import type { DrizzleD1Database } from 'drizzle-orm/d1';
 import { ulid } from 'ulid';
 import { workspaceSettings, workspaces } from '~/schema';
@@ -63,7 +63,12 @@ export async function listWorkspaces(
   db: DrizzleD1Database,
   limit: number = 100,
 ): Promise<Workspace[]> {
-  const workspaceRows = await db.select().from(workspaces).limit(limit).all();
+  const workspaceRows = await db
+    .select()
+    .from(workspaces)
+    .orderBy(desc(workspaces.createdAt))
+    .limit(limit)
+    .all();
 
   // Fetch settings for all workspaces
   const workspaceIds = workspaceRows.map((w) => w.id);
