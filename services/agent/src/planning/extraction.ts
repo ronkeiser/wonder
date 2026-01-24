@@ -4,7 +4,7 @@
  * Plans the dispatch of the memory extraction workflow.
  */
 
-import type { AgentDecision, MemoryExtractionInput, MoveSnapshot, PlanningResult } from '../types';
+import type { AgentDecision, MemoryExtractionInput, Move, PlanningResult } from '../types';
 
 // ============================================================================
 // Input Types
@@ -13,7 +13,7 @@ import type { AgentDecision, MemoryExtractionInput, MoveSnapshot, PlanningResult
 export type MemoryExtractionParams = {
   turnId: string;
   agentId: string;
-  transcript: MoveSnapshot[];
+  transcript: Move[];
   memoryExtractionWorkflowDefId: string;
   projectId: string;
 };

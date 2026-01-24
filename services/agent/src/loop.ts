@@ -24,11 +24,11 @@ import type {
   ActiveTurnInfo,
   ContextAssemblyInput,
   LLMRequest,
-  MessageSnapshot,
-  MoveSnapshot,
+  Message,
+  Move,
   PendingOperationInfo,
   ToolDefinition,
-  TurnSnapshot,
+  Turn,
 } from './types';
 
 // ============================================================================
@@ -79,7 +79,7 @@ export async function dispatchContextAssembly(
 
   // Get recent turns for context
   const recentTurnRows = ctx.turns.getRecent(ctx.conversationId, persona.recentTurnsLimit);
-  const recentTurns = recentTurnRows.map((turn) => toTurnSnapshot(turn, ctx));
+  const recentTurns = recentTurnRows.map((turn) => toTurn(turn, ctx));
 
   // Get active turns with pending operations (excluding current turn)
   const activeTurnRows = ctx.turns.getActive(ctx.conversationId);
@@ -313,27 +313,27 @@ function toTool(def: ToolDefRow): Tool {
 }
 
 /**
- * Convert turn row to snapshot for context assembly.
+ * Convert turn row to Turn for context assembly.
  */
-function toTurnSnapshot(
+function toTurn(
   turn: { id: string; input: unknown; completedAt: Date | null },
   ctx: DispatchContext,
-): TurnSnapshot {
+): Turn {
   const moves = ctx.moves.getForTurn(turn.id);
   const messages = ctx.messages.getForTurn(turn.id);
   return {
     id: turn.id,
     input: turn.input,
-    messages: messages.map(toMessageSnapshot),
-    moves: moves.map(toMoveSnapshot),
+    messages: messages.map(toMessage),
+    moves: moves.map(toMove),
     completedAt: turn.completedAt?.toISOString() ?? null,
   };
 }
 
 /**
- * Convert message row to snapshot for context assembly.
+ * Convert message row to Message for context assembly.
  */
-function toMessageSnapshot(message: { role: 'user' | 'agent'; content: string; createdAt: Date }): MessageSnapshot {
+function toMessage(message: { role: 'user' | 'agent'; content: string; createdAt: Date }): Message {
   return {
     role: message.role,
     content: message.content,
@@ -342,9 +342,9 @@ function toMessageSnapshot(message: { role: 'user' | 'agent'; content: string; c
 }
 
 /**
- * Convert move row to snapshot for context assembly.
+ * Convert move row to Move for context assembly.
  */
-function toMoveSnapshot(move: MoveRow): MoveSnapshot {
+function toMove(move: MoveRow): Move {
   return {
     sequence: move.sequence,
     reasoning: move.reasoning ?? undefined,

@@ -136,7 +136,7 @@ export type ContextAssemblyInput = {
   userMessage: string;
   /** System prompt from persona */
   systemPrompt: string;
-  recentTurns: TurnSnapshot[];
+  recentTurns: Turn[];
   modelProfileId: string;
   toolIds: string[];
   /** Resolved tool definitions for the persona */
@@ -145,21 +145,21 @@ export type ContextAssemblyInput = {
   activeTurns?: ActiveTurnInfo[];
 };
 
-export type MessageSnapshot = {
+export type Message = {
   role: MessageRole;
   content: string;
   createdAt: string;
 };
 
-export type TurnSnapshot = {
+export type Turn = {
   id: string;
   input: unknown;
-  messages: MessageSnapshot[];
-  moves: MoveSnapshot[];
+  messages: Message[];
+  moves: Move[];
   completedAt: string | null;
 };
 
-export type MoveSnapshot = {
+export type Move = {
   sequence: number;
   reasoning?: string;
   toolCall?: { toolId: string; input: Record<string, unknown> };
@@ -173,7 +173,7 @@ export type MoveSnapshot = {
 export type MemoryExtractionInput = {
   agentId: string;
   turnId: string;
-  transcript: MoveSnapshot[];
+  transcript: Move[];
 };
 
 // ============================================================================

@@ -9,7 +9,7 @@ import type {
   ContextAssemblyInput,
   PlanningResult,
   ToolDefinition,
-  TurnSnapshot,
+  Turn,
 } from '../types';
 
 // ============================================================================
@@ -21,7 +21,7 @@ export type ContextAssemblyParams = {
   conversationId: string;
   userMessage: string;
   systemPrompt: string;
-  recentTurns: TurnSnapshot[];
+  recentTurns: Turn[];
   contextAssemblyWorkflowId: string;
   modelProfileId: string;
   toolIds: string[];

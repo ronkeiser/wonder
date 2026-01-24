@@ -61,14 +61,12 @@ steps:
     output_mapping:
       "output.llmRequest": |
         {
-          messages: [
-            ...(result.recentTurns || []).flatMap(turn =>
-              (turn.messages || []).map(msg => ({
-                role: msg.role === 'agent' ? 'assistant' : msg.role,
-                content: msg.content
-              }))
+          messages: concat(
+            map(
+              flatten(map(result.recentTurns || [], "item.messages || []")),
+              "{ role: item.role === 'agent' ? 'assistant' : item.role, content: item.content }"
             ),
-            { role: 'user', content: result.userMessage }
-          ],
+            [{ role: 'user', content: result.userMessage }]
+          ),
           systemPrompt: result.systemPrompt
         }
