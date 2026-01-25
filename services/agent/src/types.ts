@@ -131,11 +131,20 @@ export type ToolDefinition = {
   async: boolean;
 };
 
+/** Message with LLM-compatible role (user/assistant instead of user/agent) */
+export type LLMMessage = {
+  role: 'user' | 'assistant';
+  content: string;
+  createdAt: string;
+};
+
 export type ContextAssemblyInput = {
   conversationId: string;
   userMessage: string;
   /** System prompt from persona */
   systemPrompt: string;
+  /** Flat array of all messages from recent turns (LLM-compatible roles) */
+  messages: LLMMessage[];
   recentTurns: Turn[];
   modelProfileId: string;
   toolIds: string[];

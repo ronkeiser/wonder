@@ -48,10 +48,20 @@ export function decideContextAssembly(params: ContextAssemblyParams): PlanningRe
     toolDefinitions,
   } = params;
 
+  // Flatten messages from recent turns for simple context assembly
+  // Map 'agent' role to 'assistant' for LLM API compatibility
+  const messages = recentTurns.flatMap((turn) =>
+    turn.messages.map((msg) => ({
+      ...msg,
+      role: (msg.role === 'agent' ? 'assistant' : msg.role) as 'user' | 'assistant',
+    })),
+  );
+
   const input: ContextAssemblyInput = {
     conversationId,
     userMessage,
     systemPrompt,
+    messages,
     recentTurns,
     modelProfileId,
     toolIds,

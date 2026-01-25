@@ -109,11 +109,21 @@ export async function dispatchContextAssembly(
     async: def.async,
   }));
 
+  // Flatten messages from recent turns for simple context assembly
+  // Map 'agent' role to 'assistant' for LLM API compatibility
+  const messages = recentTurns.flatMap((turn) =>
+    turn.messages.map((msg) => ({
+      ...msg,
+      role: (msg.role === 'agent' ? 'assistant' : msg.role) as 'user' | 'assistant',
+    })),
+  );
+
   // Build context assembly input
   const input: ContextAssemblyInput = {
     conversationId: ctx.conversationId,
     userMessage,
     systemPrompt: persona.systemPrompt,
+    messages,
     recentTurns,
     modelProfileId: persona.modelProfileId,
     toolIds: persona.toolIds,
@@ -206,6 +216,7 @@ export async function runLLMLoop(params: RunLLMLoopParams): Promise<RunLLMLoopRe
       turnId,
       messageCount: llmRequest.messages.length,
       toolCount: specs.length,
+      llmRequest,
     },
   });
 

@@ -22,6 +22,19 @@ input_schema:
       type: string
     systemPrompt:
       type: string
+    messages:
+      type: array
+      description: Flat array of all messages from recent turns
+      items:
+        type: object
+        properties:
+          role:
+            type: string
+          content:
+            type: string
+          createdAt:
+            type: string
+        required: [role, content, createdAt]
     recentTurns:
       type: array
       items:
@@ -47,6 +60,11 @@ input_schema:
             type: array
             items:
               type: object
+              properties:
+                sequence:
+                  type: integer
+                reasoning:
+                  type: string
           completedAt:
             type: string
             nullable: true
@@ -60,7 +78,7 @@ input_schema:
       type: array
       items:
         type: object
-  required: [conversationId, userMessage, systemPrompt]
+  required: [conversationId, userMessage, systemPrompt, messages]
 
 output_schema:
   type: object
@@ -95,7 +113,7 @@ nodes:
     input_mapping:
       userMessage: "input.userMessage"
       systemPrompt: "input.systemPrompt"
-      recentTurns: "input.recentTurns"
+      messages: "input.messages"
     output_mapping:
       "output.llmRequest": "result.llmRequest"
 

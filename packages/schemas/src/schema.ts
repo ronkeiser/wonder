@@ -307,6 +307,9 @@ class SchemaInserter {
     if (!schema.properties) return;
 
     for (const [field, fieldSchema] of Object.entries(schema.properties)) {
+      // Skip 'id' field at root level - DDL adds it as INTEGER PRIMARY KEY AUTOINCREMENT
+      if (field === 'id' && !prefix) continue;
+
       const value = data[field];
       if (value === undefined) continue;
 

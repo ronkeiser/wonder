@@ -1,7 +1,7 @@
 # Task that builds an LLM request from conversation history
-# Extracts messages from recent turns and appends the current user message
+# Uses the flat messages array and appends the current user message
 task: context-assembly-passthrough
-description: Builds LLM request from recent turns and current user message
+description: Builds LLM request from messages and current user message
 
 imports:
   build_llm_request: "./build-llm-request.action"
@@ -13,22 +13,18 @@ input_schema:
       type: string
     systemPrompt:
       type: string
-    recentTurns:
+    messages:
       type: array
+      description: Flat array of all messages from recent turns
       items:
         type: object
         properties:
-          messages:
-            type: array
-            items:
-              type: object
-              properties:
-                role:
-                  type: string
-                content:
-                  type: string
-              required: [role, content]
-  required: [userMessage, systemPrompt]
+          role:
+            type: string
+          content:
+            type: string
+        required: [role, content]
+  required: [userMessage, systemPrompt, messages]
 
 output_schema:
   type: object
@@ -57,10 +53,10 @@ steps:
     input_mapping:
       userMessage: "input.userMessage"
       systemPrompt: "input.systemPrompt"
-      recentTurns: "input.recentTurns"
+      messages: "input.messages"
     output_mapping:
       "output.llmRequest": |
         {
-          messages: [{ role: 'user', content: result.userMessage }],
+          messages: [...result.messages, { role: 'user', content: result.userMessage }],
           systemPrompt: result.systemPrompt
         }

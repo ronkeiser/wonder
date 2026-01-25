@@ -37,7 +37,7 @@
 
 ## Development
 
-- **[cloudflare.md](cloudflare.md)** - Modern Cloudflare practices for 2025: wrangler types, Workers RPC, and correct platform usage patterns.
+- **[cloudflare.md](cloudflare.md)** - Modern Cloudflare practices for 2026: wrangler types, Workers RPC, and correct platform usage patterns.
 - **[testing.md](testing.md)** - Three-layer testing strategy using decision pattern for unit tests, SDK introspection tests, and end-to-end tests.
 
 ## User Experience

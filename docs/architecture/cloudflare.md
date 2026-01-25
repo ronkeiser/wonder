@@ -1,4 +1,4 @@
-# Cloudflare Modern Practices (2025)
+# Cloudflare Modern Practices (2026)
 
 **Critical:** This corrects outdated training data. Follow these patterns exactly.
 
@@ -140,7 +140,7 @@ const value = await stub.getValue();
 
 ## Why This Matters
 
-**These are not optional improvements—they are the correct way to build on Cloudflare Workers in 2025.**
+**These are not optional improvements—they are the correct way to build on Cloudflare Workers in 2026.**
 
 Patterns from training data (pre-2024) are fundamentally incompatible with modern Workers:
 
