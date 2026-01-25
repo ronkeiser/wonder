@@ -7,29 +7,15 @@
 
 import { CustomTypeRegistry, validateSchema, type JSONSchema } from '@wonder/schemas';
 
+import type { LLMResponse, LLMToolUse } from '../llm/types';
 import type { AgentDecision, PlanningResult, ToolResult } from '../types';
 import type { Tool } from './tools';
 
+// Re-export for consumers
+export type { LLMResponse, LLMToolUse } from '../llm/types';
+
 // Shared empty registry for basic JSON Schema validation (no custom types)
 const emptyCustomTypes = new CustomTypeRegistry();
-
-// ============================================================================
-// LLM Response Types (provider-agnostic)
-// ============================================================================
-
-export type LLMToolUse = {
-  id: string;
-  name: string;
-  input: Record<string, unknown>;
-};
-
-export type LLMResponse = {
-  text?: string;
-  toolUse?: LLMToolUse[];
-  stopReason: 'end_turn' | 'tool_use' | 'max_tokens';
-  /** Raw content blocks from LLM response (for tool continuation) */
-  rawContent?: unknown[];
-};
 
 // ============================================================================
 // Input Types

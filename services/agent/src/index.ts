@@ -25,11 +25,11 @@ import {
   ParticipantManager,
   TurnManager,
 } from './operations';
+import type { LLMRawRequest, LLMRequest } from './llm';
 import type {
   AgentCallback,
   AgentCallParams,
   Caller,
-  LLMRequest,
   ToolResult,
   TurnIssues,
   WorkflowCallback,
@@ -505,8 +505,11 @@ export class Conversation extends DurableObject {
    * Reconstructs the conversation from the moves table. The moves table
    * is the canonical source of truth—tool results should already be
    * recorded before calling this function.
+   *
+   * Returns LLMRawRequest because continuation messages are in Anthropic format
+   * (with tool_use and tool_result content blocks).
    */
-  private buildContinuationRequest(turnId: string): LLMRequest {
+  private buildContinuationRequest(turnId: string): LLMRawRequest {
     type AnthropicMessage = {
       role: 'user' | 'assistant';
       content: string | unknown[];

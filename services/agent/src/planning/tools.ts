@@ -6,6 +6,11 @@
 
 import type { TraceEventInput } from '@wonder/events';
 
+import type { LLMToolSpec } from '../llm/types';
+
+// Re-export for consumers
+export type { LLMToolSpec } from '../llm/types';
+
 // ============================================================================
 // Tool Definition (from Resources/D1)
 // ============================================================================
@@ -28,16 +33,6 @@ export type Tool = {
     backoffMs: number;
     timeoutMs: number;
   };
-};
-
-// ============================================================================
-// LLM Tool Spec (provider-agnostic)
-// ============================================================================
-
-export type LLMToolSpec = {
-  name: string;
-  description: string;
-  inputSchema: Record<string, unknown>;
 };
 
 // ============================================================================

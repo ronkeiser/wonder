@@ -131,9 +131,9 @@ export type ToolDefinition = {
   async: boolean;
 };
 
-/** Message with LLM-compatible role (user/assistant instead of user/agent) */
+/** Message for context assembly (uses our domain roles) */
 export type LLMMessage = {
-  role: 'user' | 'assistant';
+  role: 'user' | 'agent';
   content: string;
   createdAt: string;
 };
@@ -143,7 +143,7 @@ export type ContextAssemblyInput = {
   userMessage: string;
   /** System prompt from persona */
   systemPrompt: string;
-  /** Flat array of all messages from recent turns (LLM-compatible roles) */
+  /** Flat array of all messages from recent turns */
   messages: LLMMessage[];
   recentTurns: Turn[];
   modelProfileId: string;
@@ -185,23 +185,6 @@ export type MemoryExtractionInput = {
   transcript: Move[];
 };
 
-// ============================================================================
-// LLM Request (output of context assembly workflow)
-// ============================================================================
-
-/**
- * Provider-native LLM request format.
- *
- * Context assembly workflow outputs this format directly.
- * The messages array is in the provider's native format (Anthropic, OpenAI, etc.)
- */
-export type LLMRequest = {
-  messages: unknown[];
-  model?: string;
-  maxTokens?: number;
-  temperature?: number;
-  systemPrompt?: string;
-};
 
 // ============================================================================
 // Message Types

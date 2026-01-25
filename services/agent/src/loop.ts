@@ -12,18 +12,15 @@
  * 6. On all ops complete: dispatch memory extraction, complete turn
  */
 
-import { ulid } from 'ulid';
-
 import { applyDecisions } from './dispatch/apply';
 import type { DispatchContext } from './dispatch/context';
-import { callLLM, callLLMWithStreaming } from './llm';
+import { callLLM, callLLMRaw, callLLMWithStreaming, type LLMRawRequest, type LLMRequest } from './llm';
 import type { DefinitionManager, ToolDefRow } from './operations/defs';
 import type { MoveRow } from './operations/moves';
 import { interpretResponse, resolveTools, type Tool } from './planning';
 import type {
   ActiveTurnInfo,
   ContextAssemblyInput,
-  LLMRequest,
   Message,
   Move,
   PendingOperationInfo,
@@ -37,7 +34,7 @@ import type {
 
 export type RunLLMLoopParams = {
   turnId: string;
-  llmRequest: LLMRequest;
+  llmRequest: LLMRequest | LLMRawRequest;
   defs: DefinitionManager;
   ctx: DispatchContext;
 };
@@ -109,14 +106,9 @@ export async function dispatchContextAssembly(
     async: def.async,
   }));
 
-  // Flatten messages from recent turns for simple context assembly
-  // Map 'agent' role to 'assistant' for LLM API compatibility
-  const messages = recentTurns.flatMap((turn) =>
-    turn.messages.map((msg) => ({
-      ...msg,
-      role: (msg.role === 'agent' ? 'assistant' : msg.role) as 'user' | 'assistant',
-    })),
-  );
+  // Flatten messages from recent turns for context assembly
+  // Role translation (agent → assistant) happens at the provider adapter layer
+  const messages = recentTurns.flatMap((turn) => turn.messages);
 
   // Build context assembly input
   const input: ContextAssemblyInput = {
@@ -220,10 +212,24 @@ export async function runLLMLoop(params: RunLLMLoopParams): Promise<RunLLMLoopRe
     },
   });
 
-  // Call LLM (use streaming if WebSocket connected)
-  const response = ctx.streamToken
-    ? await callLLMWithStreaming(llmRequest, specs, ctx.env.ANTHROPIC_API_KEY, ctx.streamToken)
-    : await callLLM(llmRequest, specs, ctx.env.ANTHROPIC_API_KEY);
+  // Determine if this is a raw request (continuation with tool_use/tool_result blocks)
+  // Raw requests have messages with complex content (arrays) or 'assistant' role
+  const isRaw = llmRequest.messages.some((msg) => {
+    if (typeof msg !== 'object' || msg === null) return false;
+    const m = msg as { role?: string; content?: unknown };
+    return m.role === 'assistant' || Array.isArray(m.content);
+  });
+
+  // Call LLM (use streaming if WebSocket connected, use raw variant for continuation)
+  let response;
+  if (isRaw) {
+    // Raw request - messages are already in Anthropic format
+    response = await callLLMRaw(llmRequest as LLMRawRequest, specs, ctx.env.ANTHROPIC_API_KEY);
+  } else if (ctx.streamToken) {
+    response = await callLLMWithStreaming(llmRequest as LLMRequest, specs, ctx.env.ANTHROPIC_API_KEY, ctx.streamToken);
+  } else {
+    response = await callLLM(llmRequest as LLMRequest, specs, ctx.env.ANTHROPIC_API_KEY);
+  }
 
   ctx.emitter.emitTrace({
     type: 'loop.llm.response',
