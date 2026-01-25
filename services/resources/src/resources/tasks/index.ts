@@ -10,7 +10,7 @@ import {
   getLatestDefinition,
   listDefinitions,
   type Definition,
-} from '~/shared/definitions-repository';
+} from '~/shared/definitions';
 import type { TaskContent } from '~/shared/content-schemas';
 import type { Step, Task, TaskInput } from './types';
 

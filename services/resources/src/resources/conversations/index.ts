@@ -6,7 +6,7 @@ import {
   getDefinition,
   getDefinitionByVersion,
   getLatestDefinition,
-} from '~/shared/definitions-repository';
+} from '~/shared/definitions';
 import { NotFoundError } from '~/shared/errors';
 import { Resource } from '~/shared/resource';
 import * as agentRepo from '../agents/repository';

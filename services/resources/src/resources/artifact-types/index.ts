@@ -8,7 +8,7 @@ import {
   getDefinition,
   listDefinitions,
   type Definition,
-} from '~/shared/definitions-repository';
+} from '~/shared/definitions';
 import type { ArtifactTypeContent } from '~/shared/content-schemas';
 import type { ArtifactType, ArtifactTypeInput } from './types';
 

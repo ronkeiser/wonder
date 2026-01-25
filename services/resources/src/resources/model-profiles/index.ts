@@ -9,7 +9,7 @@ import {
   getLatestDefinition,
   listDefinitions,
   type Definition,
-} from '~/shared/definitions-repository';
+} from '~/shared/definitions';
 import type { ModelProfileContent } from '~/shared/content-schemas';
 import type { ModelProfile, ModelProfileInput, ModelProvider } from './types';
 

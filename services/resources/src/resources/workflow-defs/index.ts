@@ -9,7 +9,7 @@ import {
   getLatestDefinition,
   listDefinitions,
   type Definition,
-} from '~/shared/definitions-repository';
+} from '~/shared/definitions';
 import type { WorkflowDefContent } from '~/shared/content-schemas';
 import * as repo from './repository';
 import { transformWorkflowDef } from './transformer';

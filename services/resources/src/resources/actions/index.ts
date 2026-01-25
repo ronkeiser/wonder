@@ -8,7 +8,7 @@ import {
   getDefinition,
   listDefinitions,
   type Definition,
-} from '~/shared/definitions-repository';
+} from '~/shared/definitions';
 import type { ActionContent, ActionKind as ContentActionKind } from '~/shared/content-schemas';
 import type { Action, ActionInput, ActionKind } from './types';
 

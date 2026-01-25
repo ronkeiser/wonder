@@ -6,7 +6,7 @@ import { ulid } from 'ulid';
 import { NotFoundError } from '~/shared/errors';
 import * as schema from '~/schema';
 import { Resource } from '~/shared/resource';
-import { getDefinition } from '~/shared/definitions-repository';
+import { getDefinition } from '~/shared/definitions';
 import type { WorkflowDefContent } from '~/shared/content-schemas';
 import * as workflowRepo from '../workflows/repository';
 import * as repo from './repository';

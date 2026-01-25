@@ -8,7 +8,7 @@ import {
   getDefinition,
   listDefinitions,
   type Definition,
-} from '~/shared/definitions-repository';
+} from '~/shared/definitions';
 import type { PromptSpecContent } from '~/shared/content-schemas';
 import type { PromptSpec, PromptSpecInput } from './types';
 
