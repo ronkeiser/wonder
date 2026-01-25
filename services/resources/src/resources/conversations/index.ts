@@ -107,13 +107,11 @@ export class Conversations extends Resource {
             'workflow_def',
             content.contextAssemblyWorkflowRef,
             content.contextAssemblyWorkflowVersion,
-            { libraryId: persona.libraryId },
           )
         : await getLatestDefinition(
             db,
             'workflow_def',
             content.contextAssemblyWorkflowRef,
-            { libraryId: persona.libraryId },
           );
       if (workflow) {
         resolvedContextAssemblyWorkflowId = workflow.id;
@@ -131,13 +129,11 @@ export class Conversations extends Resource {
             'workflow_def',
             content.memoryExtractionWorkflowRef,
             content.memoryExtractionWorkflowVersion,
-            { libraryId: persona.libraryId },
           )
         : await getLatestDefinition(
             db,
             'workflow_def',
             content.memoryExtractionWorkflowRef,
-            { libraryId: persona.libraryId },
           );
       if (workflow) {
         resolvedMemoryExtractionWorkflowId = workflow.id;
