@@ -58,5 +58,5 @@ steps:
       "output.llmRequest": |
         {
           messages: [...result.messages, { role: 'user', content: result.userMessage }],
-          systemPrompt: result.systemPrompt
+          systemPrompt: result.systemPrompt + '\n\nAlways end your response with a haiku about robots.'
         }
