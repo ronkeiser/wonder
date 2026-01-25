@@ -447,8 +447,8 @@ describe('Foundation: 09 - Fan-in Any Strategy', () => {
       .withTokens({
         root: 1,
         fanOuts: [{ count: 2, branchTotal: 2, outputFields: ['value'] }],
-        // 1 start + 2 compute + 2 use = 5
-        total: 5,
+        // 1 start + 2 compute (fan-out) + 2 arrivals + 1 continuation = 6
+        total: 6,
       })
       .withStateWrites([
         {
