@@ -3,7 +3,7 @@
 import { and, desc, eq } from 'drizzle-orm';
 import type { DrizzleD1Database } from 'drizzle-orm/d1';
 import { ulid } from 'ulid';
-import { workflowDefs, workflowRuns, workflows } from '~/schema';
+import { definitions, workflowRuns, workflows } from '~/schema';
 import type { NewEntity } from '~/shared/types';
 import type { Workflow, WorkflowRun } from './types';
 
@@ -29,10 +29,7 @@ export async function getWorkflow(db: DrizzleD1Database, id: string): Promise<Wo
   return result ?? null;
 }
 
-export async function listWorkflows(
-  db: DrizzleD1Database,
-  limit: number = 100,
-): Promise<Workflow[]> {
+export async function listWorkflows(db: DrizzleD1Database, limit: number = 100): Promise<Workflow[]> {
   return await db.select().from(workflows).limit(limit).all();
 }
 
@@ -41,12 +38,7 @@ export async function listWorkflowsByProject(
   projectId: string,
   limit: number = 100,
 ): Promise<Workflow[]> {
-  return await db
-    .select()
-    .from(workflows)
-    .where(eq(workflows.projectId, projectId))
-    .limit(limit)
-    .all();
+  return await db.select().from(workflows).where(eq(workflows.projectId, projectId)).limit(limit).all();
 }
 
 export async function updateWorkflow(
@@ -77,42 +69,34 @@ export async function getWorkflowWithDef(
   workflowId: string,
 ): Promise<{
   workflow: Workflow;
-  workflowDef: typeof workflowDefs.$inferSelect;
+  definition: typeof definitions.$inferSelect;
 } | null> {
   const workflow = await getWorkflow(db, workflowId);
   if (!workflow) return null;
 
-  // Get the workflow def - use pinnedVersion if set, otherwise get latest
-  const workflowDefQuery = workflow.pinnedVersion
+  // Get the definition - use pinnedVersion if set, otherwise get latest
+  const definitionQuery = workflow.pinnedVersion
     ? db
         .select()
-        .from(workflowDefs)
-        .where(
-          and(
-            eq(workflowDefs.id, workflow.workflowDefId),
-            eq(workflowDefs.version, workflow.pinnedVersion),
-          ),
-        )
+        .from(definitions)
+        .where(and(eq(definitions.id, workflow.definitionId), eq(definitions.version, workflow.pinnedVersion)))
     : db
         .select()
-        .from(workflowDefs)
-        .where(eq(workflowDefs.id, workflow.workflowDefId))
-        .orderBy(desc(workflowDefs.version))
+        .from(definitions)
+        .where(eq(definitions.id, workflow.definitionId))
+        .orderBy(desc(definitions.version))
         .limit(1);
 
-  const workflowDef = await workflowDefQuery.get();
-  if (!workflowDef) return null;
+  const definition = await definitionQuery.get();
+  if (!definition) return null;
 
   return {
     workflow,
-    workflowDef,
+    definition,
   };
 }
 
-export async function getWorkflowRun(
-  db: DrizzleD1Database,
-  id: string,
-): Promise<WorkflowRun | null> {
+export async function getWorkflowRun(db: DrizzleD1Database, id: string): Promise<WorkflowRun | null> {
   const result = await db.select().from(workflowRuns).where(eq(workflowRuns.id, id)).get();
   return result ?? null;
 }
@@ -123,8 +107,8 @@ export async function createWorkflowRun(
     id: string;
     projectId: string;
     workflowId: string;
-    workflowDefId: string;
-    workflowVersion: number;
+    definitionId: string;
+    definitionVersion: number;
     status: 'running' | 'completed' | 'failed' | 'waiting';
     context: object;
     activeTokens: object[];

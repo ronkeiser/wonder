@@ -7,12 +7,24 @@ export const StandardLibraryListResponseSchema = z
   })
   .openapi('StandardLibraryListResponse');
 
+/** All definition types supported in libraries */
+const definitionTypeEnum = z.enum([
+  'workflow',
+  'task',
+  'action',
+  'tool',
+  'persona',
+  'prompt_spec',
+  'artifact_type',
+  'model_profile',
+]);
+
 export const StandardLibraryManifestSchema = z
   .object({
     libraries: z.record(
       z.string(),
       z.object({
-        definitions: z.record(z.string(), z.enum(['workflow', 'task', 'action', 'tool'])),
+        definitions: z.record(z.string(), definitionTypeEnum),
       }),
     ),
   })
@@ -23,7 +35,7 @@ export const StandardLibraryDefinitionsResponseSchema = z
     definitions: z.array(
       z.object({
         name: z.string(),
-        type: z.enum(['workflow', 'task', 'action', 'tool']),
+        type: definitionTypeEnum,
         id: z.string(),
       }),
     ),

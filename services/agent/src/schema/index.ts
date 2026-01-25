@@ -35,6 +35,8 @@ export type {
 /**
  * Conversation metadata cached in DO SQLite.
  * Single row - loaded from D1 on first access, cached for DO lifetime.
+ *
+ * Includes resolved definition IDs pinned at conversation creation time.
  */
 export const conversationMeta = sqliteTable('conversation_meta', {
   id: text().primaryKey(),
@@ -43,6 +45,17 @@ export const conversationMeta = sqliteTable('conversation_meta', {
   status: text().$type<ConversationStatus>().notNull(),
   /** Branch context for shell operations (created on first turn) */
   branchContext: text({ mode: 'json' }).$type<BranchContext>(),
+
+  // Resolved definitions (pinned at conversation creation)
+  resolvedPersonaId: text(),
+  resolvedPersonaVersion: integer(),
+  resolvedModelProfileId: text(),
+  resolvedModelProfileVersion: integer(),
+  resolvedContextAssemblyWorkflowId: text(),
+  resolvedContextAssemblyWorkflowVersion: integer(),
+  resolvedMemoryExtractionWorkflowId: text(),
+  resolvedMemoryExtractionWorkflowVersion: integer(),
+
   createdAt: integer({ mode: 'timestamp_ms' }).notNull(),
   updatedAt: integer({ mode: 'timestamp_ms' }).notNull(),
 });
@@ -62,15 +75,15 @@ export const agentDef = sqliteTable('agent_def', {
 /**
  * Persona definition cached in DO SQLite.
  * Single row - loaded from D1 on first access.
+ *
+ * Note: Workflow and model profile IDs are now on conversationMeta (resolved at creation).
+ * This table only stores persona-specific config needed for agent behavior.
  */
 export const personaDef = sqliteTable('persona_def', {
   id: text().notNull(),
   version: integer().notNull(),
   name: text().notNull(),
   systemPrompt: text().notNull(),
-  modelProfileId: text().notNull(),
-  contextAssemblyWorkflowDefId: text().notNull(),
-  memoryExtractionWorkflowDefId: text().notNull(),
   recentTurnsLimit: integer().notNull(),
   toolIds: text({ mode: 'json' }).$type<string[]>().notNull(),
   constraints: text({ mode: 'json' }).$type<{ maxMovesPerTurn?: number }>(),

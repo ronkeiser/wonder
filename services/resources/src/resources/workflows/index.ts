@@ -34,9 +34,9 @@ export class Workflows extends Resource {
 
           if (dbError.constraint === 'foreign_key') {
             throw new NotFoundError(
-              'Referenced project or workflow_def does not exist',
+              'Referenced project or definition does not exist',
               'reference',
-              data.workflowDefId,
+              data.definitionId,
             );
           }
 

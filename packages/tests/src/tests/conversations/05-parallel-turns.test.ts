@@ -272,9 +272,9 @@ describe('Conversation: 05 - Parallel Turns', () => {
         name: 'Multi-tasker Agent',
         description: 'Test agent for parallel turns',
         systemPrompt,
-        modelProfileId: ctx.modelProfileId,
-        contextAssemblyWorkflowDefId: contextAssemblySetup.workflowDefId,
-        memoryExtractionWorkflowDefId: memoryExtractionSetup.workflowDefId,
+        modelProfileRef: ctx.modelProfileRef,
+        contextAssemblyWorkflowRef: contextAssemblySetup.workflowDefRef,
+        memoryExtractionWorkflowRef: memoryExtractionSetup.workflowDefRef,
         toolIds: [toolResponse.toolId],
         recentTurnsLimit: 10,
       });

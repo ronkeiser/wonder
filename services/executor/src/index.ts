@@ -1,5 +1,6 @@
 import { createEmitter } from '@wonder/events';
 import { createLogger } from '@wonder/logs';
+import type { Task } from '@wonder/resources/types';
 import { WorkerEntrypoint } from 'cloudflare:workers';
 import { runTask } from './execution/task-runner';
 import type { AgentTaskPayload, LLMCallParams, TaskPayload } from './types';
@@ -171,7 +172,7 @@ export default class ExecutorService extends WorkerEntrypoint<Env> {
     try {
       // Load task definition from Resources (use latest version)
       using tasksResource = this.env.RESOURCES.tasks();
-      const { task } = await tasksResource.get(taskId);
+      const { task } = await tasksResource.get(taskId) as { task: Task };
 
       // Create emitter for this task execution
       const emitter = createEmitter(

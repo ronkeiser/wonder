@@ -1,9 +1,7 @@
 /** Type definitions for actions */
 
-import { actions } from '../../schema';
-
 // ============================================================================
-// Enums (explicit - used by schema via .$type<T>())
+// Enums
 // ============================================================================
 
 export type ActionKind =
@@ -18,22 +16,46 @@ export type ActionKind =
   | 'mock';
 
 // ============================================================================
-// Entity Types (inferred from schema)
+// Entity Types
 // ============================================================================
 
-/** Action entity - inferred from database schema */
-export type Action = typeof actions.$inferSelect;
+/**
+ * Action entity - the API-facing shape.
+ * Internally stored in the unified `definitions` table.
+ */
+export type Action = {
+  id: string;
+  version: number;
+  name: string;
+  description: string;
+  reference: string;
+  kind: ActionKind;
+  implementation: object;
+  requires: object | null;
+  produces: object | null;
+  execution: object | null;
+  idempotency: object | null;
+  contentHash: string;
+  createdAt: string;
+  updatedAt: string;
+};
 
 // ============================================================================
-// API DTOs (inferred from schema)
+// API DTOs
 // ============================================================================
 
-import type { NewEntity } from '~/shared/types';
-
-/** Base input for creating an action - inferred from schema */
-type ActionInsert = NewEntity<typeof actions.$inferInsert>;
-
-/** API input for creating an action - adds autoversion option */
-export type ActionInput = Omit<ActionInsert, 'contentHash'> & {
+/**
+ * API input for creating an action.
+ */
+export type ActionInput = {
+  name: string;
+  description?: string;
+  reference?: string;
+  kind: ActionKind;
+  implementation: Record<string, unknown>;
+  requires?: Record<string, unknown> | null;
+  produces?: Record<string, unknown> | null;
+  execution?: Record<string, unknown> | null;
+  idempotency?: Record<string, unknown> | null;
   autoversion?: boolean;
 };

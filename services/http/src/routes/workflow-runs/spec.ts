@@ -12,8 +12,8 @@ const workflowRunSummarySchema = z
     projectId: z.string(),
     workflowId: z.string().nullable(), // Nullable for def-only runs (agent workflows)
     workflowName: z.string(),
-    workflowDefId: z.string(),
-    workflowVersion: z.number(),
+    definitionId: z.string(),
+    definitionVersion: z.number(),
     status: z.enum(['running', 'completed', 'failed', 'waiting']),
     parentRunId: z.string().nullable(),
     createdAt: z.string(),

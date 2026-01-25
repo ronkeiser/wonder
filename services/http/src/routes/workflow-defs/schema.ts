@@ -107,8 +107,8 @@ export const CreateWorkflowDefSchema = z
 export const NodeSchema = z
   .object({
     id: ulid(),
-    workflowDefId: ulid(),
-    workflowDefVersion: z.number().int(),
+    definitionId: ulid(),
+    definitionVersion: z.number().int(),
     ref: z.string(),
     name: z.string(),
     taskId: z.string().nullable(),
@@ -124,8 +124,8 @@ export const NodeSchema = z
 export const TransitionSchema = z
   .object({
     id: ulid(),
-    workflowDefId: ulid(),
-    workflowDefVersion: z.number().int(),
+    definitionId: ulid(),
+    definitionVersion: z.number().int(),
     ref: z.string().nullable(),
     fromNodeId: z.string(),
     toNodeId: z.string(),

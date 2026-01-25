@@ -2,8 +2,38 @@
 
 import { ConflictError, NotFoundError, extractDbError } from '~/shared/errors';
 import { Resource } from '~/shared/resource';
-import * as repo from './repository';
+import {
+  createDefinition,
+  deleteDefinition,
+  getDefinition,
+  listDefinitions,
+  type Definition,
+} from '~/shared/definitions-repository';
+import type { ActionContent, ActionKind as ContentActionKind } from '~/shared/content-schemas';
 import type { Action, ActionInput, ActionKind } from './types';
+
+/**
+ * Maps a Definition to the legacy Action shape for API compatibility.
+ */
+function toAction(def: Definition): Action {
+  const content = def.content as ActionContent;
+  return {
+    id: def.id,
+    version: def.version,
+    name: content.name,
+    description: def.description,
+    reference: def.reference,
+    kind: content.kind,
+    implementation: content.implementation,
+    requires: content.requires ?? null,
+    produces: content.produces ?? null,
+    execution: content.execution ?? null,
+    idempotency: content.idempotency ?? null,
+    contentHash: def.contentHash,
+    createdAt: def.createdAt,
+    updatedAt: def.updatedAt,
+  };
+}
 
 export class Actions extends Resource {
   async create(data: ActionInput): Promise<{
@@ -21,36 +51,45 @@ export class Actions extends Resource {
       metadata: { name: data.name, kind: data.kind, autoversion: data.autoversion ?? false },
     });
 
-    const autoversionResult = await this.withAutoversion<Action>(data, {
-      findByReferenceAndHash: (reference, hash) =>
-        repo.getActionByReferenceAndHash(this.serviceCtx.db, reference, hash),
-      getMaxVersion: (reference) => repo.getMaxVersionByReference(this.serviceCtx.db, reference),
-    });
-
-    if (autoversionResult.reused) {
-      return {
-        actionId: autoversionResult.entity.id,
-        action: autoversionResult.entity,
-        reused: true,
-        version: autoversionResult.entity.version,
-        latestVersion: autoversionResult.latestVersion,
-      };
+    // Actions require a reference for autoversioning
+    if (data.autoversion && !data.reference) {
+      throw new Error('reference is required when autoversion is true');
     }
 
-    const version = data.autoversion ? autoversionResult.version : (data.version ?? 1);
+    const reference = data.reference ?? data.name;
 
     try {
-      const action = await repo.createAction(this.serviceCtx.db, {
-        ...data,
-        version,
-        contentHash: autoversionResult.contentHash,
+      const result = await createDefinition(this.serviceCtx.db, 'action', {
+        reference,
+        name: data.name,
+        description: data.description,
+        content: {
+          name: data.name,
+          kind: data.kind as ContentActionKind,
+          implementation: data.implementation,
+          requires: data.requires,
+          produces: data.produces,
+          execution: data.execution,
+          idempotency: data.idempotency,
+        },
+        autoversion: data.autoversion,
       });
 
+      if (result.reused) {
+        return {
+          actionId: result.definition.id,
+          action: toAction(result.definition),
+          reused: true,
+          version: result.definition.version,
+          latestVersion: result.latestVersion,
+        };
+      }
+
       return {
-        actionId: action.id,
-        action,
+        actionId: result.definition.id,
+        action: toAction(result.definition),
         reused: false,
-        version,
+        version: result.definition.version,
       };
     } catch (error) {
       const dbError = extractDbError(error);
@@ -81,12 +120,9 @@ export class Actions extends Resource {
       'get',
       { actionId: id, version, metadata: { actionId: id, version } },
       async () => {
-        const action =
-          version !== undefined
-            ? await repo.getActionVersion(this.serviceCtx.db, id, version)
-            : await repo.getLatestAction(this.serviceCtx.db, id);
+        const definition = await getDefinition(this.serviceCtx.db, id, version);
 
-        if (!action) {
+        if (!definition || definition.kind !== 'action') {
           throw new NotFoundError(
             `Action not found: ${id}${version !== undefined ? ` version ${version}` : ''}`,
             'action',
@@ -94,7 +130,7 @@ export class Actions extends Resource {
           );
         }
 
-        return { action };
+        return { action: toAction(definition) };
       },
     );
   }
@@ -103,11 +139,18 @@ export class Actions extends Resource {
     actions: Action[];
   }> {
     return this.withLogging('list', { metadata: params }, async () => {
-      const actionsResult = params?.kind
-        ? await repo.listActionsByKind(this.serviceCtx.db, params.kind, params.limit)
-        : await repo.listActions(this.serviceCtx.db, params?.limit);
+      const defs = await listDefinitions(this.serviceCtx.db, 'action', {
+        limit: params?.limit,
+      });
 
-      return { actions: actionsResult };
+      let actions = defs.map(toAction);
+
+      // Filter by action kind if specified
+      if (params?.kind) {
+        actions = actions.filter((a) => a.kind === params.kind);
+      }
+
+      return { actions };
     });
   }
 
@@ -116,12 +159,9 @@ export class Actions extends Resource {
       'delete',
       { actionId: id, version, metadata: { actionId: id, version } },
       async () => {
-        const action =
-          version !== undefined
-            ? await repo.getActionVersion(this.serviceCtx.db, id, version)
-            : await repo.getAction(this.serviceCtx.db, id);
+        const existing = await getDefinition(this.serviceCtx.db, id, version);
 
-        if (!action) {
+        if (!existing || existing.kind !== 'action') {
           throw new NotFoundError(
             `Action not found: ${id}${version !== undefined ? ` version ${version}` : ''}`,
             'action',
@@ -129,7 +169,7 @@ export class Actions extends Resource {
           );
         }
 
-        await repo.deleteAction(this.serviceCtx.db, id, version);
+        await deleteDefinition(this.serviceCtx.db, id, version);
         return { success: true };
       },
     );

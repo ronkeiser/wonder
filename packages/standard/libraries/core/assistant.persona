@@ -7,9 +7,9 @@ system_prompt: |
   You are a helpful assistant. Be concise, accurate, and thoughtful in your responses ha.
 
 # References to resources in the same library (core)
-model_profile_id: core/claude-sonnet
-context_assembly_workflow_def_id: core/context-assembly-passthrough
-memory_extraction_workflow_def_id: core/memory-extraction-noop
+model_profile_ref: core/claude-sonnet
+context_assembly_workflow_ref: core/context-assembly-passthrough
+memory_extraction_workflow_ref: core/memory-extraction-noop
 
 # Tools - empty list for basic assistant
 tool_ids: []

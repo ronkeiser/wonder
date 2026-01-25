@@ -29,6 +29,13 @@ type Token = ReturnType<TokenManager['get']>;
 /** Node shape returned by DefinitionManager.getNode() */
 type Node = ReturnType<DefinitionManager['getNode']>;
 
+/** Task shape for RPC result type assertion (minimal fields needed) */
+type Task = {
+  id: string;
+  version: number;
+  outputSchema: object;
+};
+
 // ============================================================================
 // Branch Output Handling
 // ============================================================================
@@ -61,7 +68,7 @@ export async function handleBranchOutput(
   }
 
   const tasksResource = ctx.resources.tasks();
-  const { task } = await tasksResource.get(node.taskId, node.taskVersion ?? 1);
+  const { task } = await tasksResource.get(node.taskId, node.taskVersion ?? 1) as { task: Task };
 
   if (!task.outputSchema) {
     ctx.logger.debug({
@@ -365,7 +372,7 @@ async function mergeBranchOutputs(
   if (!sourceNode.taskId) return;
 
   const tasksResource = ctx.resources.tasks();
-  const { task } = await tasksResource.get(sourceNode.taskId, sourceNode.taskVersion ?? 1);
+  const { task } = await tasksResource.get(sourceNode.taskId, sourceNode.taskVersion ?? 1) as { task: Task };
 
   if (task.outputSchema) {
     // Merge branches and clean up via decisions

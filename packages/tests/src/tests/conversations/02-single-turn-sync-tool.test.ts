@@ -250,9 +250,9 @@ describe('Conversation: 02 - Single Turn, Sync Tool', () => {
         name: 'Echo Agent',
         description: 'Test agent with echo tool',
         systemPrompt,
-        modelProfileId: ctx.modelProfileId,
-        contextAssemblyWorkflowDefId: contextAssemblySetup.workflowDefId,
-        memoryExtractionWorkflowDefId: memoryExtractionSetup.workflowDefId,
+        modelProfileRef: ctx.modelProfileRef,
+        contextAssemblyWorkflowRef: contextAssemblySetup.workflowDefRef,
+        memoryExtractionWorkflowRef: memoryExtractionSetup.workflowDefRef,
         toolIds: [toolResponse.toolId],
         recentTurnsLimit: 10,
       });

@@ -1,10 +1,33 @@
 /** ArtifactTypes RPC resource */
 
 import { ConflictError, NotFoundError, extractDbError } from '~/shared/errors';
-import { computeContentHash } from '~/shared/fingerprint';
 import { Resource } from '~/shared/resource';
-import * as repo from './repository';
+import {
+  createDefinition,
+  deleteDefinition,
+  getDefinition,
+  listDefinitions,
+  type Definition,
+} from '~/shared/definitions-repository';
+import type { ArtifactTypeContent } from '~/shared/content-schemas';
 import type { ArtifactType, ArtifactTypeInput } from './types';
+
+/**
+ * Maps a Definition to the legacy ArtifactType shape for API compatibility.
+ */
+function toArtifactType(def: Definition): ArtifactType {
+  const content = def.content as ArtifactTypeContent;
+  return {
+    id: def.id,
+    version: def.version,
+    name: content.name,
+    description: def.description,
+    schema: content.schema,
+    contentHash: def.contentHash,
+    createdAt: def.createdAt,
+    updatedAt: def.updatedAt,
+  };
+}
 
 export class ArtifactTypes extends Resource {
   async create(data: ArtifactTypeInput): Promise<{
@@ -18,41 +41,32 @@ export class ArtifactTypes extends Resource {
       metadata: { name: data.name, autoversion: data.autoversion ?? false },
     });
 
-    // Artifact types use name-based autoversioning (no reference field)
-    const contentHash = await computeContentHash(data as Record<string, unknown>);
-    let version = data.version ?? 1;
+    // Artifact types use name as reference (normalize name-based to reference-based)
+    const reference = data.name;
 
-    if (data.autoversion) {
-      // Check for existing artifact type with same name + content
-      const existing = await repo.getArtifactTypeByNameAndHash(
-        this.serviceCtx.db,
-        data.name,
-        contentHash,
-      );
+    try {
+      const result = await createDefinition(this.serviceCtx.db, 'artifact_type', {
+        reference,
+        name: data.name,
+        description: data.description,
+        content: {
+          name: data.name,
+          schema: data.schema,
+        },
+        autoversion: data.autoversion,
+      });
 
-      if (existing) {
+      if (result.reused) {
         return {
-          artifactTypeId: existing.id,
-          artifactType: existing,
+          artifactTypeId: result.definition.id,
+          artifactType: toArtifactType(result.definition),
           reused: true,
         };
       }
 
-      // Get max version and increment
-      const maxVersion = await repo.getMaxVersionByName(this.serviceCtx.db, data.name);
-      version = maxVersion + 1;
-    }
-
-    try {
-      const artifactType = await repo.createArtifactType(this.serviceCtx.db, {
-        ...data,
-        version,
-        contentHash,
-      });
-
       return {
-        artifactTypeId: artifactType.id,
-        artifactType,
+        artifactTypeId: result.definition.id,
+        artifactType: toArtifactType(result.definition),
         reused: false,
       };
     } catch (error) {
@@ -77,11 +91,9 @@ export class ArtifactTypes extends Resource {
     artifactType: ArtifactType;
   }> {
     return this.withLogging('get', { metadata: { artifactTypeId: id, version } }, async () => {
-      const artifactType = version
-        ? await repo.getArtifactTypeVersion(this.serviceCtx.db, id, version)
-        : await repo.getLatestArtifactType(this.serviceCtx.db, id);
+      const definition = await getDefinition(this.serviceCtx.db, id, version);
 
-      if (!artifactType) {
+      if (!definition || definition.kind !== 'artifact_type') {
         throw new NotFoundError(
           `ArtifactType not found: ${id}${version ? ` version ${version}` : ''}`,
           'artifactType',
@@ -89,7 +101,7 @@ export class ArtifactTypes extends Resource {
         );
       }
 
-      return { artifactType };
+      return { artifactType: toArtifactType(definition) };
     });
   }
 
@@ -97,8 +109,10 @@ export class ArtifactTypes extends Resource {
     artifactTypes: ArtifactType[];
   }> {
     return this.withLogging('list', { metadata: params }, async () => {
-      const artifactTypes = await repo.listArtifactTypes(this.serviceCtx.db, params?.limit);
-      return { artifactTypes };
+      const defs = await listDefinitions(this.serviceCtx.db, 'artifact_type', {
+        limit: params?.limit,
+      });
+      return { artifactTypes: defs.map(toArtifactType) };
     });
   }
 
@@ -107,11 +121,9 @@ export class ArtifactTypes extends Resource {
       'delete',
       { metadata: { artifactTypeId: id, version } },
       async () => {
-        const existing = version
-          ? await repo.getArtifactTypeVersion(this.serviceCtx.db, id, version)
-          : await repo.getArtifactType(this.serviceCtx.db, id);
+        const existing = await getDefinition(this.serviceCtx.db, id, version);
 
-        if (!existing) {
+        if (!existing || existing.kind !== 'artifact_type') {
           throw new NotFoundError(
             `ArtifactType not found: ${id}${version ? ` version ${version}` : ''}`,
             'artifactType',
@@ -119,7 +131,7 @@ export class ArtifactTypes extends Resource {
           );
         }
 
-        await repo.deleteArtifactType(this.serviceCtx.db, id, version);
+        await deleteDefinition(this.serviceCtx.db, id, version);
         return { success: true };
       },
     );

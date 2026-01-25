@@ -1,9 +1,7 @@
 /** Type definitions for tasks */
 
-import { tasks } from '../../schema';
-
 // ============================================================================
-// Embedded JSON Types (explicit - used by schema via .$type<T>())
+// Embedded JSON Types
 // ============================================================================
 
 /**
@@ -18,8 +16,8 @@ export type Step = {
   actionId: string; // FK → actions
   actionVersion: number;
 
-  inputMapping: object | null; // Map task context → action input
-  outputMapping: object | null; // Map action output → task context
+  inputMapping: Record<string, unknown> | null; // Map task context → action input
+  outputMapping: Record<string, unknown> | null; // Map action output → task context
 
   onFailure: 'abort' | 'retry' | 'continue'; // Default: abort
 
@@ -41,23 +39,50 @@ export type RetryConfig = {
 export type StepInput = Omit<Step, 'id'>;
 
 // ============================================================================
-// Entity Types (inferred from schema)
+// Entity Types
 // ============================================================================
 
-/** Task entity - inferred from database schema */
-export type Task = typeof tasks.$inferSelect;
+/**
+ * Task entity - the API-facing shape.
+ * Internally stored in the unified `definitions` table.
+ */
+export type Task = {
+  id: string;
+  version: number;
+  name: string;
+  description: string;
+  reference: string;
+  projectId: string | null;
+  libraryId: string | null;
+  tags: string[] | null;
+  inputSchema: object;
+  outputSchema: object;
+  steps: Step[];
+  retry: RetryConfig | null;
+  timeoutMs: number | null;
+  contentHash: string;
+  createdAt: string;
+  updatedAt: string;
+};
 
 // ============================================================================
-// API DTOs (inferred from schema with API-specific modifications)
+// API DTOs
 // ============================================================================
 
-import type { NewEntity } from '~/shared/types';
-
-/** Base input for creating a task - inferred from schema */
-type TaskInsert = NewEntity<typeof tasks.$inferInsert>;
-
-/** API input for creating a task - uses StepInput instead of Step, adds autoversion */
-export type TaskInput = Omit<TaskInsert, 'contentHash' | 'steps'> & {
+/**
+ * API input for creating a task.
+ */
+export type TaskInput = {
+  name: string;
+  description?: string;
+  reference?: string;
+  projectId?: string | null;
+  libraryId?: string | null;
+  tags?: string[] | null;
+  inputSchema: Record<string, unknown>;
+  outputSchema: Record<string, unknown>;
   steps: StepInput[];
+  retry?: RetryConfig | null;
+  timeoutMs?: number | null;
   autoversion?: boolean;
 };

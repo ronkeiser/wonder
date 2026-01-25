@@ -110,6 +110,11 @@ export async function dispatchContextAssembly(
   // Role translation (agent → assistant) happens at the provider adapter layer
   const messages = recentTurns.flatMap((turn) => turn.messages);
 
+  // Get resolved IDs from conversation
+  const contextAssemblyWorkflowId = defs.getContextAssemblyWorkflowId();
+  const contextAssemblyWorkflowVersion = defs.getContextAssemblyWorkflowVersion();
+  const modelProfileId = defs.getModelProfileId();
+
   // Build context assembly input
   const input: ContextAssemblyInput = {
     conversationId: ctx.conversationId,
@@ -117,7 +122,7 @@ export async function dispatchContextAssembly(
     systemPrompt: persona.systemPrompt,
     messages,
     recentTurns,
-    modelProfileId: persona.modelProfileId,
+    modelProfileId,
     toolIds: persona.toolIds,
     toolDefinitions,
     activeTurns: activeTurns.length > 0 ? activeTurns : undefined,
@@ -133,7 +138,7 @@ export async function dispatchContextAssembly(
   // Create workflow run in D1 directly from workflow def
   const workflowRunsResource = ctx.resources.workflowRuns();
   const { workflowRunId } = await workflowRunsResource.createFromWorkflowDef(
-    persona.contextAssemblyWorkflowDefId,
+    contextAssemblyWorkflowId,
     {
       ...input,
       // Include callback routing info in input for coordinator to use
@@ -143,7 +148,7 @@ export async function dispatchContextAssembly(
         type: 'context_assembly',
       },
     },
-    { projectId },
+    { projectId, version: contextAssemblyWorkflowVersion },
   );
 
   // Start the coordinator DO
@@ -156,7 +161,7 @@ export async function dispatchContextAssembly(
         type: 'loop.context_assembly.dispatch_error',
         payload: {
           turnId,
-          workflowDefId: persona.contextAssemblyWorkflowDefId,
+          workflowDefId: contextAssemblyWorkflowId,
           workflowRunId,
           error: error.message,
         },
@@ -172,7 +177,7 @@ export async function dispatchContextAssembly(
     payload: {
       turnId,
       workflowRunId,
-      workflowDefId: persona.contextAssemblyWorkflowDefId,
+      workflowDefId: contextAssemblyWorkflowId,
       recentTurnsCount: recentTurns.length,
       activeTurnsCount: activeTurns.length,
     },

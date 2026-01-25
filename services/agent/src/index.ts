@@ -344,7 +344,6 @@ export class Conversation extends DurableObject {
     }
 
     // All done - dispatch memory extraction
-    const persona = this.defs.getPersona();
     const agent = this.defs.getAgent();
     const moves = this.moves.getForTurn(turnId);
 
@@ -352,7 +351,9 @@ export class Conversation extends DurableObject {
     // or skipped (finalized event emitted immediately after turn completion)
     let memoryExtractionDispatched = false;
 
-    if (persona?.memoryExtractionWorkflowDefId) {
+    // Get resolved memory extraction workflow from conversation
+    const conversation = this.defs.getConversation();
+    if (conversation.resolvedMemoryExtractionWorkflowId && conversation.resolvedMemoryExtractionWorkflowVersion) {
       const projectId = agent.projectIds[0];
       if (!projectId) {
         this.emitter.emitTrace({
@@ -363,7 +364,8 @@ export class Conversation extends DurableObject {
         const extractionDecisions = decideMemoryExtraction({
           turnId,
           agentId: agent.id,
-          memoryExtractionWorkflowDefId: persona.memoryExtractionWorkflowDefId,
+          memoryExtractionWorkflowId: conversation.resolvedMemoryExtractionWorkflowId,
+          memoryExtractionWorkflowVersion: conversation.resolvedMemoryExtractionWorkflowVersion,
           projectId,
           transcript: moves.map((m) => ({
             sequence: m.sequence,

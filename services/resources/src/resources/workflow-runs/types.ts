@@ -26,7 +26,7 @@ export type WorkflowRunSummary = Omit<
 export interface ListWorkflowRunsFilters {
   projectId?: string;
   workflowId?: string;
-  workflowDefId?: string;
+  definitionId?: string;
   status?: ('running' | 'completed' | 'failed' | 'waiting')[];
   parentRunId?: string | null; // null = only root runs
   createdAfter?: string;

@@ -291,9 +291,9 @@ describe('Conversation: 08 - Tool Dispatch to Agent (Loop-In Mode)', () => {
         name: 'Architect',
         description: 'Architect agent for testing loop_in mode',
         systemPrompt: architectSystemPrompt,
-        modelProfileId: ctx.modelProfileId,
-        contextAssemblyWorkflowDefId: architectContextAssemblySetup.workflowDefId,
-        memoryExtractionWorkflowDefId: memoryExtractionSetup.workflowDefId,
+        modelProfileRef: ctx.modelProfileRef,
+        contextAssemblyWorkflowRef: architectContextAssemblySetup.workflowDefRef,
+        memoryExtractionWorkflowRef: memoryExtractionSetup.workflowDefRef,
         toolIds: [], // Architect has no tools - just responds with text
         recentTurnsLimit: 10,
       });
@@ -340,9 +340,9 @@ describe('Conversation: 08 - Tool Dispatch to Agent (Loop-In Mode)', () => {
         name: 'Manager',
         description: 'Manager agent that loops in architect for design discussions',
         systemPrompt: managerSystemPrompt,
-        modelProfileId: ctx.modelProfileId,
-        contextAssemblyWorkflowDefId: managerContextAssemblySetup.workflowDefId,
-        memoryExtractionWorkflowDefId: memoryExtractionSetup.workflowDefId,
+        modelProfileRef: ctx.modelProfileRef,
+        contextAssemblyWorkflowRef: managerContextAssemblySetup.workflowDefRef,
+        memoryExtractionWorkflowRef: memoryExtractionSetup.workflowDefRef,
         toolIds: [toolResponse.toolId],
         recentTurnsLimit: 10,
       });

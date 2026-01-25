@@ -25,7 +25,7 @@ export type LibraryInput = LibraryInsert;
 // ============================================================================
 
 /** Definition type for standard library manifest */
-export type DefinitionType = 'workflow' | 'task' | 'action' | 'tool';
+export type DefinitionType = 'workflow' | 'task' | 'action' | 'tool' | 'persona' | 'prompt_spec' | 'artifact_type' | 'model_profile';
 
 /** Information about a definition in a standard library */
 export interface DefinitionInfo {

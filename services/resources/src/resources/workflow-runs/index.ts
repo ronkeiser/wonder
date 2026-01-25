@@ -6,14 +6,11 @@ import { ulid } from 'ulid';
 import { NotFoundError } from '~/shared/errors';
 import * as schema from '~/schema';
 import { Resource } from '~/shared/resource';
-import * as workflowDefRepo from '../workflow-defs/repository';
+import { getDefinition } from '~/shared/definitions-repository';
+import type { WorkflowDefContent } from '~/shared/content-schemas';
 import * as workflowRepo from '../workflows/repository';
 import * as repo from './repository';
-import type {
-  ListWorkflowRunsFilters,
-  WorkflowRunSummary,
-  WorkflowRunWithWorkspace,
-} from './types';
+import type { ListWorkflowRunsFilters, WorkflowRunSummary, WorkflowRunWithWorkspace } from './types';
 
 export type { ListWorkflowRunsFilters, WorkflowRunSummary, WorkflowRunWithWorkspace } from './types';
 
@@ -47,7 +44,8 @@ export class WorkflowRuns extends Resource {
         throw new NotFoundError(`Workflow not found: ${workflowId}`, 'workflow', workflowId);
       }
 
-      const { workflow, workflowDef } = result;
+      const { workflow, definition } = result;
+      const defContent = definition.content as WorkflowDefContent;
 
       // Get project to access workspace_id
       const project = await this.serviceCtx.db
@@ -56,11 +54,7 @@ export class WorkflowRuns extends Resource {
         .where(eq(schema.projects.id, workflow.projectId))
         .get();
       if (!project) {
-        throw new NotFoundError(
-          `Project not found: ${workflow.projectId}`,
-          'project',
-          workflow.projectId,
-        );
+        throw new NotFoundError(`Project not found: ${workflow.projectId}`, 'project', workflow.projectId);
       }
 
       // Generate workflow_run_id (ULID)
@@ -78,7 +72,7 @@ export class WorkflowRuns extends Resource {
       const activeTokens = [
         {
           id: ulid(),
-          nodeId: workflowDef.initialNodeId,
+          nodeId: defContent.initialNodeId,
           status: 'ready',
           context: {},
         },
@@ -91,8 +85,8 @@ export class WorkflowRuns extends Resource {
         id: workflowRunId,
         projectId: workflow.projectId,
         workflowId: workflow.id,
-        workflowDefId: workflowDef.id,
-        workflowVersion: workflowDef.version,
+        definitionId: definition.id,
+        definitionVersion: definition.version,
         status: 'waiting',
         context,
         activeTokens: activeTokens,
@@ -126,14 +120,14 @@ export class WorkflowRuns extends Resource {
   }
 
   /**
-   * Create a workflow run directly from a workflow definition.
+   * Create a workflow run directly from a definition.
    *
    * This bypasses the workflows table - useful for agent workflows
    * (context assembly, memory extraction) that are defined in libraries
    * and don't have project-specific workflow deployments.
    */
-  async createFromWorkflowDef(
-    workflowDefId: string,
+  async createFromDefinition(
+    definitionId: string,
     input: Record<string, unknown>,
     options: {
       projectId: string;
@@ -149,27 +143,25 @@ export class WorkflowRuns extends Resource {
   }> {
     this.serviceCtx.logger.info({
       eventType: 'workflow_run.create_from_def.requested',
-      metadata: { workflowDefId, projectId: options.projectId, version: options.version },
+      metadata: { definitionId, projectId: options.projectId, version: options.version },
     });
 
     try {
-      // Get workflow definition directly (use specified version or latest)
-      const workflowDef = await workflowDefRepo.getWorkflowDef(
-        this.serviceCtx.db,
-        workflowDefId,
-        options.version,
-      );
-      if (!workflowDef) {
+      // Get definition directly (use specified version or latest)
+      const definition = await getDefinition(this.serviceCtx.db, definitionId, options.version);
+      if (!definition || definition.kind !== 'workflow_def') {
         this.serviceCtx.logger.warn({
           eventType: 'workflow_def.not_found',
-          metadata: { workflowDefId, version: options.version },
+          metadata: { definitionId, version: options.version },
         });
         throw new NotFoundError(
-          `WorkflowDef not found: ${workflowDefId}${options.version ? ` version ${options.version}` : ''}`,
+          `WorkflowDef not found: ${definitionId}${options.version ? ` version ${options.version}` : ''}`,
           'workflow_def',
-          workflowDefId,
+          definitionId,
         );
       }
+
+      const defContent = definition.content as WorkflowDefContent;
 
       // Get project to access workspace_id
       const project = await this.serviceCtx.db
@@ -178,11 +170,7 @@ export class WorkflowRuns extends Resource {
         .where(eq(schema.projects.id, options.projectId))
         .get();
       if (!project) {
-        throw new NotFoundError(
-          `Project not found: ${options.projectId}`,
-          'project',
-          options.projectId,
-        );
+        throw new NotFoundError(`Project not found: ${options.projectId}`, 'project', options.projectId);
       }
 
       // Generate workflow_run_id (ULID)
@@ -200,7 +188,7 @@ export class WorkflowRuns extends Resource {
       const activeTokens = [
         {
           id: ulid(),
-          nodeId: workflowDef.initialNodeId,
+          nodeId: defContent.initialNodeId,
           status: 'ready',
           context: {},
         },
@@ -210,8 +198,8 @@ export class WorkflowRuns extends Resource {
       await repo.createWorkflowRunFromDef(this.serviceCtx.db, {
         id: workflowRunId,
         projectId: options.projectId,
-        workflowDefId: workflowDef.id,
-        workflowVersion: workflowDef.version,
+        definitionId: definition.id,
+        definitionVersion: definition.version,
         status: 'waiting',
         context,
         activeTokens: activeTokens,
@@ -223,7 +211,7 @@ export class WorkflowRuns extends Resource {
 
       this.serviceCtx.logger.info({
         eventType: 'workflow_run.created_from_def',
-        metadata: { workflowDefId, workflowRunId, version: workflowDef.version },
+        metadata: { definitionId, workflowRunId, version: definition.version },
       });
 
       return {
@@ -236,7 +224,7 @@ export class WorkflowRuns extends Resource {
         eventType: 'workflow_run.create_from_def.failed',
         message: error instanceof Error ? error.message : String(error),
         metadata: {
-          workflowDefId,
+          definitionId,
           projectId: options.projectId,
           stack: error instanceof Error ? error.stack : undefined,
         },
@@ -245,10 +233,22 @@ export class WorkflowRuns extends Resource {
     }
   }
 
-  async updateStatus(
-    workflowRunId: string,
-    status: 'running' | 'completed' | 'failed' | 'waiting',
-  ): Promise<void> {
+  // Keep old method name for backwards compatibility
+  async createFromWorkflowDef(
+    workflowDefId: string,
+    input: Record<string, unknown>,
+    options: {
+      projectId: string;
+      version?: number;
+      rootRunId?: string;
+      parentRunId?: string;
+      parentTokenId?: string;
+    },
+  ) {
+    return this.createFromDefinition(workflowDefId, input, options);
+  }
+
+  async updateStatus(workflowRunId: string, status: 'running' | 'completed' | 'failed' | 'waiting'): Promise<void> {
     return this.withLogging(
       'updateStatus',
       { workflowRunId: workflowRunId, metadata: { workflowRunId: workflowRunId, status } },
@@ -256,11 +256,7 @@ export class WorkflowRuns extends Resource {
         // Fetch workflow run first to get details for Broadcaster notification
         const workflowRun = await repo.getWorkflowRun(this.serviceCtx.db, workflowRunId);
         if (!workflowRun) {
-          throw new NotFoundError(
-            `Workflow run not found: ${workflowRunId}`,
-            'workflow_run',
-            workflowRunId,
-          );
+          throw new NotFoundError(`Workflow run not found: ${workflowRunId}`, 'workflow_run', workflowRunId);
         }
 
         const updated = await repo.updateWorkflowRun(this.serviceCtx.db, workflowRunId, {
@@ -268,24 +264,18 @@ export class WorkflowRuns extends Resource {
         });
 
         if (!updated) {
-          throw new NotFoundError(
-            `Workflow run not found: ${workflowRunId}`,
-            'workflow_run',
-            workflowRunId,
-          );
+          throw new NotFoundError(`Workflow run not found: ${workflowRunId}`, 'workflow_run', workflowRunId);
         }
 
         // Notify Broadcaster about the status change
-        const broadcaster = (
-          this.env as unknown as { BROADCASTER: DurableObjectNamespace<Broadcaster> }
-        ).BROADCASTER;
+        const broadcaster = (this.env as unknown as { BROADCASTER: DurableObjectNamespace<Broadcaster> }).BROADCASTER;
         const broadcasterId = broadcaster.idFromName('global');
         const broadcasterStub = broadcaster.get(broadcasterId);
         broadcasterStub.notifyStatusChange({
           executionType: 'workflow',
           streamId: workflowRun.rootRunId,
           executionId: workflowRunId,
-          definitionId: workflowRun.workflowDefId,
+          definitionId: workflowRun.definitionId,
           parentExecutionId: workflowRun.parentRunId,
           status,
           timestamp: Date.now(),
@@ -297,17 +287,13 @@ export class WorkflowRuns extends Resource {
   async get(id: string): Promise<{
     workflowRun: WorkflowRunWithWorkspace;
   }> {
-    return this.withLogging(
-      'get',
-      { workflowRunId: id, metadata: { workflowRunId: id } },
-      async () => {
-        const workflowRun = await repo.getWorkflowRunWithProject(this.serviceCtx.db, id);
-        if (!workflowRun) {
-          throw new NotFoundError(`Workflow run not found: ${id}`, 'workflow_run', id);
-        }
-        return { workflowRun };
-      },
-    );
+    return this.withLogging('get', { workflowRunId: id, metadata: { workflowRunId: id } }, async () => {
+      const workflowRun = await repo.getWorkflowRunWithProject(this.serviceCtx.db, id);
+      if (!workflowRun) {
+        throw new NotFoundError(`Workflow run not found: ${id}`, 'workflow_run', id);
+      }
+      return { workflowRun };
+    });
   }
 
   async complete(id: string, finalOutput: object): Promise<void> {
@@ -332,16 +318,14 @@ export class WorkflowRuns extends Resource {
         }
 
         // Notify Broadcaster about the status change
-        const broadcaster = (
-          this.env as unknown as { BROADCASTER: DurableObjectNamespace<Broadcaster> }
-        ).BROADCASTER;
+        const broadcaster = (this.env as unknown as { BROADCASTER: DurableObjectNamespace<Broadcaster> }).BROADCASTER;
         const broadcasterId = broadcaster.idFromName('global');
         const broadcasterStub = broadcaster.get(broadcasterId);
         broadcasterStub.notifyStatusChange({
           executionType: 'workflow',
           streamId: workflowRun.rootRunId,
           executionId: id,
-          definitionId: workflowRun.workflowDefId,
+          definitionId: workflowRun.definitionId,
           parentExecutionId: workflowRun.parentRunId,
           status: 'completed',
           timestamp: Date.now(),
@@ -351,19 +335,15 @@ export class WorkflowRuns extends Resource {
   }
 
   async delete(id: string): Promise<{ success: boolean }> {
-    return this.withLogging(
-      'delete',
-      { workflowRunId: id, metadata: { workflowRunId: id } },
-      async () => {
-        const workflowRun = await repo.getWorkflowRun(this.serviceCtx.db, id);
-        if (!workflowRun) {
-          throw new NotFoundError(`Workflow run not found: ${id}`, 'workflow_run', id);
-        }
+    return this.withLogging('delete', { workflowRunId: id, metadata: { workflowRunId: id } }, async () => {
+      const workflowRun = await repo.getWorkflowRun(this.serviceCtx.db, id);
+      if (!workflowRun) {
+        throw new NotFoundError(`Workflow run not found: ${id}`, 'workflow_run', id);
+      }
 
-        await repo.deleteWorkflowRun(this.serviceCtx.db, id);
-        return { success: true };
-      },
-    );
+      await repo.deleteWorkflowRun(this.serviceCtx.db, id);
+      return { success: true };
+    });
   }
 
   async list(filters: ListWorkflowRunsFilters = {}): Promise<{
@@ -372,24 +352,20 @@ export class WorkflowRuns extends Resource {
     limit: number;
     offset: number;
   }> {
-    return this.withLogging(
-      'list',
-      { metadata: { filters } },
-      async () => {
-        const { runs, total } = await repo.listWorkflowRuns(this.serviceCtx.db, filters);
+    return this.withLogging('list', { metadata: { filters } }, async () => {
+      const { runs, total } = await repo.listWorkflowRuns(this.serviceCtx.db, filters);
 
-        // Return summary (exclude heavy fields)
-        const summaries: WorkflowRunSummary[] = runs.map(
-          ({ context, activeTokens, latestSnapshot, durableObjectId, ...summary }) => summary,
-        );
+      // Return summary (exclude heavy fields)
+      const summaries: WorkflowRunSummary[] = runs.map(
+        ({ context, activeTokens, latestSnapshot, durableObjectId, ...summary }) => summary,
+      );
 
-        return {
-          runs: summaries,
-          total,
-          limit: filters.limit ?? 50,
-          offset: filters.offset ?? 0,
-        };
-      },
-    );
+      return {
+        runs: summaries,
+        total,
+        limit: filters.limit ?? 50,
+        offset: filters.offset ?? 0,
+      };
+    });
   }
 }

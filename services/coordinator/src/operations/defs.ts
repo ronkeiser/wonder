@@ -7,17 +7,18 @@
  */
 
 import { createLogger, type Logger } from '@wonder/logs';
+import type { WorkflowDefContent } from '@wonder/resources/schemas';
 import { and, eq } from 'drizzle-orm';
 import { migrate } from 'drizzle-orm/durable-sqlite/migrator';
 
-import { nodes, transitions, workflowDefs, workflowRuns } from '../schema';
+import { definitions, nodes, transitions, workflowRuns } from '../schema';
 import { errorDetails } from '../shared';
 import migrations from '../schema/migrations';
 import type { CoordinatorDb } from './db';
 
 // Types inferred from schema
 export type WorkflowRunRow = typeof workflowRuns.$inferSelect;
-export type WorkflowDefRow = typeof workflowDefs.$inferSelect;
+export type DefinitionRow = typeof definitions.$inferSelect;
 export type NodeRow = typeof nodes.$inferSelect;
 export type TransitionRow = typeof transitions.$inferSelect;
 
@@ -168,15 +169,15 @@ export class DefinitionManager {
       eventType: 'defs.fetch_workflow_run.success',
       message: 'Successfully fetched workflow run',
       traceId: workflowRunId,
-      metadata: { workflowRunId, workflowDefId: runResponse.workflowRun.workflowDefId },
+      metadata: { workflowRunId, definitionId: runResponse.workflowRun.definitionId },
     });
 
     const run = runResponse.workflowRun;
 
     // 2. Fetch workflow def with nodes and transitions
     const workflowDefsResource = this.env.RESOURCES.workflowDefs();
-    const defResponse = await workflowDefsResource.get(run.workflowDefId, run.workflowVersion);
-    const def = defResponse.workflowDef;
+    const defResponse = await workflowDefsResource.get(run.definitionId, run.definitionVersion);
+    const def = defResponse.definition; // Use raw definition row for DO SQLite insertion
     const nodesList = defResponse.nodes;
     const transitionsList = defResponse.transitions;
 
@@ -199,7 +200,7 @@ export class DefinitionManager {
     this.db.insert(workflowRuns).values(run).run();
 
     // 4. Insert workflow def
-    this.db.insert(workflowDefs).values(def).run();
+    this.db.insert(definitions).values(def).run();
 
     // 5. Insert nodes
     for (const node of nodesList) {
@@ -244,7 +245,7 @@ export class DefinitionManager {
       // Fetch workflow def directly (not via workflowRun)
       const workflowDefsResource = this.env.RESOURCES.workflowDefs();
       const defResponse = await workflowDefsResource.get(params.workflowId, params.version);
-      const def = defResponse.workflowDef;
+      const def = defResponse.definition; // Use raw definition row for DO SQLite insertion
       const nodesList = defResponse.nodes;
       const transitionsList = defResponse.transitions;
 
@@ -254,8 +255,8 @@ export class DefinitionManager {
         id: params.runId,
         projectId: params.projectId,
         workflowId: params.workflowId,
-        workflowDefId: def.id,
-        workflowVersion: def.version,
+        definitionId: def.id,
+        definitionVersion: def.version,
         status: 'running',
         context: { input: params.input, state: {}, output: {} },
         activeTokens: [],
@@ -272,7 +273,7 @@ export class DefinitionManager {
       this.db.insert(workflowRuns).values(syntheticRun).run();
 
       // Insert workflow def
-      this.db.insert(workflowDefs).values(def).run();
+      this.db.insert(definitions).values(def).run();
 
       // Insert nodes
       for (const node of nodesList) {
@@ -343,12 +344,20 @@ export class DefinitionManager {
   /**
    * Get the workflow definition
    */
-  getWorkflowDef(): WorkflowDefRow {
-    const result = this.db.select().from(workflowDefs).limit(1).all();
+  getWorkflowDef(): DefinitionRow {
+    const result = this.db.select().from(definitions).limit(1).all();
     if (result.length === 0) {
       throw new Error('WorkflowDef not found');
     }
     return result[0];
+  }
+
+  /**
+   * Get the workflow definition content with proper typing
+   */
+  getWorkflowDefContent(): WorkflowDefContent {
+    const def = this.getWorkflowDef();
+    return def.content as WorkflowDefContent;
   }
 
   /**
@@ -361,8 +370,8 @@ export class DefinitionManager {
       .from(nodes)
       .where(
         and(
-          eq(nodes.workflowDefId, def.id),
-          eq(nodes.workflowDefVersion, def.version),
+          eq(nodes.definitionId, def.id),
+          eq(nodes.definitionVersion, def.version),
           eq(nodes.id, nodeId),
         ),
       )
@@ -383,7 +392,7 @@ export class DefinitionManager {
     return this.db
       .select()
       .from(nodes)
-      .where(and(eq(nodes.workflowDefId, def.id), eq(nodes.workflowDefVersion, def.version)))
+      .where(and(eq(nodes.definitionId, def.id), eq(nodes.definitionVersion, def.version)))
       .all();
   }
 
@@ -397,8 +406,8 @@ export class DefinitionManager {
       .from(transitions)
       .where(
         and(
-          eq(transitions.workflowDefId, def.id),
-          eq(transitions.workflowDefVersion, def.version),
+          eq(transitions.definitionId, def.id),
+          eq(transitions.definitionVersion, def.version),
           eq(transitions.fromNodeId, nodeId),
         ),
       )
@@ -415,8 +424,8 @@ export class DefinitionManager {
       .from(transitions)
       .where(
         and(
-          eq(transitions.workflowDefId, def.id),
-          eq(transitions.workflowDefVersion, def.version),
+          eq(transitions.definitionId, def.id),
+          eq(transitions.definitionVersion, def.version),
         ),
       )
       .all();
@@ -432,8 +441,8 @@ export class DefinitionManager {
       .from(transitions)
       .where(
         and(
-          eq(transitions.workflowDefId, def.id),
-          eq(transitions.workflowDefVersion, def.version),
+          eq(transitions.definitionId, def.id),
+          eq(transitions.definitionVersion, def.version),
           eq(transitions.id, transitionId),
         ),
       )

@@ -6,18 +6,14 @@ import {
   index,
   integer,
   primaryKey,
-  real,
   sqliteTable,
   text,
   unique,
 } from 'drizzle-orm/sqlite-core';
 
-import type { ModelId, ModelProfile } from '../resources/model-profiles/types';
-import type { RetryConfig, Step } from '../resources/tasks/types';
 import type { Condition, ForeachConfig, LoopConfig, SynchronizationConfig } from './types';
 
 // Re-export schema types for consumers
-export type { RetryConfig, Step } from '../resources/tasks/types';
 export type {
   Condition,
   ForeachConfig,
@@ -94,53 +90,65 @@ export const libraries = sqliteTable(
   ],
 );
 
-/** Workflow Definitions */
+/** Unified Definitions Table */
 
-export const workflowDefs = sqliteTable(
-  'workflow_defs',
+import type { DefinitionKind } from '../shared/content-schemas';
+
+// Re-export content schema types for consumers
+export type {
+  DefinitionKind,
+  WorkflowDefContent,
+  TaskContent,
+  ActionContent,
+  PersonaContent,
+  PromptSpecContent,
+  ArtifactTypeContent,
+  ModelProfileContent,
+} from '../shared/content-schemas';
+
+export const definitions = sqliteTable(
+  'definitions',
   {
     id: text().notNull(),
+    version: integer().notNull().default(1),
+    kind: text().$type<DefinitionKind>().notNull(),
+    reference: text().notNull(),
     name: text().notNull(),
     description: text().notNull().default(''),
-    version: integer().notNull().default(1),
 
-    // Stable identity for autoversion scoping (derived from file path in CLI)
-    reference: text(),
-
+    // Scope (validated by kind at repository layer)
     projectId: text().references(() => projects.id, { onDelete: 'cascade' }),
-    libraryId: text(),
+    libraryId: text().references(() => libraries.id, { onDelete: 'cascade' }),
 
-    tags: text({ mode: 'json' }).$type<string[]>(),
-    inputSchema: text({ mode: 'json' }).$type<object>().notNull(),
-    outputSchema: text({ mode: 'json' }).$type<object>().notNull(),
-    outputMapping: text({ mode: 'json' }).$type<object>(),
-    contextSchema: text({ mode: 'json' }).$type<object>(),
-
-    initialNodeId: text(),
-
-    contentHash: text(),
+    contentHash: text().notNull(),
+    content: text({ mode: 'json' }).$type<object>().notNull(),
 
     createdAt: text().notNull(),
     updatedAt: text().notNull(),
   },
   (table) => [
     primaryKey({ columns: [table.id, table.version] }),
-    index('idx_workflow_defs_project').on(table.projectId),
-    index('idx_workflow_defs_library').on(table.libraryId),
-    index('idx_workflow_defs_reference_version').on(
+    unique('unique_definitions_version').on(
+      table.kind,
       table.reference,
-      table.projectId,
-      table.libraryId,
       table.version,
-    ),
-    index('idx_workflow_defs_content_hash').on(
-      table.reference,
       table.projectId,
       table.libraryId,
-      table.contentHash,
     ),
+    unique('unique_definitions_content').on(
+      table.kind,
+      table.reference,
+      table.contentHash,
+      table.projectId,
+      table.libraryId,
+    ),
+    index('idx_definitions_kind').on(table.kind),
+    index('idx_definitions_reference').on(table.reference, table.kind),
+    index('idx_definitions_scope').on(table.projectId, table.libraryId),
   ],
 );
+
+/** Workflows (instantiated from definitions of kind 'workflow_def') */
 
 export const workflows = sqliteTable(
   'workflows',
@@ -151,7 +159,7 @@ export const workflows = sqliteTable(
       .references(() => projects.id, { onDelete: 'cascade' }),
     name: text().notNull(),
     description: text().notNull(),
-    workflowDefId: text().notNull(),
+    definitionId: text().notNull(),
     pinnedVersion: integer(), // null = always use latest
     enabled: integer({ mode: 'boolean' }).notNull().default(true),
     createdAt: text().notNull(),
@@ -159,7 +167,7 @@ export const workflows = sqliteTable(
   },
   (table) => [
     index('idx_workflows_project').on(table.projectId),
-    index('idx_workflows_def').on(table.workflowDefId, table.pinnedVersion),
+    index('idx_workflows_definition').on(table.definitionId, table.pinnedVersion),
   ],
 );
 
@@ -170,8 +178,8 @@ export const nodes = sqliteTable(
   {
     id: text().notNull(),
     ref: text().notNull(),
-    workflowDefId: text().notNull(),
-    workflowDefVersion: integer().notNull(),
+    definitionId: text().notNull(),
+    definitionVersion: integer().notNull(),
     name: text().notNull(),
 
     // Task execution (5-layer model: WorkflowDef → Node → Task → Step → ActionDef)
@@ -195,14 +203,14 @@ export const nodes = sqliteTable(
     // All branching is specified on transitions
   },
   (table) => [
-    primaryKey({ columns: [table.workflowDefId, table.workflowDefVersion, table.id] }),
+    primaryKey({ columns: [table.definitionId, table.definitionVersion, table.id] }),
     foreignKey({
-      columns: [table.workflowDefId, table.workflowDefVersion],
-      foreignColumns: [workflowDefs.id, workflowDefs.version],
+      columns: [table.definitionId, table.definitionVersion],
+      foreignColumns: [definitions.id, definitions.version],
     }).onDelete('cascade'),
-    index('idx_nodes_workflow_def').on(table.workflowDefId, table.workflowDefVersion),
+    index('idx_nodes_definition').on(table.definitionId, table.definitionVersion),
     index('idx_nodes_task').on(table.taskId, table.taskVersion),
-    index('idx_nodes_ref').on(table.workflowDefId, table.workflowDefVersion, table.ref),
+    index('idx_nodes_ref').on(table.definitionId, table.definitionVersion, table.ref),
   ],
 );
 
@@ -211,8 +219,8 @@ export const transitions = sqliteTable(
   {
     id: text().notNull(),
     ref: text(),
-    workflowDefId: text().notNull(),
-    workflowDefVersion: integer().notNull(),
+    definitionId: text().notNull(),
+    definitionVersion: integer().notNull(),
     fromNodeId: text().notNull(),
     toNodeId: text().notNull(),
     priority: integer().notNull(),
@@ -225,160 +233,24 @@ export const transitions = sqliteTable(
     loopConfig: text({ mode: 'json' }).$type<LoopConfig>(),
   },
   (table) => [
-    primaryKey({ columns: [table.workflowDefId, table.workflowDefVersion, table.id] }),
+    primaryKey({ columns: [table.definitionId, table.definitionVersion, table.id] }),
     foreignKey({
-      columns: [table.workflowDefId, table.workflowDefVersion],
-      foreignColumns: [workflowDefs.id, workflowDefs.version],
+      columns: [table.definitionId, table.definitionVersion],
+      foreignColumns: [definitions.id, definitions.version],
     }).onDelete('cascade'),
     foreignKey({
-      columns: [table.workflowDefId, table.workflowDefVersion, table.fromNodeId],
-      foreignColumns: [nodes.workflowDefId, nodes.workflowDefVersion, nodes.id],
+      columns: [table.definitionId, table.definitionVersion, table.fromNodeId],
+      foreignColumns: [nodes.definitionId, nodes.definitionVersion, nodes.id],
     }).onDelete('cascade'),
     foreignKey({
-      columns: [table.workflowDefId, table.workflowDefVersion, table.toNodeId],
-      foreignColumns: [nodes.workflowDefId, nodes.workflowDefVersion, nodes.id],
+      columns: [table.definitionId, table.definitionVersion, table.toNodeId],
+      foreignColumns: [nodes.definitionId, nodes.definitionVersion, nodes.id],
     }).onDelete('cascade'),
-    index('idx_transitions_workflow_def').on(table.workflowDefId, table.workflowDefVersion),
+    index('idx_transitions_definition').on(table.definitionId, table.definitionVersion),
     index('idx_transitions_from_node').on(table.fromNodeId),
     index('idx_transitions_to_node').on(table.toNodeId),
-    index('idx_transitions_ref').on(table.workflowDefId, table.workflowDefVersion, table.ref),
+    index('idx_transitions_ref').on(table.definitionId, table.definitionVersion, table.ref),
   ],
-);
-
-/** Actions */
-
-export const actions = sqliteTable(
-  'actions',
-  {
-    id: text().notNull(),
-    name: text().notNull(),
-    description: text().notNull().default(''),
-    version: integer().notNull().default(1),
-
-    // Stable identity for autoversion scoping (derived from file path in CLI)
-    reference: text(),
-
-    kind: text({
-      enum: ['llm', 'mcp', 'http', 'human', 'context', 'artifact', 'vector', 'metric', 'mock'],
-    }).notNull(),
-
-    implementation: text({ mode: 'json' }).$type<object>().notNull(), // discriminated by kind
-
-    requires: text({ mode: 'json' }).$type<object>(),
-    produces: text({ mode: 'json' }).$type<object>(),
-    execution: text({ mode: 'json' }).$type<object>(), // timeout, retry_policy
-    idempotency: text({ mode: 'json' }).$type<object>(),
-
-    contentHash: text(),
-
-    createdAt: text().notNull(),
-    updatedAt: text().notNull(),
-  },
-  (table) => [
-    primaryKey({ columns: [table.id, table.version] }),
-    index('idx_actions_reference_version').on(table.reference, table.version),
-    index('idx_actions_content_hash').on(table.reference, table.contentHash),
-  ],
-);
-
-/** Tasks - Intermediate layer between Node and Action */
-
-export const tasks = sqliteTable(
-  'tasks',
-  {
-    id: text().notNull(),
-    version: integer().notNull().default(1),
-    name: text().notNull(),
-    description: text().notNull().default(''),
-
-    // Stable identity for autoversion scoping (derived from file path in CLI)
-    reference: text(),
-
-    // Ownership (exactly one)
-    projectId: text().references(() => projects.id, { onDelete: 'cascade' }),
-    libraryId: text(),
-
-    tags: text({ mode: 'json' }).$type<string[]>(),
-
-    inputSchema: text({ mode: 'json' }).$type<object>().notNull(),
-    outputSchema: text({ mode: 'json' }).$type<object>().notNull(),
-
-    // Steps are embedded (not a separate table)
-    steps: text({ mode: 'json' }).$type<Step[]>().notNull(),
-
-    retry: text({ mode: 'json' }).$type<RetryConfig>(),
-    timeoutMs: integer(),
-
-    contentHash: text(),
-
-    createdAt: text().notNull(),
-    updatedAt: text().notNull(),
-  },
-  (table) => [
-    primaryKey({ columns: [table.id, table.version] }),
-    index('idx_tasks_project').on(table.projectId),
-    index('idx_tasks_library').on(table.libraryId),
-    index('idx_tasks_reference_version').on(table.reference, table.projectId, table.libraryId, table.version),
-    index('idx_tasks_content_hash').on(
-      table.reference,
-      table.projectId,
-      table.libraryId,
-      table.contentHash,
-    ),
-  ],
-);
-
-/** AI Primitives */
-
-export const promptSpecs = sqliteTable(
-  'prompt_specs',
-  {
-    id: text().notNull(),
-    name: text().notNull(),
-    description: text().notNull().default(''),
-    version: integer().notNull().default(1),
-
-    systemPrompt: text(),
-    template: text().notNull(),
-
-    requires: text({ mode: 'json' }).$type<object>().notNull().default({}),
-    produces: text({ mode: 'json' }).$type<object>().notNull().default({}),
-    examples: text({ mode: 'json' }).$type<object>(),
-    tags: text({ mode: 'json' }).$type<string[]>(),
-
-    contentHash: text(),
-
-    createdAt: text().notNull(),
-    updatedAt: text().notNull(),
-  },
-  (table) => [
-    primaryKey({ columns: [table.id, table.version] }),
-    index('idx_prompt_specs_content_hash').on(table.name, table.contentHash),
-  ],
-);
-
-export const modelProfiles = sqliteTable(
-  'model_profiles',
-  {
-    id: text().primaryKey(),
-    name: text().notNull(),
-    // Stable identity for autoversion scoping (derived from file path in CLI)
-    reference: text(),
-    provider: text().notNull(),
-    modelId: text().$type<ModelId>().notNull(),
-
-    parameters: text({ mode: 'json' }).$type<ModelProfile['parameters']>().notNull().default({}),
-    executionConfig: text({ mode: 'json' }).$type<object>(),
-
-    costPer1kInputTokens: real('cost_per_1k_input_tokens').notNull().default(0),
-    costPer1kOutputTokens: real('cost_per_1k_output_tokens').notNull().default(0),
-
-    contentHash: text(),
-
-    createdAt: text().notNull(),
-    updatedAt: text().notNull(),
-  },
-  (table) => [index('idx_model_profiles_reference_hash').on(table.reference, table.contentHash)],
 );
 
 /** Workflow Runs & Execution */
@@ -391,8 +263,8 @@ export const workflowRuns = sqliteTable(
       .notNull()
       .references(() => projects.id, { onDelete: 'cascade' }),
     workflowId: text().references(() => workflows.id), // Nullable for def-only runs (agent workflows)
-    workflowDefId: text().notNull(),
-    workflowVersion: integer().notNull(),
+    definitionId: text().notNull(),
+    definitionVersion: integer().notNull(),
 
     status: text({
       enum: ['running', 'completed', 'failed', 'waiting'],
@@ -415,8 +287,8 @@ export const workflowRuns = sqliteTable(
   },
   (table) => [
     foreignKey({
-      columns: [table.workflowDefId, table.workflowVersion, table.parentNodeId],
-      foreignColumns: [nodes.workflowDefId, nodes.workflowDefVersion, nodes.id],
+      columns: [table.definitionId, table.definitionVersion, table.parentNodeId],
+      foreignColumns: [nodes.definitionId, nodes.definitionVersion, nodes.id],
     }).onDelete('cascade'),
     index('idx_workflow_runs_project').on(table.projectId),
     index('idx_workflow_runs_workflow').on(table.workflowId),
@@ -470,26 +342,6 @@ export const events = sqliteTable(
 
 /** Artifacts */
 
-export const artifactTypes = sqliteTable(
-  'artifact_types',
-  {
-    id: text().notNull(),
-    name: text().notNull(),
-    description: text().notNull().default(''),
-    schema: text({ mode: 'json' }).$type<object>().notNull(),
-    version: integer().notNull().default(1),
-
-    contentHash: text(),
-
-    createdAt: text().notNull(),
-    updatedAt: text().notNull(),
-  },
-  (table) => [
-    primaryKey({ columns: [table.id, table.version] }),
-    index('idx_artifact_types_content_hash').on(table.name, table.contentHash),
-  ],
-);
-
 export const artifacts = sqliteTable(
   'artifacts',
   {
@@ -503,8 +355,8 @@ export const artifacts = sqliteTable(
     content: text({ mode: 'json' }).$type<object>().notNull(),
 
     createdByWorkflowRunId: text().references(() => workflowRuns.id),
-    createdByWorkflowDefId: text(),
-    createdByWorkflowDefVersion: integer(),
+    createdByDefinitionId: text(),
+    createdByDefinitionVersion: integer(),
     createdByNodeId: text(),
 
     createdAt: text().notNull(),
@@ -512,11 +364,11 @@ export const artifacts = sqliteTable(
   (table) => [
     foreignKey({
       columns: [
-        table.createdByWorkflowDefId,
-        table.createdByWorkflowDefVersion,
+        table.createdByDefinitionId,
+        table.createdByDefinitionVersion,
         table.createdByNodeId,
       ],
-      foreignColumns: [nodes.workflowDefId, nodes.workflowDefVersion, nodes.id],
+      foreignColumns: [nodes.definitionId, nodes.definitionVersion, nodes.id],
     }).onDelete('cascade'),
     index('idx_artifacts_project_type').on(table.projectId, table.typeId),
     index('idx_artifacts_workflow_run').on(table.createdByWorkflowRunId),
@@ -656,55 +508,6 @@ export const secrets = sqliteTable(
 /** Agent Primitives */
 
 /**
- * Persona: Shareable identity, behavior, and tool configuration.
- * Versioned, lives in libraries.
- * @see docs/architecture/agent.md
- */
-export const personas = sqliteTable(
-  'personas',
-  {
-    id: text().notNull(),
-    version: integer().notNull().default(1),
-    name: text().notNull(),
-    description: text().notNull().default(''),
-
-    // Stable identity for autoversion scoping (derived from file path in CLI)
-    reference: text(),
-
-    // Ownership (exactly one)
-    libraryId: text().references(() => libraries.id),
-
-    // Identity
-    systemPrompt: text().notNull(),
-    modelProfileId: text()
-      .notNull()
-      .references(() => modelProfiles.id, { onDelete: 'cascade' }),
-
-    // Memory configuration (references workflow_defs directly, not workflows)
-    contextAssemblyWorkflowDefId: text().notNull(),
-    memoryExtractionWorkflowDefId: text().notNull(),
-    recentTurnsLimit: integer().notNull().default(20),
-
-    // Tools
-    toolIds: text({ mode: 'json' }).$type<string[]>().notNull(),
-    constraints: text({ mode: 'json' }).$type<{
-      maxMovesPerTurn?: number;
-    }>(),
-
-    contentHash: text(),
-
-    createdAt: text().notNull(),
-    updatedAt: text().notNull(),
-  },
-  (table) => [
-    primaryKey({ columns: [table.id, table.version] }),
-    index('idx_personas_library').on(table.libraryId),
-    index('idx_personas_reference_version').on(table.reference, table.libraryId, table.version),
-    index('idx_personas_content_hash').on(table.reference, table.libraryId, table.contentHash),
-  ],
-);
-
-/**
  * Tool: LLM-facing interface to execution primitives.
  * Lives in libraries alongside Workflows, Tasks, and Personas.
  * @see docs/architecture/agent.md
@@ -777,6 +580,10 @@ export const agents = sqliteTable(
 /**
  * Conversation: A session with an agent.
  * Multi-party collaboration space with participants, messages, and turns.
+ *
+ * Resolved fields capture the exact versions of definitions at conversation creation time.
+ * This provides version pinning - changing a persona doesn't affect existing conversations.
+ *
  * @see docs/architecture/agent.md
  */
 export const conversations = sqliteTable(
@@ -790,6 +597,20 @@ export const conversations = sqliteTable(
       .notNull(),
 
     status: text({ enum: ['active', 'waiting', 'completed', 'failed'] }).notNull(),
+
+    // Resolved persona (pinned at conversation creation)
+    resolvedPersonaId: text(),
+    resolvedPersonaVersion: integer(),
+
+    // Resolved model profile (from persona, pinned at conversation creation)
+    resolvedModelProfileId: text(),
+    resolvedModelProfileVersion: integer(),
+
+    // Resolved workflows (from persona, pinned at conversation creation)
+    resolvedContextAssemblyWorkflowId: text(),
+    resolvedContextAssemblyWorkflowVersion: integer(),
+    resolvedMemoryExtractionWorkflowId: text(),
+    resolvedMemoryExtractionWorkflowVersion: integer(),
 
     createdAt: text().notNull(),
     updatedAt: text().notNull(),
@@ -805,15 +626,12 @@ export const conversations = sqliteTable(
 
 // Legacy snake_case exports for backward compatibility during migration
 // TODO: Remove these after all consumers are updated
+// Legacy snake_case exports for backward compatibility
 export {
-  artifactTypes as artifact_types,
   eventSources as event_sources,
   mcpServers as mcp_servers,
-  modelProfiles as model_profiles,
   projectSettings as project_settings,
-  promptSpecs as prompt_specs,
   vectorIndexes as vector_indexes,
-  workflowDefs as workflow_defs,
   workflowRuns as workflow_runs,
   workspaceSettings as workspace_settings,
 };

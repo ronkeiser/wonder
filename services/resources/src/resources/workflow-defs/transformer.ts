@@ -17,14 +17,14 @@ import type { TransitionInput, WorkflowDefInput } from './types';
 // ============================================================================
 
 /** Transformed node ready for database insertion (inferred from schema) */
-export type TransformedNode = Omit<typeof nodes.$inferInsert, 'workflowDefId' | 'workflowDefVersion'>;
+export type TransformedNode = Omit<typeof nodes.$inferInsert, 'definitionId' | 'definitionVersion'>;
 
 /** Transformed transition ready for database insertion (inferred from schema) */
-export type TransformedTransition = Omit<typeof transitions.$inferInsert, 'workflowDefId' | 'workflowDefVersion'>;
+export type TransformedTransition = Omit<typeof transitions.$inferInsert, 'definitionId' | 'definitionVersion'>;
 
 /** Result of transformation */
 export type TransformResult = {
-  workflowDefId: string;
+  definitionId: string;
   initialNodeId: string;
   nodes: TransformedNode[];
   transitions: TransformedTransition[];
@@ -44,7 +44,7 @@ export type TransformResult = {
  * 4. Transform transitions using that mapping
  */
 export function transformWorkflowDef(data: WorkflowDefInput): TransformResult {
-  const workflowDefId = ulid();
+  const definitionId = ulid();
 
   // Add IDs to nodes
   const transformedNodes = data.nodes.map((node) => ({ id: ulid(), ...node }));
@@ -61,7 +61,7 @@ export function transformWorkflowDef(data: WorkflowDefInput): TransformResult {
   );
 
   return {
-    workflowDefId,
+    definitionId,
     initialNodeId: nodeIdByRef[data.initialNodeRef],
     nodes: transformedNodes,
     transitions: transformedTransitions,

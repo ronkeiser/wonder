@@ -525,6 +525,9 @@ importers:
       ulid:
         specifier: ^3.0.1
         version: 3.0.2
+      zod:
+        specifier: ^4.3.6
+        version: 4.3.6
     devDependencies:
       '@cloudflare/vitest-pool-workers':
         specifier: ^0.10.11
@@ -3674,6 +3677,9 @@ packages:
   zod@4.1.13:
     resolution: {integrity: sha512-AvvthqfqrAhNH9dnfmrfKzX5upOdjUVJYFqNSlkmGf64gRaTzlPwz99IHYnVs28qYAybvAlBV+H7pn0saFY4Ig==}
 
+  zod@4.3.6:
+    resolution: {integrity: sha512-rftlrkhHZOcjDwkGlnUtZZkvaPHCsDATp4pGpuOOMDaTdDDXF91wuVDJoWoPsKX/3YPQ5fHuF3STjcYyKr+Qhg==}
+
 snapshots:
 
   '@asteasolutions/zod-to-openapi@8.1.0(zod@4.1.13)':
@@ -3718,7 +3724,7 @@ snapshots:
       devalue: 5.5.0
       miniflare: 4.20251125.0
       semver: 7.7.3
-      vitest: 3.2.4(@types/node@22.19.3)(@vitest/ui@3.2.4)(jiti@2.6.1)(lightningcss@1.30.2)(tsx@4.21.0)(yaml@2.8.1)
+      vitest: 3.2.4(@types/node@24.10.1)(@vitest/ui@3.2.4)(jiti@2.6.1)(lightningcss@1.30.2)(tsx@4.21.0)(yaml@2.8.1)
       wrangler: 4.51.0(@cloudflare/workers-types@4.20251127.0)
       zod: 3.25.76
     transitivePeerDependencies:
@@ -6529,3 +6535,5 @@ snapshots:
   zod@3.25.76: {}
 
   zod@4.1.13: {}
+
+  zod@4.3.6: {}

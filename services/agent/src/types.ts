@@ -297,6 +297,7 @@ export type AgentDecision =
       type: 'DISPATCH_MEMORY_EXTRACTION';
       turnId: string;
       workflowDefId: string;
+      workflowDefVersion: number;
       projectId: string;
       input: MemoryExtractionInput;
     };

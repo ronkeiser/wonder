@@ -45,6 +45,8 @@ export async function setupTestContext(): Promise<TestContext> {
     workspaceId: workspace.id,
     projectId: project.id,
     modelProfileId: modelProfile.id,
+    // reference defaults to name if not provided, so it should always be set
+    modelProfileRef: modelProfile.reference ?? modelProfile.name,
   };
 }
 

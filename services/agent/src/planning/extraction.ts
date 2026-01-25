@@ -14,7 +14,8 @@ export type MemoryExtractionParams = {
   turnId: string;
   agentId: string;
   transcript: Move[];
-  memoryExtractionWorkflowDefId: string;
+  memoryExtractionWorkflowId: string;
+  memoryExtractionWorkflowVersion: number;
   projectId: string;
 };
 
@@ -28,7 +29,7 @@ export type MemoryExtractionParams = {
  * Returns empty decisions if transcript is empty (nothing to extract).
  */
 export function decideMemoryExtraction(params: MemoryExtractionParams): PlanningResult {
-  const { turnId, agentId, transcript, memoryExtractionWorkflowDefId, projectId } = params;
+  const { turnId, agentId, transcript, memoryExtractionWorkflowId, memoryExtractionWorkflowVersion, projectId } = params;
 
   if (transcript.length === 0) {
     return {
@@ -51,7 +52,8 @@ export function decideMemoryExtraction(params: MemoryExtractionParams): Planning
   const decision: AgentDecision = {
     type: 'DISPATCH_MEMORY_EXTRACTION',
     turnId,
-    workflowDefId: memoryExtractionWorkflowDefId,
+    workflowDefId: memoryExtractionWorkflowId,
+    workflowDefVersion: memoryExtractionWorkflowVersion,
     projectId,
     input,
   };
@@ -63,7 +65,7 @@ export function decideMemoryExtraction(params: MemoryExtractionParams): Planning
         type: 'planning.memory_extraction.planned',
         payload: {
           turnId,
-          workflowDefId: memoryExtractionWorkflowDefId,
+          workflowDefId: memoryExtractionWorkflowId,
           moveCount: transcript.length,
         },
       },

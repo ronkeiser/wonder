@@ -1,8 +1,15 @@
 /** Conversations RPC resource */
 
 import type { Broadcaster, ExecutionStatus } from '@wonder/events';
+import type { PersonaContent } from '~/shared/content-schemas';
+import {
+  getDefinition,
+  getDefinitionByVersion,
+  getLatestDefinition,
+} from '~/shared/definitions-repository';
 import { NotFoundError } from '~/shared/errors';
 import { Resource } from '~/shared/resource';
+import * as agentRepo from '../agents/repository';
 import * as repo from './repository';
 import type { Conversation, ConversationInput, ConversationStatus, Participant } from './types';
 
@@ -18,7 +25,138 @@ function getAgentId(participants: Participant[]): string | null {
   return agentParticipant?.type === 'agent' ? agentParticipant.agentId : null;
 }
 
+/** Resolved definition references for a conversation */
+type ResolvedRefs = {
+  resolvedPersonaId: string | null;
+  resolvedPersonaVersion: number | null;
+  resolvedModelProfileId: string | null;
+  resolvedModelProfileVersion: number | null;
+  resolvedContextAssemblyWorkflowId: string | null;
+  resolvedContextAssemblyWorkflowVersion: number | null;
+  resolvedMemoryExtractionWorkflowId: string | null;
+  resolvedMemoryExtractionWorkflowVersion: number | null;
+};
+
 export class Conversations extends Resource {
+  /**
+   * Resolve all definition references for a conversation.
+   *
+   * Given an agent, resolves:
+   * 1. Persona (from agent.personaId + personaVersion)
+   * 2. Model profile (from persona.modelProfileRef + version)
+   * 3. Context assembly workflow (from persona ref + version)
+   * 4. Memory extraction workflow (from persona ref + version)
+   *
+   * Returns resolved IDs and versions to be stored on the conversation.
+   */
+  private async resolveDefinitions(agentId: string): Promise<ResolvedRefs> {
+    const db = this.serviceCtx.db;
+
+    // Get agent
+    const agent = await agentRepo.getAgent(db, agentId);
+    if (!agent) {
+      throw new NotFoundError(`Agent not found: ${agentId}`, 'agent', agentId);
+    }
+
+    // If no persona, return nulls
+    if (!agent.personaId) {
+      return {
+        resolvedPersonaId: null,
+        resolvedPersonaVersion: null,
+        resolvedModelProfileId: null,
+        resolvedModelProfileVersion: null,
+        resolvedContextAssemblyWorkflowId: null,
+        resolvedContextAssemblyWorkflowVersion: null,
+        resolvedMemoryExtractionWorkflowId: null,
+        resolvedMemoryExtractionWorkflowVersion: null,
+      };
+    }
+
+    // Get persona (by ID and optional version)
+    const persona = await getDefinition(db, agent.personaId, agent.personaVersion ?? undefined);
+    if (!persona || persona.kind !== 'persona') {
+      throw new NotFoundError(
+        `Persona not found: ${agent.personaId}`,
+        'persona',
+        agent.personaId,
+      );
+    }
+
+    const content = persona.content as PersonaContent;
+
+    // Resolve model profile
+    let resolvedModelProfileId: string | null = null;
+    let resolvedModelProfileVersion: number | null = null;
+    if (content.modelProfileRef) {
+      const modelProfile = content.modelProfileVersion
+        ? await getDefinitionByVersion(db, 'model_profile', content.modelProfileRef, content.modelProfileVersion)
+        : await getLatestDefinition(db, 'model_profile', content.modelProfileRef);
+      if (modelProfile) {
+        resolvedModelProfileId = modelProfile.id;
+        resolvedModelProfileVersion = modelProfile.version;
+      }
+    }
+
+    // Resolve context assembly workflow
+    let resolvedContextAssemblyWorkflowId: string | null = null;
+    let resolvedContextAssemblyWorkflowVersion: number | null = null;
+    if (content.contextAssemblyWorkflowRef) {
+      const workflow = content.contextAssemblyWorkflowVersion
+        ? await getDefinitionByVersion(
+            db,
+            'workflow_def',
+            content.contextAssemblyWorkflowRef,
+            content.contextAssemblyWorkflowVersion,
+            { libraryId: persona.libraryId },
+          )
+        : await getLatestDefinition(
+            db,
+            'workflow_def',
+            content.contextAssemblyWorkflowRef,
+            { libraryId: persona.libraryId },
+          );
+      if (workflow) {
+        resolvedContextAssemblyWorkflowId = workflow.id;
+        resolvedContextAssemblyWorkflowVersion = workflow.version;
+      }
+    }
+
+    // Resolve memory extraction workflow
+    let resolvedMemoryExtractionWorkflowId: string | null = null;
+    let resolvedMemoryExtractionWorkflowVersion: number | null = null;
+    if (content.memoryExtractionWorkflowRef) {
+      const workflow = content.memoryExtractionWorkflowVersion
+        ? await getDefinitionByVersion(
+            db,
+            'workflow_def',
+            content.memoryExtractionWorkflowRef,
+            content.memoryExtractionWorkflowVersion,
+            { libraryId: persona.libraryId },
+          )
+        : await getLatestDefinition(
+            db,
+            'workflow_def',
+            content.memoryExtractionWorkflowRef,
+            { libraryId: persona.libraryId },
+          );
+      if (workflow) {
+        resolvedMemoryExtractionWorkflowId = workflow.id;
+        resolvedMemoryExtractionWorkflowVersion = workflow.version;
+      }
+    }
+
+    return {
+      resolvedPersonaId: persona.id,
+      resolvedPersonaVersion: persona.version,
+      resolvedModelProfileId,
+      resolvedModelProfileVersion,
+      resolvedContextAssemblyWorkflowId,
+      resolvedContextAssemblyWorkflowVersion,
+      resolvedMemoryExtractionWorkflowId,
+      resolvedMemoryExtractionWorkflowVersion,
+    };
+  }
+
   async create(data: ConversationInput): Promise<{
     conversationId: string;
     conversation: Conversation;
@@ -29,7 +167,27 @@ export class Conversations extends Resource {
       'create',
       { metadata: { agentId, participantCount: data.participants.length } },
       async () => {
-        const conversation = await repo.createConversation(this.serviceCtx.db, data);
+        // Resolve all definition references at conversation creation
+        let resolvedRefs: ResolvedRefs = {
+          resolvedPersonaId: null,
+          resolvedPersonaVersion: null,
+          resolvedModelProfileId: null,
+          resolvedModelProfileVersion: null,
+          resolvedContextAssemblyWorkflowId: null,
+          resolvedContextAssemblyWorkflowVersion: null,
+          resolvedMemoryExtractionWorkflowId: null,
+          resolvedMemoryExtractionWorkflowVersion: null,
+        };
+
+        if (agentId) {
+          resolvedRefs = await this.resolveDefinitions(agentId);
+        }
+
+        // Create conversation with resolved refs
+        const conversation = await repo.createConversation(this.serviceCtx.db, {
+          ...data,
+          ...resolvedRefs,
+        });
 
         // Notify Broadcaster about the new conversation
         const broadcaster = (

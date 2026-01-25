@@ -301,9 +301,9 @@ describe('Conversation: 06 - Tool Dispatch to Workflow (Sync)', () => {
         name: 'Lookup Agent',
         description: 'Test agent with sync workflow tool',
         systemPrompt,
-        modelProfileId: ctx.modelProfileId,
-        contextAssemblyWorkflowDefId: contextAssemblySetup.workflowDefId,
-        memoryExtractionWorkflowDefId: memoryExtractionSetup.workflowDefId,
+        modelProfileRef: ctx.modelProfileRef,
+        contextAssemblyWorkflowRef: contextAssemblySetup.workflowDefRef,
+        memoryExtractionWorkflowRef: memoryExtractionSetup.workflowDefRef,
         toolIds: [toolResponse.toolId],
         recentTurnsLimit: 10,
       });

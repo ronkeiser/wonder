@@ -762,7 +762,7 @@ async function executeTestCase(
     // Create workflow instance
     const workflowResponse = await testContext.client.workflows.create({
       projectId: apiCtx.projectId,
-      workflowDefId: workflowDefResponse.workflowDefId,
+      definitionId: workflowDefResponse.workflowDefId,
       name: embeddedWorkflow.name,
       description: embeddedWorkflow.description || 'Test workflow',
     });

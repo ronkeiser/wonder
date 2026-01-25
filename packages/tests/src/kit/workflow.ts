@@ -100,13 +100,14 @@ export async function createWorkflow(
     throw new Error('Failed to create workflow definition');
   }
   const workflowDefId = workflowDefResponse.workflowDefId;
+  const workflowDefRef = workflowDefResponse.workflowDef?.reference ?? workflowDefId;
   const version = workflowDefResponse.workflowDef?.version ?? 1;
 
   console.log(`📦 Created workflow def (version ${version})`);
 
   const workflowResponse = await wonder.workflows.create({
     projectId: ctx.projectId,
-    workflowDefId: workflowDefId,
+    definitionId: workflowDefId,
     name: options?.name ?? workflow.name,
     description: workflow.description || 'Test workflow',
   });
@@ -119,6 +120,7 @@ export async function createWorkflow(
   return {
     ...ctx,
     workflowDefId,
+    workflowDefRef,
     workflowId,
     createdResources,
   };

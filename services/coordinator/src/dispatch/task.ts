@@ -400,13 +400,13 @@ async function checkAndFinalizeWorkflow(ctx: DispatchContext): Promise<void> {
  */
 async function finalizeWorkflow(ctx: DispatchContext): Promise<void> {
   try {
-    // Get context snapshot and workflow def
+    // Get context snapshot and workflow def content
     const context = ctx.context.getSnapshot();
-    const workflowDef = ctx.defs.getWorkflowDef();
+    const workflowDefContent = ctx.defs.getWorkflowDefContent();
 
     // Extract final output using pure planning function
     const completionResult = extractFinalOutput(
-      workflowDef.outputMapping as Record<string, string> | null,
+      workflowDefContent.outputMapping as Record<string, string> | null,
       context,
     );
 

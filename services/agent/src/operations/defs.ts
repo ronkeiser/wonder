@@ -97,7 +97,7 @@ export class DefinitionManager {
    * Fetch definitions from RESOURCES service and insert into DO SQLite.
    */
   private async fetchAndInsert(conversationId: string): Promise<void> {
-    // 1. Fetch conversation
+    // 1. Fetch conversation (includes resolved definition IDs)
     const conversationsResource = this.env.RESOURCES.conversations();
     const { conversation } = await conversationsResource.get(conversationId);
 
@@ -113,33 +113,32 @@ export class DefinitionManager {
     const agentsResource = this.env.RESOURCES.agents();
     const { agent } = await agentsResource.get(agentParticipant.agentId);
 
-    // 3. Fetch persona (if referenced)
+    // 3. Fetch persona (if resolved on conversation)
     let persona: PersonaDefRow | null = null;
-    if (agent.personaId) {
+    let toolIds: string[] = [];
+    if (conversation.resolvedPersonaId) {
       const personasResource = this.env.RESOURCES.personas();
       const { persona: fetchedPersona } = await personasResource.get(
-        agent.personaId,
-        agent.personaVersion ?? undefined,
+        conversation.resolvedPersonaId,
+        conversation.resolvedPersonaVersion ?? undefined,
       );
       persona = {
         id: fetchedPersona.id,
         version: fetchedPersona.version,
         name: fetchedPersona.name,
         systemPrompt: fetchedPersona.systemPrompt,
-        modelProfileId: fetchedPersona.modelProfileId,
-        contextAssemblyWorkflowDefId: fetchedPersona.contextAssemblyWorkflowDefId,
-        memoryExtractionWorkflowDefId: fetchedPersona.memoryExtractionWorkflowDefId,
         recentTurnsLimit: fetchedPersona.recentTurnsLimit,
         toolIds: fetchedPersona.toolIds,
         constraints: fetchedPersona.constraints,
       };
+      toolIds = fetchedPersona.toolIds;
     }
 
     // 4. Fetch tools (if persona has toolIds)
     let tools: ToolDefRow[] = [];
-    if (persona && persona.toolIds.length > 0) {
+    if (toolIds.length > 0) {
       const toolsResource = this.env.RESOURCES.tools();
-      const { tools: fetchedTools } = await toolsResource.getByIds(persona.toolIds);
+      const { tools: fetchedTools } = await toolsResource.getByIds(toolIds);
       tools = fetchedTools.map(
         (t: {
           id: string;
@@ -165,7 +164,7 @@ export class DefinitionManager {
       );
     }
 
-    // 5. Insert conversation metadata
+    // 5. Insert conversation metadata (includes resolved definition IDs)
     this.db
       .insert(conversationMeta)
       .values({
@@ -173,6 +172,15 @@ export class DefinitionManager {
         agentId: agentParticipant.agentId,
         participants: conversation.participants,
         status: conversation.status,
+        // Resolved definitions from conversation
+        resolvedPersonaId: conversation.resolvedPersonaId,
+        resolvedPersonaVersion: conversation.resolvedPersonaVersion,
+        resolvedModelProfileId: conversation.resolvedModelProfileId,
+        resolvedModelProfileVersion: conversation.resolvedModelProfileVersion,
+        resolvedContextAssemblyWorkflowId: conversation.resolvedContextAssemblyWorkflowId,
+        resolvedContextAssemblyWorkflowVersion: conversation.resolvedContextAssemblyWorkflowVersion,
+        resolvedMemoryExtractionWorkflowId: conversation.resolvedMemoryExtractionWorkflowId,
+        resolvedMemoryExtractionWorkflowVersion: conversation.resolvedMemoryExtractionWorkflowVersion,
         createdAt: new Date(conversation.createdAt),
         updatedAt: new Date(conversation.updatedAt),
       })
@@ -274,36 +282,69 @@ export class DefinitionManager {
   }
 
   /**
-   * Get the model profile ID for this conversation's persona.
+   * Get the resolved model profile ID for this conversation.
    */
   getModelProfileId(): string {
-    const persona = this.getPersona();
-    if (!persona) {
-      throw new Error('No persona configured for this agent');
+    const conv = this.getConversation();
+    if (!conv.resolvedModelProfileId) {
+      throw new Error('No model profile resolved for this conversation');
     }
-    return persona.modelProfileId;
+    return conv.resolvedModelProfileId;
   }
 
   /**
-   * Get the context assembly workflow definition ID.
+   * Get the resolved model profile version for this conversation.
    */
-  getContextAssemblyWorkflowDefId(): string {
-    const persona = this.getPersona();
-    if (!persona) {
-      throw new Error('No persona configured for this agent');
+  getModelProfileVersion(): number {
+    const conv = this.getConversation();
+    if (!conv.resolvedModelProfileVersion) {
+      throw new Error('No model profile version resolved for this conversation');
     }
-    return persona.contextAssemblyWorkflowDefId;
+    return conv.resolvedModelProfileVersion;
   }
 
   /**
-   * Get the memory extraction workflow definition ID.
+   * Get the resolved context assembly workflow ID for this conversation.
    */
-  getMemoryExtractionWorkflowDefId(): string {
-    const persona = this.getPersona();
-    if (!persona) {
-      throw new Error('No persona configured for this agent');
+  getContextAssemblyWorkflowId(): string {
+    const conv = this.getConversation();
+    if (!conv.resolvedContextAssemblyWorkflowId) {
+      throw new Error('No context assembly workflow resolved for this conversation');
     }
-    return persona.memoryExtractionWorkflowDefId;
+    return conv.resolvedContextAssemblyWorkflowId;
+  }
+
+  /**
+   * Get the resolved context assembly workflow version for this conversation.
+   */
+  getContextAssemblyWorkflowVersion(): number {
+    const conv = this.getConversation();
+    if (!conv.resolvedContextAssemblyWorkflowVersion) {
+      throw new Error('No context assembly workflow version resolved for this conversation');
+    }
+    return conv.resolvedContextAssemblyWorkflowVersion;
+  }
+
+  /**
+   * Get the resolved memory extraction workflow ID for this conversation.
+   */
+  getMemoryExtractionWorkflowId(): string {
+    const conv = this.getConversation();
+    if (!conv.resolvedMemoryExtractionWorkflowId) {
+      throw new Error('No memory extraction workflow resolved for this conversation');
+    }
+    return conv.resolvedMemoryExtractionWorkflowId;
+  }
+
+  /**
+   * Get the resolved memory extraction workflow version for this conversation.
+   */
+  getMemoryExtractionWorkflowVersion(): number {
+    const conv = this.getConversation();
+    if (!conv.resolvedMemoryExtractionWorkflowVersion) {
+      throw new Error('No memory extraction workflow version resolved for this conversation');
+    }
+    return conv.resolvedMemoryExtractionWorkflowVersion;
   }
 
   /**

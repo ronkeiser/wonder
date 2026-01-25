@@ -97,8 +97,8 @@ export async function listWorkflowRuns(
   if (filters.workflowId) {
     conditions.push(eq(workflowRuns.workflowId, filters.workflowId));
   }
-  if (filters.workflowDefId) {
-    conditions.push(eq(workflowRuns.workflowDefId, filters.workflowDefId));
+  if (filters.definitionId) {
+    conditions.push(eq(workflowRuns.definitionId, filters.definitionId));
   }
   if (filters.status && filters.status.length > 0) {
     conditions.push(inArray(workflowRuns.status, filters.status));
@@ -155,7 +155,7 @@ export async function listWorkflowRuns(
 }
 
 /**
- * Create a workflow run directly from a workflow definition (no workflow record).
+ * Create a workflow run directly from a definition (no workflow record).
  * Used for agent workflows like context assembly that are library-level.
  */
 export async function createWorkflowRunFromDef(
@@ -163,8 +163,8 @@ export async function createWorkflowRunFromDef(
   data: {
     id: string;
     projectId: string;
-    workflowDefId: string;
-    workflowVersion: number;
+    definitionId: string;
+    definitionVersion: number;
     status: 'running' | 'completed' | 'failed' | 'waiting';
     context: object;
     activeTokens: object[];

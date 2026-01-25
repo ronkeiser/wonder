@@ -2,8 +2,40 @@
 
 import { ConflictError, NotFoundError, extractDbError } from '~/shared/errors';
 import { Resource } from '~/shared/resource';
-import * as repo from './repository';
-import type { ModelId, ModelProfile, ModelProfileInput, ModelProvider } from './types';
+import {
+  createDefinition,
+  deleteDefinition,
+  getDefinition,
+  getLatestDefinition,
+  listDefinitions,
+  type Definition,
+} from '~/shared/definitions-repository';
+import type { ModelProfileContent } from '~/shared/content-schemas';
+import type { ModelProfile, ModelProfileInput, ModelProvider } from './types';
+
+/**
+ * Maps a Definition to the legacy ModelProfile shape for API compatibility.
+ */
+function toModelProfile(def: Definition): ModelProfile {
+  const content = def.content as ModelProfileContent;
+  // Provider is stored as string in content, but we validate it matches ModelProvider at creation time
+  const provider = content.provider as ModelProvider;
+  return {
+    id: def.id,
+    version: def.version,
+    name: content.name,
+    reference: def.reference,
+    provider,
+    modelId: content.modelId,
+    parameters: content.parameters,
+    executionConfig: content.executionConfig ?? null,
+    costPer1kInputTokens: content.costPer1kInputTokens,
+    costPer1kOutputTokens: content.costPer1kOutputTokens,
+    contentHash: def.contentHash,
+    createdAt: def.createdAt,
+    updatedAt: def.updatedAt,
+  };
+}
 
 export class ModelProfiles extends Resource {
   async create(data: ModelProfileInput & { autoversion?: boolean }): Promise<{
@@ -20,37 +52,40 @@ export class ModelProfiles extends Resource {
       'create',
       { metadata: { name: data.name, provider: data.provider, autoversion: data.autoversion } },
       async () => {
-        // Autoversion deduplication check
-        const autoversionResult = await this.withAutoversion<ModelProfile>(
-          data as unknown as Record<string, unknown> & { name: string; reference?: string; autoversion?: boolean },
-          {
-            findByReferenceAndHash: (reference, hash) =>
-              repo.getModelProfileByReferenceAndHash(this.serviceCtx.db, reference, hash),
-            getMaxVersion: (reference) => repo.getMaxVersionByReference(this.serviceCtx.db, reference),
-          },
-        );
-
-        if (autoversionResult.reused) {
-          return {
-            modelProfileId: autoversionResult.entity.id,
-            modelProfile: autoversionResult.entity,
-            reused: true,
-            version: 1, // Model profiles don't have versioning yet
-            latestVersion: autoversionResult.latestVersion,
-          };
-        }
+        // Model profiles use reference for identity (fall back to name if not provided)
+        const reference = data.reference ?? data.name;
 
         try {
-          const profile = await repo.createModelProfile(this.serviceCtx.db, {
-            ...data,
-            contentHash: autoversionResult.contentHash,
+          const result = await createDefinition(this.serviceCtx.db, 'model_profile', {
+            reference,
+            name: data.name,
+            content: {
+              name: data.name,
+              provider: data.provider,
+              modelId: data.modelId,
+              parameters: data.parameters ?? {},
+              executionConfig: data.executionConfig,
+              costPer1kInputTokens: data.costPer1kInputTokens ?? 0,
+              costPer1kOutputTokens: data.costPer1kOutputTokens ?? 0,
+            },
+            autoversion: data.autoversion,
           });
 
+          if (result.reused) {
+            return {
+              modelProfileId: result.definition.id,
+              modelProfile: toModelProfile(result.definition),
+              reused: true,
+              version: result.definition.version,
+              latestVersion: result.latestVersion,
+            };
+          }
+
           return {
-            modelProfileId: profile.id,
-            modelProfile: profile,
+            modelProfileId: result.definition.id,
+            modelProfile: toModelProfile(result.definition),
             reused: false,
-            version: autoversionResult.version,
+            version: result.definition.version,
           };
         } catch (error) {
           const dbError = extractDbError(error);
@@ -69,18 +104,20 @@ export class ModelProfiles extends Resource {
     );
   }
 
-  async get(id: string): Promise<{
+  async get(id: string, version?: number): Promise<{
     modelProfile: ModelProfile;
   }> {
     return this.withLogging(
       'get',
-      { modelProfileId: id, metadata: { modelProfileId: id } },
+      { modelProfileId: id, metadata: { modelProfileId: id, version } },
       async () => {
-        const profile = await repo.getModelProfile(this.serviceCtx.db, id);
-        if (!profile) {
+        const definition = await getDefinition(this.serviceCtx.db, id, version);
+
+        if (!definition || definition.kind !== 'model_profile') {
           throw new NotFoundError(`ModelProfile not found: ${id}`, 'modelProfile', id);
         }
-        return { modelProfile: profile as ModelProfile };
+
+        return { modelProfile: toModelProfile(definition) };
       },
     );
   }
@@ -89,31 +126,40 @@ export class ModelProfiles extends Resource {
     modelProfiles: ModelProfile[];
   }> {
     return this.withLogging('list', { metadata: params }, async () => {
-      // If name is specified, find by name (efficient single-row lookup)
+      // If name is specified, find by reference (name is normalized to reference)
       if (params?.name) {
-        const profile = await repo.getModelProfileByName(this.serviceCtx.db, params.name);
-        return { modelProfiles: profile ? [profile] : [] };
+        const definition = await getLatestDefinition(this.serviceCtx.db, 'model_profile', params.name);
+        return { modelProfiles: definition ? [toModelProfile(definition)] : [] };
       }
 
-      const profiles = params?.provider
-        ? await repo.listModelProfilesByProvider(this.serviceCtx.db, params.provider, params.limit)
-        : await repo.listModelProfiles(this.serviceCtx.db, params?.limit);
+      const defs = await listDefinitions(this.serviceCtx.db, 'model_profile', {
+        limit: params?.limit,
+        latestOnly: true,
+      });
+
+      let profiles = defs.map(toModelProfile);
+
+      // Filter by provider if specified
+      if (params?.provider) {
+        profiles = profiles.filter((p) => p.provider === params.provider);
+      }
 
       return { modelProfiles: profiles };
     });
   }
 
-  async delete(id: string): Promise<{ success: boolean }> {
+  async delete(id: string, version?: number): Promise<{ success: boolean }> {
     return this.withLogging(
       'delete',
-      { modelProfileId: id, metadata: { modelProfileId: id } },
+      { modelProfileId: id, metadata: { modelProfileId: id, version } },
       async () => {
-        const profile = await repo.getModelProfile(this.serviceCtx.db, id);
-        if (!profile) {
+        const existing = await getDefinition(this.serviceCtx.db, id, version);
+
+        if (!existing || existing.kind !== 'model_profile') {
           throw new NotFoundError(`ModelProfile not found: ${id}`, 'modelProfile', id);
         }
 
-        await repo.deleteModelProfile(this.serviceCtx.db, id);
+        await deleteDefinition(this.serviceCtx.db, id, version);
         return { success: true };
       },
     );

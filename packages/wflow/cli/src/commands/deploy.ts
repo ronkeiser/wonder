@@ -341,10 +341,10 @@ async function createDefinition(
         name: displayName,
         reference: refString,
         libraryId: libraryId ?? undefined,
-        // Resolve reference IDs to server IDs (workflow references resolve to workflow_def IDs)
-        modelProfileId: resolveReferenceId(doc.modelProfileId as string | undefined, serverIds),
-        contextAssemblyWorkflowDefId: resolveReferenceId(doc.contextAssemblyWorkflowDefId as string | undefined, serverIds),
-        memoryExtractionWorkflowDefId: resolveReferenceId(doc.memoryExtractionWorkflowDefId as string | undefined, serverIds),
+        // Pass refs directly - server expects refs, not resolved IDs
+        modelProfileRef: doc.modelProfileRef as string,
+        contextAssemblyWorkflowRef: doc.contextAssemblyWorkflowRef as string,
+        memoryExtractionWorkflowRef: doc.memoryExtractionWorkflowRef as string,
         autoversion: !options.force,
       } as unknown as Parameters<typeof client.personas.create>[0]);
       const latestVersion = (result as { latestVersion?: number }).latestVersion;

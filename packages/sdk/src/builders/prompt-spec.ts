@@ -38,7 +38,7 @@ export function promptSpec(config: {
   template: string;
   requires: Record<string, unknown>;
   produces: JSONSchema;
-  examples?: unknown[];
+  examples?: Record<string, unknown>;
   tags?: string[];
 }): EmbeddedPromptSpec {
   return {

@@ -1,8 +1,7 @@
 /** Type definitions for workflow definitions */
 
-import { nodes, transitions, workflowDefs } from '../../schema';
+import { nodes, transitions } from '../../schema';
 import type { MergeConfig } from '../../schema/types';
-import type { NewEntity } from '~/shared/types';
 
 // Re-export schema types for convenience
 export type {
@@ -17,9 +16,6 @@ export type {
 // Entity Types (inferred from schema)
 // ============================================================================
 
-/** WorkflowDef entity - inferred from database schema */
-export type WorkflowDef = typeof workflowDefs.$inferSelect;
-
 /** Node entity - inferred from database schema */
 export type Node = typeof nodes.$inferSelect;
 
@@ -27,22 +23,32 @@ export type Node = typeof nodes.$inferSelect;
 export type Transition = typeof transitions.$inferSelect;
 
 // ============================================================================
-// Input Types (inferred from schema with API modifications)
+// Input Types (for API layer)
 // ============================================================================
 
-/** Base insert type for workflow defs */
-type WorkflowDefInsert = NewEntity<typeof workflowDefs.$inferInsert>;
-
-/** Input for creating a workflow def - uses refs instead of IDs, includes nested entities */
-export type WorkflowDefInput = Omit<WorkflowDefInsert, 'initialNodeId' | 'contentHash'> & {
+/**
+ * Input for creating a workflow def.
+ * Uses refs instead of IDs, includes nested entities.
+ */
+export type WorkflowDefInput = {
+  name: string;
+  description?: string;
+  reference?: string;
+  projectId?: string | null;
+  libraryId?: string | null;
+  tags?: string[] | null;
+  inputSchema: Record<string, unknown>;
+  outputSchema: Record<string, unknown>;
+  outputMapping?: Record<string, unknown> | null;
+  contextSchema?: Record<string, unknown> | null;
   initialNodeRef: string;
   nodes: NodeInput[];
   transitions?: TransitionInput[];
   autoversion?: boolean;
 };
 
-/** Node input - uses ref instead of id, omits workflow FK fields */
-export type NodeInput = Omit<typeof nodes.$inferInsert, 'id' | 'workflowDefId' | 'workflowDefVersion'> & {
+/** Node input - uses ref instead of id, omits definition FK fields */
+export type NodeInput = Omit<typeof nodes.$inferInsert, 'id' | 'definitionId' | 'definitionVersion'> & {
   ref: string;
 };
 
@@ -61,11 +67,38 @@ export type SynchronizationInput = {
 /** Transition input - uses refs instead of IDs, condition is a string to be parsed */
 export type TransitionInput = Omit<
   typeof transitions.$inferInsert,
-  'id' | 'workflowDefId' | 'workflowDefVersion' | 'fromNodeId' | 'toNodeId' | 'condition' | 'synchronization'
+  'id' | 'definitionId' | 'definitionVersion' | 'fromNodeId' | 'toNodeId' | 'condition' | 'synchronization'
 > & {
   ref?: string;
   fromNodeRef: string;
   toNodeRef: string;
   condition?: string; // Expression string (e.g., "state.score >= 80") - gets parsed to AST
   synchronization?: SynchronizationInput;
+};
+
+// ============================================================================
+// WorkflowDef Entity Type (API-facing shape)
+// ============================================================================
+
+/**
+ * WorkflowDef entity - the API-facing shape.
+ * Internally stored in the unified `definitions` table.
+ */
+export type WorkflowDef = {
+  id: string;
+  version: number;
+  name: string;
+  description: string;
+  reference: string;
+  projectId: string | null;
+  libraryId: string | null;
+  tags: string[] | null;
+  inputSchema: object;
+  outputSchema: object;
+  outputMapping: object | null;
+  contextSchema: object | null;
+  initialNodeId: string | null;
+  contentHash: string;
+  createdAt: string;
+  updatedAt: string;
 };

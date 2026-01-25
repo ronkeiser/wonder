@@ -58,43 +58,43 @@ export function validatePersonaDocument(doc: PersonaDocument, imports: ImportsMa
     });
   }
 
-  // Validate modelProfileId is present
-  if (!doc.modelProfileId) {
+  // Validate modelProfileRef is present
+  if (!doc.modelProfileRef) {
     diagnostics.push({
       severity: DiagnosticSeverity.Error,
       range: {
         start: { line: 0, character: 0 },
         end: { line: 0, character: 0 },
       },
-      message: "Missing required property 'model_profile_id'",
+      message: "Missing required property 'model_profile_ref'",
       source: 'wflow',
       code: 'MISSING_REQUIRED',
     });
   }
 
-  // Validate contextAssemblyWorkflowDefId is present
-  if (!doc.contextAssemblyWorkflowDefId) {
+  // Validate contextAssemblyWorkflowRef is present
+  if (!doc.contextAssemblyWorkflowRef) {
     diagnostics.push({
       severity: DiagnosticSeverity.Error,
       range: {
         start: { line: 0, character: 0 },
         end: { line: 0, character: 0 },
       },
-      message: "Missing required property 'context_assembly_workflow_id'",
+      message: "Missing required property 'context_assembly_workflow_ref'",
       source: 'wflow',
       code: 'MISSING_REQUIRED',
     });
   }
 
-  // Validate memoryExtractionWorkflowDefId is present
-  if (!doc.memoryExtractionWorkflowDefId) {
+  // Validate memoryExtractionWorkflowRef is present
+  if (!doc.memoryExtractionWorkflowRef) {
     diagnostics.push({
       severity: DiagnosticSeverity.Error,
       range: {
         start: { line: 0, character: 0 },
         end: { line: 0, character: 0 },
       },
-      message: "Missing required property 'memory_extraction_workflow_id'",
+      message: "Missing required property 'memory_extraction_workflow_ref'",
       source: 'wflow',
       code: 'MISSING_REQUIRED',
     });

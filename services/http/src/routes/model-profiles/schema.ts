@@ -48,31 +48,17 @@ export const ModelProfileSchema = z
   .object({
     id: ulid(),
     name: z.string(),
-    reference: z.string().nullable().openapi({ description: 'Stable identity for autoversion scoping' }),
-    provider: z.enum(['anthropic', 'openai', 'google', 'cloudflare', 'local']),
-    modelId: z.enum([
-      // Cloudflare Workers AI models
-      '@cf/meta/llama-4-scout-17b-16e-instruct',
-      '@cf/meta/llama-3.3-70b-instruct-fp8-fast',
-      '@cf/openai/gpt-oss-120b',
-      '@cf/openai/gpt-oss-20b',
-      // Anthropic Claude models
-      'claude-opus-4-20250514',
-      'claude-sonnet-4-20250514',
-      'claude-3-5-sonnet-20241022',
-      'claude-3-5-haiku-20241022',
-      'claude-3-opus-20240229',
-      'claude-3-haiku-20240307',
-      // Dummy providers for testing
-      'anthropic-dummy',
-      'openai-dummy',
-      'google-dummy',
-      'local-dummy',
-    ]),
-    parameters: z.any().nullable(),
+    version: z.number(),
+    reference: z.string().openapi({ description: 'Stable identity for autoversion scoping' }),
+    provider: z.string().openapi({ example: 'anthropic' }),
+    modelId: z.string().openapi({ example: 'claude-3-5-sonnet-20241022' }),
+    parameters: z.any(),
     executionConfig: z.any().nullable(),
     costPer1kInputTokens: z.number(),
     costPer1kOutputTokens: z.number(),
+    contentHash: z.string(),
+    createdAt: z.string(),
+    updatedAt: z.string(),
   })
   .openapi('ModelProfile');
 

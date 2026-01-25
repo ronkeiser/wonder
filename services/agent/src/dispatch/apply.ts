@@ -492,7 +492,7 @@ async function dispatchMemoryExtraction(
   decision: Extract<AgentDecision, { type: 'DISPATCH_MEMORY_EXTRACTION' }>,
   ctx: DispatchContext,
 ): Promise<void> {
-  const { turnId, workflowDefId, projectId, input } = decision;
+  const { turnId, workflowDefId, workflowDefVersion, projectId, input } = decision;
 
   ctx.emitter.emitTrace({
     type: 'dispatch.memory_extraction.queued',
@@ -512,7 +512,7 @@ async function dispatchMemoryExtraction(
         type: 'memory_extraction',
       },
     },
-    { projectId },
+    { projectId, version: workflowDefVersion },
   );
 
   // Link to turn

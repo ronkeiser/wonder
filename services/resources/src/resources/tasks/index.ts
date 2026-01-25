@@ -2,10 +2,42 @@
 
 import { ulid } from 'ulid';
 import { ConflictError, NotFoundError, extractDbError } from '~/shared/errors';
-import type { Step } from '../../schema';
 import { Resource } from '~/shared/resource';
-import * as repo from './repository';
-import type { Task, TaskInput } from './types';
+import {
+  createDefinition,
+  deleteDefinition,
+  getDefinition,
+  getLatestDefinition,
+  listDefinitions,
+  type Definition,
+} from '~/shared/definitions-repository';
+import type { TaskContent } from '~/shared/content-schemas';
+import type { Step, Task, TaskInput } from './types';
+
+/**
+ * Maps a Definition to the legacy Task shape for API compatibility.
+ */
+function toTask(def: Definition): Task {
+  const content = def.content as TaskContent;
+  return {
+    id: def.id,
+    version: def.version,
+    name: content.name,
+    description: def.description,
+    reference: def.reference,
+    projectId: def.projectId,
+    libraryId: def.libraryId,
+    tags: null, // Tags could be stored in content if needed
+    inputSchema: content.inputSchema,
+    outputSchema: content.outputSchema,
+    steps: content.steps,
+    retry: content.retry ?? null,
+    timeoutMs: content.timeoutMs ?? null,
+    contentHash: def.contentHash,
+    createdAt: def.createdAt,
+    updatedAt: def.updatedAt,
+  };
+}
 
 export class Tasks extends Resource {
   async create(data: TaskInput): Promise<{
@@ -23,44 +55,12 @@ export class Tasks extends Resource {
       metadata: { name: data.name, autoversion: data.autoversion ?? false },
     });
 
-    const scope = {
-      projectId: data.projectId ?? null,
-      libraryId: data.libraryId ?? null,
-    };
-
-    const autoversionResult = await this.withAutoversion<Task>(
-      data,
-      {
-        findByReferenceAndHash: (reference, hash, s) =>
-          repo.getTaskByReferenceAndHash(
-            this.serviceCtx.db,
-            reference,
-            hash,
-            s?.projectId ?? null,
-            s?.libraryId ?? null,
-          ),
-        getMaxVersion: (reference, s) =>
-          repo.getMaxVersionByReference(
-            this.serviceCtx.db,
-            reference,
-            s?.projectId ?? null,
-            s?.libraryId ?? null,
-          ),
-      },
-      scope,
-    );
-
-    if (autoversionResult.reused) {
-      return {
-        taskId: autoversionResult.entity.id,
-        task: autoversionResult.entity,
-        reused: true,
-        version: autoversionResult.entity.version,
-        latestVersion: autoversionResult.latestVersion,
-      };
+    // Tasks require a reference for autoversioning
+    if (data.autoversion && !data.reference) {
+      throw new Error('reference is required when autoversion is true');
     }
 
-    const version = data.autoversion ? autoversionResult.version : (data.version ?? 1);
+    const reference = data.reference ?? data.name;
 
     // Generate step IDs
     const stepsWithIds: Step[] = data.steps.map((step) => ({
@@ -69,18 +69,38 @@ export class Tasks extends Resource {
     }));
 
     try {
-      const task = await repo.createTask(this.serviceCtx.db, {
-        ...data,
-        version,
-        steps: stepsWithIds,
-        contentHash: autoversionResult.contentHash,
+      const result = await createDefinition(this.serviceCtx.db, 'task', {
+        reference,
+        name: data.name,
+        description: data.description,
+        projectId: data.projectId,
+        libraryId: data.libraryId,
+        content: {
+          name: data.name,
+          inputSchema: data.inputSchema,
+          outputSchema: data.outputSchema,
+          steps: stepsWithIds,
+          retry: data.retry,
+          timeoutMs: data.timeoutMs,
+        },
+        autoversion: data.autoversion,
       });
 
+      if (result.reused) {
+        return {
+          taskId: result.definition.id,
+          task: toTask(result.definition),
+          reused: true,
+          version: result.definition.version,
+          latestVersion: result.latestVersion,
+        };
+      }
+
       return {
-        taskId: task.id,
-        task,
+        taskId: result.definition.id,
+        task: toTask(result.definition),
         reused: false,
-        version,
+        version: result.definition.version,
       };
     } catch (error) {
       const dbError = extractDbError(error);
@@ -108,11 +128,9 @@ export class Tasks extends Resource {
     task: Task;
   }> {
     return this.withLogging('get', { metadata: { taskId: id, version } }, async () => {
-      const task = version
-        ? await repo.getTaskVersion(this.serviceCtx.db, id, version)
-        : await repo.getLatestTask(this.serviceCtx.db, id);
+      const definition = await getDefinition(this.serviceCtx.db, id, version);
 
-      if (!task) {
+      if (!definition || definition.kind !== 'task') {
         throw new NotFoundError(
           `Task not found: ${id}${version ? ` version ${version}` : ''}`,
           'task',
@@ -120,7 +138,7 @@ export class Tasks extends Resource {
         );
       }
 
-      return { task };
+      return { task: toTask(definition) };
     });
   }
 
@@ -133,47 +151,32 @@ export class Tasks extends Resource {
     tasks: Task[];
   }> {
     return this.withLogging('list', { metadata: options }, async () => {
-      // If name is specified, return single-item list or empty
+      // If name is specified, find by reference (name is normalized to reference)
       if (options?.name) {
-        const task = await repo.getTaskByName(
+        const definition = await getLatestDefinition(
           this.serviceCtx.db,
+          'task',
           options.name,
-          options?.projectId ?? null,
-          options?.libraryId ?? null,
+          { projectId: options.projectId ?? null, libraryId: options.libraryId ?? null },
         );
-        return { tasks: task ? [task] : [] };
+        return { tasks: definition ? [toTask(definition)] : [] };
       }
 
-      let tasks: Task[];
+      const defs = await listDefinitions(this.serviceCtx.db, 'task', {
+        projectId: options?.projectId,
+        libraryId: options?.libraryId,
+        limit: options?.limit,
+      });
 
-      if (options?.projectId) {
-        tasks = await repo.listTasksByProject(
-          this.serviceCtx.db,
-          options.projectId,
-          options?.limit,
-        );
-      } else if (options?.libraryId) {
-        tasks = await repo.listTasksByLibrary(
-          this.serviceCtx.db,
-          options.libraryId,
-          options?.limit,
-        );
-      } else {
-        tasks = await repo.listTasks(this.serviceCtx.db, options?.limit);
-      }
-
-      return { tasks };
+      return { tasks: defs.map(toTask) };
     });
   }
 
   async delete(id: string, version?: number): Promise<{ success: boolean }> {
     return this.withLogging('delete', { metadata: { taskId: id, version } }, async () => {
-      // Check if exists first
-      const existing = version
-        ? await repo.getTaskVersion(this.serviceCtx.db, id, version)
-        : await repo.getLatestTask(this.serviceCtx.db, id);
+      const existing = await getDefinition(this.serviceCtx.db, id, version);
 
-      if (!existing) {
+      if (!existing || existing.kind !== 'task') {
         throw new NotFoundError(
           `Task not found: ${id}${version ? ` version ${version}` : ''}`,
           'task',
@@ -181,7 +184,7 @@ export class Tasks extends Resource {
         );
       }
 
-      await repo.deleteTask(this.serviceCtx.db, id, version);
+      await deleteDefinition(this.serviceCtx.db, id, version);
       return { success: true };
     });
   }

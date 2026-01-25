@@ -19,13 +19,10 @@ export type { TokenStatus, WorkflowStatus } from '../types';
 /**
  * Definition tables (imported from Resources service)
  */
-export { nodes, transitions, workflowDefs, workflowRuns } from '@wonder/resources/schemas';
+export { definitions, nodes, transitions, workflowRuns } from '@wonder/resources/schemas';
 
 // Legacy snake_case re-exports for backward compatibility during migration
-export {
-  workflowDefs as workflow_defs,
-  workflowRuns as workflow_runs,
-} from '@wonder/resources/schemas';
+export { workflowRuns as workflow_runs } from '@wonder/resources/schemas';
 
 /**
  * Execution tables (internal coordinator state)

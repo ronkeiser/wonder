@@ -15,6 +15,8 @@ export interface TestContext {
   workspaceId: string;
   projectId: string;
   modelProfileId: string;
+  /** Model profile reference (for persona creation) */
+  modelProfileRef: string;
 }
 
 // =============================================================================
@@ -44,6 +46,8 @@ export interface Deletable {
 
 export interface WorkflowTestSetup extends TestContext {
   workflowDefId: string;
+  /** Workflow def reference (for persona creation) */
+  workflowDefRef: string;
   workflowId: string;
   /** IDs of all created resources for cleanup (in creation order) */
   createdResources: CreatedResources;

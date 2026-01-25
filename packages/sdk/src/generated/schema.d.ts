@@ -3115,16 +3115,20 @@ export interface components {
         ModelProfile: {
             id: string;
             name: string;
+            version: number;
             /** @description Stable identity for autoversion scoping */
-            reference: string | null;
-            /** @enum {string} */
-            provider: "anthropic" | "openai" | "google" | "cloudflare" | "local";
-            /** @enum {string} */
-            modelId: "@cf/meta/llama-4-scout-17b-16e-instruct" | "@cf/meta/llama-3.3-70b-instruct-fp8-fast" | "@cf/openai/gpt-oss-120b" | "@cf/openai/gpt-oss-20b" | "claude-opus-4-20250514" | "claude-sonnet-4-20250514" | "claude-3-5-sonnet-20241022" | "claude-3-5-haiku-20241022" | "claude-3-opus-20240229" | "claude-3-haiku-20240307" | "anthropic-dummy" | "openai-dummy" | "google-dummy" | "local-dummy";
+            reference: string;
+            /** @example anthropic */
+            provider: string;
+            /** @example claude-3-5-sonnet-20241022 */
+            modelId: string;
             parameters?: unknown;
             executionConfig?: unknown;
             costPer1kInputTokens: number;
             costPer1kOutputTokens: number;
+            contentHash: string;
+            createdAt: string;
+            updatedAt: string;
         };
         ModelProfileGetResponse: {
             modelProfile: components["schemas"]["ModelProfile"];
@@ -3181,19 +3185,22 @@ export interface components {
             version: number;
             name: string;
             /** @description Stable identity for autoversion scoping */
-            reference: string | null;
+            reference: string;
             description: string;
             libraryId: string | null;
             systemPrompt: string;
-            modelProfileId: string;
-            contextAssemblyWorkflowDefId: string;
-            memoryExtractionWorkflowDefId: string;
+            modelProfileRef: string;
+            modelProfileVersion: number | null;
+            contextAssemblyWorkflowRef: string;
+            contextAssemblyWorkflowVersion: number | null;
+            memoryExtractionWorkflowRef: string;
+            memoryExtractionWorkflowVersion: number | null;
             recentTurnsLimit: number;
             toolIds: string[];
             constraints: {
                 maxMovesPerTurn?: number;
             } | null;
-            contentHash: string | null;
+            contentHash: string;
             createdAt: string;
             updatedAt: string;
         };
@@ -3224,12 +3231,18 @@ export interface components {
             libraryId?: string;
             /** @example You are a helpful code reviewer. */
             systemPrompt: string;
-            /** @example 01ARZ3NDEKTSV4RRFFQ69G5FAV */
-            modelProfileId: string;
-            /** @example wfdef_context */
-            contextAssemblyWorkflowDefId: string;
-            /** @example wfdef_memory */
-            memoryExtractionWorkflowDefId: string;
+            /** @example claude-3-5-sonnet */
+            modelProfileRef: string;
+            /** @example 1 */
+            modelProfileVersion?: number | null;
+            /** @example core/context-assembly */
+            contextAssemblyWorkflowRef: string;
+            /** @example 1 */
+            contextAssemblyWorkflowVersion?: number | null;
+            /** @example core/memory-extraction */
+            memoryExtractionWorkflowRef: string;
+            /** @example 1 */
+            memoryExtractionWorkflowVersion?: number | null;
             /**
              * @default 20
              * @example 20
@@ -3310,9 +3323,11 @@ export interface components {
                 [key: string]: unknown;
             };
             produces: JSONSchema;
-            examples: unknown[] | null;
+            examples: {
+                [key: string]: unknown;
+            } | null;
             tags: string[] | null;
-            contentHash: string | null;
+            contentHash: string;
             createdAt: string;
             updatedAt: string;
         };
@@ -3350,7 +3365,9 @@ export interface components {
              *     }
              */
             produces: JSONSchema;
-            examples?: unknown[];
+            examples?: {
+                [key: string]: unknown;
+            };
             tags?: string[];
             /** @description When true, compute content hash for deduplication. If existing spec with same name and content exists, return it. Otherwise auto-increment version. */
             autoversion?: boolean;
@@ -3365,7 +3382,7 @@ export interface components {
             libraries: {
                 [key: string]: {
                     definitions: {
-                        [key: string]: "workflow" | "task" | "action" | "tool";
+                        [key: string]: "workflow" | "task" | "action" | "tool" | "persona" | "prompt_spec" | "artifact_type" | "model_profile";
                     };
                 };
             };
@@ -3374,7 +3391,7 @@ export interface components {
             definitions: {
                 name: string;
                 /** @enum {string} */
-                type: "workflow" | "task" | "action" | "tool";
+                type: "workflow" | "task" | "action" | "tool" | "persona" | "prompt_spec" | "artifact_type" | "model_profile";
                 id: string;
             }[];
         };
@@ -3785,8 +3802,8 @@ export interface components {
         };
         Node: {
             id: string;
-            workflowDefId: string;
-            workflowDefVersion: number;
+            definitionId: string;
+            definitionVersion: number;
             ref: string;
             name: string;
             taskId: string | null;
@@ -3805,8 +3822,8 @@ export interface components {
         };
         Transition: {
             id: string;
-            workflowDefId: string;
-            workflowDefVersion: number;
+            definitionId: string;
+            definitionVersion: number;
             ref: string | null;
             fromNodeId: string;
             toNodeId: string;
@@ -3836,8 +3853,8 @@ export interface components {
             projectId: string;
             workflowId: string | null;
             workflowName: string;
-            workflowDefId: string;
-            workflowVersion: number;
+            definitionId: string;
+            definitionVersion: number;
             /** @enum {string} */
             status: "running" | "completed" | "failed" | "waiting";
             parentRunId: string | null;
@@ -3871,7 +3888,7 @@ export interface components {
         Workflow: {
             id: string;
             projectId: string;
-            workflowDefId: string;
+            definitionId: string;
             name: string;
             description: string | null;
             createdAt: string;
@@ -3885,7 +3902,7 @@ export interface components {
             /** @example 01ARZ3NDEKTSV4RRFFQ69G5FAV */
             projectId: string;
             /** @example 01ARZ3NDEKTSV4RRFFQ69G5FAV */
-            workflowDefId: string;
+            definitionId: string;
             /** @example My Workflow Instance */
             name: string;
             /** @example Production workflow instance */

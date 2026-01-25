@@ -1,9 +1,7 @@
 /** Type definitions for personas */
 
-import { personas } from '../../schema';
-
 // ============================================================================
-// Embedded JSON Types (explicit - used by schema via .$type<T>())
+// Embedded JSON Types
 // ============================================================================
 
 /**
@@ -15,22 +13,75 @@ export type AgentConstraints = {
 };
 
 // ============================================================================
-// Entity Types (inferred from schema)
+// Entity Types
 // ============================================================================
 
-/** Persona entity - inferred from database schema */
-export type Persona = typeof personas.$inferSelect;
+/**
+ * Persona entity - the API-facing shape.
+ * Internally stored in the unified `definitions` table.
+ *
+ * BREAKING CHANGE: Now uses reference-based fields instead of ID-based:
+ * - modelProfileRef + modelProfileVersion (replaces modelProfileId)
+ * - contextAssemblyWorkflowRef + contextAssemblyWorkflowVersion (replaces contextAssemblyWorkflowDefId)
+ * - memoryExtractionWorkflowRef + memoryExtractionWorkflowVersion (replaces memoryExtractionWorkflowDefId)
+ */
+export type Persona = {
+  id: string;
+  version: number;
+  name: string;
+  description: string;
+  reference: string;
+  libraryId: string | null;
+  systemPrompt: string;
+
+  // Reference-based model profile (null version = latest)
+  modelProfileRef: string;
+  modelProfileVersion: number | null;
+
+  // Reference-based workflow definitions (null version = latest)
+  contextAssemblyWorkflowRef: string;
+  contextAssemblyWorkflowVersion: number | null;
+  memoryExtractionWorkflowRef: string;
+  memoryExtractionWorkflowVersion: number | null;
+
+  recentTurnsLimit: number;
+  toolIds: string[];
+  constraints: AgentConstraints | null;
+
+  contentHash: string;
+  createdAt: string;
+  updatedAt: string;
+};
 
 // ============================================================================
-// API DTOs (inferred from schema with API-specific modifications)
+// API DTOs
 // ============================================================================
 
-import type { NewEntity } from '~/shared/types';
+/**
+ * API input for creating a persona.
+ *
+ * BREAKING CHANGE: Now uses reference-based fields instead of ID-based.
+ */
+export type PersonaInput = {
+  name: string;
+  description?: string;
+  reference?: string;
+  libraryId?: string | null;
+  systemPrompt: string;
 
-/** Base input for creating a persona - inferred from schema */
-type PersonaInsert = NewEntity<typeof personas.$inferInsert>;
+  // Reference-based model profile (null version = latest)
+  modelProfileRef: string;
+  modelProfileVersion?: number | null;
 
-/** API input for creating a persona - adds autoversion */
-export type PersonaInput = Omit<PersonaInsert, 'contentHash'> & {
+  // Reference-based workflow definitions (null version = latest)
+  contextAssemblyWorkflowRef: string;
+  contextAssemblyWorkflowVersion?: number | null;
+  memoryExtractionWorkflowRef: string;
+  memoryExtractionWorkflowVersion?: number | null;
+
+  recentTurnsLimit?: number;
+  toolIds: string[];
+  constraints?: AgentConstraints | null;
+
   autoversion?: boolean;
 };

@@ -603,10 +603,11 @@ async function applyOne(decision: Decision, ctx: DispatchContext): Promise<Apply
             switch (callback.type) {
               case 'context_assembly':
                 // Workflow output contains llmRequest - pass as context
+                // Type assertion is safe: context assembly workflow produces LLMRequest-compatible output
                 await agent.handleContextAssemblyResult(
                   callback.turnId,
                   ctx.workflowRunId,
-                  decision.output as { llmRequest: { messages: unknown[] } },
+                  decision.output as Parameters<typeof agent.handleContextAssemblyResult>[2],
                 );
                 break;
               case 'memory_extraction':

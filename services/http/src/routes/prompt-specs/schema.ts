@@ -13,7 +13,7 @@ export const CreatePromptSpecSchema = z
     template: z.string().min(1).openapi({ example: 'Summarize: {{text}}' }),
     requires: z.record(z.string(), z.unknown()).openapi({ example: { text: 'string' } }),
     produces: z.record(z.string(), z.unknown()).openapi({ example: { summary: 'string' } }),
-    examples: z.array(z.unknown()).optional(),
+    examples: z.record(z.string(), z.unknown()).optional(),
     tags: z.array(z.string()).optional(),
     autoversion: z
       .boolean()
@@ -35,9 +35,9 @@ export const PromptSpecSchema = z
     template: z.string(),
     requires: z.record(z.string(), z.unknown()),
     produces: z.record(z.string(), z.unknown()),
-    examples: z.array(z.unknown()).nullable(),
+    examples: z.record(z.string(), z.unknown()).nullable(),
     tags: z.array(z.string()).nullable(),
-    contentHash: z.string().nullable(),
+    contentHash: z.string(),
     createdAt: z.string(),
     updatedAt: z.string(),
   })

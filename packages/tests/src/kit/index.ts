@@ -20,7 +20,7 @@
  * import { runTestConversation, assertConversationInvariants } from '~/kit';
  *
  * const { result, cleanup } = await runTestConversation(
- *   { name: 'Test', contextAssemblyWorkflowDefId: '...', memoryExtractionWorkflowDefId: '...' },
+ *   { name: 'Test', contextAssemblyWorkflowRef: '...', memoryExtractionWorkflowRef: '...' },
  *   [{ role: 'user', content: 'Hello!' }],
  * );
  * assertConversationInvariants(result.trace);

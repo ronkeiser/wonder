@@ -1,144 +1,9 @@
 {
   "version": "6",
   "dialect": "sqlite",
-  "id": "995aaf3e-3eb8-4fed-be2a-57c6af504897",
+  "id": "78792630-9ef0-43cb-afbc-48819129ca34",
   "prevId": "00000000-0000-0000-0000-000000000000",
   "tables": {
-    "actions": {
-      "name": "actions",
-      "columns": {
-        "id": {
-          "name": "id",
-          "type": "text",
-          "primaryKey": false,
-          "notNull": true,
-          "autoincrement": false
-        },
-        "name": {
-          "name": "name",
-          "type": "text",
-          "primaryKey": false,
-          "notNull": true,
-          "autoincrement": false
-        },
-        "description": {
-          "name": "description",
-          "type": "text",
-          "primaryKey": false,
-          "notNull": true,
-          "autoincrement": false,
-          "default": "''"
-        },
-        "version": {
-          "name": "version",
-          "type": "integer",
-          "primaryKey": false,
-          "notNull": true,
-          "autoincrement": false,
-          "default": 1
-        },
-        "reference": {
-          "name": "reference",
-          "type": "text",
-          "primaryKey": false,
-          "notNull": false,
-          "autoincrement": false
-        },
-        "kind": {
-          "name": "kind",
-          "type": "text",
-          "primaryKey": false,
-          "notNull": true,
-          "autoincrement": false
-        },
-        "implementation": {
-          "name": "implementation",
-          "type": "text",
-          "primaryKey": false,
-          "notNull": true,
-          "autoincrement": false
-        },
-        "requires": {
-          "name": "requires",
-          "type": "text",
-          "primaryKey": false,
-          "notNull": false,
-          "autoincrement": false
-        },
-        "produces": {
-          "name": "produces",
-          "type": "text",
-          "primaryKey": false,
-          "notNull": false,
-          "autoincrement": false
-        },
-        "execution": {
-          "name": "execution",
-          "type": "text",
-          "primaryKey": false,
-          "notNull": false,
-          "autoincrement": false
-        },
-        "idempotency": {
-          "name": "idempotency",
-          "type": "text",
-          "primaryKey": false,
-          "notNull": false,
-          "autoincrement": false
-        },
-        "content_hash": {
-          "name": "content_hash",
-          "type": "text",
-          "primaryKey": false,
-          "notNull": false,
-          "autoincrement": false
-        },
-        "created_at": {
-          "name": "created_at",
-          "type": "text",
-          "primaryKey": false,
-          "notNull": true,
-          "autoincrement": false
-        },
-        "updated_at": {
-          "name": "updated_at",
-          "type": "text",
-          "primaryKey": false,
-          "notNull": true,
-          "autoincrement": false
-        }
-      },
-      "indexes": {
-        "idx_actions_reference_version": {
-          "name": "idx_actions_reference_version",
-          "columns": [
-            "reference",
-            "version"
-          ],
-          "isUnique": false
-        },
-        "idx_actions_content_hash": {
-          "name": "idx_actions_content_hash",
-          "columns": [
-            "reference",
-            "content_hash"
-          ],
-          "isUnique": false
-        }
-      },
-      "foreignKeys": {},
-      "compositePrimaryKeys": {
-        "actions_id_version_pk": {
-          "columns": [
-            "id",
-            "version"
-          ],
-          "name": "actions_id_version_pk"
-        }
-      },
-      "uniqueConstraints": {},
-      "checkConstraints": {}
-    },
     "actors": {
       "name": "actors",
       "columns": {
@@ -267,91 +132,6 @@
       "uniqueConstraints": {},
       "checkConstraints": {}
     },
-    "artifact_types": {
-      "name": "artifact_types",
-      "columns": {
-        "id": {
-          "name": "id",
-          "type": "text",
-          "primaryKey": false,
-          "notNull": true,
-          "autoincrement": false
-        },
-        "name": {
-          "name": "name",
-          "type": "text",
-          "primaryKey": false,
-          "notNull": true,
-          "autoincrement": false
-        },
-        "description": {
-          "name": "description",
-          "type": "text",
-          "primaryKey": false,
-          "notNull": true,
-          "autoincrement": false,
-          "default": "''"
-        },
-        "schema": {
-          "name": "schema",
-          "type": "text",
-          "primaryKey": false,
-          "notNull": true,
-          "autoincrement": false
-        },
-        "version": {
-          "name": "version",
-          "type": "integer",
-          "primaryKey": false,
-          "notNull": true,
-          "autoincrement": false,
-          "default": 1
-        },
-        "content_hash": {
-          "name": "content_hash",
-          "type": "text",
-          "primaryKey": false,
-          "notNull": false,
-          "autoincrement": false
-        },
-        "created_at": {
-          "name": "created_at",
-          "type": "text",
-          "primaryKey": false,
-          "notNull": true,
-          "autoincrement": false
-        },
-        "updated_at": {
-          "name": "updated_at",
-          "type": "text",
-          "primaryKey": false,
-          "notNull": true,
-          "autoincrement": false
-        }
-      },
-      "indexes": {
-        "idx_artifact_types_content_hash": {
-          "name": "idx_artifact_types_content_hash",
-          "columns": [
-            "name",
-            "content_hash"
-          ],
-          "isUnique": false
-        }
-      },
-      "foreignKeys": {},
-      "compositePrimaryKeys": {
-        "artifact_types_id_version_pk": {
-          "columns": [
-            "id",
-            "version"
-          ],
-          "name": "artifact_types_id_version_pk"
-        }
-      },
-      "uniqueConstraints": {},
-      "checkConstraints": {}
-    },
     "artifacts": {
       "name": "artifacts",
       "columns": {
@@ -397,15 +177,15 @@
           "notNull": false,
           "autoincrement": false
         },
-        "created_by_workflow_def_id": {
-          "name": "created_by_workflow_def_id",
+        "created_by_definition_id": {
+          "name": "created_by_definition_id",
           "type": "text",
           "primaryKey": false,
           "notNull": false,
           "autoincrement": false
         },
-        "created_by_workflow_def_version": {
-          "name": "created_by_workflow_def_version",
+        "created_by_definition_version": {
+          "name": "created_by_definition_version",
           "type": "integer",
           "primaryKey": false,
           "notNull": false,
@@ -477,18 +257,18 @@
           "onDelete": "no action",
           "onUpdate": "no action"
         },
-        "artifacts_created_by_workflow_def_id_created_by_workflow_def_version_created_by_node_id_nodes_workflow_def_id_workflow_def_version_id_fk": {
-          "name": "artifacts_created_by_workflow_def_id_created_by_workflow_def_version_created_by_node_id_nodes_workflow_def_id_workflow_def_version_id_fk",
+        "artifacts_created_by_definition_id_created_by_definition_version_created_by_node_id_nodes_definition_id_definition_version_id_fk": {
+          "name": "artifacts_created_by_definition_id_created_by_definition_version_created_by_node_id_nodes_definition_id_definition_version_id_fk",
           "tableFrom": "artifacts",
           "tableTo": "nodes",
           "columnsFrom": [
-            "created_by_workflow_def_id",
-            "created_by_workflow_def_version",
+            "created_by_definition_id",
+            "created_by_definition_version",
             "created_by_node_id"
           ],
           "columnsTo": [
-            "workflow_def_id",
-            "workflow_def_version",
+            "definition_id",
+            "definition_version",
             "id"
           ],
           "onDelete": "cascade",
@@ -523,6 +303,62 @@
           "notNull": true,
           "autoincrement": false
         },
+        "resolved_persona_id": {
+          "name": "resolved_persona_id",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false,
+          "autoincrement": false
+        },
+        "resolved_persona_version": {
+          "name": "resolved_persona_version",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": false,
+          "autoincrement": false
+        },
+        "resolved_model_profile_id": {
+          "name": "resolved_model_profile_id",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false,
+          "autoincrement": false
+        },
+        "resolved_model_profile_version": {
+          "name": "resolved_model_profile_version",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": false,
+          "autoincrement": false
+        },
+        "resolved_context_assembly_workflow_id": {
+          "name": "resolved_context_assembly_workflow_id",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false,
+          "autoincrement": false
+        },
+        "resolved_context_assembly_workflow_version": {
+          "name": "resolved_context_assembly_workflow_version",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": false,
+          "autoincrement": false
+        },
+        "resolved_memory_extraction_workflow_id": {
+          "name": "resolved_memory_extraction_workflow_id",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false,
+          "autoincrement": false
+        },
+        "resolved_memory_extraction_workflow_version": {
+          "name": "resolved_memory_extraction_workflow_version",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": false,
+          "autoincrement": false
+        },
         "created_at": {
           "name": "created_at",
           "type": "text",
@@ -549,6 +385,183 @@
       },
       "foreignKeys": {},
       "compositePrimaryKeys": {},
+      "uniqueConstraints": {},
+      "checkConstraints": {}
+    },
+    "definitions": {
+      "name": "definitions",
+      "columns": {
+        "id": {
+          "name": "id",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false
+        },
+        "version": {
+          "name": "version",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false,
+          "default": 1
+        },
+        "kind": {
+          "name": "kind",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false
+        },
+        "reference": {
+          "name": "reference",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false
+        },
+        "name": {
+          "name": "name",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false
+        },
+        "description": {
+          "name": "description",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false,
+          "default": "''"
+        },
+        "project_id": {
+          "name": "project_id",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false,
+          "autoincrement": false
+        },
+        "library_id": {
+          "name": "library_id",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false,
+          "autoincrement": false
+        },
+        "content_hash": {
+          "name": "content_hash",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false
+        },
+        "content": {
+          "name": "content",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false
+        },
+        "created_at": {
+          "name": "created_at",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false
+        },
+        "updated_at": {
+          "name": "updated_at",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false
+        }
+      },
+      "indexes": {
+        "idx_definitions_kind": {
+          "name": "idx_definitions_kind",
+          "columns": [
+            "kind"
+          ],
+          "isUnique": false
+        },
+        "idx_definitions_reference": {
+          "name": "idx_definitions_reference",
+          "columns": [
+            "reference",
+            "kind"
+          ],
+          "isUnique": false
+        },
+        "idx_definitions_scope": {
+          "name": "idx_definitions_scope",
+          "columns": [
+            "project_id",
+            "library_id"
+          ],
+          "isUnique": false
+        },
+        "unique_definitions_version": {
+          "name": "unique_definitions_version",
+          "columns": [
+            "kind",
+            "reference",
+            "version",
+            "project_id",
+            "library_id"
+          ],
+          "isUnique": true
+        },
+        "unique_definitions_content": {
+          "name": "unique_definitions_content",
+          "columns": [
+            "kind",
+            "reference",
+            "content_hash",
+            "project_id",
+            "library_id"
+          ],
+          "isUnique": true
+        }
+      },
+      "foreignKeys": {
+        "definitions_project_id_projects_id_fk": {
+          "name": "definitions_project_id_projects_id_fk",
+          "tableFrom": "definitions",
+          "tableTo": "projects",
+          "columnsFrom": [
+            "project_id"
+          ],
+          "columnsTo": [
+            "id"
+          ],
+          "onDelete": "cascade",
+          "onUpdate": "no action"
+        },
+        "definitions_library_id_libraries_id_fk": {
+          "name": "definitions_library_id_libraries_id_fk",
+          "tableFrom": "definitions",
+          "tableTo": "libraries",
+          "columnsFrom": [
+            "library_id"
+          ],
+          "columnsTo": [
+            "id"
+          ],
+          "onDelete": "cascade",
+          "onUpdate": "no action"
+        }
+      },
+      "compositePrimaryKeys": {
+        "definitions_id_version_pk": {
+          "columns": [
+            "id",
+            "version"
+          ],
+          "name": "definitions_id_version_pk"
+        }
+      },
       "uniqueConstraints": {},
       "checkConstraints": {}
     },
@@ -959,112 +972,6 @@
       "uniqueConstraints": {},
       "checkConstraints": {}
     },
-    "model_profiles": {
-      "name": "model_profiles",
-      "columns": {
-        "id": {
-          "name": "id",
-          "type": "text",
-          "primaryKey": true,
-          "notNull": true,
-          "autoincrement": false
-        },
-        "name": {
-          "name": "name",
-          "type": "text",
-          "primaryKey": false,
-          "notNull": true,
-          "autoincrement": false
-        },
-        "reference": {
-          "name": "reference",
-          "type": "text",
-          "primaryKey": false,
-          "notNull": false,
-          "autoincrement": false
-        },
-        "provider": {
-          "name": "provider",
-          "type": "text",
-          "primaryKey": false,
-          "notNull": true,
-          "autoincrement": false
-        },
-        "model_id": {
-          "name": "model_id",
-          "type": "text",
-          "primaryKey": false,
-          "notNull": true,
-          "autoincrement": false
-        },
-        "parameters": {
-          "name": "parameters",
-          "type": "text",
-          "primaryKey": false,
-          "notNull": true,
-          "autoincrement": false,
-          "default": "'{}'"
-        },
-        "execution_config": {
-          "name": "execution_config",
-          "type": "text",
-          "primaryKey": false,
-          "notNull": false,
-          "autoincrement": false
-        },
-        "cost_per_1k_input_tokens": {
-          "name": "cost_per_1k_input_tokens",
-          "type": "real",
-          "primaryKey": false,
-          "notNull": true,
-          "autoincrement": false,
-          "default": 0
-        },
-        "cost_per_1k_output_tokens": {
-          "name": "cost_per_1k_output_tokens",
-          "type": "real",
-          "primaryKey": false,
-          "notNull": true,
-          "autoincrement": false,
-          "default": 0
-        },
-        "content_hash": {
-          "name": "content_hash",
-          "type": "text",
-          "primaryKey": false,
-          "notNull": false,
-          "autoincrement": false
-        },
-        "created_at": {
-          "name": "created_at",
-          "type": "text",
-          "primaryKey": false,
-          "notNull": true,
-          "autoincrement": false
-        },
-        "updated_at": {
-          "name": "updated_at",
-          "type": "text",
-          "primaryKey": false,
-          "notNull": true,
-          "autoincrement": false
-        }
-      },
-      "indexes": {
-        "idx_model_profiles_reference_hash": {
-          "name": "idx_model_profiles_reference_hash",
-          "columns": [
-            "reference",
-            "content_hash"
-          ],
-          "isUnique": false
-        }
-      },
-      "foreignKeys": {},
-      "compositePrimaryKeys": {},
-      "uniqueConstraints": {},
-      "checkConstraints": {}
-    },
     "nodes": {
       "name": "nodes",
       "columns": {
@@ -1082,15 +989,15 @@
           "notNull": true,
           "autoincrement": false
         },
-        "workflow_def_id": {
-          "name": "workflow_def_id",
+        "definition_id": {
+          "name": "definition_id",
           "type": "text",
           "primaryKey": false,
           "notNull": true,
           "autoincrement": false
         },
-        "workflow_def_version": {
-          "name": "workflow_def_version",
+        "definition_version": {
+          "name": "definition_version",
           "type": "integer",
           "primaryKey": false,
           "notNull": true,
@@ -1154,11 +1061,11 @@
         }
       },
       "indexes": {
-        "idx_nodes_workflow_def": {
-          "name": "idx_nodes_workflow_def",
+        "idx_nodes_definition": {
+          "name": "idx_nodes_definition",
           "columns": [
-            "workflow_def_id",
-            "workflow_def_version"
+            "definition_id",
+            "definition_version"
           ],
           "isUnique": false
         },
@@ -1173,21 +1080,21 @@
         "idx_nodes_ref": {
           "name": "idx_nodes_ref",
           "columns": [
-            "workflow_def_id",
-            "workflow_def_version",
+            "definition_id",
+            "definition_version",
             "ref"
           ],
           "isUnique": false
         }
       },
       "foreignKeys": {
-        "nodes_workflow_def_id_workflow_def_version_workflow_defs_id_version_fk": {
-          "name": "nodes_workflow_def_id_workflow_def_version_workflow_defs_id_version_fk",
+        "nodes_definition_id_definition_version_definitions_id_version_fk": {
+          "name": "nodes_definition_id_definition_version_definitions_id_version_fk",
           "tableFrom": "nodes",
-          "tableTo": "workflow_defs",
+          "tableTo": "definitions",
           "columnsFrom": [
-            "workflow_def_id",
-            "workflow_def_version"
+            "definition_id",
+            "definition_version"
           ],
           "columnsTo": [
             "id",
@@ -1198,199 +1105,13 @@
         }
       },
       "compositePrimaryKeys": {
-        "nodes_workflow_def_id_workflow_def_version_id_pk": {
+        "nodes_definition_id_definition_version_id_pk": {
           "columns": [
-            "workflow_def_id",
-            "workflow_def_version",
+            "definition_id",
+            "definition_version",
             "id"
           ],
-          "name": "nodes_workflow_def_id_workflow_def_version_id_pk"
-        }
-      },
-      "uniqueConstraints": {},
-      "checkConstraints": {}
-    },
-    "personas": {
-      "name": "personas",
-      "columns": {
-        "id": {
-          "name": "id",
-          "type": "text",
-          "primaryKey": false,
-          "notNull": true,
-          "autoincrement": false
-        },
-        "version": {
-          "name": "version",
-          "type": "integer",
-          "primaryKey": false,
-          "notNull": true,
-          "autoincrement": false,
-          "default": 1
-        },
-        "name": {
-          "name": "name",
-          "type": "text",
-          "primaryKey": false,
-          "notNull": true,
-          "autoincrement": false
-        },
-        "description": {
-          "name": "description",
-          "type": "text",
-          "primaryKey": false,
-          "notNull": true,
-          "autoincrement": false,
-          "default": "''"
-        },
-        "reference": {
-          "name": "reference",
-          "type": "text",
-          "primaryKey": false,
-          "notNull": false,
-          "autoincrement": false
-        },
-        "library_id": {
-          "name": "library_id",
-          "type": "text",
-          "primaryKey": false,
-          "notNull": false,
-          "autoincrement": false
-        },
-        "system_prompt": {
-          "name": "system_prompt",
-          "type": "text",
-          "primaryKey": false,
-          "notNull": true,
-          "autoincrement": false
-        },
-        "model_profile_id": {
-          "name": "model_profile_id",
-          "type": "text",
-          "primaryKey": false,
-          "notNull": true,
-          "autoincrement": false
-        },
-        "context_assembly_workflow_def_id": {
-          "name": "context_assembly_workflow_def_id",
-          "type": "text",
-          "primaryKey": false,
-          "notNull": true,
-          "autoincrement": false
-        },
-        "memory_extraction_workflow_def_id": {
-          "name": "memory_extraction_workflow_def_id",
-          "type": "text",
-          "primaryKey": false,
-          "notNull": true,
-          "autoincrement": false
-        },
-        "recent_turns_limit": {
-          "name": "recent_turns_limit",
-          "type": "integer",
-          "primaryKey": false,
-          "notNull": true,
-          "autoincrement": false,
-          "default": 20
-        },
-        "tool_ids": {
-          "name": "tool_ids",
-          "type": "text",
-          "primaryKey": false,
-          "notNull": true,
-          "autoincrement": false
-        },
-        "constraints": {
-          "name": "constraints",
-          "type": "text",
-          "primaryKey": false,
-          "notNull": false,
-          "autoincrement": false
-        },
-        "content_hash": {
-          "name": "content_hash",
-          "type": "text",
-          "primaryKey": false,
-          "notNull": false,
-          "autoincrement": false
-        },
-        "created_at": {
-          "name": "created_at",
-          "type": "text",
-          "primaryKey": false,
-          "notNull": true,
-          "autoincrement": false
-        },
-        "updated_at": {
-          "name": "updated_at",
-          "type": "text",
-          "primaryKey": false,
-          "notNull": true,
-          "autoincrement": false
-        }
-      },
-      "indexes": {
-        "idx_personas_library": {
-          "name": "idx_personas_library",
-          "columns": [
-            "library_id"
-          ],
-          "isUnique": false
-        },
-        "idx_personas_reference_version": {
-          "name": "idx_personas_reference_version",
-          "columns": [
-            "reference",
-            "library_id",
-            "version"
-          ],
-          "isUnique": false
-        },
-        "idx_personas_content_hash": {
-          "name": "idx_personas_content_hash",
-          "columns": [
-            "reference",
-            "library_id",
-            "content_hash"
-          ],
-          "isUnique": false
-        }
-      },
-      "foreignKeys": {
-        "personas_library_id_libraries_id_fk": {
-          "name": "personas_library_id_libraries_id_fk",
-          "tableFrom": "personas",
-          "tableTo": "libraries",
-          "columnsFrom": [
-            "library_id"
-          ],
-          "columnsTo": [
-            "id"
-          ],
-          "onDelete": "no action",
-          "onUpdate": "no action"
-        },
-        "personas_model_profile_id_model_profiles_id_fk": {
-          "name": "personas_model_profile_id_model_profiles_id_fk",
-          "tableFrom": "personas",
-          "tableTo": "model_profiles",
-          "columnsFrom": [
-            "model_profile_id"
-          ],
-          "columnsTo": [
-            "id"
-          ],
-          "onDelete": "cascade",
-          "onUpdate": "no action"
-        }
-      },
-      "compositePrimaryKeys": {
-        "personas_id_version_pk": {
-          "columns": [
-            "id",
-            "version"
-          ],
-          "name": "personas_id_version_pk"
+          "name": "nodes_definition_id_definition_version_id_pk"
         }
       },
       "uniqueConstraints": {},
@@ -1557,128 +1278,6 @@
       "uniqueConstraints": {},
       "checkConstraints": {}
     },
-    "prompt_specs": {
-      "name": "prompt_specs",
-      "columns": {
-        "id": {
-          "name": "id",
-          "type": "text",
-          "primaryKey": false,
-          "notNull": true,
-          "autoincrement": false
-        },
-        "name": {
-          "name": "name",
-          "type": "text",
-          "primaryKey": false,
-          "notNull": true,
-          "autoincrement": false
-        },
-        "description": {
-          "name": "description",
-          "type": "text",
-          "primaryKey": false,
-          "notNull": true,
-          "autoincrement": false,
-          "default": "''"
-        },
-        "version": {
-          "name": "version",
-          "type": "integer",
-          "primaryKey": false,
-          "notNull": true,
-          "autoincrement": false,
-          "default": 1
-        },
-        "system_prompt": {
-          "name": "system_prompt",
-          "type": "text",
-          "primaryKey": false,
-          "notNull": false,
-          "autoincrement": false
-        },
-        "template": {
-          "name": "template",
-          "type": "text",
-          "primaryKey": false,
-          "notNull": true,
-          "autoincrement": false
-        },
-        "requires": {
-          "name": "requires",
-          "type": "text",
-          "primaryKey": false,
-          "notNull": true,
-          "autoincrement": false,
-          "default": "'{}'"
-        },
-        "produces": {
-          "name": "produces",
-          "type": "text",
-          "primaryKey": false,
-          "notNull": true,
-          "autoincrement": false,
-          "default": "'{}'"
-        },
-        "examples": {
-          "name": "examples",
-          "type": "text",
-          "primaryKey": false,
-          "notNull": false,
-          "autoincrement": false
-        },
-        "tags": {
-          "name": "tags",
-          "type": "text",
-          "primaryKey": false,
-          "notNull": false,
-          "autoincrement": false
-        },
-        "content_hash": {
-          "name": "content_hash",
-          "type": "text",
-          "primaryKey": false,
-          "notNull": false,
-          "autoincrement": false
-        },
-        "created_at": {
-          "name": "created_at",
-          "type": "text",
-          "primaryKey": false,
-          "notNull": true,
-          "autoincrement": false
-        },
-        "updated_at": {
-          "name": "updated_at",
-          "type": "text",
-          "primaryKey": false,
-          "notNull": true,
-          "autoincrement": false
-        }
-      },
-      "indexes": {
-        "idx_prompt_specs_content_hash": {
-          "name": "idx_prompt_specs_content_hash",
-          "columns": [
-            "name",
-            "content_hash"
-          ],
-          "isUnique": false
-        }
-      },
-      "foreignKeys": {},
-      "compositePrimaryKeys": {
-        "prompt_specs_id_version_pk": {
-          "columns": [
-            "id",
-            "version"
-          ],
-          "name": "prompt_specs_id_version_pk"
-        }
-      },
-      "uniqueConstraints": {},
-      "checkConstraints": {}
-    },
     "secrets": {
       "name": "secrets",
       "columns": {
@@ -1751,187 +1350,6 @@
         }
       },
       "compositePrimaryKeys": {},
-      "uniqueConstraints": {},
-      "checkConstraints": {}
-    },
-    "tasks": {
-      "name": "tasks",
-      "columns": {
-        "id": {
-          "name": "id",
-          "type": "text",
-          "primaryKey": false,
-          "notNull": true,
-          "autoincrement": false
-        },
-        "version": {
-          "name": "version",
-          "type": "integer",
-          "primaryKey": false,
-          "notNull": true,
-          "autoincrement": false,
-          "default": 1
-        },
-        "name": {
-          "name": "name",
-          "type": "text",
-          "primaryKey": false,
-          "notNull": true,
-          "autoincrement": false
-        },
-        "description": {
-          "name": "description",
-          "type": "text",
-          "primaryKey": false,
-          "notNull": true,
-          "autoincrement": false,
-          "default": "''"
-        },
-        "reference": {
-          "name": "reference",
-          "type": "text",
-          "primaryKey": false,
-          "notNull": false,
-          "autoincrement": false
-        },
-        "project_id": {
-          "name": "project_id",
-          "type": "text",
-          "primaryKey": false,
-          "notNull": false,
-          "autoincrement": false
-        },
-        "library_id": {
-          "name": "library_id",
-          "type": "text",
-          "primaryKey": false,
-          "notNull": false,
-          "autoincrement": false
-        },
-        "tags": {
-          "name": "tags",
-          "type": "text",
-          "primaryKey": false,
-          "notNull": false,
-          "autoincrement": false
-        },
-        "input_schema": {
-          "name": "input_schema",
-          "type": "text",
-          "primaryKey": false,
-          "notNull": true,
-          "autoincrement": false
-        },
-        "output_schema": {
-          "name": "output_schema",
-          "type": "text",
-          "primaryKey": false,
-          "notNull": true,
-          "autoincrement": false
-        },
-        "steps": {
-          "name": "steps",
-          "type": "text",
-          "primaryKey": false,
-          "notNull": true,
-          "autoincrement": false
-        },
-        "retry": {
-          "name": "retry",
-          "type": "text",
-          "primaryKey": false,
-          "notNull": false,
-          "autoincrement": false
-        },
-        "timeout_ms": {
-          "name": "timeout_ms",
-          "type": "integer",
-          "primaryKey": false,
-          "notNull": false,
-          "autoincrement": false
-        },
-        "content_hash": {
-          "name": "content_hash",
-          "type": "text",
-          "primaryKey": false,
-          "notNull": false,
-          "autoincrement": false
-        },
-        "created_at": {
-          "name": "created_at",
-          "type": "text",
-          "primaryKey": false,
-          "notNull": true,
-          "autoincrement": false
-        },
-        "updated_at": {
-          "name": "updated_at",
-          "type": "text",
-          "primaryKey": false,
-          "notNull": true,
-          "autoincrement": false
-        }
-      },
-      "indexes": {
-        "idx_tasks_project": {
-          "name": "idx_tasks_project",
-          "columns": [
-            "project_id"
-          ],
-          "isUnique": false
-        },
-        "idx_tasks_library": {
-          "name": "idx_tasks_library",
-          "columns": [
-            "library_id"
-          ],
-          "isUnique": false
-        },
-        "idx_tasks_reference_version": {
-          "name": "idx_tasks_reference_version",
-          "columns": [
-            "reference",
-            "project_id",
-            "library_id",
-            "version"
-          ],
-          "isUnique": false
-        },
-        "idx_tasks_content_hash": {
-          "name": "idx_tasks_content_hash",
-          "columns": [
-            "reference",
-            "project_id",
-            "library_id",
-            "content_hash"
-          ],
-          "isUnique": false
-        }
-      },
-      "foreignKeys": {
-        "tasks_project_id_projects_id_fk": {
-          "name": "tasks_project_id_projects_id_fk",
-          "tableFrom": "tasks",
-          "tableTo": "projects",
-          "columnsFrom": [
-            "project_id"
-          ],
-          "columnsTo": [
-            "id"
-          ],
-          "onDelete": "cascade",
-          "onUpdate": "no action"
-        }
-      },
-      "compositePrimaryKeys": {
-        "tasks_id_version_pk": {
-          "columns": [
-            "id",
-            "version"
-          ],
-          "name": "tasks_id_version_pk"
-        }
-      },
       "uniqueConstraints": {},
       "checkConstraints": {}
     },
@@ -2092,15 +1510,15 @@
           "notNull": false,
           "autoincrement": false
         },
-        "workflow_def_id": {
-          "name": "workflow_def_id",
+        "definition_id": {
+          "name": "definition_id",
           "type": "text",
           "primaryKey": false,
           "notNull": true,
           "autoincrement": false
         },
-        "workflow_def_version": {
-          "name": "workflow_def_version",
+        "definition_version": {
+          "name": "definition_version",
           "type": "integer",
           "primaryKey": false,
           "notNull": true,
@@ -2171,11 +1589,11 @@
         }
       },
       "indexes": {
-        "idx_transitions_workflow_def": {
-          "name": "idx_transitions_workflow_def",
+        "idx_transitions_definition": {
+          "name": "idx_transitions_definition",
           "columns": [
-            "workflow_def_id",
-            "workflow_def_version"
+            "definition_id",
+            "definition_version"
           ],
           "isUnique": false
         },
@@ -2196,21 +1614,21 @@
         "idx_transitions_ref": {
           "name": "idx_transitions_ref",
           "columns": [
-            "workflow_def_id",
-            "workflow_def_version",
+            "definition_id",
+            "definition_version",
             "ref"
           ],
           "isUnique": false
         }
       },
       "foreignKeys": {
-        "transitions_workflow_def_id_workflow_def_version_workflow_defs_id_version_fk": {
-          "name": "transitions_workflow_def_id_workflow_def_version_workflow_defs_id_version_fk",
+        "transitions_definition_id_definition_version_definitions_id_version_fk": {
+          "name": "transitions_definition_id_definition_version_definitions_id_version_fk",
           "tableFrom": "transitions",
-          "tableTo": "workflow_defs",
+          "tableTo": "definitions",
           "columnsFrom": [
-            "workflow_def_id",
-            "workflow_def_version"
+            "definition_id",
+            "definition_version"
           ],
           "columnsTo": [
             "id",
@@ -2219,35 +1637,35 @@
           "onDelete": "cascade",
           "onUpdate": "no action"
         },
-        "transitions_workflow_def_id_workflow_def_version_from_node_id_nodes_workflow_def_id_workflow_def_version_id_fk": {
-          "name": "transitions_workflow_def_id_workflow_def_version_from_node_id_nodes_workflow_def_id_workflow_def_version_id_fk",
+        "transitions_definition_id_definition_version_from_node_id_nodes_definition_id_definition_version_id_fk": {
+          "name": "transitions_definition_id_definition_version_from_node_id_nodes_definition_id_definition_version_id_fk",
           "tableFrom": "transitions",
           "tableTo": "nodes",
           "columnsFrom": [
-            "workflow_def_id",
-            "workflow_def_version",
+            "definition_id",
+            "definition_version",
             "from_node_id"
           ],
           "columnsTo": [
-            "workflow_def_id",
-            "workflow_def_version",
+            "definition_id",
+            "definition_version",
             "id"
           ],
           "onDelete": "cascade",
           "onUpdate": "no action"
         },
-        "transitions_workflow_def_id_workflow_def_version_to_node_id_nodes_workflow_def_id_workflow_def_version_id_fk": {
-          "name": "transitions_workflow_def_id_workflow_def_version_to_node_id_nodes_workflow_def_id_workflow_def_version_id_fk",
+        "transitions_definition_id_definition_version_to_node_id_nodes_definition_id_definition_version_id_fk": {
+          "name": "transitions_definition_id_definition_version_to_node_id_nodes_definition_id_definition_version_id_fk",
           "tableFrom": "transitions",
           "tableTo": "nodes",
           "columnsFrom": [
-            "workflow_def_id",
-            "workflow_def_version",
+            "definition_id",
+            "definition_version",
             "to_node_id"
           ],
           "columnsTo": [
-            "workflow_def_id",
-            "workflow_def_version",
+            "definition_id",
+            "definition_version",
             "id"
           ],
           "onDelete": "cascade",
@@ -2255,13 +1673,13 @@
         }
       },
       "compositePrimaryKeys": {
-        "transitions_workflow_def_id_workflow_def_version_id_pk": {
+        "transitions_definition_id_definition_version_id_pk": {
           "columns": [
-            "workflow_def_id",
-            "workflow_def_version",
+            "definition_id",
+            "definition_version",
             "id"
           ],
-          "name": "transitions_workflow_def_id_workflow_def_version_id_pk"
+          "name": "transitions_definition_id_definition_version_id_pk"
         }
       },
       "uniqueConstraints": {},
@@ -2439,187 +1857,6 @@
       "uniqueConstraints": {},
       "checkConstraints": {}
     },
-    "workflow_defs": {
-      "name": "workflow_defs",
-      "columns": {
-        "id": {
-          "name": "id",
-          "type": "text",
-          "primaryKey": false,
-          "notNull": true,
-          "autoincrement": false
-        },
-        "name": {
-          "name": "name",
-          "type": "text",
-          "primaryKey": false,
-          "notNull": true,
-          "autoincrement": false
-        },
-        "description": {
-          "name": "description",
-          "type": "text",
-          "primaryKey": false,
-          "notNull": true,
-          "autoincrement": false,
-          "default": "''"
-        },
-        "version": {
-          "name": "version",
-          "type": "integer",
-          "primaryKey": false,
-          "notNull": true,
-          "autoincrement": false,
-          "default": 1
-        },
-        "reference": {
-          "name": "reference",
-          "type": "text",
-          "primaryKey": false,
-          "notNull": false,
-          "autoincrement": false
-        },
-        "project_id": {
-          "name": "project_id",
-          "type": "text",
-          "primaryKey": false,
-          "notNull": false,
-          "autoincrement": false
-        },
-        "library_id": {
-          "name": "library_id",
-          "type": "text",
-          "primaryKey": false,
-          "notNull": false,
-          "autoincrement": false
-        },
-        "tags": {
-          "name": "tags",
-          "type": "text",
-          "primaryKey": false,
-          "notNull": false,
-          "autoincrement": false
-        },
-        "input_schema": {
-          "name": "input_schema",
-          "type": "text",
-          "primaryKey": false,
-          "notNull": true,
-          "autoincrement": false
-        },
-        "output_schema": {
-          "name": "output_schema",
-          "type": "text",
-          "primaryKey": false,
-          "notNull": true,
-          "autoincrement": false
-        },
-        "output_mapping": {
-          "name": "output_mapping",
-          "type": "text",
-          "primaryKey": false,
-          "notNull": false,
-          "autoincrement": false
-        },
-        "context_schema": {
-          "name": "context_schema",
-          "type": "text",
-          "primaryKey": false,
-          "notNull": false,
-          "autoincrement": false
-        },
-        "initial_node_id": {
-          "name": "initial_node_id",
-          "type": "text",
-          "primaryKey": false,
-          "notNull": false,
-          "autoincrement": false
-        },
-        "content_hash": {
-          "name": "content_hash",
-          "type": "text",
-          "primaryKey": false,
-          "notNull": false,
-          "autoincrement": false
-        },
-        "created_at": {
-          "name": "created_at",
-          "type": "text",
-          "primaryKey": false,
-          "notNull": true,
-          "autoincrement": false
-        },
-        "updated_at": {
-          "name": "updated_at",
-          "type": "text",
-          "primaryKey": false,
-          "notNull": true,
-          "autoincrement": false
-        }
-      },
-      "indexes": {
-        "idx_workflow_defs_project": {
-          "name": "idx_workflow_defs_project",
-          "columns": [
-            "project_id"
-          ],
-          "isUnique": false
-        },
-        "idx_workflow_defs_library": {
-          "name": "idx_workflow_defs_library",
-          "columns": [
-            "library_id"
-          ],
-          "isUnique": false
-        },
-        "idx_workflow_defs_reference_version": {
-          "name": "idx_workflow_defs_reference_version",
-          "columns": [
-            "reference",
-            "project_id",
-            "library_id",
-            "version"
-          ],
-          "isUnique": false
-        },
-        "idx_workflow_defs_content_hash": {
-          "name": "idx_workflow_defs_content_hash",
-          "columns": [
-            "reference",
-            "project_id",
-            "library_id",
-            "content_hash"
-          ],
-          "isUnique": false
-        }
-      },
-      "foreignKeys": {
-        "workflow_defs_project_id_projects_id_fk": {
-          "name": "workflow_defs_project_id_projects_id_fk",
-          "tableFrom": "workflow_defs",
-          "tableTo": "projects",
-          "columnsFrom": [
-            "project_id"
-          ],
-          "columnsTo": [
-            "id"
-          ],
-          "onDelete": "cascade",
-          "onUpdate": "no action"
-        }
-      },
-      "compositePrimaryKeys": {
-        "workflow_defs_id_version_pk": {
-          "columns": [
-            "id",
-            "version"
-          ],
-          "name": "workflow_defs_id_version_pk"
-        }
-      },
-      "uniqueConstraints": {},
-      "checkConstraints": {}
-    },
     "workflow_runs": {
       "name": "workflow_runs",
       "columns": {
@@ -2644,15 +1881,15 @@
           "notNull": false,
           "autoincrement": false
         },
-        "workflow_def_id": {
-          "name": "workflow_def_id",
+        "definition_id": {
+          "name": "definition_id",
           "type": "text",
           "primaryKey": false,
           "notNull": true,
           "autoincrement": false
         },
-        "workflow_version": {
-          "name": "workflow_version",
+        "definition_version": {
+          "name": "definition_version",
           "type": "integer",
           "primaryKey": false,
           "notNull": true,
@@ -2814,18 +2051,18 @@
           "onDelete": "no action",
           "onUpdate": "no action"
         },
-        "workflow_runs_workflow_def_id_workflow_version_parent_node_id_nodes_workflow_def_id_workflow_def_version_id_fk": {
-          "name": "workflow_runs_workflow_def_id_workflow_version_parent_node_id_nodes_workflow_def_id_workflow_def_version_id_fk",
+        "workflow_runs_definition_id_definition_version_parent_node_id_nodes_definition_id_definition_version_id_fk": {
+          "name": "workflow_runs_definition_id_definition_version_parent_node_id_nodes_definition_id_definition_version_id_fk",
           "tableFrom": "workflow_runs",
           "tableTo": "nodes",
           "columnsFrom": [
-            "workflow_def_id",
-            "workflow_version",
+            "definition_id",
+            "definition_version",
             "parent_node_id"
           ],
           "columnsTo": [
-            "workflow_def_id",
-            "workflow_def_version",
+            "definition_id",
+            "definition_version",
             "id"
           ],
           "onDelete": "cascade",
@@ -2867,8 +2104,8 @@
           "notNull": true,
           "autoincrement": false
         },
-        "workflow_def_id": {
-          "name": "workflow_def_id",
+        "definition_id": {
+          "name": "definition_id",
           "type": "text",
           "primaryKey": false,
           "notNull": true,
@@ -2912,10 +2149,10 @@
           ],
           "isUnique": false
         },
-        "idx_workflows_def": {
-          "name": "idx_workflows_def",
+        "idx_workflows_definition": {
+          "name": "idx_workflows_definition",
           "columns": [
-            "workflow_def_id",
+            "definition_id",
             "pinned_version"
           ],
           "isUnique": false

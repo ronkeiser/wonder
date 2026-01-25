@@ -31,7 +31,8 @@
     "@wonder/logs": "workspace:*",
     "@wonder/schemas": "workspace:*",
     "drizzle-orm": "^0.44.7",
-    "ulid": "^3.0.1"
+    "ulid": "^3.0.1",
+    "zod": "^4.3.6"
   },
   "devDependencies": {
     "@cloudflare/vitest-pool-workers": "^0.10.11",

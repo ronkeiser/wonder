@@ -193,35 +193,44 @@ export const MODEL_CATALOG = {
  */
 export type ModelId = keyof typeof MODEL_CATALOG;
 
-/**
- * Discriminated union of model profiles derived from the catalog
- * Maps each model_id to its provider and parameter types
- */
-export type ModelProfile = {
-  [K in ModelId]: {
-    id: string;
-    name: string;
-    reference: string | null;
-    modelId: K;
-    provider: (typeof MODEL_CATALOG)[K]['provider'];
-    parameters: (typeof MODEL_CATALOG)[K]['parameters'];
-    executionConfig: object | null;
-    costPer1kInputTokens: number;
-    costPer1kOutputTokens: number;
-    contentHash: string | null;
-    createdAt: string;
-    updatedAt: string;
-  };
-}[ModelId];
-
 // ============================================================================
-// API DTOs (inferred from schema)
+// API DTOs
 // ============================================================================
-
-import { modelProfiles } from '../../schema';
-import type { NewEntity } from '~/shared/types';
 
 export type ModelProvider = 'anthropic' | 'openai' | 'google' | 'cloudflare' | 'local';
 
-/** Input for creating a model profile - inferred from schema */
-export type ModelProfileInput = NewEntity<typeof modelProfiles.$inferInsert>;
+/**
+ * Model profile entity - the API-facing shape.
+ * Internally stored in the unified `definitions` table.
+ *
+ * Note: The discriminated union based on modelId has been simplified to use
+ * string types for provider/modelId/parameters since the definition repository
+ * stores these as JSON strings. Runtime validation can be added via Zod if needed.
+ */
+export type ModelProfile = {
+  id: string;
+  version: number;
+  name: string;
+  reference: string;
+  modelId: string;
+  provider: ModelProvider;
+  parameters: object;
+  executionConfig: object | null;
+  costPer1kInputTokens: number;
+  costPer1kOutputTokens: number;
+  contentHash: string;
+  createdAt: string;
+  updatedAt: string;
+};
+
+/** Input for creating a model profile */
+export type ModelProfileInput = {
+  name: string;
+  reference?: string;
+  provider: string;
+  modelId: string;
+  parameters?: Record<string, unknown>;
+  executionConfig?: Record<string, unknown> | null;
+  costPer1kInputTokens?: number;
+  costPer1kOutputTokens?: number;
+};
