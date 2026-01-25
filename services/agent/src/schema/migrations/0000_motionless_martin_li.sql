@@ -1,5 +1,6 @@
 CREATE TABLE `agent_def` (
 	`id` text PRIMARY KEY NOT NULL,
+	`name` text NOT NULL,
 	`project_ids` text NOT NULL,
 	`persona_id` text,
 	`persona_version` integer
@@ -30,6 +31,14 @@ CREATE TABLE `conversation_meta` (
 	`participants` text NOT NULL,
 	`status` text NOT NULL,
 	`branch_context` text,
+	`resolved_persona_id` text,
+	`resolved_persona_version` integer,
+	`resolved_model_profile_id` text,
+	`resolved_model_profile_version` integer,
+	`resolved_context_assembly_workflow_id` text,
+	`resolved_context_assembly_workflow_version` integer,
+	`resolved_memory_extraction_workflow_id` text,
+	`resolved_memory_extraction_workflow_version` integer,
 	`created_at` integer NOT NULL,
 	`updated_at` integer NOT NULL
 );
@@ -77,9 +86,6 @@ CREATE TABLE `persona_def` (
 	`version` integer NOT NULL,
 	`name` text NOT NULL,
 	`system_prompt` text NOT NULL,
-	`model_profile_id` text NOT NULL,
-	`context_assembly_workflow_id` text NOT NULL,
-	`memory_extraction_workflow_id` text NOT NULL,
 	`recent_turns_limit` integer NOT NULL,
 	`tool_ids` text NOT NULL,
 	`constraints` text

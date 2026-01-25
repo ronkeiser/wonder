@@ -5,36 +5,8 @@
     {
       "idx": 0,
       "version": "6",
-      "when": 1766532202863,
-      "tag": "0000_fuzzy_northstar",
-      "breakpoints": true
-    },
-    {
-      "idx": 1,
-      "version": "6",
-      "when": 1766548091886,
-      "tag": "0001_right_namora",
-      "breakpoints": true
-    },
-    {
-      "idx": 2,
-      "version": "6",
-      "when": 1766560016778,
-      "tag": "0002_flashy_white_tiger",
-      "breakpoints": true
-    },
-    {
-      "idx": 3,
-      "version": "6",
-      "when": 1768977435543,
-      "tag": "0003_acoustic_micromacro",
-      "breakpoints": true
-    },
-    {
-      "idx": 4,
-      "version": "6",
-      "when": 1737453800000,
-      "tag": "0004_workflow_runs_nullable_workflow_id",
+      "when": 1769368127359,
+      "tag": "0000_light_felicia_hardy",
       "breakpoints": true
     }
   ]

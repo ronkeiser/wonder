@@ -1,7 +1,7 @@
 {
   "version": "6",
   "dialect": "sqlite",
-  "id": "152a09d7-7fbb-481d-b9ad-3a404b0e2d9d",
+  "id": "4fa196fb-ef71-43d4-ad7a-27d5f8106b60",
   "prevId": "00000000-0000-0000-0000-000000000000",
   "tables": {
     "agent_def": {
@@ -11,6 +11,13 @@
           "name": "id",
           "type": "text",
           "primaryKey": true,
+          "notNull": true,
+          "autoincrement": false
+        },
+        "name": {
+          "name": "name",
+          "type": "text",
+          "primaryKey": false,
           "notNull": true,
           "autoincrement": false
         },
@@ -201,6 +208,62 @@
         "branch_context": {
           "name": "branch_context",
           "type": "text",
+          "primaryKey": false,
+          "notNull": false,
+          "autoincrement": false
+        },
+        "resolved_persona_id": {
+          "name": "resolved_persona_id",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false,
+          "autoincrement": false
+        },
+        "resolved_persona_version": {
+          "name": "resolved_persona_version",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": false,
+          "autoincrement": false
+        },
+        "resolved_model_profile_id": {
+          "name": "resolved_model_profile_id",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false,
+          "autoincrement": false
+        },
+        "resolved_model_profile_version": {
+          "name": "resolved_model_profile_version",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": false,
+          "autoincrement": false
+        },
+        "resolved_context_assembly_workflow_id": {
+          "name": "resolved_context_assembly_workflow_id",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false,
+          "autoincrement": false
+        },
+        "resolved_context_assembly_workflow_version": {
+          "name": "resolved_context_assembly_workflow_version",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": false,
+          "autoincrement": false
+        },
+        "resolved_memory_extraction_workflow_id": {
+          "name": "resolved_memory_extraction_workflow_id",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false,
+          "autoincrement": false
+        },
+        "resolved_memory_extraction_workflow_version": {
+          "name": "resolved_memory_extraction_workflow_version",
+          "type": "integer",
           "primaryKey": false,
           "notNull": false,
           "autoincrement": false
@@ -489,27 +552,6 @@
         },
         "system_prompt": {
           "name": "system_prompt",
-          "type": "text",
-          "primaryKey": false,
-          "notNull": true,
-          "autoincrement": false
-        },
-        "model_profile_id": {
-          "name": "model_profile_id",
-          "type": "text",
-          "primaryKey": false,
-          "notNull": true,
-          "autoincrement": false
-        },
-        "context_assembly_workflow_id": {
-          "name": "context_assembly_workflow_id",
-          "type": "text",
-          "primaryKey": false,
-          "notNull": true,
-          "autoincrement": false
-        },
-        "memory_extraction_workflow_id": {
-          "name": "memory_extraction_workflow_id",
           "type": "text",
           "primaryKey": false,
           "notNull": true,

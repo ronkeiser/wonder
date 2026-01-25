@@ -1,94 +1,183 @@
 {
   "version": "6",
   "dialect": "sqlite",
-  "id": "7fa5d83c-488c-4584-8711-b7afec97e25c",
+  "id": "b2baa918-337d-404a-92c1-67b4fe0f17bf",
   "prevId": "00000000-0000-0000-0000-000000000000",
   "tables": {
-    "child_workflows": {
-      "name": "child_workflows",
+    "definitions": {
+      "name": "definitions",
       "columns": {
         "id": {
           "name": "id",
           "type": "text",
-          "primaryKey": true,
-          "notNull": true,
-          "autoincrement": false
-        },
-        "workflow_run_id": {
-          "name": "workflow_run_id",
-          "type": "text",
           "primaryKey": false,
           "notNull": true,
           "autoincrement": false
         },
-        "parent_token_id": {
-          "name": "parent_token_id",
-          "type": "text",
-          "primaryKey": false,
-          "notNull": true,
-          "autoincrement": false
-        },
-        "child_run_id": {
-          "name": "child_run_id",
-          "type": "text",
-          "primaryKey": false,
-          "notNull": true,
-          "autoincrement": false
-        },
-        "status": {
-          "name": "status",
-          "type": "text",
-          "primaryKey": false,
-          "notNull": true,
-          "autoincrement": false
-        },
-        "timeout_ms": {
-          "name": "timeout_ms",
+        "version": {
+          "name": "version",
           "type": "integer",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false,
+          "default": 1
+        },
+        "kind": {
+          "name": "kind",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false
+        },
+        "reference": {
+          "name": "reference",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false
+        },
+        "name": {
+          "name": "name",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false
+        },
+        "description": {
+          "name": "description",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false,
+          "default": "''"
+        },
+        "project_id": {
+          "name": "project_id",
+          "type": "text",
           "primaryKey": false,
           "notNull": false,
           "autoincrement": false
         },
+        "library_id": {
+          "name": "library_id",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false,
+          "autoincrement": false
+        },
+        "content_hash": {
+          "name": "content_hash",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false
+        },
+        "content": {
+          "name": "content",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false
+        },
         "created_at": {
           "name": "created_at",
-          "type": "integer",
+          "type": "text",
           "primaryKey": false,
           "notNull": true,
           "autoincrement": false
         },
         "updated_at": {
           "name": "updated_at",
-          "type": "integer",
+          "type": "text",
           "primaryKey": false,
           "notNull": true,
           "autoincrement": false
         }
       },
       "indexes": {
-        "idx_child_workflows_workflow_run": {
-          "name": "idx_child_workflows_workflow_run",
+        "idx_definitions_kind": {
+          "name": "idx_definitions_kind",
           "columns": [
-            "workflow_run_id"
+            "kind"
           ],
           "isUnique": false
         },
-        "idx_child_workflows_parent_token": {
-          "name": "idx_child_workflows_parent_token",
+        "idx_definitions_reference": {
+          "name": "idx_definitions_reference",
           "columns": [
-            "parent_token_id"
+            "reference",
+            "kind"
           ],
           "isUnique": false
         },
-        "idx_child_workflows_status": {
-          "name": "idx_child_workflows_status",
+        "idx_definitions_scope": {
+          "name": "idx_definitions_scope",
           "columns": [
-            "status"
+            "project_id",
+            "library_id"
           ],
           "isUnique": false
+        },
+        "unique_definitions_version": {
+          "name": "unique_definitions_version",
+          "columns": [
+            "kind",
+            "reference",
+            "version",
+            "project_id",
+            "library_id"
+          ],
+          "isUnique": true
+        },
+        "unique_definitions_content": {
+          "name": "unique_definitions_content",
+          "columns": [
+            "kind",
+            "reference",
+            "content_hash",
+            "project_id",
+            "library_id"
+          ],
+          "isUnique": true
         }
       },
-      "foreignKeys": {},
-      "compositePrimaryKeys": {},
+      "foreignKeys": {
+        "definitions_project_id_projects_id_fk": {
+          "name": "definitions_project_id_projects_id_fk",
+          "tableFrom": "definitions",
+          "tableTo": "projects",
+          "columnsFrom": [
+            "project_id"
+          ],
+          "columnsTo": [
+            "id"
+          ],
+          "onDelete": "cascade",
+          "onUpdate": "no action"
+        },
+        "definitions_library_id_libraries_id_fk": {
+          "name": "definitions_library_id_libraries_id_fk",
+          "tableFrom": "definitions",
+          "tableTo": "libraries",
+          "columnsFrom": [
+            "library_id"
+          ],
+          "columnsTo": [
+            "id"
+          ],
+          "onDelete": "cascade",
+          "onUpdate": "no action"
+        }
+      },
+      "compositePrimaryKeys": {
+        "definitions_id_version_pk": {
+          "columns": [
+            "id",
+            "version"
+          ],
+          "name": "definitions_id_version_pk"
+        }
+      },
       "uniqueConstraints": {},
       "checkConstraints": {}
     },
@@ -205,15 +294,15 @@
           "notNull": true,
           "autoincrement": false
         },
-        "workflow_def_id": {
-          "name": "workflow_def_id",
+        "definition_id": {
+          "name": "definition_id",
           "type": "text",
           "primaryKey": false,
           "notNull": true,
           "autoincrement": false
         },
-        "workflow_def_version": {
-          "name": "workflow_def_version",
+        "definition_version": {
+          "name": "definition_version",
           "type": "integer",
           "primaryKey": false,
           "notNull": true,
@@ -235,6 +324,20 @@
         },
         "task_version": {
           "name": "task_version",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": false,
+          "autoincrement": false
+        },
+        "subworkflow_id": {
+          "name": "subworkflow_id",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false,
+          "autoincrement": false
+        },
+        "subworkflow_version": {
+          "name": "subworkflow_version",
           "type": "integer",
           "primaryKey": false,
           "notNull": false,
@@ -263,11 +366,11 @@
         }
       },
       "indexes": {
-        "idx_nodes_workflow_def": {
-          "name": "idx_nodes_workflow_def",
+        "idx_nodes_definition": {
+          "name": "idx_nodes_definition",
           "columns": [
-            "workflow_def_id",
-            "workflow_def_version"
+            "definition_id",
+            "definition_version"
           ],
           "isUnique": false
         },
@@ -282,40 +385,128 @@
         "idx_nodes_ref": {
           "name": "idx_nodes_ref",
           "columns": [
-            "workflow_def_id",
-            "workflow_def_version",
+            "definition_id",
+            "definition_version",
             "ref"
           ],
           "isUnique": false
         }
       },
       "foreignKeys": {
-        "nodes_workflow_def_id_workflow_def_version_workflow_defs_id_version_fk": {
-          "name": "nodes_workflow_def_id_workflow_def_version_workflow_defs_id_version_fk",
+        "nodes_definition_id_definition_version_definitions_id_version_fk": {
+          "name": "nodes_definition_id_definition_version_definitions_id_version_fk",
           "tableFrom": "nodes",
-          "tableTo": "workflow_defs",
+          "tableTo": "definitions",
           "columnsFrom": [
-            "workflow_def_id",
-            "workflow_def_version"
+            "definition_id",
+            "definition_version"
           ],
           "columnsTo": [
             "id",
             "version"
           ],
-          "onDelete": "no action",
+          "onDelete": "cascade",
           "onUpdate": "no action"
         }
       },
       "compositePrimaryKeys": {
-        "nodes_workflow_def_id_workflow_def_version_id_pk": {
+        "nodes_definition_id_definition_version_id_pk": {
           "columns": [
-            "workflow_def_id",
-            "workflow_def_version",
+            "definition_id",
+            "definition_version",
             "id"
           ],
-          "name": "nodes_workflow_def_id_workflow_def_version_id_pk"
+          "name": "nodes_definition_id_definition_version_id_pk"
         }
       },
+      "uniqueConstraints": {},
+      "checkConstraints": {}
+    },
+    "subworkflows": {
+      "name": "subworkflows",
+      "columns": {
+        "id": {
+          "name": "id",
+          "type": "text",
+          "primaryKey": true,
+          "notNull": true,
+          "autoincrement": false
+        },
+        "workflow_run_id": {
+          "name": "workflow_run_id",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false
+        },
+        "parent_token_id": {
+          "name": "parent_token_id",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false
+        },
+        "subworkflow_run_id": {
+          "name": "subworkflow_run_id",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false
+        },
+        "status": {
+          "name": "status",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false
+        },
+        "timeout_ms": {
+          "name": "timeout_ms",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": false,
+          "autoincrement": false
+        },
+        "created_at": {
+          "name": "created_at",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false
+        },
+        "updated_at": {
+          "name": "updated_at",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false
+        }
+      },
+      "indexes": {
+        "idx_subworkflows_workflow_run": {
+          "name": "idx_subworkflows_workflow_run",
+          "columns": [
+            "workflow_run_id"
+          ],
+          "isUnique": false
+        },
+        "idx_subworkflows_parent_token": {
+          "name": "idx_subworkflows_parent_token",
+          "columns": [
+            "parent_token_id"
+          ],
+          "isUnique": false
+        },
+        "idx_subworkflows_status": {
+          "name": "idx_subworkflows_status",
+          "columns": [
+            "status"
+          ],
+          "isUnique": false
+        }
+      },
+      "foreignKeys": {},
+      "compositePrimaryKeys": {},
       "uniqueConstraints": {},
       "checkConstraints": {}
     },
@@ -466,15 +657,15 @@
           "notNull": false,
           "autoincrement": false
         },
-        "workflow_def_id": {
-          "name": "workflow_def_id",
+        "definition_id": {
+          "name": "definition_id",
           "type": "text",
           "primaryKey": false,
           "notNull": true,
           "autoincrement": false
         },
-        "workflow_def_version": {
-          "name": "workflow_def_version",
+        "definition_version": {
+          "name": "definition_version",
           "type": "integer",
           "primaryKey": false,
           "notNull": true,
@@ -545,11 +736,11 @@
         }
       },
       "indexes": {
-        "idx_transitions_workflow_def": {
-          "name": "idx_transitions_workflow_def",
+        "idx_transitions_definition": {
+          "name": "idx_transitions_definition",
           "columns": [
-            "workflow_def_id",
-            "workflow_def_version"
+            "definition_id",
+            "definition_version"
           ],
           "isUnique": false
         },
@@ -570,58 +761,58 @@
         "idx_transitions_ref": {
           "name": "idx_transitions_ref",
           "columns": [
-            "workflow_def_id",
-            "workflow_def_version",
+            "definition_id",
+            "definition_version",
             "ref"
           ],
           "isUnique": false
         }
       },
       "foreignKeys": {
-        "transitions_workflow_def_id_workflow_def_version_workflow_defs_id_version_fk": {
-          "name": "transitions_workflow_def_id_workflow_def_version_workflow_defs_id_version_fk",
+        "transitions_definition_id_definition_version_definitions_id_version_fk": {
+          "name": "transitions_definition_id_definition_version_definitions_id_version_fk",
           "tableFrom": "transitions",
-          "tableTo": "workflow_defs",
+          "tableTo": "definitions",
           "columnsFrom": [
-            "workflow_def_id",
-            "workflow_def_version"
+            "definition_id",
+            "definition_version"
           ],
           "columnsTo": [
             "id",
             "version"
           ],
-          "onDelete": "no action",
+          "onDelete": "cascade",
           "onUpdate": "no action"
         },
-        "transitions_workflow_def_id_workflow_def_version_from_node_id_nodes_workflow_def_id_workflow_def_version_id_fk": {
-          "name": "transitions_workflow_def_id_workflow_def_version_from_node_id_nodes_workflow_def_id_workflow_def_version_id_fk",
+        "transitions_definition_id_definition_version_from_node_id_nodes_definition_id_definition_version_id_fk": {
+          "name": "transitions_definition_id_definition_version_from_node_id_nodes_definition_id_definition_version_id_fk",
           "tableFrom": "transitions",
           "tableTo": "nodes",
           "columnsFrom": [
-            "workflow_def_id",
-            "workflow_def_version",
+            "definition_id",
+            "definition_version",
             "from_node_id"
           ],
           "columnsTo": [
-            "workflow_def_id",
-            "workflow_def_version",
+            "definition_id",
+            "definition_version",
             "id"
           ],
           "onDelete": "cascade",
           "onUpdate": "no action"
         },
-        "transitions_workflow_def_id_workflow_def_version_to_node_id_nodes_workflow_def_id_workflow_def_version_id_fk": {
-          "name": "transitions_workflow_def_id_workflow_def_version_to_node_id_nodes_workflow_def_id_workflow_def_version_id_fk",
+        "transitions_definition_id_definition_version_to_node_id_nodes_definition_id_definition_version_id_fk": {
+          "name": "transitions_definition_id_definition_version_to_node_id_nodes_definition_id_definition_version_id_fk",
           "tableFrom": "transitions",
           "tableTo": "nodes",
           "columnsFrom": [
-            "workflow_def_id",
-            "workflow_def_version",
+            "definition_id",
+            "definition_version",
             "to_node_id"
           ],
           "columnsTo": [
-            "workflow_def_id",
-            "workflow_def_version",
+            "definition_id",
+            "definition_version",
             "id"
           ],
           "onDelete": "cascade",
@@ -629,187 +820,13 @@
         }
       },
       "compositePrimaryKeys": {
-        "transitions_workflow_def_id_workflow_def_version_id_pk": {
+        "transitions_definition_id_definition_version_id_pk": {
           "columns": [
-            "workflow_def_id",
-            "workflow_def_version",
+            "definition_id",
+            "definition_version",
             "id"
           ],
-          "name": "transitions_workflow_def_id_workflow_def_version_id_pk"
-        }
-      },
-      "uniqueConstraints": {},
-      "checkConstraints": {}
-    },
-    "workflow_defs": {
-      "name": "workflow_defs",
-      "columns": {
-        "id": {
-          "name": "id",
-          "type": "text",
-          "primaryKey": false,
-          "notNull": true,
-          "autoincrement": false
-        },
-        "name": {
-          "name": "name",
-          "type": "text",
-          "primaryKey": false,
-          "notNull": true,
-          "autoincrement": false
-        },
-        "description": {
-          "name": "description",
-          "type": "text",
-          "primaryKey": false,
-          "notNull": true,
-          "autoincrement": false,
-          "default": "''"
-        },
-        "version": {
-          "name": "version",
-          "type": "integer",
-          "primaryKey": false,
-          "notNull": true,
-          "autoincrement": false,
-          "default": 1
-        },
-        "project_id": {
-          "name": "project_id",
-          "type": "text",
-          "primaryKey": false,
-          "notNull": false,
-          "autoincrement": false
-        },
-        "library_id": {
-          "name": "library_id",
-          "type": "text",
-          "primaryKey": false,
-          "notNull": false,
-          "autoincrement": false
-        },
-        "tags": {
-          "name": "tags",
-          "type": "text",
-          "primaryKey": false,
-          "notNull": false,
-          "autoincrement": false
-        },
-        "input_schema": {
-          "name": "input_schema",
-          "type": "text",
-          "primaryKey": false,
-          "notNull": true,
-          "autoincrement": false
-        },
-        "output_schema": {
-          "name": "output_schema",
-          "type": "text",
-          "primaryKey": false,
-          "notNull": true,
-          "autoincrement": false
-        },
-        "output_mapping": {
-          "name": "output_mapping",
-          "type": "text",
-          "primaryKey": false,
-          "notNull": false,
-          "autoincrement": false
-        },
-        "context_schema": {
-          "name": "context_schema",
-          "type": "text",
-          "primaryKey": false,
-          "notNull": false,
-          "autoincrement": false
-        },
-        "initial_node_id": {
-          "name": "initial_node_id",
-          "type": "text",
-          "primaryKey": false,
-          "notNull": false,
-          "autoincrement": false
-        },
-        "content_hash": {
-          "name": "content_hash",
-          "type": "text",
-          "primaryKey": false,
-          "notNull": false,
-          "autoincrement": false
-        },
-        "created_at": {
-          "name": "created_at",
-          "type": "text",
-          "primaryKey": false,
-          "notNull": true,
-          "autoincrement": false
-        },
-        "updated_at": {
-          "name": "updated_at",
-          "type": "text",
-          "primaryKey": false,
-          "notNull": true,
-          "autoincrement": false
-        }
-      },
-      "indexes": {
-        "idx_workflow_defs_project": {
-          "name": "idx_workflow_defs_project",
-          "columns": [
-            "project_id"
-          ],
-          "isUnique": false
-        },
-        "idx_workflow_defs_library": {
-          "name": "idx_workflow_defs_library",
-          "columns": [
-            "library_id"
-          ],
-          "isUnique": false
-        },
-        "idx_workflow_defs_name_version": {
-          "name": "idx_workflow_defs_name_version",
-          "columns": [
-            "name",
-            "project_id",
-            "library_id",
-            "version"
-          ],
-          "isUnique": false
-        },
-        "idx_workflow_defs_content_hash": {
-          "name": "idx_workflow_defs_content_hash",
-          "columns": [
-            "name",
-            "project_id",
-            "library_id",
-            "content_hash"
-          ],
-          "isUnique": false
-        }
-      },
-      "foreignKeys": {
-        "workflow_defs_project_id_projects_id_fk": {
-          "name": "workflow_defs_project_id_projects_id_fk",
-          "tableFrom": "workflow_defs",
-          "tableTo": "projects",
-          "columnsFrom": [
-            "project_id"
-          ],
-          "columnsTo": [
-            "id"
-          ],
-          "onDelete": "no action",
-          "onUpdate": "no action"
-        }
-      },
-      "compositePrimaryKeys": {
-        "workflow_defs_id_version_pk": {
-          "columns": [
-            "id",
-            "version"
-          ],
-          "name": "workflow_defs_id_version_pk"
+          "name": "transitions_definition_id_definition_version_id_pk"
         }
       },
       "uniqueConstraints": {},
@@ -836,18 +853,18 @@
           "name": "workflow_id",
           "type": "text",
           "primaryKey": false,
-          "notNull": true,
+          "notNull": false,
           "autoincrement": false
         },
-        "workflow_def_id": {
-          "name": "workflow_def_id",
+        "definition_id": {
+          "name": "definition_id",
           "type": "text",
           "primaryKey": false,
           "notNull": true,
           "autoincrement": false
         },
-        "workflow_version": {
-          "name": "workflow_version",
+        "definition_version": {
+          "name": "definition_version",
           "type": "integer",
           "primaryKey": false,
           "notNull": true,
@@ -993,7 +1010,7 @@
           "columnsTo": [
             "id"
           ],
-          "onDelete": "no action",
+          "onDelete": "cascade",
           "onUpdate": "no action"
         },
         "workflow_runs_workflow_id_workflows_id_fk": {
@@ -1009,21 +1026,21 @@
           "onDelete": "no action",
           "onUpdate": "no action"
         },
-        "workflow_runs_workflow_def_id_workflow_version_parent_node_id_nodes_workflow_def_id_workflow_def_version_id_fk": {
-          "name": "workflow_runs_workflow_def_id_workflow_version_parent_node_id_nodes_workflow_def_id_workflow_def_version_id_fk",
+        "workflow_runs_definition_id_definition_version_parent_node_id_nodes_definition_id_definition_version_id_fk": {
+          "name": "workflow_runs_definition_id_definition_version_parent_node_id_nodes_definition_id_definition_version_id_fk",
           "tableFrom": "workflow_runs",
           "tableTo": "nodes",
           "columnsFrom": [
-            "workflow_def_id",
-            "workflow_version",
+            "definition_id",
+            "definition_version",
             "parent_node_id"
           ],
           "columnsTo": [
-            "workflow_def_id",
-            "workflow_def_version",
+            "definition_id",
+            "definition_version",
             "id"
           ],
-          "onDelete": "no action",
+          "onDelete": "cascade",
           "onUpdate": "no action"
         }
       },

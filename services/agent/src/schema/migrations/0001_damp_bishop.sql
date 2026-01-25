@@ -1,1 +1,0 @@
-ALTER TABLE `agent_def` ADD `name` text NOT NULL;
