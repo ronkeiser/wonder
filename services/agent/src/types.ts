@@ -12,6 +12,54 @@
 import type { TraceEventInput } from '@wonder/events';
 
 // ============================================================================
+// Pending Dispatch Types (for alarm-based trampolining)
+// ============================================================================
+
+/**
+ * Pending dispatch for alarm-based execution.
+ *
+ * When a recursive call is received (from coordinator, parent agent, etc.),
+ * we persist the request and set an immediate alarm rather than executing
+ * synchronously. This breaks the subrequest depth chain.
+ */
+export type PendingDispatch =
+  | {
+      id: string;
+      type: 'startTurn';
+      payload: {
+        id: string;
+        content: string;
+        caller: Caller;
+        options?: { enableTraceEvents?: boolean };
+      };
+      createdAt: number;
+    }
+  | {
+      id: string;
+      type: 'handleAgentResponse';
+      payload: { turnId: string; toolCallId: string; response: string };
+      createdAt: number;
+    }
+  | {
+      id: string;
+      type: 'handleWorkflowResult';
+      payload: { turnId: string; toolCallId: string; result: unknown };
+      createdAt: number;
+    }
+  | {
+      id: string;
+      type: 'handleContextAssemblyResult';
+      payload: { turnId: string; runId: string; context: { llmRequest: { messages: unknown[] } } };
+      createdAt: number;
+    }
+  | {
+      id: string;
+      type: 'handleMemoryExtractionResult';
+      payload: { turnId: string; runId: string };
+      createdAt: number;
+    };
+
+// ============================================================================
 // Domain Status Types
 // ============================================================================
 

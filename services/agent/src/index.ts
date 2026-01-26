@@ -30,6 +30,7 @@ import type {
   AgentCallback,
   AgentCallParams,
   Caller,
+  PendingDispatch,
   ToolResult,
   TurnIssues,
   WorkflowCallback,
@@ -574,12 +575,42 @@ export class Conversation extends DurableObject {
    *
    * Called when a user sends a message or when a workflow/agent invokes this agent.
    *
+   * When called by another agent (delegate mode), uses alarm-based trampolining
+   * to break the subrequest depth chain.
+   *
    * @param conversationId - The conversation ID (must match DO ID)
    * @param input - The input for this turn (user message or caller's input)
    * @param caller - Who initiated this turn
    * @param options - Optional settings for this turn
    */
   async startTurn(
+    conversationId: string,
+    input: unknown,
+    caller: Caller,
+    options?: { enableTraceEvents?: boolean },
+  ): Promise<{ turnId: string }> {
+    // If called by another agent (delegate mode), trampoline to break depth chain
+    if (caller.type === 'agent') {
+      const content = typeof input === 'string' ? input : JSON.stringify(input);
+      await this.queuePendingDispatch({
+        id: crypto.randomUUID(),
+        type: 'startTurn',
+        payload: { id: conversationId, content, caller, options },
+        createdAt: Date.now(),
+      });
+      // Return a placeholder turnId - the actual turn will be created in executeStartTurn
+      // The caller doesn't need the real turnId since they'll get results via callback
+      return { turnId: 'pending' };
+    }
+
+    // Non-agent callers (user, workflow) execute directly
+    return this.executeStartTurn(conversationId, input, caller, options);
+  }
+
+  /**
+   * Execute startTurn after trampolining via alarm.
+   */
+  private async executeStartTurn(
     conversationId: string,
     input: unknown,
     caller: Caller,
@@ -935,8 +966,25 @@ export class Conversation extends DurableObject {
    * Handle workflow result from Coordinator.
    *
    * Called when a workflow dispatched by a tool completes.
+   * Uses alarm-based trampolining to break subrequest depth chain.
    */
   async handleWorkflowResult(
+    turnId: string,
+    toolCallId: string,
+    output: Record<string, unknown>,
+  ): Promise<void> {
+    await this.queuePendingDispatch({
+      id: crypto.randomUUID(),
+      type: 'handleWorkflowResult',
+      payload: { turnId, toolCallId, result: output },
+      createdAt: Date.now(),
+    });
+  }
+
+  /**
+   * Execute handleWorkflowResult after trampolining via alarm.
+   */
+  private async executeHandleWorkflowResult(
     turnId: string,
     toolCallId: string,
     output: Record<string, unknown>,
@@ -1076,8 +1124,25 @@ export class Conversation extends DurableObject {
    * Handle agent response from another ConversationRunner.
    *
    * Called when an agent invoked by a tool responds (delegate mode).
+   * Uses alarm-based trampolining to break subrequest depth chain.
    */
   async handleAgentResponse(turnId: string, toolCallId: string, response: string): Promise<void> {
+    await this.queuePendingDispatch({
+      id: crypto.randomUUID(),
+      type: 'handleAgentResponse',
+      payload: { turnId, toolCallId, response },
+      createdAt: Date.now(),
+    });
+  }
+
+  /**
+   * Execute handleAgentResponse after trampolining via alarm.
+   */
+  private async executeHandleAgentResponse(
+    turnId: string,
+    toolCallId: string,
+    response: string,
+  ): Promise<void> {
     try {
       const turn = this.turns.get(turnId);
       if (!turn) {
@@ -1214,11 +1279,28 @@ export class Conversation extends DurableObject {
    *
    * Called when the context assembly workflow completes.
    * The context includes the provider-native LLM request.
+   * Uses alarm-based trampolining to break subrequest depth chain.
    */
   async handleContextAssemblyResult(
     turnId: string,
     runId: string,
     context: { llmRequest: LLMRequest },
+  ): Promise<void> {
+    await this.queuePendingDispatch({
+      id: crypto.randomUUID(),
+      type: 'handleContextAssemblyResult',
+      payload: { turnId, runId, context: context as { llmRequest: { messages: unknown[] } } },
+      createdAt: Date.now(),
+    });
+  }
+
+  /**
+   * Execute handleContextAssemblyResult after trampolining via alarm.
+   */
+  private async executeHandleContextAssemblyResult(
+    turnId: string,
+    runId: string,
+    context: { llmRequest: { messages: unknown[] } },
   ): Promise<void> {
     try {
       const turn = this.turns.get(turnId);
@@ -1251,7 +1333,7 @@ export class Conversation extends DurableObject {
       // Run the LLM loop with the assembled context
       const loopResult = await runLLMLoop({
         turnId,
-        llmRequest: context.llmRequest,
+        llmRequest: context.llmRequest as LLMRequest,
         defs: this.defs,
         ctx,
       });
@@ -1337,8 +1419,21 @@ export class Conversation extends DurableObject {
    * Handle memory extraction completion.
    *
    * Called when the memory extraction workflow completes.
+   * Uses alarm-based trampolining to break subrequest depth chain.
    */
   async handleMemoryExtractionResult(turnId: string, runId: string): Promise<void> {
+    await this.queuePendingDispatch({
+      id: crypto.randomUUID(),
+      type: 'handleMemoryExtractionResult',
+      payload: { turnId, runId },
+      createdAt: Date.now(),
+    });
+  }
+
+  /**
+   * Execute handleMemoryExtractionResult after trampolining via alarm.
+   */
+  private async executeHandleMemoryExtractionResult(turnId: string, runId: string): Promise<void> {
     try {
       const turn = this.turns.get(turnId);
       if (!turn) {
@@ -1434,14 +1529,131 @@ export class Conversation extends DurableObject {
     }
   }
 
+  // ============================================================================
+  // Pending Dispatch Management (alarm-based trampolining)
+  // ============================================================================
+
   /**
-   * Durable Object alarm handler for timeouts.
+   * Queue a pending dispatch and schedule an immediate alarm.
    *
-   * Fires when the earliest pending async operation times out.
-   * Marks the operation as failed and either resumes the LLM loop
-   * (for sync operations) or checks turn completion (for async).
+   * This breaks the subrequest depth chain by deferring execution
+   * until the alarm fires (which starts a fresh request context).
+   */
+  private async queuePendingDispatch(dispatch: PendingDispatch): Promise<void> {
+    await this.ctx.storage.put(`pending:${dispatch.id}`, dispatch);
+
+    // Schedule immediate alarm to process the dispatch
+    const existingAlarm = await this.ctx.storage.getAlarm();
+    const now = Date.now();
+    if (!existingAlarm || now < existingAlarm) {
+      await this.ctx.storage.setAlarm(now);
+    }
+
+    this.logger.debug({
+      eventType: 'conversation.pending_dispatch.queued',
+      message: `Queued pending dispatch: ${dispatch.type}`,
+      metadata: { dispatchId: dispatch.id, type: dispatch.type },
+    });
+  }
+
+  /**
+   * Process all pending dispatches.
+   *
+   * Called from alarm() handler after depth has been reset.
+   */
+  private async processPendingDispatches(): Promise<void> {
+    const pending = await this.ctx.storage.list<PendingDispatch>({ prefix: 'pending:' });
+
+    if (pending.size === 0) {
+      return;
+    }
+
+    // Sort by createdAt to maintain FIFO order
+    const dispatches = [...pending.entries()].sort(([, a], [, b]) => a.createdAt - b.createdAt);
+
+    this.logger.info({
+      eventType: 'conversation.pending_dispatch.processing',
+      message: `Processing ${dispatches.length} pending dispatch(es)`,
+      metadata: { count: dispatches.length, types: dispatches.map(([, d]) => d.type) },
+    });
+
+    for (const [key, dispatch] of dispatches) {
+      try {
+        await this.executePendingDispatch(dispatch);
+        await this.ctx.storage.delete(key);
+      } catch (error) {
+        this.logger.error({
+          eventType: 'conversation.pending_dispatch.failed',
+          message: `Failed to process pending dispatch: ${dispatch.type}`,
+          metadata: {
+            dispatchId: dispatch.id,
+            type: dispatch.type,
+            error: error instanceof Error ? error.message : String(error),
+          },
+        });
+        // Delete failed dispatch to avoid infinite retry loop
+        // Errors will surface through turn failure states
+        await this.ctx.storage.delete(key);
+      }
+    }
+  }
+
+  /**
+   * Execute a single pending dispatch.
+   */
+  private async executePendingDispatch(dispatch: PendingDispatch): Promise<void> {
+    switch (dispatch.type) {
+      case 'startTurn':
+        await this.executeStartTurn(
+          dispatch.payload.id,
+          dispatch.payload.content,
+          dispatch.payload.caller,
+          dispatch.payload.options,
+        );
+        break;
+      case 'handleAgentResponse':
+        await this.executeHandleAgentResponse(
+          dispatch.payload.turnId,
+          dispatch.payload.toolCallId,
+          dispatch.payload.response,
+        );
+        break;
+      case 'handleWorkflowResult':
+        await this.executeHandleWorkflowResult(
+          dispatch.payload.turnId,
+          dispatch.payload.toolCallId,
+          dispatch.payload.result as Record<string, unknown>,
+        );
+        break;
+      case 'handleContextAssemblyResult':
+        await this.executeHandleContextAssemblyResult(
+          dispatch.payload.turnId,
+          dispatch.payload.runId,
+          dispatch.payload.context,
+        );
+        break;
+      case 'handleMemoryExtractionResult':
+        await this.executeHandleMemoryExtractionResult(
+          dispatch.payload.turnId,
+          dispatch.payload.runId,
+        );
+        break;
+    }
+  }
+
+  /**
+   * Durable Object alarm handler.
+   *
+   * Handles two responsibilities:
+   * 1. Process pending dispatches (alarm-based trampolining)
+   * 2. Check async operations for timeouts
    */
   async alarm(): Promise<void> {
+    // First, process any pending dispatches (this is the trampoline)
+    // These take priority because they represent work that needs to be done
+    await this.processPendingDispatches();
+
+    // Then check for timeouts on async operations
     try {
       const now = new Date();
       const timedOutOps = this.asyncOps.getTimedOut(now);

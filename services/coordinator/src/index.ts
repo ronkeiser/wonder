@@ -27,7 +27,7 @@ import { DefinitionManager, type SubworkflowParams } from './operations/defs';
 import { StatusManager } from './operations/status';
 import { TokenManager } from './operations/tokens';
 import { errorDetails, errorMessage } from './shared';
-import type { TaskResult } from './types';
+import type { PendingDispatch, TaskResult } from './types';
 
 /**
  * WorkflowCoordinator Durable Object
@@ -151,11 +151,25 @@ export class WorkflowCoordinator extends DurableObject {
    * The subworkflow runs to completion and calls back to parent via
    * handleSubworkflowResult() or handleSubworkflowError().
    *
+   * Uses alarm-based trampolining to break subrequest depth chain.
+   *
    * Note: The runId is passed from the parent (dispatchSubworkflow) and must
    * match the DO ID used to create this coordinator instance. This ensures
    * the executor can callback to the correct coordinator using workflowRunId.
    */
   async startSubworkflow(params: SubworkflowParams): Promise<void> {
+    await this.queuePendingDispatch({
+      id: crypto.randomUUID(),
+      type: 'startSubworkflow',
+      payload: params,
+      createdAt: Date.now(),
+    });
+  }
+
+  /**
+   * Execute startSubworkflow after trampolining via alarm.
+   */
+  private async executeStartSubworkflow(params: SubworkflowParams): Promise<void> {
     const { runId } = params;
 
     try {
@@ -358,8 +372,25 @@ export class WorkflowCoordinator extends DurableObject {
   /**
    * Handle successful subworkflow completion.
    * Called by subworkflow coordinator when it completes successfully.
+   *
+   * Uses alarm-based trampolining to break subrequest depth chain.
    */
   async handleSubworkflowResult(
+    tokenId: string,
+    subworkflowOutput: Record<string, unknown>,
+  ): Promise<void> {
+    await this.queuePendingDispatch({
+      id: crypto.randomUUID(),
+      type: 'handleSubworkflowResult',
+      payload: { tokenId, output: subworkflowOutput },
+      createdAt: Date.now(),
+    });
+  }
+
+  /**
+   * Execute handleSubworkflowResult after trampolining via alarm.
+   */
+  private async executeHandleSubworkflowResult(
     tokenId: string,
     subworkflowOutput: Record<string, unknown>,
   ): Promise<void> {
@@ -412,12 +443,26 @@ export class WorkflowCoordinator extends DurableObject {
    * Handle agent result.
    * Called by ConversationRunner when a workflow-invoked agent completes.
    *
+   * Uses alarm-based trampolining to break subrequest depth chain.
+   *
    * TODO: Full implementation requires:
    * - 'waiting_for_agent' token status
    * - 'RESUME_FROM_AGENT' decision type
    * - Token tracking for agent dispatch
    */
   async handleAgentResult(nodeId: string, output: { response: string }): Promise<void> {
+    await this.queuePendingDispatch({
+      id: crypto.randomUUID(),
+      type: 'handleAgentResult',
+      payload: { nodeId, output },
+      createdAt: Date.now(),
+    });
+  }
+
+  /**
+   * Execute handleAgentResult after trampolining via alarm.
+   */
+  private async executeHandleAgentResult(nodeId: string, output: { response: string }): Promise<void> {
     this.logger.info({
       eventType: 'coordinator.agent_result.received',
       message: 'Received agent result',
@@ -432,12 +477,26 @@ export class WorkflowCoordinator extends DurableObject {
    * Handle agent error.
    * Called by ConversationRunner when a workflow-invoked agent fails.
    *
+   * Uses alarm-based trampolining to break subrequest depth chain.
+   *
    * TODO: Full implementation requires:
    * - 'waiting_for_agent' token status
    * - 'FAIL_FROM_AGENT' decision type
    * - Token tracking for agent dispatch
    */
   async handleAgentError(nodeId: string, error: string): Promise<void> {
+    await this.queuePendingDispatch({
+      id: crypto.randomUUID(),
+      type: 'handleAgentError',
+      payload: { nodeId, error },
+      createdAt: Date.now(),
+    });
+  }
+
+  /**
+   * Execute handleAgentError after trampolining via alarm.
+   */
+  private async executeHandleAgentError(nodeId: string, error: string): Promise<void> {
     this.logger.warn({
       eventType: 'coordinator.agent_error.received',
       message: 'Received agent error',
@@ -451,8 +510,22 @@ export class WorkflowCoordinator extends DurableObject {
   /**
    * Handle subworkflow failure.
    * Called by subworkflow coordinator when it fails.
+   *
+   * Uses alarm-based trampolining to break subrequest depth chain.
    */
   async handleSubworkflowError(tokenId: string, error: string): Promise<void> {
+    await this.queuePendingDispatch({
+      id: crypto.randomUUID(),
+      type: 'handleSubworkflowError',
+      payload: { tokenId, error },
+      createdAt: Date.now(),
+    });
+  }
+
+  /**
+   * Execute handleSubworkflowError after trampolining via alarm.
+   */
+  private async executeHandleSubworkflowError(tokenId: string, error: string): Promise<void> {
     try {
       const token = this.tokens.get(tokenId);
 
@@ -499,6 +572,101 @@ export class WorkflowCoordinator extends DurableObject {
     }
   }
 
+  // ============================================================================
+  // Pending Dispatch Management (alarm-based trampolining)
+  // ============================================================================
+
+  /**
+   * Queue a pending dispatch and schedule an immediate alarm.
+   *
+   * This breaks the subrequest depth chain by deferring execution
+   * until the alarm fires (which starts a fresh request context).
+   */
+  private async queuePendingDispatch(dispatch: PendingDispatch): Promise<void> {
+    await this.ctx.storage.put(`pending:${dispatch.id}`, dispatch);
+
+    // Schedule immediate alarm to process the dispatch
+    const existingAlarm = await this.ctx.storage.getAlarm();
+    const now = Date.now();
+    if (!existingAlarm || now < existingAlarm) {
+      await this.ctx.storage.setAlarm(now);
+    }
+
+    this.logger.debug({
+      eventType: 'coordinator.pending_dispatch.queued',
+      message: `Queued pending dispatch: ${dispatch.type}`,
+      metadata: { dispatchId: dispatch.id, type: dispatch.type },
+    });
+  }
+
+  /**
+   * Process all pending dispatches.
+   *
+   * Called from alarm() handler after depth has been reset.
+   */
+  private async processPendingDispatches(): Promise<void> {
+    const pending = await this.ctx.storage.list<PendingDispatch>({ prefix: 'pending:' });
+
+    if (pending.size === 0) {
+      return;
+    }
+
+    // Sort by createdAt to maintain FIFO order
+    const dispatches = [...pending.entries()].sort(([, a], [, b]) => a.createdAt - b.createdAt);
+
+    this.logger.info({
+      eventType: 'coordinator.pending_dispatch.processing',
+      message: `Processing ${dispatches.length} pending dispatch(es)`,
+      metadata: { count: dispatches.length, types: dispatches.map(([, d]) => d.type) },
+    });
+
+    for (const [key, dispatch] of dispatches) {
+      try {
+        await this.executePendingDispatch(dispatch);
+        await this.ctx.storage.delete(key);
+      } catch (error) {
+        this.logger.error({
+          eventType: 'coordinator.pending_dispatch.failed',
+          message: `Failed to process pending dispatch: ${dispatch.type}`,
+          metadata: {
+            dispatchId: dispatch.id,
+            type: dispatch.type,
+            ...errorDetails(error),
+          },
+        });
+        // Delete failed dispatch to avoid infinite retry loop
+        // Errors will surface through workflow failure states
+        await this.ctx.storage.delete(key);
+      }
+    }
+  }
+
+  /**
+   * Execute a single pending dispatch.
+   */
+  private async executePendingDispatch(dispatch: PendingDispatch): Promise<void> {
+    switch (dispatch.type) {
+      case 'startSubworkflow':
+        await this.executeStartSubworkflow(dispatch.payload);
+        break;
+      case 'handleSubworkflowResult':
+        await this.executeHandleSubworkflowResult(
+          dispatch.payload.tokenId,
+          dispatch.payload.output,
+        );
+        break;
+      case 'handleSubworkflowError':
+        await this.executeHandleSubworkflowError(dispatch.payload.tokenId, dispatch.payload.error);
+        break;
+      case 'handleAgentResult':
+        await this.executeHandleAgentResult(dispatch.payload.nodeId, dispatch.payload.output);
+        break;
+      case 'handleAgentError':
+        await this.executeHandleAgentError(dispatch.payload.nodeId, dispatch.payload.error);
+        break;
+    }
+  }
+
   /**
    * Schedule an alarm to fire after delayMs.
    *
@@ -523,21 +691,39 @@ export class WorkflowCoordinator extends DurableObject {
   /**
    * Alarm handler - called by Cloudflare when the scheduled alarm fires.
    *
-   * Checks all waiting tokens for timeouts and applies appropriate actions.
+   * Handles two responsibilities:
+   * 1. Process pending dispatches (alarm-based trampolining)
+   * 2. Check waiting tokens for timeouts
    */
   async alarm(): Promise<void> {
+    // First, process any pending dispatches (this is the trampoline)
+    // These take priority because they represent work that needs to be done
+    await this.processPendingDispatches();
+
+    // Then check for timeouts (only if we have an initialized workflow)
     try {
       const run = this.defs.getWorkflowRun();
       const ctx = this.getDispatchContext(run.id);
 
-      this.logger.info({
-        eventType: 'coordinator.alarm.fired',
-        message: 'Timeout alarm fired',
+      this.logger.debug({
+        eventType: 'coordinator.alarm.checking_timeouts',
+        message: 'Checking for timeouts',
         traceId: run.id,
       });
 
       await checkTimeouts(ctx);
     } catch (error) {
+      // If getWorkflowRun() fails, the workflow isn't initialized yet
+      // This can happen if alarm fires before initialization completes
+      // (e.g., pending dispatch for startSubworkflow)
+      if (error instanceof Error && error.message.includes('not initialized')) {
+        this.logger.debug({
+          eventType: 'coordinator.alarm.no_workflow',
+          message: 'No workflow initialized, skipping timeout check',
+        });
+        return;
+      }
+
       this.logger.error({
         eventType: 'coordinator.alarm.failed',
         message: 'Error in alarm handler',

@@ -96,7 +96,6 @@ describe('Foundation: 14 - Deep Sub-Workflow Chain', () => {
       },
       outputMapping: {
         'output.result': 'result.result',
-        'output.maxDepthReached': 'input.depth',
       },
     });
 
@@ -106,7 +105,7 @@ describe('Foundation: 14 - Deep Sub-Workflow Chain', () => {
       inputSchema: levelInputSchema,
       outputSchema: levelOutputSchema,
       outputMapping: {
-        maxDepthReached: 'output.maxDepthReached',
+        maxDepthReached: 'input.depth',
         result: 'output.result',
       },
       initialNodeRef: 'generate',

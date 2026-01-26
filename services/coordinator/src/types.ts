@@ -15,6 +15,52 @@ import type { Emitter, TraceEventInput } from '@wonder/events';
 import type { Logger } from '@wonder/logs';
 
 // ============================================================================
+// Pending Dispatch Types (for alarm-based trampolining)
+// ============================================================================
+
+/**
+ * Pending dispatch for alarm-based execution.
+ *
+ * When a recursive call is received (from child coordinator, agent, etc.),
+ * we persist the request and set an immediate alarm rather than executing
+ * synchronously. This breaks the subrequest depth chain.
+ */
+export type PendingDispatch =
+  | {
+      id: string;
+      type: 'startSubworkflow';
+      payload: SubworkflowParams;
+      createdAt: number;
+    }
+  | {
+      id: string;
+      type: 'handleSubworkflowResult';
+      payload: { tokenId: string; output: Record<string, unknown> };
+      createdAt: number;
+    }
+  | {
+      id: string;
+      type: 'handleSubworkflowError';
+      payload: { tokenId: string; error: string };
+      createdAt: number;
+    }
+  | {
+      id: string;
+      type: 'handleAgentResult';
+      payload: { nodeId: string; output: { response: string } };
+      createdAt: number;
+    }
+  | {
+      id: string;
+      type: 'handleAgentError';
+      payload: { nodeId: string; error: string };
+      createdAt: number;
+    };
+
+// Forward declaration for SubworkflowParams (defined in operations/defs)
+import type { SubworkflowParams } from './operations/defs';
+
+// ============================================================================
 // Domain Status Types
 // ============================================================================
 
