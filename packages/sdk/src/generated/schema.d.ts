@@ -2841,6 +2841,8 @@ export interface components {
             };
             /** @description When true, compute content hash for deduplication. If existing action with same reference and content exists, return it. Otherwise auto-increment version. */
             autoversion?: boolean;
+            /** @description Skip content hash deduplication and always create a new version. */
+            force?: boolean;
         };
         ActionGetResponse: {
             action: components["schemas"]["Action"];
@@ -2942,6 +2944,8 @@ export interface components {
             version: number;
             /** @description When true, compute content hash for deduplication. If existing artifact type with same name and content exists, return it. Otherwise auto-increment version. */
             autoversion?: boolean;
+            /** @description Skip content hash deduplication and always create a new version. */
+            force?: boolean;
         };
         ArtifactTypeListResponse: {
             artifactTypes: components["schemas"]["ArtifactType"][];
@@ -3178,6 +3182,8 @@ export interface components {
             costPer1kOutputTokens: number;
             /** @description Enable content-based deduplication */
             autoversion?: boolean;
+            /** @description Skip content hash deduplication and always create a new version. */
+            force?: boolean;
         };
         Persona: {
             /** @example code-reviewer */
@@ -3260,6 +3266,8 @@ export interface components {
             };
             /** @description When true, compute content hash for deduplication. If existing persona with same reference and content exists, return it. Otherwise auto-increment version. */
             autoversion?: boolean;
+            /** @description Skip content hash deduplication and always create a new version. */
+            force?: boolean;
         };
         PersonaListResponse: {
             personas: components["schemas"]["Persona"][];
@@ -3371,6 +3379,8 @@ export interface components {
             tags?: string[];
             /** @description When true, compute content hash for deduplication. If existing spec with same name and content exists, return it. Otherwise auto-increment version. */
             autoversion?: boolean;
+            /** @description Skip content hash deduplication and always create a new version. */
+            force?: boolean;
         };
         PromptSpecGetResponse: {
             promptSpec: components["schemas"]["PromptSpec"];
@@ -3590,6 +3600,8 @@ export interface components {
             timeoutMs?: number;
             /** @description When true, compute content hash for deduplication. If existing task with same name/owner and content exists, return it. Otherwise auto-increment version. */
             autoversion?: boolean;
+            /** @description Skip content hash deduplication and always create a new version. */
+            force?: boolean;
         };
         TaskListResponse: {
             tasks: components["schemas"]["Task"][];
@@ -3796,6 +3808,8 @@ export interface components {
             }[];
             /** @description Enable content-based deduplication. If true, returns existing workflow def when content matches. */
             autoversion?: boolean;
+            /** @description Skip content hash deduplication and always create a new version. */
+            force?: boolean;
         };
         WorkflowDefListResponse: {
             workflowDefs: components["schemas"]["WorkflowDef"][];

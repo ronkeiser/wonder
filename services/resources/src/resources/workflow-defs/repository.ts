@@ -47,8 +47,16 @@ export async function getNode(
   return result ?? null;
 }
 
-export async function listNodesByDefinition(db: DrizzleD1Database, definitionId: string): Promise<Node[]> {
-  return await db.select().from(nodes).where(eq(nodes.definitionId, definitionId)).all();
+export async function listNodesByDefinition(
+  db: DrizzleD1Database,
+  definitionId: string,
+  definitionVersion: number,
+): Promise<Node[]> {
+  return await db
+    .select()
+    .from(nodes)
+    .where(and(eq(nodes.definitionId, definitionId), eq(nodes.definitionVersion, definitionVersion)))
+    .all();
 }
 
 /** Transition */
@@ -78,20 +86,34 @@ export async function createTransitionWithId(
   return row;
 }
 
-export async function listTransitionsByDefinition(db: DrizzleD1Database, definitionId: string): Promise<Transition[]> {
+export async function listTransitionsByDefinition(
+  db: DrizzleD1Database,
+  definitionId: string,
+  definitionVersion: number,
+): Promise<Transition[]> {
   return await db
     .select()
     .from(transitions)
-    .where(eq(transitions.definitionId, definitionId))
+    .where(and(eq(transitions.definitionId, definitionId), eq(transitions.definitionVersion, definitionVersion)))
     .all();
 }
 
 /** Delete nodes and transitions for a definition */
 
-export async function deleteNodesAndTransitions(db: DrizzleD1Database, definitionId: string): Promise<void> {
+export async function deleteNodesAndTransitions(
+  db: DrizzleD1Database,
+  definitionId: string,
+  definitionVersion: number,
+): Promise<void> {
   // Delete associated nodes
-  await db.delete(nodes).where(eq(nodes.definitionId, definitionId)).run();
+  await db
+    .delete(nodes)
+    .where(and(eq(nodes.definitionId, definitionId), eq(nodes.definitionVersion, definitionVersion)))
+    .run();
 
   // Delete associated transitions
-  await db.delete(transitions).where(eq(transitions.definitionId, definitionId)).run();
+  await db
+    .delete(transitions)
+    .where(and(eq(transitions.definitionId, definitionId), eq(transitions.definitionVersion, definitionVersion)))
+    .run();
 }

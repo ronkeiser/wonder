@@ -345,7 +345,8 @@ async function createDefinition(
         modelProfileRef: doc.modelProfileRef as string,
         contextAssemblyWorkflowRef: doc.contextAssemblyWorkflowRef as string,
         memoryExtractionWorkflowRef: doc.memoryExtractionWorkflowRef as string,
-        autoversion: !options.force,
+        autoversion: true,
+        force: options.force,
       } as unknown as Parameters<typeof client.personas.create>[0]);
       const latestVersion = (result as { latestVersion?: number }).latestVersion;
       return { id: result.personaId, reused: result.reused ?? false, version: result.version, latestVersion };
@@ -375,7 +376,8 @@ async function createDefinition(
         reference: refString,
         libraryId: libraryId ?? undefined,
         projectId: projectId ?? undefined,
-        autoversion: !options.force,
+        autoversion: true,
+        force: options.force,
       } as unknown as Parameters<typeof client.tasks.create>[0]);
       const latestVersion = (result as { latestVersion?: number }).latestVersion;
       return { id: result.taskId, reused: result.reused ?? false, version: result.version, latestVersion };
@@ -397,7 +399,8 @@ async function createDefinition(
         reference: refString,
         libraryId: libraryId ?? undefined,
         projectId: projectId ?? undefined,
-        autoversion: !options.force,
+        autoversion: true,
+        force: options.force,
       } as unknown as Parameters<typeof wfClient.create>[0]);
       const latestVersion = (result as { latestVersion?: number }).latestVersion;
       return { id: result.workflowDefId, reused: result.reused ?? false, version: result.version, latestVersion };
@@ -407,7 +410,8 @@ async function createDefinition(
         ...doc,
         name: displayName,
         reference: refString,
-        autoversion: !options.force,
+        autoversion: true,
+        force: options.force,
       } as unknown as Parameters<typeof client['model-profiles']['create']>[0]);
       const latestVersion = (result as { latestVersion?: number }).latestVersion;
       return { id: result.modelProfileId, reused: result.reused ?? false, version: result.version, latestVersion };
@@ -424,7 +428,8 @@ async function createDefinition(
         produces: doc.produces as Record<string, unknown> | undefined,
         execution: doc.execution as Record<string, unknown> | undefined,
         idempotency: doc.idempotency as Record<string, unknown> | undefined,
-        autoversion: !options.force,
+        autoversion: true,
+        force: options.force,
       } as unknown as Parameters<typeof client.actions.create>[0]);
       const latestVersion = (result as { latestVersion?: number }).latestVersion;
       return { id: result.actionId, reused: result.reused ?? false, version: result.version, latestVersion };

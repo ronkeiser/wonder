@@ -2,12 +2,17 @@
  * Shared fingerprinting utility for content-based deduplication.
  *
  * Computes a SHA-256 hash of an object's structural content,
- * automatically excluding common identity/metadata fields.
+ * automatically excluding identity/metadata fields and generated IDs.
+ *
+ * The hash should reflect only user-authored content. Generated fields
+ * (ULIDs, derived node/transition IDs) are excluded at all nesting levels
+ * so that identical authored content always produces the same hash.
  */
 
 /**
- * Fields that are excluded from fingerprinting across all resources.
- * These are identity, organizational, or system-managed fields.
+ * Top-level fields excluded from fingerprinting.
+ * These are organizational or system-managed fields that aren't part of
+ * the authored content.
  *
  * Note: `name` is NOT excluded - it's user-facing content that should affect versioning.
  * `reference` is the stable identity used for autoversion scoping.
@@ -32,19 +37,39 @@ const METADATA_FIELDS = new Set([
 ]);
 
 /**
- * Recursively sorts object keys for deterministic JSON serialization.
+ * Fields excluded from fingerprinting at ALL nesting levels.
+ * These are generated identity fields (ULIDs or values derived from ULIDs)
+ * that are not user-authored content:
+ *
+ * - `id`: Generated ULID for steps, nodes, transitions
+ * - `initialNodeId`: Derived from generated node ULID (authored as `initialNodeRef`)
+ * - `fromNodeId`: Derived from generated node ULID (authored as `fromNodeRef`)
+ * - `toNodeId`: Derived from generated node ULID (authored as `toNodeRef`)
  */
-function sortObjectKeys(obj: unknown): unknown {
+const GENERATED_ID_FIELDS = new Set([
+  'id',
+  'initialNodeId',
+  'fromNodeId',
+  'toNodeId',
+]);
+
+/**
+ * Recursively sorts object keys for deterministic JSON serialization,
+ * stripping generated ID fields at every level.
+ */
+function sortAndStripKeys(obj: unknown): unknown {
   if (obj === null || obj === undefined) {
     return obj;
   }
   if (Array.isArray(obj)) {
-    return obj.map(sortObjectKeys);
+    return obj.map(sortAndStripKeys);
   }
   if (typeof obj === 'object') {
     const sorted: Record<string, unknown> = {};
     for (const key of Object.keys(obj).sort()) {
-      sorted[key] = sortObjectKeys((obj as Record<string, unknown>)[key]);
+      if (!GENERATED_ID_FIELDS.has(key)) {
+        sorted[key] = sortAndStripKeys((obj as Record<string, unknown>)[key]);
+      }
     }
     return sorted;
   }
@@ -52,7 +77,7 @@ function sortObjectKeys(obj: unknown): unknown {
 }
 
 /**
- * Extracts content fields from an object by excluding metadata fields.
+ * Extracts content fields from a top-level object by excluding metadata fields.
  */
 function extractContent(data: Record<string, unknown>): Record<string, unknown> {
   const content: Record<string, unknown> = {};
@@ -79,7 +104,7 @@ function extractContent(data: Record<string, unknown>): Record<string, unknown> 
  */
 export async function computeContentHash(data: Record<string, unknown>): Promise<string> {
   const content = extractContent(data);
-  const sortedContent = sortObjectKeys(content);
+  const sortedContent = sortAndStripKeys(content);
 
   // Deterministic JSON serialization
   const jsonString = JSON.stringify(sortedContent);
@@ -107,6 +132,6 @@ export function getContentKeys(data: Record<string, unknown>): string[] {
  */
 export function getContentJson(data: Record<string, unknown>): string {
   const content = extractContent(data);
-  const sortedContent = sortObjectKeys(content);
+  const sortedContent = sortAndStripKeys(content);
   return JSON.stringify(sortedContent);
 }

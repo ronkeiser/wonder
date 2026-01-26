@@ -28,6 +28,9 @@ export const CreateActionSchema = z
         description:
           'When true, compute content hash for deduplication. If existing action with same reference and content exists, return it. Otherwise auto-increment version.',
       }),
+    force: z.boolean().optional().openapi({
+      description: 'Skip content hash deduplication and always create a new version.',
+    }),
   })
   .openapi('CreateAction');
 

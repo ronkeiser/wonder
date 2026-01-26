@@ -63,6 +63,7 @@ export class PromptSpecs extends Resource {
           examples: data.examples,
         },
         autoversion: data.autoversion,
+        force: data.force,
       });
 
       if (result.reused) {

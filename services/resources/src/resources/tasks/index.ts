@@ -84,6 +84,7 @@ export class Tasks extends Resource {
           timeoutMs: data.timeoutMs,
         },
         autoversion: data.autoversion,
+        force: data.force,
       });
 
       if (result.reused) {

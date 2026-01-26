@@ -54,6 +54,7 @@ export class ArtifactTypes extends Resource {
           schema: data.schema,
         },
         autoversion: data.autoversion,
+        force: data.force,
       });
 
       if (result.reused) {

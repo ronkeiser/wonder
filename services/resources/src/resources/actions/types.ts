@@ -58,4 +58,5 @@ export type ActionInput = {
   execution?: Record<string, unknown> | null;
   idempotency?: Record<string, unknown> | null;
   autoversion?: boolean;
+  force?: boolean;
 };

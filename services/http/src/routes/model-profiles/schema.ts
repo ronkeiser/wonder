@@ -41,6 +41,9 @@ export const CreateModelProfileSchema = z
     costPer1kInputTokens: z.number().nonnegative().openapi({ example: 0.03 }),
     costPer1kOutputTokens: z.number().nonnegative().openapi({ example: 0.06 }),
     autoversion: z.boolean().optional().openapi({ description: 'Enable content-based deduplication' }),
+    force: z.boolean().optional().openapi({
+      description: 'Skip content hash deduplication and always create a new version.',
+    }),
   })
   .openapi('CreateModelProfile');
 

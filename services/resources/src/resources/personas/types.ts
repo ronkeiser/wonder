@@ -84,4 +84,5 @@ export type PersonaInput = {
   constraints?: AgentConstraints | null;
 
   autoversion?: boolean;
+  force?: boolean;
 };

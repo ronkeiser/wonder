@@ -73,6 +73,7 @@ export class Actions extends Resource {
           idempotency: data.idempotency,
         },
         autoversion: data.autoversion,
+        force: data.force,
       });
 
       if (result.reused) {

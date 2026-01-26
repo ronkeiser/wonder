@@ -8,7 +8,7 @@
  * - Reference resolution (latest or pinned version)
  */
 
-import { and, desc, eq, isNull, max, or, SQL } from 'drizzle-orm';
+import { and, desc, eq, isNull, max, SQL } from 'drizzle-orm';
 import type { DrizzleD1Database } from 'drizzle-orm/d1';
 import { ulid } from 'ulid';
 import { definitions } from '../schema';
@@ -41,6 +41,8 @@ export type DefinitionInput<K extends DefinitionKind = DefinitionKind> = {
   projectId?: string | null;
   libraryId?: string | null;
   autoversion?: boolean;
+  /** Skip content hash deduplication and always create a new version. */
+  force?: boolean;
 };
 
 export type CreateDefinitionResult =
@@ -134,13 +136,20 @@ function scopeCondition(scope: Scope): SQL | undefined {
 /**
  * Creates a new definition with autoversion support.
  *
- * If `autoversion` is true:
+ * ID stability: all versions of a definition share the same ID.
+ * The ID is established on first creation and reused for all subsequent versions.
+ * `(kind, reference, scope)` identifies the logical entity; `id` is its stable key.
+ *
+ * If `autoversion` is true (and not `force`):
  * - Checks for existing definition with same reference + content hash
  * - If found, returns existing (reused)
- * - If not found, increments version and creates new
+ * - If not found, increments version and creates new with same ID
  *
- * If `autoversion` is false:
- * - Creates with version 1
+ * If `force` is true:
+ * - Skips hash deduplication, always creates a new version with same ID
+ *
+ * If `autoversion` is false (first creation):
+ * - Creates with version 1 and a new ID
  */
 export async function createDefinition<K extends DefinitionKind>(
   db: DrizzleD1Database,
@@ -158,33 +167,39 @@ export async function createDefinition<K extends DefinitionKind>(
   // Validate content
   const validatedContent = validateContent(kind, input.content);
 
-  // Compute content hash (excludes metadata fields)
+  // Compute content hash (excludes generated ID fields at all levels)
   const contentHash = await computeContentHash(validatedContent as Record<string, unknown>);
 
-  if (input.autoversion) {
-    // Check for existing with same reference + hash
-    const existing = await getDefinitionByReferenceAndHash(
-      db,
-      kind,
-      input.reference,
-      contentHash,
-      scope,
-    );
+  if (input.autoversion || input.force) {
+    // Look up existing definition to get stable ID
+    const latest = await getLatestDefinition(db, kind, input.reference, scope);
+    const stableId = latest?.id ?? input.id ?? ulid();
 
-    if (existing) {
-      const latestVersion = await getMaxVersionByReference(db, kind, input.reference, scope);
-      return { reused: true, definition: existing, latestVersion };
+    // Unless forcing, check for content hash match (deduplication)
+    if (!input.force) {
+      const existing = await getDefinitionByReferenceAndHash(
+        db,
+        kind,
+        input.reference,
+        contentHash,
+        scope,
+      );
+
+      if (existing) {
+        const latestVersion = await getMaxVersionByReference(db, kind, input.reference, scope);
+        return { reused: true, definition: existing, latestVersion };
+      }
     }
 
-    // Get next version
+    // Create new version with stable ID
     const maxVersion = await getMaxVersionByReference(db, kind, input.reference, scope);
     const version = maxVersion + 1;
 
-    const definition = await insertDefinition(db, kind, input, validatedContent, contentHash, version, scope);
+    const definition = await insertDefinition(db, kind, input, validatedContent, contentHash, version, scope, stableId);
     return { reused: false, definition };
   }
 
-  // Non-autoversion: always version 1
+  // Non-autoversion: first creation, version 1
   const definition = await insertDefinition(db, kind, input, validatedContent, contentHash, 1, scope);
   return { reused: false, definition };
 }
@@ -197,12 +212,13 @@ async function insertDefinition<K extends DefinitionKind>(
   contentHash: string,
   version: number,
   scope: Scope,
+  stableId?: string,
 ): Promise<Definition> {
   const now = new Date().toISOString();
   const [definition] = await db
     .insert(definitions)
     .values({
-      id: input.id ?? ulid(), // Use provided ID or generate new
+      id: stableId ?? input.id ?? ulid(),
       version,
       kind,
       reference: input.reference,

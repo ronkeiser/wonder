@@ -1,6 +1,6 @@
 # General-purpose assistant persona
 # This is a basic persona configuration for the standard library
-persona: Mega Man
+persona: Mega Mans
 description: A helpful general-purpose assistant
 
 system_prompt: |

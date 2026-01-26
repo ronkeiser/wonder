@@ -33,4 +33,5 @@ export type PromptSpecInput = {
   examples?: Record<string, unknown> | null;
   tags?: string[] | null;
   autoversion?: boolean;
+  force?: boolean;
 };

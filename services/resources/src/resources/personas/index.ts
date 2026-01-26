@@ -85,6 +85,7 @@ export class Personas extends Resource {
           constraints: data.constraints,
         },
         autoversion: data.autoversion,
+        force: data.force,
       });
 
       if (result.reused) {

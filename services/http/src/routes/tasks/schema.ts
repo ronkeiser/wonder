@@ -129,6 +129,9 @@ export const CreateTaskSchema = z
       description:
         'When true, compute content hash for deduplication. If existing task with same name/owner and content exists, return it. Otherwise auto-increment version.',
     }),
+    force: z.boolean().optional().openapi({
+      description: 'Skip content hash deduplication and always create a new version.',
+    }),
   })
   .openapi('CreateTask');
 

@@ -45,6 +45,7 @@ export type WorkflowDefInput = {
   nodes: NodeInput[];
   transitions?: TransitionInput[];
   autoversion?: boolean;
+  force?: boolean;
 };
 
 /** Node input - uses ref instead of id, omits definition FK fields */

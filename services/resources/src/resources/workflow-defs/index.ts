@@ -110,6 +110,7 @@ export class WorkflowDefs extends Resource {
           transitions: transformed.transitions,
         },
         autoversion: data.autoversion,
+        force: data.force,
       });
     } catch (error) {
       const dbError = extractDbError(error);
@@ -220,8 +221,8 @@ export class WorkflowDefs extends Resource {
           throw new NotFoundError(`WorkflowDef not found: ${workflowDefId}`, 'workflow_def', workflowDefId);
         }
 
-        const nodes = await repo.listNodesByDefinition(this.serviceCtx.db, workflowDefId);
-        const transitions = await repo.listTransitionsByDefinition(this.serviceCtx.db, workflowDefId);
+        const nodes = await repo.listNodesByDefinition(this.serviceCtx.db, workflowDefId, definition.version);
+        const transitions = await repo.listTransitionsByDefinition(this.serviceCtx.db, workflowDefId, definition.version);
 
         return {
           workflowDef: toWorkflowDef(definition),
@@ -277,7 +278,7 @@ export class WorkflowDefs extends Resource {
         }
 
         // Delete nodes and transitions first (they have FK to definitions)
-        await repo.deleteNodesAndTransitions(this.serviceCtx.db, workflowDefId);
+        await repo.deleteNodesAndTransitions(this.serviceCtx.db, workflowDefId, definition.version);
 
         // Delete the definition
         await deleteDefinition(this.serviceCtx.db, workflowDefId, version);

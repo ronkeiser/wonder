@@ -31,6 +31,9 @@ export const CreatePersonaSchema = z
         description:
           'When true, compute content hash for deduplication. If existing persona with same reference and content exists, return it. Otherwise auto-increment version.',
       }),
+    force: z.boolean().optional().openapi({
+      description: 'Skip content hash deduplication and always create a new version.',
+    }),
   })
   .openapi('CreatePersona');
 

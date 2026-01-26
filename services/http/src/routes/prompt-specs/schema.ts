@@ -22,6 +22,9 @@ export const CreatePromptSpecSchema = z
         description:
           'When true, compute content hash for deduplication. If existing spec with same name and content exists, return it. Otherwise auto-increment version.',
       }),
+    force: z.boolean().optional().openapi({
+      description: 'Skip content hash deduplication and always create a new version.',
+    }),
   })
   .openapi('CreatePromptSpec');
 

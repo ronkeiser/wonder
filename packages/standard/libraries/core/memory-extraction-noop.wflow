@@ -37,7 +37,6 @@ nodes:
   noop:
     name: Noop
     task_id: noop_task
-    task_version: 1
     input_mapping: {}
     output_mapping: {}
 

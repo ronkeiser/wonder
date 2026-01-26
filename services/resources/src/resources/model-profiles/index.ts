@@ -38,7 +38,7 @@ function toModelProfile(def: Definition): ModelProfile {
 }
 
 export class ModelProfiles extends Resource {
-  async create(data: ModelProfileInput & { autoversion?: boolean }): Promise<{
+  async create(data: ModelProfileInput & { autoversion?: boolean; force?: boolean }): Promise<{
     modelProfileId: string;
     modelProfile: ModelProfile;
     /** True if an existing model profile was reused (autoversion matched content hash) */
@@ -69,6 +69,7 @@ export class ModelProfiles extends Resource {
               costPer1kOutputTokens: data.costPer1kOutputTokens ?? 0,
             },
             autoversion: data.autoversion,
+            force: data.force,
           });
 
           if (result.reused) {

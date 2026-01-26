@@ -85,4 +85,5 @@ export type TaskInput = {
   retry?: RetryConfig | null;
   timeoutMs?: number | null;
   autoversion?: boolean;
+  force?: boolean;
 };

@@ -101,6 +101,9 @@ export const CreateWorkflowDefSchema = z
     autoversion: z.boolean().optional().openapi({
       description: 'Enable content-based deduplication. If true, returns existing workflow def when content matches.',
     }),
+    force: z.boolean().optional().openapi({
+      description: 'Skip content hash deduplication and always create a new version.',
+    }),
   })
   .openapi('CreateWorkflowDef');
 

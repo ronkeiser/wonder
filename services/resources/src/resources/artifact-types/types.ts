@@ -23,4 +23,5 @@ export type ArtifactTypeInput = {
   description?: string;
   schema: Record<string, unknown>;
   autoversion?: boolean;
+  force?: boolean;
 };
