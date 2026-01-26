@@ -402,11 +402,11 @@ async function finalizeWorkflow(ctx: DispatchContext): Promise<void> {
   try {
     // Get context snapshot and workflow def content
     const context = ctx.context.getSnapshot();
-    const workflowDefContent = ctx.defs.getWorkflowDefContent();
+    const workflowDef = ctx.defs.getWorkflowDef();
 
     // Extract final output using pure planning function
     const completionResult = extractFinalOutput(
-      workflowDefContent.outputMapping as Record<string, string> | null,
+      workflowDef.outputMapping as Record<string, string> | null,
       context,
     );
 

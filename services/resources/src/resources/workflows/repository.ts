@@ -3,7 +3,7 @@
 import { and, desc, eq } from 'drizzle-orm';
 import type { DrizzleD1Database } from 'drizzle-orm/d1';
 import { ulid } from 'ulid';
-import { definitions, workflowRuns, workflows } from '~/schema';
+import { workflowDefs, workflowRuns, workflows } from '~/schema';
 import type { NewEntity } from '~/shared/types';
 import type { Workflow, WorkflowRun } from './types';
 
@@ -69,30 +69,30 @@ export async function getWorkflowWithDef(
   workflowId: string,
 ): Promise<{
   workflow: Workflow;
-  definition: typeof definitions.$inferSelect;
+  workflowDef: typeof workflowDefs.$inferSelect;
 } | null> {
   const workflow = await getWorkflow(db, workflowId);
   if (!workflow) return null;
 
-  // Get the definition - use pinnedVersion if set, otherwise get latest
-  const definitionQuery = workflow.pinnedVersion
+  // Get the workflow def - use pinnedVersion if set, otherwise get latest
+  const defQuery = workflow.pinnedVersion
     ? db
         .select()
-        .from(definitions)
-        .where(and(eq(definitions.id, workflow.definitionId), eq(definitions.version, workflow.pinnedVersion)))
+        .from(workflowDefs)
+        .where(and(eq(workflowDefs.id, workflow.definitionId), eq(workflowDefs.version, workflow.pinnedVersion)))
     : db
         .select()
-        .from(definitions)
-        .where(eq(definitions.id, workflow.definitionId))
-        .orderBy(desc(definitions.version))
+        .from(workflowDefs)
+        .where(eq(workflowDefs.id, workflow.definitionId))
+        .orderBy(desc(workflowDefs.version))
         .limit(1);
 
-  const definition = await definitionQuery.get();
-  if (!definition) return null;
+  const workflowDef = await defQuery.get();
+  if (!workflowDef) return null;
 
   return {
     workflow,
-    definition,
+    workflowDef,
   };
 }
 

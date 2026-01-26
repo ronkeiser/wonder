@@ -3,7 +3,7 @@
 import { and, eq, isNull } from 'drizzle-orm';
 import type { DrizzleD1Database } from 'drizzle-orm/d1';
 import { ulid } from 'ulid';
-import { definitions, libraries, tools } from '../../schema';
+import { libraries, personas, tasks, tools, workflowDefs } from '../../schema';
 import type { NewEntity } from '../../shared/types';
 import type { Library, StandardLibraryManifest, DefinitionInfo, DefinitionType } from './types';
 
@@ -93,8 +93,8 @@ export async function updateLibrary(
 /**
  * Get definitions for a specific library.
  *
- * All entity types (tasks, workflows, personas, etc.) are now stored in the unified
- * definitions table. This function queries by libraryId and groups by kind.
+ * Queries the three library-scoped entity tables (workflow_defs, tasks, personas)
+ * plus the tools table, and returns a flat list of DefinitionInfo entries.
  */
 export async function getLibraryDefinitions(
   db: DrizzleD1Database,
@@ -102,7 +102,7 @@ export async function getLibraryDefinitions(
 ): Promise<DefinitionInfo[]> {
   const results: DefinitionInfo[] = [];
 
-  // Get tools (still in separate tools table)
+  // Get tools
   const libraryTools = await db
     .select({ id: tools.id, name: tools.name })
     .from(tools)
@@ -112,35 +112,45 @@ export async function getLibraryDefinitions(
     results.push({ id: t.id, name: t.name, type: 'tool' });
   }
 
-  // Get all definitions from the unified definitions table for this library
-  const libraryDefs = await db
-    .select({ id: definitions.id, name: definitions.name, kind: definitions.kind })
-    .from(definitions)
-    .where(eq(definitions.libraryId, libraryId))
+  // Get workflow defs
+  const libraryWorkflowDefs = await db
+    .select({ id: workflowDefs.id, name: workflowDefs.name })
+    .from(workflowDefs)
+    .where(eq(workflowDefs.libraryId, libraryId))
     .all();
+  const seenWorkflows = new Set<string>();
+  for (const w of libraryWorkflowDefs) {
+    if (!seenWorkflows.has(w.name)) {
+      seenWorkflows.add(w.name);
+      results.push({ id: w.id, name: w.name, type: 'workflow' });
+    }
+  }
 
-  // Dedupe by kind+name (take first occurrence, which is latest version due to ordering)
-  const seenNames = new Map<string, Set<string>>(); // kind -> Set<name>
-  for (const def of libraryDefs) {
-    const kindSet = seenNames.get(def.kind) ?? new Set<string>();
-    if (!kindSet.has(def.name)) {
-      kindSet.add(def.name);
-      seenNames.set(def.kind, kindSet);
+  // Get tasks
+  const libraryTasks = await db
+    .select({ id: tasks.id, name: tasks.name })
+    .from(tasks)
+    .where(eq(tasks.libraryId, libraryId))
+    .all();
+  const seenTasks = new Set<string>();
+  for (const t of libraryTasks) {
+    if (!seenTasks.has(t.name)) {
+      seenTasks.add(t.name);
+      results.push({ id: t.id, name: t.name, type: 'task' });
+    }
+  }
 
-      // Map definition kind to type used in DefinitionInfo
-      const typeMap: Record<string, DefinitionType> = {
-        workflow_def: 'workflow',
-        task: 'task',
-        persona: 'persona',
-        action: 'action',
-        prompt_spec: 'prompt_spec',
-        artifact_type: 'artifact_type',
-        model_profile: 'model_profile',
-      };
-      const mappedType = typeMap[def.kind];
-      if (mappedType) {
-        results.push({ id: def.id, name: def.name, type: mappedType });
-      }
+  // Get personas
+  const libraryPersonas = await db
+    .select({ id: personas.id, name: personas.name })
+    .from(personas)
+    .where(eq(personas.libraryId, libraryId))
+    .all();
+  const seenPersonas = new Set<string>();
+  for (const p of libraryPersonas) {
+    if (!seenPersonas.has(p.name)) {
+      seenPersonas.add(p.name);
+      results.push({ id: p.id, name: p.name, type: 'persona' });
     }
   }
 

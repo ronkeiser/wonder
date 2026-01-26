@@ -7,18 +7,17 @@
  */
 
 import { createLogger, type Logger } from '@wonder/logs';
-import type { WorkflowDefContent } from '@wonder/resources/schemas';
 import { and, eq } from 'drizzle-orm';
 import { migrate } from 'drizzle-orm/durable-sqlite/migrator';
 
-import { definitions, nodes, transitions, workflowRuns } from '../schema';
+import { workflowDefs, nodes, transitions, workflowRuns } from '../schema';
 import { errorDetails } from '../shared';
 import migrations from '../schema/migrations';
 import type { CoordinatorDb } from './db';
 
 // Types inferred from schema
 export type WorkflowRunRow = typeof workflowRuns.$inferSelect;
-export type DefinitionRow = typeof definitions.$inferSelect;
+export type WorkflowDefRow = typeof workflowDefs.$inferSelect;
 export type NodeRow = typeof nodes.$inferSelect;
 export type TransitionRow = typeof transitions.$inferSelect;
 
@@ -177,7 +176,7 @@ export class DefinitionManager {
     // 2. Fetch workflow def with nodes and transitions
     const workflowDefsResource = this.env.RESOURCES.workflowDefs();
     const defResponse = await workflowDefsResource.get(run.definitionId, run.definitionVersion);
-    const def = defResponse.definition; // Use raw definition row for DO SQLite insertion
+    const def = defResponse.workflowDef;
     const nodesList = defResponse.nodes;
     const transitionsList = defResponse.transitions;
 
@@ -200,7 +199,7 @@ export class DefinitionManager {
     this.db.insert(workflowRuns).values(run).run();
 
     // 4. Insert workflow def
-    this.db.insert(definitions).values(def).run();
+    this.db.insert(workflowDefs).values(def).run();
 
     // 5. Insert nodes
     for (const node of nodesList) {
@@ -245,7 +244,7 @@ export class DefinitionManager {
       // Fetch workflow def directly (not via workflowRun)
       const workflowDefsResource = this.env.RESOURCES.workflowDefs();
       const defResponse = await workflowDefsResource.get(params.workflowId, params.version);
-      const def = defResponse.definition; // Use raw definition row for DO SQLite insertion
+      const def = defResponse.workflowDef;
       const nodesList = defResponse.nodes;
       const transitionsList = defResponse.transitions;
 
@@ -273,7 +272,7 @@ export class DefinitionManager {
       this.db.insert(workflowRuns).values(syntheticRun).run();
 
       // Insert workflow def
-      this.db.insert(definitions).values(def).run();
+      this.db.insert(workflowDefs).values(def).run();
 
       // Insert nodes
       for (const node of nodesList) {
@@ -344,20 +343,12 @@ export class DefinitionManager {
   /**
    * Get the workflow definition
    */
-  getWorkflowDef(): DefinitionRow {
-    const result = this.db.select().from(definitions).limit(1).all();
+  getWorkflowDef(): WorkflowDefRow {
+    const result = this.db.select().from(workflowDefs).limit(1).all();
     if (result.length === 0) {
       throw new Error('WorkflowDef not found');
     }
     return result[0];
-  }
-
-  /**
-   * Get the workflow definition content with proper typing
-   */
-  getWorkflowDefContent(): WorkflowDefContent {
-    const def = this.getWorkflowDef();
-    return def.content as WorkflowDefContent;
   }
 
   /**

@@ -8,7 +8,7 @@ export const CreatePromptSpecSchema = z
   .object({
     name: z.string().min(1).max(255).openapi({ example: 'Summarization Prompt' }),
     description: z.string().min(1).openapi({ example: 'Prompt for summarizing text' }),
-    version: z.number().int().positive().default(1).openapi({ example: 1 }),
+    version: z.number().int().positive().optional().default(1).openapi({ example: 1 }),
     systemPrompt: z.string().optional().openapi({ example: 'You are a helpful assistant.' }),
     template: z.string().min(1).openapi({ example: 'Summarize: {{text}}' }),
     requires: z.record(z.string(), z.unknown()).openapi({ example: { text: 'string' } }),

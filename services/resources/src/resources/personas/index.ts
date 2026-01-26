@@ -1,44 +1,35 @@
 /** Personas RPC resource */
 
+import { and, eq } from 'drizzle-orm';
+import { ulid } from 'ulid';
+import { personas } from '~/schema';
 import { ConflictError, NotFoundError, extractDbError } from '~/shared/errors';
+import { computeContentHash } from '~/shared/fingerprint';
 import { Resource } from '~/shared/resource';
 import {
-  createDefinition,
-  deleteDefinition,
-  getDefinition,
-  getLatestDefinition,
-  listDefinitions,
-  type Definition,
-} from '~/shared/definitions';
-import type { PersonaContent } from '~/shared/content-schemas';
+  getByIdAndVersion,
+  getByReferenceAndHash,
+  getLatestByReference,
+  getMaxVersion,
+  deleteById,
+} from '~/shared/versioning';
 import type { Persona, PersonaInput } from './types';
 
-/**
- * Maps a Definition to the legacy Persona shape for API compatibility.
- */
-function toPersona(def: Definition): Persona {
-  const content = def.content as PersonaContent;
+const scopeCols = { libraryId: personas.libraryId };
+
+function hashableContent(data: PersonaInput): Record<string, unknown> {
   return {
-    id: def.id,
-    version: def.version,
-    name: content.name,
-    description: def.description,
-    reference: def.reference,
-    libraryId: def.libraryId,
-    systemPrompt: content.systemPrompt,
-    // New reference-based fields
-    modelProfileRef: content.modelProfileRef,
-    modelProfileVersion: content.modelProfileVersion,
-    contextAssemblyWorkflowRef: content.contextAssemblyWorkflowRef,
-    contextAssemblyWorkflowVersion: content.contextAssemblyWorkflowVersion,
-    memoryExtractionWorkflowRef: content.memoryExtractionWorkflowRef,
-    memoryExtractionWorkflowVersion: content.memoryExtractionWorkflowVersion,
-    recentTurnsLimit: content.recentTurnsLimit,
-    toolIds: content.toolIds,
-    constraints: content.constraints ?? null,
-    contentHash: def.contentHash,
-    createdAt: def.createdAt,
-    updatedAt: def.updatedAt,
+    name: data.name,
+    systemPrompt: data.systemPrompt,
+    modelProfileRef: data.modelProfileRef,
+    modelProfileVersion: data.modelProfileVersion ?? null,
+    contextAssemblyWorkflowRef: data.contextAssemblyWorkflowRef,
+    contextAssemblyWorkflowVersion: data.contextAssemblyWorkflowVersion ?? null,
+    memoryExtractionWorkflowRef: data.memoryExtractionWorkflowRef,
+    memoryExtractionWorkflowVersion: data.memoryExtractionWorkflowVersion ?? null,
+    recentTurnsLimit: data.recentTurnsLimit ?? 20,
+    toolIds: data.toolIds,
+    constraints: data.constraints ?? null,
   };
 }
 
@@ -46,11 +37,8 @@ export class Personas extends Resource {
   async create(data: PersonaInput): Promise<{
     personaId: string;
     persona: Persona;
-    /** True if an existing persona was reused (autoversion matched content hash) */
     reused: boolean;
-    /** Version number of the created/reused persona */
     version: number;
-    /** Latest version for this name (only present when reused=true) */
     latestVersion?: number;
   }> {
     this.serviceCtx.logger.info({
@@ -58,21 +46,58 @@ export class Personas extends Resource {
       metadata: { name: data.name, autoversion: data.autoversion ?? false },
     });
 
-    // Personas require a reference for autoversioning
-    if (data.autoversion && !data.reference) {
-      throw new Error('reference is required when autoversion is true');
+    const reference = data.reference ?? data.name;
+    const scope = { libraryId: data.libraryId ?? null };
+
+    const contentHash = await computeContentHash(hashableContent(data));
+
+    if (data.autoversion && !data.force) {
+      const existing = await getByReferenceAndHash(
+        this.serviceCtx.db, personas, reference, contentHash, scope, scopeCols,
+      );
+
+      if (existing) {
+        const latestVersion = await getMaxVersion(
+          this.serviceCtx.db, personas, reference, scope, scopeCols,
+        );
+        return {
+          personaId: existing.id,
+          persona: existing,
+          reused: true,
+          version: existing.version,
+          latestVersion,
+        };
+      }
     }
 
-    const reference = data.reference ?? data.name;
+    const maxVersion = await getMaxVersion(
+      this.serviceCtx.db, personas, reference, scope, scopeCols,
+    );
+    const version = (data.autoversion || data.force) ? maxVersion + 1 : 1;
+
+    let stableId: string;
+    if (maxVersion > 0) {
+      const latest = await getLatestByReference(
+        this.serviceCtx.db, personas, reference, scope, scopeCols,
+      );
+      stableId = latest?.id ?? ulid();
+    } else {
+      stableId = ulid();
+    }
+
+    const now = new Date().toISOString();
 
     try {
-      const result = await createDefinition(this.serviceCtx.db, 'persona', {
-        reference,
-        name: data.name,
-        description: data.description,
-        libraryId: data.libraryId,
-        content: {
+      const [persona] = await this.serviceCtx.db
+        .insert(personas)
+        .values({
+          id: stableId,
+          version,
+          reference,
           name: data.name,
+          description: data.description ?? '',
+          contentHash,
+          libraryId: data.libraryId ?? null,
           systemPrompt: data.systemPrompt,
           modelProfileRef: data.modelProfileRef,
           modelProfileVersion: data.modelProfileVersion ?? null,
@@ -82,57 +107,35 @@ export class Personas extends Resource {
           memoryExtractionWorkflowVersion: data.memoryExtractionWorkflowVersion ?? null,
           recentTurnsLimit: data.recentTurnsLimit ?? 20,
           toolIds: data.toolIds,
-          constraints: data.constraints,
-        },
-        autoversion: data.autoversion,
-        force: data.force,
-      });
-
-      if (result.reused) {
-        return {
-          personaId: result.definition.id,
-          persona: toPersona(result.definition),
-          reused: true,
-          version: result.definition.version,
-          latestVersion: result.latestVersion,
-        };
-      }
+          constraints: data.constraints ?? null,
+          createdAt: now,
+          updatedAt: now,
+        })
+        .returning();
 
       return {
-        personaId: result.definition.id,
-        persona: toPersona(result.definition),
+        personaId: persona.id,
+        persona,
         reused: false,
-        version: result.definition.version,
+        version: persona.version,
       };
     } catch (error) {
       const dbError = extractDbError(error);
-
       if (dbError.constraint === 'unique') {
-        throw new ConflictError(
-          `Persona with ${dbError.field} already exists`,
-          dbError.field,
-          'unique',
-        );
+        throw new ConflictError(`Persona with ${dbError.field} already exists`, dbError.field, 'unique');
       }
-
       if (dbError.constraint === 'foreign_key') {
         throw new ConflictError('Referenced entity does not exist', undefined, 'foreign_key');
       }
-
       throw error;
     }
   }
 
-  async get(
-    id: string,
-    version?: number,
-  ): Promise<{
-    persona: Persona;
-  }> {
+  async get(id: string, version?: number): Promise<{ persona: Persona }> {
     return this.withLogging('get', { metadata: { personaId: id, version } }, async () => {
-      const definition = await getDefinition(this.serviceCtx.db, id, version);
+      const persona = await getByIdAndVersion(this.serviceCtx.db, personas, id, version);
 
-      if (!definition || definition.kind !== 'persona') {
+      if (!persona) {
         throw new NotFoundError(
           `Persona not found: ${id}${version ? ` version ${version}` : ''}`,
           'persona',
@@ -140,7 +143,7 @@ export class Personas extends Resource {
         );
       }
 
-      return { persona: toPersona(definition) };
+      return { persona };
     });
   }
 
@@ -148,31 +151,35 @@ export class Personas extends Resource {
     personas: Persona[];
   }> {
     return this.withLogging('list', { metadata: options }, async () => {
-      // If name is specified, find by reference (name is normalized to reference)
       if (options?.name) {
-        const definition = await getLatestDefinition(
-          this.serviceCtx.db,
-          'persona',
-          options.name,
-          { libraryId: options.libraryId ?? null },
+        const scope = { libraryId: options.libraryId ?? null };
+        const persona = await getLatestByReference(
+          this.serviceCtx.db, personas, options.name, scope, scopeCols,
         );
-        return { personas: definition ? [toPersona(definition)] : [] };
+        return { personas: persona ? [persona] : [] };
       }
 
-      const defs = await listDefinitions(this.serviceCtx.db, 'persona', {
-        libraryId: options?.libraryId,
-        limit: options?.limit,
-      });
+      const conditions = [];
+      if (options?.libraryId) {
+        conditions.push(eq(personas.libraryId, options.libraryId));
+      }
 
-      return { personas: defs.map(toPersona) };
+      const results = await this.serviceCtx.db
+        .select()
+        .from(personas)
+        .where(conditions.length > 0 ? and(...conditions) : undefined)
+        .limit(options?.limit ?? 100)
+        .all();
+
+      return { personas: results };
     });
   }
 
   async delete(id: string, version?: number): Promise<{ success: boolean }> {
     return this.withLogging('delete', { metadata: { personaId: id, version } }, async () => {
-      const existing = await getDefinition(this.serviceCtx.db, id, version);
+      const existing = await getByIdAndVersion(this.serviceCtx.db, personas, id, version);
 
-      if (!existing || existing.kind !== 'persona') {
+      if (!existing) {
         throw new NotFoundError(
           `Persona not found: ${id}${version ? ` version ${version}` : ''}`,
           'persona',
@@ -180,7 +187,7 @@ export class Personas extends Resource {
         );
       }
 
-      await deleteDefinition(this.serviceCtx.db, id, version);
+      await deleteById(this.serviceCtx.db, personas, id, version);
       return { success: true };
     });
   }

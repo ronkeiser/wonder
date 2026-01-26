@@ -1,23 +1,9 @@
-/** Type definitions for artifact types */
+import type { artifactTypes } from '~/schema';
 
-/**
- * ArtifactType entity - the API-facing shape.
- * Internally stored in the unified `definitions` table.
- */
-export type ArtifactType = {
-  id: string;
-  version: number;
-  name: string;
-  description: string;
-  schema: object;
-  contentHash: string;
-  createdAt: string;
-  updatedAt: string;
-};
+/** ArtifactType entity — inferred from database schema. */
+export type ArtifactType = typeof artifactTypes.$inferSelect;
 
-/**
- * API input for creating an artifact type.
- */
+/** API input for creating an artifact type. */
 export type ArtifactTypeInput = {
   name: string;
   description?: string;

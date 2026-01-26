@@ -1,14 +1,13 @@
 /** Conversations RPC resource */
 
 import type { Broadcaster, ExecutionStatus } from '@wonder/events';
-import type { PersonaContent } from '~/shared/content-schemas';
-import {
-  getDefinition,
-  getDefinitionByVersion,
-  getLatestDefinition,
-} from '~/shared/definitions';
+import { modelProfiles, personas, workflowDefs } from '~/schema';
 import { NotFoundError } from '~/shared/errors';
 import { Resource } from '~/shared/resource';
+import {
+  getByIdAndVersion,
+  resolveReference,
+} from '~/shared/versioning';
 import * as agentRepo from '../agents/repository';
 import * as repo from './repository';
 import type { Conversation, ConversationInput, ConversationStatus, Participant } from './types';
@@ -73,8 +72,8 @@ export class Conversations extends Resource {
     }
 
     // Get persona (by ID and optional version)
-    const persona = await getDefinition(db, agent.personaId, agent.personaVersion ?? undefined);
-    if (!persona || persona.kind !== 'persona') {
+    const persona = await getByIdAndVersion(db, personas, agent.personaId, agent.personaVersion ?? undefined);
+    if (!persona) {
       throw new NotFoundError(
         `Persona not found: ${agent.personaId}`,
         'persona',
@@ -82,15 +81,13 @@ export class Conversations extends Resource {
       );
     }
 
-    const content = persona.content as PersonaContent;
-
-    // Resolve model profile
+    // Resolve model profile — persona has typed columns directly, no cast needed
     let resolvedModelProfileId: string | null = null;
     let resolvedModelProfileVersion: number | null = null;
-    if (content.modelProfileRef) {
-      const modelProfile = content.modelProfileVersion
-        ? await getDefinitionByVersion(db, 'model_profile', content.modelProfileRef, content.modelProfileVersion)
-        : await getLatestDefinition(db, 'model_profile', content.modelProfileRef);
+    if (persona.modelProfileRef) {
+      const modelProfile = await resolveReference(
+        db, modelProfiles, persona.modelProfileRef, persona.modelProfileVersion,
+      );
       if (modelProfile) {
         resolvedModelProfileId = modelProfile.id;
         resolvedModelProfileVersion = modelProfile.version;
@@ -100,19 +97,10 @@ export class Conversations extends Resource {
     // Resolve context assembly workflow
     let resolvedContextAssemblyWorkflowId: string | null = null;
     let resolvedContextAssemblyWorkflowVersion: number | null = null;
-    if (content.contextAssemblyWorkflowRef) {
-      const workflow = content.contextAssemblyWorkflowVersion
-        ? await getDefinitionByVersion(
-            db,
-            'workflow_def',
-            content.contextAssemblyWorkflowRef,
-            content.contextAssemblyWorkflowVersion,
-          )
-        : await getLatestDefinition(
-            db,
-            'workflow_def',
-            content.contextAssemblyWorkflowRef,
-          );
+    if (persona.contextAssemblyWorkflowRef) {
+      const workflow = await resolveReference(
+        db, workflowDefs, persona.contextAssemblyWorkflowRef, persona.contextAssemblyWorkflowVersion,
+      );
       if (workflow) {
         resolvedContextAssemblyWorkflowId = workflow.id;
         resolvedContextAssemblyWorkflowVersion = workflow.version;
@@ -122,19 +110,10 @@ export class Conversations extends Resource {
     // Resolve memory extraction workflow
     let resolvedMemoryExtractionWorkflowId: string | null = null;
     let resolvedMemoryExtractionWorkflowVersion: number | null = null;
-    if (content.memoryExtractionWorkflowRef) {
-      const workflow = content.memoryExtractionWorkflowVersion
-        ? await getDefinitionByVersion(
-            db,
-            'workflow_def',
-            content.memoryExtractionWorkflowRef,
-            content.memoryExtractionWorkflowVersion,
-          )
-        : await getLatestDefinition(
-            db,
-            'workflow_def',
-            content.memoryExtractionWorkflowRef,
-          );
+    if (persona.memoryExtractionWorkflowRef) {
+      const workflow = await resolveReference(
+        db, workflowDefs, persona.memoryExtractionWorkflowRef, persona.memoryExtractionWorkflowVersion,
+      );
       if (workflow) {
         resolvedMemoryExtractionWorkflowId = workflow.id;
         resolvedMemoryExtractionWorkflowVersion = workflow.version;

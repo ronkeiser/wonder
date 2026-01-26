@@ -1,9 +1,3 @@
-/** Type definitions for actions */
-
-// ============================================================================
-// Enums
-// ============================================================================
-
 export type ActionKind =
   | 'llm'
   | 'mcp'
@@ -15,38 +9,25 @@ export type ActionKind =
   | 'metric'
   | 'mock';
 
-// ============================================================================
-// Entity Types
-// ============================================================================
-
-/**
- * Action entity - the API-facing shape.
- * Internally stored in the unified `definitions` table.
- */
+/** Action entity — matches database schema columns. */
 export type Action = {
   id: string;
   version: number;
+  reference: string;
   name: string;
   description: string;
-  reference: string;
+  contentHash: string;
   kind: ActionKind;
   implementation: object;
   requires: object | null;
   produces: object | null;
   execution: object | null;
   idempotency: object | null;
-  contentHash: string;
   createdAt: string;
   updatedAt: string;
 };
 
-// ============================================================================
-// API DTOs
-// ============================================================================
-
-/**
- * API input for creating an action.
- */
+/** API input for creating an action. */
 export type ActionInput = {
   name: string;
   description?: string;

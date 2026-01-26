@@ -38,7 +38,6 @@ export const CreateWorkflowDefSchema = z
     description: z.string().min(1).openapi({ example: 'Generates and reviews content' }),
     projectId: ulid().optional().openapi({ example: '01ARZ3NDEKTSV4RRFFQ69G5FAV' }),
     libraryId: ulid().optional(),
-    tags: z.array(z.string()).optional(),
     inputSchema: z.record(z.string(), z.unknown()).openapi({ example: { topic: 'string' } }),
     outputSchema: z.record(z.string(), z.unknown()).openapi({ example: { content: 'string' } }),
     outputMapping: z
@@ -146,17 +145,17 @@ export const WorkflowDefSchema = z
   .object({
     id: ulid(),
     name: z.string(),
-    reference: z.string().nullable().openapi({ description: 'Stable identity for autoversion scoping' }),
+    reference: z.string().openapi({ description: 'Stable identity for autoversion scoping' }),
     description: z.string(),
     version: z.number().int(),
     projectId: ulid().nullable(),
     libraryId: ulid().nullable(),
-    tags: z.array(z.string()).nullable(),
+    contentHash: z.string(),
     inputSchema: z.record(z.string(), z.unknown()),
     outputSchema: z.record(z.string(), z.unknown()),
+    outputMapping: z.record(z.string(), z.unknown()).nullable(),
     contextSchema: z.record(z.string(), z.unknown()).nullable(),
     initialNodeId: z.string().nullable(),
-    contentHash: z.string().nullable(),
     createdAt: z.string(),
     updatedAt: z.string(),
   })

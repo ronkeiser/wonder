@@ -19,10 +19,7 @@ export type { TokenStatus, WorkflowStatus } from '../types';
 /**
  * Definition tables (imported from Resources service)
  */
-export { definitions, nodes, transitions, workflowRuns } from '@wonder/resources/schemas';
-
-// Legacy snake_case re-exports for backward compatibility during migration
-export { workflowRuns as workflow_runs } from '@wonder/resources/schemas';
+export { workflowDefs, nodes, transitions, workflowRuns } from '@wonder/resources/schemas';
 
 /**
  * Execution tables (internal coordinator state)
@@ -128,5 +125,3 @@ export const subworkflows = sqliteTable(
   ],
 );
 
-// Legacy snake_case exports for backward compatibility during migration
-export { fanIns as fan_ins, workflowStatus as workflow_status };

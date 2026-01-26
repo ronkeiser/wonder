@@ -1,45 +1,17 @@
 /**
- * Shared fingerprinting utility for content-based deduplication.
+ * Content fingerprinting for version deduplication.
  *
- * Computes a SHA-256 hash of an object's structural content,
- * automatically excluding identity/metadata fields and generated IDs.
+ * Computes a SHA-256 hash of entity content. The caller passes only the
+ * hashable fields — versioning/metadata columns are not included.
  *
- * The hash should reflect only user-authored content. Generated fields
- * (ULIDs, derived node/transition IDs) are excluded at all nesting levels
- * so that identical authored content always produces the same hash.
+ * Generated ID fields (ULIDs for nodes, transitions, steps) are stripped
+ * at all nesting levels so that identical authored content always produces
+ * the same hash regardless of generated IDs.
  */
 
 /**
- * Top-level fields excluded from fingerprinting.
- * These are organizational or system-managed fields that aren't part of
- * the authored content.
- *
- * Note: `name` is NOT excluded - it's user-facing content that should affect versioning.
- * `reference` is the stable identity used for autoversion scoping.
- */
-const METADATA_FIELDS = new Set([
-  'id',
-  'version',
-  'reference',
-  'description',
-  'created_at',
-  'updated_at',
-  'createdAt',
-  'updatedAt',
-  'tags',
-  'project_id',
-  'library_id',
-  'projectId',
-  'libraryId',
-  'autoversion',
-  'content_hash',
-  'contentHash',
-]);
-
-/**
- * Fields excluded from fingerprinting at ALL nesting levels.
- * These are generated identity fields (ULIDs or values derived from ULIDs)
- * that are not user-authored content:
+ * Fields stripped at ALL nesting levels. These are generated identity
+ * fields (ULIDs or values derived from ULIDs) that are not user-authored:
  *
  * - `id`: Generated ULID for steps, nodes, transitions
  * - `initialNodeId`: Derived from generated node ULID (authored as `initialNodeRef`)
@@ -77,61 +49,21 @@ function sortAndStripKeys(obj: unknown): unknown {
 }
 
 /**
- * Extracts content fields from a top-level object by excluding metadata fields.
- */
-function extractContent(data: Record<string, unknown>): Record<string, unknown> {
-  const content: Record<string, unknown> = {};
-  for (const [key, value] of Object.entries(data)) {
-    if (!METADATA_FIELDS.has(key)) {
-      content[key] = value;
-    }
-  }
-  return content;
-}
-
-/**
- * Computes a SHA-256 fingerprint of an object's structural content.
+ * Computes a SHA-256 fingerprint of entity content.
  *
- * Automatically excludes metadata fields (id, version, reference, description,
- * timestamps, tags, project_id, library_id, autoversion, content_hash).
- *
- * Note: `name` is included in the hash since it's user-facing content.
+ * The caller is responsible for passing only the fields that should
+ * affect versioning (entity-specific content, not metadata).
  *
  * Uses the Web Crypto API (available in Cloudflare Workers runtime).
- *
- * @param data - The object to fingerprint
- * @returns A hex-encoded SHA-256 hash string
  */
-export async function computeContentHash(data: Record<string, unknown>): Promise<string> {
-  const content = extractContent(data);
-  const sortedContent = sortAndStripKeys(content);
+export async function computeContentHash(content: Record<string, unknown>): Promise<string> {
+  const sorted = sortAndStripKeys(content);
+  const jsonString = JSON.stringify(sorted);
 
-  // Deterministic JSON serialization
-  const jsonString = JSON.stringify(sortedContent);
-
-  // Use Web Crypto API (available in Workers)
   const encoder = new TextEncoder();
   const dataBuffer = encoder.encode(jsonString);
   const hashBuffer = await crypto.subtle.digest('SHA-256', dataBuffer);
 
-  // Convert to hex string
   const hashArray = Array.from(new Uint8Array(hashBuffer));
   return hashArray.map((b) => b.toString(16).padStart(2, '0')).join('');
-}
-
-/**
- * Get the keys that will be included in the content hash (for debugging)
- */
-export function getContentKeys(data: Record<string, unknown>): string[] {
-  const content = extractContent(data);
-  return Object.keys(content).sort();
-}
-
-/**
- * Get the JSON that will be hashed (for debugging)
- */
-export function getContentJson(data: Record<string, unknown>): string {
-  const content = extractContent(data);
-  const sortedContent = sortAndStripKeys(content);
-  return JSON.stringify(sortedContent);
 }

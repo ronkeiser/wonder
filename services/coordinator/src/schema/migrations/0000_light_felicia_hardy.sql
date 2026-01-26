@@ -1,24 +1,26 @@
-CREATE TABLE `definitions` (
+CREATE TABLE `workflow_defs` (
 	`id` text NOT NULL,
 	`version` integer DEFAULT 1 NOT NULL,
-	`kind` text NOT NULL,
 	`reference` text NOT NULL,
 	`name` text NOT NULL,
 	`description` text DEFAULT '' NOT NULL,
+	`content_hash` text NOT NULL,
 	`project_id` text,
 	`library_id` text,
-	`content_hash` text NOT NULL,
-	`content` text NOT NULL,
+	`input_schema` text NOT NULL,
+	`output_schema` text NOT NULL,
+	`output_mapping` text,
+	`context_schema` text,
+	`initial_node_id` text,
 	`created_at` text NOT NULL,
 	`updated_at` text NOT NULL,
 	PRIMARY KEY(`id`, `version`)
 );
 --> statement-breakpoint
-CREATE INDEX `idx_definitions_kind` ON `definitions` (`kind`);--> statement-breakpoint
-CREATE INDEX `idx_definitions_reference` ON `definitions` (`reference`,`kind`);--> statement-breakpoint
-CREATE INDEX `idx_definitions_scope` ON `definitions` (`project_id`,`library_id`);--> statement-breakpoint
-CREATE UNIQUE INDEX `unique_definitions_version` ON `definitions` (`kind`,`reference`,`version`,`project_id`,`library_id`);--> statement-breakpoint
-CREATE UNIQUE INDEX `unique_definitions_content` ON `definitions` (`kind`,`reference`,`content_hash`,`project_id`,`library_id`);--> statement-breakpoint
+CREATE INDEX `idx_workflow_defs_reference` ON `workflow_defs` (`reference`);--> statement-breakpoint
+CREATE INDEX `idx_workflow_defs_scope` ON `workflow_defs` (`project_id`,`library_id`);--> statement-breakpoint
+CREATE UNIQUE INDEX `unique_workflow_defs_version` ON `workflow_defs` (`reference`,`version`,`project_id`,`library_id`);--> statement-breakpoint
+CREATE UNIQUE INDEX `unique_workflow_defs_content` ON `workflow_defs` (`reference`,`content_hash`,`project_id`,`library_id`);--> statement-breakpoint
 CREATE TABLE `fan_ins` (
 	`id` text PRIMARY KEY NOT NULL,
 	`workflow_run_id` text NOT NULL,
@@ -48,7 +50,7 @@ CREATE TABLE `nodes` (
 	`output_mapping` text,
 	`resource_bindings` text,
 	PRIMARY KEY(`definition_id`, `definition_version`, `id`),
-	FOREIGN KEY (`definition_id`,`definition_version`) REFERENCES `definitions`(`id`,`version`) ON UPDATE no action ON DELETE cascade
+	FOREIGN KEY (`definition_id`,`definition_version`) REFERENCES `workflow_defs`(`id`,`version`) ON UPDATE no action ON DELETE cascade
 );
 --> statement-breakpoint
 CREATE INDEX `idx_nodes_definition` ON `nodes` (`definition_id`,`definition_version`);--> statement-breakpoint
@@ -103,7 +105,7 @@ CREATE TABLE `transitions` (
 	`synchronization` text,
 	`loop_config` text,
 	PRIMARY KEY(`definition_id`, `definition_version`, `id`),
-	FOREIGN KEY (`definition_id`,`definition_version`) REFERENCES `definitions`(`id`,`version`) ON UPDATE no action ON DELETE cascade,
+	FOREIGN KEY (`definition_id`,`definition_version`) REFERENCES `workflow_defs`(`id`,`version`) ON UPDATE no action ON DELETE cascade,
 	FOREIGN KEY (`definition_id`,`definition_version`,`from_node_id`) REFERENCES `nodes`(`definition_id`,`definition_version`,`id`) ON UPDATE no action ON DELETE cascade,
 	FOREIGN KEY (`definition_id`,`definition_version`,`to_node_id`) REFERENCES `nodes`(`definition_id`,`definition_version`,`id`) ON UPDATE no action ON DELETE cascade
 );

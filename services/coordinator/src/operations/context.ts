@@ -72,7 +72,6 @@ export class ContextManager {
   /** Initialize context tables and store input. */
   initialize(input: Record<string, unknown>): void {
     const workflowDef = this.defs.getWorkflowDef();
-    const workflowDefContent = this.defs.getWorkflowDefContent();
 
     this.emitter.emit({
       eventType: 'context.initialize.starting',
@@ -80,24 +79,24 @@ export class ContextManager {
       metadata: {
         inputKeys: Object.keys(input),
         workflowDefId: workflowDef.id,
-        inputSchemaType: typeof workflowDefContent.inputSchema,
-        inputSchemaKeys: workflowDefContent.inputSchema && typeof workflowDefContent.inputSchema === 'object'
-          ? Object.keys(workflowDefContent.inputSchema)
+        inputSchemaType: typeof workflowDef.inputSchema,
+        inputSchemaKeys: workflowDef.inputSchema && typeof workflowDef.inputSchema === 'object'
+          ? Object.keys(workflowDef.inputSchema)
           : [],
-        inputSchemaProperties: (workflowDefContent.inputSchema as { properties?: object })?.properties
-          ? Object.keys((workflowDefContent.inputSchema as { properties?: object }).properties!)
+        inputSchemaProperties: (workflowDef.inputSchema as { properties?: object })?.properties
+          ? Object.keys((workflowDef.inputSchema as { properties?: object }).properties!)
           : [],
       },
     });
 
-    const inputSchema = new Schema(workflowDefContent.inputSchema as JSONSchema);
-    const outputSchema = new Schema(workflowDefContent.outputSchema as JSONSchema);
+    const inputSchema = new Schema(workflowDef.inputSchema as JSONSchema);
+    const outputSchema = new Schema(workflowDef.outputSchema as JSONSchema);
 
     this.inputTable = inputSchema.bind(this.sql, 'context_input', this.sqlHook);
     this.outputTable = outputSchema.bind(this.sql, 'context_output', this.sqlHook);
 
-    if (workflowDefContent.contextSchema) {
-      const stateSchema = new Schema(workflowDefContent.contextSchema as JSONSchema);
+    if (workflowDef.contextSchema) {
+      const stateSchema = new Schema(workflowDef.contextSchema as JSONSchema);
       this.stateTable = stateSchema.bind(this.sql, 'context_state', this.sqlHook);
     }
 
@@ -126,12 +125,12 @@ export class ContextManager {
         hasContextSchema: this.stateTable !== null,
         tableCount: tablesCreated.length,
         tablesCreated: tablesCreated,
-        inputSchemaType: typeof workflowDefContent.inputSchema,
-        inputSchemaKeys: workflowDefContent.inputSchema && typeof workflowDefContent.inputSchema === 'object'
-          ? Object.keys(workflowDefContent.inputSchema)
+        inputSchemaType: typeof workflowDef.inputSchema,
+        inputSchemaKeys: workflowDef.inputSchema && typeof workflowDef.inputSchema === 'object'
+          ? Object.keys(workflowDef.inputSchema)
           : [],
-        inputSchemaProperties: (workflowDefContent.inputSchema as { properties?: object })?.properties
-          ? Object.keys((workflowDefContent.inputSchema as { properties?: object }).properties!)
+        inputSchemaProperties: (workflowDef.inputSchema as { properties?: object })?.properties
+          ? Object.keys((workflowDef.inputSchema as { properties?: object }).properties!)
           : [],
       },
     });

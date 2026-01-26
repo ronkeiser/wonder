@@ -1,6 +1,6 @@
 /** Type definitions for workflow definitions */
 
-import { nodes, transitions } from '../../schema';
+import { nodes, transitions, workflowDefs } from '../../schema';
 import type { MergeConfig } from '../../schema/types';
 
 // Re-export schema types for convenience
@@ -15,6 +15,9 @@ export type {
 // ============================================================================
 // Entity Types (inferred from schema)
 // ============================================================================
+
+/** WorkflowDef entity — inferred from database schema. */
+export type WorkflowDef = typeof workflowDefs.$inferSelect;
 
 /** Node entity - inferred from database schema */
 export type Node = typeof nodes.$inferSelect;
@@ -77,29 +80,3 @@ export type TransitionInput = Omit<
   synchronization?: SynchronizationInput;
 };
 
-// ============================================================================
-// WorkflowDef Entity Type (API-facing shape)
-// ============================================================================
-
-/**
- * WorkflowDef entity - the API-facing shape.
- * Internally stored in the unified `definitions` table.
- */
-export type WorkflowDef = {
-  id: string;
-  version: number;
-  name: string;
-  description: string;
-  reference: string;
-  projectId: string | null;
-  libraryId: string | null;
-  tags: string[] | null;
-  inputSchema: object;
-  outputSchema: object;
-  outputMapping: object | null;
-  contextSchema: object | null;
-  initialNodeId: string | null;
-  contentHash: string;
-  createdAt: string;
-  updatedAt: string;
-};

@@ -3,11 +3,11 @@
 import type { Broadcaster } from '@wonder/events';
 import { eq } from 'drizzle-orm';
 import { ulid } from 'ulid';
-import { NotFoundError } from '~/shared/errors';
+import { workflowDefs } from '~/schema';
 import * as schema from '~/schema';
+import { NotFoundError } from '~/shared/errors';
 import { Resource } from '~/shared/resource';
-import { getDefinition } from '~/shared/definitions';
-import type { WorkflowDefContent } from '~/shared/content-schemas';
+import { getByIdAndVersion } from '~/shared/versioning';
 import * as workflowRepo from '../workflows/repository';
 import * as repo from './repository';
 import type { ListWorkflowRunsFilters, WorkflowRunSummary, WorkflowRunWithWorkspace } from './types';
@@ -44,8 +44,7 @@ export class WorkflowRuns extends Resource {
         throw new NotFoundError(`Workflow not found: ${workflowId}`, 'workflow', workflowId);
       }
 
-      const { workflow, definition } = result;
-      const defContent = definition.content as WorkflowDefContent;
+      const { workflow, workflowDef } = result;
 
       // Get project to access workspace_id
       const project = await this.serviceCtx.db
@@ -72,7 +71,7 @@ export class WorkflowRuns extends Resource {
       const activeTokens = [
         {
           id: ulid(),
-          nodeId: defContent.initialNodeId,
+          nodeId: workflowDef.initialNodeId,
           status: 'ready',
           context: {},
         },
@@ -85,8 +84,8 @@ export class WorkflowRuns extends Resource {
         id: workflowRunId,
         projectId: workflow.projectId,
         workflowId: workflow.id,
-        definitionId: definition.id,
-        definitionVersion: definition.version,
+        definitionId: workflowDef.id,
+        definitionVersion: workflowDef.version,
         status: 'waiting',
         context,
         activeTokens: activeTokens,
@@ -147,9 +146,9 @@ export class WorkflowRuns extends Resource {
     });
 
     try {
-      // Get definition directly (use specified version or latest)
-      const definition = await getDefinition(this.serviceCtx.db, definitionId, options.version);
-      if (!definition || definition.kind !== 'workflow_def') {
+      // Get workflow def directly (use specified version or latest)
+      const def = await getByIdAndVersion(this.serviceCtx.db, workflowDefs, definitionId, options.version);
+      if (!def) {
         this.serviceCtx.logger.warn({
           eventType: 'workflow_def.not_found',
           metadata: { definitionId, version: options.version },
@@ -160,8 +159,6 @@ export class WorkflowRuns extends Resource {
           definitionId,
         );
       }
-
-      const defContent = definition.content as WorkflowDefContent;
 
       // Get project to access workspace_id
       const project = await this.serviceCtx.db
@@ -188,7 +185,7 @@ export class WorkflowRuns extends Resource {
       const activeTokens = [
         {
           id: ulid(),
-          nodeId: defContent.initialNodeId,
+          nodeId: def.initialNodeId,
           status: 'ready',
           context: {},
         },
@@ -198,8 +195,8 @@ export class WorkflowRuns extends Resource {
       await repo.createWorkflowRunFromDef(this.serviceCtx.db, {
         id: workflowRunId,
         projectId: options.projectId,
-        definitionId: definition.id,
-        definitionVersion: definition.version,
+        definitionId: def.id,
+        definitionVersion: def.version,
         status: 'waiting',
         context,
         activeTokens: activeTokens,
@@ -211,7 +208,7 @@ export class WorkflowRuns extends Resource {
 
       this.serviceCtx.logger.info({
         eventType: 'workflow_run.created_from_def',
-        metadata: { definitionId, workflowRunId, version: definition.version },
+        metadata: { definitionId, workflowRunId, version: def.version },
       });
 
       return {
@@ -231,21 +228,6 @@ export class WorkflowRuns extends Resource {
       });
       throw error;
     }
-  }
-
-  // Keep old method name for backwards compatibility
-  async createFromWorkflowDef(
-    workflowDefId: string,
-    input: Record<string, unknown>,
-    options: {
-      projectId: string;
-      version?: number;
-      rootRunId?: string;
-      parentRunId?: string;
-      parentTokenId?: string;
-    },
-  ) {
-    return this.createFromDefinition(workflowDefId, input, options);
   }
 
   async updateStatus(workflowRunId: string, status: 'running' | 'completed' | 'failed' | 'waiting'): Promise<void> {

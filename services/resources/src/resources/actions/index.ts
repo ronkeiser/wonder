@@ -1,37 +1,30 @@
 /** Actions RPC resource */
 
+import { and, eq } from 'drizzle-orm';
+import { ulid } from 'ulid';
+import { actions } from '~/schema';
 import { ConflictError, NotFoundError, extractDbError } from '~/shared/errors';
+import { computeContentHash } from '~/shared/fingerprint';
 import { Resource } from '~/shared/resource';
 import {
-  createDefinition,
-  deleteDefinition,
-  getDefinition,
-  listDefinitions,
-  type Definition,
-} from '~/shared/definitions';
-import type { ActionContent, ActionKind as ContentActionKind } from '~/shared/content-schemas';
-import type { Action, ActionInput, ActionKind } from './types';
+  getByIdAndVersion,
+  getByReferenceAndHash,
+  getLatestByReference,
+  getMaxVersion,
+  deleteById,
+} from '~/shared/versioning';
+import type { Action, ActionInput } from './types';
 
-/**
- * Maps a Definition to the legacy Action shape for API compatibility.
- */
-function toAction(def: Definition): Action {
-  const content = def.content as ActionContent;
+/** Fields that affect the content hash. */
+function hashableContent(data: ActionInput): Record<string, unknown> {
   return {
-    id: def.id,
-    version: def.version,
-    name: content.name,
-    description: def.description,
-    reference: def.reference,
-    kind: content.kind,
-    implementation: content.implementation,
-    requires: content.requires ?? null,
-    produces: content.produces ?? null,
-    execution: content.execution ?? null,
-    idempotency: content.idempotency ?? null,
-    contentHash: def.contentHash,
-    createdAt: def.createdAt,
-    updatedAt: def.updatedAt,
+    name: data.name,
+    kind: data.kind,
+    implementation: data.implementation,
+    requires: data.requires ?? null,
+    produces: data.produces ?? null,
+    execution: data.execution ?? null,
+    idempotency: data.idempotency ?? null,
   };
 }
 
@@ -39,11 +32,8 @@ export class Actions extends Resource {
   async create(data: ActionInput): Promise<{
     actionId: string;
     action: Action;
-    /** True if an existing action was reused (autoversion matched content hash) */
     reused: boolean;
-    /** Version number of the created/reused action */
     version: number;
-    /** Latest version for this name (only present when reused=true) */
     latestVersion?: number;
   }> {
     this.serviceCtx.logger.info({
@@ -51,50 +41,70 @@ export class Actions extends Resource {
       metadata: { name: data.name, kind: data.kind, autoversion: data.autoversion ?? false },
     });
 
-    // Actions require a reference for autoversioning
-    if (data.autoversion && !data.reference) {
-      throw new Error('reference is required when autoversion is true');
-    }
-
     const reference = data.reference ?? data.name;
+    const contentHash = await computeContentHash(hashableContent(data));
 
-    try {
-      const result = await createDefinition(this.serviceCtx.db, 'action', {
-        reference,
-        name: data.name,
-        description: data.description,
-        content: {
-          name: data.name,
-          kind: data.kind as ContentActionKind,
-          implementation: data.implementation,
-          requires: data.requires,
-          produces: data.produces,
-          execution: data.execution,
-          idempotency: data.idempotency,
-        },
-        autoversion: data.autoversion,
-        force: data.force,
-      });
+    if (data.autoversion && !data.force) {
+      const existing = await getByReferenceAndHash(
+        this.serviceCtx.db, actions, reference, contentHash,
+      );
 
-      if (result.reused) {
+      if (existing) {
+        const latestVersion = await getMaxVersion(this.serviceCtx.db, actions, reference);
         return {
-          actionId: result.definition.id,
-          action: toAction(result.definition),
+          actionId: existing.id,
+          action: existing,
           reused: true,
-          version: result.definition.version,
-          latestVersion: result.latestVersion,
+          version: existing.version,
+          latestVersion,
         };
       }
+    }
+
+    // Determine version and stable ID
+    const maxVersion = await getMaxVersion(this.serviceCtx.db, actions, reference);
+    const version = (data.autoversion || data.force) ? maxVersion + 1 : 1;
+
+    // Reuse stable ID from existing versions, or generate new
+    let stableId: string;
+    if (maxVersion > 0) {
+      const existing = await getLatestByReference(this.serviceCtx.db, actions, reference);
+      stableId = existing?.id ?? ulid();
+    } else {
+      stableId = ulid();
+    }
+
+    const now = new Date().toISOString();
+
+    try {
+      const [action] = await this.serviceCtx.db
+        .insert(actions)
+        .values({
+          id: stableId,
+          version,
+          reference,
+          name: data.name,
+          description: data.description ?? '',
+          contentHash,
+          kind: data.kind,
+          implementation: data.implementation,
+          requires: data.requires ?? null,
+          produces: data.produces ?? null,
+          execution: data.execution ?? null,
+          idempotency: data.idempotency ?? null,
+          createdAt: now,
+          updatedAt: now,
+        })
+        .returning();
 
       return {
-        actionId: result.definition.id,
-        action: toAction(result.definition),
+        actionId: action.id,
+        action,
         reused: false,
-        version: result.definition.version,
+        version: action.version,
       };
     } catch (error) {
       const dbError = extractDbError(error);
-
       if (dbError.constraint === 'unique') {
         throw new ConflictError(
           `Action with ${dbError.field} already exists`,
@@ -102,28 +112,18 @@ export class Actions extends Resource {
           'unique',
         );
       }
-
-      if (dbError.constraint === 'foreign_key') {
-        throw new ConflictError('Referenced entity does not exist', undefined, 'foreign_key');
-      }
-
       throw error;
     }
   }
 
-  async get(
-    id: string,
-    version?: number,
-  ): Promise<{
-    action: Action;
-  }> {
+  async get(id: string, version?: number): Promise<{ action: Action }> {
     return this.withLogging(
       'get',
       { actionId: id, version, metadata: { actionId: id, version } },
       async () => {
-        const definition = await getDefinition(this.serviceCtx.db, id, version);
+        const action = await getByIdAndVersion(this.serviceCtx.db, actions, id, version);
 
-        if (!definition || definition.kind !== 'action') {
+        if (!action) {
           throw new NotFoundError(
             `Action not found: ${id}${version !== undefined ? ` version ${version}` : ''}`,
             'action',
@@ -131,27 +131,27 @@ export class Actions extends Resource {
           );
         }
 
-        return { action: toAction(definition) };
+        return { action };
       },
     );
   }
 
-  async list(params?: { limit?: number; kind?: ActionKind }): Promise<{
-    actions: Action[];
-  }> {
+  async list(params?: { limit?: number; kind?: string }): Promise<{ actions: Action[] }> {
     return this.withLogging('list', { metadata: params }, async () => {
-      const defs = await listDefinitions(this.serviceCtx.db, 'action', {
-        limit: params?.limit,
-      });
+      const conditions = [];
 
-      let actions = defs.map(toAction);
-
-      // Filter by action kind if specified
       if (params?.kind) {
-        actions = actions.filter((a) => a.kind === params.kind);
+        conditions.push(eq(actions.kind, params.kind as Action['kind']));
       }
 
-      return { actions };
+      const results = await this.serviceCtx.db
+        .select()
+        .from(actions)
+        .where(conditions.length > 0 ? and(...conditions) : undefined)
+        .limit(params?.limit ?? 100)
+        .all();
+
+      return { actions: results };
     });
   }
 
@@ -160,9 +160,9 @@ export class Actions extends Resource {
       'delete',
       { actionId: id, version, metadata: { actionId: id, version } },
       async () => {
-        const existing = await getDefinition(this.serviceCtx.db, id, version);
+        const existing = await getByIdAndVersion(this.serviceCtx.db, actions, id, version);
 
-        if (!existing || existing.kind !== 'action') {
+        if (!existing) {
           throw new NotFoundError(
             `Action not found: ${id}${version !== undefined ? ` version ${version}` : ''}`,
             'action',
@@ -170,7 +170,7 @@ export class Actions extends Resource {
           );
         }
 
-        await deleteDefinition(this.serviceCtx.db, id, version);
+        await deleteById(this.serviceCtx.db, actions, id, version);
         return { success: true };
       },
     );

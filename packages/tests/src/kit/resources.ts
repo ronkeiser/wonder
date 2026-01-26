@@ -145,6 +145,7 @@ export async function createEmbeddedAction(
     produces: action.produces,
     execution: action.execution,
     idempotency: action.idempotency,
+    autoversion: true,
   });
 
   if (!response?.action?.id) {
@@ -173,6 +174,7 @@ export async function createEmbeddedPromptSpec(
     produces: promptSpec.produces,
     examples: promptSpec.examples,
     tags: promptSpec.tags,
+    autoversion: true,
   });
 
   if (!response?.promptSpecId) {

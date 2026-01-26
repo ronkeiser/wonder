@@ -90,65 +90,273 @@ export const libraries = sqliteTable(
   ],
 );
 
-/** Unified Definitions Table */
+/** Versioned Entity Tables */
 
-import type { DefinitionKind } from '../shared/content-schemas';
+// -- Action Kinds --------------------------------------------------------
 
-// Re-export content schema types for consumers
-export type {
-  DefinitionKind,
-  WorkflowDefContent,
-  TaskContent,
-  ActionContent,
-  PersonaContent,
-  PromptSpecContent,
-  ArtifactTypeContent,
-  ModelProfileContent,
-} from '../shared/content-schemas';
+export const ACTION_KINDS = [
+  'llm',
+  'mcp',
+  'http',
+  'human',
+  'context',
+  'artifact',
+  'vector',
+  'metric',
+  'mock',
+] as const;
 
-export const definitions = sqliteTable(
-  'definitions',
+export type ActionKind = (typeof ACTION_KINDS)[number];
+
+// -- Step / Retry types (embedded JSON in tasks) -------------------------
+
+export type StepRow = {
+  id: string;
+  ref: string;
+  ordinal: number;
+  actionId: string;
+  actionVersion: number;
+  inputMapping: object | null;
+  outputMapping: object | null;
+  onFailure: 'abort' | 'retry' | 'continue';
+  condition: {
+    if: string;
+    then: 'continue' | 'skip' | 'succeed' | 'fail';
+    else: 'continue' | 'skip' | 'succeed' | 'fail';
+  } | null;
+};
+
+export type RetryConfig = {
+  maxAttempts: number;
+  backoff: 'none' | 'linear' | 'exponential';
+  initialDelayMs: number;
+  maxDelayMs: number | null;
+};
+
+export type AgentConstraints = {
+  maxMovesPerTurn?: number;
+};
+
+// -- Actions (scope: global) ---------------------------------------------
+
+export const actions = sqliteTable(
+  'actions',
   {
     id: text().notNull(),
     version: integer().notNull().default(1),
-    kind: text().$type<DefinitionKind>().notNull(),
     reference: text().notNull(),
     name: text().notNull(),
     description: text().notNull().default(''),
-
-    // Scope (validated by kind at repository layer)
-    projectId: text().references(() => projects.id, { onDelete: 'cascade' }),
-    libraryId: text().references(() => libraries.id, { onDelete: 'cascade' }),
-
     contentHash: text().notNull(),
-    content: text({ mode: 'json' }).$type<object>().notNull(),
+
+    kind: text({ enum: ACTION_KINDS }).notNull(),
+    implementation: text({ mode: 'json' }).$type<object>().notNull(),
+    requires: text({ mode: 'json' }).$type<object>(),
+    produces: text({ mode: 'json' }).$type<object>(),
+    execution: text({ mode: 'json' }).$type<object>(),
+    idempotency: text({ mode: 'json' }).$type<object>(),
 
     createdAt: text().notNull(),
     updatedAt: text().notNull(),
   },
   (table) => [
     primaryKey({ columns: [table.id, table.version] }),
-    unique('unique_definitions_version').on(
-      table.kind,
-      table.reference,
-      table.version,
-      table.projectId,
-      table.libraryId,
-    ),
-    unique('unique_definitions_content').on(
-      table.kind,
-      table.reference,
-      table.contentHash,
-      table.projectId,
-      table.libraryId,
-    ),
-    index('idx_definitions_kind').on(table.kind),
-    index('idx_definitions_reference').on(table.reference, table.kind),
-    index('idx_definitions_scope').on(table.projectId, table.libraryId),
+    unique('unique_actions_version').on(table.reference, table.version),
+    unique('unique_actions_content').on(table.reference, table.contentHash),
+    index('idx_actions_reference').on(table.reference),
+    index('idx_actions_kind').on(table.kind),
   ],
 );
 
-/** Workflows (instantiated from definitions of kind 'workflow_def') */
+// -- Tasks (scope: project or library) -----------------------------------
+
+export const tasks = sqliteTable(
+  'tasks',
+  {
+    id: text().notNull(),
+    version: integer().notNull().default(1),
+    reference: text().notNull(),
+    name: text().notNull(),
+    description: text().notNull().default(''),
+    contentHash: text().notNull(),
+
+    projectId: text().references(() => projects.id, { onDelete: 'cascade' }),
+    libraryId: text().references(() => libraries.id, { onDelete: 'cascade' }),
+
+    inputSchema: text({ mode: 'json' }).$type<object>().notNull(),
+    outputSchema: text({ mode: 'json' }).$type<object>().notNull(),
+    steps: text({ mode: 'json' }).$type<StepRow[]>().notNull(),
+    retry: text({ mode: 'json' }).$type<RetryConfig>(),
+    timeoutMs: integer(),
+
+    createdAt: text().notNull(),
+    updatedAt: text().notNull(),
+  },
+  (table) => [
+    primaryKey({ columns: [table.id, table.version] }),
+    unique('unique_tasks_version').on(table.reference, table.version, table.projectId, table.libraryId),
+    unique('unique_tasks_content').on(table.reference, table.contentHash, table.projectId, table.libraryId),
+    index('idx_tasks_reference').on(table.reference),
+    index('idx_tasks_scope').on(table.projectId, table.libraryId),
+  ],
+);
+
+// -- Workflow Defs (scope: project or library) ---------------------------
+
+export const workflowDefs = sqliteTable(
+  'workflow_defs',
+  {
+    id: text().notNull(),
+    version: integer().notNull().default(1),
+    reference: text().notNull(),
+    name: text().notNull(),
+    description: text().notNull().default(''),
+    contentHash: text().notNull(),
+
+    projectId: text().references(() => projects.id, { onDelete: 'cascade' }),
+    libraryId: text().references(() => libraries.id, { onDelete: 'cascade' }),
+
+    inputSchema: text({ mode: 'json' }).$type<object>().notNull(),
+    outputSchema: text({ mode: 'json' }).$type<object>().notNull(),
+    outputMapping: text({ mode: 'json' }).$type<object>(),
+    contextSchema: text({ mode: 'json' }).$type<object>(),
+    initialNodeId: text(),
+
+    createdAt: text().notNull(),
+    updatedAt: text().notNull(),
+  },
+  (table) => [
+    primaryKey({ columns: [table.id, table.version] }),
+    unique('unique_workflow_defs_version').on(table.reference, table.version, table.projectId, table.libraryId),
+    unique('unique_workflow_defs_content').on(table.reference, table.contentHash, table.projectId, table.libraryId),
+    index('idx_workflow_defs_reference').on(table.reference),
+    index('idx_workflow_defs_scope').on(table.projectId, table.libraryId),
+  ],
+);
+
+// -- Personas (scope: library only) --------------------------------------
+
+export const personas = sqliteTable(
+  'personas',
+  {
+    id: text().notNull(),
+    version: integer().notNull().default(1),
+    reference: text().notNull(),
+    name: text().notNull(),
+    description: text().notNull().default(''),
+    contentHash: text().notNull(),
+
+    libraryId: text().references(() => libraries.id, { onDelete: 'cascade' }),
+
+    systemPrompt: text().notNull(),
+    modelProfileRef: text().notNull(),
+    modelProfileVersion: integer(),
+    contextAssemblyWorkflowRef: text().notNull(),
+    contextAssemblyWorkflowVersion: integer(),
+    memoryExtractionWorkflowRef: text().notNull(),
+    memoryExtractionWorkflowVersion: integer(),
+    recentTurnsLimit: integer().notNull().default(20),
+    toolIds: text({ mode: 'json' }).$type<string[]>().notNull(),
+    constraints: text({ mode: 'json' }).$type<AgentConstraints>(),
+
+    createdAt: text().notNull(),
+    updatedAt: text().notNull(),
+  },
+  (table) => [
+    primaryKey({ columns: [table.id, table.version] }),
+    unique('unique_personas_version').on(table.reference, table.version, table.libraryId),
+    unique('unique_personas_content').on(table.reference, table.contentHash, table.libraryId),
+    index('idx_personas_reference').on(table.reference),
+    index('idx_personas_library').on(table.libraryId),
+  ],
+);
+
+// -- Prompt Specs (scope: global) ----------------------------------------
+
+export const promptSpecs = sqliteTable(
+  'prompt_specs',
+  {
+    id: text().notNull(),
+    version: integer().notNull().default(1),
+    reference: text().notNull(),
+    name: text().notNull(),
+    description: text().notNull().default(''),
+    contentHash: text().notNull(),
+
+    systemPrompt: text(),
+    template: text().notNull(),
+    requires: text({ mode: 'json' }).$type<object>().notNull(),
+    produces: text({ mode: 'json' }).$type<object>().notNull(),
+    examples: text({ mode: 'json' }).$type<object>(),
+
+    createdAt: text().notNull(),
+    updatedAt: text().notNull(),
+  },
+  (table) => [
+    primaryKey({ columns: [table.id, table.version] }),
+    unique('unique_prompt_specs_version').on(table.reference, table.version),
+    unique('unique_prompt_specs_content').on(table.reference, table.contentHash),
+    index('idx_prompt_specs_reference').on(table.reference),
+  ],
+);
+
+// -- Artifact Types (scope: global) --------------------------------------
+
+export const artifactTypes = sqliteTable(
+  'artifact_types',
+  {
+    id: text().notNull(),
+    version: integer().notNull().default(1),
+    reference: text().notNull(),
+    name: text().notNull(),
+    description: text().notNull().default(''),
+    contentHash: text().notNull(),
+
+    schema: text({ mode: 'json' }).$type<object>().notNull(),
+
+    createdAt: text().notNull(),
+    updatedAt: text().notNull(),
+  },
+  (table) => [
+    primaryKey({ columns: [table.id, table.version] }),
+    unique('unique_artifact_types_version').on(table.reference, table.version),
+    unique('unique_artifact_types_content').on(table.reference, table.contentHash),
+    index('idx_artifact_types_reference').on(table.reference),
+  ],
+);
+
+// -- Model Profiles (scope: global) --------------------------------------
+
+export const modelProfiles = sqliteTable(
+  'model_profiles',
+  {
+    id: text().notNull(),
+    version: integer().notNull().default(1),
+    reference: text().notNull(),
+    name: text().notNull(),
+    description: text().notNull().default(''),
+    contentHash: text().notNull(),
+
+    provider: text().notNull(),
+    modelId: text().notNull(),
+    parameters: text({ mode: 'json' }).$type<object>().notNull(),
+    executionConfig: text({ mode: 'json' }).$type<object>(),
+    costPer1kInputTokens: integer().notNull().default(0),
+    costPer1kOutputTokens: integer().notNull().default(0),
+
+    createdAt: text().notNull(),
+    updatedAt: text().notNull(),
+  },
+  (table) => [
+    primaryKey({ columns: [table.id, table.version] }),
+    unique('unique_model_profiles_version').on(table.reference, table.version),
+    unique('unique_model_profiles_content').on(table.reference, table.contentHash),
+    index('idx_model_profiles_reference').on(table.reference),
+    index('idx_model_profiles_provider').on(table.provider),
+  ],
+);
+
+/** Workflows (instantiated from workflow defs) */
 
 export const workflows = sqliteTable(
   'workflows',
@@ -206,7 +414,7 @@ export const nodes = sqliteTable(
     primaryKey({ columns: [table.definitionId, table.definitionVersion, table.id] }),
     foreignKey({
       columns: [table.definitionId, table.definitionVersion],
-      foreignColumns: [definitions.id, definitions.version],
+      foreignColumns: [workflowDefs.id, workflowDefs.version],
     }).onDelete('cascade'),
     index('idx_nodes_definition').on(table.definitionId, table.definitionVersion),
     index('idx_nodes_task').on(table.taskId, table.taskVersion),
@@ -236,7 +444,7 @@ export const transitions = sqliteTable(
     primaryKey({ columns: [table.definitionId, table.definitionVersion, table.id] }),
     foreignKey({
       columns: [table.definitionId, table.definitionVersion],
-      foreignColumns: [definitions.id, definitions.version],
+      foreignColumns: [workflowDefs.id, workflowDefs.version],
     }).onDelete('cascade'),
     foreignKey({
       columns: [table.definitionId, table.definitionVersion, table.fromNodeId],
@@ -624,14 +832,3 @@ export const conversations = sqliteTable(
 // accessed in conversation context. Cross-conversation queries (search, analytics)
 // are handled via events/Vectorize, not D1.
 
-// Legacy snake_case exports for backward compatibility during migration
-// TODO: Remove these after all consumers are updated
-// Legacy snake_case exports for backward compatibility
-export {
-  eventSources as event_sources,
-  mcpServers as mcp_servers,
-  projectSettings as project_settings,
-  vectorIndexes as vector_indexes,
-  workflowRuns as workflow_runs,
-  workspaceSettings as workspace_settings,
-};

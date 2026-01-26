@@ -3690,17 +3690,19 @@ export interface components {
             id: string;
             name: string;
             /** @description Stable identity for autoversion scoping */
-            reference: string | null;
+            reference: string;
             description: string;
             version: number;
             projectId: string | null;
             libraryId: string | null;
-            tags: string[] | null;
+            contentHash: string;
             inputSchema: JSONSchema;
             outputSchema: JSONSchema;
+            outputMapping: {
+                [key: string]: unknown;
+            } | null;
             contextSchema: JSONSchema | null;
             initialNodeId: string | null;
-            contentHash: string | null;
             createdAt: string;
             updatedAt: string;
         };
@@ -3726,7 +3728,6 @@ export interface components {
             /** @example 01ARZ3NDEKTSV4RRFFQ69G5FAV */
             projectId?: string;
             libraryId?: string;
-            tags?: string[];
             /**
              * @example {
              *       "topic": "string"

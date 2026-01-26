@@ -197,31 +197,12 @@ export type ModelId = keyof typeof MODEL_CATALOG;
 // API DTOs
 // ============================================================================
 
+import type { modelProfiles } from '~/schema';
+
 export type ModelProvider = 'anthropic' | 'openai' | 'google' | 'cloudflare' | 'local';
 
-/**
- * Model profile entity - the API-facing shape.
- * Internally stored in the unified `definitions` table.
- *
- * Note: The discriminated union based on modelId has been simplified to use
- * string types for provider/modelId/parameters since the definition repository
- * stores these as JSON strings. Runtime validation can be added via Zod if needed.
- */
-export type ModelProfile = {
-  id: string;
-  version: number;
-  name: string;
-  reference: string;
-  modelId: string;
-  provider: ModelProvider;
-  parameters: object;
-  executionConfig: object | null;
-  costPer1kInputTokens: number;
-  costPer1kOutputTokens: number;
-  contentHash: string;
-  createdAt: string;
-  updatedAt: string;
-};
+/** ModelProfile entity — inferred from database schema. */
+export type ModelProfile = typeof modelProfiles.$inferSelect;
 
 /** Input for creating a model profile */
 export type ModelProfileInput = {

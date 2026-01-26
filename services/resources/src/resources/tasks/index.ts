@@ -1,41 +1,30 @@
 /** Tasks RPC resource */
 
+import { and, eq, isNull } from 'drizzle-orm';
 import { ulid } from 'ulid';
+import { tasks } from '~/schema';
 import { ConflictError, NotFoundError, extractDbError } from '~/shared/errors';
+import { computeContentHash } from '~/shared/fingerprint';
 import { Resource } from '~/shared/resource';
 import {
-  createDefinition,
-  deleteDefinition,
-  getDefinition,
-  getLatestDefinition,
-  listDefinitions,
-  type Definition,
-} from '~/shared/definitions';
-import type { TaskContent } from '~/shared/content-schemas';
-import type { Step, Task, TaskInput } from './types';
+  getByIdAndVersion,
+  getByReferenceAndHash,
+  getLatestByReference,
+  getMaxVersion,
+  deleteById,
+} from '~/shared/versioning';
+import type { Task, TaskInput } from './types';
 
-/**
- * Maps a Definition to the legacy Task shape for API compatibility.
- */
-function toTask(def: Definition): Task {
-  const content = def.content as TaskContent;
+const scopeCols = { projectId: tasks.projectId, libraryId: tasks.libraryId };
+
+function hashableContent(data: TaskInput, stepsWithIds: unknown[]): Record<string, unknown> {
   return {
-    id: def.id,
-    version: def.version,
-    name: content.name,
-    description: def.description,
-    reference: def.reference,
-    projectId: def.projectId,
-    libraryId: def.libraryId,
-    tags: null, // Tags could be stored in content if needed
-    inputSchema: content.inputSchema,
-    outputSchema: content.outputSchema,
-    steps: content.steps,
-    retry: content.retry ?? null,
-    timeoutMs: content.timeoutMs ?? null,
-    contentHash: def.contentHash,
-    createdAt: def.createdAt,
-    updatedAt: def.updatedAt,
+    name: data.name,
+    inputSchema: data.inputSchema,
+    outputSchema: data.outputSchema,
+    steps: stepsWithIds,
+    retry: data.retry ?? null,
+    timeoutMs: data.timeoutMs ?? null,
   };
 }
 
@@ -43,11 +32,8 @@ export class Tasks extends Resource {
   async create(data: TaskInput): Promise<{
     taskId: string;
     task: Task;
-    /** True if an existing task was reused (autoversion matched content hash) */
     reused: boolean;
-    /** Version number of the created/reused task */
     version: number;
-    /** Latest version for this name (only present when reused=true) */
     latestVersion?: number;
   }> {
     this.serviceCtx.logger.info({
@@ -55,83 +41,95 @@ export class Tasks extends Resource {
       metadata: { name: data.name, autoversion: data.autoversion ?? false },
     });
 
-    // Tasks require a reference for autoversioning
-    if (data.autoversion && !data.reference) {
-      throw new Error('reference is required when autoversion is true');
-    }
-
     const reference = data.reference ?? data.name;
+    const scope = { projectId: data.projectId ?? null, libraryId: data.libraryId ?? null };
 
     // Generate step IDs
-    const stepsWithIds: Step[] = data.steps.map((step) => ({
-      ...step,
-      id: ulid(),
-    }));
+    const stepsWithIds = data.steps.map((step) => ({ ...step, id: ulid() }));
+
+    const contentHash = await computeContentHash(hashableContent(data, stepsWithIds));
+
+    if (data.autoversion && !data.force) {
+      const existing = await getByReferenceAndHash(
+        this.serviceCtx.db, tasks, reference, contentHash, scope, scopeCols,
+      );
+
+      if (existing) {
+        const latestVersion = await getMaxVersion(
+          this.serviceCtx.db, tasks, reference, scope, scopeCols,
+        );
+        return {
+          taskId: existing.id,
+          task: existing,
+          reused: true,
+          version: existing.version,
+          latestVersion,
+        };
+      }
+    }
+
+    const maxVersion = await getMaxVersion(
+      this.serviceCtx.db, tasks, reference, scope, scopeCols,
+    );
+    const version = (data.autoversion || data.force) ? maxVersion + 1 : 1;
+
+    let stableId: string;
+    if (maxVersion > 0) {
+      const latest = await getLatestByReference(
+        this.serviceCtx.db, tasks, reference, scope, scopeCols,
+      );
+      stableId = latest?.id ?? ulid();
+    } else {
+      stableId = ulid();
+    }
+
+    const now = new Date().toISOString();
 
     try {
-      const result = await createDefinition(this.serviceCtx.db, 'task', {
-        reference,
-        name: data.name,
-        description: data.description,
-        projectId: data.projectId,
-        libraryId: data.libraryId,
-        content: {
+      const [task] = await this.serviceCtx.db
+        .insert(tasks)
+        .values({
+          id: stableId,
+          version,
+          reference,
           name: data.name,
+          description: data.description ?? '',
+          contentHash,
+          projectId: data.projectId ?? null,
+          libraryId: data.libraryId ?? null,
           inputSchema: data.inputSchema,
           outputSchema: data.outputSchema,
           steps: stepsWithIds,
-          retry: data.retry,
-          timeoutMs: data.timeoutMs,
-        },
-        autoversion: data.autoversion,
-        force: data.force,
-      });
-
-      if (result.reused) {
-        return {
-          taskId: result.definition.id,
-          task: toTask(result.definition),
-          reused: true,
-          version: result.definition.version,
-          latestVersion: result.latestVersion,
-        };
-      }
+          retry: data.retry ?? null,
+          timeoutMs: data.timeoutMs ?? null,
+          createdAt: now,
+          updatedAt: now,
+        })
+        .returning();
 
       return {
-        taskId: result.definition.id,
-        task: toTask(result.definition),
+        taskId: task.id,
+        task,
         reused: false,
-        version: result.definition.version,
+        version: task.version,
       };
     } catch (error) {
       const dbError = extractDbError(error);
-
       if (dbError.constraint === 'unique') {
-        throw new ConflictError(
-          `Task with ${dbError.field} already exists`,
-          dbError.field,
-          'unique',
-        );
+        throw new ConflictError(`Task with ${dbError.field} already exists`, dbError.field, 'unique');
       }
-
       if (dbError.constraint === 'foreign_key') {
         throw new ConflictError('Referenced entity does not exist', undefined, 'foreign_key');
       }
-
       throw error;
     }
   }
 
-  async get(
-    id: string,
-    version?: number,
-  ): Promise<{
-    task: Task;
-  }> {
+  async get(id: string, version?: number): Promise<{ task: Task }> {
     return this.withLogging('get', { metadata: { taskId: id, version } }, async () => {
-      const definition = await getDefinition(this.serviceCtx.db, id, version);
+      const task = await getByIdAndVersion(this.serviceCtx.db, tasks, id, version);
 
-      if (!definition || definition.kind !== 'task') {
+      if (!task) {
         throw new NotFoundError(
           `Task not found: ${id}${version ? ` version ${version}` : ''}`,
           'task',
@@ -139,7 +137,7 @@ export class Tasks extends Resource {
         );
       }
 
-      return { task: toTask(definition) };
+      return { task };
     });
   }
 
@@ -148,36 +146,39 @@ export class Tasks extends Resource {
     libraryId?: string;
     name?: string;
     limit?: number;
-  }): Promise<{
-    tasks: Task[];
-  }> {
+  }): Promise<{ tasks: Task[] }> {
     return this.withLogging('list', { metadata: options }, async () => {
-      // If name is specified, find by reference (name is normalized to reference)
       if (options?.name) {
-        const definition = await getLatestDefinition(
-          this.serviceCtx.db,
-          'task',
-          options.name,
-          { projectId: options.projectId ?? null, libraryId: options.libraryId ?? null },
+        const scope = { projectId: options.projectId ?? null, libraryId: options.libraryId ?? null };
+        const task = await getLatestByReference(
+          this.serviceCtx.db, tasks, options.name, scope, scopeCols,
         );
-        return { tasks: definition ? [toTask(definition)] : [] };
+        return { tasks: task ? [task] : [] };
       }
 
-      const defs = await listDefinitions(this.serviceCtx.db, 'task', {
-        projectId: options?.projectId,
-        libraryId: options?.libraryId,
-        limit: options?.limit,
-      });
+      const conditions = [];
+      if (options?.projectId) {
+        conditions.push(eq(tasks.projectId, options.projectId));
+      } else if (options?.libraryId) {
+        conditions.push(eq(tasks.libraryId, options.libraryId));
+      }
 
-      return { tasks: defs.map(toTask) };
+      const results = await this.serviceCtx.db
+        .select()
+        .from(tasks)
+        .where(conditions.length > 0 ? and(...conditions) : undefined)
+        .limit(options?.limit ?? 100)
+        .all();
+
+      return { tasks: results };
     });
   }
 
   async delete(id: string, version?: number): Promise<{ success: boolean }> {
     return this.withLogging('delete', { metadata: { taskId: id, version } }, async () => {
-      const existing = await getDefinition(this.serviceCtx.db, id, version);
+      const existing = await getByIdAndVersion(this.serviceCtx.db, tasks, id, version);
 
-      if (!existing || existing.kind !== 'task') {
+      if (!existing) {
         throw new NotFoundError(
           `Task not found: ${id}${version ? ` version ${version}` : ''}`,
           'task',
@@ -185,7 +186,7 @@ export class Tasks extends Resource {
         );
       }
 
-      await deleteDefinition(this.serviceCtx.db, id, version);
+      await deleteById(this.serviceCtx.db, tasks, id, version);
       return { success: true };
     });
   }

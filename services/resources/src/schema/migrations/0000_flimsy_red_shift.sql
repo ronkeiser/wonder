@@ -1,3 +1,25 @@
+CREATE TABLE `actions` (
+	`id` text NOT NULL,
+	`version` integer DEFAULT 1 NOT NULL,
+	`reference` text NOT NULL,
+	`name` text NOT NULL,
+	`description` text DEFAULT '' NOT NULL,
+	`content_hash` text NOT NULL,
+	`kind` text NOT NULL,
+	`implementation` text NOT NULL,
+	`requires` text,
+	`produces` text,
+	`execution` text,
+	`idempotency` text,
+	`created_at` text NOT NULL,
+	`updated_at` text NOT NULL,
+	PRIMARY KEY(`id`, `version`)
+);
+--> statement-breakpoint
+CREATE INDEX `idx_actions_reference` ON `actions` (`reference`);--> statement-breakpoint
+CREATE INDEX `idx_actions_kind` ON `actions` (`kind`);--> statement-breakpoint
+CREATE UNIQUE INDEX `unique_actions_version` ON `actions` (`reference`,`version`);--> statement-breakpoint
+CREATE UNIQUE INDEX `unique_actions_content` ON `actions` (`reference`,`content_hash`);--> statement-breakpoint
 CREATE TABLE `actors` (
 	`id` text PRIMARY KEY NOT NULL,
 	`type` text NOT NULL,
@@ -19,6 +41,22 @@ CREATE TABLE `agents` (
 );
 --> statement-breakpoint
 CREATE INDEX `idx_agents_persona` ON `agents` (`persona_id`,`persona_version`);--> statement-breakpoint
+CREATE TABLE `artifact_types` (
+	`id` text NOT NULL,
+	`version` integer DEFAULT 1 NOT NULL,
+	`reference` text NOT NULL,
+	`name` text NOT NULL,
+	`description` text DEFAULT '' NOT NULL,
+	`content_hash` text NOT NULL,
+	`schema` text NOT NULL,
+	`created_at` text NOT NULL,
+	`updated_at` text NOT NULL,
+	PRIMARY KEY(`id`, `version`)
+);
+--> statement-breakpoint
+CREATE INDEX `idx_artifact_types_reference` ON `artifact_types` (`reference`);--> statement-breakpoint
+CREATE UNIQUE INDEX `unique_artifact_types_version` ON `artifact_types` (`reference`,`version`);--> statement-breakpoint
+CREATE UNIQUE INDEX `unique_artifact_types_content` ON `artifact_types` (`reference`,`content_hash`);--> statement-breakpoint
 CREATE TABLE `artifacts` (
 	`id` text PRIMARY KEY NOT NULL,
 	`project_id` text NOT NULL,
@@ -55,29 +93,6 @@ CREATE TABLE `conversations` (
 );
 --> statement-breakpoint
 CREATE INDEX `idx_conversations_status` ON `conversations` (`status`);--> statement-breakpoint
-CREATE TABLE `definitions` (
-	`id` text NOT NULL,
-	`version` integer DEFAULT 1 NOT NULL,
-	`kind` text NOT NULL,
-	`reference` text NOT NULL,
-	`name` text NOT NULL,
-	`description` text DEFAULT '' NOT NULL,
-	`project_id` text,
-	`library_id` text,
-	`content_hash` text NOT NULL,
-	`content` text NOT NULL,
-	`created_at` text NOT NULL,
-	`updated_at` text NOT NULL,
-	PRIMARY KEY(`id`, `version`),
-	FOREIGN KEY (`project_id`) REFERENCES `projects`(`id`) ON UPDATE no action ON DELETE cascade,
-	FOREIGN KEY (`library_id`) REFERENCES `libraries`(`id`) ON UPDATE no action ON DELETE cascade
-);
---> statement-breakpoint
-CREATE INDEX `idx_definitions_kind` ON `definitions` (`kind`);--> statement-breakpoint
-CREATE INDEX `idx_definitions_reference` ON `definitions` (`reference`,`kind`);--> statement-breakpoint
-CREATE INDEX `idx_definitions_scope` ON `definitions` (`project_id`,`library_id`);--> statement-breakpoint
-CREATE UNIQUE INDEX `unique_definitions_version` ON `definitions` (`kind`,`reference`,`version`,`project_id`,`library_id`);--> statement-breakpoint
-CREATE UNIQUE INDEX `unique_definitions_content` ON `definitions` (`kind`,`reference`,`content_hash`,`project_id`,`library_id`);--> statement-breakpoint
 CREATE TABLE `event_sources` (
 	`id` text PRIMARY KEY NOT NULL,
 	`workspace_id` text NOT NULL,
@@ -137,6 +152,28 @@ CREATE TABLE `mcp_servers` (
 --> statement-breakpoint
 CREATE INDEX `idx_mcp_servers_workspace` ON `mcp_servers` (`workspace_id`);--> statement-breakpoint
 CREATE UNIQUE INDEX `unique_mcp_servers_workspace_name` ON `mcp_servers` (`workspace_id`,`name`);--> statement-breakpoint
+CREATE TABLE `model_profiles` (
+	`id` text NOT NULL,
+	`version` integer DEFAULT 1 NOT NULL,
+	`reference` text NOT NULL,
+	`name` text NOT NULL,
+	`description` text DEFAULT '' NOT NULL,
+	`content_hash` text NOT NULL,
+	`provider` text NOT NULL,
+	`model_id` text NOT NULL,
+	`parameters` text NOT NULL,
+	`execution_config` text,
+	`cost_per1k_input_tokens` integer DEFAULT 0 NOT NULL,
+	`cost_per1k_output_tokens` integer DEFAULT 0 NOT NULL,
+	`created_at` text NOT NULL,
+	`updated_at` text NOT NULL,
+	PRIMARY KEY(`id`, `version`)
+);
+--> statement-breakpoint
+CREATE INDEX `idx_model_profiles_reference` ON `model_profiles` (`reference`);--> statement-breakpoint
+CREATE INDEX `idx_model_profiles_provider` ON `model_profiles` (`provider`);--> statement-breakpoint
+CREATE UNIQUE INDEX `unique_model_profiles_version` ON `model_profiles` (`reference`,`version`);--> statement-breakpoint
+CREATE UNIQUE INDEX `unique_model_profiles_content` ON `model_profiles` (`reference`,`content_hash`);--> statement-breakpoint
 CREATE TABLE `nodes` (
 	`id` text NOT NULL,
 	`ref` text NOT NULL,
@@ -151,12 +188,40 @@ CREATE TABLE `nodes` (
 	`output_mapping` text,
 	`resource_bindings` text,
 	PRIMARY KEY(`definition_id`, `definition_version`, `id`),
-	FOREIGN KEY (`definition_id`,`definition_version`) REFERENCES `definitions`(`id`,`version`) ON UPDATE no action ON DELETE cascade
+	FOREIGN KEY (`definition_id`,`definition_version`) REFERENCES `workflow_defs`(`id`,`version`) ON UPDATE no action ON DELETE cascade
 );
 --> statement-breakpoint
 CREATE INDEX `idx_nodes_definition` ON `nodes` (`definition_id`,`definition_version`);--> statement-breakpoint
 CREATE INDEX `idx_nodes_task` ON `nodes` (`task_id`,`task_version`);--> statement-breakpoint
 CREATE INDEX `idx_nodes_ref` ON `nodes` (`definition_id`,`definition_version`,`ref`);--> statement-breakpoint
+CREATE TABLE `personas` (
+	`id` text NOT NULL,
+	`version` integer DEFAULT 1 NOT NULL,
+	`reference` text NOT NULL,
+	`name` text NOT NULL,
+	`description` text DEFAULT '' NOT NULL,
+	`content_hash` text NOT NULL,
+	`library_id` text,
+	`system_prompt` text NOT NULL,
+	`model_profile_ref` text NOT NULL,
+	`model_profile_version` integer,
+	`context_assembly_workflow_ref` text NOT NULL,
+	`context_assembly_workflow_version` integer,
+	`memory_extraction_workflow_ref` text NOT NULL,
+	`memory_extraction_workflow_version` integer,
+	`recent_turns_limit` integer DEFAULT 20 NOT NULL,
+	`tool_ids` text NOT NULL,
+	`constraints` text,
+	`created_at` text NOT NULL,
+	`updated_at` text NOT NULL,
+	PRIMARY KEY(`id`, `version`),
+	FOREIGN KEY (`library_id`) REFERENCES `libraries`(`id`) ON UPDATE no action ON DELETE cascade
+);
+--> statement-breakpoint
+CREATE INDEX `idx_personas_reference` ON `personas` (`reference`);--> statement-breakpoint
+CREATE INDEX `idx_personas_library` ON `personas` (`library_id`);--> statement-breakpoint
+CREATE UNIQUE INDEX `unique_personas_version` ON `personas` (`reference`,`version`,`library_id`);--> statement-breakpoint
+CREATE UNIQUE INDEX `unique_personas_content` ON `personas` (`reference`,`content_hash`,`library_id`);--> statement-breakpoint
 CREATE TABLE `project_settings` (
 	`project_id` text PRIMARY KEY NOT NULL,
 	`default_model_profile_id` text,
@@ -181,6 +246,26 @@ CREATE TABLE `projects` (
 );
 --> statement-breakpoint
 CREATE INDEX `idx_projects_workspace` ON `projects` (`workspace_id`);--> statement-breakpoint
+CREATE TABLE `prompt_specs` (
+	`id` text NOT NULL,
+	`version` integer DEFAULT 1 NOT NULL,
+	`reference` text NOT NULL,
+	`name` text NOT NULL,
+	`description` text DEFAULT '' NOT NULL,
+	`content_hash` text NOT NULL,
+	`system_prompt` text,
+	`template` text NOT NULL,
+	`requires` text NOT NULL,
+	`produces` text NOT NULL,
+	`examples` text,
+	`created_at` text NOT NULL,
+	`updated_at` text NOT NULL,
+	PRIMARY KEY(`id`, `version`)
+);
+--> statement-breakpoint
+CREATE INDEX `idx_prompt_specs_reference` ON `prompt_specs` (`reference`);--> statement-breakpoint
+CREATE UNIQUE INDEX `unique_prompt_specs_version` ON `prompt_specs` (`reference`,`version`);--> statement-breakpoint
+CREATE UNIQUE INDEX `unique_prompt_specs_content` ON `prompt_specs` (`reference`,`content_hash`);--> statement-breakpoint
 CREATE TABLE `secrets` (
 	`id` text PRIMARY KEY NOT NULL,
 	`workspace_id` text NOT NULL,
@@ -192,6 +277,31 @@ CREATE TABLE `secrets` (
 );
 --> statement-breakpoint
 CREATE UNIQUE INDEX `unique_secrets_workspace_key` ON `secrets` (`workspace_id`,`key`);--> statement-breakpoint
+CREATE TABLE `tasks` (
+	`id` text NOT NULL,
+	`version` integer DEFAULT 1 NOT NULL,
+	`reference` text NOT NULL,
+	`name` text NOT NULL,
+	`description` text DEFAULT '' NOT NULL,
+	`content_hash` text NOT NULL,
+	`project_id` text,
+	`library_id` text,
+	`input_schema` text NOT NULL,
+	`output_schema` text NOT NULL,
+	`steps` text NOT NULL,
+	`retry` text,
+	`timeout_ms` integer,
+	`created_at` text NOT NULL,
+	`updated_at` text NOT NULL,
+	PRIMARY KEY(`id`, `version`),
+	FOREIGN KEY (`project_id`) REFERENCES `projects`(`id`) ON UPDATE no action ON DELETE cascade,
+	FOREIGN KEY (`library_id`) REFERENCES `libraries`(`id`) ON UPDATE no action ON DELETE cascade
+);
+--> statement-breakpoint
+CREATE INDEX `idx_tasks_reference` ON `tasks` (`reference`);--> statement-breakpoint
+CREATE INDEX `idx_tasks_scope` ON `tasks` (`project_id`,`library_id`);--> statement-breakpoint
+CREATE UNIQUE INDEX `unique_tasks_version` ON `tasks` (`reference`,`version`,`project_id`,`library_id`);--> statement-breakpoint
+CREATE UNIQUE INDEX `unique_tasks_content` ON `tasks` (`reference`,`content_hash`,`project_id`,`library_id`);--> statement-breakpoint
 CREATE TABLE `tools` (
 	`id` text PRIMARY KEY NOT NULL,
 	`name` text NOT NULL,
@@ -227,7 +337,7 @@ CREATE TABLE `transitions` (
 	`synchronization` text,
 	`loop_config` text,
 	PRIMARY KEY(`definition_id`, `definition_version`, `id`),
-	FOREIGN KEY (`definition_id`,`definition_version`) REFERENCES `definitions`(`id`,`version`) ON UPDATE no action ON DELETE cascade,
+	FOREIGN KEY (`definition_id`,`definition_version`) REFERENCES `workflow_defs`(`id`,`version`) ON UPDATE no action ON DELETE cascade,
 	FOREIGN KEY (`definition_id`,`definition_version`,`from_node_id`) REFERENCES `nodes`(`definition_id`,`definition_version`,`id`) ON UPDATE no action ON DELETE cascade,
 	FOREIGN KEY (`definition_id`,`definition_version`,`to_node_id`) REFERENCES `nodes`(`definition_id`,`definition_version`,`id`) ON UPDATE no action ON DELETE cascade
 );
@@ -262,6 +372,31 @@ CREATE TABLE `vector_indexes` (
 );
 --> statement-breakpoint
 CREATE UNIQUE INDEX `unique_vectorize_index_id` ON `vector_indexes` (`vectorize_index_id`);--> statement-breakpoint
+CREATE TABLE `workflow_defs` (
+	`id` text NOT NULL,
+	`version` integer DEFAULT 1 NOT NULL,
+	`reference` text NOT NULL,
+	`name` text NOT NULL,
+	`description` text DEFAULT '' NOT NULL,
+	`content_hash` text NOT NULL,
+	`project_id` text,
+	`library_id` text,
+	`input_schema` text NOT NULL,
+	`output_schema` text NOT NULL,
+	`output_mapping` text,
+	`context_schema` text,
+	`initial_node_id` text,
+	`created_at` text NOT NULL,
+	`updated_at` text NOT NULL,
+	PRIMARY KEY(`id`, `version`),
+	FOREIGN KEY (`project_id`) REFERENCES `projects`(`id`) ON UPDATE no action ON DELETE cascade,
+	FOREIGN KEY (`library_id`) REFERENCES `libraries`(`id`) ON UPDATE no action ON DELETE cascade
+);
+--> statement-breakpoint
+CREATE INDEX `idx_workflow_defs_reference` ON `workflow_defs` (`reference`);--> statement-breakpoint
+CREATE INDEX `idx_workflow_defs_scope` ON `workflow_defs` (`project_id`,`library_id`);--> statement-breakpoint
+CREATE UNIQUE INDEX `unique_workflow_defs_version` ON `workflow_defs` (`reference`,`version`,`project_id`,`library_id`);--> statement-breakpoint
+CREATE UNIQUE INDEX `unique_workflow_defs_content` ON `workflow_defs` (`reference`,`content_hash`,`project_id`,`library_id`);--> statement-breakpoint
 CREATE TABLE `workflow_runs` (
 	`id` text PRIMARY KEY NOT NULL,
 	`project_id` text NOT NULL,

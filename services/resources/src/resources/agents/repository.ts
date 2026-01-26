@@ -3,25 +3,23 @@
 import { and, desc, eq, isNull, max, or } from 'drizzle-orm';
 import type { DrizzleD1Database } from 'drizzle-orm/d1';
 import { ulid } from 'ulid';
-import { agents, definitions } from '../../schema';
+import { agents, personas } from '../../schema';
 import type { NewEntity } from '../../shared/types';
 import type { Agent, AgentWithRelations } from './types';
 
 type NewAgent = NewEntity<typeof agents.$inferInsert>;
 
 /**
- * Subquery to get latest version per persona definition.
- * Uses definitions table where kind = 'persona'.
+ * Subquery to get latest version per persona.
  */
 function latestPersonaVersionsSubquery(db: DrizzleD1Database) {
   return db
     .select({
-      personaId: definitions.id,
-      latestVersion: max(definitions.version).as('latest_version'),
+      personaId: personas.id,
+      latestVersion: max(personas.version).as('latest_version'),
     })
-    .from(definitions)
-    .where(eq(definitions.kind, 'persona'))
-    .groupBy(definitions.id)
+    .from(personas)
+    .groupBy(personas.id)
     .as('latest_versions');
 }
 
@@ -52,18 +50,17 @@ export async function getAgent(db: DrizzleD1Database, id: string): Promise<Agent
       personaVersion: agents.personaVersion,
       createdAt: agents.createdAt,
       updatedAt: agents.updatedAt,
-      personaName: definitions.name,
+      personaName: personas.name,
     })
     .from(agents)
     .leftJoin(latestVersions, eq(agents.personaId, latestVersions.personaId))
     .leftJoin(
-      definitions,
+      personas,
       and(
-        eq(agents.personaId, definitions.id),
-        eq(definitions.kind, 'persona'),
+        eq(agents.personaId, personas.id),
         or(
-          eq(agents.personaVersion, definitions.version),
-          and(isNull(agents.personaVersion), eq(definitions.version, latestVersions.latestVersion)),
+          eq(agents.personaVersion, personas.version),
+          and(isNull(agents.personaVersion), eq(personas.version, latestVersions.latestVersion)),
         ),
       ),
     )
@@ -85,18 +82,17 @@ export async function listAgents(db: DrizzleD1Database, limit: number = 100): Pr
       personaVersion: agents.personaVersion,
       createdAt: agents.createdAt,
       updatedAt: agents.updatedAt,
-      personaName: definitions.name,
+      personaName: personas.name,
     })
     .from(agents)
     .leftJoin(latestVersions, eq(agents.personaId, latestVersions.personaId))
     .leftJoin(
-      definitions,
+      personas,
       and(
-        eq(agents.personaId, definitions.id),
-        eq(definitions.kind, 'persona'),
+        eq(agents.personaId, personas.id),
         or(
-          eq(agents.personaVersion, definitions.version),
-          and(isNull(agents.personaVersion), eq(definitions.version, latestVersions.latestVersion)),
+          eq(agents.personaVersion, personas.version),
+          and(isNull(agents.personaVersion), eq(personas.version, latestVersions.latestVersion)),
         ),
       ),
     )

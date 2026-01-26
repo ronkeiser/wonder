@@ -12,7 +12,7 @@ export const CreateActionSchema = z
       description: 'Stable identity for autoversion scoping. Required when autoversion=true.',
     }),
     description: z.string().min(1).openapi({ example: 'Generates a summary using LLM' }),
-    version: z.number().int().positive().default(1).openapi({ example: 1 }),
+    version: z.number().int().positive().optional().default(1).openapi({ example: 1 }),
     kind: z
       .enum(['llm', 'mcp', 'http', 'human', 'context', 'artifact', 'vector', 'metric', 'mock'])
       .openapi({ example: 'llm' }),

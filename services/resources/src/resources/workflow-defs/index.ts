@@ -1,43 +1,37 @@
 /** WorkflowDefs RPC resource */
 
+import { and, eq } from 'drizzle-orm';
+import { workflowDefs } from '~/schema';
 import { ConflictError, NotFoundError, ValidationError, extractDbError } from '~/shared/errors';
+import { computeContentHash } from '~/shared/fingerprint';
 import { Resource } from '~/shared/resource';
 import {
-  createDefinition,
-  deleteDefinition,
-  getDefinition,
-  getLatestDefinition,
-  listDefinitions,
-  type Definition,
-} from '~/shared/definitions';
-import type { WorkflowDefContent } from '~/shared/content-schemas';
+  getByIdAndVersion,
+  getByReferenceAndHash,
+  getLatestByReference,
+  getMaxVersion,
+  deleteById,
+} from '~/shared/versioning';
 import * as repo from './repository';
 import { transformWorkflowDef } from './transformer';
 import type { Node, Transition, WorkflowDef, WorkflowDefInput } from './types';
 import { validateWorkflowDef } from './validator';
 
-/**
- * Maps a Definition to the legacy WorkflowDef shape for API compatibility.
- */
-function toWorkflowDef(def: Definition): WorkflowDef {
-  const content = def.content as WorkflowDefContent;
+const scopeCols = { projectId: workflowDefs.projectId, libraryId: workflowDefs.libraryId };
+
+function hashableContent(
+  data: WorkflowDefInput,
+  transformed: { initialNodeId: string; nodes: unknown[]; transitions: unknown[] },
+): Record<string, unknown> {
   return {
-    id: def.id,
-    version: def.version,
-    name: content.name,
-    description: def.description,
-    reference: def.reference,
-    projectId: def.projectId,
-    libraryId: def.libraryId,
-    tags: null, // Tags not stored in content schema currently
-    inputSchema: content.inputSchema,
-    outputSchema: content.outputSchema,
-    outputMapping: content.outputMapping ?? null,
-    contextSchema: content.contextSchema ?? null,
-    initialNodeId: content.initialNodeId ?? null,
-    contentHash: def.contentHash,
-    createdAt: def.createdAt,
-    updatedAt: def.updatedAt,
+    name: data.name,
+    inputSchema: data.inputSchema,
+    outputSchema: data.outputSchema,
+    outputMapping: data.outputMapping ?? null,
+    contextSchema: data.contextSchema ?? null,
+    initialNodeId: transformed.initialNodeId,
+    nodes: transformed.nodes,
+    transitions: transformed.transitions,
   };
 }
 
@@ -45,11 +39,8 @@ export class WorkflowDefs extends Resource {
   async create(data: WorkflowDefInput): Promise<{
     workflowDefId: string;
     workflowDef: WorkflowDef;
-    /** True if an existing workflow def was reused (autoversion matched content hash) */
     reused: boolean;
-    /** Version number of the created/reused workflow def */
     version: number;
-    /** Latest version for this name (only present when reused=true) */
     latestVersion?: number;
   }> {
     this.serviceCtx.logger.info({
@@ -73,7 +64,6 @@ export class WorkflowDefs extends Resource {
     // Transform refs → IDs (single-pass: generates all IDs inline)
     const transformed = transformWorkflowDef(data);
 
-    // DEBUG: Log transformed transitions
     this.serviceCtx.logger.info({
       eventType: 'workflow_def.transitions.transformed',
       metadata: {
@@ -88,33 +78,77 @@ export class WorkflowDefs extends Resource {
     });
 
     const reference = data.reference ?? data.name;
+    const scope = { projectId: data.projectId ?? null, libraryId: data.libraryId ?? null };
 
-    // 2. Create definition via definitions-repository
-    let result;
+    const contentHash = await computeContentHash(
+      hashableContent(data, transformed),
+    );
+
+    // 2. Check for dedup (autoversion without force)
+    if (data.autoversion && !data.force) {
+      const existing = await getByReferenceAndHash(
+        this.serviceCtx.db, workflowDefs, reference, contentHash, scope, scopeCols,
+      );
+
+      if (existing) {
+        const latestVersion = await getMaxVersion(
+          this.serviceCtx.db, workflowDefs, reference, scope, scopeCols,
+        );
+        return {
+          workflowDefId: existing.id,
+          workflowDef: existing,
+          reused: true,
+          version: existing.version,
+          latestVersion,
+        };
+      }
+    }
+
+    // 3. Determine version and stable ID
+    const maxVersion = await getMaxVersion(
+      this.serviceCtx.db, workflowDefs, reference, scope, scopeCols,
+    );
+    const version = (data.autoversion || data.force) ? maxVersion + 1 : 1;
+
+    let stableId: string;
+    if (maxVersion > 0) {
+      const latest = await getLatestByReference(
+        this.serviceCtx.db, workflowDefs, reference, scope, scopeCols,
+      );
+      stableId = latest?.id ?? transformed.definitionId;
+    } else {
+      stableId = transformed.definitionId;
+    }
+
+    const now = new Date().toISOString();
+
+    // 4. Insert workflow def
+    let workflowDef: WorkflowDef;
     try {
-      result = await createDefinition(this.serviceCtx.db, 'workflow_def', {
-        id: transformed.definitionId, // Use pre-generated ID for consistency with nodes/transitions
-        reference,
-        name: data.name,
-        description: data.description,
-        projectId: data.projectId,
-        libraryId: data.libraryId,
-        content: {
+      const [row] = await this.serviceCtx.db
+        .insert(workflowDefs)
+        .values({
+          id: stableId,
+          version,
+          reference,
           name: data.name,
+          description: data.description ?? '',
+          contentHash,
+          projectId: data.projectId ?? null,
+          libraryId: data.libraryId ?? null,
           inputSchema: data.inputSchema,
           outputSchema: data.outputSchema,
-          outputMapping: data.outputMapping,
-          contextSchema: data.contextSchema,
+          outputMapping: data.outputMapping ?? null,
+          contextSchema: data.contextSchema ?? null,
           initialNodeId: transformed.initialNodeId,
-          nodes: transformed.nodes,
-          transitions: transformed.transitions,
-        },
-        autoversion: data.autoversion,
-        force: data.force,
-      });
+          createdAt: now,
+          updatedAt: now,
+        })
+        .returning();
+
+      workflowDef = row;
     } catch (error) {
       const dbError = extractDbError(error);
-
       if (dbError.constraint === 'unique') {
         this.serviceCtx.logger.warn({
           eventType: 'workflow_def.create.conflict',
@@ -122,7 +156,6 @@ export class WorkflowDefs extends Resource {
         });
         throw new ConflictError(`WorkflowDef with ${dbError.field} already exists`, dbError.field, 'unique');
       }
-
       this.serviceCtx.logger.error({
         eventType: 'workflow_def.create.failed',
         message: dbError.message,
@@ -131,19 +164,7 @@ export class WorkflowDefs extends Resource {
       throw error;
     }
 
-    if (result.reused) {
-      return {
-        workflowDefId: result.definition.id,
-        workflowDef: toWorkflowDef(result.definition),
-        reused: true,
-        version: result.definition.version,
-        latestVersion: result.latestVersion,
-      };
-    }
-
-    const workflowDef = toWorkflowDef(result.definition);
-
-    // 3. Create all nodes with pre-generated IDs
+    // 5. Create all nodes with pre-generated IDs
     try {
       for (const node of transformed.nodes) {
         await repo.createNodeWithId(this.serviceCtx.db, {
@@ -161,7 +182,7 @@ export class WorkflowDefs extends Resource {
       throw error;
     }
 
-    // 4. Create transitions with transformed IDs
+    // 6. Create transitions with transformed IDs
     try {
       for (const transition of transformed.transitions) {
         await repo.createTransitionWithId(this.serviceCtx.db, {
@@ -191,7 +212,7 @@ export class WorkflowDefs extends Resource {
 
     return {
       workflowDefId: workflowDef.id,
-      workflowDef: workflowDef,
+      workflowDef,
       reused: false,
       version: workflowDef.version,
     };
@@ -202,34 +223,25 @@ export class WorkflowDefs extends Resource {
     version?: number,
   ): Promise<{
     workflowDef: WorkflowDef;
-    /** Raw definition row for coordinator DO SQLite insertion */
-    definition: Definition;
     nodes: Node[];
     transitions: Transition[];
   }> {
     return this.withLogging(
       'get',
-      {
-        workflowDefId: workflowDefId,
-        version,
-        metadata: { workflowDefId: workflowDefId, version },
-      },
+      { metadata: { workflowDefId, version } },
       async () => {
-        const definition = await getDefinition(this.serviceCtx.db, workflowDefId, version);
+        const workflowDef = await getByIdAndVersion(
+          this.serviceCtx.db, workflowDefs, workflowDefId, version,
+        );
 
-        if (!definition || definition.kind !== 'workflow_def') {
+        if (!workflowDef) {
           throw new NotFoundError(`WorkflowDef not found: ${workflowDefId}`, 'workflow_def', workflowDefId);
         }
 
-        const nodes = await repo.listNodesByDefinition(this.serviceCtx.db, workflowDefId, definition.version);
-        const transitions = await repo.listTransitionsByDefinition(this.serviceCtx.db, workflowDefId, definition.version);
+        const nodes = await repo.listNodesByDefinition(this.serviceCtx.db, workflowDefId, workflowDef.version);
+        const transitions = await repo.listTransitionsByDefinition(this.serviceCtx.db, workflowDefId, workflowDef.version);
 
-        return {
-          workflowDef: toWorkflowDef(definition),
-          definition,
-          nodes,
-          transitions,
-        };
+        return { workflowDef, nodes, transitions };
       },
     );
   }
@@ -239,53 +251,55 @@ export class WorkflowDefs extends Resource {
     libraryId?: string;
     name?: string;
     limit?: number;
-  }): Promise<{
-    workflowDefs: WorkflowDef[];
-  }> {
+  }): Promise<{ workflowDefs: WorkflowDef[] }> {
     return this.withLogging('list', { metadata: options }, async () => {
-      // If name is specified, find by reference (name is normalized to reference)
       if (options?.name) {
-        const definition = await getLatestDefinition(this.serviceCtx.db, 'workflow_def', options.name, {
-          projectId: options.projectId ?? null,
-          libraryId: options.libraryId ?? null,
-        });
-        return { workflowDefs: definition ? [toWorkflowDef(definition)] : [] };
+        const scope = { projectId: options.projectId ?? null, libraryId: options.libraryId ?? null };
+        const workflowDef = await getLatestByReference(
+          this.serviceCtx.db, workflowDefs, options.name, scope, scopeCols,
+        );
+        return { workflowDefs: workflowDef ? [workflowDef] : [] };
       }
 
-      const defs = await listDefinitions(this.serviceCtx.db, 'workflow_def', {
-        projectId: options?.projectId,
-        libraryId: options?.libraryId,
-        limit: options?.limit,
-      });
+      const conditions = [];
+      if (options?.projectId) {
+        conditions.push(eq(workflowDefs.projectId, options.projectId));
+      } else if (options?.libraryId) {
+        conditions.push(eq(workflowDefs.libraryId, options.libraryId));
+      }
 
-      return { workflowDefs: defs.map(toWorkflowDef) };
+      const results = await this.serviceCtx.db
+        .select()
+        .from(workflowDefs)
+        .where(conditions.length > 0 ? and(...conditions) : undefined)
+        .limit(options?.limit ?? 100)
+        .all();
+
+      return { workflowDefs: results };
     });
   }
 
   async delete(workflowDefId: string, version?: number): Promise<void> {
     return this.withLogging(
       'delete',
-      {
-        workflowDefId: workflowDefId,
-        version,
-        metadata: { workflowDefId: workflowDefId, version },
-      },
+      { metadata: { workflowDefId, version } },
       async () => {
-        const definition = await getDefinition(this.serviceCtx.db, workflowDefId, version);
+        const workflowDef = await getByIdAndVersion(
+          this.serviceCtx.db, workflowDefs, workflowDefId, version,
+        );
 
-        if (!definition || definition.kind !== 'workflow_def') {
+        if (!workflowDef) {
           throw new NotFoundError(`WorkflowDef not found: ${workflowDefId}`, 'workflow_def', workflowDefId);
         }
 
-        // Delete nodes and transitions first (they have FK to definitions)
-        await repo.deleteNodesAndTransitions(this.serviceCtx.db, workflowDefId, definition.version);
+        // Delete nodes and transitions first (they have FK to workflow_defs)
+        await repo.deleteNodesAndTransitions(this.serviceCtx.db, workflowDefId, workflowDef.version);
 
-        // Delete the definition
-        await deleteDefinition(this.serviceCtx.db, workflowDefId, version);
+        // Delete the workflow def
+        await deleteById(this.serviceCtx.db, workflowDefs, workflowDefId, version);
       },
     );
   }
 }
 
 export type { WorkflowDef };
-export type { Definition };

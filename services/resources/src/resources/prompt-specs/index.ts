@@ -1,36 +1,27 @@
 /** PromptSpecs RPC resource */
 
+import { ulid } from 'ulid';
+import { promptSpecs } from '~/schema';
 import { ConflictError, NotFoundError, extractDbError } from '~/shared/errors';
+import { computeContentHash } from '~/shared/fingerprint';
 import { Resource } from '~/shared/resource';
 import {
-  createDefinition,
-  deleteDefinition,
-  getDefinition,
-  listDefinitions,
-  type Definition,
-} from '~/shared/definitions';
-import type { PromptSpecContent } from '~/shared/content-schemas';
+  getByIdAndVersion,
+  getByReferenceAndHash,
+  getLatestByReference,
+  getMaxVersion,
+  deleteById,
+} from '~/shared/versioning';
 import type { PromptSpec, PromptSpecInput } from './types';
 
-/**
- * Maps a Definition to the legacy PromptSpec shape for API compatibility.
- */
-function toPromptSpec(def: Definition): PromptSpec {
-  const content = def.content as PromptSpecContent;
+function hashableContent(data: PromptSpecInput): Record<string, unknown> {
   return {
-    id: def.id,
-    version: def.version,
-    name: content.name,
-    description: def.description,
-    systemPrompt: content.systemPrompt ?? null,
-    template: content.template,
-    requires: content.requires,
-    produces: content.produces,
-    examples: content.examples ?? null,
-    tags: null, // Tags are in definition.description or could be added to content
-    contentHash: def.contentHash,
-    createdAt: def.createdAt,
-    updatedAt: def.updatedAt,
+    name: data.name,
+    systemPrompt: data.systemPrompt ?? null,
+    template: data.template,
+    requires: data.requires ?? {},
+    produces: data.produces ?? {},
+    examples: data.examples ?? null,
   };
 }
 
@@ -38,50 +29,76 @@ export class PromptSpecs extends Resource {
   async create(data: PromptSpecInput): Promise<{
     promptSpecId: string;
     promptSpec: PromptSpec;
-    /** True if an existing prompt spec was reused (autoversion matched content hash) */
     reused: boolean;
+    version: number;
+    latestVersion?: number;
   }> {
     this.serviceCtx.logger.info({
       eventType: 'prompt_spec.create.started',
       metadata: { name: data.name, autoversion: data.autoversion ?? false },
     });
 
-    // Prompt specs use name as reference (normalize name-based to reference-based)
     const reference = data.name;
+    const contentHash = await computeContentHash(hashableContent(data));
+
+    if (data.autoversion && !data.force) {
+      const existing = await getByReferenceAndHash(
+        this.serviceCtx.db, promptSpecs, reference, contentHash,
+      );
+
+      if (existing) {
+        const latestVersion = await getMaxVersion(this.serviceCtx.db, promptSpecs, reference);
+        return {
+          promptSpecId: existing.id,
+          promptSpec: existing,
+          reused: true,
+          version: existing.version,
+          latestVersion,
+        };
+      }
+    }
+
+    const maxVersion = await getMaxVersion(this.serviceCtx.db, promptSpecs, reference);
+    const version = (data.autoversion || data.force) ? maxVersion + 1 : 1;
+
+    let stableId: string;
+    if (maxVersion > 0) {
+      const latest = await getLatestByReference(this.serviceCtx.db, promptSpecs, reference);
+      stableId = latest?.id ?? ulid();
+    } else {
+      stableId = ulid();
+    }
+
+    const now = new Date().toISOString();
 
     try {
-      const result = await createDefinition(this.serviceCtx.db, 'prompt_spec', {
-        reference,
-        name: data.name,
-        description: data.description,
-        content: {
+      const [promptSpec] = await this.serviceCtx.db
+        .insert(promptSpecs)
+        .values({
+          id: stableId,
+          version,
+          reference,
           name: data.name,
-          systemPrompt: data.systemPrompt,
+          description: data.description ?? '',
+          contentHash,
+          systemPrompt: data.systemPrompt ?? null,
           template: data.template,
           requires: data.requires ?? {},
           produces: data.produces ?? {},
-          examples: data.examples,
-        },
-        autoversion: data.autoversion,
-        force: data.force,
-      });
-
-      if (result.reused) {
-        return {
-          promptSpecId: result.definition.id,
-          promptSpec: toPromptSpec(result.definition),
-          reused: true,
-        };
-      }
+          examples: data.examples ?? null,
+          createdAt: now,
+          updatedAt: now,
+        })
+        .returning();
 
       return {
-        promptSpecId: result.definition.id,
-        promptSpec: toPromptSpec(result.definition),
+        promptSpecId: promptSpec.id,
+        promptSpec,
         reused: false,
+        version: promptSpec.version,
       };
     } catch (error) {
       const dbError = extractDbError(error);
-
       if (dbError.constraint === 'unique') {
         throw new ConflictError(
           `PromptSpec with ${dbError.field} already exists`,
@@ -89,24 +106,18 @@ export class PromptSpecs extends Resource {
           'unique',
         );
       }
-
       throw error;
     }
   }
 
-  async get(
-    id: string,
-    version?: number,
-  ): Promise<{
-    promptSpec: PromptSpec;
-  }> {
+  async get(id: string, version?: number): Promise<{ promptSpec: PromptSpec }> {
     return this.withLogging(
       'get',
-      { promptSpecId: id, version, metadata: { promptSpecId: id, version } },
+      { metadata: { promptSpecId: id, version } },
       async () => {
-        const definition = await getDefinition(this.serviceCtx.db, id, version);
+        const promptSpec = await getByIdAndVersion(this.serviceCtx.db, promptSpecs, id, version);
 
-        if (!definition || definition.kind !== 'prompt_spec') {
+        if (!promptSpec) {
           throw new NotFoundError(
             `PromptSpec not found: ${id}${version !== undefined ? ` version ${version}` : ''}`,
             'promptSpec',
@@ -114,30 +125,38 @@ export class PromptSpecs extends Resource {
           );
         }
 
-        return { promptSpec: toPromptSpec(definition) };
+        return { promptSpec };
       },
     );
   }
 
-  async list(params?: { limit?: number }): Promise<{
-    promptSpecs: PromptSpec[];
-  }> {
+  async list(params?: { limit?: number; name?: string }): Promise<{ promptSpecs: PromptSpec[] }> {
     return this.withLogging('list', { metadata: params }, async () => {
-      const defs = await listDefinitions(this.serviceCtx.db, 'prompt_spec', {
-        limit: params?.limit,
-      });
-      return { promptSpecs: defs.map(toPromptSpec) };
+      if (params?.name) {
+        const promptSpec = await getLatestByReference(
+          this.serviceCtx.db, promptSpecs, params.name,
+        );
+        return { promptSpecs: promptSpec ? [promptSpec] : [] };
+      }
+
+      const results = await this.serviceCtx.db
+        .select()
+        .from(promptSpecs)
+        .limit(params?.limit ?? 100)
+        .all();
+
+      return { promptSpecs: results };
     });
   }
 
   async delete(id: string, version?: number): Promise<{ success: boolean }> {
     return this.withLogging(
       'delete',
-      { promptSpecId: id, version, metadata: { promptSpecId: id, version } },
+      { metadata: { promptSpecId: id, version } },
       async () => {
-        const existing = await getDefinition(this.serviceCtx.db, id, version);
+        const existing = await getByIdAndVersion(this.serviceCtx.db, promptSpecs, id, version);
 
-        if (!existing || existing.kind !== 'prompt_spec') {
+        if (!existing) {
           throw new NotFoundError(
             `PromptSpec not found: ${id}${version !== undefined ? ` version ${version}` : ''}`,
             'promptSpec',
@@ -145,7 +164,7 @@ export class PromptSpecs extends Resource {
           );
         }
 
-        await deleteDefinition(this.serviceCtx.db, id, version);
+        await deleteById(this.serviceCtx.db, promptSpecs, id, version);
         return { success: true };
       },
     );

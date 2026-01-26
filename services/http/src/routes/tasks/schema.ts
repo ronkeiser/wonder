@@ -96,7 +96,7 @@ export const CreateTaskSchema = z
       .string()
       .optional()
       .openapi({ example: 'Write file with read-back verification' }),
-    version: z.number().int().positive().default(1).openapi({ example: 1 }),
+    version: z.number().int().positive().optional().default(1).openapi({ example: 1 }),
     projectId: z.string().optional().openapi({ example: '01ARZ3NDEKTSV4RRFFQ69G5FAV' }),
     libraryId: z.string().optional(),
     tags: z.array(z.string()).optional(),

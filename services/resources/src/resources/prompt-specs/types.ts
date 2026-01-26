@@ -1,28 +1,9 @@
-/** Type definitions for prompt specs */
+import type { promptSpecs } from '~/schema';
 
-/**
- * PromptSpec entity - the API-facing shape.
- * Internally stored in the unified `definitions` table.
- */
-export type PromptSpec = {
-  id: string;
-  version: number;
-  name: string;
-  description: string;
-  systemPrompt: string | null;
-  template: string;
-  requires: object;
-  produces: object;
-  examples: object | null;
-  tags: string[] | null;
-  contentHash: string;
-  createdAt: string;
-  updatedAt: string;
-};
+/** PromptSpec entity — inferred from database schema. */
+export type PromptSpec = typeof promptSpecs.$inferSelect;
 
-/**
- * API input for creating a prompt spec.
- */
+/** API input for creating a prompt spec. */
 export type PromptSpecInput = {
   name: string;
   description?: string;
@@ -31,7 +12,6 @@ export type PromptSpecInput = {
   requires?: Record<string, unknown>;
   produces?: Record<string, unknown>;
   examples?: Record<string, unknown> | null;
-  tags?: string[] | null;
   autoversion?: boolean;
   force?: boolean;
 };

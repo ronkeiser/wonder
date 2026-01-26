@@ -137,7 +137,7 @@ export async function dispatchContextAssembly(
 
   // Create workflow run in D1 directly from workflow def
   const workflowRunsResource = ctx.resources.workflowRuns();
-  const { workflowRunId } = await workflowRunsResource.createFromWorkflowDef(
+  const { workflowRunId } = await workflowRunsResource.createFromDefinition(
     contextAssemblyWorkflowId,
     {
       ...input,

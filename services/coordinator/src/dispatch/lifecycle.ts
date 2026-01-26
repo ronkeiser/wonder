@@ -31,7 +31,7 @@ import { dispatchToken } from './task';
 export async function startWorkflow(ctx: DispatchContext): Promise<void> {
   // Get definitions for token creation and input
   const workflowRun = ctx.defs.getWorkflowRun();
-  const workflowDefContent = ctx.defs.getWorkflowDefContent();
+  const workflowDef = ctx.defs.getWorkflowDef();
 
   // Extract input from workflow run context
   const runContext = workflowRun.context as {
@@ -47,7 +47,7 @@ export async function startWorkflow(ctx: DispatchContext): Promise<void> {
   // Plan initial token creation (pure function)
   const startResult = decideWorkflowStart({
     workflowRunId: workflowRun.id,
-    initialNodeId: workflowDefContent.initialNodeId!,
+    initialNodeId: workflowDef.initialNodeId!,
   });
 
   // Emit trace events from planning

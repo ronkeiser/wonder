@@ -5,7 +5,7 @@ export const CreateArtifactTypeSchema = z
     name: z.string().min(1).max(255).openapi({ example: 'document' }),
     description: z.string().default('').openapi({ example: 'A text document' }),
     schema: z.record(z.string(), z.unknown()).openapi({ example: { type: 'object' } }),
-    version: z.number().int().positive().default(1).openapi({ example: 1 }),
+    version: z.number().int().positive().optional().default(1).openapi({ example: 1 }),
     autoversion: z
       .boolean()
       .optional()

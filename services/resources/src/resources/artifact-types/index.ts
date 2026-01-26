@@ -1,31 +1,23 @@
 /** ArtifactTypes RPC resource */
 
+import { ulid } from 'ulid';
+import { artifactTypes } from '~/schema';
 import { ConflictError, NotFoundError, extractDbError } from '~/shared/errors';
+import { computeContentHash } from '~/shared/fingerprint';
 import { Resource } from '~/shared/resource';
 import {
-  createDefinition,
-  deleteDefinition,
-  getDefinition,
-  listDefinitions,
-  type Definition,
-} from '~/shared/definitions';
-import type { ArtifactTypeContent } from '~/shared/content-schemas';
+  getByIdAndVersion,
+  getByReferenceAndHash,
+  getLatestByReference,
+  getMaxVersion,
+  deleteById,
+} from '~/shared/versioning';
 import type { ArtifactType, ArtifactTypeInput } from './types';
 
-/**
- * Maps a Definition to the legacy ArtifactType shape for API compatibility.
- */
-function toArtifactType(def: Definition): ArtifactType {
-  const content = def.content as ArtifactTypeContent;
+function hashableContent(data: ArtifactTypeInput): Record<string, unknown> {
   return {
-    id: def.id,
-    version: def.version,
-    name: content.name,
-    description: def.description,
-    schema: content.schema,
-    contentHash: def.contentHash,
-    createdAt: def.createdAt,
-    updatedAt: def.updatedAt,
+    name: data.name,
+    schema: data.schema,
   };
 }
 
@@ -33,46 +25,72 @@ export class ArtifactTypes extends Resource {
   async create(data: ArtifactTypeInput): Promise<{
     artifactTypeId: string;
     artifactType: ArtifactType;
-    /** True if an existing artifact type was reused (autoversion matched content hash) */
     reused: boolean;
+    version: number;
+    latestVersion?: number;
   }> {
     this.serviceCtx.logger.info({
       eventType: 'artifact_type.create.started',
       metadata: { name: data.name, autoversion: data.autoversion ?? false },
     });
 
-    // Artifact types use name as reference (normalize name-based to reference-based)
     const reference = data.name;
+    const contentHash = await computeContentHash(hashableContent(data));
 
-    try {
-      const result = await createDefinition(this.serviceCtx.db, 'artifact_type', {
-        reference,
-        name: data.name,
-        description: data.description,
-        content: {
-          name: data.name,
-          schema: data.schema,
-        },
-        autoversion: data.autoversion,
-        force: data.force,
-      });
+    if (data.autoversion && !data.force) {
+      const existing = await getByReferenceAndHash(
+        this.serviceCtx.db, artifactTypes, reference, contentHash,
+      );
 
-      if (result.reused) {
+      if (existing) {
+        const latestVersion = await getMaxVersion(this.serviceCtx.db, artifactTypes, reference);
         return {
-          artifactTypeId: result.definition.id,
-          artifactType: toArtifactType(result.definition),
+          artifactTypeId: existing.id,
+          artifactType: existing,
           reused: true,
+          version: existing.version,
+          latestVersion,
         };
       }
+    }
+
+    const maxVersion = await getMaxVersion(this.serviceCtx.db, artifactTypes, reference);
+    const version = (data.autoversion || data.force) ? maxVersion + 1 : 1;
+
+    let stableId: string;
+    if (maxVersion > 0) {
+      const latest = await getLatestByReference(this.serviceCtx.db, artifactTypes, reference);
+      stableId = latest?.id ?? ulid();
+    } else {
+      stableId = ulid();
+    }
+
+    const now = new Date().toISOString();
+
+    try {
+      const [artifactType] = await this.serviceCtx.db
+        .insert(artifactTypes)
+        .values({
+          id: stableId,
+          version,
+          reference,
+          name: data.name,
+          description: data.description ?? '',
+          contentHash,
+          schema: data.schema,
+          createdAt: now,
+          updatedAt: now,
+        })
+        .returning();
 
       return {
-        artifactTypeId: result.definition.id,
-        artifactType: toArtifactType(result.definition),
+        artifactTypeId: artifactType.id,
+        artifactType,
         reused: false,
+        version: artifactType.version,
       };
     } catch (error) {
       const dbError = extractDbError(error);
-
       if (dbError.constraint === 'unique') {
         throw new ConflictError(
           `ArtifactType with ${dbError.field} already exists`,
@@ -80,40 +98,42 @@ export class ArtifactTypes extends Resource {
           'unique',
         );
       }
-
       throw error;
     }
   }
 
-  async get(
-    id: string,
-    version?: number,
-  ): Promise<{
-    artifactType: ArtifactType;
-  }> {
+  async get(id: string, version?: number): Promise<{ artifactType: ArtifactType }> {
     return this.withLogging('get', { metadata: { artifactTypeId: id, version } }, async () => {
-      const definition = await getDefinition(this.serviceCtx.db, id, version);
+      const artifactType = await getByIdAndVersion(this.serviceCtx.db, artifactTypes, id, version);
 
-      if (!definition || definition.kind !== 'artifact_type') {
+      if (!artifactType) {
         throw new NotFoundError(
-          `ArtifactType not found: ${id}${version ? ` version ${version}` : ''}`,
+          `ArtifactType not found: ${id}${version !== undefined ? ` version ${version}` : ''}`,
           'artifactType',
           id,
         );
       }
 
-      return { artifactType: toArtifactType(definition) };
+      return { artifactType };
     });
   }
 
-  async list(params?: { limit?: number }): Promise<{
-    artifactTypes: ArtifactType[];
-  }> {
+  async list(params?: { limit?: number; name?: string }): Promise<{ artifactTypes: ArtifactType[] }> {
     return this.withLogging('list', { metadata: params }, async () => {
-      const defs = await listDefinitions(this.serviceCtx.db, 'artifact_type', {
-        limit: params?.limit,
-      });
-      return { artifactTypes: defs.map(toArtifactType) };
+      if (params?.name) {
+        const artifactType = await getLatestByReference(
+          this.serviceCtx.db, artifactTypes, params.name,
+        );
+        return { artifactTypes: artifactType ? [artifactType] : [] };
+      }
+
+      const results = await this.serviceCtx.db
+        .select()
+        .from(artifactTypes)
+        .limit(params?.limit ?? 100)
+        .all();
+
+      return { artifactTypes: results };
     });
   }
 
@@ -122,17 +142,17 @@ export class ArtifactTypes extends Resource {
       'delete',
       { metadata: { artifactTypeId: id, version } },
       async () => {
-        const existing = await getDefinition(this.serviceCtx.db, id, version);
+        const existing = await getByIdAndVersion(this.serviceCtx.db, artifactTypes, id, version);
 
-        if (!existing || existing.kind !== 'artifact_type') {
+        if (!existing) {
           throw new NotFoundError(
-            `ArtifactType not found: ${id}${version ? ` version ${version}` : ''}`,
+            `ArtifactType not found: ${id}${version !== undefined ? ` version ${version}` : ''}`,
             'artifactType',
             id,
           );
         }
 
-        await deleteDefinition(this.serviceCtx.db, id, version);
+        await deleteById(this.serviceCtx.db, artifactTypes, id, version);
         return { success: true };
       },
     );

@@ -308,7 +308,7 @@ async function dispatchWorkflow(
 
   // Create workflow run in D1 from workflow def
   const workflowRunsResource = ctx.resources.workflowRuns();
-  const { workflowRunId } = await workflowRunsResource.createFromWorkflowDef(
+  const { workflowRunId } = await workflowRunsResource.createFromDefinition(
     workflowDefId,
     {
       ...(input as Record<string, unknown>),
@@ -501,7 +501,7 @@ async function dispatchMemoryExtraction(
 
   // Create workflow run in D1 directly from workflow def
   const workflowRunsResource = ctx.resources.workflowRuns();
-  const { workflowRunId } = await workflowRunsResource.createFromWorkflowDef(
+  const { workflowRunId } = await workflowRunsResource.createFromDefinition(
     workflowDefId,
     {
       ...input,
